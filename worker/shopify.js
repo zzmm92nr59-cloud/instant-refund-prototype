@@ -27,6 +27,7 @@ export async function syncShopifyCatalogue(env) {
   await db.prepare("INSERT OR IGNORE INTO retailer_connections(id,provider,merchant_external_id) VALUES (?,?,?)")
     .bind(connection, "shopify", shop).run();
   const gql = `query RelayProducts($cursor: String) {
+    shop { currencyCode }
     products(first: 30, after: $cursor) {
       pageInfo { hasNextPage endCursor }
       nodes { id title description
@@ -55,7 +56,7 @@ export async function syncShopifyCatalogue(env) {
           title=excluded.title,sku=excluded.sku,price_minor=excluded.price_minor,
           currency=excluded.currency,updated_at=CURRENT_TIMESTAMP`)
           .bind(vid, id, variant.id, variant.title, variant.sku || null,
-            Number.isSafeInteger(price) ? price : null, "GBP").run();
+            Number.isSafeInteger(price) ? price : null, data.shop?.currencyCode || "GBP").run();
         variants++;
         const qty = Number(variant.inventoryQuantity);
         await db.prepare(`INSERT INTO retailer_inventory_snapshots
@@ -71,5 +72,5 @@ export async function syncShopifyCatalogue(env) {
     cursor = data.products.pageInfo.endCursor;
   } while (more && cursor && pages < 10);
   return { configured: true, shop, products, variants, inventorySnapshots,
-    morePages: more, inventoryScope: "shop_aggregate", currencyAssumption: "GBP" };
+    morePages: more, inventoryScope: "shop_aggregate" };
 }
