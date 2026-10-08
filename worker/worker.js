@@ -4791,11 +4791,11 @@ body {
     margin-top:3px
   "
 >
-  Jordans shoes
+  Relay Demo purchase
 </div>
 
 <div class="price">
-  £159.99
+  Select a product below
 </div>
 
 </div>
@@ -4809,6 +4809,11 @@ body {
   No real money is used.
 </p>
 
+<label for="relay-product" style="display:block;margin-top:18px;font-weight:750">Choose a Square Sandbox product and size</label>
+<select id="relay-product" style="width:100%;padding:12px;margin-top:8px;border:1px solid #d0d5dd;border-radius:10px">
+<option value="">Original Jordans test</option>
+</select>
+<p class="muted">Choose a Relay Demo variation for the next test purchase.</p>
 <div id="card-container"></div>
 
 <button
@@ -5056,6 +5061,7 @@ payButton.onclick =
               JSON.stringify({
                 sourceId:
                   tokenResult.token,
+                sku: document.getElementById("relay-product")?.value || "",
               }),
           }
         );
@@ -5095,7 +5101,7 @@ payButton.onclick =
 
         line(
           "✓",
-          "Jordans order " +
+          "Square order " +
           data.orderId.slice(
             0,
             10
@@ -5116,7 +5122,7 @@ payButton.onclick =
 
         line(
           "✓",
-          "Plaid NORTH & CO £159.99 transaction created",
+          "Matching Plaid Sandbox transaction created",
           "ok"
         ) +
 
@@ -5182,6 +5188,15 @@ payButton.onclick =
   };
 
 
+fetch("/relay/live-test/products").then(r=>r.json()).then(data=>{
+ const select=document.getElementById("relay-product");
+ for(const p of data.products||[]){
+  const option=document.createElement("option");
+  option.value=p.sku;
+  option.textContent=p.product+" / "+p.variation+" (GBP "+(Number(p.priceMinor||0)/100).toFixed(2)+")";
+  select.appendChild(option);
+ }
+}).catch(()=>{});
 boot();
 
 </script>
