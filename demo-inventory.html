@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay Demo Inventory</title><style>
+:root{font-family:system-ui,-apple-system,sans-serif;color:#172032;background:#f5f7fa}
+body{max-width:1100px;margin:0 auto;padding:32px 20px}
+h1{margin-bottom:4px}p{color:#556275}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.badge{background:#fff0ca;color:#795500;border-radius:99px;padding:8px 12px;font-size:12px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:20px}
+.card{background:white;border:1px solid #e1e6ec;border-radius:16px;padding:20px;box-shadow:0 4px 15px #13233a0b}
+.shop{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#65758a;font-weight:700}
+.price{font-weight:800;font-size:22px}.variant{display:flex;justify-content:space-between;border-top:1px solid #edf0f3;padding:10px 0;font-size:14px}
+.empty{color:#ad3641;font-weight:600}.ok{color:#166d46;font-weight:600}
+a{color:#165ed1}button{border:0;border-radius:10px;background:#132a4a;color:white;padding:10px 14px;cursor:pointer}
+</style></head><body>
+<header><div><h1>Relay multi-store inventory</h1><p>Browse example products, sizes and stock across fictional shops.</p></div><span class="badge">SIMULATED INVENTORY — NOT REAL STOCK</span></header>
+<button id="refresh">Refresh inventory</button><p id="status">Loading fictional catalogue…</p>
+<main id="cards" class="grid"></main>
+<p>This demonstration does not reserve products, place orders or offer live retailer stock.</p>
+<script>
+const endpoint='https://relay-square-api2.9pts72cy5j.workers.dev/relay/demo/inventory';
+const cards=document.querySelector('#cards'),status=document.querySelector('#status');
+const money=(minor,currency)=>new Intl.NumberFormat('en-GB',{style:'currency',currency:currency||'GBP'}).format(minor/100);
+const text=(tag,content,cls)=>{const el=document.createElement(tag);el.textContent=content;if(cls)el.className=cls;return el};
+async function load(){
+ status.textContent='Loading…';cards.replaceChildren();
+ try{
+  const res=await fetch(endpoint,{cache:'no-store'}),data=await res.json();
+  if(!res.ok||!data.success)throw Error(data.error||'Inventory unavailable');
+  const groups=new Map();
+  for(const row of data.rows||[]){const key=row.storeId+'|'+row.productId;
+   if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row)}
+  status.textContent=groups.size+' demo products across '+new Set((data.rows||[]).map(r=>r.storeId)).size+' fictional stores';
+  for(const rows of groups.values()){
+   const first=rows[0],card=text('article','','card');
+   card.append(text('div',first.storeId.replaceAll('-',' '),'shop'),text('h2',first.product),
+    text('div',money(first.priceMinor,first.currency),'price'));
+   for(const row of rows){const line=text('div','','variant');
+    line.append(text('span',row.variant),text('span',row.quantity>0?row.quantity+' in stock':'Out of stock',row.quantity>0?'ok':'empty'));card.append(line)}
+   cards.append(card);
+  }
+ }catch(e){status.textContent='Inventory is not ready: '+e.message}
+}
+document.querySelector('#refresh').addEventListener('click',load);load();
+</script></body></html>
