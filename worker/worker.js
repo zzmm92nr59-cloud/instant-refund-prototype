@@ -52,6 +52,17 @@ export default {
         {headers:{"Cache-Control":"no-store",...corsHeaders}});
     }
 
+    // Public demo-only product selector; never exposes production merchant data.
+    if (url.pathname === "/relay/live-test/products" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({products:[]},{headers:corsHeaders});
+      const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
+        v.sku,v.price_minor AS priceMinor,v.currency
+        FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id=i.id
+        WHERE i.provider='square_sandbox' AND v.sku LIKE 'DEMO-%'
+        ORDER BY i.title,v.title LIMIT 100`).all();
+      return Response.json({products:result.results||[]},{headers:{"Cache-Control":"no-store",...corsHeaders}});
+    }
+
     // Sandbox-only inventory verification. No consumer or production retailer data.
     if (url.pathname === "/relay/ledger/sandbox-stock" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({error:"Ledger unavailable"},{status:503});
@@ -5278,6 +5289,27 @@ boot();
         }
 
 
+        // Optional exact Sandbox demo variation. The server resolves the SKU;
+        // never accept an arbitrary Square catalogue ID from the browser.
+        let checkoutVariationId = RELAY_JORDANS_VARIATION_ID;
+        let checkoutLocationId = RELAY_SQUARE_LOCATION_ID;
+        const selectedSku = String(body?.sku || "").trim();
+        if (selectedSku) {
+          if (!/^DEMO-[A-Z0-9-]{1,70}$/.test(selectedSku) || !env.RELAY_DB)
+            throw Error("Invalid demo product SKU");
+          const variant = await env.RELAY_DB.prepare(`SELECT v.external_variant_id AS id
+            FROM retailer_catalog_variants v
+            JOIN retailer_catalog_items i ON i.id=v.item_id
+            WHERE i.provider='square_sandbox' AND v.sku=? LIMIT 1`)
+            .bind(selectedSku).first();
+          if (!variant?.id) throw Error("Demo variation not found in Square catalogue snapshot");
+          checkoutVariationId = variant.id;
+          const locationData = await squareJson("/v2/locations",{method:"GET"});
+          const location = (locationData.locations||[]).find(l=>l.status==="ACTIVE");
+          if (!location) throw Error("No active Square Sandbox location");
+          checkoutLocationId = location.id;
+        }
+
         // ========================================================
         // CREATE EXACT JORDANS ORDER
         // ========================================================
@@ -5299,7 +5331,7 @@ boot();
                   order: {
 
                     location_id:
-                      RELAY_SQUARE_LOCATION_ID,
+                      checkoutLocationId,
 
                     reference_id:
                       "relay-live-" +
@@ -5317,7 +5349,7 @@ boot();
                           "1",
 
                         catalog_object_id:
-                          RELAY_JORDANS_VARIATION_ID,
+                          checkoutVariationId,
                       },
                     ],
                   },
@@ -5337,7 +5369,7 @@ boot();
         ) {
 
           throw new Error(
-            "Square created no usable Jordans order."
+            "Square created no usable demo order."
           );
         }
 
@@ -5381,7 +5413,7 @@ boot();
                     order.id,
 
                   location_id:
-                    RELAY_SQUARE_LOCATION_ID,
+                    checkoutLocationId,
 
                   autocomplete:
                     true,
