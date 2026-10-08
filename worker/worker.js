@@ -5069,32 +5069,33 @@ boot();
 
       try {
 
-        const accessToken =
-          getPlaidAccessTokenFromCookie();
+        // This controlled Sandbox test creates a dedicated Plaid item
+        // server-side. A browser cookie is not required for this route.
+        // Both Plaid calls must succeed before charging the Square test card.
+        const plaidPublicToken = await plaidPost(
+          "/sandbox/public_token/create",
+          {
+            institution_id: "ins_109508",
+            initial_products: ["transactions"],
+          }
+        );
 
+        if (!plaidPublicToken?.public_token) {
+          throw new Error(
+            "Plaid Sandbox did not issue a public token. No Square payment was attempted."
+          );
+        }
+
+        const plaidExchange = await plaidPost(
+          "/item/public_token/exchange",
+          { public_token: plaidPublicToken.public_token }
+        );
+
+        const accessToken = plaidExchange?.access_token;
 
         if (!accessToken) {
-
-          return Response.json(
-            {
-
-              success:
-                false,
-
-              stage:
-                "plaid_connection",
-
-              message:
-                "Your Plaid Sandbox connection has expired. Reconnect it, then return to the live test.",
-
-              reconnect:
-                "/plaid/connect?user=relay_user_001",
-            },
-            {
-              status: 401,
-              headers:
-                corsHeaders,
-            }
+          throw new Error(
+            "Plaid Sandbox token exchange failed. No Square payment was attempted."
           );
         }
 
