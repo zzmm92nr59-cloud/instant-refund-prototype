@@ -32,6 +32,21 @@ export default {
       return receiveSquareWebhook(request, env, ctx);
     }
 
+    // Sandbox-only inventory verification. No consumer or production retailer data.
+    if (url.pathname === "/relay/ledger/sandbox-stock" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({error:"Ledger unavailable"},{status:503});
+      const sku = url.searchParams.get("sku");
+      if (!sku || !/^DEMO-[A-Z0-9-]{1,70}$/.test(sku))
+        return Response.json({error:"A DEMO- SKU is required"},{status:400});
+      const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product, v.title AS variation,
+        v.sku, s.quantity, s.inventory_state AS state, s.observed_at AS observedAt
+        FROM retailer_catalog_variants v
+        JOIN retailer_catalog_items i ON i.id=v.item_id
+        LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
+        WHERE i.provider='square_sandbox' AND v.sku=?`).bind(sku).all();
+      return Response.json({success:true,items:rows.results||[]},{headers:{"Cache-Control":"no-store",...corsHeaders}});
+    }
+
     // Relay purchase ledger readiness. No personal purchase data is exposed.
     // Binding RELAY_DB is optional until the D1 database is provisioned.
     if (url.pathname === "/relay/ledger/status" && request.method === "GET") {
