@@ -1,4 +1,5 @@
 const base="https://sandbox.plaid.com";
+if(!process.env.PLAID_CLIENT_ID||!process.env.PLAID_SECRET)throw Error("Missing GitHub Actions secrets PLAID_CLIENT_ID and/or PLAID_SECRET. Configure them in Settings > Secrets and variables > Actions. No API call attempted.");
 const headers={"Content-Type":"application/json","PLAID-CLIENT-ID":process.env.PLAID_CLIENT_ID,"PLAID-SECRET":process.env.PLAID_SECRET};
 async function plaid(path,body){const r=await fetch(base+path,{method:"POST",headers,body:JSON.stringify(body)});const j=await r.json();if(!r.ok)throw Error(path+" "+JSON.stringify(j));return j}
 const people=["Ava","Ben","Cara","Dylan"],out=[];
