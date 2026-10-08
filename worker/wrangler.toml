@@ -8,3 +8,6 @@ binding = "RELAY_DB"
 database_name = "relay-purchase-ledger"
 database_id = "6d3a035f-b869-4e1f-af61-bb34f2f5c51c"
 migrations_dir = "migrations"
+
+[triggers]
+crons = ["0 * * * *"]
