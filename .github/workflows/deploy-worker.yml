@@ -17,6 +17,13 @@ jobs:
         run: |
           test -f worker/worker.js || { echo "worker/worker.js is missing"; exit 1; }
           node --check worker/worker.js
+      - name: Apply catalogue and inventory schema
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: d1 execute relay-purchase-ledger --remote --file=migrations/0002_retailer_catalogue_inventory.sql
       - name: Deploy existing Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
         with:
