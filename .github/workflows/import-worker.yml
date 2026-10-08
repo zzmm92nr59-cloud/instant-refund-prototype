@@ -29,16 +29,77 @@ jobs:
 
           content_type=$(grep -i '^content-type:' /tmp/relay-worker-headers | tail -1 | tr -d '\r' | cut -d: -f2- | xargs)
 
+
           case "$content_type" in
             application/javascript*|text/javascript*|application/ecmascript*|text/plain*)
               cp /tmp/relay-worker-response worker/worker.js
               ;;
+            multipart/form-data*)
+              python3 - <<'PY'
+          from email.parser import BytesParser
+          from email.policy import default
+          from pathlib import Path
+          import re
+
+          headers = Path("/tmp/relay-worker-headers").read_text()
+          matches = re.findall(
+              r"^content-type:\s*(.+)$",
+              headers,
+              flags=re.IGNORECASE | re.MULTILINE,
+          )
+          if not matches:
+              raise SystemExit("Cloudflare response has no Content-Type")
+
+          content_type = matches[-1].strip()
+          body = Path("/tmp/relay-worker-response").read_bytes()
+
+          message = BytesParser(policy=default).parsebytes(
+              ("Content-Type: " + content_type + "\r\n"
+               "MIME-Version: 1.0\r\n\r\n").encode() + body
+          )
+
+          if not message.is_multipart():
+              raise SystemExit("Expected multipart Worker bundle")
+
+          metadata = None
+          scripts = []
+
+          for part in message.iter_parts():
+              name = part.get_param("name", header="content-disposition")
+              data = part.get_payload(decode=True)
+
+              if name == "metadata":
+                  import json
+                  metadata = json.loads(data)
+              elif name and data:
+                  scripts.append((name, data))
+
+          if not metadata:
+              raise SystemExit("Worker metadata missing")
+
+          main = metadata.get("main_module") or metadata.get("body_part")
+          matches = [data for name, data in scripts if name == main]
+
+          if not main or len(matches) != 1:
+              raise SystemExit(
+                  "Could not identify a unique Worker entrypoint"
+              )
+
+          if len(scripts) != 1:
+              raise SystemExit(
+                  "Multi-module Worker detected; refusing to discard modules"
+              )
+
+          Path("worker/worker.js").write_bytes(matches[0])
+          print("Extracted Worker entrypoint:", main)
+          PY
+              ;;
             *)
               echo "Unexpected response type: $content_type"
-              echo "Import stopped. The Worker may be bundled."
               exit 1
               ;;
           esac
+
 
           test -s worker/worker.js
           node --check worker/worker.js
