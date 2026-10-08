@@ -4811,7 +4811,7 @@ body {
 
 <label for="relay-product" style="display:block;margin-top:18px;font-weight:750">Choose a Square Sandbox product and size</label>
 <select id="relay-product" style="width:100%;padding:12px;margin-top:8px;border:1px solid #d0d5dd;border-radius:10px">
-<option value="">Original Jordans test</option>
+<option value="">Loading Relay Demo catalogue…</option>
 </select>
 <p class="muted">Choose a Relay Demo variation for the next test purchase.</p>
 <div id="card-container"></div>
@@ -4821,7 +4821,7 @@ body {
   id="pay"
   disabled
 >
-  Buy Jordans — £159.99
+  Buy selected Sandbox product
 </button>
 
 <div
@@ -4870,6 +4870,8 @@ const payButton =
     "pay"
   );
 
+document.getElementById("relay-product").addEventListener("change",e=>{payButton.disabled=!e.target.value;const opt=e.target.selectedOptions[0];payButton.textContent=opt?.value?"Buy "+opt.textContent:"Select a product";});
+
 let card;
 
 
@@ -4917,7 +4919,7 @@ async function boot() {
     );
 
     payButton.disabled =
-      false;
+      !document.getElementById("relay-product")?.selectedOptions[0]?.value;
 
     statusBox.innerHTML =
       "Ready. Use a Square Sandbox test card — never a real card.";
@@ -4953,7 +4955,7 @@ payButton.onclick =
       const verificationDetails = {
 
         amount:
-          "159.99",
+          document.getElementById("relay-product")?.selectedOptions[0]?.dataset.amount || "159.99",
 
         currencyCode:
           "GBP",
@@ -5190,13 +5192,17 @@ payButton.onclick =
 
 fetch("/relay/live-test/products").then(r=>r.json()).then(data=>{
  const select=document.getElementById("relay-product");
+ select.innerHTML="";
  for(const p of data.products||[]){
   const option=document.createElement("option");
   option.value=p.sku;
+  option.dataset.amount=(Number(p.priceMinor||0)/100).toFixed(2);
   option.textContent=p.product+" / "+p.variation+" (GBP "+(Number(p.priceMinor||0)/100).toFixed(2)+")";
   select.appendChild(option);
  }
-}).catch(()=>{});
+ select.dispatchEvent(new Event("change"));
+ if(!select.options.length){select.innerHTML="<option value=\"\">Catalogue unavailable — do not pay</option>";payButton.disabled=true;}
+}).catch(()=>{document.getElementById("relay-product").innerHTML="<option>Catalogue unavailable — do not pay</option>";payButton.disabled=true;});
 boot();
 
 </script>
