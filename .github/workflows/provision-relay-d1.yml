@@ -1,0 +1,75 @@
+name: Provision Relay D1
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create or find Relay D1 database
+        id: d1
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const token=process.env.CF_API_TOKEN, account=process.env.CF_ACCOUNT_ID;
+          if(!token||!account)throw Error('Cloudflare GitHub secrets missing');
+          const root=`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database`;
+          async function api(url,options={}){
+            const res=await fetch(url,{...options,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',...options.headers}});
+            const data=await res.json();
+            if(!res.ok||!data.success)throw Error(`Cloudflare D1 API HTTP ${res.status}: ${JSON.stringify(data.errors||[])}`);
+            return data;
+          }
+          (async()=>{
+            let db=null, page=1;
+            while(page<=20){
+              const data=await api(`${root}?per_page=100&page=${page}`);
+              db=(data.result||[]).find(x=>x.name==='relay-purchase-ledger');
+              if(db||!data.result?.length||data.result.length<100)break;
+              page++;
+            }
+            if(!db){
+              const created=await api(root,{method:'POST',body:JSON.stringify({name:'relay-purchase-ledger'})});
+              db=created.result;
+            }
+            const id=db.uuid||db.id;
+            if(!/^[0-9a-f-]{36}$/i.test(id||''))throw Error('Cloudflare did not return a valid D1 database ID');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,`database_id=${id}\n`);
+            console.log('Relay D1 database provisioned or found:',db.name);
+          })().catch(e=>{console.error(e.message);process.exitCode=1});
+          NODE
+      - name: Configure D1 binding in Wrangler
+        env:
+          DATABASE_ID: ${{ steps.d1.outputs.database_id }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_ID"
+          if grep -q '^\[\[d1_databases\]\]' worker/wrangler.toml; then
+            echo "Existing D1 binding detected. Refusing to overwrite it."
+            exit 1
+          fi
+          printf '\n[[d1_databases]]\nbinding = "RELAY_DB"\ndatabase_name = "relay-purchase-ledger"\ndatabase_id = "%s"\nmigrations_dir = "migrations"\n' "$DATABASE_ID" >> worker/wrangler.toml
+      - name: Apply schema migration
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: d1 execute relay-purchase-ledger --remote --file=migrations/0001_relay_purchase_ledger.sql
+      - name: Commit D1 binding
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add worker/wrangler.toml
+          git commit -m "Bind Relay D1 purchase ledger" || exit 0
+          git push
