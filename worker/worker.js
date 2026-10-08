@@ -56,10 +56,15 @@ export default {
     if (url.pathname === "/relay/live-test/products" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({products:[]},{headers:corsHeaders});
       const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
-        v.sku,v.price_minor AS priceMinor,v.currency
+        v.sku,v.price_minor AS priceMinor,v.currency,i.provider AS provider,
+        i.external_item_id AS externalItemId,
+        MAX(s.quantity) AS quantity, MAX(s.observed_at) AS observedAt
         FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id=i.id
-        WHERE i.provider='square_sandbox' AND v.sku LIKE 'DEMO-%'
-        ORDER BY i.title,v.title LIMIT 100`).all();
+        LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
+        WHERE i.provider IN ('square_sandbox','relay_demo')
+          AND v.price_minor IS NOT NULL AND v.sku IS NOT NULL
+        GROUP BY i.id,v.id
+        ORDER BY i.provider DESC,i.title,v.title LIMIT 250`).all();
       return Response.json({products:result.results||[]},{headers:{"Cache-Control":"no-store",...corsHeaders}});
     }
 
