@@ -1,9 +1,11 @@
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
+import { shopifyConfigured, syncShopifyCatalogue } from "./shopify.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(importHistoricalSquareOrders(env));
     ctx.waitUntil(syncSquareCatalogue(env));
+    if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogue(env));
   },
   async fetch(request, env) {
     const corsHeaders = {
@@ -67,6 +69,13 @@ export default {
       } catch {
         return Response.json({ success: false, error: "catalogue_schema_or_sync_unavailable" }, { status: 503, headers: corsHeaders });
       }
+    }
+
+    if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
+      return Response.json({ success: true, configured: shopifyConfigured(env),
+        mode: "read_only_catalogue", historicalOrdersConnected: false,
+        note: "Requires retailer-authorised Shopify Admin API credentials; demo stores are simulated."
+      }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
     }
 
     // Public fictional catalogue only. No private Square/Shopify retailer data.
