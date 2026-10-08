@@ -1,0 +1,20 @@
+name: Sync Square Catalogue to Relay
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Import Square Sandbox catalogue and stock into Relay D1
+        env:
+          SQUARE_ACCESS_TOKEN: ${{ secrets.SQUARE_ACCESS_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RELAY_D1_DATABASE_ID: 6d3a035f-b869-4e1f-af61-bb34f2f5c51c
+        run: node scripts/sync-square-catalogue-to-d1.mjs
