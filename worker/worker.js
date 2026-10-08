@@ -1,4 +1,8 @@
+import { importHistoricalSquareOrders } from "./square-history.js";
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(importHistoricalSquareOrders(env));
+  },
   async fetch(request, env) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -40,6 +44,26 @@ export default {
         return Response.json({ success: false, ledger: "unavailable" }, {
           status: 503, headers: { ...corsHeaders, "Cache-Control": "no-store" }
         });
+      }
+    }
+
+    // Aggregated importer status only; never expose retailer orders publicly.
+    if (url.pathname === "/relay/ledger/import-status" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({ success: false, error: "not_configured" }, { status: 503, headers: corsHeaders });
+      try {
+        const row = await env.RELAY_DB.prepare(
+          "SELECT COUNT(*) AS order_count FROM retailer_orders WHERE connection_id = ?"
+        ).bind("square:sandbox:L8REYQ315CEM6").first();
+        const last = await env.RELAY_DB.prepare(
+          "SELECT created_at,metadata_json FROM audit_events WHERE event_type = 'historical_import' ORDER BY created_at DESC LIMIT 1"
+        ).first();
+        return Response.json({ success: true, environment: "square_sandbox",
+          importedOrderCount: row?.order_count || 0, lastImportAt: last?.created_at || null,
+          lastImport: last ? JSON.parse(last.metadata_json) : null,
+          ownershipVerified: false
+        }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      } catch {
+        return Response.json({ success: false, error: "ledger_unavailable" }, { status: 503, headers: corsHeaders });
       }
     }
 
