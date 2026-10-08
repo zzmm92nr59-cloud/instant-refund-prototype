@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {assessCandidate,discoverCandidates,claimRequirements,IDENTIFIER_REGISTRY} from "./purchase-identity.mjs";
+const bank={bank_transaction_id:"b1",merchant_name:"North & Co",amount_minor:15999,currency:"GBP",booking_date:"2026-10-08",card_brand:"VISA",card_last4:"1111"};
+const order={retailer_order_id:"o1",merchant_name:"NORTH & CO",amount_minor:15999,currency:"GBP",ordered_at:"2026-10-07",card_brand:"VISA",card_last4:"1111"};
+assert.equal(assessCandidate(bank,order).status,"potential");
+assert.equal(assessCandidate(bank,{...order,card_last4:"2222"}).status,"conflict");
+assert.equal(assessCandidate(bank,{...order,amount_minor:16000}).status,"conflict");
+assert.equal(assessCandidate(bank,{...order,shared_processor_reference:"abc"}).status,"potential");
+assert.equal(assessCandidate({...bank,shared_processor_reference:"abc"},{...order,shared_processor_reference:"abc"}).status,"strong_candidate");
+assert.equal(claimRequirements(assessCandidate(bank,order)).eligible,false);
+assert.equal(discoverCandidates([{...bank,booking_date:"2026-01-01"}],[order],{now:new Date("2026-10-08")}).length,0);
+assert.ok(IDENTIFIER_REGISTRY.order.includes("line_items"));
+console.log("Relay matching tests passed: candidate, conflicts, shared reference, no auto-verification, lookback, registry");
