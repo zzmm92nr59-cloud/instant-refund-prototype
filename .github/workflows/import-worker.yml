@@ -1,0 +1,63 @@
+name: Import Relay Worker from Cloudflare
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Retrieve Worker from Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p worker
+
+          curl --fail --silent --show-error --location \
+            --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            --output /tmp/relay-worker-response \
+            --dump-header /tmp/relay-worker-headers \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/relay-square-api2"
+
+          content_type=$(grep -i '^content-type:' /tmp/relay-worker-headers | tail -1 | tr -d '\r' | cut -d: -f2- | xargs)
+
+          case "$content_type" in
+            application/javascript*|text/javascript*|application/ecmascript*|text/plain*)
+              cp /tmp/relay-worker-response worker/worker.js
+              ;;
+            *)
+              echo "Unexpected response type: $content_type"
+              echo "Import stopped. The Worker may be bundled."
+              exit 1
+              ;;
+          esac
+
+          test -s worker/worker.js
+          node --check worker/worker.js
+
+          if grep -Eq 'sq0atp-|plaid-secret-|-----BEGIN (RSA |EC )?PRIVATE KEY-----' worker/worker.js; then
+            echo "Potential embedded secret detected. Import stopped."
+            exit 1
+          fi
+
+      - name: Commit imported source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add worker/worker.js
+
+          if git diff --cached --quiet; then
+            echo "No source changes to commit."
+          else
+            git commit -m "Import existing Relay Worker [skip ci]"
+            git push
+          fi
