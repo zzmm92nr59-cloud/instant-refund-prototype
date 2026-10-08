@@ -24,6 +24,13 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: d1 execute relay-purchase-ledger --remote --file=migrations/0002_retailer_catalogue_inventory.sql
+      - name: Seed fictional demo retailers and inventory
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: worker
+          command: d1 execute relay-purchase-ledger --remote --file=migrations/0003_demo_inventory.sql
       - name: Deploy existing Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
         with:
