@@ -9,11 +9,12 @@ permissions:
 jobs:
   import-worker:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Retrieve Worker from Cloudflare
+      - name: Download and extract Cloudflare Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -27,97 +28,118 @@ jobs:
             --dump-header /tmp/relay-worker-headers \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/relay-square-api2"
 
-          content_type=$(grep -i '^content-type:' /tmp/relay-worker-headers | tail -1 | tr -d '\r' | cut -d: -f2- | xargs)
-
-
-          case "$content_type" in
-            application/javascript*|text/javascript*|application/ecmascript*|text/plain*)
-              cp /tmp/relay-worker-response worker/worker.js
-              ;;
-            multipart/form-data*)
-              python3 - <<'PY'
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
           from email.parser import BytesParser
           from email.policy import default
-          from pathlib import Path
-          import re
 
           headers = Path("/tmp/relay-worker-headers").read_text()
-          matches = re.findall(
+          body = Path("/tmp/relay-worker-response").read_bytes()
+
+          types = re.findall(
               r"^content-type:\s*(.+)$",
               headers,
               flags=re.IGNORECASE | re.MULTILINE,
           )
-          if not matches:
-              raise SystemExit("Cloudflare response has no Content-Type")
 
-          content_type = matches[-1].strip()
-          body = Path("/tmp/relay-worker-response").read_bytes()
+          if not types:
+              raise SystemExit("Missing Content-Type header")
 
-          message = BytesParser(policy=default).parsebytes(
-              ("Content-Type: " + content_type + "\r\n"
-               "MIME-Version: 1.0\r\n\r\n").encode() + body
-          )
+          content_type = types[-1].strip()
 
-          if not message.is_multipart():
-              raise SystemExit("Expected multipart Worker bundle")
+          if not content_type.lower().startswith("multipart/form-data"):
+              if not (
+                  "javascript" in content_type.lower()
+                  or "ecmascript" in content_type.lower()
+                  or "text/plain" in content_type.lower()
+              ):
+                  raise SystemExit(
+                      f"Unexpected response type: {content_type}"
+                  )
 
-          metadata = None
-          scripts = []
+              Path("worker/worker.js").write_bytes(body)
+              print("Imported single-file Worker")
+          else:
+              prefix = (
+                  f"Content-Type: {content_type}\r\n"
+                  "MIME-Version: 1.0\r\n\r\n"
+              ).encode()
 
-          for part in message.iter_parts():
-              name = part.get_param("name", header="content-disposition")
-              data = part.get_payload(decode=True)
+              message = BytesParser(
+                  policy=default
+              ).parsebytes(prefix + body)
 
-              if name == "metadata":
-                  import json
-                  metadata = json.loads(data)
-              elif name and data:
-                  scripts.append((name, data))
+              if not message.is_multipart():
+                  raise SystemExit(
+                      "Cloudflare multipart response could not be parsed"
+                  )
 
-          if not metadata:
-              raise SystemExit("Worker metadata missing")
+              metadata = None
+              scripts = []
 
-          main = metadata.get("main_module") or metadata.get("body_part")
-          matches = [data for name, data in scripts if name == main]
+              for part in message.iter_parts():
+                  name = part.get_param(
+                      "name",
+                      header="content-disposition",
+                  )
+                  data = part.get_payload(decode=True)
 
-          if not main or len(matches) != 1:
-              raise SystemExit(
-                  "Could not identify a unique Worker entrypoint"
+                  if name == "metadata":
+                      metadata = json.loads(data)
+                  elif name and data is not None:
+                      scripts.append((name, data))
+
+              if not isinstance(metadata, dict):
+                  raise SystemExit("Worker metadata missing")
+
+              main = (
+                  metadata.get("main_module")
+                  or metadata.get("body_part")
               )
 
-          if len(scripts) != 1:
-              raise SystemExit(
-                  "Multi-module Worker detected; refusing to discard modules"
-              )
+              matches = [
+                  data for name, data in scripts
+                  if name == main
+              ]
 
-          Path("worker/worker.js").write_bytes(matches[0])
-          print("Extracted Worker entrypoint:", main)
+              if not main or len(matches) != 1:
+                  raise SystemExit(
+                      "Cannot identify unique Worker entrypoint"
+                  )
+
+              if len(scripts) != 1:
+                  raise SystemExit(
+                      "Worker has multiple modules. "
+                      "Import stopped to prevent data loss."
+                  )
+
+              Path("worker/worker.js").write_bytes(matches[0])
+              print(f"Extracted Worker entrypoint: {main}")
           PY
-              ;;
-            *)
-              echo "Unexpected response type: $content_type"
-              exit 1
-              ;;
-          esac
-
 
           test -s worker/worker.js
           node --check worker/worker.js
 
           if grep -Eq 'sq0atp-|plaid-secret-|-----BEGIN (RSA |EC )?PRIVATE KEY-----' worker/worker.js; then
-            echo "Potential embedded secret detected. Import stopped."
+            echo "Potential hardcoded credential detected."
             exit 1
           fi
 
-      - name: Commit imported source
+          echo "Worker extraction and syntax check passed."
+
+      - name: Commit Worker source to GitHub
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add worker/worker.js
 
           if git diff --cached --quiet; then
-            echo "No source changes to commit."
+            echo "Worker source already matches GitHub."
           else
             git commit -m "Import existing Relay Worker [skip ci]"
             git push
