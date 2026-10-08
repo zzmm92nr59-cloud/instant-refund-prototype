@@ -1,7 +1,9 @@
 import { importHistoricalSquareOrders } from "./square-history.js";
+import { syncSquareCatalogue } from "./square-catalogue.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(importHistoricalSquareOrders(env));
+    ctx.waitUntil(syncSquareCatalogue(env));
   },
   async fetch(request, env) {
     const corsHeaders = {
@@ -44,6 +46,26 @@ export default {
         return Response.json({ success: false, ledger: "unavailable" }, {
           status: 503, headers: { ...corsHeaders, "Cache-Control": "no-store" }
         });
+      }
+    }
+
+    if (url.pathname === "/relay/ledger/catalogue-status" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({ success: false, error: "not_configured" }, { status: 503, headers: corsHeaders });
+      try {
+        const products = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM retailer_catalog_items").first();
+        const variants = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM retailer_catalog_variants").first();
+        const stock = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM retailer_inventory_snapshots").first();
+        const last = await env.RELAY_DB.prepare(
+          "SELECT created_at,metadata_json FROM audit_events WHERE event_type='catalogue_sync' ORDER BY created_at DESC LIMIT 1"
+        ).first();
+        return Response.json({ success: true, environment: "square_sandbox",
+          products: products?.n || 0, variants: variants?.n || 0,
+          inventorySnapshots: stock?.n || 0, lastSyncAt: last?.created_at || null,
+          lastSync: last ? JSON.parse(last.metadata_json) : null,
+          stockIsLive: false
+        }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      } catch {
+        return Response.json({ success: false, error: "catalogue_schema_or_sync_unavailable" }, { status: 503, headers: corsHeaders });
       }
     }
 
