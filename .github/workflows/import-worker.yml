@@ -92,33 +92,23 @@ jobs:
                       scripts.append((name, data))
 
               
-                  if not isinstance(metadata, dict):
-                    print("Multipart part names:", [name for name, _ in scripts])
-                    raise SystemExit("Worker metadata missing")
-
-              main = (
-                  metadata.get("main_module")
-                  or metadata.get("body_part")
-              )
-
-              matches = [
-                  data for name, data in scripts
-                  if name == main
-              ]
-
-              if not main or len(matches) != 1:
-                  raise SystemExit(
-                      "Cannot identify unique Worker entrypoint"
-                  )
-
               if len(scripts) != 1:
                   raise SystemExit(
-                      "Worker has multiple modules. "
-                      "Import stopped to prevent data loss."
+                      "Expected exactly one Worker source file"
                   )
 
+              name, source = scripts[0]
+
+              if name != "worker.js":
+                  raise SystemExit(
+                      f"Unexpected Worker filename: {name}"
+                  )
+
+              matches = [source]
+
+
               Path("worker/worker.js").write_bytes(matches[0])
-              print(f"Extracted Worker entrypoint: {main}")
+              print(f"Extracted Worker source: {name}")
           PY
 
           test -s worker/worker.js
