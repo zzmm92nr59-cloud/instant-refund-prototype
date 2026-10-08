@@ -69,6 +69,30 @@ export default {
       }
     }
 
+    // Public fictional catalogue only. No private Square/Shopify retailer data.
+    if (url.pathname === "/relay/demo/inventory" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({ success: false, error: "not_configured" }, { status: 503, headers: corsHeaders });
+      try {
+        const data = await env.RELAY_DB.prepare(`SELECT
+          c.merchant_external_id AS storeId, c.provider AS demoPlatform,
+          p.external_item_id AS productId, p.title AS product,
+          v.title AS variant, v.sku AS sku, v.price_minor AS priceMinor,
+          v.currency AS currency, i.quantity AS quantity
+          FROM retailer_inventory_snapshots i
+          JOIN retailer_connections c ON c.id=i.connection_id
+          JOIN retailer_catalog_variants v ON v.id=i.variant_id
+          JOIN retailer_catalog_items p ON p.id=v.item_id
+          WHERE p.provider='relay_demo' AND c.id LIKE 'demo:%'
+          ORDER BY c.merchant_external_id,p.title,v.title LIMIT 200`).all();
+        return Response.json({ success: true, simulated: true,
+          notice: "Fictional demonstration stock only; not connected to live retailers.",
+          rows: data.results || []
+        }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      } catch {
+        return Response.json({ success: false, error: "demo_inventory_unavailable" }, { status: 503, headers: corsHeaders });
+      }
+    }
+
     // Aggregated importer status only; never expose retailer orders publicly.
     if (url.pathname === "/relay/ledger/import-status" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({ success: false, error: "not_configured" }, { status: 503, headers: corsHeaders });
