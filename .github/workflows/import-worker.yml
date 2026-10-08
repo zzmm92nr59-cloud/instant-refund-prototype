@@ -91,7 +91,7 @@ jobs:
                   elif name and data is not None:
                       scripts.append((name, data))
 
-              if not isinstance(metadata, dict):
+              if not isinstance(metadata, dict):     print("Multipart part names:", [name for name, _ in scripts])     raise SystemExit("Worker metadata missing")
                   raise SystemExit("Worker metadata missing")
 
               main = (
