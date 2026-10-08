@@ -52,13 +52,16 @@ export default {
       if (!env.RELAY_DB) return Response.json({ success: false, error: "not_configured" }, { status: 503, headers: corsHeaders });
       try {
         const row = await env.RELAY_DB.prepare(
-          "SELECT COUNT(*) AS order_count FROM retailer_orders WHERE connection_id = ?"
-        ).bind("square:sandbox:L8REYQ315CEM6").first();
+          "SELECT COUNT(*) AS order_count FROM retailer_orders WHERE connection_id LIKE 'square:sandbox:%'"
+        ).first();
         const last = await env.RELAY_DB.prepare(
           "SELECT created_at,metadata_json FROM audit_events WHERE event_type = 'historical_import' ORDER BY created_at DESC LIMIT 1"
         ).first();
+        const locations = await env.RELAY_DB.prepare(
+          "SELECT COUNT(*) AS location_count FROM retailer_connections WHERE provider = 'square_sandbox'"
+        ).first();
         return Response.json({ success: true, environment: "square_sandbox",
-          importedOrderCount: row?.order_count || 0, lastImportAt: last?.created_at || null,
+          importedOrderCount: row?.order_count || 0, connectedLocationCount: locations?.location_count || 0, lastImportAt: last?.created_at || null,
           lastImport: last ? JSON.parse(last.metadata_json) : null,
           ownershipVerified: false
         }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
