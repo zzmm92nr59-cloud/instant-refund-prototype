@@ -32,6 +32,26 @@ export default {
       return receiveSquareWebhook(request, env, ctx);
     }
 
+    // Read-only Sandbox catalogue suggestions. Stock is indicative, never reserved.
+    if (url.pathname === "/relay/returns/sandbox-options" && request.method === "GET") {
+      if (!env.RELAY_DB) return Response.json({error:"Ledger unavailable"},{status:503});
+      const query = (url.searchParams.get("product")||"").trim();
+      if (query.length < 3 || query.length > 120)
+        return Response.json({error:"Product name required"},{status:400});
+      const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product, v.title AS variation,
+        v.sku, v.price_minor AS priceMinor, v.currency,
+        s.quantity, s.observed_at AS observedAt
+        FROM retailer_catalog_items i
+        JOIN retailer_catalog_variants v ON v.item_id=i.id
+        LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
+        WHERE i.provider='square_sandbox'
+          AND lower(i.title)=lower(?)
+        ORDER BY v.title LIMIT 50`).bind(query).all();
+      return Response.json({success:true,stockIsLive:false,reservationSupported:false,
+        options:(rows.results||[]).map(row=>({...row,available:Number(row.quantity)>0}))},
+        {headers:{"Cache-Control":"no-store",...corsHeaders}});
+    }
+
     // Sandbox-only inventory verification. No consumer or production retailer data.
     if (url.pathname === "/relay/ledger/sandbox-stock" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({error:"Ledger unavailable"},{status:503});
