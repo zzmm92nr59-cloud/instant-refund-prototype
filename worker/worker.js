@@ -20,6 +20,29 @@ export default {
 
     const url = new URL(request.url);
 
+    // Relay purchase ledger readiness. No personal purchase data is exposed.
+    // Binding RELAY_DB is optional until the D1 database is provisioned.
+    if (url.pathname === "/relay/ledger/status" && request.method === "GET") {
+      if (!env.RELAY_DB) {
+        return Response.json({
+          success: true, ledger: "not_configured",
+          nextStep: "Create Cloudflare D1 database, bind as RELAY_DB, and apply migration 0001."
+        }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      }
+      try {
+        const check = await env.RELAY_DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='match_candidates'"
+        ).first();
+        return Response.json({
+          success: true, ledger: check ? "schema_ready" : "migration_required"
+        }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      } catch {
+        return Response.json({ success: false, ledger: "unavailable" }, {
+          status: 503, headers: { ...corsHeaders, "Cache-Control": "no-store" }
+        });
+      }
+    }
+
     // ============================================================
     // SHARED HELPERS
     // ============================================================
