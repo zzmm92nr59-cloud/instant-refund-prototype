@@ -1,3 +1,4 @@
+import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { shopifyConfigured, syncShopifyCatalogue } from "./shopify.js";
@@ -7,7 +8,7 @@ export default {
     ctx.waitUntil(syncSquareCatalogue(env));
     if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogue(env));
   },
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -27,6 +28,9 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname === "/relay/webhooks/square" && request.method === "POST") {
+      return receiveSquareWebhook(request, env, ctx);
+    }
 
     // Relay purchase ledger readiness. No personal purchase data is exposed.
     // Binding RELAY_DB is optional until the D1 database is provisioned.
