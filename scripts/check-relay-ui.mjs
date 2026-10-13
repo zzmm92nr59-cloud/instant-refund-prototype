@@ -63,6 +63,28 @@ for (const [name, expected] of [
   ["profile", "Your Relay profile"],
 ]) check(name, expected);
 
+// Exercise the browser-style global inline handler, not just a direct JS function call.
+win.go("wallet");
+win.toggleDemo(); // off
+assert.equal(win.demo, false, "Demo toggle failed to turn off");
+Object.defineProperties(context, {
+  demo: { get: () => win.demo, set: value => { win.demo = value; }, configurable: true },
+  page: { get: () => win.page, set: value => { win.page = value; }, configurable: true },
+  reason: { get: () => win.reason, set: value => { win.reason = value; }, configurable: true },
+  exchangeContext: { get: () => win.exchangeContext, set: value => { win.exchangeContext = value; }, configurable: true },
+});
+Object.assign(context, { openPurchase: win.openPurchase, render: win.render, go: win.go });
+new vm.Script("demo=true;openPurchase('sample-1')").runInContext(context);
+assert.equal(win.demo, true, "Demo click did not restore demo mode");
+assert.ok(screen().includes("Retro High Trainers"), "Demo purchase button did not open item");
+new vm.Script("page='refund';render()").runInContext(context);
+assert.ok(screen().includes("SIMULATED OFFER"), "Instant refund click did not open offer");
+new vm.Script("page='exchange';render()").runInContext(context);
+assert.ok(screen().includes("Reason for exchange"), "Exchange click did not open options");
+new vm.Script("exchangeContext=true;go('discover')").runInContext(context);
+assert.ok(screen().includes("Find the right replacement"), "Discover exchange link did not set context");
+console.log("PASS in-page demo, refund, exchange and contextual Discover clicks");
+
 win.openPurchase("sample-1");
 assert.ok(screen().includes("Retro High Trainers"), "Demo purchase details missing");
 verifyHandlers("purchase");
