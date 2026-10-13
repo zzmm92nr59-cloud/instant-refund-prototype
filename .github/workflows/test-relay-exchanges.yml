@@ -1,0 +1,20 @@
+name: Relay exchange and refund regression tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'relay-exchange-engine.js'
+      - 'index.html'
+      - 'scripts/test-relay-exchanges.cjs'
+      - '.github/workflows/test-relay-exchanges.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check three-retailer sizes, coats and payment/refund state machine
+        run: node scripts/test-relay-exchanges.cjs
