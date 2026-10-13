@@ -1,0 +1,15 @@
+name: Seed Relay Square Sandbox catalogue
+on:
+  workflow_dispatch:
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create demo products and stock in Square Sandbox
+        env:
+          SQUARE_ACCESS_TOKEN: ${{ secrets.SQUARE_ACCESS_TOKEN }}
+        run: node scripts/seed-relay-square-catalogue.mjs
