@@ -1,0 +1,25 @@
+name: Validate Relay app JavaScript
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - .github/workflows/validate-relay-app.yml
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate embedded app script syntax
+        run: |
+          node --input-type=module -e "const fs=require('fs')" 2>/dev/null || true
+          node - <<'NODE'
+          const fs=require('fs');
+          const html=fs.readFileSync('index.html','utf8');
+          const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
+          if(!scripts.length)throw Error('No app scripts found');
+          const vm=require('node:vm');
+          for(const [,src] of scripts)new vm.Script(src,{filename:'index.html'});
+          console.log('Checked',scripts.length,'embedded scripts');
+          NODE
