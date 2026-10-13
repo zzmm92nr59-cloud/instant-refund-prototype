@@ -1,0 +1,42 @@
+/* Run with: node scripts/test-relay-exchanges.cjs
+ * No credentials, network, actual customer data or Square charges needed. */
+"use strict";
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const Engine=require("../relay-exchange-engine.js");
+const purchase=(item,detail,merchant,price,id)=>({item,detail,merchant,price,id,demo:true});
+const item=(product,variation,store,priceMinor,quantity=5,sku="DEMO-TEST-001")=>({product,variation,store,priceMinor,quantity,sku,fixture:true});
+let tests=0;
+function test(name,fn){try{fn();tests++;console.log("✓ "+name)}catch(e){console.error("✗ "+name);throw e}}
+const north=purchase("Retro High Trainers","UK 7 · White / Grey","NORTH & CO.",129.99,"a");
+const studio=purchase("Boxy Cotton Tee","Forest / M","Relay Studio",28.99,"b");
+const harbour=purchase("Linen Overshirt","Ecru / M","Harbour Goods",64.99,"c");
+const coat=purchase("Waxed Field Coat","Olive / M","Harbour Goods",139.99,"d");
+const north8=item("Retro High Trainers","White / Grey / UK 8","North & Co.",12999);
+const studioL=item("Boxy Cotton Tee","Forest / L","Relay Studio",2899);
+const harbourL=item("Linen Overshirt","Ecru / L","Harbour Goods",6499);
+const coatAlt=item("Quilted Liner Jacket","Navy / M","Harbour Goods",11999);
+const coatMore=item("Waterproof Rain Shell Coat","Sand / M","Harbour Goods",15999);
+test("North & Co size change keeps exact design",()=>{assert.equal(Engine.matches(north,north8,"size"),true);assert.equal(Engine.quote({purchase:north,candidate:north8,reason:"size"}).differenceMinor,0)});
+test("North & Co size does not show different products",()=>assert.equal(Engine.matches(north,item("Minimal Low Trainers","White / UK 8","North & Co.",11999),"size"),false));
+test("Relay Studio M → L size selection",()=>assert.equal(Engine.matches(studio,studioL,"size"),true));
+test("Harbour Goods M → L size selection",()=>assert.equal(Engine.matches(harbour,harbourL,"size"),true));
+test("Coat design finds another coat or jacket",()=>{assert.equal(Engine.matches(coat,coatAlt,"design"),true);assert.equal(Engine.matches(coat,coatMore,"design"),true)});
+test("Coat design excludes trainers and other stores",()=>{assert.equal(Engine.matches(coat,item("Retro Suede Trainers","Cream / UK 8","Harbour Goods",12999),"design"),false);assert.equal(Engine.matches(coat,{...coatAlt,store:"North & Co."},"design"),false)});
+test("Even exchange has no payment",()=>{const r=Engine.createExchange({purchase:north,candidate:north8,reason:"size",id:"RELAY-TEST-01"});assert.equal(r.ledger[0].type,"EVEN_EXCHANGE");assert.equal(r.differenceMinor,0);assert.equal(r.returnStatus,"RETURN_REQUESTED");assert.ok(r.replacementOrderId)});
+test("More expensive replacement captures only extra amount",()=>{const r=Engine.createExchange({purchase:coat,candidate:coatMore,reason:"design",id:"RELAY-TEST-02"});assert.equal(r.differenceMinor,2000);assert.deepEqual(r.ledger.map(x=>[x.type,x.amountMinor]),[["ADDITIONAL_CARD_PAYMENT",2000]])});
+test("Cheaper replacement refunds only difference",()=>{const r=Engine.createExchange({purchase:coat,candidate:coatAlt,reason:"design",id:"RELAY-TEST-03"});assert.equal(r.differenceMinor,-2000);assert.deepEqual(r.ledger.map(x=>[x.type,x.amountMinor]),[["PRICE_DIFFERENCE_REFUND",2000]])});
+test("Out of stock blocks exchange and no ledger created",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,quantity:0},reason:"design"}),/out of stock/i));
+test("Wrong store blocks exchange",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,store:"Relay Studio"},reason:"design"}),/does not qualify/));
+test("Real customer purchases blocked from browser-only demo checkout",()=>assert.throws(()=>Engine.quote({purchase:{...coat,demo:false},candidate:coatAlt,reason:"design"}),/Only fictional demo/));
+test("Untrusted Square browse-only items cannot be exchanged",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,fixture:false},reason:"design"}),/Only editable demo/));
+test("Two exchanges cannot use the same original purchase",()=>{const e=Engine.createExchange({purchase:coat,candidate:coatAlt,reason:"design",id:"RELAY-TEST-04"});assert.throws(()=>Engine.createExchange({purchase:coat,candidate:coatMore,reason:"design",existing:[e],id:"RELAY-TEST-05"}),/already has an exchange/)});
+test("Return tracking stops at completion",()=>{let r=Engine.createExchange({purchase:north,candidate:north8,reason:"size",id:"RELAY-TEST-06"});for(const next of ["RETURN_LABEL_ISSUED","RETURN_IN_TRANSIT","RETURN_RECEIVED","RETURN_COMPLETED"]){r=Engine.advanceReturn(r);assert.equal(r.returnStatus,next)}assert.equal(Engine.advanceReturn(r),r)});
+test("Refund advance creates one simulated ledger entry",()=>{const r=Engine.createInstantRefund({purchase:studio,id:"RELAY-TEST-07"});assert.equal(r.ledger[0].type,"INSTANT_REFUND_ADVANCE");assert.equal(r.ledger[0].amountMinor,2899);assert.throws(()=>Engine.createInstantRefund({purchase:studio,id:"RELAY-TEST-08",existing:[r]}),/already/)});
+test("Return request and payment ledger have distinct references",()=>{const r=Engine.createExchange({purchase:coat,candidate:coatAlt,reason:"design",id:"RELAY-TEST-09"});assert.notEqual(r.returnRequestId,r.replacementOrderId);assert.equal(r.history.length,3)});
+const html=fs.readFileSync("index.html","utf8");
+test("UI bundles exchange engine and clickable variant buttons",()=>{assert.match(html,/relay-exchange-engine\.js/);assert.match(html,/data-select/);assert.match(html,/Choose your replacement size/);assert.match(html,/showCheckoutError/)});
+test("UI includes coat stock, each retailer, demo refund and return progression",()=>{for(const text of ["Waxed Field Coat","Quilted Liner Jacket","Waterproof Rain Shell Coat","City Runner Sneakers","Harbour Trail Boots","simulateDemoRefund","Advance return"])assert.ok(html.includes(text),text)});
+const inlined=html.match(/<script>\(function\(\)\{try\{([\s\S]*?)<\/script>/);
+test("Application inline JavaScript compiles",()=>{assert.ok(inlined);new Function("(function(){try{"+inlined[1])});
+console.log("\n"+tests+" deterministic exchange/refund checks passed. No money was moved.");
