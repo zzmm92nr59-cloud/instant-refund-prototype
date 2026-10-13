@@ -1,0 +1,24 @@
+name: Validate Relay consumer UI
+on:
+  push:
+    paths:
+      - index.html
+      - relay-app-v2.html
+      - scripts/check-relay-ui.mjs
+      - .github/workflows/validate-relay-ui.yml
+  pull_request:
+    paths:
+      - index.html
+      - scripts/check-relay-ui.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui-smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-relay-ui.mjs
