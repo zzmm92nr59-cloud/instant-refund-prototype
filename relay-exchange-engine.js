@@ -1,0 +1,71 @@
+/* Relay exchange orchestration — browser-only demo. No Square payment/return calls. */
+(function(root,factory){
+  const engine=factory();
+  if(typeof module==="object"&&module.exports)module.exports=engine;
+  else root.RelayExchangeEngine=engine;
+})(typeof globalThis!=="undefined"?globalThis:this,function(){
+ "use strict";
+ const minor=n=>Math.round(Number(n)*100);
+ const normal=s=>String(s??"").trim().toLowerCase().replace(/\s+/g," ");
+ function sizeOf(s){
+   s=normal(s);
+   const uk=s.match(/\buk\s*(\d{1,2}(?:\.5)?)\b/);
+   if(uk)return "uk "+uk[1];
+   const match=s.match(/\b(xxs|xs|xxxl|xxl|xl|small|medium|large|s|m|l)\b/);
+   return match?({s:"small",m:"medium",l:"large"}[match[1]]||match[1]):null;
+ }
+ function styleOf(s){return normal(s).replace(/\buk\s*\d{1,2}(?:\.5)?\b/g,"").replace(/\b(xxs|xs|xxxl|xxl|xl|small|medium|large|s|m|l)\b/g,"").replace(/[^a-z0-9]+/g," ").trim().split(" ").filter(Boolean).sort().join(" ")}
+ function category(name){
+   const s=normal(name);
+   if(/bag|tote|handbag|backpack|purse|satchel/.test(s))return "bag";
+   if(/coat|jacket|parka|trench|puffer|rain shell/.test(s))return "outerwear";
+   if(/trainer|shoe|sneaker|jordan|footwear|boot/.test(s))return "footwear";
+   if(/hoodie|sweatshirt|jumper|sweater|shirt|blouse|tee|t-shirt|top|overshirt/.test(s))return "tops";
+   if(/jean|trouser|pant|legging/.test(s))return "bottoms";
+   if(/dress|skirt/.test(s))return "dress";
+   return "other";
+ }
+ function matches(purchase,candidate,reason){
+   if(!purchase||!candidate)return false;
+   if(normal(purchase.merchant)!==normal(candidate.store))return false;
+   const family=normal(purchase.item)===normal(candidate.product);
+   const originalStyle=styleOf(purchase.detail),nextStyle=styleOf(candidate.variation);
+   const a=sizeOf(purchase.detail),b=sizeOf(candidate.variation);
+   const exactSame=family&&normal(purchase.detail)===normal(candidate.variation);
+   if(reason==="size")return family&&!!a&&!!b&&a!==b&&originalStyle===nextStyle;
+   if(reason==="colour")return family&&originalStyle!==nextStyle&&(!a||!b||a===b);
+   if(reason==="design")return !exactSame&&category(purchase.item)===category(candidate.product);
+   if(reason==="mind")return !exactSame&&category(purchase.item)===category(candidate.product);
+   return false;
+ }
+ function quote({purchase,candidate,reason,existing=[]}){
+   if(!purchase||purchase.demo!==true)throw Error("Only fictional demo purchases are supported. A real purchase needs a verified retailer integration.");
+   if(!candidate||candidate.fixture!==true)throw Error("Only editable demo retailer inventory can be transacted. Square catalogue listings are browse-only.");
+   if(!matches(purchase,candidate,reason))throw Error("This variant does not qualify for the selected same-retailer exchange.");
+   if(!Number.isInteger(Number(candidate.quantity))||Number(candidate.quantity)<1)throw Error("Replacement out of stock.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&x.exchange===true))throw Error("This demo purchase already has an exchange. Reset test transactions to try another.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&x.type==="REFUND"))throw Error("This purchase has already been refunded in the demo.");
+   const orig=minor(purchase.price),next=Number(candidate.priceMinor);
+   if(!Number.isSafeInteger(orig)||orig<0||!Number.isSafeInteger(next)||next<0)throw Error("Invalid currency amount.");
+   const delta=next-orig;
+   return {originalMinor:orig,replacementMinor:next,differenceMinor:delta,paymentMinor:Math.max(delta,0),refundMinor:Math.max(-delta,0),currency:"GBP",sku:candidate.sku,store:candidate.store,reason};
+ }
+ function ledgerForQuote(q){if(q.paymentMinor>0)return[{type:"ADDITIONAL_CARD_PAYMENT",amountMinor:q.paymentMinor,currency:"GBP",status:"SIMULATED_CAPTURED"}];if(q.refundMinor>0)return[{type:"PRICE_DIFFERENCE_REFUND",amountMinor:q.refundMinor,currency:"GBP",status:"SIMULATED_ISSUED"}];return [{type:"EVEN_EXCHANGE",amountMinor:0,currency:"GBP",status:"NO_PAYMENT_REQUIRED"}]}
+ function createExchange({purchase,candidate,reason,existing=[],id,at}){
+   if(!id||!/^[a-zA-Z0-9-]{8,70}$/.test(id))throw Error("A unique request ID is required.");
+   if(existing.some(x=>x.id===id))throw Error("Duplicate exchange request ID.");
+   const q=quote({purchase,candidate,reason,existing}),now=at||new Date().toISOString();
+   return {id,type:"EXCHANGE",exchange:true,originalPurchaseId:purchase.id,originalProduct:purchase.item,originalVariant:purchase.detail,originalPriceMinor:q.originalMinor,store:candidate.store,sku:candidate.sku,product:candidate.product,variant:candidate.variation,amount:q.replacementMinor/100,amountMinor:q.replacementMinor,difference:q.differenceMinor/100,differenceMinor:q.differenceMinor,reason,currency:"GBP",date:now,createdAt:now,status:"REPLACEMENT_ORDER_CREATED",replacementStatus:"ORDER_CREATED",replacementOrderId:id+"-ORDER",returnRequestId:id+"-RETURN",returnStatus:"RETURN_REQUESTED",ledger:ledgerForQuote(q),history:[{event:"EXCHANGE_STARTED",at:now},{event:"REPLACEMENT_ORDER_CREATED",at:now},{event:"ORIGINAL_RETURN_REQUESTED",at:now}]};
+ }
+ function createInstantRefund({purchase,existing=[],id,at}){
+   if(!purchase||purchase.demo!==true)throw Error("Only demo purchases support simulated instant refunds.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&(x.exchange||x.type==="REFUND")))throw Error("A refund or exchange has already been recorded for this purchase.");
+   if(!id||!/^[a-zA-Z0-9-]{8,70}$/.test(id)||existing.some(x=>x.id===id))throw Error("Unique refund request ID required.");
+   const amount=minor(purchase.price);if(!Number.isSafeInteger(amount)||amount<0)throw Error("Invalid refund amount.");
+   const now=at||new Date().toISOString();
+   return {id,type:"REFUND",exchange:false,originalPurchaseId:purchase.id,originalProduct:purchase.item,originalVariant:purchase.detail,originalPriceMinor:amount,amount:amount/100,amountMinor:amount,currency:"GBP",store:purchase.merchant,date:now,createdAt:now,status:"SIMULATED_INSTANT_ADVANCE_ISSUED",returnRequestId:id+"-RETURN",returnStatus:"RETURN_REQUESTED",ledger:[{type:"INSTANT_REFUND_ADVANCE",amountMinor:amount,currency:"GBP",status:"SIMULATED_ISSUED"}],history:[{event:"INSTANT_ADVANCE_SIMULATED",at:now},{event:"ORIGINAL_RETURN_REQUESTED",at:now}]};
+ }
+ const returnStates=["RETURN_REQUESTED","RETURN_LABEL_ISSUED","RETURN_IN_TRANSIT","RETURN_RECEIVED","RETURN_COMPLETED"];
+ function advanceReturn(record,at){if(!record||!returnStates.includes(record.returnStatus))throw Error("Invalid return request.");const idx=returnStates.indexOf(record.returnStatus);if(idx===returnStates.length-1)return record;const status=returnStates[idx+1],now=at||new Date().toISOString();return {...record,returnStatus:status,history:[...(record.history||[]),{event:status,at:now}]}}
+ return {sizeOf,styleOf,category,matches,quote,createExchange,createInstantRefund,advanceReturn,returnStates};
+});
