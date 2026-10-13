@@ -1,0 +1,20 @@
+name: Set up Relay Studio second Square Sandbox store
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/setup-second-square-store.mjs
+      - .github/workflows/setup-second-square-store.yml
+jobs:
+  create-studio-store:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Create or reuse second Sandbox location and its demo catalogue
+        env:
+          SQUARE_ACCESS_TOKEN: ${{ secrets.SQUARE_ACCESS_TOKEN }}
+        run: node scripts/setup-second-square-store.mjs
