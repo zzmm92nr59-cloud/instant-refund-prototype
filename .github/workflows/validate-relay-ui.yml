@@ -3,6 +3,11 @@ on:
   push:
     paths:
       - index.html
+      - relay-exchange-engine.js
+      - worker/shopify-webhooks.js
+      - worker/worker.js
+      - scripts/check-shopify-webhooks.mjs
+      - scripts/check-relay-tiers.mjs
       - relay-app-v2.html
       - scripts/check-relay-ui.mjs
       - .github/workflows/validate-relay-ui.yml
@@ -21,4 +26,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node scripts/check-relay-ui.mjs
+      - name: Frontend smoke test
+        run: node scripts/check-relay-ui.mjs
+      - name: Free/Plus refund and exchange rules
+        run: node scripts/check-relay-tiers.mjs
+      - name: Shopify webhook security tests
+        run: node scripts/check-shopify-webhooks.mjs
+      - name: Worker syntax
+        run: |
+          node --check worker/worker.js
+          node --check worker/shopify-webhooks.js
+          node --check worker/shopify.js
