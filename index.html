@@ -140,7 +140,7 @@ function renderCatalog(){
    if(!exchangeContext)return true;
    return RelayExchangeEngine.matches(selected,{...p,store:storeOf(p)},reason);
  });
- if(exchangeContext&&reason==="design")rows.sort((a,b)=>Math.abs(a.priceMinor-selected.price*100)-Math.abs(b.priceMinor-selected.price*100));
+ if(exchangeContext)rows.sort((a,b)=>(Number(b.fixture&&b.quantity>0)-Number(a.fixture&&a.quantity>0))||(reason==="design"||reason==="mind"?Math.abs(a.priceMinor-selected.price*100)-Math.abs(b.priceMinor-selected.price*100):0));
  else if(sort!=="all")rows.sort((a,b)=>sort==="low"?a.priceMinor-b.priceMinor:b.priceMinor-a.priceMinor);
  const sizeExchange=exchangeContext&&reason==="size";
  let markup="";
@@ -148,38 +148,52 @@ function renderCatalog(){
    const groups=new Map();
    for(const p of rows){const key=storeOf(p)+"|"+p.product+"|"+withoutSize(p.variation);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p)}
    markup=[...groups.values()].map(options=>{
-     const p=options[0];const all=options.slice().sort((a,b)=>(Number(sizeOf(a.variation)?.replace("uk ",""))||0)-(Number(sizeOf(b.variation)?.replace("uk ",""))||0));
-     return '<div class="card"><div class="eyebrow">'+safe(storeOf(p))+' · SAME PRODUCT</div><div class="art">'+productImage(p.product,p.variation)+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">Your current size: '+safe(sizeOf(selected.detail)||selected.detail)+'</p><p class="small">Choose your replacement size:</p><div class="actions">'+all.map(v=>'<button class="'+(v.fixture&&Number(v.quantity)<=0?"outline":"darkbtn")+'" data-select="'+safe(v.sku)+'" '+(!v.fixture||Number(v.quantity)<=0?'disabled title="No demo stock or browse-only Sandbox listing"':'')+'>'+safe(sizeOf(v.variation)||v.variation)+(v.fixture?' · '+v.quantity+' left':' · browse')+'</button>').join("")+'</div><p class="small muted">Other sizes retain the same product, design and colour.</p></div>'
+     const p=options[0],all=options.slice().sort((a,b)=>(Number(sizeOf(a.variation)?.replace("uk ",""))||0)-(Number(sizeOf(b.variation)?.replace("uk ",""))||0));
+     return '<div class="card"><div class="eyebrow">'+safe(storeOf(p))+' · SAME PRODUCT</div><div class="art">'+productImage(p.product,p.variation)+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">Your current size: '+safe(sizeOf(selected.detail)||selected.detail)+'</p><p class="small">Tap the new size to review the exchange:</p><div class="actions">'+all.map(v=>'<button class="'+(v.fixture&&Number(v.quantity)<=0?"outline":"darkbtn")+'" data-select="'+safe(v.sku)+'" aria-label="Review '+safe(v.variation)+'">'+safe(sizeOf(v.variation)||v.variation)+(v.fixture?(Number(v.quantity)>0?' · '+v.quantity+' available':' · out of stock'):' · preview only')+'</button>').join("")+'</div><p class="small muted">The selected size will be reviewed before a simulated replacement and return are recorded.</p></div>';
    }).join("");
  }else{
-   markup=rows.slice(0,32).map(p=>{
-     const usable=p.fixture&&Number(p.quantity)>0;
-     return '<div class="card"><div class="art">'+productImage(p.product,p.variation)+'</div><div class="eyebrow">'+safe(storeOf(p))+' · '+(p.fixture?'DEMO STOCK':'SQUARE SANDBOX CATALOGUE')+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">'+safe(p.variation)+'</p><div class="price">'+money(p.priceMinor/100)+'</div><p class="small muted">'+(p.fixture?(usable?p.quantity+' demo units available':'Out of stock in demo retailer'):'Read-only listing; no exchange checkout')+'</p><button class="outline" data-watch="'+safe(p.sku)+'">'+(watch[p.sku]?"✓ Watching":"◎ Watch price")+'</button> <button class="darkbtn" data-select="'+safe(p.sku)+'" '+(!usable?'disabled title="Demo variant unavailable"':'')+'>'+(exchangeContext?'Choose swap →':'Explore →')+'</button></div>';
+   markup=rows.slice(0,40).map(p=>{
+     const usable=p.fixture&&Number(p.quantity)>0,previewOnly=!p.fixture,availability=usable?p.quantity+' demo units available':p.fixture?'Out of stock · view details':'Square Sandbox · browsing only';
+     const explanation=exchangeContext?(reason==="design"?"A different look from the same retailer":reason==="colour"?"Another colour of your original item":"An alternative to consider"):"See details before choosing a purchase to exchange";
+     return '<div class="card suggestion-card" role="button" tabindex="0" data-card-select="'+safe(p.sku)+'" aria-label="View '+safe(p.product)+' '+safe(p.variation)+'"><div class="art">'+productImage(p.product,p.variation)+'</div><div class="eyebrow">'+safe(storeOf(p))+' · '+(p.fixture?'DEMO INVENTORY':'SQUARE SANDBOX')+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">'+safe(p.variation)+'</p><div class="price">'+money(p.priceMinor/100)+'</div><p class="small muted">'+safe(availability)+'</p><div class="select-hint">'+(usable?(exchangeContext?'Select this replacement →':'Tap to view product →'):previewOnly?'View catalogue details →':'View stock status →')+'</div><p class="small muted">'+explanation+'</p><button class="outline" data-watch="'+safe(p.sku)+'">'+(watch[p.sku]?"✓ Watching":"◎ Watch price")+'</button></div>';
    }).join("");
  }
- root.innerHTML=markup||'<div class="card" style="grid-column:1/-1"><h3>No in-stock alternatives found for this reason</h3><p class="sub">'+(sizeExchange?'This exact design has no other demo sizes in stock. Check the retailer inventory lab.':'Try another exchange reason or use the retailer lab to add stock. No unrelated items will be silently substituted.')+'</p><button class="outline" onclick="page=\'exchange\';render()">← Change exchange reason</button></div>';
- const status=$("catalogStatus");if(status)status.textContent=rows.filter(p=>p.fixture).length+" editable demo variants · "+rows.filter(p=>!p.fixture).length+" Square browse-only variants. Purchases, exchanges and payment adjustments below are simulations.";
- root.querySelectorAll("[data-watch]").forEach(b=>b.onclick=()=>watchSku(b.dataset.watch));
- root.querySelectorAll("[data-select]").forEach(b=>b.onclick=()=>chooseSku(b.dataset.select));
+ root.innerHTML=markup||'<div class="card" style="grid-column:1/-1"><h3>No matching alternatives found for this reason</h3><p class="sub">'+(sizeExchange?'This exact design has no other listed sizes. You can choose a different reason.':'Try another exchange reason or explore a different style. No unrelated items will be silently substituted.')+'</p><button class="outline" onclick="page=\'exchange\';render()">← Change exchange reason</button></div>';
+ const status=$("catalogStatus");
+ if(status)status.textContent=rows.filter(p=>p.fixture&&Number(p.quantity)>0).length+" selectable, in-stock demo variants · "+rows.filter(p=>!p.fixture).length+" Square browsing-only variants. All checkout and return actions are simulated.";
+ root.querySelectorAll("[data-watch]").forEach(button=>button.onclick=event=>{event.stopPropagation();watchSku(button.dataset.watch)});
+ root.querySelectorAll("[data-select]").forEach(button=>button.onclick=()=>chooseSku(button.dataset.select));
+ root.querySelectorAll("[data-card-select]").forEach(card=>{
+   const open=()=>chooseSku(card.dataset.cardSelect);
+   card.onclick=event=>{if(event.target.closest("[data-watch]"))return;open()};
+   card.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest("button")){event.preventDefault();open()}};
+ });
 }
 function readDemoLog(){try{const x=JSON.parse(localStorage.getItem("relay-demo-orders-v1")||"[]");return Array.isArray(x)?x:[]}catch{return []}}
 function demoRequestId(){return "RELAY-DEMO-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,8).toUpperCase()}
 function quoteText(q){return q.paymentMinor>0?'Additional payment · '+money(q.paymentMinor/100):q.refundMinor>0?'Refund difference · '+money(q.refundMinor/100):'Even exchange · £0.00'}
 function chooseSku(sku){
- chosen=catalog.find(p=>p.sku===sku);if(!chosen||!chosen.fixture)return;
+ chosen=catalog.find(p=>p.sku===sku);if(!chosen)return;
  const box=$("catalogResults");if(!box)return;
- const sameStore=!!exchangeContext&&storeOf(chosen).toLowerCase()===String(selected.merchant).toLowerCase();
+ const context=!!exchangeContext,fromSameStore=context&&storeOf(chosen).toLowerCase()===String(selected.merchant).toLowerCase();
+ const eligible=chosen.fixture&&Number(chosen.quantity)>0;
  let quote=null,message="";
- if(sameStore){try{quote=RelayExchangeEngine.quote({purchase:selected,candidate:{...chosen,store:storeOf(chosen)},reason,existing:readDemoLog()})}catch(e){message=e.message}}
+ if(context&&fromSameStore&&eligible){try{quote=RelayExchangeEngine.quote({purchase:selected,candidate:{...chosen,store:storeOf(chosen)},reason,existing:readDemoLog()})}catch(e){message=e.message}}
  const original=Math.round(Number(selected?.price||0)*100),next=Number(chosen.priceMinor);
- box.innerHTML='<div class="card" style="grid-column:1/-1"><button class="link" id="backToResults">← Other alternatives</button><div class="eyebrow">'+safe(storeOf(chosen))+' · EDITABLE DEMO INVENTORY</div><div class="art">'+productImage(chosen.product,chosen.variation)+'</div><h2>'+safe(chosen.product)+'</h2><p>'+safe(chosen.variation)+'</p><div class="price">'+money(next/100)+'</div>'+
- (quote?'<div class="card" style="background:#eff5e9;margin-top:15px"><h3>Exchange quote</h3><div class="split"><span>Return original</span><b>'+money(original/100)+'</b></div><div class="split"><span>Replacement order</span><b>'+money(next/100)+'</b></div><hr><strong>'+quoteText(quote)+'</strong></div>':sameStore?'<div class="error">'+safe(message)+'</div>':'<div class="notice">This is a standalone demo purchase. Exchange and return must be with the original retailer.</div>')+
- '<p class="small muted">Demo stock: '+chosen.quantity+'. The checkout below updates the local stock, records a replacement order, starts the original return and simulates any price difference. No Square payment/refund/return is called.</p><div class="actions"><button class="outline" id="watchSelected">◎ Watch price</button><button class="darkbtn" id="placeSelected" '+(sameStore&&!quote?'disabled':'')+'>'+(quote?'Confirm simulated exchange →':'Place standalone demo order →')+'</button></div><div id="orderResult" aria-live="polite"></div></div>';
- $("backToResults").onclick=renderCatalog;
- $("watchSelected").onclick=()=>watchSku(sku);
- $("placeSelected").onclick=()=>placeDemoOrder(sku,!!quote);
+ const status=!chosen.fixture?"This Square Sandbox catalogue item is browse-only. Its inventory and exchange eligibility are not confirmed.":!eligible?"This demo item is out of stock. It cannot be selected for exchange.":!context?"To exchange an item, open the original purchase in your wallet first.":"This is an alternative product, but a coordinated exchange is unavailable: "+(message||"Original and replacement retailers must match.");
+ box.innerHTML='<div class="card" style="grid-column:1/-1"><button class="link" id="backToResults">← Back to suggestions</button><div class="eyebrow" style="margin-top:12px">'+safe(storeOf(chosen))+' · '+(chosen.fixture?'DEMO INVENTORY':'SQUARE SANDBOX CATALOGUE')+'</div><div class="art">'+productImage(chosen.product,chosen.variation)+'</div><h2>'+safe(chosen.product)+'</h2><p>'+safe(chosen.variation)+'</p><div class="price">'+money(next/100)+'</div>'+
+ (quote?'<div class="card" style="background:#263e32;border-color:#71934e;margin-top:15px"><h3>Review your exchange</h3><p class="small">Original: '+safe(selected.item)+' · '+safe(selected.detail)+'</p><div class="split"><span>Return original</span><b>'+money(original/100)+'</b></div><div class="split"><span>Replacement</span><b>'+money(next/100)+'</b></div><hr style="border:0;border-top:1px solid #66845d"><strong>'+quoteText(quote)+'</strong><p class="small">This demo will record a replacement order and original-item return together. No real payment is taken.</p></div>':'<div class="notice" style="margin-top:16px">'+safe(status)+'</div>')+
+ '<p class="small muted">'+(chosen.fixture?'Demo stock: '+chosen.quantity+' · ':'')+'Selecting a product is a preview, not a payment, return authorisation or stock reservation.</p><div class="actions"><button class="outline" id="watchSelected">◎ Watch price</button>'+
+ (quote?'<button class="darkbtn" id="placeSelected">Confirm simulated exchange →</button>':context?'<button class="outline" id="backToPurchase">← Back to original purchase</button>':'<button class="darkbtn" id="goToWallet">Go to my purchases →</button>')+'</div><div id="orderResult" aria-live="polite"></div></div>';
+ const back=$("backToResults");if(back)back.onclick=renderCatalog;
+ const watchButton=$("watchSelected");if(watchButton)watchButton.onclick=()=>watchSku(sku);
+ const confirm=$("placeSelected");if(confirm)confirm.onclick=()=>placeDemoOrder(sku,true);
+ const backOriginal=$("backToPurchase");if(backOriginal)backOriginal.onclick=()=>{page="detail";exchangeContext=false;render()};
+ const backWallet=$("goToWallet");if(backWallet)backWallet.onclick=()=>go("wallet");
+ box.scrollIntoView({behavior:"smooth",block:"start"});
 }
 function placeDemoOrder(sku,isExchange){
+ if(!isExchange||!exchangeContext)return showCheckoutError("Start with a purchase in your wallet, then select Exchange. Standalone orders are not created here.");
  const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return showCheckoutError("Only editable demo inventory supports test checkout.");
  const existing=readDemoLog(),now=new Date().toISOString(),id=demoRequestId();
  let rec;
