@@ -1,8 +1,6 @@
-import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
-const moduleCode=readFileSync(new URL("../worker/shopify-webhooks.js", import.meta.url),"utf8");
-const { receiveShopifyWebhook }=await import("data:text/javascript;base64,"+Buffer.from(moduleCode).toString("base64"));
+import { receiveShopifyWebhook } from "../worker/shopify-webhooks.js";
 const secret="unit-test-secret";
 const data=JSON.stringify({
  id:123456789,created_at:"2026-10-14T12:30:00+00:00",processed_at:"2026-10-14T12:31:00+00:00",
