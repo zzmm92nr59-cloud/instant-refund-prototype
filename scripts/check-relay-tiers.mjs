@@ -22,5 +22,8 @@ const finished=engine.advanceReturn(received);
 assert.equal(finished.returnStatus,"RETURN_COMPLETED");
 assert.equal(finished.status,"SIMULATED_STANDARD_REFUND_AFTER_RETURN");
 assert.equal(finished.ledger[0].type,"STANDARD_REFUND_AFTER_RETURN");
+const exchangedReturn=engine.advanceReturn(received,undefined,{exchangeAlreadyIssued:true});
+assert.equal(exchangedReturn.status,"RETURN_COMPLETED_WITH_EXCHANGE");
+assert.equal(exchangedReturn.ledger.length,0,"An exchanged return must not also receive a standard refund");
 assert.throws(()=>engine.quote({purchase,candidate,reason:"size",existing:[finished]}),/return/,"Cannot refund then exchange twice");
 console.log("PASS Free return-first exchange, no duplicate return, standard refund after completion");
