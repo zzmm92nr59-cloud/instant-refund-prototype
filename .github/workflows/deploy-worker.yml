@@ -17,6 +17,9 @@ jobs:
         run: |
           test -f worker/worker.js || { echo "worker/worker.js is missing"; exit 1; }
           node --check worker/worker.js
+          node --check worker/shopify.js
+          node --check worker/shopify-webhooks.js
+          node scripts/test-shopify-multi-store.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
