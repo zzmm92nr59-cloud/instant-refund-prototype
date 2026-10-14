@@ -286,15 +286,38 @@ const stores=demoRetailers.map(st=>{const rows=catalog.filter(p=>storeOf(p)===st
 return '<button class="link" onclick="retailer=false;render()">← Back to Relay</button><h1 class="title">Retailer inventory lab</h1><p class="sub">Edit three independent fictional retailer inventories, including Shopify-style demo shops. Changes persist in this browser and appear in Discover, Radar and exchange checks.</p><div class="notice">The Shopify demo retailers are fictional. Actual Shopify order ingestion is private and requires retailer authorisation. Square Sandbox inventory is read-only here. No changes are sent to any real merchant, and demo stock is not shared across devices.</div><div class="card"><h3>North & Co. · Square Sandbox</h3><p class="small muted">'+catalog.filter(p=>!p.fixture).length+' catalogue variants from Square Sandbox. Not editable through this lab.</p></div>'+stores+'<button class="outline" id="resetInventory">Reset all demo retailer prices and stock</button>';
 }
 function bindRetailerControls(){document.querySelectorAll("[data-save-sku]").forEach(b=>b.onclick=()=>{const sku=b.dataset.saveSku;const price=Number($("price-"+sku)?.value),qty=Number($("qty-"+sku)?.value);if(!Number.isFinite(price)||price<1||!Number.isInteger(qty)||qty<0){alert("Enter a valid price and non-negative whole-number stock quantity.");return}inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(price*100),quantity:qty,updatedAt:new Date().toISOString()};saveInventory()});document.querySelectorAll("[data-discount-sku]").forEach(b=>b.onclick=()=>applyDemoDiscount(b.dataset.discountSku));const reset=$("resetInventory");if(reset)reset.onclick=()=>{if(confirm("Reset all demo retailer prices and stock?"))resetDemoInventory()}}
-async function loadCatalog(manual=false){try{const r=await fetch(API+"/relay/live-test/products",{cache:"no-store"});if(!r.ok)throw Error("HTTP "+r.status);const d=await r.json();catalog=(d.products||[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor)));
- catalog.push(...demoProducts());
- try {
-  const sr=await fetch(API+"/relay/shopify/catalogue",{cache:"no-store"});
-  if(sr.ok){const sd=await sr.json();if(sd.published&&Array.isArray(sd.products)){
-   catalog.push(...sd.products.filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"shopify",store:"Shopify retailer",fixture:false})));
-  }}
- }catch{} // Shopify catalogue is only available with explicit merchant publication.
- if(page==="wallet")render();if(manual){for(const [sku,w] of Object.entries(watch)){const p=catalog.find(x=>x.sku===sku);if(p&&history[sku]===undefined)history[sku]=w.baseline}localStorage.setItem("relay-radar-history-v2",JSON.stringify(history))}}catch(e){catalog=demoProducts();if(manual)alert("Square catalogue unavailable; demo store inventories remain accessible: "+e.message)}if(page==="discover")renderCatalog();if(page==="radar")showRadar()}
+async function loadCatalog(manual=false){
+ let next=demoProducts(),squareError=null;
+ try{
+  const response=await fetch(API+"/relay/live-test/products",{cache:"no-store"});
+  if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
+  const data=await response.json();
+  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))),...next];
+ }catch(e){squareError=e.message}
+ // Independent retailer feed: a Square outage must not suppress a connected Shopify catalogue.
+ try{
+  const response=await fetch(API+"/relay/shopify/catalogue",{cache:"no-store"});
+  if(response.ok){
+   const data=await response.json();
+   if(data.published&&Array.isArray(data.products)){
+    const published=data.products.filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"shopify",store:"Shopify retailer",fixture:false}));
+    next.push(...published);
+   }
+  }
+ }catch{}
+ catalog=next;
+ if(page==="wallet")render();
+ if(manual){
+  for(const [sku,w] of Object.entries(watch)){
+   const p=catalog.find(x=>x.sku===sku);
+   if(p&&history[sku]===undefined)history[sku]=w.baseline;
+  }
+  localStorage.setItem("relay-radar-history-v2",JSON.stringify(history));
+  if(squareError)console.warn("Square unavailable; independent demo/Shopify feeds remain available",squareError);
+ }
+ if(page==="discover")renderCatalog();
+ if(page==="radar")showRadar();
+}
 async function loadShopifyStatus(){
  const node=$("shopifyStatus");if(!node)return;
  try{
