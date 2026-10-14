@@ -1,0 +1,27 @@
+name: Relay UI Smoke Test
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - relay-exchange-engine.js
+      - scripts/ui-smoke-test.mjs
+      - .github/workflows/ui-smoke-test.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Test purchase flows on desktop and mobile
+        run: node scripts/ui-smoke-test.mjs
