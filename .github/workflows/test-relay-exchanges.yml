@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'relay-exchange-engine.js'
+      - 'relay-recommendation-engine.js'
+      - 'scripts/test-relay-recommendations.cjs'
       - 'index.html'
       - 'scripts/test-relay-exchanges.cjs'
       - '.github/workflows/test-relay-exchanges.yml'
@@ -18,3 +20,5 @@ jobs:
           node-version: '22'
       - name: Check three-retailer sizes, coats and payment/refund state machine
         run: node scripts/test-relay-exchanges.cjs
+      - name: Discover purchase-history recommendation tests
+        run: node scripts/test-relay-recommendations.cjs
