@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#151b2c"><title>North & Co. — The Relay Test Store</title>
+<style>
+:root{--ink:#172032;--paper:#f7f8fa;--line:#e6e9ee;--lime:#c8f36a;--muted:#677185}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font:15px Inter,-apple-system,BlinkMacSystemFont,Segoe UI,system-ui,sans-serif}button,input,select{font:inherit}button{cursor:pointer}a{text-decoration:none;color:inherit}
+.announce{background:#162036;color:#dce9c2;text-align:center;font-size:12px;font-weight:750;letter-spacing:.2px;padding:10px 18px}
+.header{background:white;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.headrow{max-width:1190px;margin:auto;padding:15px 22px;display:flex;align-items:center;gap:25px}
+.brand{font-size:27px;font-weight:950;letter-spacing:-1.7px;white-space:nowrap}.brand span{color:#88ab37}
+.links{display:flex;gap:19px;align-items:center;flex:1}.links a{font-weight:750;font-size:13px;color:#4b576a}.links a:hover{color:#0d6b49}
+.shopper{display:flex;gap:8px;align-items:center;color:#5e697b;font-size:12px;font-weight:750}
+.shopper select{border:1px solid #d4dae3;background:white;border-radius:10px;padding:9px}
+.bag{border:0;background:#182235;color:white;font-size:13px;font-weight:850;padding:12px 18px;border-radius:13px;white-space:nowrap}
+.container{max-width:1190px;margin:auto;padding:0 22px 75px}
+.hero{display:grid;grid-template-columns:1.08fr .92fr;min-height:380px;overflow:hidden;border-radius:24px;background:#152139;color:white;margin:25px 0 30px}
+.hero-copy{padding:48px 42px;position:relative;z-index:1;display:flex;flex-direction:column;align-items:start;justify-content:center}
+.overline{font-size:11px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:#d4ef96}
+.hero h1{font-size:clamp(37px,5.2vw,65px);line-height:1.02;letter-spacing:-2.6px;margin:15px 0}
+.hero p{color:#d2d9e4;font-size:15px;line-height:1.6;max-width:430px}
+.cta{background:var(--lime);color:#1a2915;display:inline-block;border:0;border-radius:12px;padding:14px 20px;font-weight:900;margin-top:14px}
+.hero-art{background:radial-gradient(circle at 45% 45%,#d9e4d0 0,#aabbb3 34%,#6d8595 65%,#34465f 100%);display:grid;place-items:center;position:relative;overflow:hidden}
+.hero-art:before{content:"N° 01";position:absolute;top:20px;right:25px;font-size:13px;font-weight:800;color:#fff8}
+.hero-art img{width:min(78%,330px);aspect-ratio:1/1;object-fit:contain;filter:drop-shadow(0 32px 25px #10203666);transform:rotate(-15deg) scale(1.24);border-radius:24px;opacity:.96}
+.labels{display:flex;justify-content:space-between;align-items:center;gap:12px}.labels h2{font-size:26px;letter-spacing:-.9px;margin:0}.muted{color:var(--muted)}.small{font-size:12px}.badge{background:#e9f3d8;color:#4b6d25;border-radius:100px;padding:7px 10px;font-size:11px;font-weight:800}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}
+.toolbar input,.toolbar select{background:white;border:1px solid #dbe0e7;padding:12px;border-radius:12px;min-height:44px}
+.toolbar input{flex:1;min-width:190px}.toolbar select{min-width:180px}
+.products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:17px}
+.product{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.photo{background:#eef0f5;min-height:190px;aspect-ratio:1.15;display:grid;place-items:center}
+.photo img{width:100%;max-height:230px;height:100%;object-fit:contain}
+.info{padding:18px;display:flex;flex:1;flex-direction:column}.type{font-size:10px;font-weight:900;letter-spacing:1px;color:#819096}
+.info h3{font-size:18px;margin:7px 0 5px;line-height:1.2}.price{font-size:20px;font-weight:900;letter-spacing:-.5px;margin:8px 0 12px}
+.product label{font-size:11px;font-weight:800;color:#586477;margin-bottom:5px}
+.product select{width:100%;padding:10px;border:1px solid #d8dde4;border-radius:9px;background:#fff;min-width:0;color:#23304b}
+.stock{font-size:11px;color:#60736a;margin:9px 0}.stock.low{color:#ab6519}.add{background:#172135;color:white;border:0;width:100%;padding:12px;border-radius:12px;font-weight:900;margin-top:auto}.add:disabled{opacity:.45;cursor:not-allowed}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:23px;margin-top:30px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.step{background:#f7f8f9;padding:20px;border-radius:15px}.step strong{display:block;margin-bottom:8px}.step p{font-size:12px;color:#657084;line-height:1.6}
+.overlay{position:fixed;inset:0;background:#0a122aa8;z-index:35;display:none}.overlay.open{display:block}.drawer{position:fixed;right:0;top:0;bottom:0;width:min(445px,100%);background:#fff;z-index:40;transform:translateX(105%);transition:transform .22s ease;box-shadow:-12px 0 40px #0002;display:flex;flex-direction:column}.drawer.open{transform:translateX(0)}
+.drawerhead{padding:22px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}
+.close{background:#f1f3f6;border:0;border-radius:50%;height:38px;width:38px;font-size:18px}
+.drawerbody{padding:19px 22px;overflow:auto;flex:1}.cartitem{display:flex;gap:14px;padding:17px 0;border-bottom:1px solid var(--line)}
+.mini{background:#edf0f4;border-radius:13px;width:70px;height:70px;display:grid;place-items:center;flex:none}.mini img{width:70px;height:70px}
+.cartitem strong{font-size:14px}.cartitem p{margin:5px 0;color:#707b8c;font-size:12px}.qty{display:flex;gap:9px;align-items:center;margin-top:10px}.qty button{border:1px solid #dde1e9;border-radius:7px;background:white;width:29px;height:29px}
+.drawerfoot{padding:19px 22px;border-top:1px solid var(--line)}.total{display:flex;justify-content:space-between;font-size:19px;font-weight:850;margin-bottom:12px}
+.checkout{display:block;background:#c8f36a;border:0;border-radius:12px;padding:15px;font-weight:900;width:100%;color:#263513}
+.checkout:disabled{opacity:.45;cursor:not-allowed}.disclaimer{color:#748093;font-size:11px;line-height:1.5}
+.error{background:#fff0ec;color:#9c3525;border-radius:10px;padding:12px;font-size:12px;margin:10px 0}
+.success{background:#e7f6da;color:#365d22;border-radius:10px;padding:12px;font-size:12px;margin:10px 0}
+.confirm{max-width:650px;margin:40px auto;background:white;border-radius:25px;padding:39px;box-shadow:0 15px 40px #16213413;text-align:center}.confirm h2{font-size:34px;letter-spacing:-1px}.confirm .check{background:#e6f7d6;border-radius:50%;width:65px;height:65px;display:grid;place-items:center;margin:auto;font-size:35px}.confirm a{display:inline-block;margin:9px;padding:14px 19px;border-radius:12px;background:#182135;color:white;font-weight:850}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1c2d21;color:white;padding:12px 19px;border-radius:12px;box-shadow:0 8px 30px #0004;z-index:45;display:none;font-size:13px}.toast.show{display:block}
+@media(max-width:1000px){.products{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{min-height:335px}.hero-copy{padding:32px}.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.headrow{padding:12px 15px;gap:8px;flex-wrap:wrap}.brand{font-size:22px}.links{display:none}.shopper{margin-left:auto}.shopper span{display:none}.shopper select{padding:7px}.bag{padding:10px}.container{padding:0 13px 65px}.hero{grid-template-columns:1fr;min-height:0;margin:13px 0 25px}.hero-copy{padding:30px 23px}.hero h1{font-size:37px;margin:12px 0}.hero-art{min-height:190px;max-height:200px}.hero-art img{max-width:220px}.products{gap:10px}.photo{min-height:125px}.info{padding:12px}.info h3{font-size:15px}.price{font-size:18px}.steps{grid-template-columns:1fr}.labels h2{font-size:23px}.toolbar input,.toolbar select{width:100%;flex:1}.confirm{padding:25px;margin:25px 5px}.panel{padding:17px}}
+</style></head><body>
+<div class="announce">✦ A FICTIONAL RETAIL STORE · CHECKOUT IS A SIMULATION · NO REAL PAYMENTS</div>
+<header class="header"><div class="headrow"><a href="./test-store.html" class="brand">north<span>&</span>co.</a><nav class="links"><a href="#collection">Shop trainers</a><a href="#how">How Relay works</a><a href="./">My Relay wallet ↗</a></nav><label class="shopper"><span>Demo shopper</span><select id="shopper" aria-label="Demo shopper"><option>Ava</option><option>Ben</option><option>Cara</option><option>Dylan</option></select></label><button class="bag" id="openBag">Bag <span id="bagCount">0</span> ↗</button></div></header>
+<main class="container" id="main">
+<section class="hero"><div class="hero-copy"><div class="overline">NORTH & CO. · AUTUMN COLLECTION</div><h1>Find your<br>next favourite.</h1><p>Considered footwear for whatever comes next. Explore styles, choose your size and see how effortless exchanging could feel with Relay.</p><a href="#collection" class="cta">Shop the collection →</a></div><div class="hero-art" id="heroArt"><span style="font-size:115px">👟</span></div></section>
+<section id="collection"><div class="labels"><div><div class="overline" style="color:#69883e">THE COLLECTION</div><h2>Made to move with you</h2></div><span class="badge" id="variantCount">Demo inventory</span></div>
+<div class="toolbar"><input id="search" placeholder="Search styles or colours…" aria-label="Search products"><select id="sort" aria-label="Sort products"><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div>
+<div id="products" class="products"><div class="panel">Loading test inventory…</div></div></section>
+<section class="panel" id="how"><div class="overline" style="color:#719445">THE RELAY CONNECTION</div><h2>Purchase normally. Change your mind easily.</h2><div class="steps"><div class="step"><strong>01 · Shop</strong><p>Choose a size or style at North & Co. and complete a simulated checkout.</p></div><div class="step"><strong>02 · Track</strong><p>Your test order appears in the Relay demo wallet for your chosen demo shopper.</p></div><div class="step"><strong>03 · Swap or refund</strong><p>Try Relay's exchange, return and simulated refund journeys. No real money or items move.</p></div></div><p class="disclaimer">Stock and prices are fictional retailer fixtures shared with Relay via browser storage. This is not connected to a real payment processor or shipping provider.</p></section>
+</main>
+<div class="overlay" id="overlay"></div><aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Shopping bag"><div class="drawerhead"><div><div class="overline" style="color:#729b3c">NORTH & CO.</div><h2 style="margin:5px 0">Your bag</h2></div><button class="close" id="closeBag" aria-label="Close bag">×</button></div><div class="drawerbody"><div id="cartItems"><p class="muted">Your bag is empty.</p></div><p id="checkoutMessage" aria-live="polite"></p></div><div class="drawerfoot"><div class="total"><span>Subtotal</span><span id="subtotal">£0.00</span></div><button id="checkout" class="checkout">Place simulated order →</button><p class="disclaimer">TEST CHECKOUT ONLY. We will not ask for payment details, send charges or create a real Square/Shopify order.</p></div></aside>
+<div class="toast" id="toast" aria-live="polite"></div>
+<script>
+(function(){
+"use strict";
+const INVENTORY_KEY="relay-retailer-inventory-v3",ORDER_KEY="relay-test-store-orders-v1",SHOPPER_KEY="relay-demo-active-customer-v1";
+const demoRetailers=[
+{id:"north",name:"North & Co.",prefix:"NORTH",items:[
+["Retro High Trainers","White / Grey / UK 6",12999,6],
+["Retro High Trainers","White / Grey / UK 7",12999,10],
+["Retro High Trainers","White / Grey / UK 8",12999,12],
+["Retro High Trainers","White / Grey / UK 9",12999,8],
+["Retro High Trainers","White / Grey / UK 10",12999,4],
+["Retro High Trainers","Black / UK 7",12999,7],
+["Retro High Trainers","Black / UK 8",12999,9],
+["Retro High Trainers","Sand / UK 8",12999,5],
+["Minimal Low Trainers","White / UK 7",11999,11],
+["Minimal Low Trainers","White / UK 8",11999,8],
+["Minimal Low Trainers","Black / UK 8",11999,5],
+["Retro Suede Trainers","Slate / UK 7",13499,6],
+["Retro Suede Trainers","Slate / UK 8",13499,7],
+["Retro Suede Trainers","Cream / UK 8",13499,4],
+["Everyday Runner Sneakers","Grey / UK 8",9999,14],
+["Everyday Runner Sneakers","Navy / UK 9",9999,10]]},
+{id:"studio",name:"Relay Studio",platform:"Shopify demo",prefix:"STUDIO",items:[
+["Boxy Cotton Tee","Forest / M",2899,14],["Boxy Cotton Tee","Forest / L",2899,8],["Boxy Cotton Tee","Chalk / M",2899,11],
+["Everyday Crossbody Bag","Black",4999,5],["Everyday Crossbody Bag","Clay",4999,9],
+["Relaxed Denim Jacket","Washed Blue / M",7999,4],["Relaxed Denim Jacket","Washed Blue / L",7999,6],
+["Ribbed Knit Jumper","Oat / S",4599,12],["Ribbed Knit Jumper","Oat / M",4599,7],
+["City Runner Sneakers","Cream / UK 7",8999,3],["City Runner Sneakers","Cream / UK 8",8999,9],["City Runner Sneakers","Slate / UK 8",9499,4],
+["City Runner Sneakers","Cream / UK 9",8999,4],["Boxy Cotton Tee","Forest / S",2899,6],["Boxy Cotton Tee","Forest / XL",2899,3]]},
+{id:"harbour",name:"Harbour Goods",platform:"Shopify demo",prefix:"HARBOUR",items:[
+["Coastal Canvas Tote","Navy",3899,22],["Coastal Canvas Tote","Stone",3899,15],
+["Harbour Trail Boots","Brown / UK 8",12499,6],["Harbour Trail Boots","Brown / UK 9",12499,2],
+["Linen Overshirt","Ecru / M",6499,8],["Linen Overshirt","Ecru / L",6499,5],
+["Waxed Field Jacket","Olive / M",13999,3],["Waxed Field Jacket","Olive / L",13999,4],
+["Weekend Holdall","Rust",7999,10],["Weekend Holdall","Navy",7999,7],
+["Merino Beanie","Charcoal",2499,17],["Merino Beanie","Moss",2499,12],
+["Harbour Trail Boots","Brown / UK 7",12499,5],["Harbour Trail Boots","Brown / UK 10",12499,3],
+["Linen Overshirt","Ecru / S",6499,4],["Linen Overshirt","Ecru / XL",6499,2],
+["Waxed Field Coat","Olive / M",13999,5],["Waxed Field Coat","Olive / L",13999,5],["Waxed Field Coat","Slate / M",13999,4],
+["Quilted Liner Jacket","Navy / M",11999,6],["Quilted Liner Jacket","Navy / L",11999,4],
+["Waterproof Rain Shell Coat","Sand / M",15999,7],["Waterproof Rain Shell Coat","Black / M",15999,3],
+["City Trench Coat","Stone / M",16999,3],["City Trench Coat","Stone / L",16999,2]]}
+];
+const shop=demoRetailers.find(s=>s.id==="north");
+const $=id=>document.getElementById(id);
+const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money=p=>"£"+(Number(p)/100).toFixed(2);
+function productImage(name,variation=""){const n=String(name||"").toLowerCase(),v=String(variation||"").toLowerCase();let kind=/trainer|shoe|sneaker|jordan|boot/.test(n)?"shoe":/hoodie|sweatshirt|jumper/.test(n)?"hoodie":/jacket|coat|denim/.test(n)?"jacket":/bag|tote|backpack/.test(n)?"bag":/shirt|tee|top/.test(n)?"shirt":/trouser|jean|pant/.test(n)?"trousers":"shoe";
+let c=/green|sage/.test(v)?"#90ad9d":/blue|denim/.test(v)?"#6687b3":/black/.test(v)?"#34384a":/pink/.test(v)?"#d5a1b4":/sand|cream|beige/.test(v)?"#cbb99d":"#e3e5e9";
+const shapes={
+shoe:'<path d="M27 103q15-8 24-28l17 8q9 15 30 19l26 3q17 4 17 19v10H20q-7-13 7-31z" fill="'+c+'" stroke="#737d91" stroke-width="3"/><path d="M20 126h121v12H20z" fill="#fff" stroke="#737d91" stroke-width="2"/><path d="M59 92l28 14m-20-19l29 15m-18-20l29 14" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M35 114q16-3 23-15" stroke="#8b96aa" stroke-width="3" fill="none"/>',
+hoodie:'<path d="M53 40l-25 17-15 45 22 9 13-26v62h65V85l13 26 22-9-15-45-25-17-13 18H66z" fill="'+c+'" stroke="#64748b" stroke-width="3"/><path d="M54 40q26-27 52 0L94 68H67z" fill="#b7c4bf" stroke="#64748b" stroke-width="3"/><path d="M72 69v24m18-24v24M59 111h43" stroke="#fff" stroke-width="3" fill="none"/>',
+jacket:'<path d="M58 35l-32 18-17 58 27 10 15-36v63h66V85l15 36 27-10-17-58-32-18-22 25z" fill="'+c+'" stroke="#536c91" stroke-width="3"/><path d="M58 35l23 31-17 18-18-42m64-7L81 66l17 18 18-42M81 66v81" stroke="#e7edf5" stroke-width="3" fill="none"/><path d="M54 95h19v17H54zm35 0h19v17H89z" fill="none" stroke="#dbe4ef" stroke-width="3"/>',
+bag:'<path d="M32 63h97l10 80H22z" fill="'+c+'" stroke="#8a7966" stroke-width="3"/><path d="M56 67V48q0-26 24-26t24 26v19" fill="none" stroke="#8a7966" stroke-width="8"/><path d="M30 91h100M49 91v49m63-49v49" stroke="#f0e7d9" stroke-width="3" opacity=".8"/>',
+shirt:'<path d="M53 37l-37 24 22 31 15-13v69h56V79l15 13 22-31-37-24-15 20H68z" fill="'+c+'" stroke="#68758a" stroke-width="3"/><path d="M68 37q12 26 26 0" fill="none" stroke="#fff" stroke-width="4"/>',
+trousers:'<path d="M44 20h72l-5 126H83l-7-75-8 75H39z" fill="'+c+'" stroke="#63758e" stroke-width="3"/><path d="M44 41h72M80 40v20" stroke="#e3eaf1" stroke-width="3"/>'
+};
+const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="22" fill="#f0f1f6"/><circle cx="81" cy="80" r="67" fill="#e7eaf1"/>'+shapes[kind]+'</svg>';return '<img alt="'+safe(name)+' product illustration" loading="lazy" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'">'}
+const loadJSON=(key,otherwise)=>{try{const d=JSON.parse(localStorage.getItem(key));return d===null?otherwise:d}catch{return otherwise}};
+let cart=new Map(),lastOrder=null;
+const variants=shop.items.map(([product,variation,priceMinor,quantity],i)=>({sku:"DEMO-NORTH-"+String(i+1).padStart(3,"0"),product,variation,priceMinor,quantity}));
+function inventory(){const changes=loadJSON(INVENTORY_KEY,{});return variants.map(p=>({...p,quantity:Number.isInteger(changes[p.sku]?.quantity)?changes[p.sku].quantity:p.quantity,priceMinor:Number.isInteger(changes[p.sku]?.priceMinor)?changes[p.sku].priceMinor:p.priceMinor}))}
+function uniqueProducts(){const groups=new Map();for(const p of inventory()){if(!groups.has(p.product))groups.set(p.product,[]);groups.get(p.product).push(p)}return [...groups].map(([name,options])=>({name,options}))}
+function shopper(){return ["Ava","Ben","Cara","Dylan"].includes($("shopper").value)?$("shopper").value:"Ava"}
+function announce(msg){$("toast").textContent=msg;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2600)}
+function allCart(){return [...cart].map(([sku,quantity])=>({product:inventory().find(p=>p.sku===sku),quantity})).filter(x=>x.product)}
+function openBag(){document.getElementById("overlay").classList.add("open");document.getElementById("drawer").classList.add("open");$("closeBag").focus();renderCart()}
+function closeBag(){document.getElementById("overlay").classList.remove("open");document.getElementById("drawer").classList.remove("open")}
+function renderProducts(){
+const q=$("search").value.trim().toLowerCase(),sort=$("sort").value;
+let groups=uniqueProducts().filter(p=>(p.name+" "+p.options.map(x=>x.variation).join(" ")).toLowerCase().includes(q));
+if(sort!=="featured")groups.sort((a,b)=>(sort==="low"?1:-1)*(Math.min(...a.options.map(x=>x.priceMinor))-Math.min(...b.options.map(x=>x.priceMinor))));
+$("variantCount").textContent=inventory().length+" demo variants";
+$("heroArt").innerHTML=productImage("Retro High Trainers","White / Grey / UK 7");
+$("products").innerHTML=groups.map((group,i)=>{
+const available=group.options.find(x=>x.quantity>0)||group.options[0],pid="product-"+i;
+return '<article class="product"><div class="photo">'+productImage(group.name,available.variation)+'</div><div class="info"><div class="type">NORTH & CO. / FOOTWEAR</div><h3>'+safe(group.name)+'</h3><div class="price" id="cost-'+i+'">'+money(available.priceMinor)+'</div><label for="'+pid+'">Choose colour & size</label><select id="'+pid+'" data-choice="'+i+'">'+group.options.map(p=>'<option value="'+safe(p.sku)+'"'+(p===available?" selected":"")+'>'+safe(p.variation)+(p.quantity<1?" — sold out":"")+'</option>').join("")+'</select><div class="stock" id="stock-'+i+'">'+(available.quantity>0?available.quantity+" available in demo stock":"Sold out")+'</div><button class="add" data-add="'+i+'"'+(available.quantity<1?" disabled":"")+'>Add to bag +</button></div></article>'}).join("")||'<div class="panel" style="grid-column:1/-1">No styles found. Try a different search.</div>';
+$("products").querySelectorAll("[data-choice]").forEach(select=>select.onchange=()=>{
+const i=select.dataset.choice,p=inventory().find(x=>x.sku===select.value),box=select.closest(".product");
+if(!p)return;
+box.querySelector(".photo").innerHTML=productImage(p.product,p.variation);
+box.querySelector(".price").textContent=money(p.priceMinor);
+box.querySelector(".stock").textContent=p.quantity>0?p.quantity+" available in demo stock":"Sold out";
+box.querySelector("[data-add]").disabled=p.quantity<1;
+});
+$("products").querySelectorAll("[data-add]").forEach(btn=>btn.onclick=()=>{
+const sku=btn.closest(".product").querySelector("select").value,p=inventory().find(x=>x.sku===sku);
+if(!p||p.quantity<=Number(cart.get(sku)||0)){announce("No additional demo stock available");return}
+cart.set(sku,Number(cart.get(sku)||0)+1);renderCart();announce(p.product+" added to bag");
+});
+}
+function changeQty(sku,diff){const p=inventory().find(x=>x.sku===sku),n=Math.max(0,Number(cart.get(sku)||0)+diff);if(n>Number(p?.quantity||0)){announce("Not enough demo stock");return}if(n===0)cart.delete(sku);else cart.set(sku,n);renderCart()}
+function renderCart(){const items=allCart();$("bagCount").textContent=items.reduce((n,x)=>n+x.quantity,0);$("subtotal").textContent=money(items.reduce((n,x)=>n+x.quantity*x.product.priceMinor,0));$("checkout").disabled=!items.length;$("cartItems").innerHTML=items.length?items.map(({product:p,quantity})=>'<div class="cartitem"><div class="mini">'+productImage(p.product,p.variation)+'</div><div style="min-width:0"><strong>'+safe(p.product)+'</strong><p>'+safe(p.variation)+'</p><strong>'+money(p.priceMinor*quantity)+'</strong><div class="qty"><button data-dec="'+safe(p.sku)+'" aria-label="Remove one">−</button><span>'+quantity+'</span><button data-inc="'+safe(p.sku)+'" aria-label="Add one">+</button></div></div></div>').join(""):'<p class="muted">Your bag is empty. Choose something you love.</p>';$("cartItems").querySelectorAll("[data-dec]").forEach(x=>x.onclick=()=>changeQty(x.dataset.dec,-1));$("cartItems").querySelectorAll("[data-inc]").forEach(x=>x.onclick=()=>changeQty(x.dataset.inc,1))}
+function checkout(){
+const items=allCart();if(!items.length)return;
+const currentChanges=loadJSON(INVENTORY_KEY,{}),current=inventory();
+for(const {product,quantity} of items){const check=current.find(x=>x.sku===product.sku);if(!check||check.quantity<quantity){$("checkoutMessage").innerHTML='<div class="error">Inventory changed. Check your bag and try again.</div>';return}}
+const oldOrders=localStorage.getItem(ORDER_KEY),oldInventory=localStorage.getItem(INVENTORY_KEY),oldShopper=localStorage.getItem(SHOPPER_KEY);
+const now=new Date(),date=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}),deadlineDate=new Date(now.getTime()+30*86400000);
+const deadline=deadlineDate.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+const orderId="NCO-DEMO-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
+const customer=shopper(),lineItems=items.map(({product:p,quantity},i)=>({id:"teststore-"+orderId+"-"+i,orderId,merchant:"North & Co.",item:p.product,detail:p.variation,price:p.priceMinor/100,quantity,sku:p.sku,date,deadline,icon:"👟",demo:true,customer,source:"test_store",createdAt:now.toISOString()}));
+const existing=loadJSON(ORDER_KEY,[]);if(!Array.isArray(existing))throw Error("Invalid test order storage");
+const newChanges={...currentChanges};for(const {product:p,quantity} of items){const check=current.find(x=>x.sku===p.sku);newChanges[p.sku]={...(newChanges[p.sku]||{}),quantity:check.quantity-quantity,updatedAt:now.toISOString()}}
+try{
+localStorage.setItem(ORDER_KEY,JSON.stringify([...lineItems,...existing].slice(0,100)));
+localStorage.setItem(INVENTORY_KEY,JSON.stringify(newChanges));
+localStorage.setItem(SHOPPER_KEY,customer);
+}catch(e){
+try{if(oldOrders===null)localStorage.removeItem(ORDER_KEY);else localStorage.setItem(ORDER_KEY,oldOrders);if(oldInventory===null)localStorage.removeItem(INVENTORY_KEY);else localStorage.setItem(INVENTORY_KEY,oldInventory);if(oldShopper===null)localStorage.removeItem(SHOPPER_KEY);else localStorage.setItem(SHOPPER_KEY,oldShopper)}catch{}
+$("checkoutMessage").innerHTML='<div class="error">Unable to save the test order in this browser. Check storage permissions and retry.</div>';return
+}
+cart.clear();renderCart();closeBag();lastOrder=orderId;showConfirmation(customer,lineItems);renderProducts();
+}
+function showConfirmation(customer,items){
+const total=items.reduce((n,x)=>n+Math.round(x.price*100)*x.quantity,0);
+$("main").innerHTML='<div class="confirm"><div class="check">✓</div><div class="overline" style="color:#719445;margin-top:20px">ORDER RECORDED IN THIS BROWSER</div><h2>Good choice, '+safe(customer)+'!</h2><p style="font-size:16px">Your North & Co. test order has been added to the Relay demo wallet.</p><div class="badge">'+safe(lastOrder)+'</div><h2>'+money(total)+'</h2><p class="muted">'+items.map(x=>safe(x.item)+" · "+safe(x.detail)+" × "+x.quantity).join("<br>")+'</p><p class="disclaimer">Simulated purchase only. No bank transaction, card charge, retailer fulfilment or verified matching has occurred.</p><a href="./?testOrder='+encodeURIComponent(lastOrder)+'" target="_blank" rel="noopener">Open in Relay wallet ↗</a><a href="./test-store.html" style="background:#edf1f5;color:#1e2839">Shop again</a></div>';
+}
+$("shopper").value=["Ava","Ben","Cara","Dylan"].includes(localStorage.getItem(SHOPPER_KEY))?localStorage.getItem(SHOPPER_KEY):"Ava";
+$("shopper").onchange=()=>{localStorage.setItem(SHOPPER_KEY,shopper());announce("Shopping as "+shopper()+" (demo only)")};
+$("search").oninput=renderProducts;$("sort").onchange=renderProducts;$("openBag").onclick=openBag;$("closeBag").onclick=closeBag;$("overlay").onclick=closeBag;
+$("checkout").onclick=checkout;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeBag()});
+window.addEventListener("storage",e=>{if(e.key===INVENTORY_KEY){renderProducts();renderCart()}});
+renderProducts();renderCart();
+})();
+</script></body></html>
