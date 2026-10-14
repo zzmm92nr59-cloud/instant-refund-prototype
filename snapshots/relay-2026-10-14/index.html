@@ -1,0 +1,373 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta name="theme-color" content="#101828"><title>Relay — Your purchases, reimagined</title><style>
+:root{--ink:#141827;--muted:#737b8c;--bg:#f6f7fb;--lime:#c7f567;--line:#e8eaf0;--purple:#30255d}*{box-sizing:border-box}body{margin:0;background:var(--bg);font:15px Inter,system-ui,-apple-system,sans-serif;color:var(--ink)}button,input,select{font:inherit}button{cursor:pointer}a{color:inherit;text-decoration:none}.app{max-width:1170px;margin:auto;display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}.sidebar{background:white;border-right:1px solid var(--line);padding:29px 17px;position:sticky;top:0;height:100vh}.logo{font-size:31px;font-weight:950;letter-spacing:-2px;padding:0 13px}.logo span{color:#8eb83b}.side-nav{margin-top:25px;display:grid;gap:8px;min-height:270px}.navbtn{width:100%;text-align:left;border:0;background:transparent;padding:13px 14px;border-radius:13px;font-weight:750;color:#737b8c}.navbtn.active{background:#f0f3e7;color:#141827}.navbtn span{display:inline-block;width:29px}.sidebar-note{margin-top:35px;background:#101828;border-radius:17px;padding:16px;color:white}.sidebar-note p{font-size:12px;color:#d1d5e1}.main{padding:29px 38px 100px;max-width:900px;width:100%;margin:0 auto;align-self:start}.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:28px}.eyebrow{font-size:11px;font-weight:900;letter-spacing:1.3px;color:#7d8798}.title{font-size:34px;letter-spacing:-1.6px;margin:8px 0}.sub{color:var(--muted);line-height:1.5}.pill{border-radius:50px;background:#eaf6dc;color:#46731a;padding:7px 11px;font-size:11px;font-weight:850}.avatar{background:#e8e4f4;padding:10px 13px;border-radius:50%;font-weight:900}.card{background:#fff;border:1px solid var(--line);border-radius:21px;padding:22px;margin-bottom:17px}.hero{background:#101828;color:#fff;border-radius:25px;padding:29px;position:relative;overflow:hidden;margin-bottom:22px}.hero:after{content:"✦";position:absolute;right:-18px;top:-45px;font-size:205px;color:#283545;pointer-events:none}.hero>*{position:relative;z-index:1}.hero h2{font-size:31px;letter-spacing:-1.2px;max-width:430px;margin:11px 0}.hero p{max-width:410px;color:#c9d0df}.limebtn{background:var(--lime);color:#1d2911;border:0;border-radius:13px;padding:13px 19px;font-weight:900}.darkbtn{background:#101828;color:white;border:0;border-radius:13px;padding:13px 18px;font-weight:850}.outline{background:white;border:1px solid #d8dce5;border-radius:13px;padding:12px 16px;font-weight:800}.sectionhead{display:flex;align-items:center;justify-content:space-between;margin:25px 0 12px}.sectionhead h2{font-size:20px;margin:0;letter-spacing:-.5px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.feature{padding:22px;border-radius:20px;min-height:170px;display:flex;flex-direction:column;align-items:start;justify-content:space-between}.feature h3{margin:5px 0;font-size:21px}.feature p{font-size:13px;line-height:1.5;margin:6px 0 15px}.purple{background:#30255d;color:#fff}.pink{background:#f6c7e2;color:#57233f}.lime{background:#c7f567;color:#263513}.product{display:flex;align-items:center;gap:17px}.product .art{height:86px;width:86px;flex:none;border-radius:17px;background:#f1f2f6;display:grid;place-items:center;font-size:42px}.product .details{flex:1;min-width:0}.product h3{margin:4px 0;font-size:17px}.price{font-size:22px;font-weight:900}.muted{color:var(--muted)}.small{font-size:12px}.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}.banner{background:#eff5e9;padding:13px;border-radius:13px;color:#47642e;font-size:12px}.demo{background:#fff3d7;color:#78530b;border-radius:9px;padding:7px 11px;font-size:11px;font-weight:800}.hidden{display:none!important}.reason{display:grid;grid-template-columns:1fr 1fr;gap:9px}.reason button{text-align:left;border:1px solid #e1e4eb;border-radius:12px;padding:13px;background:#fff;font-weight:750}.reason button.selected{background:#edf5df;border-color:#91b64d}.offer{background:#101828;color:white;border-radius:20px;padding:24px}.offer .amount{font-size:48px;font-weight:950;letter-spacing:-2px;margin:9px 0}.offer p{color:#d4d9e4;font-size:13px;line-height:1.5}.offer .limebtn{width:100%;margin-top:10px}.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:13px}.catalog .card{margin:0;padding:17px}.catalog .art{background:#f2f1f7;border-radius:13px;font-size:32px;padding:17px;width:fit-content}.catalog h3{font-size:16px;margin:10px 0 5px}.catalog button{width:100%;margin-top:12px}.controls{display:flex;gap:9px;flex-wrap:wrap;margin:15px 0}.controls input,.controls select{min-width:140px;flex:1;border:1px solid #d6d9e2;padding:12px;border-radius:11px;background:white}.wrapped{background:#101828;color:white;border-radius:24px;padding:24px}.wrapped h2{font-size:37px;letter-spacing:-1.7px;line-height:1.1}.stats{display:grid;grid-template-columns:1fr 1fr;gap:11px}.stat{border-radius:18px;padding:19px;min-height:145px;display:flex;flex-direction:column;justify-content:space-between}.stat strong{font-size:30px;letter-spacing:-1px}.stat small{font-size:12px}.footnav{display:none}.loading{padding:18px;color:#777}.link{background:none;border:0;color:#555c80;text-decoration:underline;padding:0}.notice{font-size:12px;background:#fff3dc;padding:12px;border-radius:12px;color:#815a16}.error{background:#fff0ef;color:#9c3328;padding:12px;border-radius:12px;font-size:12px}.watch{font-size:12px;color:#537a25}.split{display:flex;justify-content:space-between;gap:10px;align-items:center}.toggle{border:1px solid #d6dbe5;background:white;border-radius:20px;padding:8px 12px;font-size:12px;font-weight:800}.toggle.on{background:#e6f3d7}.retailer-metric{font-size:28px;font-weight:900}.spacer{height:8px}@media(max-width:760px){.app{display:block}.sidebar{display:none}.main{padding:20px 16px 110px}.title{font-size:29px}.hero{padding:24px}.hero h2{font-size:27px}.grid2{grid-template-columns:1fr 1fr;gap:9px}.feature{padding:15px;min-height:175px}.feature h3{font-size:18px}.feature p{font-size:12px}.card{padding:16px}.product{gap:12px}.product .art{height:65px;width:65px;font-size:32px}.footnav{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:20;background:white;border-top:1px solid var(--line);justify-content:space-around;padding:9px 3px max(10px,env(safe-area-inset-bottom))}.footnav button{background:none;border:0;font-size:11px;color:#777;font-weight:800;padding:7px 5px}.footnav button.active{color:#222}.footnav .ico{display:block;font-size:21px;margin-bottom:3px}.stats{gap:9px}.stat{padding:15px}.stat strong{font-size:27px}}
+.product .art img,.catalog .art img{display:block;width:100%;height:100%;object-fit:contain}.catalog .art{width:100%;height:148px;display:grid;place-items:center;overflow:hidden}.product .art{overflow:hidden}.product .art img{padding:5px}.catalog .art img{padding:8px}.navbtn:hover,.outline:hover{filter:brightness(.94)}.hero{min-height:230px}.product .details{overflow:hidden}@media(max-width:760px){.catalog .art{height:130px}}</style><style id="relay-dark-theme">
+:root{--ink:#f7f8ff;--muted:#b0bad0;--bg:#0c1020;--line:#343a52}body{background:#0c1020;color:#f7f8ff}.sidebar{background:#11172b;border-color:#30374b}.logo{color:#fff}.navbtn{color:#b4bbcf}.navbtn.active{background:#29324a;color:#c7f567}.sidebar-note{background:#30255d}.main{background:#0c1020}.card{background:#192239;border-color:#303951;color:#f7f8ff}.hero,.offer{background:#30255d}.hero:after{color:#45366d}.eyebrow{color:#c7f567}.sub,.muted{color:#b5bed0}.product .art{background:#303956}.outline{background:#29324a;color:#f7f8ff;border-color:#48536b}.darkbtn{background:#c7f567;color:#182110}.banner{background:#24334b;color:#dce4f3}.reason button{background:#26314b;color:#f7f8ff;border-color:#48536b}.reason button.selected{background:#4c5d40;border-color:#c7f567}.controls input,.controls select{background:#1b2540;color:#fff;border-color:#48536b}.footnav{background:#11172b;border-color:#303951}.footnav button{color:#b0b9cb}.footnav button.active{color:#c7f567}.feature.pink{color:#57233f}.feature.lime{color:#263513}.feature .outline{background:#fff;color:#171d2c}.feature.purple .outline{background:#c7f567}.demo{background:#4d3b23;color:#ffe1a1}.notice{background:#3a302a;color:#ffe0a8}.error{background:#452b35;color:#ffccd2}.pill{background:#304a34;color:#d4ffae}.topline .avatar{color:#101828}.topline .toggle{color:#182110}.link{color:#d5ccff}.wrapped{background:#11152a}
+</style><style id="relay-interaction-fixes">.purchase-tile,.suggestion-card{cursor:pointer;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}.purchase-tile:hover,.suggestion-card:hover{border-color:#b8e371;transform:translateY(-2px);box-shadow:0 7px 24px #0002}.purchase-tile:focus-visible,.suggestion-card:focus-visible{outline:3px solid #c7f567;outline-offset:3px}.purchase-tile .tile-arrow{font-size:13px;font-weight:800;color:#c7f567;margin-top:11px}.suggestion-card .select-hint{font-size:12px;font-weight:850;color:#c7f567;margin:8px 0}.suggestion-card[aria-disabled="true"]{cursor:default;opacity:.86}.suggestion-card[aria-disabled="true"]:hover{transform:none;box-shadow:none}.resolution-options{display:grid;grid-template-columns:1fr 1fr;gap:11px}.resolution-options button{text-align:left}@media(max-width:520px){.resolution-options{grid-template-columns:1fr}}</style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side"><a class="navbtn active" href="./">⌂ Wallet</a><a class="navbtn" href="./discover.html">✦ Discover</a><a class="navbtn" href="./discover.html">◎ Radar</a><a class="navbtn" href="./wrapped.html">◈ Wrapped</a></nav><div class="sidebar-note"><strong>Money back. Or something better.</strong><p>Refunds, exchanges and discoveries — all in one place.</p></div><p class="small muted" style="margin:25px 12px"><a href="./legacy-wallet.html">Developer / API testing ↗</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle on" onclick="toggleDemo()">✦ Catalogue preview on</button><div class="avatar">R</div></div></div><div id="view"><h1 class="title">Your purchases 👋</h1><p class="sub">Your purchases, returns and exchanges. All together.</p><div class="hero"><div class="eyebrow" style="color:#c7f567">✦ THE RELAY WAY</div><h2>Money back. Or something better.</h2><p>Get an instant refund offer, exchange the wrong size or discover a style you'll love.</p><a class="limebtn" style="display:inline-block" href="./legacy-wallet.html">Explore instant refunds →</a></div><div class="sectionhead"><h2>Sandbox catalogue previews & verified purchases</h2><span class="pill">4 demo purchases</span></div><div class="card product"><div class="art">👟</div><div class="details"><div class="eyebrow">NORTH &amp; CO. · DEMO</div><h3>Retro High Trainers</h3><div class="small muted">UK 7 · White / Grey</div><div class="price">£129.99</div><div class="actions"><button class="darkbtn" onclick="openPurchase('sample-1')">Refund or exchange →</button><a class="outline" href="./discover.html">Explore other designs →</a></div></div></div><div class="card product"><div class="art">🧥</div><div class="details"><div class="eyebrow">NORTH &amp; CO. · DEMO</div><h3>Everyday Hoodie</h3><div class="small muted">Medium · Sage Green</div><div class="price">£89.99</div><button class="outline" onclick="openPurchase('sample-2')">View options →</button></div></div><div class="card product"><div class="art">🧥</div><div class="details"><div class="eyebrow">NORTH &amp; CO. · DEMO</div><h3>Classic Denim Jacket</h3><div class="small muted">Large · Washed Blue</div><div class="price">£159.99</div><button class="outline" onclick="openPurchase('sample-3')">View options →</button></div></div><div class="sectionhead"><h2>More from Relay</h2></div><div class="grid2"><a class="feature purple" href="./discover.html"><div>✦<h3>Discover</h3><p>Find alternative designs and sizes.</p></div><strong>Explore →</strong></a><a class="feature lime" href="./discover.html"><div>◎<h3>Radar</h3><p>Watch catalogue prices.</p></div><strong>View Radar →</strong></a><a class="feature pink" href="./wrapped.html"><div>◈<h3>Wrapped</h3><p>Your year in purchases.</p></div><strong>View Wrapped →</strong></a></div><p class="small muted">Illustrative purchases only. Live orders require verified matching.</p></div></main></div><nav class="footnav" id="foot"><a href="./">⌂ Wallet</a><a href="./discover.html">✦ Discover</a><a href="./discover.html">◎ Radar</a><a href="./wrapped.html">◈ Wrapped</a></nav><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script>(function(){try{
+
+const API="https://relay-square-api2.9pts72cy5j.workers.dev",VERIFIED=API+"/relay/verified-purchases";const sample={id:"sample-1",item:"Retro High Trainers",detail:"UK 7 · White / Grey",merchant:"NORTH & CO.",price:129.99,date:"8 Oct 2026",deadline:"30 Oct 2026",icon:"👟",demo:true};
+const demoOrders=[
+sample,
+{id:"sample-2",item:"Boxy Cotton Tee",detail:"Forest / M",merchant:"Relay Studio",price:28.99,date:"7 Oct 2026",deadline:"29 Oct 2026",icon:"👕",demo:true},
+{id:"sample-3",item:"Linen Overshirt",detail:"Ecru / M",merchant:"Harbour Goods",price:64.99,date:"6 Oct 2026",deadline:"28 Oct 2026",icon:"👕",demo:true},
+{id:"sample-4",item:"Everyday Crossbody Bag",detail:"Black",merchant:"Relay Studio",price:49.99,date:"5 Oct 2026",deadline:"27 Oct 2026",icon:"👜",demo:true},
+{id:"sample-5",item:"Waxed Field Coat",detail:"Olive / M",merchant:"Harbour Goods",price:139.99,date:"4 Oct 2026",deadline:"26 Oct 2026",icon:"🧥",demo:true},
+{id:"sample-6",item:"City Runner Sneakers",detail:"Cream / UK 7",merchant:"Relay Studio",price:89.99,date:"3 Oct 2026",deadline:"25 Oct 2026",icon:"👟",demo:true},
+{id:"sample-7",item:"Harbour Trail Boots",detail:"Brown / UK 8",merchant:"Harbour Goods",price:124.99,date:"2 Oct 2026",deadline:"24 Oct 2026",icon:"🥾",demo:true}
+];
+// Self-contained original SVG product illustrations: no external image hosts or broken hotlinks.
+
+// Separate, editable demo retailer feeds. Square Sandbox records remain untouched.
+const demoRetailers=[
+{id:"north",name:"North & Co.",prefix:"NORTH",items:[
+["Retro High Trainers","White / Grey / UK 6",12999,6],
+["Retro High Trainers","White / Grey / UK 7",12999,10],
+["Retro High Trainers","White / Grey / UK 8",12999,12],
+["Retro High Trainers","White / Grey / UK 9",12999,8],
+["Retro High Trainers","White / Grey / UK 10",12999,4],
+["Retro High Trainers","Black / UK 7",12999,7],
+["Retro High Trainers","Black / UK 8",12999,9],
+["Retro High Trainers","Sand / UK 8",12999,5],
+["Minimal Low Trainers","White / UK 7",11999,11],
+["Minimal Low Trainers","White / UK 8",11999,8],
+["Minimal Low Trainers","Black / UK 8",11999,5],
+["Retro Suede Trainers","Slate / UK 7",13499,6],
+["Retro Suede Trainers","Slate / UK 8",13499,7],
+["Retro Suede Trainers","Cream / UK 8",13499,4],
+["Everyday Runner Sneakers","Grey / UK 8",9999,14],
+["Everyday Runner Sneakers","Navy / UK 9",9999,10]]},
+{id:"studio",name:"Relay Studio",platform:"Shopify demo",prefix:"STUDIO",items:[
+["Boxy Cotton Tee","Forest / M",2899,14],["Boxy Cotton Tee","Forest / L",2899,8],["Boxy Cotton Tee","Chalk / M",2899,11],
+["Everyday Crossbody Bag","Black",4999,5],["Everyday Crossbody Bag","Clay",4999,9],
+["Relaxed Denim Jacket","Washed Blue / M",7999,4],["Relaxed Denim Jacket","Washed Blue / L",7999,6],
+["Ribbed Knit Jumper","Oat / S",4599,12],["Ribbed Knit Jumper","Oat / M",4599,7],
+["City Runner Sneakers","Cream / UK 7",8999,3],["City Runner Sneakers","Cream / UK 8",8999,9],["City Runner Sneakers","Slate / UK 8",9499,4],
+["City Runner Sneakers","Cream / UK 9",8999,4],["Boxy Cotton Tee","Forest / S",2899,6],["Boxy Cotton Tee","Forest / XL",2899,3]]},
+{id:"harbour",name:"Harbour Goods",platform:"Shopify demo",prefix:"HARBOUR",items:[
+["Coastal Canvas Tote","Navy",3899,22],["Coastal Canvas Tote","Stone",3899,15],
+["Harbour Trail Boots","Brown / UK 8",12499,6],["Harbour Trail Boots","Brown / UK 9",12499,2],
+["Linen Overshirt","Ecru / M",6499,8],["Linen Overshirt","Ecru / L",6499,5],
+["Waxed Field Jacket","Olive / M",13999,3],["Waxed Field Jacket","Olive / L",13999,4],
+["Weekend Holdall","Rust",7999,10],["Weekend Holdall","Navy",7999,7],
+["Merino Beanie","Charcoal",2499,17],["Merino Beanie","Moss",2499,12],
+["Harbour Trail Boots","Brown / UK 7",12499,5],["Harbour Trail Boots","Brown / UK 10",12499,3],
+["Linen Overshirt","Ecru / S",6499,4],["Linen Overshirt","Ecru / XL",6499,2],
+["Waxed Field Coat","Olive / M",13999,5],["Waxed Field Coat","Olive / L",13999,5],["Waxed Field Coat","Slate / M",13999,4],
+["Quilted Liner Jacket","Navy / M",11999,6],["Quilted Liner Jacket","Navy / L",11999,4],
+["Waterproof Rain Shell Coat","Sand / M",15999,7],["Waterproof Rain Shell Coat","Black / M",15999,3],
+["City Trench Coat","Stone / M",16999,3],["City Trench Coat","Stone / L",16999,2]]}
+];
+const demoInventoryKey="relay-retailer-inventory-v3";
+let inventoryChanges={};try{inventoryChanges=JSON.parse(localStorage.getItem(demoInventoryKey)||"{}")||{}}catch{}
+function demoSku(store,i){return "DEMO-"+store.prefix+"-"+String(i+1).padStart(3,"0")}
+function demoProducts(){return demoRetailers.flatMap(store=>store.items.map(([product,variation,priceMinor,quantity],i)=>{const sku=demoSku(store,i),change=inventoryChanges[sku]||{};return {product,variation,priceMinor:change.priceMinor??priceMinor,originalPriceMinor:priceMinor,quantity:change.quantity??quantity,sku,currency:"GBP",provider:"relay_demo",store:store.name,fixture:true,updatedAt:change.updatedAt||null}}))}
+function saveInventory(){localStorage.setItem(demoInventoryKey,JSON.stringify(inventoryChanges));catalog=catalog.filter(p=>!p.fixture).concat(demoProducts());if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(page==="wallet")bindPurchaseCards();if(retailer)render()}
+function updateDemoStock(sku,quantity){const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return;const n=Number(quantity);if(!Number.isInteger(n)||n<0||n>10000)return;inventoryChanges[sku]={...(inventoryChanges[sku]||{}),quantity:n,updatedAt:new Date().toISOString()};saveInventory()}
+function updateDemoPrice(sku,pounds){const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return;const n=Math.round(Number(pounds)*100);if(!Number.isFinite(n)||n<100||n>10000000)return;inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:n,updatedAt:new Date().toISOString()};saveInventory()}
+function resetDemoInventory(){inventoryChanges={};saveInventory()}
+function applyDemoDiscount(sku){const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return;inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(p.priceMinor*0.8),updatedAt:new Date().toISOString()};saveInventory()}
+function storeStock(p){return p.fixture?Number(p.quantity):null}
+function canDemoOrder(p){return !!p&&(!p.fixture||storeStock(p)>0)}
+function productImage(name,variation=""){const n=String(name||"").toLowerCase(),v=String(variation||"").toLowerCase();let kind=/trainer|shoe|sneaker|jordan|boot/.test(n)?"shoe":/hoodie|sweatshirt|jumper/.test(n)?"hoodie":/jacket|coat|denim/.test(n)?"jacket":/bag|tote|backpack/.test(n)?"bag":/shirt|tee|top/.test(n)?"shirt":/trouser|jean|pant/.test(n)?"trousers":"shoe";
+let c=/green|sage/.test(v)?"#90ad9d":/blue|denim/.test(v)?"#6687b3":/black/.test(v)?"#34384a":/pink/.test(v)?"#d5a1b4":/sand|cream|beige/.test(v)?"#cbb99d":"#e3e5e9";
+const shapes={
+shoe:'<path d="M27 103q15-8 24-28l17 8q9 15 30 19l26 3q17 4 17 19v10H20q-7-13 7-31z" fill="'+c+'" stroke="#737d91" stroke-width="3"/><path d="M20 126h121v12H20z" fill="#fff" stroke="#737d91" stroke-width="2"/><path d="M59 92l28 14m-20-19l29 15m-18-20l29 14" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M35 114q16-3 23-15" stroke="#8b96aa" stroke-width="3" fill="none"/>',
+hoodie:'<path d="M53 40l-25 17-15 45 22 9 13-26v62h65V85l13 26 22-9-15-45-25-17-13 18H66z" fill="'+c+'" stroke="#64748b" stroke-width="3"/><path d="M54 40q26-27 52 0L94 68H67z" fill="#b7c4bf" stroke="#64748b" stroke-width="3"/><path d="M72 69v24m18-24v24M59 111h43" stroke="#fff" stroke-width="3" fill="none"/>',
+jacket:'<path d="M58 35l-32 18-17 58 27 10 15-36v63h66V85l15 36 27-10-17-58-32-18-22 25z" fill="'+c+'" stroke="#536c91" stroke-width="3"/><path d="M58 35l23 31-17 18-18-42m64-7L81 66l17 18 18-42M81 66v81" stroke="#e7edf5" stroke-width="3" fill="none"/><path d="M54 95h19v17H54zm35 0h19v17H89z" fill="none" stroke="#dbe4ef" stroke-width="3"/>',
+bag:'<path d="M32 63h97l10 80H22z" fill="'+c+'" stroke="#8a7966" stroke-width="3"/><path d="M56 67V48q0-26 24-26t24 26v19" fill="none" stroke="#8a7966" stroke-width="8"/><path d="M30 91h100M49 91v49m63-49v49" stroke="#f0e7d9" stroke-width="3" opacity=".8"/>',
+shirt:'<path d="M53 37l-37 24 22 31 15-13v69h56V79l15 13 22-31-37-24-15 20H68z" fill="'+c+'" stroke="#68758a" stroke-width="3"/><path d="M68 37q12 26 26 0" fill="none" stroke="#fff" stroke-width="4"/>',
+trousers:'<path d="M44 20h72l-5 126H83l-7-75-8 75H39z" fill="'+c+'" stroke="#63758e" stroke-width="3"/><path d="M44 41h72M80 40v20" stroke="#e3eaf1" stroke-width="3"/>'
+};
+const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" rx="22" fill="#f0f1f6"/><circle cx="81" cy="80" r="67" fill="#e7eaf1"/>'+shapes[kind]+'</svg>';return '<img alt="'+safe(name)+' product illustration" loading="lazy" src="data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg)+'">'}
+const $=id=>document.getElementById(id),money=n=>"£"+Number(n).toFixed(2),safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let page="wallet",demo=true,real=[],error="",catalog=[],watch={},reason="design",selected=sample,chosen=null,history={},retailer=false,exchangeContext=false,storeFilter="all";try{watch=JSON.parse(localStorage.getItem("relay-radar-v2")||"{}")||{}}catch{}try{history=JSON.parse(localStorage.getItem("relay-radar-history-v2")||"{}")||{}}catch{}
+const nav=[["wallet","⌂","Wallet"],["discover","✦","Discover"],["radar","◎","Radar"],["wrapped","◈","Wrapped"],["profile","◯","Profile"]];
+
+let planPreview="free";try{if(localStorage.getItem("relay-plan-preview")==="plus")planPreview="plus"}catch{}
+function setPlanPreview(tier){
+ if(tier!=="free"&&tier!=="plus")return;
+ planPreview=tier;try{localStorage.setItem("relay-plan-preview",tier)}catch{}
+ render();
+}
+function planBanner(){
+ return '<div class="card" style="border:1px solid #c8d6bc;background:linear-gradient(125deg,#f0f7e6,#fff);color:#101828"><div class="split"><div><div class="eyebrow">✦ RELAY MEMBERSHIP · CONCEPT</div><h2 style="margin:8px 0">'+(planPreview==="plus"?"Plus preview":"Free for everyone")+'</h2></div><span class="pill">'+(planPreview==="plus"?"PLUS DEMO":"FREE")+'</span></div>'+
+ '<p class="sub" style="margin-top:6px">'+(planPreview==="plus"?"Explore early refund advances before an item is returned, subject to eligibility and risk checks. No subscription or real payout.":"Track purchases, Discover and Radar. Refunds and replacement orders follow retailer receipt and approval of returns.")+'</p>'+
+ '<div class="actions"><button class="'+(planPreview==="free"?"darkbtn":"outline")+'" onclick="setPlanPreview(\'free\')">Free</button><button class="'+(planPreview==="plus"?"darkbtn":"outline")+'" onclick="setPlanPreview(\'plus\')">✦ Preview Plus</button></div>'+
+ '<p class="small muted">Concept only. No subscription is sold or activated; pricing and benefits are not final.</p></div>';
+}
+function refundOfferBlock(){
+ if(planPreview==="plus")return '<div class="offer"><div class="eyebrow" style="color:#c7f567">⚡ RELAY PLUS · EARLY REFUND DEMO</div><div class="small">Illustrative and subject to approval</div><div class="amount">'+money(selected.price)+'</div><p>Qualifying returns could receive an advance before the original item arrives. Return obligations remain; no real payout takes place.</p><button class="limebtn" onclick="page=\'refund\';render()">⚡ Explore early refund →</button></div>';
+ return '<div class="offer"><div class="eyebrow" style="color:#c7f567">↩ RELAY FREE · STANDARD REFUND</div><div class="small">Original purchase value</div><div class="amount">'+money(selected.price)+'</div><p>Start a return for free. The retailer processes the refund after receiving and approving the item. No advance is promised.</p><button class="limebtn" onclick="page=\'return\';render()">↩ Start free return →</button></div><div class="card" style="margin-top:15px"><div class="eyebrow">✦ OPTIONAL PLUS BENEFIT</div><h3>Want money back before returning?</h3><p class="sub">Explore a simulated early refund offer. Plus is not available to purchase yet.</p><button class="outline" onclick="setPlanPreview(\'plus\')">Preview Relay Plus →</button></div>';
+}
+
+function navRender(){for(const id of ["side","foot"])$(id).innerHTML=nav.map(([key,ico,name])=>'<button class="'+(page===key?"active":"")+(id==="side"?" navbtn":"")+'" onclick="go(\''+key+'\')"><span class="'+(id==="foot"?"ico":"")+'">'+ico+'</span>'+name+'</button>').join("")}
+function go(p){if(p==="discover"&&page==="exchange"){exchangeContext=true;storeFilter=selected.merchant==="NORTH & CO."?"North & Co.":selected.merchant;}else if(p!=="discover"){exchangeContext=false;storeFilter="all";}else if(!exchangeContext){storeFilter="all";}page=p;retailer=false;render();window.scrollTo({top:0,behavior:"instant"})}
+function toggleDemo(){demo=!demo;$("modeToggle").textContent=demo?"✦ Catalogue preview on":"Live only";$("modeToggle").classList.toggle("on",demo);render()}
+function cataloguePreview(){return catalog.slice(0,4).map((p,i)=>({id:"catalogue-"+i,item:p.product,detail:p.variation,merchant:"SQUARE SANDBOX CATALOGUE",price:Number(p.priceMinor)/100,date:"Catalogue item · not purchased",deadline:"Not applicable",icon:/trainer|shoe|sneaker/i.test(p.product)?"👟":/bag/i.test(p.product)?"👜":"🛍️",demo:true,cataloguePreview:true,sku:p.sku}))}
+function getPurchases(){return demo?[...demoOrders,...real]:real}
+function render(){navRender();$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():profileView();if(page==="wallet"&&!retailer)bindPurchaseCards();if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus()}}
+function wallet(){
+ const list=getPurchases();
+ return '<h1 class="title">Your purchases 👋</h1><p class="sub">Everything you buy, with returns, instant refund offers and better alternatives in one place.</p>'+
+ '<div class="hero"><div class="eyebrow" style="color:#c7f567">✦ THE RELAY WAY</div><h2>Money back. Or something better.</h2><p>Pick a purchase below to choose your next step: return it, explore an instant refund, or exchange it.</p><button class="limebtn" id="browsePurchaseBtn">Browse purchases ↓</button></div>'+
+ planBanner()+
+ '<div class="sectionhead" id="recentPurchases"><h2>Recent purchases</h2><span class="pill">'+list.length+' shown</span></div>'+
+ (error&&!demo?'<p class="notice">Verified purchases are temporarily unavailable: '+safe(error)+'. Demo purchases are separate.</p>':'')+
+ (list.length?list.map(p=>'<div class="card product purchase-tile" data-purchase="'+safe(p.id)+'" role="button" tabindex="0" aria-label="View '+safe(p.item)+' purchase and return, refund or exchange options"><div class="art">'+productImage(p.item,p.detail)+'</div><div class="details"><div class="eyebrow">'+safe(p.merchant)+(p.demo?' · FICTIONAL DEMO':' · VERIFIED')+'</div><h3>'+safe(p.item)+'</h3><div class="small muted">'+safe(p.detail)+' · '+safe(p.date)+'</div><div class="price">'+money(p.price)+'</div><div class="tile-arrow">View purchase & options →</div></div></div>').join(''):'<div class="card"><h3>No verified purchases yet</h3><p class="sub">Real purchases remain hidden until safely matched to the customer. Turn Demo on to try the fictional purchase journey.</p></div>')+
+ '<div class="sectionhead"><h2>More from Relay</h2></div><div class="grid2"><div class="feature purple"><div>✦<h3>Discover</h3><p>Browse new designs and watch your favourite products.</p></div><button class="outline" onclick="go(\'discover\')">Explore →</button></div><div class="feature lime"><div>◎<h3>Radar</h3><p>Track price changes in connected demo inventory.</p></div><button class="outline" onclick="go(\'radar\')">See Radar →</button></div></div>'+
+ '<div class="card" style="margin-top:16px;background:#f6c7e2;color:#57233f"><div class="split"><div><div class="eyebrow" style="color:#57233f">✦ RELAY WRAPPED</div><h2 style="margin:6px 0">Your year, in purchases.</h2><p class="small">Your favourites, exchanges and shopping personality.</p></div><button class="outline" onclick="go(\'wrapped\')">Explore →</button></div></div>'+
+ '<p class="small muted">Fictional demo purchases are for interface testing only. No live refund, return or replacement order is initiated.</p>';
+}
+function bindPurchaseCards(){
+ const browse=$("browsePurchaseBtn");if(browse)browse.onclick=()=>$("recentPurchases")?.scrollIntoView({behavior:"smooth",block:"start"});
+ document.querySelectorAll("[data-purchase]").forEach(card=>{
+   const open=()=>openPurchase(card.dataset.purchase);
+   card.onclick=open;
+   card.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}};
+ });
+}
+function openPurchase(id){selected=getPurchases().find(x=>x.id===id);if(!selected)return;exchangeContext=false;storeFilter="all";reason="size";page="detail";render()}
+function detailView(){if(selected.cataloguePreview)return '<button class="link" onclick="go(\'wallet\')">← Back to wallet</button><h1 class="title">Square Sandbox product</h1><div class="card product"><div class="art">'+productImage(selected.item,selected.detail)+'</div><div class="details"><div class="eyebrow">ACTUAL SANDBOX CATALOGUE · NOT A PURCHASE</div><h3>'+safe(selected.item)+'</h3><p class="small muted">'+safe(selected.detail)+'</p><div class="price">'+money(selected.price)+'</div></div></div><div class="notice">This product and price come from the Square Sandbox catalogue. No customer payment has been verified, so Relay cannot offer a genuine refund or exchange on this item.</div><div class="card"><h3>Explore this style</h3><p class="sub">Find other catalogue variants and watch prices.</p><button class="darkbtn" onclick="go(\'discover\')">✦ Browse Square alternatives →</button></div>';return '<button class="link" onclick="go(\'wallet\')">← Back to wallet</button><h1 class="title">Your purchase</h1><div class="card product"><div class="art" style="width:100px;height:100px;font-size:52px">'+productImage(selected.item,selected.detail)+'</div><div class="details"><div class="eyebrow">'+safe(selected.merchant)+'</div><h3>'+safe(selected.item)+'</h3><p class="small muted">'+safe(selected.detail)+'</p><div class="price">'+money(selected.price)+'</div><span class="demo">'+(selected.demo?"DEMO PURCHASE":"VERIFIED PURCHASE")+'</span></div></div>'+refundOfferBlock()+'<div class="card" style="margin-top:17px"><h2>Rather swap it?</h2><p class="sub">Wrong size, wrong colour, or changed your mind? Let Relay help you find something better.</p><button class="darkbtn" onclick="page=\'exchange\';render()">⇄ Exchange or discover alternatives →</button></div><div class="card"><h2>Prefer a standard return?</h2><p class="sub">Request a return without an instant refund advance or a replacement purchase. Refund timing follows the original retailer return process.</p><button class="outline" onclick="page=\'return\';render()">↩ Return item →</button></div><div class="card"><div class="split"><span class="muted">Purchase</span><strong>'+safe(selected.date)+'</strong></div><hr style="border:0;border-top:1px solid #eee"><div class="split"><span class="muted">Return by (demo)</span><strong>'+safe(selected.deadline||"Retailer policy")+'</strong></div></div>'}
+function returnView(){
+ return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Return this item</h1>'+
+ '<div class="card product"><div class="art">'+productImage(selected.item,selected.detail)+'</div><div class="details"><div class="eyebrow">'+safe(selected.merchant)+'</div><h3>'+safe(selected.item)+'</h3><p class="small muted">'+safe(selected.detail)+'</p><div class="price">'+money(selected.price)+'</div></div></div>'+
+ '<div class="card"><h2>Free · return-first refund</h2><p class="sub">The retailer processes refunds after the item is received and approved. On Free, a selected replacement is also confirmed only after return receipt.</p>'+
+ '<div class="notice">This is a browser-only simulation. No retailer is contacted, no return label is issued and no funds move.</div>'+
+ '<button class="darkbtn" id="simulateReturnButton" onclick="simulateDemoReturn()">Simulate return request →</button><div id="returnResult" aria-live="polite" style="margin-top:15px"></div></div>'+
+ '<div class="card"><h3>Want the money sooner?</h3><button class="outline" onclick="page=\'refund\';render()">Preview Plus early refund →</button></div>';
+}
+function refundView(){
+ if(planPreview!=="plus")return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Return for free</h1><div class="card"><h3>Refund after retailer receipt</h3><p class="sub">Free includes returns and exchanges, with refunds and replacements processed after retailer receipt and approval.</p><button class="darkbtn" onclick="page=\'return\';render()">Start standard return →</button><p class="small muted">Early advances are a proposed Plus benefit.</p><button class="outline" onclick="setPlanPreview(\'plus\')">Preview Plus →</button></div>';
+ return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Plus · early refund preview</h1><div class="offer"><div class="eyebrow" style="color:#c7f567">⚡ SIMULATED EARLY OFFER · NOT APPROVED</div><div class="amount">'+money(selected.price)+'</div><p>Potential advance before retailer receipt, subject to eligibility, risk checks and approval. This is only a concept.</p><div class="split"><span>Demo fee</span><b>£0.00 (not actual pricing)</b></div><p class="small">No subscription, actual payout or retailer refund occurs.</p><button class="limebtn" id="simulateRefundButton" onclick="simulateDemoRefund()">Simulate early refund →</button><p id="refundResult" style="color:#c7f567"></p></div><div class="card" style="margin-top:16px"><h3>Want a replacement instead?</h3><button class="outline" onclick="page=\'exchange\';render()">Explore exchanges →</button></div>';
+}
+function exchangeView(){return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Make it right.</h1><p class="sub">What would you like to change about '+safe(selected.item)+'?</p><div class="card"><h3>Reason for exchange</h3><div class="reason">'+[["size","Wrong size"],["design","Don’t like the design"],["colour","Different colour"],["mind","Changed my mind"]].map(([id,name])=>'<button class="'+(reason===id?"selected":"")+'" onclick="reason=\''+id+'\';render()">'+name+'</button>').join("")+'</div><div class="spacer"></div><button class="darkbtn" onclick="exchangeContext=true;go(\'discover\')">✦ Find available replacements →</button></div><div class="card"><h3>How an exchange will work</h3><p class="sub">On Free, customers choose alternatives now, but replacements are confirmed after the retailer receives the original item. Plus previews earlier processing, subject to approval. No real Square payments, Shopify orders, stock reservations or returns are submitted.</p></div>'}
+function discoverView(){const contextual=exchangeContext;return '<div class="eyebrow">✦ RELAY DISCOVER</div><h1 class="title">'+(contextual?'Find the right replacement.':'Find something better.')+'</h1><p class="sub">'+(contextual?'Original: '+safe(selected.item)+' · '+safe(selected.detail):'Explore fictional Square/Shopify demo inventory and, when authorised, published retailer catalogues.')+'</p>'+(contextual?'<div class="card"><strong>'+safe(reasonLabel())+'</strong><p class="small muted">'+(reason==="size"?"Only other sizes of this exact product are eligible.":reason==="colour"?"Only colour variants of this exact product are eligible.":reason==="design"?"Explore similar products in the same category or another variation of this product.":"Start with similar products; explore other categories below.")+'</p><button class="link" onclick="exchangeContext=false;render()">Browse all products instead →</button></div>':'')+'<div class="card"><div class="controls"><input id="query" placeholder="Search within '+(contextual?'eligible alternatives':'products')+'…" oninput="renderCatalog()"><select id="storeSelect" onchange="selectStore(this.value)"><option value="all">All stores</option><option value="North & Co.">North & Co.</option><option value="Relay Studio">Relay Studio</option><option value="Harbour Goods">Harbour Goods</option><option value="Shopify retailer">Connected Shopify retailer</option></select><input id="storeSearch" placeholder="Search store…" oninput="renderCatalog()"><select id="filter" onchange="renderCatalog()"><option value="all">Recommended</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div><p class="small muted">North & Co., Relay Studio and Harbour Goods have editable demo inventory; Square and connected Shopify catalogue variants are browse-only until retailer stock and exchange eligibility are authorised. <button class="link" onclick="retailer=true;render()">Open retailer inventory lab →</button> Recommendations are not retailer-approved exchanges.</p></div><div id="catalogResults" class="catalog"></div><p class="small muted" id="catalogStatus"></p>'}
+function reasonLabel(){return ({size:"Wrong size",colour:"Different colour",design:"Don't like the design",mind:"Changed my mind"})[reason]||"Alternative"}
+function sameFamily(p){return String(p.product||"").trim().toLowerCase()===String(selected.item||"").trim().toLowerCase()}
+function storeOf(p){return p.store||(p.provider==="shopify"?"Shopify retailer":p.provider==="relay_demo"?"Relay Studio":"North & Co.")}
+function productCategory(name){return RelayExchangeEngine.category(name)}
+function sizeOf(text){return RelayExchangeEngine.sizeOf(text)}
+function withoutSize(text){return RelayExchangeEngine.styleOf(text)}
+function sameDesign(p){return sameFamily(p)&&withoutSize(p.variation)===withoutSize(selected.detail)}
+function sameSize(p){const a=sizeOf(p.variation),b=sizeOf(selected.detail);return !!a&&!!b&&a===b}
+function selectStore(value){storeFilter=value;renderCatalog()}
+function renderCatalog(){
+ const root=$("catalogResults");if(!root)return;
+ if($("storeSelect"))$("storeSelect").value=storeFilter;
+ const query=($("query")?.value||"").trim().toLowerCase(),sort=$("filter")?.value||"all";
+ const storeQuery=($("storeSearch")?.value||"").trim().toLowerCase();
+ let rows=catalog.filter(p=>{
+   if(query&&!(p.product+" "+p.variation).toLowerCase().includes(query))return false;
+   if(storeFilter!=="all"&&storeOf(p)!==storeFilter)return false;
+   if(storeQuery&&!storeOf(p).toLowerCase().includes(storeQuery))return false;
+   if(!exchangeContext)return true;
+   return RelayExchangeEngine.matches(selected,{...p,store:storeOf(p)},reason);
+ });
+ if(exchangeContext)rows.sort((a,b)=>(Number(b.fixture&&b.quantity>0)-Number(a.fixture&&a.quantity>0))||(reason==="design"||reason==="mind"?Math.abs(a.priceMinor-selected.price*100)-Math.abs(b.priceMinor-selected.price*100):0));
+ else if(sort!=="all")rows.sort((a,b)=>sort==="low"?a.priceMinor-b.priceMinor:b.priceMinor-a.priceMinor);
+ const sizeExchange=exchangeContext&&reason==="size";
+ let markup="";
+ if(sizeExchange){
+   const groups=new Map();
+   for(const p of rows){const key=storeOf(p)+"|"+p.product+"|"+withoutSize(p.variation);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(p)}
+   markup=[...groups.values()].map(options=>{
+     const p=options[0],all=options.slice().sort((a,b)=>(Number(sizeOf(a.variation)?.replace("uk ",""))||0)-(Number(sizeOf(b.variation)?.replace("uk ",""))||0));
+     return '<div class="card"><div class="eyebrow">'+safe(storeOf(p))+' · SAME PRODUCT</div><div class="art">'+productImage(p.product,p.variation)+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">Your current size: '+safe(sizeOf(selected.detail)||selected.detail)+'</p><p class="small">Tap the new size to review the exchange:</p><div class="actions">'+all.map(v=>'<button class="'+(v.fixture&&Number(v.quantity)<=0?"outline":"darkbtn")+'" data-select="'+safe(v.sku)+'" aria-label="Review '+safe(v.variation)+'">'+safe(sizeOf(v.variation)||v.variation)+(v.fixture?(Number(v.quantity)>0?' · '+v.quantity+' available':' · out of stock'):' · preview only')+'</button>').join("")+'</div><p class="small muted">The selected size will be reviewed before a simulated replacement and return are recorded.</p></div>';
+   }).join("");
+ }else{
+   markup=rows.slice(0,40).map(p=>{
+     const usable=p.fixture&&Number(p.quantity)>0,previewOnly=!p.fixture,availability=usable?p.quantity+' demo units available':p.fixture?'Out of stock · view details':'Square Sandbox · browsing only';
+     const explanation=exchangeContext?(reason==="design"?"A different look from the same retailer":reason==="colour"?"Another colour of your original item":"An alternative to consider"):"See details before choosing a purchase to exchange";
+     return '<div class="card suggestion-card" role="button" tabindex="0" data-card-select="'+safe(p.sku)+'" aria-label="View '+safe(p.product)+' '+safe(p.variation)+'"><div class="art">'+productImage(p.product,p.variation)+'</div><div class="eyebrow">'+safe(storeOf(p))+' · '+(p.fixture?'DEMO INVENTORY':'SQUARE SANDBOX')+'</div><h3>'+safe(p.product)+'</h3><p class="small muted">'+safe(p.variation)+'</p><div class="price">'+money(p.priceMinor/100)+'</div><p class="small muted">'+safe(availability)+'</p><div class="select-hint">'+(usable?(exchangeContext?'Select this replacement →':'Tap to view product →'):previewOnly?(exchangeContext?'Preview simulated exchange →':'View catalogue details →'):'View stock status →')+'</div><p class="small muted">'+explanation+'</p><button class="outline" data-watch="'+safe(p.sku)+'">'+(watch[p.sku]?"✓ Watching":"◎ Watch price")+'</button></div>';
+   }).join("");
+ }
+ root.innerHTML=markup||'<div class="card" style="grid-column:1/-1"><h3>No matching alternatives found for this reason</h3><p class="sub">'+(sizeExchange?'This exact design has no other listed sizes. You can choose a different reason.':'Try another exchange reason or explore a different style. No unrelated items will be silently substituted.')+'</p><button class="outline" onclick="page=\'exchange\';render()">← Change exchange reason</button></div>';
+ const status=$("catalogStatus");
+ if(status)status.textContent=rows.filter(p=>p.fixture&&Number(p.quantity)>0).length+" selectable, in-stock demo variants · "+rows.filter(p=>!p.fixture).length+" Square catalogue preview variants. All checkout and return actions are simulated.";
+ root.querySelectorAll("[data-watch]").forEach(button=>button.onclick=event=>{event.stopPropagation();watchSku(button.dataset.watch)});
+ root.querySelectorAll("[data-select]").forEach(button=>button.onclick=()=>chooseSku(button.dataset.select));
+ root.querySelectorAll("[data-card-select]").forEach(card=>{
+   const open=()=>chooseSku(card.dataset.cardSelect);
+   card.onclick=event=>{if(event.target.closest("[data-watch]"))return;open()};
+   card.onkeydown=event=>{if((event.key==="Enter"||event.key===" ")&&!event.target.closest("button")){event.preventDefault();open()}};
+ });
+}
+function readDemoLog(){try{const x=JSON.parse(localStorage.getItem("relay-demo-orders-v1")||"[]");return Array.isArray(x)?x:[]}catch{return []}}
+function demoRequestId(){return "RELAY-DEMO-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,8).toUpperCase()}
+function quoteText(q){return q.paymentMinor>0?'Additional payment · '+money(q.paymentMinor/100):q.refundMinor>0?'Refund difference · '+money(q.refundMinor/100):'Even exchange · £0.00'}
+
+function chooseSku(sku){
+ chosen=catalog.find(p=>p.sku===sku);if(!chosen)return;
+ const box=$("catalogResults");if(!box)return;
+ const context=!!exchangeContext,sameRetailer=context&&storeOf(chosen).toLowerCase()===String(selected.merchant).toLowerCase();
+ const fixtureInStock=chosen.fixture&&Number(chosen.quantity)>0;
+ const sandboxPreview=!chosen.fixture&&chosen.provider==="square_sandbox"&&context&&selected?.demo===true;
+ const eligible=context&&sameRetailer&&(fixtureInStock||sandboxPreview);
+ let quote=null,message="";
+ if(eligible){try{quote=RelayExchangeEngine.quote({purchase:selected,candidate:{...chosen,store:storeOf(chosen),previewSimulation:sandboxPreview},reason,existing:readDemoLog()})}catch(e){message=e.message}}
+ const original=Math.round(Number(selected?.price||0)*100),next=Number(chosen.priceMinor);
+ const held=planPreview==="free";
+ const warning=message?"The exchange cannot be started: "+message:!context?"To exchange, open the purchase in your Wallet first.":!sameRetailer?"This replacement belongs to another retailer. Cross-retailer swaps are not yet coordinated.":chosen.fixture?"This demo item has no available stock.":"This Square Sandbox item has unconfirmed stock and retailer exchange eligibility. It is browse-only except for a labelled simulation using a fictional original purchase.";
+ const review=quote?
+ '<div class="card" style="background:#263e32;border-color:#71934e;margin-top:15px"><h3>Review simulated exchange</h3><p class="small">Original: '+safe(selected.item)+' · '+safe(selected.detail)+'</p><div class="split"><span>Original purchase</span><b>'+money(original/100)+'</b></div><div class="split"><span>Replacement item</span><b>'+money(next/100)+'</b></div><hr style="border:0;border-top:1px solid #66845d"><strong>'+quoteText(quote)+'</strong><p class="small">'+(held?"Relay Free demo: start the original return and queue the replacement together. The replacement order is created after the demo return is received.":"Relay Plus demo: create the simulated replacement order and original return together, before the return is received.")+'</p>'+(sandboxPreview?'<div class="notice">This is a Square Sandbox catalogue preview. Stock is NOT confirmed, nothing is reserved, and the retailer receives NO order. The following action is entirely fictional.</div>':'<p class="small">Editable demo stock: '+Number(chosen.quantity)+' units. One demo unit will be reserved when the simulation is confirmed.</p>')+'</div>':
+ '<div class="notice" style="margin-top:16px">'+safe(warning)+'</div>';
+ box.innerHTML='<div class="card" style="grid-column:1/-1"><button class="link" id="backToResults">← Back to suggestions</button><div class="eyebrow" style="margin-top:12px">'+safe(storeOf(chosen))+' · '+(chosen.fixture?'EDITABLE DEMO INVENTORY':'SQUARE SANDBOX CATALOGUE')+'</div><div class="art">'+productImage(chosen.product,chosen.variation)+'</div><h2>'+safe(chosen.product)+'</h2><p>'+safe(chosen.variation)+'</p><div class="price">'+money(next/100)+'</div>'+review+
+ '<p class="small muted">This preview never makes a card payment, sends a retailer return or places a real replacement order.</p><div class="actions"><button class="outline" id="watchSelected">◎ Watch price</button>'+
+ (context?'<button class="outline" id="refundOriginal">↩ Refund original instead</button>':'')+
+ (quote?'<button class="darkbtn" id="placeSelected">'+(held?'Simulate return + replacement request →':'Simulate instant exchange + return →')+'</button>':context?'<button class="outline" id="backToPurchase">← Back to original purchase</button>':'<button class="darkbtn" id="goToWallet">Go to my purchases →</button>')+
+ '</div><div id="orderResult" aria-live="polite"></div></div>';
+ const back=$("backToResults");if(back)back.onclick=renderCatalog;
+ const watchButton=$("watchSelected");if(watchButton)watchButton.onclick=()=>watchSku(sku);
+ const refund=$("refundOriginal");if(refund)refund.onclick=()=>{page=planPreview==="plus"?"refund":"return";exchangeContext=false;render()};
+ const place=$("placeSelected");if(place)place.onclick=()=>placeDemoOrder(sku,true);
+ const originalButton=$("backToPurchase");if(originalButton)originalButton.onclick=()=>{page="detail";exchangeContext=false;render()};
+ const walletButton=$("goToWallet");if(walletButton)walletButton.onclick=()=>go("wallet");
+ box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+
+function placeDemoOrder(sku,isExchange){
+ if(!isExchange||!exchangeContext)return showCheckoutError("Start from your Wallet purchase, then choose Exchange.");
+ const p=catalog.find(x=>x.sku===sku);
+ if(!p||(p.fixture!==true&&p.provider!=="square_sandbox"))return showCheckoutError("This catalogue item is not part of the demo.");
+ if(!selected||selected.demo!==true)return showCheckoutError("Real purchases require retailer authorisation. This simulation only accepts fictional purchases.");
+ const existing=readDemoLog(),now=new Date().toISOString(),id=demoRequestId();
+ let rec;
+ try{
+   const previewSimulation=p.fixture!==true&&p.provider==="square_sandbox";
+   const candidate={...p,store:storeOf(p),previewSimulation};
+   rec=RelayExchangeEngine.createExchange({purchase:selected,candidate,reason,existing,id,at:now,fulfilmentMode:planPreview==="free"?"hold":"advance"});
+   if(p.fixture&&Number(p.quantity)<1)throw Error("The demo item is out of stock.");
+   const nextChanges=p.fixture?{...inventoryChanges,[sku]:{...(inventoryChanges[sku]||{}),quantity:Number(p.quantity)-1,updatedAt:now}}:inventoryChanges;
+   const nextLog=[rec,...existing].slice(0,60),oldLog=localStorage.getItem("relay-demo-orders-v1"),oldInv=localStorage.getItem(demoInventoryKey);
+   try{
+     localStorage.setItem("relay-demo-orders-v1",JSON.stringify(nextLog));
+     if(p.fixture)localStorage.setItem(demoInventoryKey,JSON.stringify(nextChanges));
+   }catch(writeError){
+     try{if(oldLog===null)localStorage.removeItem("relay-demo-orders-v1");else localStorage.setItem("relay-demo-orders-v1",oldLog);
+       if(p.fixture){if(oldInv===null)localStorage.removeItem(demoInventoryKey);else localStorage.setItem(demoInventoryKey,oldInv)}}catch{}
+     throw writeError;
+   }
+   if(p.fixture){inventoryChanges=nextChanges;catalog=catalog.filter(x=>!x.fixture).concat(demoProducts())}
+ }catch(e){showCheckoutError(e.message);return}
+ const confirm=$("placeSelected");if(confirm){confirm.disabled=true;confirm.textContent="✓ Demo exchange recorded"}
+ const root=$("orderResult");if(root)root.innerHTML=demoExchangeReceipt(rec);
+ bindDemoExchangeReceipt(rec.id);
+}
+function demoExchangeReceipt(rec){
+ const entries=(rec.ledger||[]).map(e=>'<li>'+safe(e.type.replace(/_/g," "))+' · '+money(Number(e.amountMinor)/100)+' · '+safe(e.status)+'</li>').join("");
+ const held=rec.replacementStatus==="PENDING_RETURN_RECEIPT";
+ return '<div class="card" style="background:#eaf6dc;color:#1d3522;margin-top:15px">'+
+ '<h3>✓ Coordinated exchange simulated</h3><p class="small">Request: '+safe(rec.id)+'</p>'+
+ '<p><b>Replacement:</b> '+(held?'Queued until return receipt':safe(rec.replacementOrderId||rec.replacementRequestId))+'</p>'+
+ '<p><b>Original return:</b> '+safe(rec.returnRequestId)+' · '+safe(rec.returnStatus)+'</p>'+
+ '<p><b>Stock source:</b> '+(rec.stockConfirmed?'Editable fictional inventory':'Square Sandbox listing — stock NOT verified')+'</p>'+
+ '<p><b>Simulated payment / refund ledger:</b></p><ul>'+entries+'</ul>'+
+ '<p class="small">No real retailer order, return authorisation, payment, refund or stock reservation has occurred. Saved in this browser only.</p>'+
+ '<div class="actions">'+(rec.returnStatus!=="RETURN_COMPLETED"?'<button class="darkbtn" id="progressReturn">Advance demo return →</button>':'')+
+ '<button class="outline" id="viewLedger">View activity history →</button></div></div>';
+}
+function bindDemoExchangeReceipt(id){
+ const btn=$("progressReturn");if(btn)btn.onclick=()=>advanceDemoExchangeReturn(id);
+ const history=$("viewLedger");if(history)history.onclick=()=>go("profile");
+}
+function advanceDemoExchangeReturn(id){
+ const records=readDemoLog(),i=records.findIndex(x=>x.id===id);
+ if(i<0)return showCheckoutError("Demo exchange not found.");
+ try{records[i]=RelayExchangeEngine.advanceReturn(records[i],undefined,{exchangeAlreadyIssued:true});localStorage.setItem("relay-demo-orders-v1",JSON.stringify(records))}
+ catch(e){return showCheckoutError(e.message)}
+ const root=$("orderResult");if(root)root.innerHTML=demoExchangeReceipt(records[i]);
+ bindDemoExchangeReceipt(id);
+}
+function showCheckoutError(message){const root=$("orderResult");if(root)root.innerHTML='<div class="error" role="alert">'+safe(message)+'</div>'}
+function simulateDemoReturn(){
+ const root=$("returnResult");if(!root)return;
+ try{
+   const existing=readDemoLog(),rec=RelayExchangeEngine.createReturnOnly({purchase:selected,existing,id:demoRequestId()});
+   localStorage.setItem("relay-demo-orders-v1",JSON.stringify([rec,...existing].slice(0,60)));
+   root.innerHTML='<div class="card" style="background:#243b35"><h3>✓ Demo return request recorded</h3><p>Reference: '+safe(rec.returnRequestId)+'</p><p class="small">No retailer return was submitted. View the record in Profile.</p></div>';
+   const button=$("simulateReturnButton");if(button)button.disabled=true;
+ }catch(e){root.innerHTML='<div class="error">'+safe(e.message)+'</div>'}
+}
+function simulateDemoRefund(){
+ const root=$("refundResult");if(!root)return;
+ if(planPreview!=="plus"){root.textContent="Early refunds are only in the Plus demo preview.";return;}
+ try{
+   const existing=readDemoLog(),rec=RelayExchangeEngine.createInstantRefund({purchase:selected,existing,id:demoRequestId()});
+   localStorage.setItem("relay-demo-orders-v1",JSON.stringify([rec,...existing].slice(0,60)));
+   root.innerHTML='<div style="background:#dff5d6;color:#205b2f;border-radius:12px;padding:14px"><strong>✓ Refund advance simulated</strong><p>'+money(rec.amountMinor/100)+' · '+safe(rec.ledger[0].status)+'</p><p>Return request: '+safe(rec.returnRequestId)+'</p><p class="small">No money transferred. View the ledger in Profile.</p></div>';
+   const button=$("simulateRefundButton");if(button)button.disabled=true;
+ }catch(e){root.innerHTML='<div class="error">'+safe(e.message)+'</div>'}
+}
+function resetDemoTransactions(){localStorage.removeItem("relay-demo-orders-v1");inventoryChanges={};localStorage.removeItem(demoInventoryKey);catalog=catalog.filter(p=>!p.fixture).concat(demoProducts());render()}
+
+function watchSku(sku){const p=catalog.find(x=>x.sku===sku);if(!p)return;watch[sku]={name:p.product,variant:p.variation,baseline:Number(p.priceMinor),created:new Date().toISOString()};localStorage.setItem("relay-radar-v2",JSON.stringify(watch));if(page==="discover")renderCatalog();else showRadar()}
+function radarView(){return '<div class="eyebrow">◎ RELAY RADAR</div><h1 class="title">Your deals, discovered.</h1><p class="sub">Keep an eye on products you love. See when watched catalogue prices change.</p><div class="hero"><div class="eyebrow" style="color:#c7f567">◎ PRICE WATCH</div><h2>Good things are worth watching.</h2><p>Watch your favourite styles and check for observed price drops.</p><button class="limebtn" onclick="go(\'discover\')">Find products to watch →</button></div><div class="sectionhead"><h2>Your watchlist</h2><button class="outline" onclick="loadCatalog(true)">↻ Check prices</button></div><div id="radarList" class="catalog"></div><p class="small muted" id="radarStatus"></p><div class="card"><h3>Coming next: smart alerts</h3><p class="sub">Opt-in notifications for real retailer discounts, in-stock sizes and recommendations based on purchase history. Automatic monitoring is not enabled yet.</p></div>'}
+function showRadar(){const box=$("radarList");if(!box)return;const entries=Object.entries(watch);
+box.innerHTML=entries.length?entries.map(([sku,w])=>{const p=catalog.find(x=>x.sku===sku),current=p?Number(p.priceMinor):null,baseline=Number(w.baseline),drop=current!==null&&current<baseline,stock=p?.fixture?Number(p.quantity):null;return '<div class="card"><div class="eyebrow">'+safe(p?storeOf(p):"WATCHED PRODUCT")+'</div><h3>'+safe(w.name)+'</h3><p class="small muted">'+safe(w.variant)+'</p><div class="price">'+(current===null?"Not in current feed":money(current/100))+'</div><p class="'+(drop?"watch":"small muted")+'">'+(drop?"↓ Price decreased "+money((baseline-current)/100)+" since watch started":"Original watched price: "+money(baseline/100))+'</p><p class="small muted">'+(stock===null?"Square stock not confirmed":stock===0?"Out of stock in demo store":stock+" demo units available")+'</p><button class="outline" data-unwatch="'+safe(sku)+'">Remove watch</button></div>'}).join(""):'<div class="card">Nothing on your Radar yet. Visit Discover and watch a product.</div>';
+box.querySelectorAll("[data-unwatch]").forEach(b=>b.onclick=()=>unwatch(b.dataset.unwatch));const status=$("radarStatus");if(status)status.textContent="Prices are compared against the moment you started watching. Demo retailer prices can be edited in Profile → Retailer view. Checks are local, not push notifications."}
+function unwatch(sku){delete watch[sku];delete history[sku];localStorage.setItem("relay-radar-v2",JSON.stringify(watch));localStorage.setItem("relay-radar-history-v2",JSON.stringify(history));showRadar()}
+function wrappedView(){return '<div class="eyebrow">✦ RELAY WRAPPED</div><h1 class="title">Your year in purchases.</h1><p class="sub">Your full Wrapped experience, all in one tab.</p><iframe title="Relay Wrapped full experience" src="./wrapped.html" style="display:block;width:100%;height:1640px;border:0;border-radius:22px;background:#101828" scrolling="no"></iframe>'}
+function profileView(){const orders=readDemoLog();
+ return '<h1 class="title">Your Relay profile</h1>'+planBanner()+'<div class="card"><h3>Shopify integration</h3><p class="sub">Authorised Shopify product feeds and signed paid-order ingestion are being connected. Shopify customer orders remain private until verified.</p><p class="small muted" id="shopifyStatus">Checking Shopify connection…</p></div><div class="card"><div class="split"><div><h3>Exchange / refund test ledger</h3><p class="small muted">Demo payment, price-difference refund and return events, with unique references. Browser-only; not real Square or Plaid transactions.</p></div><button class="outline" id="resetTransactions">Reset tests</button></div>'+
+ (orders.length?orders.map(o=>'<div style="padding:14px 0;border-top:1px solid #eee"><strong>'+safe(o.product||o.originalProduct)+'</strong><div class="small muted">'+safe(o.store)+' · '+safe(o.variant||o.originalVariant||"")+' · '+safe(o.type||"ORDER")+'</div><div class="small muted">Request '+safe(o.id)+'</div><p><strong>'+safe(o.status)+'</strong> · '+(o.returnStatus?'Return: '+safe(o.returnStatus):'No return')+'</p><div class="small muted">'+(o.ledger||[]).map(e=>safe(e.type.replace(/_/g," "))+' '+money(e.amountMinor/100)+' ('+safe(e.status)+')').join(" · ")+'</div>'+(o.returnStatus&&o.returnStatus!=="RETURN_COMPLETED"?'<button class="outline" style="margin-top:12px" data-advance="'+safe(o.id)+'">Advance return →</button>':'')+'</div>').join(""):'<p class="muted">No requests yet. Open a demo purchase, select an eligible replacement, and confirm the test exchange.</p>')+'</div><div class="card"><h3>Editable retailer inventory</h3><p class="sub">Change stock and prices in North & Co., Relay Studio and Harbour Goods to test failures, different payment amounts and Radar discounts.</p><button class="darkbtn" onclick="retailer=true;render()">Open retailer inventory lab →</button></div><div class="card"><h3>Test exchange payments and refunds</h3><p class="small muted">Use the Waxed Field Coat demo purchase: choose the Slate coat for an even swap, the Quilted Liner Jacket for a £20 simulated refund, or the Waterproof Rain Shell for a £20 simulated extra payment. Reset tests above between scenarios.</p><p class="small muted">For real Square <strong>Sandbox API calls</strong> (separate from this demo), open the manual workflow below. It creates test orders and checks a card charge and partial refund using Sandbox credentials only.</p><a class="outline" target="_blank" rel="noopener noreferrer" href="https://github.com/zzmm92nr59-cloud/instant-refund-prototype/actions/workflows/square-sandbox-exchange-test.yml">Run Square Sandbox API tests ↗</a></div><div class="card"><h3>Purchase matching</h3><p class="sub">Real purchases are shown only after verification. Demo checkout cannot move money or create a Square order.</p><button class="outline" onclick="location.href=\'./legacy-wallet.html\'">Developer / API tools →</button></div>';
+}
+function bindProfileControls(){document.querySelectorAll("[data-advance]").forEach(b=>b.onclick=()=>{
+ const orders=readDemoLog(),i=orders.findIndex(x=>x.id===b.dataset.advance);
+ if(i<0||!orders[i].returnStatus)return;
+ orders[i]=RelayExchangeEngine.advanceReturn(orders[i],undefined,{exchangeAlreadyIssued:orders.some(x=>x.exchange===true&&x.originalPurchaseId===orders[i].originalPurchaseId)});
+ localStorage.setItem("relay-demo-orders-v1",JSON.stringify(orders));render();
+ });const reset=$("resetTransactions");if(reset)reset.onclick=()=>{if(confirm("Reset all simulated exchange/refund transactions and restore demo inventory?"))resetDemoTransactions()}}
+
+function merchantView(){
+const stores=demoRetailers.map(st=>{const rows=catalog.filter(p=>storeOf(p)===st.name);return '<div class="card"><div class="split"><div><div class="eyebrow">'+safe(st.platform||"Square demo")+' · EDITABLE FICTIONAL INVENTORY</div><h2>'+safe(st.name)+'</h2><p class="small muted">'+rows.length+' distinct product variants. Change a price or quantity, then visit Discover / Radar.</p></div><span class="pill">'+rows.reduce((n,p)=>n+Number(p.quantity||0),0)+' units</span></div><div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:9px">Product / variant</th><th>Price £</th><th>Stock</th><th>Update</th></tr></thead><tbody>'+rows.map(p=>'<tr style="border-top:1px solid #eee"><td style="padding:9px"><strong>'+safe(p.product)+'</strong><br><span class="small muted">'+safe(p.variation)+'</span></td><td><input aria-label="Price for '+safe(p.sku)+'" id="price-'+safe(p.sku)+'" type="number" step="0.01" min="1" style="width:86px;padding:7px;border:1px solid #ddd;border-radius:8px" value="'+(p.priceMinor/100).toFixed(2)+'"></td><td><input aria-label="Quantity for '+safe(p.sku)+'" id="qty-'+safe(p.sku)+'" type="number" min="0" step="1" style="width:64px;padding:7px;border:1px solid #ddd;border-radius:8px" value="'+p.quantity+'"></td><td><button class="outline" style="padding:7px 9px" data-save-sku="'+safe(p.sku)+'">Save</button> <button class="outline" style="padding:7px 9px" data-discount-sku="'+safe(p.sku)+'">−20%</button></td></tr>').join("")+'</tbody></table></div></div>'}).join("");
+return '<button class="link" onclick="retailer=false;render()">← Back to Relay</button><h1 class="title">Retailer inventory lab</h1><p class="sub">Edit three independent fictional retailer inventories, including Shopify-style demo shops. Changes persist in this browser and appear in Discover, Radar and exchange checks.</p><div class="notice">The Shopify demo retailers are fictional. Actual Shopify order ingestion is private and requires retailer authorisation. Square Sandbox inventory is read-only here. No changes are sent to any real merchant, and demo stock is not shared across devices.</div><div class="card"><h3>North & Co. · Square Sandbox</h3><p class="small muted">'+catalog.filter(p=>!p.fixture).length+' catalogue variants from Square Sandbox. Not editable through this lab.</p></div>'+stores+'<button class="outline" id="resetInventory">Reset all demo retailer prices and stock</button>';
+}
+function bindRetailerControls(){document.querySelectorAll("[data-save-sku]").forEach(b=>b.onclick=()=>{const sku=b.dataset.saveSku;const price=Number($("price-"+sku)?.value),qty=Number($("qty-"+sku)?.value);if(!Number.isFinite(price)||price<1||!Number.isInteger(qty)||qty<0){alert("Enter a valid price and non-negative whole-number stock quantity.");return}inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(price*100),quantity:qty,updatedAt:new Date().toISOString()};saveInventory()});document.querySelectorAll("[data-discount-sku]").forEach(b=>b.onclick=()=>applyDemoDiscount(b.dataset.discountSku));const reset=$("resetInventory");if(reset)reset.onclick=()=>{if(confirm("Reset all demo retailer prices and stock?"))resetDemoInventory()}}
+async function loadCatalog(manual=false){
+ let next=demoProducts(),squareError=null;
+ try{
+  const response=await fetch(API+"/relay/live-test/products",{cache:"no-store"});
+  if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
+  const data=await response.json();
+  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:"North & Co.",fixture:false})),...next];
+ }catch(e){squareError=e.message}
+ // Independent retailer feed: a Square outage must not suppress a connected Shopify catalogue.
+ try{
+  const response=await fetch(API+"/relay/shopify/catalogue",{cache:"no-store"});
+  if(response.ok){
+   const data=await response.json();
+   if(data.published&&Array.isArray(data.products)){
+    const published=data.products.filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"shopify",store:"Shopify retailer",fixture:false}));
+    next.push(...published);
+   }
+  }
+ }catch{}
+ catalog=next;
+ if(page==="wallet")render();
+ if(manual){
+  for(const [sku,w] of Object.entries(watch)){
+   const p=catalog.find(x=>x.sku===sku);
+   if(p&&history[sku]===undefined)history[sku]=w.baseline;
+  }
+  localStorage.setItem("relay-radar-history-v2",JSON.stringify(history));
+  if(squareError)console.warn("Square unavailable; independent demo/Shopify feeds remain available",squareError);
+ }
+ if(page==="discover")renderCatalog();
+ if(page==="radar")showRadar();
+}
+async function loadShopifyStatus(){
+ const node=$("shopifyStatus");if(!node)return;
+ try{
+  const response=await fetch(API+"/relay/shopify/status",{cache:"no-store"});
+  if(!response.ok)throw Error("Status unavailable");
+  const data=await response.json();
+  node.textContent=(data.configured?"Catalogue credentials connected.":"Awaiting Shopify retailer authorisation.")+" Paid-order webhook: "+(data.paidOrderWebhookConfigured?"configured":"not configured")+". Published catalogue: "+(data.publicCatalogueEnabled?"enabled":"not enabled")+".";
+ }catch{node.textContent="Shopify status unavailable; live connection not assumed."}
+}
+
+async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
+// Compatibility for previously cached v4 handlers that called showCatalog.
+function showCatalog(){return renderCatalog()}
+Object.assign(window,{go,toggleDemo,openPurchase,render,setPlanPreview,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,advanceDemoExchangeReturn});Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});$("modeToggle").textContent="✦ Demo on";render();loadCatalog();loadVerified();
+ 
+}catch(e){console.error("Relay startup error",e);const root=document.getElementById("view");if(root)root.innerHTML="<div class=\"card\"><h2>Relay encountered a problem</h2><p>Try reloading. Your demo purchases and features are still available through the navigation.</p><pre style=\"white-space:pre-wrap\"></pre></div>";if(root)root.querySelector("pre").textContent=String(e.message||e)}})();</script></body></html>
