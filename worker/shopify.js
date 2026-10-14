@@ -28,18 +28,19 @@ export function getShopifyStores(env) {
   for (const raw of configs) {
     const domain = String(raw.domain || "").toLowerCase().trim();
     const token = String(raw.token || "").trim();
-    // Never attempt API calls with incomplete or invalid credentials.
-    if (!DOMAIN.test(domain) || !token || seen.has(domain)) continue;
+    const webhookSecret = String(raw.webhookSecret || "").trim();
+    // Signed webhooks may be configured without catalogue API credentials.
+    if (!DOMAIN.test(domain) || (!token && !webhookSecret) || seen.has(domain)) continue;
     seen.add(domain);
     const label = String(raw.label || domain.replace(/\.myshopify\.com$/, "").replace(/-/g, " ")).trim().slice(0, 80);
     configured.push({
-      domain, token, label, published: String(raw.publish || "").toLowerCase() === "true",
-      webhookSecret: String(raw.webhookSecret || "").trim()
+      domain, token, label, published: !!token && String(raw.publish || "").toLowerCase() === "true",
+      webhookSecret
     });
   }
   return configured;
 }
-export function shopifyConfigured(env) { return getShopifyStores(env).length > 0; }
+export function shopifyConfigured(env) { return getShopifyStores(env).some(s => Boolean(s.token)); }
 async function query(store, q, variables = {}) {
   const response = await fetch("https://" + store.domain + "/admin/api/" + VERSION + "/graphql.json", {
     method: "POST",
@@ -108,7 +109,7 @@ async function syncStore(env, store) {
 }
 export async function syncShopifyCatalogues(env) {
   const results = [];
-  for (const store of getShopifyStores(env)) {
+  for (const store of getShopifyStores(env).filter(s => s.token)) {
     try { results.push({success:true, ...await syncStore(env, store)}); }
     catch (err) {
       // One retailer outage must not stop imports from other connected shops.
