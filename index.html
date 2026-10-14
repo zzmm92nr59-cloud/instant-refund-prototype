@@ -224,30 +224,59 @@ function chooseSku(sku){
  box.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
+
 function placeDemoOrder(sku,isExchange){
- if(!isExchange||!exchangeContext)return showCheckoutError("Start with a purchase in your wallet, then select Exchange. Standalone orders are not created here.");
- const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return showCheckoutError("Only editable demo inventory supports test checkout.");
+ if(!isExchange||!exchangeContext)return showCheckoutError("Start from your Wallet purchase, then choose Exchange.");
+ const p=catalog.find(x=>x.sku===sku);
+ if(!p||(p.fixture!==true&&p.provider!=="square_sandbox"))return showCheckoutError("This catalogue item is not part of the demo.");
+ if(!selected||selected.demo!==true)return showCheckoutError("Real purchases require retailer authorisation. This simulation only accepts fictional purchases.");
  const existing=readDemoLog(),now=new Date().toISOString(),id=demoRequestId();
- if(planPreview==="free"&&!existing.some(x=>x.originalPurchaseId===selected.id&&x.type==="RETURN"&&x.returnStatus==="RETURN_RECEIVED"))return showCheckoutError("Free exchanges require receipt of the original item. Request a return, then advance it to RETURN_RECEIVED in the demo ledger under Profile.");
  let rec;
  try{
-   if(isExchange){rec=RelayExchangeEngine.createExchange({purchase:selected,candidate:{...p,store:storeOf(p)},reason,existing,id,at:now});}
-   else{
-     if(!canDemoOrder(p))throw Error("Out of stock.");
-     rec={id,type:"ORDER",exchange:false,sku:p.sku,store:storeOf(p),product:p.product,variant:p.variation,amount:p.priceMinor/100,amountMinor:p.priceMinor,originalPurchaseId:null,date:now,status:"DEMO_ORDER_CREATED",ledger:[{type:"CARD_PAYMENT",amountMinor:p.priceMinor,currency:"GBP",status:"SIMULATED_CAPTURED"}],history:[{event:"ORDER_CREATED",at:now}]};
-   }
-   if(Number(p.quantity)<1)throw Error("Product is out of stock. No order or payment was recorded.");
-   // Keep the item log and stock change together in one stored transaction snapshot.
-   const nextChanges={...inventoryChanges,[sku]:{...(inventoryChanges[sku]||{}),quantity:Number(p.quantity)-1,updatedAt:now}};
+   const previewSimulation=p.fixture!==true&&p.provider==="square_sandbox";
+   const candidate={...p,store:storeOf(p),previewSimulation};
+   rec=RelayExchangeEngine.createExchange({purchase:selected,candidate,reason,existing,id,at:now,fulfilmentMode:planPreview==="free"?"hold":"advance"});
+   if(p.fixture&&Number(p.quantity)<1)throw Error("The demo item is out of stock.");
+   const nextChanges=p.fixture?{...inventoryChanges,[sku]:{...(inventoryChanges[sku]||{}),quantity:Number(p.quantity)-1,updatedAt:now}}:inventoryChanges;
    const nextLog=[rec,...existing].slice(0,60),oldLog=localStorage.getItem("relay-demo-orders-v1"),oldInv=localStorage.getItem(demoInventoryKey);
-   try{localStorage.setItem("relay-demo-orders-v1",JSON.stringify(nextLog));localStorage.setItem(demoInventoryKey,JSON.stringify(nextChanges))}
-   catch(writeError){if(oldLog===null)localStorage.removeItem("relay-demo-orders-v1");else localStorage.setItem("relay-demo-orders-v1",oldLog);if(oldInv===null)localStorage.removeItem(demoInventoryKey);else localStorage.setItem(demoInventoryKey,oldInv);throw writeError}
-   inventoryChanges=nextChanges;catalog=catalog.filter(x=>!x.fixture).concat(demoProducts());
+   try{
+     localStorage.setItem("relay-demo-orders-v1",JSON.stringify(nextLog));
+     if(p.fixture)localStorage.setItem(demoInventoryKey,JSON.stringify(nextChanges));
+   }catch(writeError){
+     try{if(oldLog===null)localStorage.removeItem("relay-demo-orders-v1");else localStorage.setItem("relay-demo-orders-v1",oldLog);
+       if(p.fixture){if(oldInv===null)localStorage.removeItem(demoInventoryKey);else localStorage.setItem(demoInventoryKey,oldInv)}}catch{}
+     throw writeError;
+   }
+   if(p.fixture){inventoryChanges=nextChanges;catalog=catalog.filter(x=>!x.fixture).concat(demoProducts())}
  }catch(e){showCheckoutError(e.message);return}
- const button=$("placeSelected");if(button){button.disabled=true;button.textContent="✓ Request recorded"}
- const entries=(rec.ledger||[]).map(e=>'<li>'+safe(e.type.replace(/_/g," "))+' · '+money(e.amountMinor/100)+' · '+safe(e.status)+'</li>').join("");
- const root=$("orderResult");if(root)root.innerHTML='<div class="card" style="background:#eaf6dc;margin-top:15px"><h3>✓ '+(isExchange?'Coordinated exchange':'New order')+' simulated</h3><p class="small">Request '+safe(rec.id)+'</p><p><b>Replacement:</b> '+safe(rec.replacementOrderId||rec.id)+'</p>'+(isExchange?'<p><b>Original return:</b> '+safe(rec.returnRequestId)+' · '+safe(rec.returnStatus)+'</p>':'')+'<p><b>Test payment ledger:</b></p><ul>'+entries+'</ul><p class="small">No real money was moved and no live retailer request was sent.</p><button class="outline" id="viewLedger">View return & payment history →</button></div>';
- if($("viewLedger"))$("viewLedger").onclick=()=>go("profile");
+ const confirm=$("placeSelected");if(confirm){confirm.disabled=true;confirm.textContent="✓ Demo exchange recorded"}
+ const root=$("orderResult");if(root)root.innerHTML=demoExchangeReceipt(rec);
+ bindDemoExchangeReceipt(rec.id);
+}
+function demoExchangeReceipt(rec){
+ const entries=(rec.ledger||[]).map(e=>'<li>'+safe(e.type.replace(/_/g," "))+' · '+money(Number(e.amountMinor)/100)+' · '+safe(e.status)+'</li>').join("");
+ const held=rec.replacementStatus==="PENDING_RETURN_RECEIPT";
+ return '<div class="card" style="background:#eaf6dc;color:#1d3522;margin-top:15px">'+
+ '<h3>✓ Coordinated exchange simulated</h3><p class="small">Request: '+safe(rec.id)+'</p>'+
+ '<p><b>Replacement:</b> '+(held?'Queued until return receipt':safe(rec.replacementOrderId||rec.replacementRequestId))+'</p>'+
+ '<p><b>Original return:</b> '+safe(rec.returnRequestId)+' · '+safe(rec.returnStatus)+'</p>'+
+ '<p><b>Stock source:</b> '+(rec.stockConfirmed?'Editable fictional inventory':'Square Sandbox listing — stock NOT verified')+'</p>'+
+ '<p><b>Simulated payment / refund ledger:</b></p><ul>'+entries+'</ul>'+
+ '<p class="small">No real retailer order, return authorisation, payment, refund or stock reservation has occurred. Saved in this browser only.</p>'+
+ '<div class="actions">'+(rec.returnStatus!=="RETURN_COMPLETED"?'<button class="darkbtn" id="progressReturn">Advance demo return →</button>':'')+
+ '<button class="outline" id="viewLedger">View activity history →</button></div></div>';
+}
+function bindDemoExchangeReceipt(id){
+ const btn=$("progressReturn");if(btn)btn.onclick=()=>advanceDemoExchangeReturn(id);
+ const history=$("viewLedger");if(history)history.onclick=()=>go("profile");
+}
+function advanceDemoExchangeReturn(id){
+ const records=readDemoLog(),i=records.findIndex(x=>x.id===id);
+ if(i<0)return showCheckoutError("Demo exchange not found.");
+ try{records[i]=RelayExchangeEngine.advanceReturn(records[i],undefined,{exchangeAlreadyIssued:true});localStorage.setItem("relay-demo-orders-v1",JSON.stringify(records))}
+ catch(e){return showCheckoutError(e.message)}
+ const root=$("orderResult");if(root)root.innerHTML=demoExchangeReceipt(records[i]);
+ bindDemoExchangeReceipt(id);
 }
 function showCheckoutError(message){const root=$("orderResult");if(root)root.innerHTML='<div class="error" role="alert">'+safe(message)+'</div>'}
 function simulateDemoReturn(){
@@ -339,6 +368,6 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{go,toggleDemo,openPurchase,render,setPlanPreview,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions});Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});$("modeToggle").textContent="✦ Demo on";render();loadCatalog();loadVerified();
+Object.assign(window,{go,toggleDemo,openPurchase,render,setPlanPreview,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,advanceDemoExchangeReturn});Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});$("modeToggle").textContent="✦ Demo on";render();loadCatalog();loadVerified();
  
 }catch(e){console.error("Relay startup error",e);const root=document.getElementById("view");if(root)root.innerHTML="<div class=\"card\"><h2>Relay encountered a problem</h2><p>Try reloading. Your demo purchases and features are still available through the navigation.</p><pre style=\"white-space:pre-wrap\"></pre></div>";if(root)root.querySelector("pre").textContent=String(e.message||e)}})();</script></body></html>
