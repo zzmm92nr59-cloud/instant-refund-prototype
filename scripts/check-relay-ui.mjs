@@ -53,7 +53,8 @@ function check(name, expected) {
   verifyHandlers(name);
   console.log("PASS", name);
 }
-assert.ok(screen().includes("Good evening"), "Wallet failed to start");
+assert.ok(screen().includes("Your purchases"), "Wallet failed to start");
+assert.ok(screen().includes("Free for everyone"), "Default Free membership missing");
 verifyHandlers("wallet");
 for (const [name, expected] of [
   ["wallet", "Recent purchases"],
@@ -78,12 +79,14 @@ new vm.Script("demo=true;openPurchase('sample-1')").runInContext(context);
 assert.equal(win.demo, true, "Demo click did not restore demo mode");
 assert.ok(screen().includes("Retro High Trainers"), "Demo purchase button did not open item");
 new vm.Script("page='refund';render()").runInContext(context);
-assert.ok(screen().includes("SIMULATED OFFER"), "Instant refund click did not open offer");
+assert.ok(screen().includes("Return for free"), "Free must not promise an early refund");
+win.setPlanPreview("plus");
+assert.ok(screen().includes("SIMULATED EARLY OFFER"), "Plus preview must show the simulated early refund offer");
 new vm.Script("page='exchange';render()").runInContext(context);
 assert.ok(screen().includes("Reason for exchange"), "Exchange click did not open options");
 new vm.Script("exchangeContext=true;go('discover')").runInContext(context);
 assert.ok(screen().includes("Find the right replacement"), "Discover exchange link did not set context");
-console.log("PASS in-page demo, refund, exchange and contextual Discover clicks");
+console.log("PASS Free return-first, Plus demo, in-page exchange and contextual Discover clicks");
 
 win.openPurchase("sample-1");
 assert.ok(screen().includes("Retro High Trainers"), "Demo purchase details missing");
