@@ -1,3 +1,4 @@
+import { getShopifyStores } from "./shopify.js";
 // Shopify retailer-authorised, signature-verified orders/paid ingestion.
 // Private retailer order and line item IDs stay in D1. Nothing here exposes consumer purchases.
 const MAX_BYTES = 256 * 1024;
@@ -29,17 +30,17 @@ async function validSignature(raw, encoded, secret) {
 }
 export async function receiveShopifyWebhook(request, env) {
   const shop = String(request.headers.get("x-shopify-shop-domain") || "").toLowerCase().trim();
-  const configuredShop = String(env.SHOPIFY_SHOP_DOMAIN || "").toLowerCase().trim();
-  if (!env.SHOPIFY_WEBHOOK_SECRET || !configuredShop || !env.RELAY_DB)
+  if (!env.RELAY_DB)
     return Response.json({ error: "not_configured" }, { status: 503 });
-  if (!DOMAIN.test(shop) || shop !== configuredShop)
+  const store = DOMAIN.test(shop) ? getShopifyStores(env).find(s => s.domain === shop) : null;
+  if (!store || !store.webhookSecret)
     return new Response("Unauthorized store", { status: 403 });
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();
   const deliveryId = String(request.headers.get("x-shopify-webhook-id") || "");
   if (!deliveryId || deliveryId.length > 128) return new Response("Missing delivery ID", { status: 400 });
   const body = await request.arrayBuffer();
   if (body.byteLength > MAX_BYTES) return new Response("Payload too large", { status: 413 });
-  if (!await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), env.SHOPIFY_WEBHOOK_SECRET))
+  if (!await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), store.webhookSecret))
     return new Response("Invalid signature", { status: 401 });
   if (topic !== "orders/paid") return Response.json({ received: true, ignored: true });
   let event;
