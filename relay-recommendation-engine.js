@@ -23,7 +23,7 @@
   return colours.find(c=>new RegExp("\\b"+c+"\\b").test(s))||null;
  }
  function getHistory(purchases){
-  const valid=(Array.isArray(purchases)?purchases:[]).filter(p=>p&&p.item&&p.merchant&&(p.demo===true||p.verified===true||p.demo===false));
+  const valid=(Array.isArray(purchases)?purchases:[]).filter(p=>p&&p.item&&p.merchant&&(p.demo===true||p.verified===true));
   return valid.map(p=>({category:category(p.item),colour:colourOf(p.detail),merchant:normal(p.merchant),priceMinor:Math.round(Number(p.price||0)*100)}));
  }
  function decorate(product,history,options={}){
