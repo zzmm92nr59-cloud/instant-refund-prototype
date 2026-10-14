@@ -2,6 +2,7 @@ import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { shopifyConfigured, syncShopifyCatalogue } from "./shopify.js";
+import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(importHistoricalSquareOrders(env));
@@ -28,6 +29,10 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {
+      return receiveShopifyWebhook(request, env);
+    }
+
     if (url.pathname === "/relay/webhooks/square" && request.method === "POST") {
       return receiveSquareWebhook(request, env, ctx);
     }
@@ -128,9 +133,33 @@ export default {
 
     if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
       return Response.json({ success: true, configured: shopifyConfigured(env),
-        mode: "read_only_catalogue", historicalOrdersConnected: false,
+        mode: "read_only_catalogue", paidOrderWebhookConfigured: Boolean(env.SHOPIFY_WEBHOOK_SECRET && env.SHOPIFY_SHOP_DOMAIN), historicalOrdersConnected: false, publicCatalogueEnabled: env.SHOPIFY_CATALOGUE_PUBLIC === "true",
         note: "Requires retailer-authorised Shopify Admin API credentials; demo stores are simulated."
       }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+    }
+
+    // Only a merchant who explicitly opts into public catalogue distribution can
+    // publish a Shopify product feed. Never serve Shopify order or customer data here.
+    if (url.pathname === "/relay/shopify/catalogue" && request.method === "GET") {
+      if (!shopifyConfigured(env) || env.SHOPIFY_CATALOGUE_PUBLIC !== "true")
+        return Response.json({ products: [], published: false }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      if (!env.RELAY_DB) return Response.json({ error: "database_unavailable" }, { status: 503, headers: corsHeaders });
+      try {
+        const shop = String(env.SHOPIFY_SHOP_DOMAIN).toLowerCase().trim();
+        const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
+          v.sku,v.price_minor AS priceMinor,v.currency,
+          MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
+          FROM retailer_catalog_items i
+          JOIN retailer_catalog_variants v ON v.item_id=i.id
+          LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
+          WHERE i.provider=? AND v.price_minor IS NOT NULL AND v.sku IS NOT NULL
+          GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
+          .bind("shopify:" + shop).all();
+        return Response.json({ products: rows.results || [], published: true, stockIsSnapshot: true },
+          { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      } catch {
+        return Response.json({ error: "catalogue_unavailable" }, { status: 503, headers: corsHeaders });
+      }
     }
 
     // Public fictional catalogue only. No private Square/Shopify retailer data.
