@@ -176,7 +176,7 @@ localStorage.setItem(SHOPPER_KEY,customer);
 try{if(oldOrders===null)localStorage.removeItem(ORDER_KEY);else localStorage.setItem(ORDER_KEY,oldOrders);if(oldInventory===null)localStorage.removeItem(INVENTORY_KEY);else localStorage.setItem(INVENTORY_KEY,oldInventory);if(oldShopper===null)localStorage.removeItem(SHOPPER_KEY);else localStorage.setItem(SHOPPER_KEY,oldShopper)}catch{}
 $("checkoutMessage").innerHTML='<div class="error">Unable to save the test order in this browser. Check storage permissions and retry.</div>';return
 }
-cart.clear();renderCart();closeBag();lastOrder=orderId;showConfirmation(customer,lineItems);renderProducts();
+cart.clear();renderCart();closeBag();lastOrder=orderId;showConfirmation(customer,lineItems);
 }
 function showConfirmation(customer,items){
 const total=items.reduce((n,x)=>n+Math.round(x.price*100)*x.quantity,0);
