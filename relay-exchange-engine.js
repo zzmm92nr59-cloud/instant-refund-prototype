@@ -41,7 +41,7 @@
  function quote({purchase,candidate,reason,existing=[]}){
    if(!purchase||purchase.demo!==true)throw Error("Only fictional demo purchases are supported. A real purchase needs a verified retailer integration.");
    const cataloguePreview=!!candidate&&candidate.previewSimulation===true&&candidate.provider==="square_sandbox"&&candidate.fixture!==true&&/^DEMO-[A-Z0-9-]+$/i.test(String(candidate.sku||""));
-   if(!candidate||(candidate.fixture!==true&&!cataloguePreview))throw Error("Only demo inventory or explicitly labelled Square Sandbox preview simulations are supported.");
+   if(!candidate||(candidate.fixture!==true&&!cataloguePreview))throw Error("Only editable demo inventory or explicitly labelled Square Sandbox preview simulations are supported.");
    if(!matches(purchase,candidate,reason))throw Error("This variant does not qualify for the selected same-retailer exchange.");
    if(!cataloguePreview&&(!Number.isInteger(Number(candidate.quantity))||Number(candidate.quantity)<1))throw Error("Replacement out of stock.");
    if(existing.some(x=>x.originalPurchaseId===purchase.id&&x.exchange===true))throw Error("This demo purchase already has an exchange. Reset test transactions to try another.");
