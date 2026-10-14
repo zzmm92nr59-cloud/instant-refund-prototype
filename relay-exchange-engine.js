@@ -44,7 +44,7 @@
    if(!matches(purchase,candidate,reason))throw Error("This variant does not qualify for the selected same-retailer exchange.");
    if(!Number.isInteger(Number(candidate.quantity))||Number(candidate.quantity)<1)throw Error("Replacement out of stock.");
    if(existing.some(x=>x.originalPurchaseId===purchase.id&&x.exchange===true))throw Error("This demo purchase already has an exchange. Reset test transactions to try another.");
-   if(existing.some(x=>x.originalPurchaseId===purchase.id&&x.type==="REFUND"))throw Error("This purchase has already been refunded in the demo.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&(x.type==="REFUND"||x.type==="RETURN")))throw Error("This purchase already has a refund or return request in the demo.");
    const orig=minor(purchase.price),next=Number(candidate.priceMinor);
    if(!Number.isSafeInteger(orig)||orig<0||!Number.isSafeInteger(next)||next<0)throw Error("Invalid currency amount.");
    const delta=next-orig;
@@ -59,13 +59,21 @@
  }
  function createInstantRefund({purchase,existing=[],id,at}){
    if(!purchase||purchase.demo!==true)throw Error("Only demo purchases support simulated instant refunds.");
-   if(existing.some(x=>x.originalPurchaseId===purchase.id&&(x.exchange||x.type==="REFUND")))throw Error("A refund or exchange has already been recorded for this purchase.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&(x.exchange||x.type==="REFUND"||x.type==="RETURN")))throw Error("A refund, return or exchange has already been recorded for this purchase.");
    if(!id||!/^[a-zA-Z0-9-]{8,70}$/.test(id)||existing.some(x=>x.id===id))throw Error("Unique refund request ID required.");
    const amount=minor(purchase.price);if(!Number.isSafeInteger(amount)||amount<0)throw Error("Invalid refund amount.");
    const now=at||new Date().toISOString();
    return {id,type:"REFUND",exchange:false,originalPurchaseId:purchase.id,originalProduct:purchase.item,originalVariant:purchase.detail,originalPriceMinor:amount,amount:amount/100,amountMinor:amount,currency:"GBP",store:purchase.merchant,date:now,createdAt:now,status:"SIMULATED_INSTANT_ADVANCE_ISSUED",returnRequestId:id+"-RETURN",returnStatus:"RETURN_REQUESTED",ledger:[{type:"INSTANT_REFUND_ADVANCE",amountMinor:amount,currency:"GBP",status:"SIMULATED_ISSUED"}],history:[{event:"INSTANT_ADVANCE_SIMULATED",at:now},{event:"ORIGINAL_RETURN_REQUESTED",at:now}]};
  }
+ function createReturnOnly({purchase,existing=[],id,at}){
+   if(!purchase||purchase.demo!==true)throw Error("Only fictional demo purchases support simulated return requests.");
+   if(existing.some(x=>x.originalPurchaseId===purchase.id&&(x.exchange||x.type==="REFUND"||x.type==="RETURN")))throw Error("This demo purchase already has a refund, return or exchange.");
+   if(!id||!/^[a-zA-Z0-9-]{8,70}$/.test(id)||existing.some(x=>x.id===id))throw Error("Unique return request ID required.");
+   const amount=minor(purchase.price);if(!Number.isSafeInteger(amount)||amount<0)throw Error("Invalid return amount.");
+   const now=at||new Date().toISOString();
+   return {id,type:"RETURN",exchange:false,originalPurchaseId:purchase.id,originalProduct:purchase.item,originalVariant:purchase.detail,originalPriceMinor:amount,amount:amount/100,amountMinor:amount,currency:"GBP",store:purchase.merchant,date:now,createdAt:now,status:"RETURN_REQUESTED",returnRequestId:id+"-RETURN",returnStatus:"RETURN_REQUESTED",ledger:[],history:[{event:"ORIGINAL_RETURN_REQUESTED",at:now}]};
+ }
  const returnStates=["RETURN_REQUESTED","RETURN_LABEL_ISSUED","RETURN_IN_TRANSIT","RETURN_RECEIVED","RETURN_COMPLETED"];
  function advanceReturn(record,at){if(!record||!returnStates.includes(record.returnStatus))throw Error("Invalid return request.");const idx=returnStates.indexOf(record.returnStatus);if(idx===returnStates.length-1)return record;const status=returnStates[idx+1],now=at||new Date().toISOString();return {...record,returnStatus:status,history:[...(record.history||[]),{event:status,at:now}]}}
- return {sizeOf,styleOf,category,matches,quote,createExchange,createInstantRefund,advanceReturn,returnStates};
+ return {sizeOf,styleOf,category,matches,quote,createExchange,createInstantRefund,createReturnOnly,advanceReturn,returnStates};
 });
