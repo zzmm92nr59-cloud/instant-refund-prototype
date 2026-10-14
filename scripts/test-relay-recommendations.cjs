@@ -31,7 +31,7 @@ assert.ok(html.includes('relay-recommendation-engine.js'),"App must load recomme
 assert.ok(html.includes('relay-discover-personalise-v1'),"Consent must be opt-in, persisted per browser");
 assert.ok(html.includes('let personalise=false'),"Personalisation must default off");
 assert.ok(html.includes('togglePersonalise'),"Discover needs a user-facing on/off setting");
-assert.ok(html.includes('personali'+'sationHistory().'),"App should use the purchase history for ranking");
+assert.ok(html.includes('personalisationHistory(),'),"App should use the purchase history for ranking");
 const script=html.match(/<script>([\s\S]*?)<\/script>/i);
 assert.ok(script);
 new vm.Script(script[1],{filename:"Relay embedded app"});
