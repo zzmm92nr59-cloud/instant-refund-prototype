@@ -1,13 +1,13 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
-import { shopifyConfigured, syncShopifyCatalogue } from "./shopify.js";
+import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues } from "./shopify.js";
 import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(importHistoricalSquareOrders(env));
     ctx.waitUntil(syncSquareCatalogue(env));
-    if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogue(env));
+    if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogues(env));
   },
   async fetch(request, env, ctx) {
     const corsHeaders = {
@@ -131,34 +131,53 @@ export default {
       }
     }
 
+    // Public connectivity metadata only; tokens and unpublished stores stay private.
     if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
-      return Response.json({ success: true, configured: shopifyConfigured(env),
-        mode: "read_only_catalogue", paidOrderWebhookConfigured: Boolean(env.SHOPIFY_WEBHOOK_SECRET && env.SHOPIFY_SHOP_DOMAIN), historicalOrdersConnected: false, publicCatalogueEnabled: env.SHOPIFY_CATALOGUE_PUBLIC === "true",
-        note: "Requires retailer-authorised Shopify Admin API credentials; demo stores are simulated."
-      }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+      const stores = getShopifyStores(env), published = stores.filter(s => s.published);
+      return Response.json({
+        success: true, configured: stores.length > 0, connectedStoreCount: stores.length,
+        publishedStoreCount: published.length, mode: "read_only_catalogue",
+        paidOrderWebhookConfigured: stores.some(s => Boolean(s.webhookSecret)),
+        historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
+        publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
+        note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
+      }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }
 
-    // Only a merchant who explicitly opts into public catalogue distribution can
-    // publish a Shopify product feed. Never serve Shopify order or customer data here.
+    // Publish only retailer-opted-in read-only products. Separate Shopify
+    // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.
     if (url.pathname === "/relay/shopify/catalogue" && request.method === "GET") {
-      if (!shopifyConfigured(env) || env.SHOPIFY_CATALOGUE_PUBLIC !== "true")
-        return Response.json({ products: [], published: false }, { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
-      if (!env.RELAY_DB) return Response.json({ error: "database_unavailable" }, { status: 503, headers: corsHeaders });
+      const stores = getShopifyStores(env).filter(s => s.published);
+      if (!stores.length)
+        return Response.json({products:[],published:false,publishedStoreCount:0},
+          {headers:{...corsHeaders,"Cache-Control":"no-store"}});
+      if (!env.RELAY_DB)
+        return Response.json({error:"database_unavailable"},{status:503,headers:corsHeaders});
       try {
-        const shop = String(env.SHOPIFY_SHOP_DOMAIN).toLowerCase().trim();
-        const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
-          v.sku,v.price_minor AS priceMinor,v.currency,
-          MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
-          FROM retailer_catalog_items i
-          JOIN retailer_catalog_variants v ON v.item_id=i.id
-          LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
-          WHERE i.provider=? AND v.price_minor IS NOT NULL AND v.sku IS NOT NULL
-          GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
-          .bind("shopify:" + shop).all();
-        return Response.json({ products: rows.results || [], published: true, stockIsSnapshot: true },
-          { headers: { ...corsHeaders, "Cache-Control": "no-store" } });
-      } catch {
-        return Response.json({ error: "catalogue_unavailable" }, { status: 503, headers: corsHeaders });
+        const products = [];
+        for (const store of stores) {
+          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
+            v.id AS catalogueId,v.sku AS retailerSku,v.price_minor AS priceMinor,
+            v.currency,MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
+            FROM retailer_catalog_items i
+            JOIN retailer_catalog_variants v ON v.item_id=i.id
+            LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
+            WHERE i.provider=? AND v.price_minor IS NOT NULL
+              AND v.currency='GBP'
+            GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
+            .bind("shopify:" + store.domain).all();
+          for (const row of rows.results || []) {
+            products.push({...row, sku:row.catalogueId, provider:"shopify",
+              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate"});
+          }
+        }
+        return Response.json({products,published:true,publishedStoreCount:stores.length,
+          stockIsSnapshot:true,exchangeOrdersSupported:false},
+          {headers:{...corsHeaders,"Cache-Control":"no-store"}});
+      } catch(e) {
+        console.error("Shopify public catalogue query failed", String(e.message || e));
+        return Response.json({error:"catalogue_unavailable"},
+          {status:503,headers:{...corsHeaders,"Cache-Control":"no-store"}});
       }
     }
 
