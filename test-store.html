@@ -54,11 +54,11 @@
 @media(max-width:600px){.headrow{padding:12px 15px;gap:8px;flex-wrap:wrap}.brand{font-size:22px}.links{display:none}.shopper{margin-left:auto}.shopper span{display:none}.shopper select{padding:7px}.bag{padding:10px}.container{padding:0 13px 65px}.hero{grid-template-columns:1fr;min-height:0;margin:13px 0 25px}.hero-copy{padding:30px 23px}.hero h1{font-size:37px;margin:12px 0}.hero-art{min-height:190px;max-height:200px}.hero-art img{max-width:220px}.products{gap:10px}.photo{min-height:125px}.info{padding:12px}.info h3{font-size:15px}.price{font-size:18px}.steps{grid-template-columns:1fr}.labels h2{font-size:23px}.toolbar input,.toolbar select{width:100%;flex:1}.confirm{padding:25px;margin:25px 5px}.panel{padding:17px}}
 </style></head><body>
 <div class="announce">✦ A FICTIONAL RETAIL STORE · CHECKOUT IS A SIMULATION · NO REAL PAYMENTS</div>
-<header class="header"><div class="headrow"><a href="./test-store.html" class="brand">north<span>&</span>co.</a><nav class="links"><a href="#collection">Shop trainers</a><a href="#how">How Relay works</a><a href="./">My Relay wallet ↗</a></nav><label class="shopper"><span>Demo shopper</span><select id="shopper" aria-label="Demo shopper"><option>Ava</option><option>Ben</option><option>Cara</option><option>Dylan</option></select></label><button class="bag" id="openBag">Bag <span id="bagCount">0</span> ↗</button></div></header>
+<header class="header"><div class="headrow"><a href="./test-store.html" class="brand">north<span>&</span>co.</a><nav class="links"><a href="#collection">Shop collection</a><a href="#how">How Relay works</a><a href="./">My Relay wallet ↗</a></nav><label class="shopper"><span>Demo shopper</span><select id="shopper" aria-label="Demo shopper"><option>Ava</option><option>Ben</option><option>Cara</option><option>Dylan</option></select></label><button class="bag" id="openBag">Bag <span id="bagCount">0</span> ↗</button></div></header>
 <main class="container" id="main">
-<section class="hero"><div class="hero-copy"><div class="overline">NORTH & CO. · AUTUMN COLLECTION</div><h1>Find your<br>next favourite.</h1><p>Considered footwear for whatever comes next. Explore styles, choose your size and see how effortless exchanging could feel with Relay.</p><a href="#collection" class="cta">Shop the collection →</a></div><div class="hero-art" id="heroArt"><span style="font-size:115px">👟</span></div></section>
-<section id="collection"><div class="labels"><div><div class="overline" style="color:#69883e">THE COLLECTION</div><h2>Made to move with you</h2></div><span class="badge" id="variantCount">Demo inventory</span></div>
-<div class="toolbar"><input id="search" placeholder="Search styles or colours…" aria-label="Search products"><select id="sort" aria-label="Sort products"><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div>
+<section class="hero"><div class="hero-copy"><div class="overline">NORTH & CO. · AUTUMN COLLECTION</div><h1>Find your<br>next favourite.</h1><p>Explore trainers, bags and everyday essentials. Pick a style or colour and see how Relay makes refunds and exchanges simpler.</p><a href="#collection" class="cta">Shop the collection →</a></div><div class="hero-art" id="heroArt"><span style="font-size:115px">👟</span></div></section>
+<section id="collection"><div class="labels"><div><div class="overline" style="color:#69883e">THE COLLECTION</div><h2>Styles worth keeping</h2></div><span class="badge" id="variantCount">Demo inventory</span></div>
+<div class="toolbar"><select id="category" aria-label="Filter product category"><option value="all">All categories</option><option value="footwear">Shoes</option><option value="bags">Bags</option><option value="clothing">Clothing</option></select><input id="search" placeholder="Search styles or colours…" aria-label="Search products"><select id="sort" aria-label="Sort products"><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div>
 <div id="products" class="products"><div class="panel">Loading test inventory…</div></div></section>
 <section class="panel" id="how"><div class="overline" style="color:#719445">THE RELAY CONNECTION</div><h2>Purchase normally. Change your mind easily.</h2><div class="steps"><div class="step"><strong>01 · Shop</strong><p>Choose a size or style at North & Co. and complete a simulated checkout.</p></div><div class="step"><strong>02 · Track</strong><p>Your test order appears in the Relay demo wallet for your chosen demo shopper.</p></div><div class="step"><strong>03 · Swap or refund</strong><p>Try Relay's exchange, return and simulated refund journeys. No real money or items move.</p></div></div><p class="disclaimer">Stock and prices are fictional retailer fixtures shared with Relay via browser storage. This is not connected to a real payment processor or shipping provider.</p></section>
 </main>
@@ -85,7 +85,18 @@ const demoRetailers=[
 ["Retro Suede Trainers","Slate / UK 8",13499,7],
 ["Retro Suede Trainers","Cream / UK 8",13499,4],
 ["Everyday Runner Sneakers","Grey / UK 8",9999,14],
-["Everyday Runner Sneakers","Navy / UK 9",9999,10]]},
+["Everyday Runner Sneakers","Navy / UK 9",9999,10,
+["Everyday Crossbody Bag","Black",4999,9],
+["Everyday Crossbody Bag","Clay",4999,6],
+["Everyday Crossbody Bag","Sage",4999,4],
+["City Canvas Tote","Stone",3899,14],
+["City Canvas Tote","Navy",3899,11],
+["Mini Backpack","Black",6499,8],
+["Mini Backpack","Olive",6499,6],
+["Weekend Holdall","Rust",7999,7],
+["Weekend Holdall","Navy",7999,5],
+["Linen Overshirt","Ecru / M",5499,9],
+["Linen Overshirt","Ecru / L",5499,7]]},
 {id:"studio",name:"Relay Studio",platform:"Shopify demo",prefix:"STUDIO",items:[
 ["Boxy Cotton Tee","Forest / M",2899,14],["Boxy Cotton Tee","Forest / L",2899,8],["Boxy Cotton Tee","Chalk / M",2899,11],
 ["Everyday Crossbody Bag","Black",4999,5],["Everyday Crossbody Bag","Clay",4999,9],
@@ -132,15 +143,17 @@ function announce(msg){$("toast").textContent=msg;$("toast").classList.add("show
 function allCart(){return [...cart].map(([sku,quantity])=>({product:inventory().find(p=>p.sku===sku),quantity})).filter(x=>x.product)}
 function openBag(){document.getElementById("overlay").classList.add("open");document.getElementById("drawer").classList.add("open");$("closeBag").focus();renderCart()}
 function closeBag(){document.getElementById("overlay").classList.remove("open");document.getElementById("drawer").classList.remove("open")}
+function productCategory(name){const n=String(name||"").toLowerCase();if(/bag|tote|holdall|backpack|satchel|purse/.test(n))return "bags";if(/trainer|shoe|sneaker|boot/.test(n))return "footwear";return "clothing"}
 function renderProducts(){
+const category=$("category").value;
 const q=$("search").value.trim().toLowerCase(),sort=$("sort").value;
-let groups=uniqueProducts().filter(p=>(p.name+" "+p.options.map(x=>x.variation).join(" ")).toLowerCase().includes(q));
+let groups=uniqueProducts().filter(p=>(category==="all"||productCategory(p.name)===category)&&(p.name+" "+p.options.map(x=>x.variation).join(" ")).toLowerCase().includes(q));
 if(sort!=="featured")groups.sort((a,b)=>(sort==="low"?1:-1)*(Math.min(...a.options.map(x=>x.priceMinor))-Math.min(...b.options.map(x=>x.priceMinor))));
 $("variantCount").textContent=inventory().length+" demo variants";
 $("heroArt").innerHTML=productImage("Retro High Trainers","White / Grey / UK 7");
 $("products").innerHTML=groups.map((group,i)=>{
 const available=group.options.find(x=>x.quantity>0)||group.options[0],pid="product-"+i;
-return '<article class="product"><div class="photo">'+productImage(group.name,available.variation)+'</div><div class="info"><div class="type">NORTH & CO. / FOOTWEAR</div><h3>'+safe(group.name)+'</h3><div class="price" id="cost-'+i+'">'+money(available.priceMinor)+'</div><label for="'+pid+'">Choose colour & size</label><select id="'+pid+'" data-choice="'+i+'">'+group.options.map(p=>'<option value="'+safe(p.sku)+'"'+(p===available?" selected":"")+'>'+safe(p.variation)+(p.quantity<1?" — sold out":"")+'</option>').join("")+'</select><div class="stock" id="stock-'+i+'">'+(available.quantity>0?available.quantity+" available in demo stock":"Sold out")+'</div><button class="add" data-add="'+i+'"'+(available.quantity<1?" disabled":"")+'>Add to bag +</button></div></article>'}).join("")||'<div class="panel" style="grid-column:1/-1">No styles found. Try a different search.</div>';
+return '<article class="product"><div class="photo">'+productImage(group.name,available.variation)+'</div><div class="info"><div class="type">NORTH & CO. / '+safe(productCategory(group.name).toUpperCase())+'</div><h3>'+safe(group.name)+'</h3><div class="price" id="cost-'+i+'">'+money(available.priceMinor)+'</div><label for="'+pid+'">Choose variant</label><select id="'+pid+'" data-choice="'+i+'">'+group.options.map(p=>'<option value="'+safe(p.sku)+'"'+(p===available?" selected":"")+'>'+safe(p.variation)+(p.quantity<1?" — sold out":"")+'</option>').join("")+'</select><div class="stock" id="stock-'+i+'">'+(available.quantity>0?available.quantity+" available in demo stock":"Sold out")+'</div><button class="add" data-add="'+i+'"'+(available.quantity<1?" disabled":"")+'>Add to bag +</button></div></article>'}).join("")||'<div class="panel" style="grid-column:1/-1">No styles found. Try a different search.</div>';
 $("products").querySelectorAll("[data-choice]").forEach(select=>select.onchange=()=>{
 const i=select.dataset.choice,p=inventory().find(x=>x.sku===select.value),box=select.closest(".product");
 if(!p)return;
@@ -165,7 +178,7 @@ const oldOrders=localStorage.getItem(ORDER_KEY),oldInventory=localStorage.getIte
 const now=new Date(),date=now.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}),deadlineDate=new Date(now.getTime()+30*86400000);
 const deadline=deadlineDate.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
 const orderId="NCO-DEMO-"+Date.now().toString(36).toUpperCase()+"-"+Math.random().toString(36).slice(2,7).toUpperCase();
-const customer=shopper(),lineItems=items.map(({product:p,quantity},i)=>({id:"teststore-"+orderId+"-"+i,orderId,merchant:"North & Co.",item:p.product,detail:p.variation,price:p.priceMinor/100,quantity,sku:p.sku,date,deadline,icon:"👟",demo:true,customer,source:"test_store",createdAt:now.toISOString()}));
+const customer=shopper(),lineItems=items.map(({product:p,quantity},i)=>({id:"teststore-"+orderId+"-"+i,orderId,merchant:"North & Co.",item:p.product,detail:p.variation,price:p.priceMinor/100,quantity,sku:p.sku,date,deadline,icon:productCategory(p.product)==="bags"?"👜":productCategory(p.product)==="footwear"?"👟":"👕",demo:true,customer,source:"test_store",createdAt:now.toISOString()}));
 const existing=loadJSON(ORDER_KEY,[]);if(!Array.isArray(existing))throw Error("Invalid test order storage");
 const newChanges={...currentChanges};for(const {product:p,quantity} of items){const check=current.find(x=>x.sku===p.sku);newChanges[p.sku]={...(newChanges[p.sku]||{}),quantity:check.quantity-quantity,updatedAt:now.toISOString()}}
 try{
@@ -184,7 +197,7 @@ $("main").innerHTML='<div class="confirm"><div class="check">✓</div><div class
 }
 $("shopper").value=["Ava","Ben","Cara","Dylan"].includes(localStorage.getItem(SHOPPER_KEY))?localStorage.getItem(SHOPPER_KEY):"Ava";
 $("shopper").onchange=()=>{localStorage.setItem(SHOPPER_KEY,shopper());announce("Shopping as "+shopper()+" (demo only)")};
-$("search").oninput=renderProducts;$("sort").onchange=renderProducts;$("openBag").onclick=openBag;$("closeBag").onclick=closeBag;$("overlay").onclick=closeBag;
+$("category").onchange=renderProducts;$("search").oninput=renderProducts;$("sort").onchange=renderProducts;$("openBag").onclick=openBag;$("closeBag").onclick=closeBag;$("overlay").onclick=closeBag;
 $("checkout").onclick=checkout;
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeBag()});
 window.addEventListener("storage",e=>{if(e.key===INVENTORY_KEY){renderProducts();renderCart()}});
