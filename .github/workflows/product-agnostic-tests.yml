@@ -1,0 +1,21 @@
+name: Product-agnostic Relay demo checks
+on:
+  push:
+    paths:
+      - 'index.html'
+      - 'relay-app-v2.html'
+      - 'test-store.html'
+      - 'relay-exchange-engine.js'
+      - 'scripts/test-product-agnostic.mjs'
+      - '.github/workflows/product-agnostic-tests.yml'
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check UI scripts and generic bag/trainer exchange cases
+        run: node scripts/test-product-agnostic.mjs
