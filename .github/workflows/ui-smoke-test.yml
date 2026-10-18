@@ -4,9 +4,14 @@ on:
     branches: [main]
     paths:
       - index.html
+      - relay-app-v2.html
+      - relay-wallet-ledger.js
+      - relay-recommendation-engine.js
+      - testing.html
       - relay-exchange-engine.js
       - scripts/ui-smoke-test.mjs
       - .github/workflows/ui-smoke-test.yml
+  pull_request:
   workflow_dispatch:
 permissions:
   contents: read
