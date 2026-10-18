@@ -11,7 +11,7 @@ const files=['index.html','relay-app-v2.html','test-store.html'];
 const source=Object.fromEntries(files.map(path=>[path,readFileSync(new URL('../'+path,import.meta.url),'utf8')]));
 
 for(const [name,html] of Object.entries(source)){
-  const scripts=[...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
   for(let i=0;i<scripts.length;i++){
     if(scripts[i][1].trim())assert.doesNotThrow(()=>new vm.Script(scripts[i][1],{filename:name+' inline '+i}),name+' JavaScript syntax');
   }
@@ -20,7 +20,7 @@ for(const [name,html] of Object.entries(source)){
 }
 
 const catalogue=Object.fromEntries(files.map(path=>{
-  const m=source[path].match(/\\{id:"north",name:"North & Co\\.",prefix:"NORTH",items:\\[([\\s\\S]*?)\\]\\},/);
+  const m=source[path].match(/\{id:"north",name:"North & Co\.",prefix:"NORTH",items:\[([\s\S]*?)\]\},/);
   assert.ok(m,path+' has North & Co. demo inventory');
   return [path,vm.runInNewContext('['+m[1]+']')];
 }));
@@ -44,8 +44,8 @@ assert.equal(engine.quote({purchase,candidate:tote,reason:'design'}).refundMinor
 assert.ok(!source['test-store.html'].includes('NORTH & CO. / FOOTWEAR'),'category labels must be dynamic');
 assert.ok(source['test-store.html'].includes('id="category"'),'test store product category filter');
 for(const name of ['index.html','relay-app-v2.html']){
-  assert.match(source[name],/reason=RelayExchangeEngine\\.sizeOf\\(selected\\.detail\\)\\?"size":"design"/,'bag default exchange design');
-  assert.ok(!source[name].includes('localStorage.removeItem("relay-test-store-orders-v1");\\n  localStorage.removeItem("relay-demo-orders-v1");'),'do not wipe orders in startup');
+  assert.match(source[name],/reason=RelayExchangeEngine\.sizeOf\(selected\.detail\)\?"size":"design"/,'bag default exchange design');
+  assert.ok(!source[name].includes('localStorage.removeItem("relay-test-store-orders-v1");\n  localStorage.removeItem("relay-demo-orders-v1");'),'do not wipe orders in startup');
   assert.ok(!source[name].includes('.filter(p=>p.provider==="square_sandbox"&&p.sku'),'square endpoint does not send provider');
 }
 console.log('PASS: compiled inline app scripts, synchronized retailer inventory, bag and trainer rules, safe matching, price difference, first-run purchase preservation.');
