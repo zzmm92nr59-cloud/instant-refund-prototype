@@ -17,7 +17,7 @@
  function styleOf(s){return normal(s).replace(/\buk\s*\d{1,2}(?:\.5)?\b/g,"").replace(/\b(xxs|xs|xxxl|xxl|xl|small|medium|large|s|m|l)\b/g,"").replace(/[^a-z0-9]+/g," ").trim().split(" ").filter(Boolean).sort().join(" ")}
  function category(name){
    const s=normal(name);
-   if(/bag|tote|handbag|backpack|purse|satchel/.test(s))return "bag";
+   if(/bag|tote|handbag|backpack|purse|satchel|holdall|duffel|weekender|luggage/.test(s))return "bag";
    if(/coat|jacket|parka|trench|puffer|rain shell/.test(s))return "outerwear";
    if(/trainer|shoe|sneaker|jordan|footwear|boot/.test(s))return "footwear";
    if(/hoodie|sweatshirt|jumper|sweater|shirt|blouse|tee|t-shirt|top|overshirt/.test(s))return "tops";
