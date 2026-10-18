@@ -41,3 +41,20 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy
+
+      # GitHub Actions secrets do not automatically become Worker runtime secrets.
+      # Set these through Wrangler without printing their values to the log.
+      - name: Configure Plaid Sandbox secrets for Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+          PLAID_SECRET: ${{ secrets.PLAID_SECRET }}
+        run: |
+          if [ -z "$PLAID_CLIENT_ID" ] || [ -z "$PLAID_SECRET" ]; then
+            echo "Plaid Actions secrets unavailable; skipping optional Sandbox bank-link setup."
+            exit 0
+          fi
+          printf '%s' "$PLAID_CLIENT_ID" | npx --yes wrangler@4 secret put PLAID_CLIENT_ID
+          printf '%s' "$PLAID_SECRET" | npx --yes wrangler@4 secret put PLAID_SECRET
