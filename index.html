@@ -85,11 +85,13 @@ const WALLET_RESET_KEY="relay-wallet-fresh-start-20261018-v1";
 function initialiseFreshWallet(){
  let start=localStorage.getItem(WALLET_RESET_KEY);
  if(!start){
-  start=new Date().toISOString();
+  // A shopper can visit the test store BEFORE opening Relay for the first time.
+  // Never erase that just-completed demo purchase on wallet first launch.
+  let existing=[];
+  try{const saved=JSON.parse(localStorage.getItem("relay-test-store-orders-v1")||"[]");if(Array.isArray(saved))existing=saved}catch{}
+  const dates=existing.map(x=>Date.parse(x.createdAt)).filter(Number.isFinite);
+  start=dates.length?new Date(Math.max(0,Math.min(...dates)-1000)).toISOString():new Date().toISOString();
   localStorage.setItem(WALLET_RESET_KEY,start);
-  localStorage.removeItem("relay-test-store-orders-v1");
-  localStorage.removeItem("relay-demo-orders-v1");
-  localStorage.removeItem("relayVerifiedOrder");
  }
  return start;
 }
@@ -149,7 +151,7 @@ function readTestStorePurchases(){
   return all.filter(p=>p&&p.demo===true&&p.source==="test_store"&&p.customer===active&&p.createdAt&&Date.parse(p.createdAt)>=Date.parse(walletCutover)&&p.merchant==="North & Co."&&typeof p.item==="string"&&typeof p.detail==="string"&&Number.isFinite(Number(p.price))&&Number(p.price)>0).flatMap(p=>
     Array.from({length:Math.min(10,Math.max(1,Math.floor(Number(p.quantity)||1)))},(_,i)=>({
        id:String(p.id)+"-unit-"+i,orderId:String(p.orderId||"DEMO"),merchant:"North & Co.",item:p.item,detail:p.detail,
-       price:Number(p.price),date:String(p.date||"Test purchase"),deadline:String(p.deadline||"Retailer policy"),icon:"👟",demo:true,source:"test_store",customer:active,sku:p.sku,createdAt:p.createdAt
+       price:Number(p.price),date:String(p.date||"Test purchase"),deadline:String(p.deadline||"Retailer policy"),icon:(RelayExchangeEngine.category(p.item)==="bag"?"👜":RelayExchangeEngine.category(p.item)==="footwear"?"👟":"👕"),demo:true,source:"test_store",customer:active,sku:p.sku,createdAt:p.createdAt
     }))
   ).slice(0,100);
  }catch{return []}
@@ -178,7 +180,7 @@ function bindPurchaseCards(){
    card.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open()}};
  });
 }
-function openPurchase(id){selected=getPurchases().find(x=>x.id===id);if(!selected)return;exchangeContext=false;storeFilter="all";reason="size";page="detail";render()}
+function openPurchase(id){selected=getPurchases().find(x=>x.id===id);if(!selected)return;exchangeContext=false;storeFilter="all";reason=RelayExchangeEngine.sizeOf(selected.detail)?"size":"design";page="detail";render()}
 function exchangeItemDetail(){
  const original=selected.status==="Exchanged",rec=readDemoLog().find(x=>x.type==="EXCHANGE"&&x.customer===activeShopper()&&x.id===selected.exchangeRequestId);
  const peer=original?selected.linkedReplacementId:selected.linkedOriginalId;
@@ -203,7 +205,7 @@ function refundView(){
  if(planPreview!=="plus")return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Return for free</h1><div class="card"><h3>Refund after retailer receipt</h3><p class="sub">Free includes returns and exchanges, with refunds and replacements processed after retailer receipt and approval.</p><button class="darkbtn" onclick="page=\'return\';render()">Start standard return →</button><p class="small muted">Early advances are a proposed Plus benefit.</p><button class="outline" onclick="setPlanPreview(\'plus\')">Preview Plus →</button></div>';
  return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Plus · early refund preview</h1><div class="offer"><div class="eyebrow" style="color:#c7f567">⚡ SIMULATED EARLY OFFER · NOT APPROVED</div><div class="amount">'+money(selected.price)+'</div><p>Potential advance before retailer receipt, subject to eligibility, risk checks and approval. This is only a concept.</p><div class="split"><span>Demo fee</span><b>£0.00 (not actual pricing)</b></div><p class="small">No subscription, actual payout or retailer refund occurs.</p><button class="limebtn" id="simulateRefundButton" onclick="simulateDemoRefund()">Simulate early refund →</button><p id="refundResult" style="color:#c7f567"></p></div>'+bankConnectBlock()+'<div class="card" style="margin-top:16px"><h3>Want a replacement instead?</h3><button class="outline" onclick="page=\'exchange\';render()">Explore exchanges →</button></div>';
 }
-function exchangeView(){return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Make it right.</h1><p class="sub">What would you like to change about '+safe(selected.item)+'?</p><div class="card"><h3>Reason for exchange</h3><div class="reason">'+[["size","Wrong size"],["design","Don’t like the design"],["colour","Different colour"],["mind","Changed my mind"]].map(([id,name])=>'<button class="'+(reason===id?"selected":"")+'" onclick="reason=\''+id+'\';render()">'+name+'</button>').join("")+'</div><div class="spacer"></div><button class="darkbtn" onclick="exchangeContext=true;go(\'discover\')">✦ Find available replacements →</button></div><div class="card"><h3>How an exchange will work</h3><p class="sub">On Free, customers choose alternatives now, but replacements are confirmed after the retailer receives the original item. Plus previews earlier processing, subject to approval. No real Square payments, Shopify orders, stock reservations or returns are submitted.</p></div>'}
+function exchangeView(){return '<button class="link" onclick="page=\'detail\';render()">← Back to purchase</button><h1 class="title">Make it right.</h1><p class="sub">What would you like to change about '+safe(selected.item)+'?</p><div class="card"><h3>Reason for exchange</h3><div class="reason">'+[["size","Wrong size"],["design","Don’t like the design"],["colour","Different colour"],["mind","Changed my mind"]].filter(([id])=>id!=="size"||!!RelayExchangeEngine.sizeOf(selected.detail)).map(([id,name])=>'<button class="'+(reason===id?"selected":"")+'" onclick="reason=\''+id+'\';render()">'+name+'</button>').join("")+'</div><div class="spacer"></div><button class="darkbtn" onclick="exchangeContext=true;go(\'discover\')">✦ Find available replacements →</button></div><div class="card"><h3>How an exchange will work</h3><p class="sub">On Free, customers choose alternatives now, but replacements are confirmed after the retailer receives the original item. Plus previews earlier processing, subject to approval. No real Square payments, Shopify orders, stock reservations or returns are submitted.</p></div>'}
 function discoverView(){const contextual=exchangeContext;return '<div class="eyebrow">✦ RELAY DISCOVER</div><h1 class="title">'+(contextual?'Find the right replacement.':'Find something better.')+'</h1><p class="sub">'+(contextual?'Original: '+safe(selected.item)+' · '+safe(selected.detail):'Explore fictional Square/Shopify demo inventory and, when authorised, published retailer catalogues.')+'</p>'+(contextual?'<div class="card"><strong>'+safe(reasonLabel())+'</strong><p class="small muted">'+(reason==="size"?"Only other sizes of this exact product are eligible.":reason==="colour"?"Only colour variants of this exact product are eligible.":reason==="design"?"Explore similar products in the same category or another variation of this product.":"Start with similar products; explore other categories below.")+'</p><button class="link" onclick="exchangeContext=false;render()">Browse all products instead →</button></div>':'')+'<div class="card"><div class="split" style="margin-bottom:12px;align-items:flex-start"><div><strong>✦ Tailor suggestions to my purchases</strong><p class="small muted" style="margin:6px 8px 0 0">Try recommendations using your tracked purchases across shops. Fictional demo history only in Demo mode; switch off whenever you like.</p></div><button class="toggle '+(personalise?'on':'')+'" aria-pressed="'+(personalise?'true':'false')+'" onclick="togglePersonalise()">'+(personalise?'Enabled ✓':'Enable')+'</button></div><div class="controls"><input id="query" placeholder="Search within '+(contextual?'eligible alternatives':'products')+'…" oninput="renderCatalog()"><select id="storeSelect" onchange="selectStore(this.value)">'+storeOptions()+'</select><input id="storeSearch" placeholder="Search store…" oninput="renderCatalog()"><select id="filter" onchange="renderCatalog()"><option value="all">Recommended</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option></select></div><p class="small muted">North & Co., Relay Studio and Harbour Goods have editable demo inventory; Square and connected Shopify catalogue variants are browse-only until retailer stock and exchange eligibility are authorised. <button class="link" onclick="retailer=true;render()">Open retailer inventory lab →</button> Recommendations are not retailer-approved exchanges.</p></div><div id="catalogResults" class="catalog"></div><p class="small muted" id="catalogStatus"></p>'}
 function reasonLabel(){return ({size:"Wrong size",colour:"Different colour",design:"Don't like the design",mind:"Changed my mind"})[reason]||"Alternative"}
 function sameFamily(p){return String(p.product||"").trim().toLowerCase()===String(selected.item||"").trim().toLowerCase()}
@@ -402,7 +404,7 @@ async function loadCatalog(manual=false){
   const response=await fetch(API+"/relay/live-test/products",{cache:"no-store"});
   if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
   const data=await response.json();
-  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.provider==="square_sandbox"&&p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:"North & Co.",fixture:false})),...next];
+  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:"North & Co.",fixture:false})),...next];
  }catch(e){squareError=e.message}
  // Independent retailer feed: a Square outage must not suppress a connected Shopify catalogue.
  try{
