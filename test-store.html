@@ -195,6 +195,8 @@ function showConfirmation(customer,items){
 const total=items.reduce((n,x)=>n+Math.round(x.price*100)*x.quantity,0);
 $("main").innerHTML='<div class="confirm"><div class="check">✓</div><div class="overline" style="color:#719445;margin-top:20px">ORDER RECORDED IN THIS BROWSER</div><h2>Good choice, '+safe(customer)+'!</h2><p style="font-size:16px">Your North & Co. test order has been added to the Relay demo wallet.</p><div class="badge">'+safe(lastOrder)+'</div><h2>'+money(total)+'</h2><p class="muted">'+items.map(x=>safe(x.item)+" · "+safe(x.detail)+" × "+x.quantity).join("<br>")+'</p><p class="disclaimer">Simulated purchase only. No bank transaction, card charge, retailer fulfilment or verified matching has occurred.</p><a href="./?testOrder='+encodeURIComponent(lastOrder)+'" target="_blank" rel="noopener">Open in Relay wallet ↗</a><a href="./test-store.html" style="background:#edf1f5;color:#1e2839">Shop again</a></div>';
 }
+const initialCategory=new URLSearchParams(location.search).get("category");
+if(["all","bags","footwear","clothing"].includes(initialCategory))$("category").value=initialCategory;
 $("shopper").value=["Ava","Ben","Cara","Dylan"].includes(localStorage.getItem(SHOPPER_KEY))?localStorage.getItem(SHOPPER_KEY):"Ava";
 $("shopper").onchange=()=>{localStorage.setItem(SHOPPER_KEY,shopper());announce("Shopping as "+shopper()+" (demo only)")};
 $("category").onchange=renderProducts;$("search").oninput=renderProducts;$("sort").onchange=renderProducts;$("openBag").onclick=openBag;$("closeBag").onclick=closeBag;$("overlay").onclick=closeBag;
