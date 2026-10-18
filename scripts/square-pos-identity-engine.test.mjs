@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {decidePosOwner,fingerprintGroups} from "./square-pos-identity-engine.mjs";
+const payment=(m="merchant-A",id="sq-customer-A",fp="fingerprint-A")=>({merchantId:m,orderId:"o1",paymentId:"p1",customerId:id,fingerprint:fp,cardLast4:"5858",amountMinor:12999});
+const anchor=(merchantId,relayConsumerId,squareCustomerId,squareFingerprint)=>({merchantId,relayConsumerId,squareCustomerId,squareFingerprint,verified:true,proof:"retailer_customer_verified"});
+const a=anchor("merchant-A","ava","sq-customer-A","fingerprint-A"),b=anchor("merchant-A","ben","sq-customer-B","fingerprint-B");
+assert.equal(decidePosOwner(payment(),[]).status,"UNCLAIMED","no verified account link: withhold");
+assert.equal(decidePosOwner(payment(),[a]).status,"LINKED","verified Square customer link");
+assert.equal(decidePosOwner(payment("merchant-A","","fingerprint-A"),[a]).status,"REVIEW","fingerprint-only cannot release");
+assert.equal(decidePosOwner(payment("merchant-B","sq-customer-A","fingerprint-A"),[a]).status,"UNCLAIMED","merchant scoped");
+assert.equal(decidePosOwner(payment("merchant-A","sq-customer-A","fingerprint-B"),[a,b]).status,"CONFLICT","Square profile/card conflict");
+assert.equal(decidePosOwner(payment("merchant-A","sq-customer-A","fingerprint-A"),[a,{...a,relayConsumerId:"dylan"}]).status,"CONFLICT","duplicate identity claims");
+assert.equal(decidePosOwner(payment(),[{...a,verified:false}]).status,"UNCLAIMED","unverified self-declared card rejected");
+assert.equal(decidePosOwner(payment(),[{...a,proof:"typed_last4"}]).status,"UNCLAIMED","typed card digits not proof");
+assert.equal(decidePosOwner(payment("merchant-A","sq-customer-B","fingerprint-A"),[a,b]).status,"CONFLICT","do not prefer card over customer ID");
+const groups=fingerprintGroups([payment(),{...payment(),paymentId:"p2"},{...payment(),paymentId:"p3",customerId:"sq-customer-B"}]);
+assert.equal(groups[0].paymentCount,3);assert.equal(groups[0].customerIdConflict,true);
+console.log("PASS: 10 POS identity safeguards. No Square payment is released on last-four digits or an unverified link.");
