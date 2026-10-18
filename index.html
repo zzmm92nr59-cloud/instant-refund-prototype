@@ -25,7 +25,18 @@ const demoRetailers=[
 ["Retro Suede Trainers","Slate / UK 8",13499,7],
 ["Retro Suede Trainers","Cream / UK 8",13499,4],
 ["Everyday Runner Sneakers","Grey / UK 8",9999,14],
-["Everyday Runner Sneakers","Navy / UK 9",9999,10]]},
+["Everyday Runner Sneakers","Navy / UK 9",9999,10,
+["Everyday Crossbody Bag","Black",4999,9],
+["Everyday Crossbody Bag","Clay",4999,6],
+["Everyday Crossbody Bag","Sage",4999,4],
+["City Canvas Tote","Stone",3899,14],
+["City Canvas Tote","Navy",3899,11],
+["Mini Backpack","Black",6499,8],
+["Mini Backpack","Olive",6499,6],
+["Weekend Holdall","Rust",7999,7],
+["Weekend Holdall","Navy",7999,5],
+["Linen Overshirt","Ecru / M",5499,9],
+["Linen Overshirt","Ecru / L",5499,7]]},
 {id:"studio",name:"Relay Studio",platform:"Shopify demo",prefix:"STUDIO",items:[
 ["Boxy Cotton Tee","Forest / M",2899,14],["Boxy Cotton Tee","Forest / L",2899,8],["Boxy Cotton Tee","Chalk / M",2899,11],
 ["Everyday Crossbody Bag","Black",4999,5],["Everyday Crossbody Bag","Clay",4999,9],
@@ -58,7 +69,7 @@ function resetDemoInventory(){inventoryChanges={};saveInventory()}
 function applyDemoDiscount(sku){const p=catalog.find(x=>x.sku===sku);if(!p||!p.fixture)return;inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(p.priceMinor*0.8),updatedAt:new Date().toISOString()};saveInventory()}
 function storeStock(p){return p.fixture?Number(p.quantity):null}
 function canDemoOrder(p){return !!p&&(!p.fixture||storeStock(p)>0)}
-function productImage(name,variation=""){const n=String(name||"").toLowerCase(),v=String(variation||"").toLowerCase();let kind=/trainer|shoe|sneaker|jordan|boot/.test(n)?"shoe":/hoodie|sweatshirt|jumper/.test(n)?"hoodie":/jacket|coat|denim/.test(n)?"jacket":/bag|tote|backpack/.test(n)?"bag":/shirt|tee|top/.test(n)?"shirt":/trouser|jean|pant/.test(n)?"trousers":"shoe";
+function productImage(name,variation=""){const n=String(name||"").toLowerCase(),v=String(variation||"").toLowerCase();let kind=/trainer|shoe|sneaker|jordan|boot/.test(n)?"shoe":/hoodie|sweatshirt|jumper/.test(n)?"hoodie":/jacket|coat|denim/.test(n)?"jacket":/bag|tote|backpack|holdall|satchel|purse/.test(n)?"bag":/shirt|tee|top/.test(n)?"shirt":/trouser|jean|pant/.test(n)?"trousers":"shirt";
 let c=/green|sage/.test(v)?"#90ad9d":/blue|denim/.test(v)?"#6687b3":/black/.test(v)?"#34384a":/pink/.test(v)?"#d5a1b4":/sand|cream|beige/.test(v)?"#cbb99d":"#e3e5e9";
 const shapes={
 shoe:'<path d="M27 103q15-8 24-28l17 8q9 15 30 19l26 3q17 4 17 19v10H20q-7-13 7-31z" fill="'+c+'" stroke="#737d91" stroke-width="3"/><path d="M20 126h121v12H20z" fill="#fff" stroke="#737d91" stroke-width="2"/><path d="M59 92l28 14m-20-19l29 15m-18-20l29 14" stroke="#fff" stroke-width="4" stroke-linecap="round"/><path d="M35 114q16-3 23-15" stroke="#8b96aa" stroke-width="3" fill="none"/>',
