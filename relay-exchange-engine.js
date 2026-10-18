@@ -33,7 +33,9 @@
    const a=sizeOf(purchase.detail),b=sizeOf(candidate.variation);
    const exactSame=family&&normal(purchase.detail)===normal(candidate.variation);
    if(reason==="size")return family&&!!a&&!!b&&a!==b&&originalStyle===nextStyle;
-   if(reason==="colour")return family&&originalStyle!==nextStyle&&(!a||!b||a===b);
+   // Colour swaps can be another colour of the original or a different design
+   // from the same retailer and category, but must keep the customer's size.
+   if(reason==="colour")return !exactSame&&category(purchase.item)===category(candidate.product)&&((!a&&!b)||(!!a&&!!b&&a===b))&&(!family||originalStyle!==nextStyle);
    if(reason==="design")return !exactSame&&category(purchase.item)===category(candidate.product);
    if(reason==="mind")return !exactSame&&category(purchase.item)===category(candidate.product);
    return false;
