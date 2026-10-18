@@ -14,4 +14,4 @@ assert.equal(decidePosOwner(payment(),[{...a,proof:"typed_last4"}]).status,"UNCL
 assert.equal(decidePosOwner(payment("merchant-A","sq-customer-B","fingerprint-A"),[a,b]).status,"CONFLICT","do not prefer card over customer ID");
 const groups=fingerprintGroups([payment(),{...payment(),paymentId:"p2"},{...payment(),paymentId:"p3",customerId:"sq-customer-B"}]);
 assert.equal(groups[0].paymentCount,3);assert.equal(groups[0].customerIdConflict,true);
-console.log("PASS: 10 POS identity safeguards. No Square payment is released on last-four digits or an unverified link.");
+console.log("PASS: 11 POS identity assertions. No Square payment is released on last-four digits or an unverified link.");
