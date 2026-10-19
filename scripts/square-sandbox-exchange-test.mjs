@@ -36,12 +36,12 @@ const cases=[
 ],run=randomUUID().slice(0,8),report=[];
 for(const c of cases){
  // The original payment is independently created on Square Sandbox first.
- const original=await createOrder(c.original,"Relay Sandbox ORIGINAL — "+c.name,"relay-original-"+run+"-"+c.name);
+ const original=await createOrder(c.original,"Relay Sandbox ORIGINAL — "+c.name,"rl-orig-"+run+"-"+c.name);
  const originalPayment=await pay(c.original,original.id);
  // Replacement is an actual Square Sandbox order, but it is NOT paid in full.
  // Its balance is not automatically settled by the original payment; production
  // needs retailer settlement/accounting integration and return authorisation.
- const replacement=await createOrder(c.replacement,"Relay Sandbox REPLACEMENT — "+c.name,"relay-replacement-"+run+"-"+c.name);
+ const replacement=await createOrder(c.replacement,"Relay Sandbox REPLACEMENT — "+c.name,"rl-repl-"+run+"-"+c.name);
  const difference=c.replacement-c.original;
  let adjustment={type:"NONE",amountMinor:0,status:"NO_PAYMENT_REQUIRED",id:null};
  if(difference>0){
