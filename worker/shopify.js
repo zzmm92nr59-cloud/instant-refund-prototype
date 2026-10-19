@@ -2,6 +2,10 @@
 // Configure up to five independent shops with SHOPIFY_STORE_{1..5}_DOMAIN,
 // _ADMIN_ACCESS_TOKEN, _CATALOGUE_PUBLIC, optional _LABEL and _WEBHOOK_SECRET.
 // Legacy single-shop secrets are still supported. Never send access tokens to a browser.
+// Dev Dashboard apps authenticate with SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET (client
+// credentials grant): Relay fetches short-lived access tokens itself. A static
+// ADMIN_ACCESS_TOKEN still works. The app's client secret also signs its webhooks, so it is
+// used as the webhook secret unless a separate one is set.
 const VERSION = "2026-07";
 const DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 export function getShopifyStores(env) {
@@ -11,40 +15,63 @@ export function getShopifyStores(env) {
   if (env.SHOPIFY_SHOP_DOMAIN || env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
     configs.push({
       domain: env.SHOPIFY_SHOP_DOMAIN, token: env.SHOPIFY_ADMIN_ACCESS_TOKEN,
+      clientId: env.SHOPIFY_CLIENT_ID, clientSecret: env.SHOPIFY_CLIENT_SECRET,
       label: env.SHOPIFY_STORE_LABEL, publish: env.SHOPIFY_CATALOGUE_PUBLIC,
-      webhookSecret: env.SHOPIFY_WEBHOOK_SECRET
+      webhookSecret: env.SHOPIFY_WEBHOOK_SECRET || env.SHOPIFY_CLIENT_SECRET
     });
   }
   for (let n = 1; n <= 5; n++) {
     const prefix = "SHOPIFY_STORE_" + n + "_";
-    if (env[prefix + "DOMAIN"] || env[prefix + "ADMIN_ACCESS_TOKEN"]) {
+    if (env[prefix + "DOMAIN"] || env[prefix + "ADMIN_ACCESS_TOKEN"] || env[prefix + "CLIENT_ID"]) {
       configs.push({
         domain: env[prefix + "DOMAIN"], token: env[prefix + "ADMIN_ACCESS_TOKEN"],
+        clientId: env[prefix + "CLIENT_ID"], clientSecret: env[prefix + "CLIENT_SECRET"],
         label: env[prefix + "LABEL"], publish: env[prefix + "CATALOGUE_PUBLIC"],
-        webhookSecret: env[prefix + "WEBHOOK_SECRET"]
+        webhookSecret: env[prefix + "WEBHOOK_SECRET"] || env[prefix + "CLIENT_SECRET"]
       });
     }
   }
   for (const raw of configs) {
     const domain = String(raw.domain || "").toLowerCase().trim();
     const token = String(raw.token || "").trim();
+    const clientId = String(raw.clientId || "").trim();
+    const clientSecret = String(raw.clientSecret || "").trim();
     const webhookSecret = String(raw.webhookSecret || "").trim();
+    const canAuth = Boolean(token || (clientId && clientSecret));
     // Signed webhooks may be configured without catalogue API credentials.
-    if (!DOMAIN.test(domain) || (!token && !webhookSecret) || seen.has(domain)) continue;
+    if (!DOMAIN.test(domain) || (!canAuth && !webhookSecret) || seen.has(domain)) continue;
     seen.add(domain);
     const label = String(raw.label || domain.replace(/\.myshopify\.com$/, "").replace(/-/g, " ")).trim().slice(0, 80);
     configured.push({
-      domain, token, label, published: !!token && String(raw.publish || "").toLowerCase() === "true",
+      domain, token, clientId, clientSecret, canAuth, label, published: canAuth && String(raw.publish || "").toLowerCase() === "true",
       webhookSecret
     });
   }
   return configured;
 }
-export function shopifyConfigured(env) { return getShopifyStores(env).some(s => Boolean(s.token)); }
+export function shopifyConfigured(env) { return getShopifyStores(env).some(s => s.canAuth); }
+// Short-lived tokens (about 24h) are cached per shop and refreshed a minute before expiry.
+const tokenCache = new Map();
+export async function getAccessToken(store, now = Date.now()) {
+  if (store.token) return store.token;
+  const hit = tokenCache.get(store.domain);
+  if (hit && hit.expiresAt - 60000 > now) return hit.token;
+  const response = await fetch("https://" + store.domain + "/admin/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ client_id: store.clientId, client_secret: store.clientSecret, grant_type: "client_credentials" })
+  });
+  if (!response.ok) throw Error("Shopify token HTTP " + response.status);
+  const data = await response.json();
+  if (!data.access_token) throw Error("Shopify token response missing access_token");
+  tokenCache.set(store.domain, { token: data.access_token, expiresAt: now + (Number(data.expires_in) || 3600) * 1000 });
+  return data.access_token;
+}
 async function query(store, q, variables = {}) {
+  const token = await getAccessToken(store);
   const response = await fetch("https://" + store.domain + "/admin/api/" + VERSION + "/graphql.json", {
     method: "POST",
-    headers: { "X-Shopify-Access-Token": store.token, "Content-Type": "application/json" },
+    headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
     body: JSON.stringify({query:q, variables})
   });
   if (!response.ok) throw Error("Shopify API HTTP " + response.status);
@@ -109,7 +136,7 @@ async function syncStore(env, store) {
 }
 export async function syncShopifyCatalogues(env) {
   const results = [];
-  for (const store of getShopifyStores(env).filter(s => s.token)) {
+  for (const store of getShopifyStores(env).filter(s => s.canAuth)) {
     try { results.push({success:true, ...await syncStore(env, store)}); }
     catch (err) {
       // One retailer outage must not stop imports from other connected shops.
