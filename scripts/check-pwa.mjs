@@ -17,7 +17,7 @@ assert.ok(manifest.icons.some((i) => i.purpose === "maskable"), "needs a maskabl
 assert.deepEqual(pngSize("icons/apple-touch-icon.png"), [180, 180]);
 for (const page of ["index.html", "relay-app-v2.html"]) {
   const html = read(page);
-  for (const needle of ['rel="manifest" href="manifest.webmanifest"', 'rel="apple-touch-icon"', 'src="pwa-register.js"', "viewport-fit=cover"])
+  for (const needle of ['rel="manifest" href="manifest.webmanifest"', 'rel="apple-touch-icon"', 'src="pwa-register.js"', 'src="account.js"', "viewport-fit=cover"])
     assert.ok(html.includes(needle), page + " is missing " + needle);
 }
 assert.equal(read("index.html"), read("relay-app-v2.html"), "index.html and relay-app-v2.html must stay identical");
