@@ -1,4 +1,5 @@
 import { getShopifyStores } from "./shopify.js";
+import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 // Shopify retailer-authorised, signature-verified orders/paid ingestion.
 // Private retailer order and line item IDs stay in D1. Nothing here exposes consumer purchases.
 const MAX_BYTES = 256 * 1024;
@@ -92,6 +93,15 @@ export async function receiveShopifyWebhook(request, env) {
     return new Response("Invalid order amount or lines", { status: 400 });
   }
   try {
+    // Ownership link: only a keyed hash of the order email is kept (never the address itself),
+    // and only when sign-in is configured. Matched later against a shopper's verified email.
+    const orderEmail = normaliseEmail(event.email || event.contact_email || (event.customer && event.customer.email));
+    if (orderEmail && env.AUTH_SECRET && String(env.AUTH_SECRET).length >= 16) {
+      await ensureAuthTables(env.RELAY_DB);
+      statements.push(env.RELAY_DB.prepare(`INSERT INTO retailer_order_emails (order_id,email_hash,created_at)
+        VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET email_hash=excluded.email_hash`)
+        .bind(orderId, await emailHash(env.AUTH_SECRET, orderEmail), Date.now()));
+    }
     await env.RELAY_DB.batch(statements);
     // Deliberately DO NOT create a verified match or expose orders to the public wallet.
     return Response.json({ received: true });
