@@ -36,6 +36,7 @@ const calls=[];
 env.RELAY_DB={
   prepare(sql){
     return {
+      run:async()=>{calls.push({sql,values:[]})},
       bind(...values){
         return {run:async()=>{calls.push({sql,values})}};
       }
@@ -52,6 +53,7 @@ globalThis.fetch=async(url,params)=>{
       shop:{currencyCode:"GBP"},
       products:{pageInfo:{hasNextPage:false,endCursor:null},nodes:[{
         id:"gid://shopify/Product/123",title:"Basic Tee",description:"",
+        featuredMedia:{preview:{image:{url:"https://cdn.shopify.com/s/files/tee.jpg"}}},
         variants:{nodes:[{id:"gid://shopify/ProductVariant/55",title:"Medium",
           sku:"SAME-SKU",price:"25.99",inventoryQuantity:4}]}
       }]}
@@ -72,5 +74,12 @@ try{
   const namespacedVariants=calls.filter(x=>x.sql.includes("INSERT INTO retailer_catalog_variants")).map(x=>x.values[0]);
   assert.equal(new Set(namespacedVariants).size,3);
   assert.ok(!JSON.stringify(report).includes("private-token"),"never include credentials in reports");
+  const imageRows=calls.filter(x=>x.sql.includes("INSERT INTO retailer_item_images"));
+  assert.equal(imageRows.length,3,"retailer image link stored per product");
+  assert.equal(imageRows[0].values[1],"https://cdn.shopify.com/s/files/tee.jpg");
+  const outcomes=calls.filter(x=>x.sql.includes("INSERT INTO audit_events")).map(x=>JSON.parse(x.values[6]));
+  assert.equal(outcomes.length,3,"one recorded outcome per store");
+  assert.ok(outcomes.every(o=>o.success===true&&o.products===1&&o.images===1));
+  assert.ok(!JSON.stringify(outcomes).includes("private-token"),"outcomes never include credentials");
 }finally{globalThis.fetch=originalFetch}
 console.log("Shopify multi-store configuration, isolation and sync tests passed");

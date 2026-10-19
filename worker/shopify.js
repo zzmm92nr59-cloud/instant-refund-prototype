@@ -79,17 +79,41 @@ async function query(store, q, variables = {}) {
   if (data.errors?.length) throw Error("Shopify GraphQL request failed");
   return data.data;
 }
+export async function ensureImageTable(db) {
+  await db.prepare("CREATE TABLE IF NOT EXISTS retailer_item_images(item_id TEXT PRIMARY KEY, image_url TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+}
+// Short non-sensitive code for the public status page; never includes raw error text.
+export function errorCode(err) {
+  const m = String(err && err.message || "");
+  let x;
+  if ((x = /^Shopify token HTTP (\d+)/.exec(m))) return "token_request_failed_" + x[1];
+  if (/^Shopify token response/.test(m)) return "token_response_invalid";
+  if ((x = /^Shopify API HTTP (\d+)/.exec(m))) return "api_http_" + x[1];
+  if (/GraphQL/.test(m)) return "graphql_error";
+  if (/RELAY_DB/.test(m)) return "database_missing";
+  return "sync_failed";
+}
+async function recordSync(env, domain, outcome) {
+  try {
+    await env.RELAY_DB.prepare(`INSERT INTO audit_events(id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
+      VALUES (?,?,?,?,?,?,?)`).bind(crypto.randomUUID(), "system", null, "shopify_catalogue_sync",
+      "shopify_store", domain, JSON.stringify(outcome)).run();
+  } catch (e) { console.error("Could not record Shopify sync outcome"); }
+}
 async function syncStore(env, store) {
   if (!env.RELAY_DB) throw Error("RELAY_DB missing");
   const db = env.RELAY_DB;
   const connection = "shopify:" + store.domain;
   await db.prepare("INSERT OR IGNORE INTO retailer_connections(id,provider,merchant_external_id) VALUES (?,?,?)")
     .bind(connection, "shopify", store.domain).run();
+  await ensureImageTable(db);
+  let images = 0;
   const gql = `query RelayProducts($cursor: String) {
     shop { currencyCode }
     products(first: 30, after: $cursor) {
       pageInfo { hasNextPage endCursor }
       nodes { id title description
+        featuredMedia { preview { image { url } } }
         variants(first: 100) { nodes { id title sku price inventoryQuantity } }
       }
     }
@@ -106,6 +130,14 @@ async function syncStore(env, store) {
         title=excluded.title,description=excluded.description,updated_at=CURRENT_TIMESTAMP`)
         .bind(id, connection, item.id, item.title, item.description || null).run();
       products++;
+      // Retailer-hosted image link only (never copied); refreshed on every sync so changes follow the store.
+      const imageUrl = item.featuredMedia?.preview?.image?.url;
+      if (typeof imageUrl === "string" && /^https:\/\//.test(imageUrl) && imageUrl.length < 600) {
+        await db.prepare(`INSERT INTO retailer_item_images(item_id,image_url) VALUES (?,?)
+          ON CONFLICT(item_id) DO UPDATE SET image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
+          .bind(id, imageUrl).run();
+        images++;
+      }
       for (const v of item.variants?.nodes || []) {
         const vid = connection + ":variant:" + v.id;
         const price = Math.round(Number(v.price) * 100);
@@ -131,17 +163,23 @@ async function syncStore(env, store) {
     more = Boolean(data.products?.pageInfo?.hasNextPage);
     cursor = data.products?.pageInfo?.endCursor || null;
   } while (more && cursor && pages < 10);
-  return {shop:store.domain, products, variants, inventorySnapshots, pages, morePages:more,
+  return {shop:store.domain, products, variants, images, inventorySnapshots, pages, morePages:more,
     inventoryScope:"shop_aggregate"};
 }
 export async function syncShopifyCatalogues(env) {
   const results = [];
   for (const store of getShopifyStores(env).filter(s => s.canAuth)) {
-    try { results.push({success:true, ...await syncStore(env, store)}); }
+    try {
+      const r = await syncStore(env, store);
+      results.push({success:true, ...r});
+      await recordSync(env, store.domain, {success:true, products:r.products, variants:r.variants, images:r.images});
+    }
     catch (err) {
       // One retailer outage must not stop imports from other connected shops.
       console.error("Shopify catalogue sync failed for " + store.domain + ": " + String(err.message || err));
-      results.push({success:false, shop:store.domain, error:"sync_failed"});
+      const code = errorCode(err);
+      results.push({success:false, shop:store.domain, error:code});
+      if (env.RELAY_DB) await recordSync(env, store.domain, {success:false, error:code});
     }
   }
   return {configuredStores:results.length, results};
