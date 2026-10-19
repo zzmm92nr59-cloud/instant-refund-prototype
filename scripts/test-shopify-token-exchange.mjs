@@ -35,3 +35,12 @@ globalThis.fetch=async()=>({ok:false,status:400,json:async()=>({})});
 const bad=getShopifyStores({SHOPIFY_SHOP_DOMAIN:"bad.myshopify.com",SHOPIFY_CLIENT_ID:"x",SHOPIFY_CLIENT_SECRET:"super-secret"})[0];
 await assert.rejects(()=>getAccessToken(bad),e=>/HTTP 400/.test(e.message)&&!/super-secret/.test(e.message));
 console.log("Shopify token exchange checks passed");
+// Public error codes: short, no raw text, no secrets.
+{
+  const {errorCode}=await import("data:text/javascript;base64," + Buffer.from(source).toString("base64")+"#2");
+  assert.equal(errorCode(Error("Shopify token HTTP 400")),"token_request_failed_400");
+  assert.equal(errorCode(Error("Shopify API HTTP 401")),"api_http_401");
+  assert.equal(errorCode(Error("Shopify GraphQL request failed")),"graphql_error");
+  assert.equal(errorCode(Error("something with super-secret inside")),"sync_failed");
+  console.log("Shopify error code checks passed");
+}
