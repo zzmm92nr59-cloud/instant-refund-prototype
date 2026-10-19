@@ -1,7 +1,7 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
-import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues } from "./shopify.js";
+import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 export default {
   async scheduled(event, env, ctx) {
@@ -134,12 +134,21 @@ export default {
     // Public connectivity metadata only; tokens and unpublished stores stay private.
     if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
       const stores = getShopifyStores(env), published = stores.filter(s => s.published);
+      // Latest sync outcome only: counts and a short error code, no shop name, tokens or raw errors.
+      let lastSync = null;
+      try {
+        const row = env.RELAY_DB && await env.RELAY_DB.prepare(
+          "SELECT created_at,metadata_json FROM audit_events WHERE event_type='shopify_catalogue_sync' ORDER BY created_at DESC LIMIT 1").first();
+        if (row) { const m = JSON.parse(row.metadata_json); lastSync = {at:row.created_at, success:!!m.success,
+          products:m.products ?? null, variants:m.variants ?? null, images:m.images ?? null, error:m.error || null}; }
+      } catch {}
       return Response.json({
         success: true, configured: stores.length > 0, connectedStoreCount: stores.length,
         publishedStoreCount: published.length, mode: "read_only_catalogue",
         paidOrderWebhookConfigured: stores.some(s => Boolean(s.webhookSecret)),
         historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
         publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
+        lastSync,
         note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
       }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }
@@ -155,12 +164,14 @@ export default {
         return Response.json({error:"database_unavailable"},{status:503,headers:corsHeaders});
       try {
         const products = [];
+        await ensureImageTable(env.RELAY_DB);
         for (const store of stores) {
-          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
+          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,img.image_url AS imageUrl,
             v.id AS catalogueId,v.sku AS retailerSku,v.price_minor AS priceMinor,
             v.currency,MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
             FROM retailer_catalog_items i
             JOIN retailer_catalog_variants v ON v.item_id=i.id
+            LEFT JOIN retailer_item_images img ON img.item_id=i.id
             LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
             WHERE i.provider=? AND v.price_minor IS NOT NULL
               AND v.currency='GBP'
