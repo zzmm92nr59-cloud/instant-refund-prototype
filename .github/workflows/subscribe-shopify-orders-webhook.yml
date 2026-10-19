@@ -1,0 +1,17 @@
+name: Subscribe Shopify paid-orders webhook (test store)
+on:
+  workflow_dispatch:
+jobs:
+  subscribe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Subscribe orders/paid to the Relay Worker
+        env:
+          SHOPIFY_SHOP_DOMAIN: relay-ltd.myshopify.com
+          SHOPIFY_CLIENT_ID: ${{ secrets.SHOPIFY_CLIENT_ID }}
+          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
+        run: node scripts/subscribe-shopify-orders-webhook.mjs
