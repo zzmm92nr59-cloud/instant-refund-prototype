@@ -64,6 +64,31 @@
      input, go, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
   }
   function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
+  function receiptView(sheet, back) {
+    var box = el("textarea", { placeholder: "Paste the whole order-confirmation email here (including the From and Subject lines if you can)", rows: 7, maxLength: 200000,
+      style: "width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ddd6c6;border-radius:16px;font-size:14px;margin-bottom:12px;font-family:inherit" });
+    var out = el("div"), msg = el("div", { className: "rl-msg" });
+    var go = el("button", { className: "rl-btn", text: "Read this receipt" });
+    go.onclick = function () {
+      go.disabled = true; out.textContent = ""; say(msg, "Reading…");
+      api("/relay/my/receipts/parse", { method: "POST", body: { email: box.value } }).then(function (r) {
+        go.disabled = false;
+        if (r.status === 401) { save(null); close(); return; }
+        if (!r.ok || !r.body.receipt) return say(msg, "Paste the full email text and try again.", true);
+        var x = r.body.receipt;
+        if (!x.ok) return say(msg, "This doesn't look like an order confirmation, so Relay didn't read it.", true);
+        say(msg, x.needsShopperConfirmation ? "Please check these details, some may be missing or wrong." : "Here's what Relay found. Please check it.");
+        var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
+        var rows = [["Store", who], ["Order", x.orderRef || "not found"], ["Date", x.orderDate || "not found"],
+          ["Total", x.totalPence == null ? "not found" : money(x.totalPence, x.currency)]];
+        rows.forEach(function (p) { out.appendChild(el("div", { className: "rl-order" }, [el("span", { text: p[0] }), el("b", { text: p[1] })])); });
+        (x.items || []).forEach(function (i) { out.appendChild(el("div", { className: "rl-order" }, [el("b", { text: i.qty + " × " + i.name }), el("span", { text: i.pricePence == null ? "" : money(i.pricePence, x.currency) })])); });
+        out.appendChild(el("p", { text: "This is read from the email you pasted and isn't saved yet. Because it comes from you rather than the store, it can't start an automatic refund." }));
+      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    [el("h2", { text: "Add a receipt" }), el("p", { text: "Paste an order-confirmation email from any store. Relay reads the details on this device's request and doesn't keep the email." }), box, go, msg, out,
+      el("button", { className: "rl-btn ghost", text: "Back", onclick: back })].forEach(function (n) { sheet.appendChild(n); });
+  }
   function signedInView(sheet, email) {
     var list = el("div"), msg = el("div", { className: "rl-msg" });
     [el("h2", { text: "Your account" }), el("p", { text: email }), el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
@@ -80,6 +105,8 @@
           el("span", { text: money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
       });
     }).catch(function () { list.textContent = ""; list.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt", onclick: function () {
+      if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { back.firstChild.textContent = ""; signedInView(back.firstChild, email); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
       api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Delete my Relay account", onclick: function () {
