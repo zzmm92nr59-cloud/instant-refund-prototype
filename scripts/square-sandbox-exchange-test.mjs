@@ -65,12 +65,11 @@ for(const c of cases){
      adjustment={type:"PRICE_DIFFERENCE_REFUND",amountMinor:-difference,status:refund.status,id:refund.id};
    }
  }
- // Record the link on the original order too (needs its latest version).
- const freshOriginal=(await api("/v2/orders/"+original.id)).order;
- await api("/v2/orders/"+original.id,{method:"PUT",body:{idempotency_key:randomUUID(),order:{location_id:location.id,version:freshOriginal.version,metadata:{relay_replaced_by:replacement.id,relay_run:run}}}});
+ // A completed Square order cannot be edited (Square rejects it), and in real life the original
+ // order belongs to the retailer. So the link is one-way, replacement -> original, and Relay keeps the
+ // reverse link in its own records.
  // Read both orders back from Square and verify the link, rather than trusting what we sent.
- const o=(await api("/v2/orders/"+original.id)).order,r=(await api("/v2/orders/"+replacement.id)).order;
- check(o.metadata?.relay_replaced_by===replacement.id,"original order does not point to replacement");
+ const r=(await api("/v2/orders/"+replacement.id)).order;
  check(r.metadata?.relay_exchange_of===original.id,"replacement does not point to original order");
  check(r.metadata?.relay_original_payment===originalPayment.id,"replacement does not record original payment");
  check(r.state==="COMPLETED","replacement order state is "+r.state);
