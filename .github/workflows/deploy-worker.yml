@@ -19,8 +19,10 @@ jobs:
           node --check worker/worker.js
           node --check worker/shopify.js
           node --check worker/shopify-webhooks.js
+          node --check worker/auth.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
+          node scripts/test-auth.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
@@ -76,3 +78,23 @@ jobs:
           fi
           printf '%s' "$SHOPIFY_CLIENT_ID" | npx --yes wrangler@4 secret put SHOPIFY_CLIENT_ID
           printf '%s' "$SHOPIFY_CLIENT_SECRET" | npx --yes wrangler@4 secret put SHOPIFY_CLIENT_SECRET
+
+      # Shopper sign-in. Without both secrets, sign-in stays off (the Worker answers "not configured").
+      - name: Configure shopper sign-in secrets for Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RELAY_EMAIL_FROM: ${{ secrets.RELAY_EMAIL_FROM }}
+        run: |
+          if [ -z "$AUTH_SECRET" ] || [ -z "$RESEND_API_KEY" ]; then
+            echo "Sign-in Actions secrets unavailable; sign-in stays switched off."
+            exit 0
+          fi
+          printf '%s' "$AUTH_SECRET" | npx --yes wrangler@4 secret put AUTH_SECRET
+          printf '%s' "$RESEND_API_KEY" | npx --yes wrangler@4 secret put RESEND_API_KEY
+          if [ -n "$RELAY_EMAIL_FROM" ]; then
+            printf '%s' "$RELAY_EMAIL_FROM" | npx --yes wrangler@4 secret put RELAY_EMAIL_FROM
+          fi
