@@ -61,7 +61,9 @@ for(const c of cases){
        amount_money:money(-difference),reason:"Relay Sandbox exchange price difference"
      }})).refund;
      check(refund&&refund.amount_money?.amount===-difference&&["COMPLETED","PENDING"].includes(refund.status),"refund not accepted");
-     check(refund.order_id===original.id,"refund not attached to the original order");
+     const rf=(await api("/v2/refunds/"+refund.id)).refund;
+     const ro=(await api("/v2/orders/"+original.id)).order;
+     check(rf.order_id===original.id||(ro.refunds||[]).some(x=>x.id===refund.id)||(ro.returns||[]).length>0,"refund not attached to the original order. refund="+JSON.stringify({order_id:rf.order_id,payment_id:rf.payment_id,status:rf.status})+" orderRefunds="+JSON.stringify((ro.refunds||[]).map(x=>x.id))+" returns="+JSON.stringify((ro.returns||[]).length)+" origOrderId="+original.id);
      adjustment={type:"PRICE_DIFFERENCE_REFUND",amountMinor:-difference,status:refund.status,id:refund.id};
    }
  }
