@@ -26,6 +26,12 @@ await context.route('https://**/*', route => {
   if (p === '/relay/auth/verify') return JSON.parse(req.postData()).token === TOKEN ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_link' });
   if (p === '/relay/my/purchases') return h.authorization === 'Bearer ' + SESSION
     ? j(200, { purchases: [{ id: 'o1', amountMinor: 12999, currency: 'GBP', orderedAt: '2026-10-14T12:00:00Z', items: [{ title: '<img src=x onerror=window.__xss=1>Trainers', quantity: 1 }] }] }) : j(401, { error: 'not_signed_in' });
+  if (p === '/relay/my/receipts/parse') {
+    if (h.authorization !== 'Bearer ' + SESSION) return j(401, { error: 'not_signed_in' });
+    return JSON.parse(req.postData()).email.includes('EO-1')
+      ? j(200, { receipt: { ok: true, needsShopperConfirmation: false, refundEligible: false, retailer: { name: '<img src=x onerror=window.__xss2=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }] } })
+      : j(200, { receipt: { ok: false, reason: 'not_an_order_confirmation' } });
+  }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
 });
@@ -44,6 +50,20 @@ assert.equal(await page.evaluate(() => window.__xss), undefined, 'server text mu
 assert.ok(!page.url().includes('signin='), 'token removed from the address bar');
 assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('relay.session.v1')).token), SESSION);
 console.log('PASS magic link signs in, token leaves URL, purchases shown safely');
+await page.getByRole('button', { name: 'Add a receipt' }).click();
+await page.getByRole('heading', { name: 'Add a receipt' }).waitFor();
+await page.locator('textarea').fill('50% off everything this weekend, shop now');
+await page.getByRole('button', { name: 'Read this receipt' }).click();
+await page.getByText("doesn't look like an order confirmation").waitFor();
+await page.locator('textarea').fill('Order number: EO-1 total £59.00');
+await page.getByRole('button', { name: 'Read this receipt' }).click();
+await page.getByText('Wool jumper').waitFor();
+await page.getByText('£59.00').first().waitFor();
+await page.getByText("can't start an automatic refund").waitFor();
+assert.equal(await page.evaluate(() => window.__xss2), undefined, 'receipt text must never run as HTML');
+await page.getByRole('button', { name: 'Back' }).click();
+await page.getByRole('heading', { name: 'Your account' }).waitFor();
+console.log('PASS receipt screen: rejects non-receipts, shows parsed details safely, says it cannot trigger refunds, Back works');
 await page.reload(); await page.locator('.avatar').waitFor();
 assert.equal((await page.locator('.avatar').textContent()).trim(), 'A');
 await page.locator('.avatar').click(); await page.getByRole('heading', { name: 'Your account' }).waitFor();
