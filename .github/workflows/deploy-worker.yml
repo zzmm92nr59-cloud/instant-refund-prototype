@@ -98,3 +98,18 @@ jobs:
           if [ -n "$RELAY_EMAIL_FROM" ]; then
             printf '%s' "$RELAY_EMAIL_FROM" | npx --yes wrangler@4 secret put RELAY_EMAIL_FROM
           fi
+
+      # Store-level "Order payment" webhook signing key (set by hand in Shopify admin for the test store).
+      # Without it the Worker falls back to the app client secret and orders from that webhook are rejected.
+      - name: Configure Shopify webhook signing key for Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHOPIFY_WEBHOOK_SECRET: ${{ secrets.SHOPIFY_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$SHOPIFY_WEBHOOK_SECRET" ]; then
+            echo "SHOPIFY_WEBHOOK_SECRET unavailable; skipping."
+            exit 0
+          fi
+          printf '%s' "$SHOPIFY_WEBHOOK_SECRET" | npx --yes wrangler@4 secret put SHOPIFY_WEBHOOK_SECRET
