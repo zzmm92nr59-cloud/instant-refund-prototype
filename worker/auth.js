@@ -8,6 +8,7 @@
 //  * No endpoint accepts a shopper ID from the client. Every "my" query is keyed by the
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
+import { parseReceiptEmail } from "./receipt-parser.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -210,6 +211,14 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
+    if (path === "/relay/my/receipts/parse" && request.method === "POST") {
+      // Reads a pasted order-confirmation email. Nothing is stored. The result is
+      // shopper-supplied evidence (refundEligible is always false).
+      const body = await readJson(request, 250_000);
+      if (!body || typeof body.email !== "string" || body.email.length < 20)
+        return json({ error: "invalid_receipt" }, 400, cors);
+      return json({ receipt: parseReceiptEmail(body.email) }, 200, cors);
+    }
     const one = /^\/relay\/my\/purchases\/([A-Za-z0-9:._-]{1,200})$/.exec(path);
     if (one && request.method === "GET") {
       const found = await listPurchases(env, shopper, one[1]);
