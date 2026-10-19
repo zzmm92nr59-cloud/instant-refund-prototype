@@ -20,6 +20,7 @@ jobs:
           node --check worker/shopify.js
           node --check worker/shopify-webhooks.js
           node scripts/test-shopify-multi-store.mjs
+          node scripts/test-shopify-token-exchange.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
@@ -58,3 +59,20 @@ jobs:
           fi
           printf '%s' "$PLAID_CLIENT_ID" | npx --yes wrangler@4 secret put PLAID_CLIENT_ID
           printf '%s' "$PLAID_SECRET" | npx --yes wrangler@4 secret put PLAID_SECRET
+
+      # Re-applied on every deploy because dashboard-added values are removed by a deploy.
+      # Values come from GitHub Actions secrets and are never printed.
+      - name: Configure Shopify test-store secrets for Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SHOPIFY_CLIENT_ID: ${{ secrets.SHOPIFY_CLIENT_ID }}
+          SHOPIFY_CLIENT_SECRET: ${{ secrets.SHOPIFY_CLIENT_SECRET }}
+        run: |
+          if [ -z "$SHOPIFY_CLIENT_ID" ] || [ -z "$SHOPIFY_CLIENT_SECRET" ]; then
+            echo "Shopify Actions secrets unavailable; skipping Shopify test-store connection."
+            exit 0
+          fi
+          printf '%s' "$SHOPIFY_CLIENT_ID" | npx --yes wrangler@4 secret put SHOPIFY_CLIENT_ID
+          printf '%s' "$SHOPIFY_CLIENT_SECRET" | npx --yes wrangler@4 secret put SHOPIFY_CLIENT_SECRET
