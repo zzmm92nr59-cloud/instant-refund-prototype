@@ -3,6 +3,11 @@ main = "worker.js"
 compatibility_date = "2026-10-07"
 workers_dev = true
 
+# Not secret. Kept here because plain-text variables added in the Cloudflare dashboard
+# are removed on every deploy (secrets are kept).
+[vars]
+SHOPIFY_SHOP_DOMAIN = "relay-ltd.myshopify.com"
+
 [[d1_databases]]
 binding = "RELAY_DB"
 database_name = "relay-purchase-ledger"
