@@ -120,6 +120,22 @@ assert.equal((await call("/relay/my/purchases")).status, 401);
 assert.equal((await call("/relay/my/purchases", { token: "A".repeat(43) })).status, 401);
 assert.equal((await call("/relay/my/purchases?shopper=" + "x", { token: carol })).status, 200);
 
+// 6b. Pasted receipts: sign-in required, parsed, never stored, never refund-eligible.
+const sample = "From: Example Outfitters <orders@exampleoutfitters.test>\nSubject: Your order confirmation #EO-1\nContent-Type: text/plain\n\nOrder number: EO-1\nOrder date: 14 Oct 2026\nWool jumper - Qty 1 - £59.00\nOrder total: £59.00\n";
+assert.equal((await call("/relay/my/receipts/parse", { method: "POST", body: { email: sample } })).status, 401, "receipt reading needs sign-in");
+const before = sqlite.prepare("SELECT (SELECT COUNT(*) FROM retailer_orders) o, (SELECT COUNT(*) FROM order_items) i").get();
+let rr = await call("/relay/my/receipts/parse", { method: "POST", token: bob, body: { email: sample } });
+assert.equal(rr.status, 200);
+const parsed = (await rr.json()).receipt;
+assert.equal(parsed.ok, true);
+assert.equal(parsed.orderRef, "EO-1");
+assert.equal(parsed.totalPence, 5900);
+assert.equal(parsed.refundEligible, false);
+assert.deepEqual(sqlite.prepare("SELECT (SELECT COUNT(*) FROM retailer_orders) o, (SELECT COUNT(*) FROM order_items) i").get(), before, "parsing stores nothing");
+assert.equal((await call("/relay/my/receipts/parse", { method: "POST", token: bob, body: { email: 123 } })).status, 400);
+assert.equal((await call("/relay/my/receipts/parse", { method: "POST", token: bob, body: { email: "x".repeat(300000) } })).status, 400, "oversized input refused");
+assert.equal((await (await call("/relay/my/receipts/parse", { method: "POST", token: bob, body: { email: "Subject: 50% off sale\n\nShop jumpers from £19.99 today only, big savings" } })).json()).receipt.ok, false);
+
 // 7. Sessions expire, logout works, delete removes the account.
 assert.equal((await call("/relay/me", { token: alice })).status, 200);
 assert.equal((await call("/relay/auth/logout", { method: "POST", token: alice })).status, 200);

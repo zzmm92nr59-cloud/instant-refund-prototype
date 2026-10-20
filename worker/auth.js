@@ -8,6 +8,8 @@
 //  * No endpoint accepts a shopper ID from the client. Every "my" query is keyed by the
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
+import { parseReceiptEmail } from "./receipt-parser.js";
+import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -61,6 +63,7 @@ export async function ensureAuthTables(db) {
     `CREATE INDEX IF NOT EXISTS idx_order_emails_hash ON retailer_order_emails(email_hash)`
   ];
   for (const sql of statements) await db.prepare(sql).run();
+  await ensureGmailTables(db);
 }
 
 function json(body, status = 200, cors = {}) {
@@ -185,7 +188,7 @@ async function listPurchases(env, shopper, orderId) {
 // Returns a Response for auth/"my" routes, or null when the route is not one of ours.
 export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const path = url.pathname;
-  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/");
+  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback";
   if (!isAuthRoute) return null;
   const o = { now: Date.now(), fetchImpl: fetch, ...opts };
   try {
@@ -193,6 +196,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
+    if (path === "/relay/gmail/callback" && request.method === "GET")
+      return await handleGmailCallback(request, env, url, { ...o, appUrl: DEFAULT_APP_URL });
     const shopper = await sessionShopper(request, env, o.now);
     if (!shopper) return json({ error: "not_signed_in" }, 401, cors);
     if (path === "/relay/me" && request.method === "GET") return json({ email: shopper.email }, 200, cors);
@@ -202,14 +207,25 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
       await env.RELAY_DB.batch([
+        ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email = ?").bind(shopper.email),
         env.RELAY_DB.prepare("DELETE FROM shoppers WHERE id = ?").bind(shopper.id)
       ]);
       return json({ ok: true }, 200, cors);
     }
+    const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);
+    if (gmailResponse) return gmailResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
+    if (path === "/relay/my/receipts/parse" && request.method === "POST") {
+      // Reads a pasted order-confirmation email. Nothing is stored. The result is
+      // shopper-supplied evidence (refundEligible is always false).
+      const body = await readJson(request, 250_000);
+      if (!body || typeof body.email !== "string" || body.email.length < 20)
+        return json({ error: "invalid_receipt" }, 400, cors);
+      return json({ receipt: parseReceiptEmail(body.email) }, 200, cors);
+    }
     const one = /^\/relay\/my\/purchases\/([A-Za-z0-9:._-]{1,200})$/.exec(path);
     if (one && request.method === "GET") {
       const found = await listPurchases(env, shopper, one[1]);

@@ -20,9 +20,13 @@ jobs:
           node --check worker/shopify.js
           node --check worker/shopify-webhooks.js
           node --check worker/auth.js
+          node --check worker/receipt-parser.js
+          node --check worker/gmail.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
+          node scripts/test-receipt-parser.mjs
+          node scripts/test-gmail.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
@@ -98,6 +102,22 @@ jobs:
           if [ -n "$RELAY_EMAIL_FROM" ]; then
             printf '%s' "$RELAY_EMAIL_FROM" | npx --yes wrangler@4 secret put RELAY_EMAIL_FROM
           fi
+
+      # Google OAuth client for the Gmail connection (created in Google Cloud Console, kept in Actions secrets).
+      - name: Configure Gmail connection secrets for Worker
+        working-directory: worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          if [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_CLIENT_SECRET" ]; then
+            echo "Google Actions secrets unavailable; Gmail connection stays switched off."
+            exit 0
+          fi
+          printf '%s' "$GOOGLE_CLIENT_ID" | npx --yes wrangler@4 secret put GOOGLE_CLIENT_ID
+          printf '%s' "$GOOGLE_CLIENT_SECRET" | npx --yes wrangler@4 secret put GOOGLE_CLIENT_SECRET
 
       # Store-level "Order payment" webhook signing key (set by hand in Shopify admin for the test store).
       # Without it the Worker falls back to the app client secret and orders from that webhook are rejected.
