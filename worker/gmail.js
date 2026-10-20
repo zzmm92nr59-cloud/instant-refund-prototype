@@ -13,11 +13,11 @@
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail } from "./receipt-parser.js";
 
-export const CONSENT_VERSION = "2026-10-v1";
+export const CONSENT_VERSION = "2026-10-v2";
 export const CONSENT_TEXT = [
   "To work, Relay needs to see your online and in-store receipts.",
   "With your permission, Relay reads your Gmail in read-only mode and looks only for order confirmations and receipts.",
-  "From each one it keeps the store, order number, date, total and items. It does not keep the email itself.",
+  "From each one it keeps the store, order number, date, total and items, plus any return details it contains (return deadline, return address, how to return and any return link). It does not keep the email itself.",
   "Relay never sends email, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
   "You can disconnect Gmail and delete everything Relay has captured at any time, in one tap.",
   "What Relay finds comes from your email, not from the store, so it can track your purchases but cannot start an automatic refund on its own."
@@ -155,13 +155,15 @@ async function scan(env, shopperId, fetchImpl, now) {
     { headers: auth });
   if (!list.ok) return { status: 502, body: { error: "gmail_unavailable" } };
   const messages = ((await list.json().catch(() => ({}))).messages || []).slice(0, MAX_MESSAGES_PER_SCAN);
-  let added = 0, skipped = 0, ignored = 0;
+  let added = 0, skipped = 0, ignored = 0, updated = 0;
   for (const m of messages) {
     if (typeof m.id !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(m.id)) continue;
     const ref = await sha256Hex("gmail:" + m.id);
     const seen = await env.RELAY_DB.prepare(
-      "SELECT 1 AS x FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
-    if (seen) { skipped++; continue; }
+      "SELECT details FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
+    // Receipts captured before return details existed are re-read once to add them.
+    const needsReturns = seen && !Object.prototype.hasOwnProperty.call(JSON.parse(seen.details), "returns");
+    if (seen && !needsReturns) { skipped++; continue; }
     const res = await fetchImpl(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=raw`, { headers: auth });
     if (!res.ok) continue;
@@ -173,16 +175,24 @@ async function scan(env, shopperId, fetchImpl, now) {
     const details = {
       retailer: parsed.retailer, orderRef: parsed.orderRef, orderDate: parsed.orderDate, currency: parsed.currency,
       totalPence: parsed.totalPence, items: parsed.items, confidence: parsed.confidence,
-      needsShopperConfirmation: parsed.needsShopperConfirmation, method: parsed.method,
+      needsShopperConfirmation: parsed.needsShopperConfirmation, method: parsed.method, returns: parsed.returns,
       source: "shopper_email", refundEligible: false
     };
+    if (needsReturns) {
+      // Keep what the shopper may already have confirmed; only add the new return details.
+      const prev = JSON.parse(seen.details);
+      await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
+        .bind(JSON.stringify({ ...prev, returns: parsed.returns }), shopperId, ref).run();
+      updated++;
+      continue;
+    }
     await env.RELAY_DB.prepare(
       "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
       .bind(crypto.randomUUID(), shopperId, ref, "pending", JSON.stringify(details), now).run();
     added++;
   }
   await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
-  return { status: 200, body: { ok: true, added, alreadyCaptured: skipped, notReceipts: ignored } };
+  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored } };
 }
 
 async function listReceipts(env, shopperId) {

@@ -123,6 +123,23 @@
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name; }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
       el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (x.orderDate ? " · " + x.orderDate : "") })]);
+    var rt = x.returns;
+    if (rt) {
+      var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
+      rb.appendChild(el("b", { text: "Returns", style: "display:block;margin-bottom:4px" }));
+      var line = function (t) { rb.appendChild(el("span", { text: t, style: "display:block;margin-top:2px" })); };
+      if (rt.deadline) line("Return by " + new Date(rt.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }));
+      else if (rt.windowDays) line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery (check your delivery date)" : ""));
+      if (rt.address) line("Send to: " + rt.address);
+      (rt.instructions || []).forEach(function (t) { line("“" + t + "”"); });
+      if (rt.qrMentioned) line("This email mentions a QR code. Relay can't read it yet, so open the original email to use it.");
+      else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Check the original email.");
+      if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
+        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return on the store's site", style: "display:block;margin-top:6px;font-weight:600" }));
+      }
+      rb.appendChild(el("span", { text: "Read from the email. Check it matches the store's own policy.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
+      card.appendChild(rb);
+    }
     if (x.status === "confirmed") { card.appendChild(el("span", { text: " · Confirmed by you", style: "display:block;margin-top:4px" })); return card; }
     card.appendChild(el("span", { text: x.needsShopperConfirmation ? "Some details may be missing or wrong. Please check." : "Please check this is right.", style: "display:block;margin-top:4px" }));
     [["Looks right", "confirm", "rl-btn"], ["Not mine / ignore", "dismiss", "rl-btn ghost"]].forEach(function (b) {

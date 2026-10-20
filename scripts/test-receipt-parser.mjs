@@ -120,4 +120,46 @@ t("inconsistent totals lower confidence", () => {
   assert.notEqual(r.confidence, "high");
 });
 
+const withReturns = `From: "Example Outfitters" <orders@exampleoutfitters.test>
+Subject: Your order confirmation #EO-777
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><p>Order number: EO-777</p><p>Order date: 10 Oct 2026</p>
+<p>Wool jumper - Qty 1 - £59.00</p><p>Order total: £59.00</p>
+<p>Changed your mind? You can return items within 28 days of delivery for a full refund.</p>
+<p>Return address:</p><p>Example Outfitters Returns</p><p>Unit 4, Mill Lane</p><p>Leeds LS1 4AB</p>
+<p>Scan the QR code in your returns portal at the drop-off point.</p>
+<p><a href="https://returns.exampleoutfitters.test/start?order=EO-777">Start your return</a>
+<a href="https://exampleoutfitters.test/unsubscribe">Unsubscribe</a>
+<a href="http://insecure.test/returns">Returns (http)</a></p></body></html>`;
+
+t("return details: window, address, link, QR mention", () => {
+  const r = parseReceiptEmail(withReturns);
+  assert.equal(r.ok, true);
+  assert.equal(r.returns.windowDays, 28);
+  assert.equal(r.returns.windowFrom, "delivery");
+  assert.equal(r.returns.deadline, null, "no deadline guessed when the window runs from delivery");
+  assert.match(r.returns.address, /Leeds LS1 4AB/);
+  assert.equal(r.returns.portalUrl, "https://returns.exampleoutfitters.test/start?order=EO-777");
+  assert.equal(r.returns.qrMentioned, true);
+  assert.ok(r.returns.instructions.length >= 1 && r.returns.instructions.length <= 3);
+  assert.equal(r.refundEligible, false);
+});
+
+t("return deadline worked out only when counted from the order date", () => {
+  const r = parseReceiptEmail(`From: Shop <a@shop.test>\nSubject: Order confirmation\nContent-Type: text/plain\n\nOrder number: SH-1\nOrder date: 2026-10-01\nHat £10.00\nOrder total: £10.00\nYou can return this order within 14 days of purchase.`);
+  assert.equal(r.returns.windowFrom, "order");
+  assert.equal(r.returns.deadline, "2026-10-15");
+  const e = parseReceiptEmail(`From: Shop <a@shop.test>\nSubject: Order confirmation\nContent-Type: text/plain\n\nOrder number: SH-2\nOrder total: £10.00\nReturns must be made by 20 November 2026.`);
+  assert.equal(e.returns.deadline, "2026-11-20");
+});
+
+t("no return info means returns is null; incomplete address is not shown", () => {
+  const r = parseReceiptEmail(plain);
+  assert.equal(r.returns, null);
+  const a = parseReceiptEmail(`From: Shop <a@shop.test>\nSubject: Order confirmation\nContent-Type: text/plain\n\nOrder number: SH-3\nOrder total: £10.00\nReturn address:\nSomewhere Road\n`);
+  assert.equal(a.returns && a.returns.address, null);
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
