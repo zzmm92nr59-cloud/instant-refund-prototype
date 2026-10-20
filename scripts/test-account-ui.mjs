@@ -90,6 +90,8 @@ gmailConnected = true;
 await page.goto(origin + '/index.html#gmail=connected');
 await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found or updated 1 receipt').waitFor();
+assert.ok(await page.evaluate(() => { const m = [...document.querySelectorAll('.rl-msg')].find(e => /Found or updated/.test(e.textContent)); const h = [...document.querySelectorAll('h2')].find(e => /Your purchases/.test(e.textContent)); return m && h && (m.compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'scan status sits above Your purchases, next to the Scan button');
+assert.equal(await page.evaluate(() => localStorage.getItem('relay_scan_cursor')), null, 'saved scan position cleared once finished');
 assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }], 'the app follows the cursor back through the mailbox');
 await page.getByPlaceholder('Search your receipts').fill('wool');
 assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1, 'search finds the item');
