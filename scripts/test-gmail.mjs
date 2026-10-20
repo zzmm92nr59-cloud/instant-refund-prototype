@@ -48,10 +48,10 @@ const fetchImpl = async (url, init = {}) => {
   if (url === "https://oauth2.googleapis.com/revoke") return new Response("{}", { status: 200 });
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
-    assert.ok(decodeURIComponent(url).includes("newer_than:180d"), "search is limited in time");
+    assert.ok(decodeURIComponent(url).includes("newer_than:400d"), "search is limited in time");
     return Response.json({ messages: Object.keys(gmailBox).map(id => ({ id: id + "abcdef" })) });
   }
-  const one = /messages\/(m\d)abcdef\?format=raw$/.exec(url);
+  const one = /messages\/(m\d+)abcdef\?format=raw$/.exec(url);
   if (one) return Response.json({ raw: b64url(gmailBox[one[1]]) });
   return new Response("blocked", { status: 500 });
 };
@@ -130,27 +130,37 @@ assert.ok(!stored.includes("PLAINTEXT-marker") && !stored.includes("refresh-toke
 calls = [];
 r = await post("/relay/my/gmail/scan", alice);
 assert.equal(r.status, 200);
-assert.deepEqual(await r.json(), { ok: true, added: 2, updated: 0, alreadyCaptured: 0, notReceipts: 1 });
+assert.deepEqual(await r.json(), { ok: true, added: 2, updated: 0, alreadyCaptured: 0, notReceipts: 1, more: false });
 assert.ok(calls.every(c => !c.url.includes("/send") && !c.url.includes("modify") && !c.url.includes("delete")), "only read calls to Gmail");
 assert.ok(calls.filter(c => c.url.includes("gmail.googleapis")).every(c => c.auth === "Bearer access-2"));
 const dump = JSON.stringify(sqlite.prepare("SELECT * FROM captured_receipts").all());
 assert.ok(!dump.includes("PRIVATE-BODY-MARKER"), "email text is never stored");
 assert.ok(dump.includes("EO-1") && dump.includes("5900"));
 r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 2, notReceipts: 1 });
+assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, more: false }, "newsletters are remembered and not fetched again");
 // Return details are stored as extracted fields, and receipts captured before they existed get them added once.
-let rows = sqlite.prepare("SELECT details FROM captured_receipts").all().map(x => JSON.parse(x.details));
+let rows = sqlite.prepare("SELECT details FROM captured_receipts WHERE status != 'not_receipt'").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30 && d.returns.deadline === "2026-11-13"), "return window and deadline kept");
-sqlite.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.parserVersion'), status = 'pending' WHERE message_ref = (SELECT message_ref FROM captured_receipts LIMIT 1)").run();
+sqlite.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.parserVersion'), status = 'pending' WHERE message_ref = (SELECT message_ref FROM captured_receipts WHERE status != 'not_receipt' LIMIT 1)").run();
 r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 1, alreadyCaptured: 1, notReceipts: 1 }, "old receipt re-read once with the newer reader");
-rows = sqlite.prepare("SELECT details FROM captured_receipts").all().map(x => JSON.parse(x.details));
+assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 1, alreadyCaptured: 2, notReceipts: 0, more: false }, "old receipt re-read once with the newer reader");
+rows = sqlite.prepare("SELECT details FROM captured_receipts WHERE status != 'not_receipt'").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30));
 assert.ok(!JSON.stringify(rows).includes("PRIVATE-BODY-MARKER"), "email text still never stored");
 r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 2, notReceipts: 1 }, "no repeat re-read");
-// (the newsletter is re-read each scan because only receipts are remembered)
+assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, more: false }, "no repeat re-read");
 
+// 7b. Return emails join their order; a long mailbox is read in steps.
+gmailBox.m4 = `From: Example Outfitters <returns@exampleoutfitters.test>\nSubject: Your return QR code for order EO-1\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-778812\nReturn by Friday 27 November 2026\nReturn Instructions\nTake your parcel to any Evri ParcelShop.\nShow the QR code to the shop.\nEstimated refund: £59.00\n`;
+for (let i = 10; i < 40; i++) gmailBox["m" + i] = newsletter + i;
+let steps = 0, last;
+do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); steps++; assert.ok(steps < 6, "scan finishes"); } while (last.more);
+assert.ok(steps >= 2, "more than one step was needed for a big mailbox");
+const merged = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
+assert.equal(merged.length, 2, "return email is not a separate card when its order exists");
+const eo1 = merged.find(x => x.orderRef === "EO-1");
+assert.ok(eo1 && eo1.returnPlan && eo1.returnPlan.returnId === "RT-778812" && eo1.returnPlan.deadline === "2026-11-27" && eo1.returnPlan.carrier === "Evri", JSON.stringify(eo1 && eo1.returnPlan));
+assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
 // 8. Captured receipts: private to the shopper, never refund-eligible, can be confirmed or dismissed.
 const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(mine.length, 2);
