@@ -141,9 +141,9 @@ assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptur
 // Return details are stored as extracted fields, and receipts captured before they existed get them added once.
 let rows = sqlite.prepare("SELECT details FROM captured_receipts").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30 && d.returns.deadline === "2026-11-13"), "return window and deadline kept");
-sqlite.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.returns'), status = 'pending' WHERE message_ref = (SELECT message_ref FROM captured_receipts LIMIT 1)").run();
+sqlite.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.parserVersion'), status = 'pending' WHERE message_ref = (SELECT message_ref FROM captured_receipts LIMIT 1)").run();
 r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 1, alreadyCaptured: 1, notReceipts: 1 }, "old receipt re-read once to add return details");
+assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 1, alreadyCaptured: 1, notReceipts: 1 }, "old receipt re-read once with the newer reader");
 rows = sqlite.prepare("SELECT details FROM captured_receipts").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30));
 assert.ok(!JSON.stringify(rows).includes("PRIVATE-BODY-MARKER"), "email text still never stored");
