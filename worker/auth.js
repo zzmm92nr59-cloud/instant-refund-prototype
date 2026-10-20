@@ -11,7 +11,11 @@
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 90 * DAY_MS;
+// A session in regular use is pushed forward, but at most about once a month.
+const SESSION_RENEW_WITHIN_MS = 60 * DAY_MS;
+const MAX_CODE_FAILURES = 5;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_LINKS_PER_EMAIL_PER_HOUR = 5;
 const MAX_LINKS_PER_CLIENT_PER_HOUR = 20;
@@ -53,6 +57,7 @@ export async function ensureAuthTables(db) {
     `CREATE TABLE IF NOT EXISTS auth_login_tokens (
        token_hash TEXT PRIMARY KEY, email TEXT NOT NULL, client_hash TEXT NOT NULL,
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS auth_code_failures (email TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_login_email ON auth_login_tokens(email, created_at)`,
     `CREATE INDEX IF NOT EXISTS idx_auth_login_client ON auth_login_tokens(client_hash, created_at)`,
     `CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -91,7 +96,12 @@ export async function sessionShopper(request, env, now = Date.now()) {
     `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash
      FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id
      WHERE a.session_hash = ? AND a.expires_at > ?`).bind(await sha256Hex(match[1]), now).first();
-  return row || null;
+  if (!row) return null;
+  // Keep a regularly used session alive so the shopper isn't asked to sign in again.
+  await env.RELAY_DB.prepare(
+    "UPDATE auth_sessions SET expires_at = ? WHERE session_hash = ? AND expires_at < ?")
+    .bind(now + SESSION_TTL_MS, row.sessionHash, now + SESSION_RENEW_WITHIN_MS).run();
+  return row;
 }
 
 async function requestLink(request, env, cors, opts) {
@@ -116,6 +126,12 @@ async function requestLink(request, env, cors, opts) {
   await env.RELAY_DB.prepare(
     "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
     .bind(tokenHash, email, client, now, now + LINK_TTL_MS).run();
+  // A 6-digit code for the same sign-in, for people whose app and email link open in different places.
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+  const codeHash = await sha256Hex("code:" + email + ":" + code);
+  await env.RELAY_DB.prepare(
+    "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(codeHash, "code:" + email, client, now, now + LINK_TTL_MS).run();
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const link = appUrl + "#signin=" + token; // fragment: never sent to a server or written to logs
   let sent = false;
@@ -126,15 +142,15 @@ async function requestLink(request, env, cors, opts) {
       body: JSON.stringify({
         from: env.RELAY_EMAIL_FROM || DEFAULT_FROM, to: [email], subject: "Your Relay sign-in link",
         text: "Open this link to sign in to Relay. It works once and expires in 15 minutes.\n\n" + link +
-          "\n\nIf you didn't ask for this, you can ignore this email.",
+          "\n\nOr type this code into the Relay app: " + code + "\n\nIf you didn't ask for this, you can ignore this email.",
         html: '<p>Open this link to sign in to Relay. It works once and expires in 15 minutes.</p><p><a href="' +
-          link + '">Sign in to Relay</a></p><p>If you didn\'t ask for this, you can ignore this email.</p>'
+          link + '">Sign in to Relay</a></p><p>Or type this code into the Relay app: <b style="font-size:20px;letter-spacing:3px">' + code + '</b></p><p>If you didn\'t ask for this, you can ignore this email.</p>'
       })
     });
     sent = res.ok;
   } catch { sent = false; }
   if (!sent) {
-    await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE token_hash = ?").bind(tokenHash).run();
+    await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE token_hash IN (?, ?)").bind(tokenHash, codeHash).run();
     return json({ error: "email_send_failed" }, 502, cors);
   }
   return json({ ok: true }, 200, cors);
@@ -153,7 +169,10 @@ async function verifyLink(request, env, cors, opts) {
      WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email`)
     .bind(now, await sha256Hex(token), now).first();
   if (!claimed) return json({ error: "invalid_or_expired_link" }, 400, cors);
-  const email = claimed.email;
+  return startSession(env, claimed.email, now, cors);
+}
+
+async function startSession(env, email, now, cors) {
   const hash = await emailHash(env.AUTH_SECRET, email);
   await env.RELAY_DB.prepare(
     "INSERT OR IGNORE INTO shoppers (id,email,email_hash,created_at) VALUES (?,?,?,?)")
@@ -165,6 +184,35 @@ async function verifyLink(request, env, cors, opts) {
     .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS).run();
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
   return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email }, 200, cors);
+}
+
+async function verifyCode(request, env, cors, opts) {
+  const { now } = opts;
+  if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
+  const origin = request.headers.get("origin");
+  if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+  const body = await readJson(request);
+  const email = normaliseEmail(body && body.email);
+  const code = body && typeof body.code === "string" ? body.code.replace(/\s/g, "") : "";
+  if (!email || !/^\d{6}$/.test(code)) return json({ error: "invalid_or_expired_code" }, 400, cors);
+  await ensureAuthTables(env.RELAY_DB);
+  // Only a few wrong guesses are allowed per email, then every outstanding code is cancelled.
+  const fails = await env.RELAY_DB.prepare(
+    "SELECT COUNT(*) AS n FROM auth_code_failures WHERE email = ? AND created_at > ?").bind(email, now - LINK_TTL_MS).first();
+  if ((fails?.n || 0) >= MAX_CODE_FAILURES) {
+    await env.RELAY_DB.prepare("UPDATE auth_login_tokens SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now, "code:" + email).run();
+    return json({ error: "too_many_requests" }, 429, cors);
+  }
+  const claimed = await env.RELAY_DB.prepare(
+    `UPDATE auth_login_tokens SET used_at = ?
+     WHERE token_hash = ? AND email = ? AND used_at IS NULL AND expires_at > ? RETURNING email`)
+    .bind(now, await sha256Hex("code:" + email + ":" + code), "code:" + email, now).first();
+  if (!claimed) {
+    await env.RELAY_DB.prepare("INSERT INTO auth_code_failures (email, created_at) VALUES (?,?)").bind(email, now).run();
+    return json({ error: "invalid_or_expired_code" }, 400, cors);
+  }
+  await env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(email).run();
+  return startSession(env, email, now, cors);
 }
 
 async function listPurchases(env, shopper, orderId) {
@@ -194,6 +242,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   try {
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
+    if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
     if (path === "/relay/gmail/callback" && request.method === "GET")
@@ -209,7 +258,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       await env.RELAY_DB.batch([
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
-        env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email = ?").bind(shopper.email),
+        env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
+        env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
         env.RELAY_DB.prepare("DELETE FROM shoppers WHERE id = ?").bind(shopper.id)
       ]);
       return json({ ok: true }, 200, cors);
