@@ -241,6 +241,7 @@
       }
       box.appendChild(el("p", { text: "Gmail connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
       var scanBtn = el("button", { className: "rl-btn", text: "Scan my Gmail for receipts" });
+      var status = el("div", { className: "rl-msg" });
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
       search.addEventListener("input", function () { query = search.value.trim().toLowerCase(); applyFilter(); });
@@ -274,27 +275,28 @@
         });
       }
       scanBtn.onclick = function () {
-        scanBtn.disabled = true; say(msg, "Scanning…");
-        var added = 0, rounds = 0;
+        scanBtn.disabled = true; say(status, "Scanning…");
+        var added = 0, rounds = 0, saved = ""; try { saved = localStorage.getItem("relay_scan_cursor") || ""; } catch (e) {}
         function step(cursor) {
           return api("/relay/my/gmail/scan", { method: "POST", body: cursor ? { cursor: cursor } : {} }).then(function (x) {
-            if (x.status === 401) { scanBtn.disabled = false; return say(msg, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
-            if (!x.ok) { scanBtn.disabled = false; return say(msg, "Couldn't scan Gmail right now. Please try again.", true); }
+            if (x.status === 401) { scanBtn.disabled = false; return say(status, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
+            if (!x.ok) { scanBtn.disabled = false; return say(status, "Couldn't scan Gmail right now. Please try again.", true); }
             added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
             loadList();
+            try { if (x.body.more && x.body.cursor) localStorage.setItem("relay_scan_cursor", x.body.cursor); else localStorage.removeItem("relay_scan_cursor"); } catch (e) {}
             if (x.body.more && x.body.cursor && rounds < 80) {
               var m = /^(\d{4})\/(\d{2})/.exec(x.body.scannedBack || "");
               var label = m ? new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : "";
-              say(msg, "Scanning" + (label ? " back to " + label : " older emails") + "… " + added + " found so far");
+              say(status, "Scanning" + (label ? " back to " + label : " older emails") + "… " + added + " found so far");
               return step(x.body.cursor);
             }
             scanBtn.disabled = false;
-            say(msg, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
+            say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
           });
         }
-        step().catch(function () { scanBtn.disabled = false; say(msg, "Couldn't reach Relay.", true); });
+        step(saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay.", true); });
       };
-      box.appendChild(scanBtn); box.appendChild(search); box.appendChild(list); loadList();
+      box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); loadList();
       box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
         if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
         api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
