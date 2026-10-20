@@ -147,13 +147,18 @@ function fromJsonLd(html) {
 // ---- Method 2: reading the text -------------------------------------------
 const MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
 
-function parseDate(text, refDate) {
+export function parseDate(text, refDate) {
   let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   m = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
   if (m) {
     const mi = MONTHS.indexOf(m[2].toLowerCase());
     if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  m = text.match(/\b([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/);
+  if (m) {
+    const mi = MONTHS.indexOf(m[1].toLowerCase());
+    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`;
   }
   m = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/); // UK day-first
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
@@ -172,7 +177,7 @@ function parseDate(text, refDate) {
 
 function fromText(text, refDate) {
   const ref =
-    text.match(/\border\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#]?\s*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
+    text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
 
   const totalMatch =
@@ -202,6 +207,20 @@ function fromText(text, refDate) {
       if (head && price && !/total|subtotal|delivery|service|discount|fee|tip|vat/i.test(head[2])) {
         items.push({ name: head[2].trim(), qty: Number(head[1]), pricePence: money(price[1]), lineTotal: true });
       }
+    }
+  }
+  if (!items.length) {
+    const rows = text.split("\n").map((x) => x.trim()).filter(Boolean);
+    for (let i = 2; i < rows.length - 1; i++) {
+      const v = rows[i].match(/^(\d{1,2})\s*[x×]\s*\S+\s*\/\s*.{2,60}$/);
+      if (!v) continue;
+      const nameLines = [rows[i - 2], rows[i - 1]].filter((r) => r.length < 80 && !/^£|items|purchased|order|subtotal|total/i.test(r));
+      let price = null;
+      for (let j = i + 1; j < Math.min(rows.length, i + 4) && price == null; j++) {
+        const pm = rows[j].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
+        if (pm) price = money(pm[1]);
+      }
+      if (nameLines.length) items.push({ name: nameLines.join(" ").trim(), qty: Number(v[1]), pricePence: price, lineTotal: true });
     }
   }
   const sub = text.match(/\bsubtotal\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
@@ -301,7 +320,7 @@ function extractReturns(text, html, orderDate) {
 function looksLikeReceipt(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no/.test(s);
-  const bodyHit = /\border\s*(number|no|ref|#)|\btotal\b.*£|£.*\btotal\b/i.test(text);
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
   return subjectHit && bodyHit;
 }
 
@@ -358,4 +377,84 @@ export function parseReceiptEmail(rawEmail) {
   result.confidence = score >= 5 && consistent ? "high" : score >= 3 && consistent ? "medium" : "low";
   result.needsShopperConfirmation = result.confidence !== "high";
   return result;
+}
+
+// ---- Return-instructions emails ("Thanks for your return request ...") -------------
+// A different kind of email from a receipt: it carries the return ID, the deadline,
+// how to send the parcel back and an estimated refund. Never refund-eligible.
+const CARRIERS = /\b(Evri|Royal Mail|DPD|UPS|InPost|Collect\+|Yodel|DHL|Parcelforce|Hermes|Post Office)\b/i;
+
+export function parseReturnEmail(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  const text = (parts.text.join("\n") || htmlToText(html)).trim();
+  const subject = headers.subject || "";
+  const sender = retailerFromFrom(headers.from);
+  const refDate = headers.date ? new Date(headers.date) : null;
+
+  const isReturn = /\breturn id\b/i.test(text) || /(?:thanks for your|your) return request/i.test(text);
+  if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
+
+  const idm = text.match(/return id\s*[:#]?\s*([A-Z0-9-]{5,30})/i);
+  const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
+  const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#]?\s*([A-Z0-9-]{4,24})/i);
+
+  // Deadline: "send it back no later than Wednesday, December 24". The year, if absent,
+  // comes from the email's own date and is never in the past relative to it.
+  let deadline = null;
+  for (const sent of text.split(/(?<=[.!?])\s+|\n+/)) {
+    if (!/back|return|send/i.test(sent)) continue;
+    const dm = sent.match(/(?:no later than|by|before|on or before)\s+(?:[A-Za-z]{3,9},?\s+)?([A-Za-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}(?:,?\s+\d{4})?)/i);
+    if (!dm) continue;
+    deadline = parseDate(dm[1]);
+    if (!deadline) {
+      const a = dm[1].match(/^([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})/) || null;
+      const b = dm[1].match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})/) || null;
+      const mi = a ? MONTHS.indexOf(a[1].toLowerCase()) : b ? MONTHS.indexOf(b[2].toLowerCase()) : -1;
+      const day = a ? Number(a[2]) : b ? Number(b[1]) : 0;
+      if (mi >= 0 && day && refDate instanceof Date && !Number.isNaN(refDate.getTime())) {
+        let year = refDate.getUTCFullYear();
+        if (new Date(Date.UTC(year, mi, day)) < new Date(refDate.getTime() - 86400000)) year += 1;
+        deadline = `${year}-${String(mi + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+    if (deadline) break;
+  }
+
+  // The "how to" steps: the lines between the instructions heading and the details heading.
+  let steps = [];
+  const sect = text.match(/instructions\s*\n([\s\S]{20,900}?)(?:\n\s*return details|\n\s*have questions|$)/i);
+  const source = sect ? sect[1] : text;
+  for (const line of source.split(/\n+/).map((x) => x.trim())) {
+    if (steps.length >= 4) break;
+    if (line.length >= 25 && line.length <= 220 && /pack|label|send|drop|take|scan|post|courier|collect/i.test(line)) steps.push(line);
+  }
+
+  const refund = text.match(/estimated refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i);
+  let trackUrl = null;
+  if (html) {
+    for (const a of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = a[1].replace(/&amp;/g, "&").trim();
+      const label = a[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (/^https:\/\//i.test(href) && href.length <= 800 && /track.{0,12}return/i.test(label)) { trackUrl = href; break; }
+    }
+  }
+  const carrier = (text.match(CARRIERS) || [])[1] || null;
+  const od = text.match(/order date\s*[:\-]?\s*([^\n]{4,30})/i);
+
+  return {
+    ok: true, kind: "return_instructions", source: "shopper_email", refundEligible: false,
+    retailer: { name: sender?.name || null, domain: sender?.domain || null },
+    returnId: idm ? idm[1] : null,
+    orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : null,
+    orderDate: od ? parseDate(od[1], refDate) : null,
+    deadline, carrier, steps,
+    qrMentioned: /\bqr\b/i.test(text) || /<img[^>]+(?:alt|src)=["'][^"']*qr/i.test(html || ""),
+    estimatedRefundPence: refund ? money(refund[1]) : null,
+    currency: /£|GBP/.test(text) ? "GBP" : null,
+    trackUrl,
+  };
 }

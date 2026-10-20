@@ -2,7 +2,7 @@
 // These prove the parser handles these layouts, not that any real retailer's
 // emails parse correctly. Real-world accuracy must be measured on real emails.
 import assert from "node:assert/strict";
-import { parseReceiptEmail } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail } from "../worker/receipt-parser.js";
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed++; console.log("ok -", name); };
@@ -218,6 +218,111 @@ t("delivery-app layout: number on next line, items over two lines, no-year date,
 t("a no-year date is never placed in the future", () => {
   const r = parseReceiptEmail(delivery.replace("Date: Fri, 9 Oct 2026", "Date: Tue, 6 Jan 2027").replace("Fri 9 Oct", "Fri 9 Oct"));
   assert.equal(r.orderDate, "2026-10-09");
+});
+
+// Layouts modelled on a real clothing retailer's order and return emails (invented brand and item).
+const clothingOrder = `From: Alpine Active <hello@e.alpineactive.test>
+Date: Wed, 19 Nov 2025 22:09:00 +0000
+Subject: Thanks for your Alpine Active order #AA04002516
+Content-Type: text/plain; charset=utf-8
+
+Thanks for your Order, Sam!
+
+Items Purchased
+
+Trail Jacket
+
+Merino
+
+1 x 074897 / Size US 8 (UK 12-14)
+
+158094170
+
+£118.00
+
+Subtotal (1 item)
+
+£98.33
+
+Shipping
+
+Free
+
+VAT
+
+£19.67
+
+Order Total
+
+£118.00
+
+Order Id: #AA04002516
+
+Order Date
+
+November 19, 2025
+
+Returns & Exchanges
+
+Return information will be provided on your shipping confirmation email once your items are on the way.
+`;
+
+t("clothing order: Order Id, month-first date, name over two lines, total on the next line", () => {
+  const r = parseReceiptEmail(clothingOrder);
+  assert.equal(r.ok, true);
+  assert.equal(r.orderRef, "AA04002516");
+  assert.equal(r.orderDate, "2025-11-19");
+  assert.equal(r.totalPence, 11800);
+  assert.equal(r.items.length, 1);
+  assert.match(r.items[0].name, /Trail Jacket/);
+  assert.equal(r.items[0].pricePence, 11800);
+  assert.equal(r.retailer.name, "Alpine Active");
+  assert.notEqual(r.confidence, "low");
+});
+
+const returnMail = `From: Alpine Active <noreply@alpineactive-intl.narvar.test>
+Date: Fri, 21 Nov 2025 21:34:00 +0000
+Subject: Your Evri QR code for your order AA04002516
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><p>RETURN ID: naa0400251601</p><p>Order Date: Nov. 19, 2025</p>
+<p>Thanks for your return request.</p>
+<p>Please follow the instructions below to package and send it back no later than Wednesday, December 24.</p>
+<p>Once we receive your return, we will process it within 3-5 business days.</p>
+<p><a href="https://track.alpineactive.test/r/naa0400251601">TRACK YOUR RETURN</a></p>
+<p>Return Instructions</p>
+<p>Pack your item(s) in the original packaging and take your return to an Evri ParcelShop.</p>
+<p>Use a Print In ParcelShop device to scan your QR code and print the return label.</p>
+<p>Affix the return label to the package and then send your return on its way.</p>
+<p>Return Details</p><p>Trail Jacket</p><p>Quantity: 1</p><p>Fit too loose</p><p>£118.00</p>
+<p>Estimated Refund</p><p>£118.00</p><p>Have Questions?</p></body></html>`;
+
+t("return instructions email: id, order, deadline, carrier, QR, refund, steps, link", () => {
+  const r = parseReturnEmail(returnMail);
+  assert.equal(r.ok, true);
+  assert.equal(r.kind, "return_instructions");
+  assert.equal(r.returnId, "naa0400251601");
+  assert.equal(r.orderRef, "AA04002516");
+  assert.equal(r.orderDate, "2025-11-19");
+  assert.equal(r.deadline, "2025-12-24");
+  assert.equal(r.carrier, "Evri");
+  assert.equal(r.qrMentioned, true);
+  assert.equal(r.estimatedRefundPence, 11800);
+  assert.equal(r.trackUrl, "https://track.alpineactive.test/r/naa0400251601");
+  assert.ok(r.steps.length >= 2 && r.steps.length <= 4);
+  assert.equal(r.refundEligible, false);
+});
+
+t("a deadline with no year rolls into next year when the month has already passed", () => {
+  const r = parseReturnEmail(returnMail.replace("Fri, 21 Nov 2025", "Mon, 22 Dec 2025").replace("December 24", "January 5"));
+  assert.equal(r.deadline, "2026-01-05");
+});
+
+t("return parser ignores receipts and marketing", () => {
+  assert.equal(parseReturnEmail(clothingOrder).ok, false);
+  assert.equal(parseReturnEmail("From: A <a@a.test>\nSubject: Free returns on everything\n\nShop now, free returns!").ok, false);
+  assert.equal(parseReceiptEmail(returnMail).ok, false, "a return email is not read as a purchase");
 });
 
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);

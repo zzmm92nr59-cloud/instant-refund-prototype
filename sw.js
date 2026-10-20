@@ -3,7 +3,7 @@
  * It NEVER caches anything from the Relay API, Square, Shopify or Plaid - only
  * Relay's own static pages and icons from this same site. Bump VERSION to force
  * every installed copy to drop its old cache. */
-const VERSION = "relay-shell-v5";
+const VERSION = "relay-shell-v6";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "account.js", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
