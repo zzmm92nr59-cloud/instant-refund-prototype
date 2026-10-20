@@ -241,6 +241,19 @@
       }
       box.appendChild(el("p", { text: "Gmail connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
       var scanBtn = el("button", { className: "rl-btn", text: "Scan my Gmail for receipts" });
+      var query = "";
+      var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
+      search.addEventListener("input", function () { query = search.value.trim().toLowerCase(); applyFilter(); });
+      function applyFilter() {
+        var shown = 0;
+        Array.prototype.forEach.call(list.children, function (c) {
+          if (!c.getAttribute("data-find")) return;
+          var hit = !query || c.getAttribute("data-find").indexOf(query) !== -1;
+          c.style.display = hit ? "" : "none"; if (hit) shown++;
+        });
+        var none = list.querySelector(".rl-none");
+        if (none) none.style.display = query && !shown ? "" : "none";
+      }
       function loadList() {
         api("/relay/my/receipts").then(function (x) {
           list.textContent = "";
@@ -249,26 +262,39 @@
           // Soonest deadline first, then everything without one, then expired ones.
           var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
           rows.sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
-          rows.forEach(function (row) { list.appendChild(receiptCard(row, loadList)); });
+          rows.forEach(function (row) {
+            var card = receiptCard(row, loadList);
+            var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef,
+              (row.items || []).map(function (i) { return i.name; }).join(" ")].filter(Boolean).join(" ").toLowerCase();
+            card.setAttribute("data-find", find);
+            list.appendChild(card);
+          });
+          if (rows.length) list.appendChild(el("p", { className: "rl-none", text: "No receipts match that search.", style: "display:none" }));
+          applyFilter();
         });
       }
       scanBtn.onclick = function () {
         scanBtn.disabled = true; say(msg, "Scanning…");
         var added = 0, rounds = 0;
-        function step() {
-          return api("/relay/my/gmail/scan", { method: "POST" }).then(function (x) {
+        function step(cursor) {
+          return api("/relay/my/gmail/scan", { method: "POST", body: cursor ? { cursor: cursor } : {} }).then(function (x) {
             if (x.status === 401) { scanBtn.disabled = false; return say(msg, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
             if (!x.ok) { scanBtn.disabled = false; return say(msg, "Couldn't scan Gmail right now. Please try again.", true); }
             added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
             loadList();
-            if (x.body.more && rounds < 8) { say(msg, "Scanning older emails…"); return step(); }
+            if (x.body.more && x.body.cursor && rounds < 80) {
+              var m = /^(\d{4})\/(\d{2})/.exec(x.body.scannedBack || "");
+              var label = m ? new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : "";
+              say(msg, "Scanning" + (label ? " back to " + label : " older emails") + "… " + added + " found so far");
+              return step(x.body.cursor);
+            }
             scanBtn.disabled = false;
-            say(msg, (x.body.more ? "Scanned the most recent emails. Scan again for older ones. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
+            say(msg, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
           });
         }
         step().catch(function () { scanBtn.disabled = false; say(msg, "Couldn't reach Relay.", true); });
       };
-      box.appendChild(scanBtn); box.appendChild(list); loadList();
+      box.appendChild(scanBtn); box.appendChild(search); box.appendChild(list); loadList();
       box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
         if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
         api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
