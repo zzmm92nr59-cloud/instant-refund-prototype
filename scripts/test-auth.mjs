@@ -83,6 +83,36 @@ clock += 16 * 60 * 1000;
 assert.equal((await call("/relay/auth/verify", { method: "POST", body: { token: old } })).status, 400, "expired link refused");
 assert.equal((await call("/relay/auth/verify", { method: "POST", body: { token: "x".repeat(43) } })).status, 400);
 
+// 3b. Six-digit code sign-in: same email, single use, expires, limited guesses, never stored in clear.
+const codeOf = e => /code into the Relay app: (\d{6})/.exec(e.body.text)[1];
+emails = [];
+await call("/relay/auth/request", { method: "POST", body: { email: "dana@example.com" }, ip: "7.7.7.7" });
+const dcode = codeOf(emails[0]);
+assert.match(emails[0].body.html, new RegExp(dcode));
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE token_hash = ?").get(dcode).n, 0, "raw code never stored");
+const wrong = dcode === "000000" ? "111111" : "000000";
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "dana@example.com", code: wrong } })).status, 400, "wrong code refused");
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "eve@example.com", code: dcode } })).status, 400, "code only works for its own email");
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "dana@example.com", code: "12ab56" } })).status, 400);
+r = await call("/relay/auth/verify-code", { method: "POST", body: { email: " Dana@Example.com", code: dcode } });
+assert.equal(r.status, 200);
+const danaSession = (await r.json()).sessionToken;
+assert.equal((await call("/relay/me", { token: danaSession })).status, 200, "code gives a working session");
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "dana@example.com", code: dcode } })).status, 400, "code is single-use");
+// Guessing: after 5 wrong tries even the right code stops working.
+emails = [];
+await call("/relay/auth/request", { method: "POST", body: { email: "gus@example.com" }, ip: "8.8.8.8" });
+const gcode = codeOf(emails[0]);
+const bad = gcode === "000000" ? "111111" : "000000";
+for (let i = 0; i < 5; i++) assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "gus@example.com", code: bad } })).status, 400);
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "gus@example.com", code: gcode } })).status, 429, "locked after 5 wrong codes");
+clock += 16 * 60 * 1000;
+emails = [];
+await call("/relay/auth/request", { method: "POST", body: { email: "hal@example.com" }, ip: "9.9.9.9" });
+const hcode = codeOf(emails[0]);
+clock += 16 * 60 * 1000;
+assert.equal((await call("/relay/auth/verify-code", { method: "POST", body: { email: "hal@example.com", code: hcode } })).status, 400, "expired code refused");
+
 // 4. Email failure leaves no usable token and reports honestly.
 failEmail = true;
 assert.equal((await call("/relay/auth/request", { method: "POST", body: { email: "fail@example.com" }, ip: "3.3.3.3" })).status, 502);
@@ -143,8 +173,13 @@ assert.equal((await call("/relay/me", { token: alice })).status, 401);
 assert.equal((await call("/relay/my/delete", { method: "POST", token: carol })).status, 200);
 assert.equal((await call("/relay/me", { token: carol })).status, 401);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shoppers WHERE email='carol@example.com'").get().n, 0);
-clock += 31 * 24 * 60 * 60 * 1000;
-assert.equal((await call("/relay/me", { token: bob })).status, 401, "session expires after 30 days");
+const DAY = 24 * 60 * 60 * 1000;
+clock += 31 * DAY;
+assert.equal((await call("/relay/me", { token: bob })).status, 200, "session lasts well past 30 days");
+clock += 80 * DAY;
+assert.equal((await call("/relay/me", { token: bob })).status, 200, "a session in regular use is kept alive");
+clock += 91 * DAY;
+assert.equal((await call("/relay/me", { token: bob })).status, 401, "an unused session expires after 90 days");
 
 // 8. Non-auth routes untouched.
 assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/status"), env, new URL("https://w.test/relay/shopify/status"), {}, {}), null);

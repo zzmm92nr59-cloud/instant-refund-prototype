@@ -26,6 +26,7 @@ await context.route('https://**/*', route => {
   const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
   if (p === '/relay/auth/request') return j(200, { ok: true });
+  if (p === '/relay/auth/verify-code') { const b = JSON.parse(req.postData()); return b.code === '123456' && b.email === 'alice@example.com' ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_code' }); }
   if (p === '/relay/auth/verify') return JSON.parse(req.postData()).token === TOKEN ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_link' });
   if (p === '/relay/my/purchases') return h.authorization === 'Bearer ' + SESSION
     ? j(200, { purchases: [{ id: 'o1', amountMinor: 12999, currency: 'GBP', orderedAt: '2026-10-14T12:00:00Z', items: [{ title: '<img src=x onerror=window.__xss=1>Trainers', quantity: 1 }] }] }) : j(401, { error: 'not_signed_in' });
@@ -56,7 +57,17 @@ await page.getByRole('heading', { name: 'Sign in to Relay' }).waitFor();
 await page.getByPlaceholder('you@example.com').fill('alice@example.com');
 await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
 await page.getByText('Check your inbox').waitFor();
-console.log('PASS requesting a sign-in link');
+assert.equal(await page.getByPlaceholder('6-digit code').isVisible(), true, 'code box appears after the email is sent');
+await page.getByPlaceholder('6-digit code').fill('999999');
+await page.getByRole('button', { name: 'Sign in with code' }).click();
+await page.getByText('wrong or has expired').waitFor();
+await page.getByPlaceholder('6-digit code').fill('123456');
+await page.getByRole('button', { name: 'Sign in with code' }).click();
+await page.getByRole('heading', { name: 'Before you start' }).waitFor();
+assert.ok(await page.evaluate(() => JSON.stringify(localStorage)).then(v => v.includes('token')), 'session saved after code sign-in');
+await page.evaluate(() => localStorage.clear());
+await page.goto(origin + '/index.html');
+console.log('PASS requesting a sign-in link and signing in with the 6-digit code');
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Before you start' }).waitFor();
 assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');
