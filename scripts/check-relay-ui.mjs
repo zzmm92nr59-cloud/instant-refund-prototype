@@ -3,3 +3,4 @@ import './smoke-relay-ui.mjs';
 import './check-pwa.mjs';
 import './test-auth.mjs';
 import './test-receipt-parser.mjs';
+import './test-gmail.mjs';

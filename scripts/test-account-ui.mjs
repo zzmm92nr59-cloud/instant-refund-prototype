@@ -17,9 +17,11 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(process.env.RELAY_CHROMIUM ? { executablePath: process.env.RELAY_CHROMIUM, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] } : {}) });
 const TOKEN = 'T'.repeat(43), SESSION = 'S'.repeat(43);
 const context = await browser.newContext({ viewport: { width: 390, height: 800 } });
+let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 await context.route('https://**/*', route => {
   const req = route.request(), p = new URL(req.url()).pathname, h = req.headers();
+  if (new URL(req.url()).hostname === 'accounts.google.com') return route.fulfill({ status: 200, contentType: 'text/html', body: '<title>google-signin-mock</title>' });
   const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
   if (p === '/relay/auth/request') return j(200, { ok: true });
@@ -32,6 +34,17 @@ await context.route('https://**/*', route => {
       ? j(200, { receipt: { ok: true, needsShopperConfirmation: false, refundEligible: false, retailer: { name: '<img src=x onerror=window.__xss2=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }] } })
       : j(200, { receipt: { ok: false, reason: 'not_an_order_confirmation' } });
   }
+  const authed = h.authorization === 'Bearer ' + SESSION;
+  if (p.startsWith('/relay/my/') && p !== '/relay/my/purchases' && p !== '/relay/my/receipts/parse' && !authed) return j(401, { error: 'not_signed_in' });
+  if (p === '/relay/my/consent' && req.method() === 'GET') return j(200, { version: 'v-test', accepted: consentAccepted, gmailAvailable: true, text: ['Relay reads receipts in read-only mode.', 'You can disconnect and delete at any time.'] });
+  if (p === '/relay/my/consent' && req.method() === 'POST') { consentPosts.push(JSON.parse(req.postData())); consentAccepted = true; return j(200, { ok: true }); }
+  if (p === '/relay/my/consent/withdraw') { consentAccepted = false; gmailConnected = false; return j(200, { ok: true }); }
+  if (p === '/relay/my/gmail') return j(200, gmailConnected ? { connected: true, googleEmail: 'alice@gmail.com' } : { connected: false });
+  if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
+  if (p === '/relay/my/gmail/scan') return j(200, { ok: true, added: 1, alreadyCaptured: 0, notReceipts: 0 });
+  if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
+  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false }] : [] });
+  if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
 });
@@ -43,6 +56,28 @@ await page.getByPlaceholder('you@example.com').fill('alice@example.com');
 await page.getByRole('button', { name: 'Email me a sign-in link' }).click();
 await page.getByText('Check your inbox').waitFor();
 console.log('PASS requesting a sign-in link');
+await page.goto(origin + '/index.html#signin=' + TOKEN);
+await page.getByRole('heading', { name: 'Before you start' }).waitFor();
+assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');
+assert.equal(await page.getByRole('heading', { name: 'Your account' }).count(), 0, 'account not reachable before agreeing');
+await page.getByText('read-only mode').waitFor();
+await page.getByRole('button', { name: 'I agree and continue' }).click();
+await page.getByRole('heading', { name: 'Your account' }).waitFor();
+assert.deepEqual(consentPosts, [{ version: 'v-test' }], 'agreement recorded against the wording version shown');
+console.log('PASS permission step is mandatory after sign-in and records the wording version');
+await page.getByRole('button', { name: 'Connect Gmail', exact: true }).click();
+await page.waitForURL(/accounts\.google\.com/);
+console.log('PASS Connect Gmail sends the shopper to Google');
+gmailConnected = true;
+await page.goto(origin + '/index.html#gmail=connected');
+await page.getByText('Gmail connected: alice@gmail.com').waitFor();
+await page.getByText('Found 1 new receipt').waitFor();
+await page.getByText('Wool jumper').waitFor();
+assert.equal(await page.evaluate(() => window.__xss3), undefined, 'captured receipt text must never run as HTML');
+await page.getByRole('button', { name: 'Looks right' }).click();
+await page.getByText('Confirmed by you').waitFor();
+console.log('PASS returning from Google scans, lists captured receipts safely, shopper confirms');
+await page.getByRole('button', { name: 'Disconnect Gmail' }).click().catch(() => {});
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Your account' }).waitFor();
 await page.getByText('Trainers', { exact: false }).waitFor();
