@@ -147,7 +147,7 @@ function fromJsonLd(html) {
 // ---- Method 2: reading the text -------------------------------------------
 const MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
 
-function parseDate(text) {
+function parseDate(text, refDate) {
   let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   m = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
@@ -157,12 +157,22 @@ function parseDate(text) {
   }
   m = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/); // UK day-first
   if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  // "Placed on Fri 9 Oct": no year in the text, so take it from the email's own date.
+  m = text.match(/\b(?:placed|ordered)\s+on\s+(?:[A-Za-z]{3,9},?\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})/i);
+  if (m && refDate instanceof Date && !Number.isNaN(refDate.getTime())) {
+    const mi = MONTHS.indexOf(m[2].toLowerCase());
+    if (mi >= 0) {
+      let year = refDate.getUTCFullYear();
+      if (new Date(Date.UTC(year, mi, Number(m[1]))) > new Date(refDate.getTime() + 86400000)) year -= 1;
+      return `${year}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    }
+  }
   return null;
 }
 
-function fromText(text) {
+function fromText(text, refDate) {
   const ref =
-    text.match(/\border\s*(?:number|no\.?|ref(?:erence)?|#)\s*[:#]?\s*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
+    text.match(/\border\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#]?\s*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
 
   const totalMatch =
@@ -172,7 +182,7 @@ function fromText(text) {
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
   for (const line of text.split("\n")) {
-    if (/total|subtotal|delivery|shipping|postage|discount|vat|tax|paid/i.test(line)) continue;
+    if (/total|subtotal|delivery|shipping|postage|discount|vat|tax|paid|service|fee|tip|offer/i.test(line)) continue;
     const m = line.match(/^\s*(?:(\d+)\s*[x×]\s*)?([A-Za-z][^|£\n]{2,80}?)\s*(?:\||-|–)?\s*(?:(?:qty|quantity)\s*[:x]?\s*(\d+)\s*(?:\||-|–)?\s*)?£\s*([0-9][0-9,]*\.[0-9]{2})\s*\|?\s*$/i);
     if (m) {
       items.push({
@@ -183,11 +193,25 @@ function fromText(text) {
     }
   }
 
+  // Layout used by delivery apps: "1 Item name" on one line, its price on the next.
+  if (!items.length) {
+    const rows = text.split("\n").map((x) => x.trim()).filter(Boolean);
+    for (let i = 0; i < rows.length - 1; i++) {
+      const head = rows[i].match(/^(\d{1,2})\s*[x×]?\s+(\p{L}[^£]{2,120})$/u);
+      const price = rows[i + 1].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})(?:\s*£\s*[0-9.]+)?$/);
+      if (head && price && !/total|subtotal|delivery|service|discount|fee|tip|vat/i.test(head[2])) {
+        items.push({ name: head[2].trim(), qty: Number(head[1]), pricePence: money(price[1]), lineTotal: true });
+      }
+    }
+  }
+  const sub = text.match(/\bsubtotal\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+
   return {
     method: "text",
+    subtotalPence: sub ? money(sub[1]) : null,
     retailerName: null,
     orderRef: ref ? ref[1] : null,
-    orderDate: parseDate(text),
+    orderDate: parseDate(text, refDate),
     currency: /£|GBP/.test(text) ? "GBP" : null,
     totalPence: totalMatch ? money(totalMatch[1]) : null,
     items,
@@ -297,7 +321,8 @@ export function parseReceiptEmail(rawEmail) {
   }
 
   const ld = html ? fromJsonLd(html) : null;
-  const txt = fromText(text);
+  const refDate = headers.date ? new Date(headers.date) : null;
+  const txt = fromText(text, refDate);
   const chosen = ld || txt;
 
   const result = {
@@ -317,7 +342,7 @@ export function parseReceiptEmail(rawEmail) {
   };
   result.returns = extractReturns(text, html, result.orderDate);
 
-  const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0);
+  const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.lineTotal ? 1 : i.qty || 1), 0);
   const checks = [
     result.orderRef ? 1 : 0,
     result.totalPence != null ? 1 : 0,
@@ -327,7 +352,9 @@ export function parseReceiptEmail(rawEmail) {
   ];
   const score = checks.reduce((a, b) => a + b, 0);
   // Item prices should not add up to more than the total (delivery/discounts can make them differ).
-  const consistent = result.totalPence == null || !result.items.length || itemSum <= result.totalPence + 1;
+  // (A discount can take the total below the item prices, so the subtotal also counts.)
+  const ceiling = Math.max(result.totalPence ?? 0, txt.subtotalPence ?? 0);
+  const consistent = result.totalPence == null || !result.items.length || itemSum <= ceiling + 1;
   result.confidence = score >= 5 && consistent ? "high" : score >= 3 && consistent ? "medium" : "low";
   result.needsShopperConfirmation = result.confidence !== "high";
   return result;

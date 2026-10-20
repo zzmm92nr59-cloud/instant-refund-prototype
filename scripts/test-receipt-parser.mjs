@@ -162,4 +162,62 @@ t("no return info means returns is null; incomplete address is not shown", () =>
   assert.equal(a.returns && a.returns.address, null);
 });
 
+// Layout modelled on a real delivery-app confirmation (invented restaurant and items).
+const delivery = `From: Food Courier <no-reply@order.foodcourier.test>
+Date: Fri, 9 Oct 2026 20:32:00 +0100
+Subject: Sam, order confirmed
+Content-Type: text/plain; charset=utf-8
+
+Your order's been received
+Great news! Golden Wok has received your order.
+
+Placed on Fri 9 Oct
+
+Your order number is:
+
+966874418
+
+1 Egg Fried Rice
+
+£3.30
+
+1 Sweet and Sour Chicken (Large)
+
+£9.40
+
+2 Spring Rolls
+
+£6.00
+
++ Extra sauce
+
+£0.50 £0.50
+
+Subtotal: £18.70
+Offer discount: -£5.00
+Service fee 11%: £1.99
+Delivery: £1.49
+
+Total: £17.18
+`;
+
+t("delivery-app layout: number on next line, items over two lines, no-year date, discount", () => {
+  const r = parseReceiptEmail(delivery);
+  assert.equal(r.ok, true);
+  assert.equal(r.orderRef, "966874418");
+  assert.equal(r.orderDate, "2026-10-09");
+  assert.equal(r.totalPence, 1718);
+  assert.equal(r.items.length, 3);
+  assert.equal(r.items[0].name, "Egg Fried Rice");
+  assert.equal(r.items[2].qty, 2);
+  assert.equal(r.retailer.domain, "order.foodcourier.test");
+  assert.notEqual(r.confidence, "low");
+  assert.equal(r.refundEligible, false);
+});
+
+t("a no-year date is never placed in the future", () => {
+  const r = parseReceiptEmail(delivery.replace("Date: Fri, 9 Oct 2026", "Date: Tue, 6 Jan 2027").replace("Fri 9 Oct", "Fri 9 Oct"));
+  assert.equal(r.orderDate, "2026-10-09");
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
