@@ -11,13 +11,13 @@
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
-import { parseReceiptEmail } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail } from "./receipt-parser.js";
 
-export const CONSENT_VERSION = "2026-10-v2";
+export const CONSENT_VERSION = "2026-10-v3";
 export const CONSENT_TEXT = [
   "To work, Relay needs to see your online and in-store receipts.",
-  "With your permission, Relay reads your Gmail in read-only mode and looks only for order confirmations and receipts.",
-  "From each one it keeps the store, order number, date, total and items, plus any return details it contains (return deadline, return address, how to return and any return link). It does not keep the email itself.",
+  "With your permission, Relay reads your Gmail in read-only mode and looks only for order confirmations, receipts and return emails from the past year or so.",
+  "From each one it keeps the store, order number, date, total and items, plus return details (deadline, how to return, return ID, any return link) and a link back to the original email so you can open it yourself. It does not keep the email itself.",
   "Relay never sends email, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
   "You can disconnect Gmail and delete everything Relay has captured at any time, in one tap.",
   "What Relay finds comes from your email, not from the store, so it can track your purchases but cannot start an automatic refund on its own."
@@ -25,11 +25,14 @@ export const CONSENT_TEXT = [
 
 const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const STATE_TTL_MS = 10 * 60 * 1000;
-const MAX_MESSAGES_PER_SCAN = 25;
+// A Worker invocation can only make so many outside calls, so one scan reads a limited number
+// of new emails and says if there are more. The app keeps asking until it is told there are none.
+const LIST_SIZE = 90;
+const MAX_FETCH_PER_SCAN = 18;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 3;
+const PARSER_VERSION = 4;
 const SEARCH =
-  'newer_than:180d (category:purchases OR subject:("order confirmation" OR "your order" OR receipt OR "thank you for your order"))';
+  'newer_than:400d (category:purchases OR subject:("order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR return OR "QR code"))';
 const encoder = new TextEncoder();
 
 async function sha256Hex(text) {
@@ -153,54 +156,99 @@ async function scan(env, shopperId, fetchImpl, now) {
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
   const auth = { Authorization: "Bearer " + token };
   const list = await fetchImpl(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + MAX_MESSAGES_PER_SCAN + "&q=" + encodeURIComponent(SEARCH),
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + LIST_SIZE + "&q=" + encodeURIComponent(SEARCH),
     { headers: auth });
   if (!list.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const messages = ((await list.json().catch(() => ({}))).messages || []).slice(0, MAX_MESSAGES_PER_SCAN);
-  let added = 0, skipped = 0, ignored = 0, updated = 0;
-  for (const m of messages) {
-    if (typeof m.id !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(m.id)) continue;
-    const ref = await sha256Hex("gmail:" + m.id);
-    const seen = await env.RELAY_DB.prepare(
-      "SELECT details FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
-    // Receipts captured by an older version of the reader are re-read once.
-    const needsReturns = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
-    if (seen && !needsReturns) { skipped++; continue; }
+  const ids = (((await list.json().catch(() => ({}))).messages || []).map(m => m && m.id)
+    .filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id))).slice(0, LIST_SIZE);
+  // One lookup tells us which of these emails Relay has already looked at.
+  const refs = await Promise.all(ids.map(id => sha256Hex("gmail:" + id)));
+  const known = new Map();
+  if (refs.length) {
+    const found = await env.RELAY_DB.prepare(
+      `SELECT message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${refs.map(() => "?").join(",")})`)
+      .bind(shopperId, ...refs).all();
+    for (const r of found.results || []) known.set(r.message_ref, r);
+  }
+  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, more = false;
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i], ref = refs[i];
+    const seen = known.get(ref);
+    // Anything read by an older version of the reader is read once more.
+    const stale = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
+    if (seen && !stale) { skipped++; continue; }
+    if (fetched >= MAX_FETCH_PER_SCAN) { more = true; continue; }
+    fetched++;
     const res = await fetchImpl(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=raw`, { headers: auth });
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
     if (!res.ok) continue;
     const raw = (await res.json().catch(() => ({}))).raw;
     if (typeof raw !== "string") continue;
-    const parsed = parseReceiptEmail(new TextDecoder().decode(unb64url(raw)));
-    if (!parsed.ok) { ignored++; continue; }
-    // Keep only extracted fields. The email text is dropped here.
-    const details = {
-      retailer: parsed.retailer, orderRef: parsed.orderRef, orderDate: parsed.orderDate, currency: parsed.currency,
-      totalPence: parsed.totalPence, items: parsed.items, confidence: parsed.confidence,
-      needsShopperConfirmation: parsed.needsShopperConfirmation, method: parsed.method, returns: parsed.returns,
-      source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
-    };
-    if (needsReturns) {
-      // The shopper's confirm/dismiss choice lives in the status column and is left alone.
-      await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
-        .bind(JSON.stringify(details), shopperId, ref).run();
-      updated++;
+    const rawText = new TextDecoder().decode(unb64url(raw));
+    let details, status = "pending";
+    const receipt = parseReceiptEmail(rawText);
+    if (receipt.ok) {
+      // Keep only extracted fields. The email text is dropped here.
+      details = {
+        kind: "receipt", gmailId: id,
+        retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
+        totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
+        needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
+        source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+      };
+    } else {
+      const ret = parseReturnEmail(rawText);
+      if (ret.ok) {
+        details = {
+          kind: "return_instructions", gmailId: id,
+          retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
+          deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
+          estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
+          source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+        };
+      } else {
+        // Remember that this email is not one of ours so it is never fetched again.
+        details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
+        status = "not_receipt";
+        ignored++;
+      }
+    }
+    if (seen) {
+      // The shopper's confirm/dismiss choice lives in the status column and is kept.
+      const keep = seen.status !== "not_receipt" && status !== "not_receipt" ? seen.status : status;
+      await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
+        .bind(JSON.stringify(details), keep, shopperId, ref).run();
+      if (status !== "not_receipt") updated++;
       continue;
     }
     await env.RELAY_DB.prepare(
       "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
-      .bind(crypto.randomUUID(), shopperId, ref, "pending", JSON.stringify(details), now).run();
-    added++;
+      .bind(crypto.randomUUID(), shopperId, ref, status, JSON.stringify(details), now).run();
+    if (status !== "not_receipt") added++;
   }
-  await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
-  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored } };
+  if (!more) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more } };
 }
 
 async function listReceipts(env, shopperId) {
   const rows = await env.RELAY_DB.prepare(
-    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status != 'dismissed' ORDER BY created_at DESC LIMIT 100")
+    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT 300")
     .bind(shopperId).all();
-  return (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
+  const all = (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
+  const orders = all.filter(x => x.kind !== "return_instructions");
+  const plans = all.filter(x => x.kind === "return_instructions");
+  const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
+  const gone = await env.RELAY_DB.prepare(
+    "SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all();
+  const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
+  const loose = [];
+  for (const p of plans) {
+    if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
+    const o = p.orderRef && byOrder.get(p.orderRef);
+    if (o) { o.returnPlan = p; } else loose.push(p);
+  }
+  // A return whose original order email was not found still gets its own card.
+  return [...orders, ...loose].sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
 }
 
 // Google redirects the browser here. No bearer token is available, so the single-use
