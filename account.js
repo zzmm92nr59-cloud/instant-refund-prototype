@@ -4,6 +4,8 @@
   var API = "https://relay-square-api2.9pts72cy5j.workers.dev";
   var KEY = "relay.session.v1";
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
+  // Ask the browser not to clear Relay's saved sign-in when it tidies up storage.
+  function keepStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
   function save(v) { try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
   function api(path, opts) {
     opts = opts || {};
@@ -44,7 +46,7 @@
   }
   var errors = { invalid_email: "That doesn't look like an email address.", too_many_requests: "Too many attempts. Please try again later.",
     sign_in_not_configured: "Sign-in isn't switched on yet.", email_send_failed: "We couldn't send the email. Please try again.",
-    invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address." };
+    invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
 
   function signedOutView(sheet) {
@@ -55,13 +57,30 @@
       go.disabled = true; say(msg, "Sending…");
       api("/relay/auth/request", { method: "POST", body: { email: input.value } }).then(function (r) {
         go.disabled = false;
-        if (r.ok) say(msg, "Check your inbox. The link works once and expires in 15 minutes.");
+        if (r.ok) {
+          say(msg, "Check your inbox. Open the link, or type the 6-digit code below. Both work once and expire in 15 minutes.");
+          codeRow.style.display = "block";
+        }
         else say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
       }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
+    var codeIn = el("input", { type: "text", placeholder: "6-digit code", autocomplete: "one-time-code", inputMode: "numeric", maxLength: 7 });
+    var codeGo = el("button", { className: "rl-btn", text: "Sign in with code" });
+    var codeRow = el("div", { style: "display:none;margin-top:12px" }, [codeIn, codeGo]);
+    codeGo.onclick = function () {
+      codeGo.disabled = true; say(msg, "Checking…");
+      api("/relay/auth/verify-code", { method: "POST", body: { email: input.value, code: codeIn.value } }).then(function (r) {
+        codeGo.disabled = false;
+        if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
+        save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
+        keepStorage();
+        var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
+        show();
+      }).catch(function () { codeGo.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
     [el("h2", { text: "Sign in to Relay" }),
      el("p", { text: "No password. We email you a one-time link. Purchases you made with that email address appear in your wallet." }),
-     input, go, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+     input, go, codeRow, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
   }
   function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
   function receiptView(sheet, back) {
@@ -274,6 +293,7 @@
         sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
         sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
       save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
+      keepStorage();
       var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
       show();
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
