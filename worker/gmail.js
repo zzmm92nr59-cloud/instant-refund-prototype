@@ -31,8 +31,14 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 5;
-const SEARCH =
-  'newer_than:400d (category:purchases OR subject:("order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR return OR "QR code"))';
+// The mailbox is read one date window at a time, newest first, so old receipts are reached
+// however busy the inbox is. The app passes back the cursor it is given.
+const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
+const SEARCH_TERMS =
+  '(category:purchases OR subject:("order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR return OR "QR code"))';
+const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
+const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
+const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;
 const encoder = new TextEncoder();
 
 async function sha256Hex(text) {
@@ -184,7 +190,7 @@ async function fetchProductImage(fetchImpl, urls) {
   return null;
 }
 
-async function scan(env, shopperId, fetchImpl, now) {
+async function scan(env, shopperId, fetchImpl, now, cursorIn) {
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
@@ -192,105 +198,117 @@ async function scan(env, shopperId, fetchImpl, now) {
   const token = await accessToken(env, refresh, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
   const auth = { Authorization: "Bearer " + token };
-  // Gmail lists newest first, a page at a time. Read several pages so older receipts are reachable.
-  const ids = [];
-  let pageToken = "";
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const list = await fetchImpl(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(SEARCH) +
-      (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
-    if (!list.ok) { if (page === 0) return { status: 502, body: { error: "gmail_unavailable" } }; break; }
-    const data = await list.json().catch(() => ({}));
-    for (const m of data.messages || []) if (m && typeof m.id === "string" && /^[A-Za-z0-9]{6,40}$/.test(m.id)) ids.push(m.id);
-    pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
-    if (!pageToken) break;
-  }
-  // Lookups are done in groups to stay under the database's per-query limit.
-  const refs = await Promise.all(ids.map(id => sha256Hex("gmail:" + id)));
-  const known = new Map();
-  for (let i = 0; i < refs.length; i += 90) {
-    const chunk = refs.slice(i, i + 90);
-    const found = await env.RELAY_DB.prepare(
-      `SELECT id, message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${chunk.map(() => "?").join(",")})`)
-      .bind(shopperId, ...chunk).all();
-    for (const r of found.results || []) known.set(r.message_ref, r);
-  }
-  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0, more = false;
-  for (let i = 0; i < ids.length; i++) {
-    const id = ids[i], ref = refs[i];
-    const seen = known.get(ref);
-    // Anything read by an older version of the reader is read once more.
-    const stale = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
-    if (seen && !stale) { skipped++; continue; }
-    if (fetched >= MAX_FETCH_PER_SCAN) { more = true; continue; }
-    fetched++;
-    const res = await fetchImpl(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
-    if (!res.ok) continue;
-    const raw = (await res.json().catch(() => ({}))).raw;
-    if (typeof raw !== "string") continue;
-    const rawText = new TextDecoder().decode(unb64url(raw));
-    let details, status = "pending", imageToStore = null;
-    const receipt = parseReceiptEmail(rawText);
-    if (receipt.ok) {
-      // Keep only extracted fields. The email text is dropped here.
-      details = {
-        kind: "receipt", gmailId: id,
-        retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
-        totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
-        needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
-        source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
-      };
-    } else {
-      const ret = parseReturnEmail(rawText);
-      if (ret.ok) {
+  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
+  const limitDay = ymd(now - LOOKBACK_DAYS * DAY_MS);
+  let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= ymd(now + DAY_MS) ? cursorIn : ymd(now + DAY_MS);
+  let incomplete = false, windows = 0;
+  while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
+    const afterD = ymd(fromYmd(before) - WINDOW_DAYS * DAY_MS);
+    incomplete = false;
+    // Gmail lists newest first, a page at a time. Read several pages so older receipts are reachable.
+    const ids = [];
+    let pageToken = "";
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const list = await fetchImpl(
+        "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(windowQuery(afterD, before)) +
+        (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
+      if (!list.ok) { if (page === 0) return { status: 502, body: { error: "gmail_unavailable" } }; break; }
+      const data = await list.json().catch(() => ({}));
+      for (const m of data.messages || []) if (m && typeof m.id === "string" && /^[A-Za-z0-9]{6,40}$/.test(m.id)) ids.push(m.id);
+      pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
+      if (!pageToken) break;
+    }
+    // Lookups are done in groups to stay under the database's per-query limit.
+    const refs = await Promise.all(ids.map(id => sha256Hex("gmail:" + id)));
+    const known = new Map();
+    for (let i = 0; i < refs.length; i += 90) {
+      const chunk = refs.slice(i, i + 90);
+      const found = await env.RELAY_DB.prepare(
+        `SELECT id, message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${chunk.map(() => "?").join(",")})`)
+        .bind(shopperId, ...chunk).all();
+      for (const r of found.results || []) known.set(r.message_ref, r);
+    }
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i], ref = refs[i];
+      const seen = known.get(ref);
+      // Anything read by an older version of the reader is read once more.
+      const stale = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
+      if (seen && !stale) { skipped++; continue; }
+      if (fetched >= MAX_FETCH_PER_SCAN) { incomplete = true; continue; }
+      fetched++;
+      const res = await fetchImpl(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
+      if (!res.ok) continue;
+      const raw = (await res.json().catch(() => ({}))).raw;
+      if (typeof raw !== "string") continue;
+      const rawText = new TextDecoder().decode(unb64url(raw));
+      let details, status = "pending", imageToStore = null;
+      const receipt = parseReceiptEmail(rawText);
+      if (receipt.ok) {
+        // Keep only extracted fields. The email text is dropped here.
         details = {
-          kind: "return_instructions", gmailId: id,
-          retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
-          deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
-          estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
+          kind: "receipt", gmailId: id,
+          retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
+          totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
+          needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
           source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
         };
       } else {
-        // Remember that this email is not one of ours so it is never fetched again.
-        details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
-        status = "not_receipt";
-        ignored++;
-      }
-    }
-    // One small product photo per receipt, fetched at most once.
-    const prev = seen ? JSON.parse(seen.details) : {};
-    const receiptId = seen ? seen.id : crypto.randomUUID();
-    if (details.kind === "receipt") {
-      details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried);
-      if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN) {
-        imagesTried++;
-        const urls = extractProductImageUrls(rawText);
-        const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
-        details.imageTried = true;
-        if (img) {
-          details.hasImage = true;
-          imageToStore = { receiptId, ...img };
+        const ret = parseReturnEmail(rawText);
+        if (ret.ok) {
+          details = {
+            kind: "return_instructions", gmailId: id,
+            retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
+            deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
+            estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
+            source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+          };
+        } else {
+          // Remember that this email is not one of ours so it is never fetched again.
+          details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
+          status = "not_receipt";
+          ignored++;
         }
       }
-    }
-    if (seen) {
-      // The shopper's confirm/dismiss choice lives in the status column and is kept.
-      const keep = seen.status !== "not_receipt" && status !== "not_receipt" ? seen.status : status;
-      await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
-        .bind(JSON.stringify(details), keep, shopperId, ref).run();
+      // One small product photo per receipt, fetched at most once.
+      const prev = seen ? JSON.parse(seen.details) : {};
+      const receiptId = seen ? seen.id : crypto.randomUUID();
+      if (details.kind === "receipt") {
+        details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried);
+        if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN) {
+          imagesTried++;
+          const urls = extractProductImageUrls(rawText);
+          const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
+          details.imageTried = true;
+          if (img) {
+            details.hasImage = true;
+            imageToStore = { receiptId, ...img };
+          }
+        }
+      }
+      if (seen) {
+        // The shopper's confirm/dismiss choice lives in the status column and is kept.
+        const keep = seen.status !== "not_receipt" && status !== "not_receipt" ? seen.status : status;
+        await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
+          .bind(JSON.stringify(details), keep, shopperId, ref).run();
+        if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
+        if (status !== "not_receipt") updated++;
+        continue;
+      }
+      await env.RELAY_DB.prepare(
+        "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+        .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now).run();
       if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
-      if (status !== "not_receipt") updated++;
-      continue;
+      if (status !== "not_receipt") added++;
     }
-    await env.RELAY_DB.prepare(
-      "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
-      .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now).run();
-    if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
-    if (status !== "not_receipt") added++;
+    windows++;
+    if (incomplete) break;       // stay on this window until every email in it is read
+    before = afterD;
+    if (fetched >= MAX_FETCH_PER_SCAN) break;
   }
+  const more = incomplete || before > limitDay;
   if (!more) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
-  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more } };
+  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
 
 async function saveImage(env, shopperId, img, now) {
@@ -407,7 +425,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
-    const r = await scan(env, shopper.id, opts.fetchImpl, opts.now);
+    const sb = await request.json().catch(() => ({}));
+    const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "");
     return json(r.body, r.status, cors);
   }
   if (path === "/relay/my/gmail/disconnect" && m === "POST") {
