@@ -458,3 +458,39 @@ export function parseReturnEmail(rawEmail) {
     trackUrl,
   };
 }
+
+
+// ---- Product photos ---------------------------------------------------------------
+// Picks up to two likely product-photo URLs from an order email's HTML. Only https links to
+// real hostnames are returned. Logos, social icons, tracking pixels and payment badges are skipped.
+const NOT_A_PHOTO = /(pixel|tracking|track\b|beacon|spacer|logo|facebook|instagram|twitter|tiktok|pinterest|youtube|linkedin|social|icon|badge|footer|header|banner|payment|visa|mastercard|paypal|klarna|apple-?pay|google-?play|app-?store|qr|barcode|\.gif(\?|$)|1x1|\/open\b|click\.)/i;
+export function extractProductImageUrls(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  if (!html) return [];
+  const words = (parseReceiptEmail(rawEmail).items || []).flatMap(i => String(i.name || "").toLowerCase().split(/\W+/)).filter(w => w.length > 3);
+  const found = [];
+  for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
+    const tag = m[0];
+    const src = (/\bsrc=["']([^"']+)["']/i.exec(tag) || [])[1];
+    if (!src) continue;
+    const url = src.replace(/&amp;/g, "&").trim();
+    if (!/^https:\/\//i.test(url) || url.length > 500) continue;
+    let host;
+    try { host = new URL(url).hostname; } catch { continue; }
+    if (!host.includes(".") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.endsWith(".local") || host === "localhost") continue;
+    const alt = ((/\balt=["']([^"']*)["']/i.exec(tag) || [])[1] || "").toLowerCase();
+    if (NOT_A_PHOTO.test(url) || NOT_A_PHOTO.test(alt)) continue;
+    const w = Number((/\bwidth=["']?(\d+)/i.exec(tag) || [])[1] || 0), h = Number((/\bheight=["']?(\d+)/i.exec(tag) || [])[1] || 0);
+    if ((w && w < 80) || (h && h < 80)) continue;
+    let score = 0;
+    if (words.some(x => alt.includes(x) || url.toLowerCase().includes(x))) score += 3;
+    if (w >= 150 || h >= 150) score += 1;
+    if (/product|item|catalog|media|images?/i.test(url)) score += 1;
+    if (!found.some(f => f.url === url)) found.push({ url, score, order: found.length });
+  }
+  return found.sort((a, b) => b.score - a.score || a.order - b.order).slice(0, 2).map(f => f.url);
+}
