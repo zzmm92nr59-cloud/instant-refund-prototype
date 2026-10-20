@@ -190,7 +190,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const path = url.pathname;
   const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback";
   if (!isAuthRoute) return null;
-  const o = { now: Date.now(), fetchImpl: fetch, ...opts };
+  const o = { now: Date.now(), fetchImpl: (...args) => fetch(...args), ...opts }; // arrow wrapper: a bare fetch called as o.fetchImpl() throws "Illegal invocation" on Workers
   try {
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
