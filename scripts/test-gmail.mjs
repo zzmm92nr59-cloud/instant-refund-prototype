@@ -31,6 +31,9 @@ const gmailBox = { m1: receiptMail(1), m2: newsletter, m3: receiptMail(3) };
 let calls = [];
 let refreshOk = true;
 let paging = false;
+const listQueries = [];
+const boxDates = {};
+const ymdOf = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const imageCalls = [];
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(3000, 7)]);
 let emails = [];
@@ -57,10 +60,15 @@ const fetchImpl = async (url, init = {}) => {
   if (url === "https://oauth2.googleapis.com/revoke") return new Response("{}", { status: 200 });
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
-    assert.ok(decodeURIComponent(url).includes("newer_than:400d"), "search is limited in time");
-    if (url.includes("pageToken=page2")) return Response.json({ messages: [{ id: "m99abcdef" }] });
-    if (paging) return Response.json({ messages: Object.keys(gmailBox).filter(k => k !== "m99").map(id => ({ id: id + "abcdef" })), nextPageToken: "page2" });
-    return Response.json({ messages: Object.keys(gmailBox).map(id => ({ id: id + "abcdef" })) });
+        const q = decodeURIComponent(url);
+    const win = /after:(\d{4}\/\d{2}\/\d{2}) before:(\d{4}\/\d{2}\/\d{2})/.exec(q);
+    assert.ok(win, "scan asks Gmail for one date window at a time");
+    listQueries.push(win[1] + ".." + win[2]);
+    const inWin = id => { const d = boxDates[id] || ymdOf(clock - 60000); return d >= win[1] && d < win[2]; };
+    if (url.includes("pageToken=page2")) return Response.json({ messages: [{ id: "m99abcdef" }].filter(m => inWin(m.id.replace("abcdef", ""))) });
+    const ids = Object.keys(gmailBox).filter(inWin);
+    if (paging) return Response.json({ messages: ids.filter(k => k !== "m99").map(id => ({ id: id + "abcdef" })), nextPageToken: "page2" });
+    return Response.json({ messages: ids.map(id => ({ id: id + "abcdef" })) });
   }
   const one = /messages\/(m\d+)abcdef\?format=raw$/.exec(url);
   if (one) return Response.json({ raw: b64url(gmailBox[one[1]]) });
@@ -137,36 +145,48 @@ assert.ok(!stored.includes("PLAINTEXT-marker") && !stored.includes("refresh-toke
 // 6. Consent is re-checked at the callback (withdrawn mid-flow means no connection).
 // (covered below with withdraw)
 
+// Follows the scan cursor the way the app does; returns the summed counts.
+const scanAll = async (token = alice, max = 60) => {
+  const tot = { added: 0, updated: 0, alreadyCaptured: 0, notReceipts: 0, calls: 0 };
+  let cursor, res;
+  do {
+    res = await post("/relay/my/gmail/scan", token, cursor ? { cursor } : undefined);
+    assert.equal(res.status, 200);
+    const j = await res.json();
+    for (const k of ["added", "updated", "alreadyCaptured", "notReceipts"]) tot[k] += j[k];
+    tot.calls++; cursor = j.cursor; tot.more = j.more;
+    assert.ok(tot.calls < max, "scan finishes");
+  } while (tot.more);
+  return tot;
+};
+
 // 7. Scan: receipts kept as extracted fields only; newsletters ignored; duplicates skipped.
 calls = [];
-r = await post("/relay/my/gmail/scan", alice);
-assert.equal(r.status, 200);
-assert.deepEqual(await r.json(), { ok: true, added: 2, updated: 0, alreadyCaptured: 0, notReceipts: 1, more: false });
+const first = await scanAll();
+assert.deepEqual({ ...first, calls: 0 }, { added: 2, updated: 0, alreadyCaptured: 0, notReceipts: 1, calls: 0, more: false });
+assert.ok(first.calls >= 5, "the whole look-back period is covered, a few months per call");
 assert.ok(calls.every(c => !c.url.includes("/send") && !c.url.includes("modify") && !c.url.includes("delete")), "only read calls to Gmail");
 assert.ok(calls.filter(c => c.url.includes("gmail.googleapis")).every(c => c.auth === "Bearer access-2"));
 const dump = JSON.stringify(sqlite.prepare("SELECT * FROM captured_receipts").all());
 assert.ok(!dump.includes("PRIVATE-BODY-MARKER"), "email text is never stored");
 assert.ok(dump.includes("EO-1") && dump.includes("5900"));
-r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, more: false }, "newsletters are remembered and not fetched again");
+assert.deepEqual({ ...(await scanAll()), calls: 0 }, { added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, calls: 0, more: false }, "newsletters are remembered and not fetched again");
 // Return details are stored as extracted fields, and receipts captured before they existed get them added once.
 let rows = sqlite.prepare("SELECT details FROM captured_receipts WHERE status != 'not_receipt'").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30 && d.returns.deadline === "2026-11-13"), "return window and deadline kept");
 sqlite.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.parserVersion'), status = 'pending' WHERE message_ref = (SELECT message_ref FROM captured_receipts WHERE status != 'not_receipt' LIMIT 1)").run();
-r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 1, alreadyCaptured: 2, notReceipts: 0, more: false }, "old receipt re-read once with the newer reader");
+assert.deepEqual({ ...(await scanAll()), calls: 0 }, { added: 0, updated: 1, alreadyCaptured: 2, notReceipts: 0, calls: 0, more: false }, "old receipt re-read once with the newer reader");
 rows = sqlite.prepare("SELECT details FROM captured_receipts WHERE status != 'not_receipt'").all().map(x => JSON.parse(x.details));
 assert.ok(rows.every(d => d.returns && d.returns.windowDays === 30));
 assert.ok(!JSON.stringify(rows).includes("PRIVATE-BODY-MARKER"), "email text still never stored");
-r = await post("/relay/my/gmail/scan", alice);
-assert.deepEqual(await r.json(), { ok: true, added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, more: false }, "no repeat re-read");
+assert.deepEqual({ ...(await scanAll()), calls: 0 }, { added: 0, updated: 0, alreadyCaptured: 3, notReceipts: 0, calls: 0, more: false }, "no repeat re-read");
 
 // 7b. Return emails join their order; a long mailbox is read in steps.
 gmailBox.m4 = `From: Example Outfitters <returns@exampleoutfitters.test>\nSubject: Your return QR code for order EO-1\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-778812\nReturn by Friday 27 November 2026\nReturn Instructions\nTake your parcel to any Evri ParcelShop.\nShow the QR code to the shop.\nEstimated refund: £59.00\n`;
 for (let i = 10; i < 40; i++) gmailBox["m" + i] = newsletter + i;
-let steps = 0, last;
-do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); steps++; assert.ok(steps < 6, "scan finishes"); } while (last.more);
-assert.ok(steps >= 2, "more than one step was needed for a big mailbox");
+let last;
+const big = await scanAll();
+assert.ok(big.calls >= 8, "a busy window takes several calls, then the older windows follow");
 const merged = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(merged.length, 2, "return email is not a separate card when its order exists");
 const eo1 = merged.find(x => x.orderRef === "EO-1");
@@ -175,16 +195,28 @@ assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
 // 7c. Older receipts on later Gmail result pages are reached.
 gmailBox.m99 = receiptMail(99).replace("14 Oct 2026", "19 Nov 2025");
 paging = true;
-do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+await scanAll();
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
 sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-99%'").run();
 delete gmailBox.m99;
 
+// 7c2. Receipts from many months ago are reached; ones beyond the look-back are not.
+gmailBox.m7 = receiptMail(7).replace("14 Oct 2026", "19 Nov 2025"); boxDates.m7 = ymdOf(clock - 300 * 86400000);
+gmailBox.m8 = receiptMail(8); boxDates.m8 = ymdOf(clock - 700 * 86400000);
+listQueries.length = 0;
+await scanAll();
+const dumpOld = JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all());
+assert.ok(dumpOld.includes("EO-7"), "a receipt from 300 days ago is found");
+assert.ok(!dumpOld.includes("EO-8"), "nothing beyond the look-back period is read");
+assert.ok(listQueries.length >= 16 && listQueries.every(q => q.length === 22), "month by month windows: " + listQueries.length);
+sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-7%'").run();
+delete gmailBox.m7; delete gmailBox.m8;
+
 // 7d. Product photo: the likely product image is stored (never logos, http links or fake images), served only to its owner.
 gmailBox.m5 = `From: Example Outfitters <orders@exampleoutfitters.test>\nSubject: Your order confirmation #EO-5\nContent-Type: text/html\n\n<html><body><img src="https://cdn.exampleoutfitters.test/logo.png" width="120"><img src="http://insecure.test/p.png" width="300"><img src="https://cdn.exampleoutfitters.test/products/wool-jumper.png" alt="Wool jumper" width="300"><p>Order number: EO-5</p><p>Order date: 14 Oct 2026</p><p>Wool jumper - Qty 1 - £59.00</p><p>Order total: £59.00</p></body></html>`;
 gmailBox.m6 = gmailBox.m5.replace("EO-5", "EO-6").replace("EO-5", "EO-6").replace("wool-jumper.png", "fake.png");
-do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+await scanAll();
 assert.ok(!imageCalls.some(u => u.includes("logo") || u.startsWith("http://")), "logos and non-https images are never fetched");
 const withPhoto = sqlite.prepare("SELECT id, details FROM captured_receipts WHERE details LIKE '%EO-5%'").get();
 assert.equal(JSON.parse(withPhoto.details).hasImage, true);
@@ -198,7 +230,7 @@ assert.deepEqual(Buffer.from(await r.arrayBuffer()), PNG);
 assert.equal((await call(`/relay/my/receipts/${withPhoto.id}/image`, { token: bob })).status, 404, "another shopper cannot see the photo");
 assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alice })).status, 404);
 const photoCalls = imageCalls.length;
-do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+await scanAll();
 assert.equal(imageCalls.length, photoCalls, "photos are fetched only once per receipt");
 
 // 7e. Return reminders: opt-in per item, sent once, only before the deadline, only if still wanted.

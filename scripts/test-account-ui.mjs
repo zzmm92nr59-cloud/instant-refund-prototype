@@ -20,6 +20,7 @@ const context = await browser.newContext({ viewport: { width: 390, height: 800 }
 const PORTAL = 'javascript:window.__xss5=1';
 const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
@@ -46,7 +47,7 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/consent/withdraw') { consentAccepted = false; gmailConnected = false; return j(200, { ok: true }); }
   if (p === '/relay/my/gmail') return j(200, gmailConnected ? { connected: true, googleEmail: 'alice@gmail.com' } : { connected: false });
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
-  if (p === '/relay/my/gmail/scan') return j(200, { ok: true, added: 1, alreadyCaptured: 0, notReceipts: 0 });
+  if (p === '/relay/my/gmail/scan') { const b = JSON.parse(req.postData() || '{}'); scanBodies.push(b); return b.cursor ? j(200, { ok: true, added: 0, more: false, cursor: null }) : j(200, { ok: true, added: 1, more: true, cursor: '2026/05/01', scannedBack: '2026/05/01' }); }
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
@@ -89,6 +90,14 @@ gmailConnected = true;
 await page.goto(origin + '/index.html#gmail=connected');
 await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found or updated 1 receipt').waitFor();
+assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }], 'the app follows the cursor back through the mailbox');
+await page.getByPlaceholder('Search your receipts').fill('wool');
+assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1, 'search finds the item');
+await page.getByPlaceholder('Search your receipts').fill('lululemon');
+await page.getByText('No receipts match that search.').waitFor();
+assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 0);
+await page.getByPlaceholder('Search your receipts').fill('');
+assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1);
 await page.getByText('Open the email with your QR code').waitFor();
 await page.getByText('5 days left').waitFor();
 await page.waitForFunction(() => { const i = document.querySelector('.rl-order img'); return i && i.src.startsWith('blob:') && i.naturalWidth === 1; });
