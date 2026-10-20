@@ -4,8 +4,10 @@ import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
+import { sendReturnReminders } from "./gmail.js";
 export default {
   async scheduled(event, env, ctx) {
+    ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
     ctx.waitUntil(importHistoricalSquareOrders(env));
     ctx.waitUntil(syncSquareCatalogue(env));
     if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogues(env));

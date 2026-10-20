@@ -2,7 +2,7 @@
 // These prove the parser handles these layouts, not that any real retailer's
 // emails parse correctly. Real-world accuracy must be measured on real emails.
 import assert from "node:assert/strict";
-import { parseReceiptEmail, parseReturnEmail } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "../worker/receipt-parser.js";
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed++; console.log("ok -", name); };
@@ -323,6 +323,27 @@ t("return parser ignores receipts and marketing", () => {
   assert.equal(parseReturnEmail(clothingOrder).ok, false);
   assert.equal(parseReturnEmail("From: A <a@a.test>\nSubject: Free returns on everything\n\nShop now, free returns!").ok, false);
   assert.equal(parseReceiptEmail(returnMail).ok, false, "a return email is not read as a purchase");
+});
+
+t("product photo: picks the item photo, skips logos, icons, pixels, http and tiny images", () => {
+  const mail = `From: Alpine Active <orders@alpineactive.test>
+Subject: Order confirmation
+Content-Type: text/html
+
+<html><body>
+<img src="https://cdn.alpineactive.test/brand/logo.png" width="200">
+<img src="https://cdn.alpineactive.test/social/instagram.png" width="40">
+<img src="https://track.alpineactive.test/open?id=1" width="1" height="1">
+<img src="http://cdn.alpineactive.test/products/jacket.jpg" width="300">
+<img src="https://192.168.0.1/products/jacket.jpg" width="300">
+<img src="https://cdn.alpineactive.test/p/define-jacket-black.jpg?w=400&amp;q=80" alt="Define Jacket" width="300">
+<img src="https://cdn.alpineactive.test/p/other.jpg" alt="Banner sale" width="300">
+<p>Order number: AA-1</p><p>Order date: 14 Oct 2026</p><p>Define Jacket - Qty 1 - £118.00</p><p>Order total: £118.00</p>
+</body></html>`;
+  const urls = extractProductImageUrls(mail);
+  assert.equal(urls[0], "https://cdn.alpineactive.test/p/define-jacket-black.jpg?w=400&q=80");
+  assert.ok(urls.every(u => u.startsWith("https://") && !/logo|instagram|192\.168|track/.test(u)), JSON.stringify(urls));
+  assert.deepEqual(extractProductImageUrls("From: A <a@a.test>\nSubject: Order\n\nplain text only"), []);
 });
 
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);

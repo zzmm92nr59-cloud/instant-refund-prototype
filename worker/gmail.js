@@ -11,14 +11,15 @@
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
-import { parseReceiptEmail, parseReturnEmail } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
 
-export const CONSENT_VERSION = "2026-10-v3";
+export const CONSENT_VERSION = "2026-10-v4";
 export const CONSENT_TEXT = [
   "To work, Relay needs to see your online and in-store receipts.",
   "With your permission, Relay reads your Gmail in read-only mode and looks only for order confirmations, receipts and return emails from the past year or so.",
-  "From each one it keeps the store, order number, date, total and items, plus return details (deadline, how to return, return ID, any return link) and a link back to the original email so you can open it yourself. It does not keep the email itself.",
-  "Relay never sends email, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
+  "From each one it keeps the store, order number, date, total and items, plus return details (deadline, how to return, return ID, any return link), one small product photo from the email if there is one, and a link back to the original email so you can open it yourself. It does not keep the email itself.",
+  "If you ask for a return reminder on an item, Relay emails you once, at your sign-in address, a few days before its deadline. It sends nothing otherwise.",
+  "Relay never sends email from your Gmail, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
   "You can disconnect Gmail and delete everything Relay has captured at any time, in one tap.",
   "What Relay finds comes from your email, not from the store, so it can track your purchases but cannot start an automatic refund on its own."
 ];
@@ -29,7 +30,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 4;
+const PARSER_VERSION = 5;
 const SEARCH =
   'newer_than:400d (category:purchases OR subject:("order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR return OR "QR code"))';
 const encoder = new TextEncoder();
@@ -86,7 +87,12 @@ export async function ensureGmailTables(db) {
     `CREATE TABLE IF NOT EXISTS captured_receipts (
        id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, message_ref TEXT NOT NULL, status TEXT NOT NULL,
        details TEXT NOT NULL, created_at INTEGER NOT NULL, UNIQUE (shopper_id, message_ref))`,
-    `CREATE INDEX IF NOT EXISTS idx_captured_receipts_shopper ON captured_receipts(shopper_id, created_at)`
+    `CREATE INDEX IF NOT EXISTS idx_captured_receipts_shopper ON captured_receipts(shopper_id, created_at)`,
+    `CREATE TABLE IF NOT EXISTS receipt_images (
+       receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS return_reminders (
+       receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, deadline TEXT NOT NULL, remind_at INTEGER NOT NULL,
+       title TEXT NOT NULL, sent_at INTEGER)`
   ];
   for (const sql of statements) await db.prepare(sql).run();
 }
@@ -95,6 +101,8 @@ export async function ensureGmailTables(db) {
 export function gmailDeleteStatements(db, shopperId) {
   return [
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").bind(shopperId)
@@ -138,12 +146,42 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
   }
   const statements = [
     env.RELAY_DB.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId)
   ];
   if (withdraw) statements.push(env.RELAY_DB.prepare(
     "UPDATE shopper_consents SET withdrawn_at = ? WHERE shopper_id = ? AND withdrawn_at IS NULL").bind(Date.now(), shopperId));
   await env.RELAY_DB.batch(statements);
   return { deleted: true, revokedAtGoogle: revoked };
+}
+
+const MAX_IMAGES_PER_SCAN = 4;
+const IMAGE_MAX_BYTES = 400000, IMAGE_MIN_BYTES = 2000;
+function b64Chunked(bytes) {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 8192) out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(out);
+}
+function imageTypeOf(bytes) {
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return "image/jpeg";
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
+  return null;
+}
+// Downloads one product photo. The file must really be a JPEG, PNG or WebP of a sensible size.
+async function fetchProductImage(fetchImpl, urls) {
+  for (const u of urls) {
+    try {
+      const res = await fetchImpl(u, { headers: { Accept: "image/*" }, redirect: "follow" });
+      if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length < IMAGE_MIN_BYTES || bytes.length > IMAGE_MAX_BYTES) continue;
+      const type = imageTypeOf(bytes);
+      if (type) return { type, data: b64Chunked(bytes) };
+    } catch { /* try the next one */ }
+  }
+  return null;
 }
 
 async function scan(env, shopperId, fetchImpl, now) {
@@ -173,11 +211,11 @@ async function scan(env, shopperId, fetchImpl, now) {
   for (let i = 0; i < refs.length; i += 90) {
     const chunk = refs.slice(i, i + 90);
     const found = await env.RELAY_DB.prepare(
-      `SELECT message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${chunk.map(() => "?").join(",")})`)
+      `SELECT id, message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${chunk.map(() => "?").join(",")})`)
       .bind(shopperId, ...chunk).all();
     for (const r of found.results || []) known.set(r.message_ref, r);
   }
-  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, more = false;
+  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0, more = false;
   for (let i = 0; i < ids.length; i++) {
     const id = ids[i], ref = refs[i];
     const seen = known.get(ref);
@@ -192,7 +230,7 @@ async function scan(env, shopperId, fetchImpl, now) {
     const raw = (await res.json().catch(() => ({}))).raw;
     if (typeof raw !== "string") continue;
     const rawText = new TextDecoder().decode(unb64url(raw));
-    let details, status = "pending";
+    let details, status = "pending", imageToStore = null;
     const receipt = parseReceiptEmail(rawText);
     if (receipt.ok) {
       // Keep only extracted fields. The email text is dropped here.
@@ -220,21 +258,45 @@ async function scan(env, shopperId, fetchImpl, now) {
         ignored++;
       }
     }
+    // One small product photo per receipt, fetched at most once.
+    const prev = seen ? JSON.parse(seen.details) : {};
+    const receiptId = seen ? seen.id : crypto.randomUUID();
+    if (details.kind === "receipt") {
+      details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried);
+      if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN) {
+        imagesTried++;
+        const urls = extractProductImageUrls(rawText);
+        const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
+        details.imageTried = true;
+        if (img) {
+          details.hasImage = true;
+          imageToStore = { receiptId, ...img };
+        }
+      }
+    }
     if (seen) {
       // The shopper's confirm/dismiss choice lives in the status column and is kept.
       const keep = seen.status !== "not_receipt" && status !== "not_receipt" ? seen.status : status;
       await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
         .bind(JSON.stringify(details), keep, shopperId, ref).run();
+      if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
       if (status !== "not_receipt") updated++;
       continue;
     }
     await env.RELAY_DB.prepare(
       "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
-      .bind(crypto.randomUUID(), shopperId, ref, status, JSON.stringify(details), now).run();
+      .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now).run();
+    if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
     if (status !== "not_receipt") added++;
   }
   if (!more) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
   return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more } };
+}
+
+async function saveImage(env, shopperId, img, now) {
+  await env.RELAY_DB.prepare(
+    "INSERT OR REPLACE INTO receipt_images (receipt_id,shopper_id,type,data,created_at) VALUES (?,?,?,?,?)")
+    .bind(img.receiptId, shopperId, img.type, img.data, now).run();
 }
 
 async function listReceipts(env, shopperId) {
@@ -254,8 +316,13 @@ async function listReceipts(env, shopperId) {
     const o = p.orderRef && byOrder.get(p.orderRef);
     if (o) { o.returnPlan = p; } else loose.push(p);
   }
+  const rem = await env.RELAY_DB.prepare(
+    "SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all();
+  const remById = new Map((rem.results || []).map(r => [r.id, r]));
   // A return whose original order email was not found still gets its own card.
-  return [...orders, ...loose].sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+  const cards = [...orders, ...loose];
+  for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
+  return cards.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
 }
 
 // Google redirects the browser here. No bearer token is available, so the single-use
@@ -356,5 +423,103 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       .bind(act[2] === "confirm" ? "confirmed" : "dismissed", act[1], shopper.id).first();
     return res ? json({ ok: true }, 200, cors) : json({ error: "not_found" }, 404, cors);
   }
+  const img = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(path);
+  if (img && m === "GET") {
+    const row = await env.RELAY_DB.prepare(
+      "SELECT type, data FROM receipt_images WHERE receipt_id = ? AND shopper_id = ?").bind(img[1], shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
+      status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
+  }
+  const rem = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/remind$/.exec(path);
+  if (rem && m === "POST") {
+    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const body = await request.json().catch(() => ({}));
+    const r = await setReminder(env, shopper.id, rem[1], body && body.on === false ? false : true, opts.now);
+    return json(r.body, r.status, cors);
+  }
   return null;
 }
+
+// ---- Return reminders ----------------------------------------------------------------
+const DAY = 24 * 60 * 60 * 1000;
+const REMIND_DAYS_BEFORE = 3;
+const todayIso = now => new Date(now).toISOString().slice(0, 10);
+
+async function setReminder(env, shopperId, receiptId, on, now) {
+  if (!on) {
+    await env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE receipt_id = ? AND shopper_id = ?").bind(receiptId, shopperId).run();
+    return { status: 200, body: { ok: true, reminder: "off" } };
+  }
+  const row = await env.RELAY_DB.prepare(
+    "SELECT id, details FROM captured_receipts WHERE id = ? AND shopper_id = ? AND status NOT IN ('dismissed','not_receipt')")
+    .bind(receiptId, shopperId).first();
+  if (!row) return { status: 404, body: { error: "not_found" } };
+  const d = JSON.parse(row.details);
+  let deadline = d.kind === "return_instructions" ? d.deadline : null;
+  if (!deadline && d.orderRef) {
+    // A return email for the same order carries the exact date, so prefer it.
+    const others = await env.RELAY_DB.prepare(
+      "SELECT details FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt')").bind(shopperId).all();
+    for (const o of others.results || []) {
+      const od = JSON.parse(o.details);
+      if (od.kind === "return_instructions" && od.orderRef === d.orderRef && od.deadline) deadline = od.deadline;
+    }
+  }
+  deadline = deadline || (d.returns && d.returns.deadline) || null;
+  if (!deadline || !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return { status: 400, body: { error: "no_deadline" } };
+  if (deadline < todayIso(now)) return { status: 400, body: { error: "deadline_passed" } };
+  // 09:00 UTC, three days ahead of the deadline. If that is already past, send at the next opportunity.
+  const remindAt = Math.max(Date.parse(deadline + "T09:00:00Z") - REMIND_DAYS_BEFORE * DAY, now);
+  const who = (d.retailer && (d.retailer.name || d.retailer.domain)) || "your order";
+  const item = d.items && d.items[0] && d.items[0].name;
+  const title = (item ? who + ": " + item : who).slice(0, 120);
+  await env.RELAY_DB.prepare(
+    "INSERT OR REPLACE INTO return_reminders (receipt_id,shopper_id,deadline,remind_at,title,sent_at) VALUES (?,?,?,?,?,NULL)")
+    .bind(receiptId, shopperId, deadline, remindAt, title).run();
+  return { status: 200, body: { ok: true, reminder: "on", deadline, remindAt } };
+}
+
+// Run by the hourly schedule. Each reminder is claimed first, so it is sent at most once.
+export async function sendReturnReminders(env, now = Date.now(), fetchImpl = fetch) {
+  if (!env.RELAY_DB || !env.RESEND_API_KEY) return { sent: 0 };
+  await ensureGmailTables(env.RELAY_DB);
+  const due = await env.RELAY_DB.prepare(
+    `SELECT r.receipt_id AS id, r.deadline AS deadline, r.title AS title, s.email AS email
+     FROM return_reminders r
+     JOIN shoppers s ON s.id = r.shopper_id
+     JOIN captured_receipts c ON c.id = r.receipt_id AND c.status NOT IN ('dismissed','not_receipt')
+     WHERE r.sent_at IS NULL AND r.remind_at <= ? AND r.deadline >= ?
+       AND EXISTS (SELECT 1 FROM shopper_consents k WHERE k.shopper_id = r.shopper_id AND k.version = ? AND k.withdrawn_at IS NULL)
+     LIMIT 20`).bind(now, todayIso(now), CONSENT_VERSION).all();
+  let sent = 0;
+  const appUrl = String(env.RELAY_APP_URL || "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/").split("#")[0];
+  for (const r of due.results || []) {
+    const claimed = await env.RELAY_DB.prepare(
+      "UPDATE return_reminders SET sent_at = ? WHERE receipt_id = ? AND sent_at IS NULL RETURNING receipt_id").bind(now, r.id).first();
+    if (!claimed) continue;
+    const days = Math.max(0, Math.ceil((Date.parse(r.deadline + "T23:59:59Z") - now) / DAY));
+    const when = days <= 1 ? "today or tomorrow" : "in " + days + " days";
+    const nice = new Date(r.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+    let ok = false;
+    try {
+      const res = await fetchImpl("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: env.RELAY_EMAIL_FROM || "Relay <onboarding@resend.dev>", to: [r.email],
+          subject: "Return deadline " + when + ": " + r.title,
+          text: r.title + " needs to go back by " + nice + " (" + when + ").\n\nOpen Relay to see how to return it and find your QR code: " + appUrl +
+            "\n\nYou asked Relay for this reminder. It is the only one it will send for this item.",
+          html: "<p><b>" + escapeHtml(r.title) + "</b> needs to go back by <b>" + nice + "</b> (" + when + ").</p><p><a href=\"" + appUrl +
+            "\">Open Relay</a> to see how to return it and find your QR code.</p><p style=\"color:#666\">You asked Relay for this reminder. It is the only one it will send for this item.</p>"
+        })
+      });
+      ok = res.ok;
+    } catch { ok = false; }
+    if (ok) sent++;
+    else await env.RELAY_DB.prepare("UPDATE return_reminders SET sent_at = NULL WHERE receipt_id = ?").bind(r.id).run();
+  }
+  return { sent };
+}
+function escapeHtml(t) { return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
