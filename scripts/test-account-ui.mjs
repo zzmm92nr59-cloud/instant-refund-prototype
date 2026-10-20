@@ -18,6 +18,9 @@ const browser = await chromium.launch({ headless: true, ...(process.env.RELAY_CH
 const TOKEN = 'T'.repeat(43), SESSION = 'S'.repeat(43);
 const context = await browser.newContext({ viewport: { width: 390, height: 800 } });
 const PORTAL = 'javascript:window.__xss5=1';
+const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
+let reminderState = 'off', remindPosts = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 await context.route('https://**/*', route => {
@@ -45,7 +48,9 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
   if (p === '/relay/my/gmail/scan') return j(200, { ok: true, added: 1, alreadyCaptured: 0, notReceipts: 0 });
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
-  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: '2026-11-27', carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
+  if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
+  if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
+  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
@@ -85,6 +90,14 @@ await page.goto(origin + '/index.html#gmail=connected');
 await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found or updated 1 receipt').waitFor();
 await page.getByText('Open the email with your QR code').waitFor();
+await page.getByText('5 days left').waitFor();
+await page.waitForFunction(() => { const i = document.querySelector('.rl-order img'); return i && i.src.startsWith('blob:') && i.naturalWidth === 1; });
+await page.getByRole('button', { name: 'Remind me 3 days before' }).click();
+await page.getByRole('button', { name: 'Reminder set · turn off' }).waitFor();
+assert.deepEqual(remindPosts, [{ on: true }]);
+await page.getByRole('button', { name: 'Reminder set · turn off' }).click();
+await page.getByRole('button', { name: 'Remind me 3 days before' }).waitFor();
+assert.deepEqual(remindPosts[1], { on: false });
 assert.equal(await page.locator('a[href^="https://mail.google.com/mail/u/0/#all/abc123def456"]').count(), 1);
 assert.equal(await page.getByText('Track your return').count(), 0, 'non-https track link is never shown');
 assert.ok(await page.getByText('Estimated refund').count() === 1);

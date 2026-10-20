@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION } from "../worker/gmail.js";
+import { CONSENT_VERSION, sendReturnReminders } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -31,6 +31,8 @@ const gmailBox = { m1: receiptMail(1), m2: newsletter, m3: receiptMail(3) };
 let calls = [];
 let refreshOk = true;
 let paging = false;
+const imageCalls = [];
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(3000, 7)]);
 let emails = [];
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
@@ -45,6 +47,12 @@ const fetchImpl = async (url, init = {}) => {
           ? Response.json({ access_token: "a", refresh_token: REFRESH, scope: "openid" })
           : new Response("{}", { status: 400 });
     return refreshOk ? Response.json({ access_token: "access-2" }) : new Response("{}", { status: 400 });
+  }
+  if (url.startsWith("https://cdn.exampleoutfitters.test/") || url.startsWith("http://insecure.test/")) {
+    imageCalls.push(url);
+    if (url.endsWith("wool-jumper.png")) return new Response(PNG, { headers: { "content-type": "image/png" } });
+    if (url.endsWith("fake.png")) return new Response("<svg onload=alert(1)>" .repeat(200), { headers: { "content-type": "image/png" } });
+    return new Response("nope", { status: 404 });
   }
   if (url === "https://oauth2.googleapis.com/revoke") return new Response("{}", { status: 200 });
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
@@ -173,6 +181,71 @@ assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts")
 sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-99%'").run();
 delete gmailBox.m99;
 
+// 7d. Product photo: the likely product image is stored (never logos, http links or fake images), served only to its owner.
+gmailBox.m5 = `From: Example Outfitters <orders@exampleoutfitters.test>\nSubject: Your order confirmation #EO-5\nContent-Type: text/html\n\n<html><body><img src="https://cdn.exampleoutfitters.test/logo.png" width="120"><img src="http://insecure.test/p.png" width="300"><img src="https://cdn.exampleoutfitters.test/products/wool-jumper.png" alt="Wool jumper" width="300"><p>Order number: EO-5</p><p>Order date: 14 Oct 2026</p><p>Wool jumper - Qty 1 - £59.00</p><p>Order total: £59.00</p></body></html>`;
+gmailBox.m6 = gmailBox.m5.replace("EO-5", "EO-6").replace("EO-5", "EO-6").replace("wool-jumper.png", "fake.png");
+do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+assert.ok(!imageCalls.some(u => u.includes("logo") || u.startsWith("http://")), "logos and non-https images are never fetched");
+const withPhoto = sqlite.prepare("SELECT id, details FROM captured_receipts WHERE details LIKE '%EO-5%'").get();
+assert.equal(JSON.parse(withPhoto.details).hasImage, true);
+assert.ok(!withPhoto.details.includes("wool-jumper.png") && !withPhoto.details.includes("cdn.exampleoutfitters"), "image address is not kept");
+const noPhoto = sqlite.prepare("SELECT id, details FROM captured_receipts WHERE details LIKE '%EO-6%'").get();
+assert.equal(JSON.parse(noPhoto.details).hasImage, false, "an image that is not really an image is refused");
+r = await call(`/relay/my/receipts/${withPhoto.id}/image`, { token: alice });
+assert.equal(r.status, 200);
+assert.equal(r.headers.get("content-type"), "image/png");
+assert.deepEqual(Buffer.from(await r.arrayBuffer()), PNG);
+assert.equal((await call(`/relay/my/receipts/${withPhoto.id}/image`, { token: bob })).status, 404, "another shopper cannot see the photo");
+assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alice })).status, 404);
+const photoCalls = imageCalls.length;
+do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+assert.equal(imageCalls.length, photoCalls, "photos are fetched only once per receipt");
+
+// 7e. Return reminders: opt-in per item, sent once, only before the deadline, only if still wanted.
+const keepClock = clock;
+const eoOne = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1");
+assert.equal(eoOne.reminder, "off");
+clock = Date.parse("2026-11-22T08:00:00Z");
+assert.equal((await post(`/relay/my/receipts/${eoOne.id}/remind`, bob, { on: true })).status, 403, "a shopper without consent cannot set reminders");
+r = await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true });
+assert.equal(r.status, 200);
+const rj = await r.json();
+assert.equal(rj.deadline, "2026-11-27", "uses the exact date from the return email");
+assert.equal(new Date(rj.remindAt).toISOString(), "2026-11-24T09:00:00.000Z", "three days before the deadline");
+emails = [];
+assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 0, "not due yet");
+clock = Date.parse("2026-11-24T10:00:00Z");
+assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 1);
+assert.deepEqual(emails[0].to, ["alice@example.com"]);
+assert.match(emails[0].subject, /^Return deadline in 4 days: Example Outfitters/);
+assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 0, "only ever sent once");
+assert.equal((await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1").reminder, "sent");
+// A dismissed item gets no reminder.
+clock = Date.parse("2026-11-22T08:00:00Z");
+await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true });
+sqlite.prepare("UPDATE captured_receipts SET status = 'dismissed' WHERE id = ?").run(eoOne.id);
+clock = Date.parse("2026-11-24T10:00:00Z");
+emails = [];
+assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 0, "dismissed item gets no reminder");
+sqlite.prepare("UPDATE captured_receipts SET status = 'pending' WHERE id = ?").run(eoOne.id);
+// Too late to remind, and an email failure retries rather than losing the reminder.
+clock = Date.parse("2026-12-01T08:00:00Z");
+assert.equal((await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true })).status, 400, "deadline already passed");
+clock = Date.parse("2026-11-26T08:00:00Z");
+assert.equal((await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true })).status, 200);
+const failingFetch = async () => new Response("{}", { status: 500 });
+assert.equal((await sendReturnReminders(env, clock, failingFetch)).sent, 0);
+assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 1, "retried after a failed send");
+assert.equal((await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: false })).status, 200);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM return_reminders").get().n, 0, "turning it off removes it");
+clock = keepClock;
+// Remove the test photo receipts so later counts are unchanged.
+sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-5%' OR details LIKE '%EO-6%'").run();
+sqlite.prepare("DELETE FROM receipt_images").run();
+delete gmailBox.m5; delete gmailBox.m6;
+await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: false });
+clock = Date.parse("2026-11-22T08:00:00Z"); await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true }); clock = keepClock;
+
 // 8. Captured receipts: private to the shopper, never refund-eligible, can be confirmed or dismissed.
 const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(mine.length, 2);
@@ -201,6 +274,7 @@ assert.equal(disc.revokedAtGoogle, true);
 assert.ok(calls.some(c => c.url === "https://oauth2.googleapis.com/revoke" && c.body.includes("PLAINTEXT-marker")));
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_connections").get().n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n, 0);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM return_reminders").get().n, 0, "reminders deleted on disconnect");
 assert.equal((await (await call("/relay/my/consent", { token: alice })).json()).accepted, true, "disconnect alone keeps consent");
 
 // 11. Withdrawing consent disconnects, deletes, and blocks further access.
