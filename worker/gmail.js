@@ -26,6 +26,8 @@ export const CONSENT_TEXT = [
 const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const STATE_TTL_MS = 10 * 60 * 1000;
 const MAX_MESSAGES_PER_SCAN = 25;
+// Bump when the receipt reader improves: older captures are re-read once with the new reader.
+const PARSER_VERSION = 3;
 const SEARCH =
   'newer_than:180d (category:purchases OR subject:("order confirmation" OR "your order" OR receipt OR "thank you for your order"))';
 const encoder = new TextEncoder();
@@ -161,8 +163,8 @@ async function scan(env, shopperId, fetchImpl, now) {
     const ref = await sha256Hex("gmail:" + m.id);
     const seen = await env.RELAY_DB.prepare(
       "SELECT details FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
-    // Receipts captured before return details existed are re-read once to add them.
-    const needsReturns = seen && !Object.prototype.hasOwnProperty.call(JSON.parse(seen.details), "returns");
+    // Receipts captured by an older version of the reader are re-read once.
+    const needsReturns = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
     if (seen && !needsReturns) { skipped++; continue; }
     const res = await fetchImpl(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=raw`, { headers: auth });
@@ -176,13 +178,12 @@ async function scan(env, shopperId, fetchImpl, now) {
       retailer: parsed.retailer, orderRef: parsed.orderRef, orderDate: parsed.orderDate, currency: parsed.currency,
       totalPence: parsed.totalPence, items: parsed.items, confidence: parsed.confidence,
       needsShopperConfirmation: parsed.needsShopperConfirmation, method: parsed.method, returns: parsed.returns,
-      source: "shopper_email", refundEligible: false
+      source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
     if (needsReturns) {
-      // Keep what the shopper may already have confirmed; only add the new return details.
-      const prev = JSON.parse(seen.details);
+      // The shopper's confirm/dismiss choice lives in the status column and is left alone.
       await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
-        .bind(JSON.stringify({ ...prev, returns: parsed.returns }), shopperId, ref).run();
+        .bind(JSON.stringify(details), shopperId, ref).run();
       updated++;
       continue;
     }
