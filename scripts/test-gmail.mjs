@@ -30,6 +30,7 @@ const newsletter = `From: Shop <news@shop.test>\nSubject: 50% off this weekend\n
 const gmailBox = { m1: receiptMail(1), m2: newsletter, m3: receiptMail(3) };
 let calls = [];
 let refreshOk = true;
+let paging = false;
 let emails = [];
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
@@ -49,6 +50,8 @@ const fetchImpl = async (url, init = {}) => {
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
     assert.ok(decodeURIComponent(url).includes("newer_than:400d"), "search is limited in time");
+    if (url.includes("pageToken=page2")) return Response.json({ messages: [{ id: "m99abcdef" }] });
+    if (paging) return Response.json({ messages: Object.keys(gmailBox).filter(k => k !== "m99").map(id => ({ id: id + "abcdef" })), nextPageToken: "page2" });
     return Response.json({ messages: Object.keys(gmailBox).map(id => ({ id: id + "abcdef" })) });
   }
   const one = /messages\/(m\d+)abcdef\?format=raw$/.exec(url);
@@ -161,6 +164,15 @@ assert.equal(merged.length, 2, "return email is not a separate card when its ord
 const eo1 = merged.find(x => x.orderRef === "EO-1");
 assert.ok(eo1 && eo1.returnPlan && eo1.returnPlan.returnId === "RT-778812" && eo1.returnPlan.deadline === "2026-11-27" && eo1.returnPlan.carrier === "Evri", JSON.stringify(eo1 && eo1.returnPlan));
 assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
+// 7c. Older receipts on later Gmail result pages are reached.
+gmailBox.m99 = receiptMail(99).replace("14 Oct 2026", "19 Nov 2025");
+paging = true;
+do { r = await post("/relay/my/gmail/scan", alice); last = await r.json(); } while (last.more);
+paging = false;
+assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
+sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-99%'").run();
+delete gmailBox.m99;
+
 // 8. Captured receipts: private to the shopper, never refund-eligible, can be confirmed or dismissed.
 const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(mine.length, 2);

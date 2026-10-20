@@ -27,8 +27,7 @@ const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const STATE_TTL_MS = 10 * 60 * 1000;
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
-const LIST_SIZE = 90;
-const MAX_FETCH_PER_SCAN = 18;
+const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 4;
 const SEARCH =
@@ -155,19 +154,27 @@ async function scan(env, shopperId, fetchImpl, now) {
   const token = await accessToken(env, refresh, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
   const auth = { Authorization: "Bearer " + token };
-  const list = await fetchImpl(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + LIST_SIZE + "&q=" + encodeURIComponent(SEARCH),
-    { headers: auth });
-  if (!list.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const ids = (((await list.json().catch(() => ({}))).messages || []).map(m => m && m.id)
-    .filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id))).slice(0, LIST_SIZE);
-  // One lookup tells us which of these emails Relay has already looked at.
+  // Gmail lists newest first, a page at a time. Read several pages so older receipts are reachable.
+  const ids = [];
+  let pageToken = "";
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const list = await fetchImpl(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(SEARCH) +
+      (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
+    if (!list.ok) { if (page === 0) return { status: 502, body: { error: "gmail_unavailable" } }; break; }
+    const data = await list.json().catch(() => ({}));
+    for (const m of data.messages || []) if (m && typeof m.id === "string" && /^[A-Za-z0-9]{6,40}$/.test(m.id)) ids.push(m.id);
+    pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
+    if (!pageToken) break;
+  }
+  // Lookups are done in groups to stay under the database's per-query limit.
   const refs = await Promise.all(ids.map(id => sha256Hex("gmail:" + id)));
   const known = new Map();
-  if (refs.length) {
+  for (let i = 0; i < refs.length; i += 90) {
+    const chunk = refs.slice(i, i + 90);
     const found = await env.RELAY_DB.prepare(
-      `SELECT message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${refs.map(() => "?").join(",")})`)
-      .bind(shopperId, ...refs).all();
+      `SELECT message_ref, status, details FROM captured_receipts WHERE shopper_id = ? AND message_ref IN (${chunk.map(() => "?").join(",")})`)
+      .bind(shopperId, ...chunk).all();
     for (const r of found.results || []) known.set(r.message_ref, r);
   }
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, more = false;
