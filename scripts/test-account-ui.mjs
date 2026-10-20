@@ -17,6 +17,7 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch({ headless: true, ...(process.env.RELAY_CHROMIUM ? { executablePath: process.env.RELAY_CHROMIUM, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] } : {}) });
 const TOKEN = 'T'.repeat(43), SESSION = 'S'.repeat(43);
 const context = await browser.newContext({ viewport: { width: 390, height: 800 } });
+const PORTAL = 'javascript:window.__xss5=1';
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 await context.route('https://**/*', route => {
@@ -43,7 +44,7 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
   if (p === '/relay/my/gmail/scan') return j(200, { ok: true, added: 1, alreadyCaptured: 0, notReceipts: 0 });
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
-  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false }] : [] });
+  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false } }] : [] });
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
@@ -74,6 +75,11 @@ await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found 1 new receipt').waitFor();
 await page.getByText('Wool jumper').waitFor();
 assert.equal(await page.evaluate(() => window.__xss3), undefined, 'captured receipt text must never run as HTML');
+await page.getByText('Return by 20 November 2026').waitFor();
+await page.getByText('Send to: Returns, Unit 4, Leeds LS1 4AB').waitFor();
+await page.getByText('mentions a QR code').waitFor();
+assert.equal(await page.evaluate(() => window.__xss4), undefined, 'return wording must never run as HTML');
+assert.equal(await page.getByRole('link', { name: /Start a return/ }).count(), 0, 'non-https return link is never shown');
 await page.getByRole('button', { name: 'Looks right' }).click();
 await page.getByText('Confirmed by you').waitFor();
 console.log('PASS returning from Google scans, lists captured receipts safely, shopper confirms');
