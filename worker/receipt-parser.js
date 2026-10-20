@@ -194,6 +194,85 @@ function fromText(text) {
   };
 }
 
+
+// ---- Return information ------------------------------------------------------
+// Pulled from the same email. Everything stays null/empty when not found, and a
+// deadline is only worked out when the email makes it unambiguous.
+const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
+
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+
+function extractReturns(text, html, orderDate) {
+  const out = {
+    windowDays: null, windowFrom: null, deadline: null, address: null,
+    portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false,
+  };
+  const flat = text.replace(/[ \t]+/g, " ");
+
+  // Window: "within 28 days of delivery", "30-day returns", "return ... within 14 days".
+  const sentences = flat.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  for (const sent of sentences) {
+    if (!/return|refund|exchange/i.test(sent) || sent.length > 400) continue;
+    let m = sent.match(/within\s+(\d{1,3})\s+(?:calendar\s+|working\s+)?days?(?:\s+(?:of|from|after)\s+(?:the\s+)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
+      sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i);
+    if (m) {
+      out.windowDays = Number(m[1]);
+      const basis = (m[2] || "").toLowerCase();
+      out.windowFrom = /^(delivery|receiv|dispatch)/.test(basis) ? "delivery" : /^(purchase|order|today)/.test(basis) ? "order" : null;
+      break;
+    }
+  }
+  // Explicit date: "return by 14 November 2026".
+  const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
+  if (byDate) out.deadline = parseDate(byDate[1]);
+  if (!out.deadline && out.windowDays && out.windowFrom === "order" && orderDate) {
+    const d = new Date(orderDate + "T00:00:00Z");
+    if (!Number.isNaN(d.getTime())) { d.setUTCDate(d.getUTCDate() + out.windowDays); out.deadline = isoDate(d); }
+  }
+
+  // Address: the few lines after a "return address" style label, accepted only if
+  // they contain a UK postcode (so we never present half an address as complete).
+  const lines = flat.split("\n").map((x) => x.trim());
+  for (let i = 0; i < lines.length; i++) {
+    if (!/(return(?:s)? address|send (?:it |them |your (?:parcel|items?) )?back to|return(?:s)? to:|returns? centre)/i.test(lines[i])) continue;
+    const after = lines[i].replace(/^.*?(?:return(?:s)? address|send (?:it |them |your (?:parcel|items?) )?back to|return(?:s)? to:|returns? centre)\s*[:\-–]?\s*/i, "");
+    const block = [];
+    if (after) block.push(after);
+    for (let j = i + 1; j < lines.length && block.length < 6; j++) {
+      if (!lines[j] || lines[j].length > 90) break;
+      block.push(lines[j]);
+    }
+    const joined = block.join(", ").replace(/\s*\|\s*/g, " ").replace(/,\s*,/g, ",");
+    if (UK_POSTCODE.test(joined)) { out.address = joined.slice(0, 250); break; }
+  }
+
+  // Link to start a return: only https links whose text or address mentions returns.
+  if (html) {
+    for (const a of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
+      const href = a[1].replace(/&amp;/g, "&").trim();
+      const label = a[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      if (!/^https:\/\//i.test(href) || href.length > 800) continue;
+      if (/unsubscribe|privacy|terms/i.test(href + " " + label)) continue;
+      if (/return|refund|exchange/i.test(label) || /\/returns?\b|returns?[-_.]|[?&]return/i.test(href)) { out.portalUrl = href; break; }
+    }
+  }
+
+  // How-to wording straight from the email (max three short sentences).
+  const seen = new Set();
+  for (const sent of sentences) {
+    if (out.instructions.length >= 3) break;
+    if (sent.length < 25 || sent.length > 220 || !/\breturn/i.test(sent)) continue;
+    if (/unsubscribe|view (this )?(email|in browser)/i.test(sent)) continue;
+    const key = sent.toLowerCase();
+    if (!seen.has(key)) { seen.add(key); out.instructions.push(sent); }
+  }
+
+  out.qrMentioned = /\bqr\b|\bqr[- ]code/i.test(flat) || /<img[^>]+(?:alt|src)=["'][^"']*qr/i.test(html || "");
+  out.labelMentioned = /(prepaid|printable|return)\s+label|drop[- ]?off|drop (?:it )?off|collect\+|evri|royal mail|inpost|dpd|ups access point/i.test(flat);
+  const any = out.windowDays || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned;
+  return any ? out : null;
+}
+
 // An email that is not an order confirmation must not be turned into a purchase.
 function looksLikeReceipt(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
@@ -236,6 +315,7 @@ export function parseReceiptEmail(rawEmail) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  result.returns = extractReturns(text, html, result.orderDate);
 
   const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0);
   const checks = [
