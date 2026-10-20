@@ -89,9 +89,97 @@
     [el("h2", { text: "Add a receipt" }), el("p", { text: "Paste an order-confirmation email from any store. Relay reads the details on this device's request and doesn't keep the email." }), box, go, msg, out,
       el("button", { className: "rl-btn ghost", text: "Back", onclick: back })].forEach(function (n) { sheet.appendChild(n); });
   }
-  function signedInView(sheet, email) {
+  function consentView(sheet, email, c) {
+    var msg = el("div", { className: "rl-msg" });
+    var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
+    agree.onclick = function () {
+      agree.disabled = true; say(msg, "Saving…");
+      api("/relay/my/consent", { method: "POST", body: { version: c.version } }).then(function (r) {
+        if (r.status === 401) { save(null); close(); return; }
+        if (!r.ok) { agree.disabled = false; return say(msg, "Couldn't save your choice. Please try again.", true); }
+        open(function (s) { gate(s, email); });
+      }).catch(function () { agree.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    sheet.appendChild(el("h2", { text: "Before you start" }));
+    sheet.appendChild(el("p", { text: "Relay is only useful if it can see your receipts, so this is needed to use it." }));
+    c.text.forEach(function (t) { sheet.appendChild(el("p", { text: t })); });
+    sheet.appendChild(agree); sheet.appendChild(msg);
+    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
+      api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); } }));
+  }
+  function gate(sheet, email, notice) {
+    sheet.textContent = "";
+    sheet.appendChild(el("p", { text: "Loading…" }));
+    api("/relay/my/consent").then(function (r) {
+      sheet.textContent = "";
+      if (r.status === 401) { save(null); close(); return; }
+      if (!r.ok) { sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); return; }
+      if (!r.body.accepted) return consentView(sheet, email, r.body);
+      signedInView(sheet, email, notice, r.body);
+    }).catch(function () { sheet.textContent = ""; sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+  }
+  function receiptCard(x, refresh) {
+    var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
+    var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name; }).join(", ");
+    var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
+      el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (x.orderDate ? " · " + x.orderDate : "") })]);
+    if (x.status === "confirmed") { card.appendChild(el("span", { text: " · Confirmed by you", style: "display:block;margin-top:4px" })); return card; }
+    card.appendChild(el("span", { text: x.needsShopperConfirmation ? "Some details may be missing or wrong. Please check." : "Please check this is right.", style: "display:block;margin-top:4px" }));
+    [["Looks right", "confirm", "rl-btn"], ["Not mine / ignore", "dismiss", "rl-btn ghost"]].forEach(function (b) {
+      card.appendChild(el("button", { className: b[2], text: b[0], style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
+        api("/relay/my/receipts/" + x.id + "/" + b[1], { method: "POST" }).then(refresh); } }));
+    });
+    return card;
+  }
+  function gmailSection(box, c, msg) {
+    box.textContent = "";
+    box.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
+    var list = el("div");
+    api("/relay/my/gmail").then(function (r) {
+      if (r.status === 401) { save(null); close(); return; }
+      if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your Gmail status." })); return; }
+      if (!r.body.connected) {
+        box.appendChild(el("p", { text: c.gmailAvailable ? "Connect Gmail so Relay can find your order confirmations and receipts for you." : "Gmail connection isn't switched on yet. You can still add a receipt by pasting it below." }));
+        if (c.gmailAvailable) box.appendChild(el("button", { className: "rl-btn", text: "Connect Gmail", onclick: function () {
+          api("/relay/my/gmail/connect", { method: "POST" }).then(function (x) {
+            if (x.ok && /^https:\/\/accounts\.google\.com\//.test(x.body.url)) location.href = x.body.url;
+            else say(msg, "Couldn't start the Gmail connection. Please try again.", true);
+          }); } }));
+        return;
+      }
+      box.appendChild(el("p", { text: "Gmail connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations and receipts." }));
+      var scanBtn = el("button", { className: "rl-btn", text: "Scan my Gmail for receipts" });
+      function loadList() {
+        api("/relay/my/receipts").then(function (x) {
+          list.textContent = "";
+          var rows = (x.body && x.body.receipts) || [];
+          if (!rows.length) list.appendChild(el("p", { text: "No receipts found yet." }));
+          rows.forEach(function (row) { list.appendChild(receiptCard(row, loadList)); });
+        });
+      }
+      scanBtn.onclick = function () {
+        scanBtn.disabled = true; say(msg, "Scanning…");
+        api("/relay/my/gmail/scan", { method: "POST" }).then(function (x) {
+          scanBtn.disabled = false;
+          if (x.status === 401) return say(msg, "Google needs you to reconnect Gmail. Disconnect and connect again.", true);
+          if (!x.ok) return say(msg, "Couldn't scan Gmail right now. Please try again.", true);
+          say(msg, x.body.added ? "Found " + x.body.added + " new receipt" + (x.body.added === 1 ? "" : "s") + ". Please check them below." : "No new receipts found.");
+          loadList();
+        }).catch(function () { scanBtn.disabled = false; say(msg, "Couldn't reach Relay.", true); });
+      };
+      box.appendChild(scanBtn); box.appendChild(list); loadList();
+      box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
+        if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
+        api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
+      if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
+    }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+  }
+  function signedInView(sheet, email, notice, c) {
     var list = el("div"), msg = el("div", { className: "rl-msg" });
-    [el("h2", { text: "Your account" }), el("p", { text: email }), el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
+    var gbox = el("div");
+    [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
+    if (notice) say(msg, notice.text, notice.bad);
+    gmailSection(gbox, c || {}, msg);
     list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
       list.textContent = "";
@@ -105,19 +193,22 @@
           el("span", { text: money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
       });
     }).catch(function () { list.textContent = ""; list.appendChild(el("p", { text: "Couldn't reach Relay." })); });
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt", onclick: function () {
-      if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { back.firstChild.textContent = ""; signedInView(back.firstChild, email); }); } }));
+    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt by pasting it", onclick: function () {
+      if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
       api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Delete my Relay account", onclick: function () {
       if (!confirm("Delete your Relay sign-in and everything linked to it? This can't be undone.")) return;
       api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); } }));
+    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Withdraw my permission for Relay to read my receipts", onclick: function () {
+      if (!confirm("Withdraw permission? Relay will disconnect Gmail and delete everything it captured. You'll be asked again next time you open your account.")) return;
+      api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) gate(sheet, email); else say(msg, "Couldn't withdraw. Try again.", true); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
   }
   function show() {
     var s = load();
     if (!s || !s.token) return open(signedOutView);
-    open(function (sheet) { signedInView(sheet, s.email || ""); });
+    open(function (sheet) { gate(sheet, s.email || ""); });
   }
   function bind() {
     var a = document.querySelector(".avatar");
@@ -142,6 +233,16 @@
       show();
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
   }
-  function start() { bind(); completeLinkSignIn(); window.addEventListener("hashchange", completeLinkSignIn); }
+  var gmailNotes = { connected: ["Gmail connected. Scanning for receipts…", false], denied: ["You chose not to connect Gmail. Relay needs a way to see your receipts, so you can try again or paste one.", true],
+    failed: ["Couldn't connect Gmail. Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect Gmail.", true], not_configured: ["Gmail connection isn't switched on yet.", true] };
+  function completeGmail() {
+    var m = /(?:^|[#&])gmail=(connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
+    if (!m) return;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    var s = load(); if (!s || !s.token) return open(signedOutView);
+    window.__relayAutoScan = m[1] === "connected";
+    open(function (sheet) { gate(sheet, s.email || "", { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }); });
+  }
+  function start() { bind(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
