@@ -35,7 +35,7 @@ const PARSER_VERSION = 5;
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
-  '(category:purchases OR subject:("order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR return OR "QR code"))';
+  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR "QR code"))';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
 const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;

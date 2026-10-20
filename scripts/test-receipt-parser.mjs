@@ -346,4 +346,10 @@ Content-Type: text/html
   assert.deepEqual(extractProductImageUrls("From: A <a@a.test>\nSubject: Order\n\nplain text only"), []);
 });
 
+// Layout modelled on a real "Thanks for your <brand> order #..." email (no "your order" in the subject).
+t("order email titled 'Thanks for your <brand> order #REF' with Items Purchased / Order Id layout", () => {
+  const r = parseReceiptEmail(`From: Brand <hello@e.brand.test>\nSubject: Thanks for your brand order #UK04002516\nDate: Wed, 19 Nov 2025 22:09:00 +0000\nContent-Type: text/plain\n\nThanks for your Order, Sam!\n\nItems Purchased\n\nDefine Jacket\n\nNulu\n\n1 x 074897 / Size US 8 (UK 12-14)\n\n158094170\n\n\u00a3118.00\n\nSubtotal (1 item)\n\n\u00a398.33\n\nOrder Total\n\n\u00a3118.00\n\nOrder Id: #UK04002516\n\nOrder Date\n\nNovember 19, 2025\n`);
+  assert.equal(r.ok, true); assert.equal(r.orderRef, "UK04002516"); assert.equal(r.totalPence, 11800); assert.equal(r.orderDate, "2025-11-19");
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
