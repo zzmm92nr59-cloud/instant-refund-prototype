@@ -32,7 +32,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 7;
+const PARSER_VERSION = 8;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
@@ -200,6 +200,38 @@ async function fetchProductImage(fetchImpl, urls) {
   return null;
 }
 
+// Reads one email and decides what it is. Only extracted fields are kept; the email text is dropped.
+function classify(rawText, id, lenient = false) {
+  let details, status = "pending";
+  // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
+  // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
+  const ret = parseReturnEmail(rawText);
+  const receipt = ret.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  if (ret.ok) {
+    details = {
+      kind: "return_instructions", gmailId: id,
+      retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
+      deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
+      estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
+      source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+    };
+  } else if (receipt.ok) {
+    // Keep only extracted fields. The email text is dropped here.
+    details = {
+      kind: "receipt", gmailId: id,
+      retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
+      totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
+      needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
+      source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+    };
+  } else {
+    // Remember that this email is not one of ours so it is never fetched again.
+    details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
+    status = "not_receipt";
+  }
+  return { details, status };
+}
+
 async function scan(env, shopperId, fetchImpl, now, cursorIn) {
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
@@ -252,34 +284,10 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn) {
       const raw = (await res.json().catch(() => ({}))).raw;
       if (typeof raw !== "string") continue;
       const rawText = new TextDecoder().decode(unb64url(raw));
-      let details, status = "pending", imageToStore = null;
-      const receipt = parseReceiptEmail(rawText);
-      if (receipt.ok) {
-        // Keep only extracted fields. The email text is dropped here.
-        details = {
-          kind: "receipt", gmailId: id,
-          retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
-          totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
-          needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
-          source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
-        };
-      } else {
-        const ret = parseReturnEmail(rawText);
-        if (ret.ok) {
-          details = {
-            kind: "return_instructions", gmailId: id,
-            retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
-            deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
-            estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
-            source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
-          };
-        } else {
-          // Remember that this email is not one of ours so it is never fetched again.
-          details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
-          status = "not_receipt";
-          ignored++;
-        }
-      }
+      const cls = classify(rawText, id);
+      const details = cls.details, status = cls.status;
+      let imageToStore = null;
+      if (status === "not_receipt") ignored++;
       // One small product photo per receipt, fetched at most once.
       const prev = seen ? JSON.parse(seen.details) : {};
       const receiptId = seen ? seen.id : crypto.randomUUID();
@@ -320,6 +328,82 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn) {
   const more = incomplete || before > limitDay;
   if (!more) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
   return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
+}
+
+
+// ---- Find a missing receipt: search Gmail live by store name, then add one chosen email ----
+async function tokenFor(env, shopperId, fetchImpl) {
+  const row = await env.RELAY_DB.prepare(
+    "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+  if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
+  const token = await accessToken(env, await decrypt(env, row.token_iv, row.token_data), fetchImpl);
+  return token ? { token } : { status: 401, body: { error: "gmail_reconnect_needed" } };
+}
+
+// Nothing here is stored: the list is for the shopper to choose from.
+async function findEmails(env, shopperId, fetchImpl, rawQuery) {
+  const q = String(rawQuery || "").replace(/[^\p{L}\p{N} .'&-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (q.length < 2) return { status: 400, body: { error: "query_too_short" } };
+  const t = await tokenFor(env, shopperId, fetchImpl);
+  if (!t.token) return t;
+  const auth = { Authorization: "Bearer " + t.token };
+  const list = await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=" + encodeURIComponent(q), { headers: auth });
+  if (!list.ok) return { status: 502, body: { error: "gmail_unavailable" } };
+  const ids = ((await list.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id)).slice(0, 10);
+  const results = [];
+  for (const id of ids) {
+    const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: auth });
+    if (!r.ok) continue;
+    const j = await r.json().catch(() => ({}));
+    const h = n => ((j.payload && j.payload.headers || []).find(x => String(x.name).toLowerCase() === n) || {}).value || "";
+    const from = h("from").replace(/<[^>]*>/g, "").replace(/["']/g, "").trim() || (/@([\w.-]+)/.exec(h("from")) || [])[1] || "";
+    const ref = await sha256Hex("gmail:" + id);
+    const have = await env.RELAY_DB.prepare("SELECT status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
+    results.push({ id, subject: h("subject").slice(0, 120), from: from.slice(0, 60),
+      date: j.internalDate ? new Date(Number(j.internalDate)).toISOString().slice(0, 10) : null,
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) });
+  }
+  return { status: 200, body: { results } };
+}
+
+async function addEmail(env, shopperId, fetchImpl, now, messageId) {
+  if (typeof messageId !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(messageId)) return { status: 400, body: { error: "invalid_message" } };
+  const t = await tokenFor(env, shopperId, fetchImpl);
+  if (!t.token) return t;
+  const res = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=raw`, { headers: { Authorization: "Bearer " + t.token } });
+  if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
+  if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
+  const raw = (await res.json().catch(() => ({}))).raw;
+  if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
+  const rawText = new TextDecoder().decode(unb64url(raw));
+  const { details, status } = classify(rawText, messageId, true);
+  if (status === "not_receipt") {
+    // Say which checks failed (no email content), so a missed layout can be fixed.
+    const why = parseReceiptEmail(rawText, { lenient: true }).signals || null;
+    return { status: 200, body: { ok: false, reason: "not_recognised", signals: why } };
+  }
+  const ref = await sha256Hex("gmail:" + messageId);
+  const seen = await env.RELAY_DB.prepare("SELECT id, details FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
+  const prev = seen ? JSON.parse(seen.details) : {};
+  const receiptId = seen ? seen.id : crypto.randomUUID();
+  let image = null;
+  if (details.kind === "receipt") {
+    details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && Boolean(prev.hasImage);
+    if (!details.imageTried) {
+      const urls = extractProductImageUrls(rawText);
+      image = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
+      details.imageTried = true;
+      if (image) details.hasImage = true;
+    }
+  }
+  if (seen) {
+    await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = 'pending' WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(details), seen.id, shopperId).run();
+  } else {
+    await env.RELAY_DB.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+      .bind(receiptId, shopperId, ref, "pending", JSON.stringify(details), now).run();
+  }
+  if (image) await saveImage(env, shopperId, { receiptId, ...image }, now);
+  return { status: 200, body: { ok: true, kind: details.kind, store: (details.retailer && (details.retailer.name || details.retailer.domain)) || null, orderRef: details.orderRef || null } };
 }
 
 async function saveImage(env, shopperId, img, now) {
@@ -438,6 +522,18 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const sb = await request.json().catch(() => ({}));
     const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "");
+    return json(r.body, r.status, cors);
+  }
+  if (path === "/relay/my/gmail/find" && m === "POST") {
+    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const fb = await request.json().catch(() => ({}));
+    const r = await findEmails(env, shopper.id, opts.fetchImpl, fb && fb.query);
+    return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
+  }
+  if (path === "/relay/my/gmail/add" && m === "POST") {
+    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const ab = await request.json().catch(() => ({}));
+    const r = await addEmail(env, shopper.id, opts.fetchImpl, opts.now, ab && ab.messageId);
     return json(r.body, r.status, cors);
   }
   if (path === "/relay/my/gmail/disconnect" && m === "POST") {

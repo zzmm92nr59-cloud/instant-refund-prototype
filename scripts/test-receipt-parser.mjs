@@ -370,4 +370,16 @@ t("base64-encoded-word subject (=?UTF-8?B?...) is decoded", () => {
   assert.equal(r.ok, true); assert.equal(r.totalPence, 2000);
 });
 
+t("return email with 'Order Id: #REF' (colon and hash) is joined to its order", () => {
+  const r = parseReturnEmail(`From: Brand <hello@e.brand.test>\nSubject: Thanks for your return request\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: #RT-5551234\nOrder Id: #UK04002516\nSend it back no later than December 24.\n`);
+  assert.equal(r.ok, true); assert.equal(r.orderRef, "UK04002516"); assert.equal(r.returnId, "RT-5551234");
+});
+t("lenient mode (shopper picked the email) accepts one signal but still needs real fields", () => {
+  const raw = `From: Brand <hello@e.brand.test>\nSubject: Thanks for your brand order\nContent-Type: text/plain\n\nOrder Total\n\u00a3118.00\n`;
+  assert.equal(parseReceiptEmail(raw).ok, true);
+  const bare = `From: Brand <hello@e.brand.test>\nSubject: Thanks for your brand order\nContent-Type: text/plain\n\nHope you enjoy it.\n`;
+  const strict = parseReceiptEmail(bare), len = parseReceiptEmail(bare, { lenient: true });
+  assert.equal(strict.ok, false); assert.equal(len.ok, false); assert.equal(len.signals.nothingFound, true);
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);

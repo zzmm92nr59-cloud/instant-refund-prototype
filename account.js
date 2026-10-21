@@ -305,6 +305,7 @@
         step(saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay.", true); });
       };
       box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); loadList();
+      if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
       box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
         if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
         api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
@@ -346,6 +347,46 @@
         '<meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>body{margin:8px;font-family:-apple-system,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style>' + String(b.html || "");
       body.appendChild(frame);
     }).catch(function () { note.textContent = "Couldn't reach Relay."; });
+  }
+
+  // ---- Find a missing receipt: search Gmail by store name, pick the right email, add it ----
+  var openFind = null;
+  function findView(sheet, onBack) {
+    var input = el("input", { type: "search", placeholder: "Store name, e.g. lululemon", style: "margin-top:8px" });
+    var go = el("button", { className: "rl-btn", text: "Search my Gmail" });
+    var msg = el("div", { className: "rl-msg" }), out = el("div");
+    [el("h2", { text: "Find a missing receipt" }),
+     el("p", { text: "Search your Gmail for a store, then pick the order confirmation email. Relay only reads the one you pick.", style: "font-size:14px;opacity:.8" }),
+     input, go, msg, out, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+    function search() {
+      var q = input.value.trim();
+      if (q.length < 2) return say(msg, "Type at least 2 letters of the store name.", true);
+      go.disabled = true; out.textContent = ""; say(msg, "Searching…");
+      api("/relay/my/gmail/find", { method: "POST", body: { query: q } }).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) return say(msg, r.body && r.body.error === "gmail_reconnect_needed" ? "Gmail needs to be reconnected first." : r.status === 409 ? "Connect Gmail first." : "Couldn't search Gmail right now. Try again.", true);
+        var list = (r.body && r.body.results) || [];
+        say(msg, list.length ? "Tap Add on the order confirmation." : "Nothing found for that name. Try a shorter name.");
+        list.forEach(function (x) {
+          var add = el("button", { className: "rl-btn", text: x.added ? "Added" : "Add", disabled: !!x.added, style: "margin-top:8px;padding:9px 14px;font-size:14px" });
+          add.onclick = function () {
+            add.disabled = true; add.textContent = "Adding…";
+            api("/relay/my/gmail/add", { method: "POST", body: { messageId: x.id } }).then(function (a) {
+              if (a.ok && a.body && a.body.ok) { add.textContent = "Added"; say(msg, "Added" + (a.body.store ? " " + a.body.store : "") + (a.body.orderRef ? " · " + a.body.orderRef : "") + ". Go back to see it in your purchases."); return; }
+              add.disabled = false; add.textContent = "Add";
+              if (a.ok && a.body && a.body.reason === "not_recognised") {
+                var sg = a.body.signals || {};
+                say(msg, "Relay couldn't read that email as an order or a return. (Subject looked like an order: " + (sg.subject ? "yes" : "no") + ", order details found: " + (sg.body ? "yes" : "no") + ".) Try another one.", true);
+              } else say(msg, "Couldn't add that email. Try again.", true);
+            }).catch(function () { add.disabled = false; add.textContent = "Add"; say(msg, "Couldn't reach Relay.", true); });
+          };
+          out.appendChild(el("div", { className: "rl-order" }, [el("b", { text: x.subject || "(no subject)" }),
+            el("span", { text: (x.from || "") + (x.date ? " · " + x.date : "") }), add]));
+        });
+      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay.", true); });
+    }
+    go.onclick = search;
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") search(); });
   }
 
   // ---- Swap & resell (v1: matches members; no payments or postage through Relay yet) ----
@@ -559,6 +600,7 @@
     var gbox = el("div");
     [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
     if (notice) say(msg, notice.text, notice.bad);
+    openFind = function () { back.firstChild.textContent = ""; findView(back.firstChild, function () { gate(back.firstChild, email); }); };
     openOriginal = function (id) { back.firstChild.textContent = ""; originalView(back.firstChild, id, function () { gate(back.firstChild, email); }); };
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     gmailSection(gbox, c || {}, msg);
