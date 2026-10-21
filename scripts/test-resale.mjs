@@ -5,6 +5,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 
+// Ids are made to sort AGAINST insertion order, so any query that relies on id order for items created in the same instant fails here.
+{ let n = 0xffffffffffff; Object.defineProperty(globalThis.crypto, "randomUUID", { value: () => "aaaaaaaa-aaaa-4aaa-8aaa-" + (n--).toString(16).padStart(12, "0") }); }
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
 function stmt(sql, args = []) {
