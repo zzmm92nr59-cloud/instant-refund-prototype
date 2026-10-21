@@ -139,7 +139,7 @@ async function myStuff(env, shopper) {
   const out = [];
   for (const l of listings.results || []) {
     const reqs = await env.RELAY_DB.prepare(
-      "SELECT id, kind, offered_listing_id, message, status, created_at, asker_id FROM resale_requests WHERE listing_id = ? ORDER BY created_at ASC LIMIT 50").bind(l.id).all();
+      "SELECT id, kind, offered_listing_id, message, status, created_at, asker_id FROM resale_requests WHERE listing_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 50").bind(l.id).all();
     const requests = [];
     let n = 0;
     for (const q of reqs.results || []) {
@@ -219,7 +219,7 @@ async function party(env, shopper, requestId) {
 async function readThread(env, shopper, requestId) {
   const q = await party(env, shopper, requestId);
   if (!q) return { status: 404, body: { error: "not_found" } };
-  const rows = await env.RELAY_DB.prepare("SELECT sender_id, body, created_at FROM resale_messages WHERE request_id = ? ORDER BY created_at ASC LIMIT 200").bind(requestId).all();
+  const rows = await env.RELAY_DB.prepare("SELECT sender_id, body, created_at FROM resale_messages WHERE request_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 200").bind(requestId).all();
   return { status: 200, body: { title: q.title, status: q.status, with: q.iAmSeller ? "Buyer" : "Seller", open: q.status === "accepted",
     messages: (rows.results || []).map(m => ({ mine: m.sender_id === shopper.id, body: m.body, createdAt: m.created_at })) } };
 }
