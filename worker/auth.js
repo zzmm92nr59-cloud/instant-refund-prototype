@@ -55,6 +55,9 @@ export async function ensureAuthTables(db) {
     `CREATE TABLE IF NOT EXISTS shoppers (
        id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, email_hash TEXT NOT NULL UNIQUE,
        created_at INTEGER NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS auth_google_states (
+       state_hash TEXT PRIMARY KEY, client_hash TEXT NOT NULL, nonce_hash TEXT NOT NULL,
+       created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
     `CREATE TABLE IF NOT EXISTS auth_login_tokens (
        token_hash TEXT PRIMARY KEY, email TEXT NOT NULL, client_hash TEXT NOT NULL,
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
@@ -167,9 +170,14 @@ async function verifyLink(request, env, cors, opts) {
   // Single atomic claim: only one request can ever turn a link into a session.
   const claimed = await env.RELAY_DB.prepare(
     `UPDATE auth_login_tokens SET used_at = ?
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email`)
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email, client_hash`)
     .bind(now, await sha256Hex(token), now).first();
   if (!claimed) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  // Google sign-ins are tied to the browser that started them, so a link someone else triggers is useless.
+  if (String(claimed.client_hash).startsWith("gnonce:")) {
+    const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
+    if (!nonce || claimed.client_hash !== "gnonce:" + (await sha256Hex("gnonce:" + nonce))) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  }
   return startSession(env, claimed.email, now, cors);
 }
 
@@ -216,6 +224,74 @@ async function verifyCode(request, env, cors, opts) {
   return startSession(env, email, now, cors);
 }
 
+// ---- Sign in with Google (identity only: openid + email; no Gmail access) ----
+const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
+const MAX_GOOGLE_STARTS_PER_CLIENT_PER_HOUR = 30;
+function googleRedirect(env, url) { return env.GOOGLE_REDIRECT_URI || `${url.origin}/relay/gmail/callback`; }
+function googleConfigured(env) { return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET); }
+
+async function googleStart(request, env, url, cors, opts) {
+  const { now } = opts;
+  const origin = request.headers.get("origin");
+  if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+  if (!googleConfigured(env)) return json({ error: "google_sign_in_not_configured" }, 503, cors);
+  const body = await readJson(request);
+  const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
+  if (!TOKEN_SHAPE.test(nonce)) return json({ error: "invalid_request" }, 400, cors);
+  const client = await sha256Hex("client:" + (request.headers.get("cf-connecting-ip") || "unknown"));
+  await env.RELAY_DB.prepare("DELETE FROM auth_google_states WHERE expires_at <= ?").bind(now).run();
+  const n = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_google_states WHERE client_hash = ? AND created_at > ?").bind(client, now - HOUR_MS).first();
+  if ((n?.n || 0) >= MAX_GOOGLE_STARTS_PER_CLIENT_PER_HOUR) return json({ error: "too_many_requests" }, 429, cors);
+  const state = randomToken();
+  await env.RELAY_DB.prepare("INSERT INTO auth_google_states (state_hash,client_hash,nonce_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS).run();
+  const params = new URLSearchParams({
+    client_id: env.GOOGLE_CLIENT_ID, redirect_uri: googleRedirect(env, url), response_type: "code",
+    scope: "openid email", state, prompt: "select_account", include_granted_scopes: "false"
+  });
+  return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
+}
+
+// Called from the shared Google redirect when the state belongs to a sign-in. Returns null if it does not.
+async function googleCallback(request, env, url, opts) {
+  const state = url.searchParams.get("state") || "";
+  if (!TOKEN_SHAPE.test(state)) return null;
+  const stateHash = await sha256Hex(state);
+  const known = await env.RELAY_DB.prepare("SELECT state_hash FROM auth_google_states WHERE state_hash = ?").bind(stateHash).first();
+  if (!known) return null;
+  const { now } = opts;
+  const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
+  const back = result => Response.redirect(appUrl + "#gsignin=" + result, 302);
+  const claimed = await env.RELAY_DB.prepare(
+    "UPDATE auth_google_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash")
+    .bind(now, stateHash, now).first();
+  if (!claimed) return back("failed");
+  if (url.searchParams.get("error")) return back("denied");
+  const code = url.searchParams.get("code") || "";
+  if (!code) return back("failed");
+  let email = null;
+  try {
+    const res = await opts.fetchImpl("https://oauth2.googleapis.com/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: googleRedirect(env, url), grant_type: "authorization_code" })
+    });
+    const tokens = res.ok ? await res.json().catch(() => null) : null;
+    // The ID token comes straight from Google's token endpoint over TLS, so its claims are read and checked here.
+    const part = tokens && typeof tokens.id_token === "string" ? tokens.id_token.split(".")[1] : "";
+    if (part) {
+      const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
+      const issOk = claims.iss === "https://accounts.google.com" || claims.iss === "accounts.google.com";
+      if (issOk && claims.aud === env.GOOGLE_CLIENT_ID && Number(claims.exp) * 1000 > now && claims.email_verified === true) email = normaliseEmail(claims.email);
+    }
+  } catch { email = null; }
+  if (!email) return back("failed");
+  const token = randomToken();
+  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(await sha256Hex(token), email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+  return Response.redirect(appUrl + "#signin=" + token, 302);
+}
+
 async function listPurchases(env, shopper, orderId) {
   const where = orderId ? "AND o.id = ?" : "";
   const params = orderId ? [shopper.emailHash, orderId] : [shopper.emailHash];
@@ -244,8 +320,13 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
+    if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
+    if (path === "/relay/gmail/callback" && request.method === "GET") {
+      const g = await googleCallback(request, env, url, o);
+      if (g) return g;
+    }
     if (path === "/relay/gmail/callback" && request.method === "GET")
       return await handleGmailCallback(request, env, url, { ...o, appUrl: DEFAULT_APP_URL });
     const shopper = await sessionShopper(request, env, o.now);
