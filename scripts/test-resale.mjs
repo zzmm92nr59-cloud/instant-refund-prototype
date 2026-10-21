@@ -132,6 +132,35 @@ assert.equal((await (await get("/relay/my/resale/feed", bob)).json()).listings.s
 const bobReqs = (await (await get("/relay/my/resale/mine", bob)).json()).myRequests;
 assert.ok(bobReqs.some(q => q.title === "Define Jacket Nulu" && q.status === "accepted"));
 
+// Messages: only the seller and the member whose request was accepted, only while it is accepted.
+const msg = (token, id, body) => post(`/relay/my/resale/requests/${id}/messages`, token, { body });
+const pendingReq = sqlite.prepare("SELECT id FROM resale_requests WHERE listing_id = ? AND status = 'pending'").get(L2).id;
+assert.equal((await msg(bob, pendingReq, "hello")).status, 409, "no messages before the seller accepts");
+assert.equal((await get(`/relay/my/resale/requests/${reqId}/messages`, carol)).status, 404, "an outsider cannot read the thread");
+assert.equal((await msg(carol, reqId, "hello")).status, 404, "an outsider cannot write to the thread");
+assert.equal((await get(`/relay/my/resale/requests/${reqId}/messages`)).status, 401);
+assert.equal((await msg(bob, reqId, "Hi, is it still available? Could do Saturday.")).status, 200);
+assert.equal((await msg(alice, reqId, "Yes it is. Saturday works.")).status, 200);
+const thread = await (await get(`/relay/my/resale/requests/${reqId}/messages`, alice)).json();
+assert.deepEqual(thread.messages.map(m => m.mine), [false, true]); assert.equal(thread.with, "Buyer"); assert.equal(thread.open, true);
+assert.equal((await (await get(`/relay/my/resale/requests/${reqId}/messages`, bob)).json()).with, "Seller");
+assert.ok(!JSON.stringify(thread).includes(idOf("bob@example.com")), "thread never shows who the other person is");
+for (const bad of ["email me at bob@example.com", "bob at gmail dot com", "call 07123 456 789", "+44 7123 456789", "see https://example.com/me", "find me on www.insta.test/bob"])
+  assert.equal(await (await msg(bob, reqId, bad)).json().then(j => j.error), "no_contact_details", "blocked: " + bad);
+assert.equal((await msg(bob, reqId, "   ")).status, 400);
+assert.equal((await msg(bob, reqId, "<b>hi</b> there")).status, 200);
+assert.ok(!(await (await get(`/relay/my/resale/requests/${reqId}/messages`, alice)).json()).messages.some(m => m.body.includes("<")), "markup is stripped");
+let hit; for (let i = 0; i < 25 && !hit; i++) { const x = await msg(bob, reqId, "ping " + i); if (x.status === 429) hit = (await x.json()).error; }
+assert.equal(hit, "too_many_messages", "message rate is limited");
+// Ending (or reporting) a conversation closes it and puts the listing back on sale.
+assert.equal((await post(`/relay/my/resale/requests/${reqId}/report`, carol, { reason: "x" })).status, 404, "outsiders cannot end it");
+assert.equal((await post(`/relay/my/resale/requests/${reqId}/report`, bob, { reason: "Asked me to pay outside Relay" })).status, 200);
+assert.equal(sqlite.prepare("SELECT status FROM resale_requests WHERE id = ?").get(reqId).status, "closed");
+assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(L1).status, "active", "listing is back on sale");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_reports WHERE request_id = ?").get(reqId).n, 1);
+assert.equal((await msg(alice, reqId, "still there?")).status, 409, "closed threads take no messages");
+assert.equal((await (await get(`/relay/my/resale/requests/${reqId}/messages`, alice)).json()).open, false);
+
 // Withdrawing, and the limits.
 assert.equal((await post(`/relay/my/resale/listings/${L2}/withdraw`, bob)).status, 404, "only the seller can withdraw");
 assert.equal((await post(`/relay/my/resale/listings/${L2}/withdraw`, alice)).status, 200);
@@ -145,4 +174,5 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_listings WHERE seller
 assert.equal((await post("/relay/my/delete", bob)).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_listings WHERE seller_id = ?").get(idOf("alice@example.com")).n > 0, true);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_requests WHERE asker_id = ?").get(idOf("carol@example.com")).n, 1, "other members' requests stay");
-console.log("PASS resale v1: ownership, receipt-sourced titles, privacy of sellers and askers, photos, requests, matching, withdrawal, deletion");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM resale_messages WHERE request_id = ?").get(reqId).n, 0, "deleting an account deletes its conversations");
+console.log("PASS resale v1 + messages: ownership, receipt-sourced titles, privacy of sellers and askers, photos, requests, matching, withdrawal, deletion");
