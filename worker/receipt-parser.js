@@ -351,14 +351,18 @@ function extractReturns(text, html, orderDate) {
 }
 
 // An email that is not an order confirmation must not be turned into a purchase.
-function looksLikeReceipt(subject, text) {
+function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b/.test(s);
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
+  return { subjectHit, bodyHit };
+}
+function looksLikeReceipt(subject, text) {
+  const { subjectHit, bodyHit } = receiptSignals(subject, text);
   return subjectHit && bodyHit;
 }
 
-export function parseReceiptEmail(rawEmail) {
+export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
   const parts = { text: [], html: [] };
@@ -371,8 +375,10 @@ export function parseReceiptEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
 
-  if (!looksLikeReceipt(subject, text)) {
-    return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email" };
+  const sig = receiptSignals(subject, text);
+  // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
+  if (!(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
+    return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
   }
 
   const ld = html ? fromJsonLd(html) : null;
@@ -401,6 +407,9 @@ export function parseReceiptEmail(rawEmail) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  if (opts.lenient && !result.orderRef && result.totalPence == null && !result.items.length) {
+    return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length, nothingFound: true } };
+  }
   result.returns = extractReturns(text, html, result.orderDate);
 
   const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.lineTotal ? 1 : i.qty || 1), 0);
@@ -440,9 +449,9 @@ export function parseReturnEmail(rawEmail) {
   const isReturn = /\breturn id\b/i.test(text) || /(?:thanks for your|your) return request/i.test(text);
   if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
 
-  const idm = text.match(/return id\s*[:#]?\s*([A-Z0-9-]{5,30})/i);
+  const idm = text.match(/return id\s*[:#\s]*([A-Z0-9-]{5,30})/i);
   const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
-  const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#]?\s*([A-Z0-9-]{4,24})/i);
+  const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#\s]*([A-Z0-9-]{4,24})/i);
 
   // Deadline: "send it back no later than Wednesday, December 24". The year, if absent,
   // comes from the email's own date and is never in the past relative to it.
