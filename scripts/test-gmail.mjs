@@ -72,7 +72,7 @@ const fetchImpl = async (url, init = {}) => {
   }
   const full = /messages\/(m\d+)abcdef\?format=full$/.exec(url);
   if (full) {
-    const html = `<html><body onload="steal()"><script>alert(1)</script><p onclick="x()">Order EO-${full[1]}</p><a href="javascript:alert(1)">bad</a><a href="https://shop.test/returns?o=1&amp;x=2">Start a return</a><img src="http://tracker.test/p.gif"><img src="cid:qr1" alt="QR"><iframe src="https://evil.test"></iframe></body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Order</title><link rel="stylesheet" href="https://x.test/a.css"><style>.a{color:red}</style></head><body onload="steal()"><form action="https://evil.test"><input type="hidden" name="a"><button>Go</button></form><script>alert(1)</script><p onclick="x()">Order EO-${full[1]}</p><a href="javascript:alert(1)">bad</a><a href="https://shop.test/returns?o=1&amp;x=2">Start a return</a><img src="http://tracker.test/p.gif"><img src="cid:qr1" alt="QR"><iframe src="https://evil.test"></iframe></body></html>`;
     return Response.json({ payload: { mimeType: "multipart/related", parts: [
       { mimeType: "text/html", body: { data: b64url(html) } },
       { mimeType: "image/png", headers: [{ name: "Content-ID", value: "<qr1>" }], body: { attachmentId: "att1", size: 3000 } },
@@ -215,7 +215,8 @@ assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts")
   const o = await call(`/relay/my/receipts/${mine.id}/original`, { token: alice });
   assert.equal(o.status, 200);
   const ob = await o.json();
-  assert.ok(ob.html.includes("Order EO-"), "body shown");
+  assert.ok(ob.html.includes("Order EO-"), "body shown even when the email has meta/link/input tags");
+  assert.ok(!/<meta|<link|<input|<form|<button/i.test(ob.html), ob.html);
   assert.ok(!/<script|onload|onclick|javascript:|<iframe|tracker\.test|evil\.test/i.test(ob.html), ob.html);
   assert.ok(ob.html.includes('href="https://shop.test/returns?o=1&amp;x=2"') && /rel="noopener/.test(ob.html), "https links kept, safely");
   assert.ok(ob.html.includes("src=\"data:image/png;base64,"), "embedded picture (QR) inlined");
