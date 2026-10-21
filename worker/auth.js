@@ -9,6 +9,7 @@
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { parseReceiptEmail } from "./receipt-parser.js";
+import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -256,6 +257,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
       await env.RELAY_DB.batch([
+        ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
@@ -266,6 +268,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);
     if (gmailResponse) return gmailResponse;
+    const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);
+    if (resaleResponse) return resaleResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {

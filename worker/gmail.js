@@ -12,6 +12,7 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
+import { ensureResaleTables } from "./resale.js";
 
 export const CONSENT_VERSION = "2026-10-v4";
 export const CONSENT_TEXT = [
@@ -101,11 +102,14 @@ export async function ensureGmailTables(db) {
        title TEXT NOT NULL, sent_at INTEGER)`
   ];
   for (const sql of statements) await db.prepare(sql).run();
+  await ensureResaleTables(db);
 }
 
 // Statements that erase everything Gmail-related for a shopper.
 export function gmailDeleteStatements(db, shopperId) {
   return [
+    // Listings are made from captured receipts, so they come down with them.
+    db.prepare("UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched')").bind(shopperId),
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
@@ -151,6 +155,9 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     } catch { revoked = false; }
   }
   const statements = [
+    // Listings are made from captured receipts, so they come down with them.
+    env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE status = 'pending' AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId),
+    env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched')").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
