@@ -50,9 +50,10 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
   if (p === '/relay/my/gmail/scan') { const b = JSON.parse(req.postData() || '{}'); scanBodies.push(b); return b.cursor ? j(200, { ok: true, added: 0, more: false, cursor: null }) : j(200, { ok: true, added: 1, more: true, cursor: '2026/05/01', scannedBack: '2026/05/01' }); }
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
+  if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/original') return j(200, { html: '<p>Order EO-1 body from the store</p>', extraImages: ['data:image/png;base64,' + PNG1.toString('base64'), 'javascript:alert(1)'], links: [{ label: 'Start a return', url: 'https://shop.test/returns' }, { label: 'Bad', url: 'http://shop.test/x' }] });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
-  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
+  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', gmailId: 'zz9876abcdef', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
   if (p === '/relay/my/resale/items') return j(200, { items: [{ receiptId: '11111111-1111-1111-1111-111111111111', itemIndex: 0, title: 'Wool jumper', store: 'Example Outfitters', pricePence: 5900, currency: 'GBP', orderDate: '2026-10-14', returnWindowOpen: true, returnDeadline: '2026-11-20', alreadyListed: resaleListed }] });
   if (p === '/relay/my/resale/feed') return j(200, { listings: [{ id: '55555555-5555-5555-5555-555555555555', title: '<img src=x onerror=window.__xss7=1>Trail shell', store: 'Alpine Active', size: 'M', condition: 'good', askPence: 4500, currency: 'GBP', swapOk: false, note: null, hasImage: false, status: 'active', myRequest: null }] });
   if (p === '/relay/my/resale/mine') return j(200, { listings: resaleListed ? [{ id: '66666666-6666-6666-6666-666666666666', title: 'Wool jumper', store: 'Example Outfitters', size: 'L', condition: 'good', askPence: 2500, currency: 'GBP', swapOk: true, hasImage: false, status: 'active', requests: [{ id: '77777777-7777-7777-7777-777777777777', who: 'Member 1', kind: 'buy', message: null, status: 'accepted', offered: null }] }] : [], myRequests: [] });
@@ -128,6 +129,18 @@ assert.equal(await page.evaluate(() => window.__xss3), undefined, 'captured rece
 await page.getByText('Return by 20 November 2026').waitFor();
 await page.getByText('Send to: Returns, Unit 4, Leeds LS1 4AB').waitFor();
 await page.getByText('mentions a QR code').waitFor();
+await page.getByRole('button', { name: 'View original receipt' }).click();
+await page.getByText('Relay doesn\'t keep a copy').waitFor();
+const fr = page.locator('iframe[title="Original receipt email"]');
+await fr.waitFor();
+const sb = await fr.getAttribute('sandbox');
+assert.ok(sb && !/allow-scripts|allow-same-origin/.test(sb), 'email frame cannot run scripts or touch Relay: ' + sb);
+await page.frameLocator('iframe[title="Original receipt email"]').getByText('Order EO-1 body from the store').waitFor();
+assert.equal(await page.getByRole('link', { name: 'Start a return' }).count(), 1, 'https return link shown as a button');
+assert.equal(await page.getByRole('link', { name: 'Bad' }).count(), 0, 'non-https link never shown');
+assert.equal(await page.locator('img[alt="Picture attached to the email"]').count(), 1, 'only a real image data URL is shown');
+await page.getByRole('button', { name: 'Back' }).last().click();
+await page.getByRole('button', { name: 'Looks right' }).waitFor();
 assert.equal(await page.evaluate(() => window.__xss4), undefined, 'return wording must never run as HTML');
 assert.equal(await page.getByRole('link', { name: /Start a return/ }).count(), 0, 'non-https return link is never shown');
 await page.getByRole('button', { name: 'Looks right' }).click();
