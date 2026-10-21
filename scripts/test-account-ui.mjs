@@ -22,6 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
+let resaleListed = false, resaleBodies = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 await context.route('https://**/*', route => {
@@ -52,6 +53,11 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
   if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
+  if (p === '/relay/my/resale/items') return j(200, { items: [{ receiptId: '11111111-1111-1111-1111-111111111111', itemIndex: 0, title: 'Wool jumper', store: 'Example Outfitters', pricePence: 5900, currency: 'GBP', orderDate: '2026-10-14', returnWindowOpen: true, returnDeadline: '2026-11-20', alreadyListed: resaleListed }] });
+  if (p === '/relay/my/resale/feed') return j(200, { listings: [{ id: '55555555-5555-5555-5555-555555555555', title: '<img src=x onerror=window.__xss7=1>Trail shell', store: 'Alpine Active', size: 'M', condition: 'good', askPence: 4500, currency: 'GBP', swapOk: false, note: null, hasImage: false, status: 'active', myRequest: null }] });
+  if (p === '/relay/my/resale/mine') return j(200, { listings: resaleListed ? [{ id: '66666666-6666-6666-6666-666666666666', title: 'Wool jumper', store: 'Example Outfitters', size: 'L', condition: 'good', askPence: 2500, currency: 'GBP', swapOk: true, hasImage: false, status: 'active', requests: [] }] : [], myRequests: [] });
+  if (p === '/relay/my/resale/listings' && req.method() === 'POST') { const b = JSON.parse(req.postData()); resaleBodies.push(b); if (b.agree !== true) return j(400, { error: 'agreement_required' }); resaleListed = true; return j(200, { ok: true, id: '66666666-6666-6666-6666-666666666666' }); }
+  if (/^\/relay\/my\/resale\/listings\/[0-9a-f-]{36}\/ask$/.test(p)) { resaleBodies.push(JSON.parse(req.postData())); return j(200, { ok: true }); }
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
@@ -123,6 +129,29 @@ assert.equal(await page.getByRole('link', { name: /Start a return/ }).count(), 0
 await page.getByRole('button', { name: 'Looks right' }).click();
 await page.getByText('Confirmed by you').waitFor();
 console.log('PASS returning from Google scans, lists captured receipts safely, shopper confirms');
+await page.getByRole('button', { name: 'Swap & resell', exact: true }).click();
+await page.getByRole('heading', { name: 'Swap & resell' }).waitFor();
+await page.getByText('nothing is bought or sent through Relay').waitFor();
+await page.getByText('Trail shell').waitFor();
+assert.equal(await page.evaluate(() => window.__xss7), undefined, 'listing text must never run as HTML');
+await page.getByRole('button', { name: "I'd like this" }).click();
+await page.getByText('Sent. The seller will see your request').waitFor();
+assert.deepEqual(resaleBodies[0], { kind: 'buy' });
+await page.locator('[data-tab="sell"]').click();
+await page.getByText('Heads up: you can still return this to the store').waitFor();
+await page.getByRole('button', { name: 'List this' }).click();
+await page.getByRole('button', { name: 'Put it on Relay' }).click();
+await page.getByText('Please tick the box to agree.').waitFor();
+await page.getByPlaceholder('Size (optional)').fill('L');
+await page.getByPlaceholder('Asking price in £').fill('£25');
+await page.getByLabel("I'm open to swaps").check();
+await page.getByLabel(/I agree Relay shows this item/).check();
+await page.getByRole('button', { name: 'Put it on Relay' }).click();
+await page.getByText('Listed. Other members can now see it.').waitFor();
+const posted = resaleBodies[resaleBodies.length - 1];
+assert.equal(posted.askPence, 2500); assert.equal(posted.size, 'L'); assert.equal(posted.swapOk, true); assert.equal(posted.agree, true); assert.equal(posted.itemIndex, 0);
+assert.ok(!('title' in posted) && !('store' in posted), 'the app never sends title or store; the server takes them from the receipt');
+console.log('PASS resale: browse safely, ask to buy, list an item only after agreeing to what is shared');
 await page.getByRole('button', { name: 'Disconnect Gmail' }).click().catch(() => {});
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Your account' }).waitFor();

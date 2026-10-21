@@ -22,11 +22,13 @@ jobs:
           node --check worker/auth.js
           node --check worker/receipt-parser.js
           node --check worker/gmail.js
+          node --check worker/resale.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-gmail.mjs
+          node scripts/test-resale.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:

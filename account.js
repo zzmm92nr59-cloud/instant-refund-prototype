@@ -176,6 +176,9 @@
         if (x.reminder === "off") card.appendChild(el("span", { text: "We'll email you once, at your sign-in address.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
       }
     }
+    if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale) {
+      card.appendChild(el("button", { className: "rl-btn ghost", text: "Missed the window? Sell or swap it", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openResale(x.id); } }));
+    }
     var rt = x.returns;
     if (rt) {
       var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
@@ -303,11 +306,160 @@
       if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
     }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
+
+  // ---- Swap & resell (v1: matches members; no payments or postage through Relay yet) ----
+  var openResale = null;
+  var CONDITION = { new_with_tags: "New with tags", like_new: "Like new", good: "Good", fair: "Fair" };
+  var resaleErrors = { agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
+    already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
+    not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
+  function resaleView(sheet, onBack, focusReceipt) {
+    var body = el("div"), msg = el("div", { className: "rl-msg" });
+    var tabs = el("div", { style: "display:flex;gap:6px;margin:10px 0" });
+    var cur = focusReceipt ? "sell" : "browse";
+    [["browse", "Browse"], ["mine", "Mine"], ["sell", "Sell"]].forEach(function (t) {
+      var b = el("button", { className: "rl-btn ghost", text: t[1], style: "margin:0;padding:9px 6px;font-size:14px", onclick: function () { cur = t[0]; focusReceipt = null; draw(); } });
+      b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
+    });
+    [el("h2", { text: "Swap & resell" }),
+     el("p", { text: "Passed your return window? Sell or swap with other Relay members. For now Relay only matches people. Payment and postage aren't built yet, so nothing is bought or sent through Relay." }),
+     tabs, body, msg,
+     el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+    function tell(t, bad) { say(msg, t, bad); }
+    function fail(r) { tell(resaleErrors[r.body && r.body.error] || "Something went wrong. Please try again.", true); }
+    function photo(card, id, has) {
+      if (!has) return;
+      var ph = el("img", { alt: "", style: "float:right;width:72px;height:72px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:#f1ecdf" });
+      card.insertBefore(ph, card.firstChild);
+      apiBlob("/relay/my/resale/listings/" + id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
+    }
+    function facts(l) {
+      return [l.store, l.size ? "Size " + l.size : null, CONDITION[l.condition] || null,
+        l.askPence == null ? "Price: open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null].filter(Boolean).join(" · ");
+    }
+    function draw() {
+      Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "#c7f567" : "transparent"; });
+      body.textContent = ""; tell("");
+      if (cur === "browse") return drawBrowse();
+      if (cur === "mine") return drawMine();
+      drawSell();
+    }
+    function drawBrowse() {
+      body.appendChild(el("p", { text: "Loading…" }));
+      Promise.all([api("/relay/my/resale/feed"), api("/relay/my/resale/mine")]).then(function (rs) {
+        body.textContent = "";
+        if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load listings." }));
+        var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
+        var rows = rs[0].body.listings || [];
+        if (!rows.length) body.appendChild(el("p", { text: "Nothing listed by other members yet. List something yourself from the Sell tab." }));
+        rows.forEach(function (l) {
+          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
+          photo(card, l.id, l.hasImage);
+          if (l.note) card.appendChild(el("span", { text: "“" + l.note + "”", style: "display:block;margin-top:4px" }));
+          if (l.myRequest) {
+            card.appendChild(el("span", { text: "You asked about this (" + l.myRequest.status + ")", style: "display:block;margin-top:6px;font-weight:600" }));
+          } else {
+            var add = function (label, kind, extra) {
+              card.appendChild(el("button", { className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
+                var pick = card.querySelector("select");
+                var b = { kind: kind };
+                if (kind === "swap") { if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true); b.offeredListingId = pick.value; }
+                api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { if (r.ok) { tell("Sent. The seller will see your request as “Member”, not your name."); drawBrowse(); } else fail(r); }); } }));
+            };
+            add("I'd like this", "buy");
+            if (l.swapOk) {
+              if (mine.length) {
+                var sel = el("select", { style: "width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px solid #ddd6c6;font-size:14px" });
+                mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
+                card.appendChild(sel);
+              }
+              add("Offer a swap", "swap");
+            }
+          }
+          body.appendChild(card);
+        });
+      });
+    }
+    function drawMine() {
+      body.appendChild(el("p", { text: "Loading…" }));
+      api("/relay/my/resale/mine").then(function (r) {
+        body.textContent = "";
+        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings." }));
+        var ls = r.body.listings || [];
+        if (!ls.length) body.appendChild(el("p", { text: "You haven't listed anything yet. Use the Sell tab." }));
+        ls.forEach(function (l) {
+          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title + (l.status === "matched" ? " · matched" : "") }), el("span", { text: facts(l) })]);
+          photo(card, l.id, l.hasImage);
+          (l.requests || []).forEach(function (q) {
+            var row = el("div", { style: "margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
+            row.appendChild(el("b", { text: q.who + (q.kind === "swap" ? " offers a swap" : " would like to buy"), style: "display:block" }));
+            if (q.offered) row.appendChild(el("span", { text: "Offering: " + q.offered.title + (q.offered.size ? " (size " + q.offered.size + ")" : ""), style: "display:block" }));
+            if (q.message) row.appendChild(el("span", { text: "“" + q.message + "”", style: "display:block" }));
+            if (q.status === "pending" && l.status === "active") {
+              [["Accept", "accept", "rl-btn"], ["Decline", "decline", "rl-btn ghost"]].forEach(function (a) {
+                row.appendChild(el("button", { className: a[2], text: a[0], style: "margin-top:6px;padding:8px 12px;font-size:14px", onclick: function () {
+                  api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) { if (x.ok) drawMine(); else fail(x); }); } }));
+              });
+            } else row.appendChild(el("span", { text: q.status === "accepted" ? "Accepted. Arranging the handover isn't built yet." : q.status, style: "display:block;margin-top:4px;opacity:.75" }));
+            card.appendChild(row);
+          });
+          card.appendChild(el("button", { className: "rl-btn ghost", text: "Take this down", style: "margin-top:8px;padding:8px 12px;font-size:14px", onclick: function () {
+            api("/relay/my/resale/listings/" + l.id + "/withdraw", { method: "POST" }).then(drawMine); } }));
+          body.appendChild(card);
+        });
+        var mr = r.body.myRequests || [];
+        if (mr.length) {
+          body.appendChild(el("h2", { text: "Your requests", style: "font-size:18px;margin-top:14px" }));
+          mr.forEach(function (q) { body.appendChild(el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "Swap offered" : "You'd like to buy") + " · " + q.status })])); });
+        }
+      });
+    }
+    function drawSell() {
+      body.appendChild(el("p", { text: "Loading your items…" }));
+      api("/relay/my/resale/items").then(function (r) {
+        body.textContent = "";
+        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items." }));
+        var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); });
+        if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your Gmail." }));
+        items.forEach(function (i) { body.appendChild(sellCard(i)); });
+        if (focusReceipt) body.appendChild(el("button", { className: "rl-btn ghost", text: "Show all my items", onclick: function () { focusReceipt = null; draw(); } }));
+      });
+    }
+    function sellCard(i) {
+      var card = el("div", { className: "rl-order" }, [el("b", { text: i.title }), el("span", { text: [i.store, i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : null, i.orderDate].filter(Boolean).join(" · ") })]);
+      if (i.returnWindowOpen === true) card.appendChild(el("span", { text: "Heads up: you can still return this to the store for a refund until " + i.returnDeadline + ".", style: "display:block;margin-top:4px;color:#77520a" }));
+      card.appendChild(el("button", { className: "rl-btn", text: "List this", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
+        card.querySelector("button").remove();
+        var cond = el("select", { style: "width:100%;margin:8px 0;padding:10px;border-radius:12px;border:1px solid #ddd6c6;font-size:15px" });
+        Object.keys(CONDITION).forEach(function (k) { cond.appendChild(el("option", { value: k, text: CONDITION[k] })); });
+        cond.value = "like_new";
+        var size = el("input", { placeholder: "Size (optional)", maxLength: 20 });
+        var price = el("input", { placeholder: "Asking price in £ (leave empty for open to offers)", inputMode: "decimal" });
+        var note = el("input", { placeholder: "Note for buyers (optional, no contact details)", maxLength: 200 });
+        var swap = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
+        var agree = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
+        var go = el("button", { className: "rl-btn", text: "Put it on Relay", style: "margin-top:10px", onclick: function () {
+          var p = price.value.trim(), pence = null;
+          if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return tell(resaleErrors.invalid_price, true); pence = Math.round(n * 100); }
+          go.disabled = true;
+          api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, agree: agree.checked } })
+            .then(function (r) { go.disabled = false; if (r.ok) { cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); });
+        } });
+        [cond, size, price, note,
+         el("label", { style: "display:block;font-size:14px;margin:4px 0" }, [swap, document.createTextNode("I'm open to swaps")]),
+         el("label", { style: "display:block;font-size:13px;margin:8px 0;color:#5b6475" }, [agree, document.createTextNode("I agree Relay shows this item's name, store, size, condition, price, note and photo to other Relay members. My name, email, order number and address are never shown.")]),
+         go].forEach(function (n) { card.appendChild(n); });
+      } }));
+      return card;
+    }
+    draw();
+  }
   function signedInView(sheet, email, notice, c) {
     var list = el("div"), msg = el("div", { className: "rl-msg" });
     var gbox = el("div");
     [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
     if (notice) say(msg, notice.text, notice.bad);
+    openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     gmailSection(gbox, c || {}, msg);
     list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
@@ -322,6 +474,7 @@
           el("span", { text: money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
       });
     }).catch(function () { list.textContent = ""; list.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+    sheet.appendChild(el("button", { className: "rl-btn", text: "Swap & resell", style: "margin-top:10px", onclick: function () { openResale(); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt by pasting it", onclick: function () {
       if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
