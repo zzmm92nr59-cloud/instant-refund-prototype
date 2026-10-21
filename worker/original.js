@@ -42,9 +42,11 @@ function safeHttps(u) {
 // Allow-list cleaning: drop active/embedding elements, event handlers and non-https links/images.
 export function cleanHtml(html, cidMap = new Map()) {
   let h = String(html).slice(0, MAX_HTML);
+  // Elements removed together with their contents. A closing tag is required: never "to the end of the page".
   h = h.replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<(script|iframe|object|embed|form|link|meta|base|applet|frame|frameset|noscript|template|svg|math|audio|video|source|input|button|select|textarea)\b[\s\S]*?(<\/\1\s*>|$)/gi, "")
-    .replace(/<\/?(script|iframe|object|embed|form|link|meta|base|applet|frame|frameset|noscript|template|svg|math|audio|video|source|input|button|select|textarea)\b[^>]*>/gi, "");
+    .replace(/<(script|iframe|object|embed|applet|noscript|template|svg|math|audio|video|frameset)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  // Anything left of the unwanted kinds (void or unclosed tags, form controls) loses just the tag; text inside stays.
+  h = h.replace(/<\/?(script|iframe|object|embed|applet|noscript|template|svg|math|audio|video|frameset|frame|form|link|meta|base|source|input|button|select|textarea|option|head|title)\b[^>]*>/gi, "");
   // Remove @import and non-https url() from style blocks and attributes.
   h = h.replace(/@import[^;>]*;?/gi, "");
   const cleanCss = css => css.replace(/url\(\s*(['"]?)([^)'"]*)\1\s*\)/gi, (m, q, u) => (/^https:\/\//i.test(u) ? `url("${esc(u)}")` : "none"))
