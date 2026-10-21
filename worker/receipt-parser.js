@@ -10,10 +10,20 @@
 
 const MAX_INPUT = 600_000;
 
-function decodeQuotedPrintable(text) {
-  return text
-    .replace(/=\r?\n/g, "")
-    .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+function decodeQuotedPrintable(text, charset = "utf-8") {
+  const joined = text.replace(/=\r?\n/g, "");
+  const bytes = [];
+  for (let i = 0; i < joined.length; i++) {
+    const c = joined[i];
+    if (c === "=" && /^[0-9A-Fa-f]{2}$/.test(joined.slice(i + 1, i + 3))) { bytes.push(parseInt(joined.slice(i + 1, i + 3), 16)); i += 2; }
+    else {
+      const code = joined.charCodeAt(i);
+      if (code < 128) bytes.push(code);
+      else for (const b of new TextEncoder().encode(c)) bytes.push(b);
+    }
+  }
+  try { return new TextDecoder(charset, { fatal: false }).decode(Uint8Array.from(bytes)); }
+  catch { return new TextDecoder("utf-8", { fatal: false }).decode(Uint8Array.from(bytes)); }
 }
 
 function decodeBase64(text) {
@@ -26,12 +36,35 @@ function decodeBase64(text) {
   }
 }
 
+// RFC 2047 "encoded words" in headers, e.g. =?UTF-8?Q?Thanks_for_your_order?= or =?UTF-8?B?...?=
+function decodeMimeWords(value) {
+  if (!/=\?[^?\s]+\?[BbQq]\?[^?]*\?=/.test(value)) return value;
+  return value
+    .replace(/(=\?[^?\s]+\?[BbQq]\?[^?]*\?=)\s+(?==\?[^?\s]+\?[BbQq]\?)/g, "$1")
+    .replace(/=\?([^?\s]+)\?([BbQq])\?([^?]*)\?=/g, (m, charset, enc, data) => {
+      try {
+        let bytes;
+        if (enc.toUpperCase() === "B") bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+        else {
+          const q = data.replace(/_/g, " ");
+          const out = [];
+          for (let i = 0; i < q.length; i++) {
+            if (q[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(q.slice(i + 1, i + 3))) { out.push(parseInt(q.slice(i + 1, i + 3), 16)); i += 2; }
+            else out.push(q.charCodeAt(i) & 0xff);
+          }
+          bytes = Uint8Array.from(out);
+        }
+        return new TextDecoder(charset.toLowerCase() === "us-ascii" ? "utf-8" : charset, { fatal: false }).decode(bytes);
+      } catch { return m; }
+    });
+}
+
 function parseHeaders(block) {
   const headers = {};
   const unfolded = block.replace(/\r?\n[ \t]+/g, " ");
   for (const line of unfolded.split(/\r?\n/)) {
     const i = line.indexOf(":");
-    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = line.slice(i + 1).trim();
+    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = decodeMimeWords(line.slice(i + 1).trim());
   }
   return headers;
 }
@@ -44,7 +77,8 @@ function splitMessage(raw) {
 
 function decodeBody(headers, body) {
   const enc = (headers["content-transfer-encoding"] || "").toLowerCase();
-  if (enc.includes("quoted-printable")) return decodeQuotedPrintable(body);
+  const cs = ((headers["content-type"] || "").match(/charset="?([^";\s]+)"?/i) || [])[1] || "utf-8";
+  if (enc.includes("quoted-printable")) return decodeQuotedPrintable(body, cs);
   if (enc.includes("base64")) return decodeBase64(body);
   return body;
 }
@@ -204,13 +238,13 @@ function fromText(text, refDate) {
     for (let i = 0; i < rows.length - 1; i++) {
       const head = rows[i].match(/^(\d{1,2})\s*[x×]?\s+(\p{L}[^£]{2,120})$/u);
       const price = rows[i + 1].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})(?:\s*£\s*[0-9.]+)?$/);
-      if (head && price && !/total|subtotal|delivery|service|discount|fee|tip|vat/i.test(head[2])) {
+      if (head && price && !/^[x×]\s/i.test(head[2]) && !/\s\/\s/.test(head[2]) && !/total|subtotal|delivery|service|discount|fee|tip|vat/i.test(head[2])) {
         items.push({ name: head[2].trim(), qty: Number(head[1]), pricePence: money(price[1]), lineTotal: true });
       }
     }
   }
   if (!items.length) {
-    const rows = text.split("\n").map((x) => x.trim()).filter(Boolean);
+    const rows = text.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
     for (let i = 2; i < rows.length - 1; i++) {
       const v = rows[i].match(/^(\d{1,2})\s*[x×]\s*\S+\s*\/\s*.{2,60}$/);
       if (!v) continue;
@@ -319,7 +353,7 @@ function extractReturns(text, html, orderDate) {
 // An email that is not an order confirmation must not be turned into a purchase.
 function looksLikeReceipt(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
-  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no/.test(s);
+  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b/.test(s);
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
   return subjectHit && bodyHit;
 }
@@ -330,7 +364,9 @@ export function parseReceiptEmail(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = (parts.text.join("\n") || htmlToText(html)).trim();
+  const plain = parts.text.join("\n").trim();
+  const fromHtml = html ? htmlToText(html) : "";
+  let text = (plain || fromHtml).trim();
 
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
@@ -341,7 +377,13 @@ export function parseReceiptEmail(rawEmail) {
 
   const ld = html ? fromJsonLd(html) : null;
   const refDate = headers.date ? new Date(headers.date) : null;
-  const txt = fromText(text, refDate);
+  let txt = fromText(text, refDate);
+  // Many senders include a skimpy plain-text part next to the full HTML one: use whichever reads richer.
+  if (plain && fromHtml) {
+    const alt = fromText(fromHtml, refDate);
+    const richness = (r) => (r.items.length ? 2 : 0) + (r.orderDate ? 1 : 0) + (r.totalPence != null ? 1 : 0) + (r.orderRef ? 1 : 0);
+    if (richness(alt) > richness(txt)) { txt = alt; text = fromHtml; }
+  }
   const chosen = ld || txt;
 
   const result = {
