@@ -95,6 +95,23 @@
     [el("h2", { text: "Sign in to Relay" }),
      el("p", { text: "No password. We email you a one-time link. Purchases you made with that email address appear in your wallet." }),
      input, go, codeRow, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+    sheet.insertBefore(googleButton(msg), sheet.children[2]);
+    sheet.insertBefore(el("p", { text: "or", style: "text-align:center;opacity:.6;margin:8px 0" }), sheet.children[3]);
+  }
+  // Identity only: Google tells Relay your verified email. Relay gets no access to Gmail from this button.
+  function googleButton(msg) {
+    var b = el("button", { className: "rl-btn", text: "Continue with Google", style: "background:#fff;color:#1f1f1f;border:1px solid #dadce0" });
+    b.onclick = function () {
+      b.disabled = true; say(msg, "Opening Google…");
+      var bytes = new Uint8Array(32); (window.crypto || window.msCrypto).getRandomValues(bytes);
+      var nonce = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { b.disabled = false; return say(msg, "Your browser is blocking storage, so Google sign-in can't work here. Use the email link instead.", true); }
+      api("/relay/auth/google/start", { method: "POST", body: { nonce: nonce } }).then(function (r) {
+        if (r.ok && r.body && /^https:\/\/accounts\.google\.com\//.test(r.body.url || "")) { location.href = r.body.url; return; }
+        b.disabled = false; say(msg, r.status === 503 ? "Google sign-in isn't switched on yet. Use the email link instead." : "Couldn't start Google sign-in. Try again, or use the email link.", true);
+      }).catch(function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    return b;
   }
   function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
   function receiptView(sheet, back) {
@@ -649,7 +666,8 @@
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     open(function (sheet) { sheet.appendChild(el("h2", { text: "Signing you in…" })); });
-    api("/relay/auth/verify", { method: "POST", body: { token: m[1] } }).then(function (r) {
+    var gn = ""; try { gn = localStorage.getItem("relay_gnonce") || ""; localStorage.removeItem("relay_gnonce"); } catch (e) {}
+    api("/relay/auth/verify", { method: "POST", body: gn ? { token: m[1], nonce: gn } : { token: m[1] } }).then(function (r) {
       if (!r.ok) return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
         sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
         sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
@@ -669,6 +687,16 @@
     window.__relayAutoScan = m[1] === "connected";
     open(function (sheet) { gate(sheet, s.email || "", { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }); });
   }
-  function start() { bind(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeLinkSignIn(); completeGmail(); }); }
+  function completeGoogleNote() {
+    var m = /(?:^|[#&])gsignin=(denied|failed)(?:&|$)/.exec(location.hash || "");
+    if (!m) return;
+    try { history.replaceState(null, "", location.pathname + location.search); localStorage.removeItem("relay_gnonce"); } catch (e) {}
+    open(function (sheet) {
+      sheet.appendChild(el("h2", { text: m[1] === "denied" ? "Google sign-in cancelled" : "Google sign-in didn't work" }));
+      sheet.appendChild(el("p", { text: m[1] === "denied" ? "No problem. You can try again or use an email link instead." : "Please try again, or use an email link instead." }));
+      sheet.appendChild(el("button", { className: "rl-btn", text: "Back to sign in", onclick: show }));
+    });
+  }
+  function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

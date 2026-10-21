@@ -183,4 +183,66 @@ assert.equal((await call("/relay/me", { token: bob })).status, 401, "an unused s
 
 // 8. Non-auth routes untouched.
 assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/status"), env, new URL("https://w.test/relay/shopify/status"), {}, {}), null);
+
+// Sign in with Google (identity only). FAKE Google: nothing here proves real Google accepts the redirect address.
+{
+  const genv = { ...env, GOOGLE_CLIENT_ID: "client-id.apps.test", GOOGLE_CLIENT_SECRET: "client-secret-test" };
+  const b64u = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const nonceOf = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
+  let claims = {};
+  const gfetch = async (url, init) => {
+    if (String(url) === "https://oauth2.googleapis.com/token") {
+      const p = new URLSearchParams(String(init.body));
+      if (p.get("code") !== "good-code" || p.get("client_secret") !== "client-secret-test") return new Response("{}", { status: 400 });
+      return Response.json({ access_token: "a", id_token: "h." + b64u({ iss: "https://accounts.google.com", aud: "client-id.apps.test", exp: Math.floor(clock / 1000) + 3600, email: "alice@example.com", email_verified: true, ...claims }) + ".s" });
+    }
+    return new Response("blocked", { status: 500 });
+  };
+  const gcall = (path, { method = "GET", body, token } = {}) =>
+    handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "9.9.9.9", ...(token ? { authorization: "Bearer " + token } : {}) },
+      body: body ? JSON.stringify(body) : undefined }), genv, new URL("https://w.test" + path), {}, { now: clock, fetchImpl: gfetch });
+  async function flow(code = "good-code", extra = "") {
+    const nonce = nonceOf();
+    const st = await (await gcall("/relay/auth/google/start", { method: "POST", body: { nonce } })).json();
+    const u = new URL(st.url);
+    const cb = await gcall(`/relay/gmail/callback?code=${code}&state=${u.searchParams.get("state")}${extra}`);
+    return { nonce, u, cb, loc: cb.headers.get("location") || "" };
+  }
+  assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: {} })).status, 400, "start needs a browser secret");
+  assert.equal((await handleAuthRoute(new Request("https://w.test/relay/auth/google/start", { method: "POST", body: JSON.stringify({ nonce: nonceOf() }) }), env, new URL("https://w.test/relay/auth/google/start"), {}, { now: clock, fetchImpl: gfetch })).status, 503, "off until Google is configured");
+  assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: { nonce: "x" } })).status, 400);
+  const a = await flow();
+  assert.equal(a.u.origin + a.u.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
+  assert.equal(a.u.searchParams.get("scope"), "openid email", "identity only: no Gmail access requested");
+  assert.equal(a.u.searchParams.get("redirect_uri"), "https://w.test/relay/gmail/callback", "reuses the already-registered redirect address");
+  const tok = /#signin=([A-Za-z0-9_-]{43})$/.exec(a.loc);
+  assert.ok(tok, a.loc);
+  // the browser that did not start the flow cannot use the link
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tok[1] } })).status, 400, "no browser secret");
+  const b = await flow();
+  const tokB = /#signin=([A-Za-z0-9_-]{43})$/.exec(b.loc)[1];
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: nonceOf() } })).status, 400, "someone else's secret");
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: b.nonce } })).status, 400, "link is single-use even then");
+  const c = await flow();
+  const tokC = /#signin=([A-Za-z0-9_-]{43})$/.exec(c.loc)[1];
+  const ok = await gcall("/relay/auth/verify", { method: "POST", body: { token: tokC, nonce: c.nonce } });
+  assert.equal(ok.status, 200);
+  const sess = await ok.json();
+  assert.equal(sess.email, "alice@example.com");
+  assert.equal((await (await gcall("/relay/me", { token: sess.sessionToken })).json()).email, "alice@example.com");
+  // refusals
+  claims = { email_verified: false }; assert.match((await flow()).loc, /#gsignin=failed$/, "unverified Google email refused");
+  claims = { aud: "someone-elses-app" }; assert.match((await flow()).loc, /#gsignin=failed$/, "token meant for another app refused");
+  claims = { exp: 1 }; assert.match((await flow()).loc, /#gsignin=failed$/, "expired token refused");
+  claims = { iss: "https://evil.test" }; assert.match((await flow()).loc, /#gsignin=failed$/, "wrong issuer refused");
+  claims = {};
+  assert.match((await flow("bad-code")).loc, /#gsignin=failed$/, "bad code refused");
+  assert.match((await flow("good-code", "&error=access_denied")).loc, /#gsignin=denied$/, "denied by the shopper");
+  const d = await flow();
+  const again = await gcall(`/relay/gmail/callback?code=good-code&state=${d.u.searchParams.get("state")}`);
+  assert.match(again.headers.get("location"), /#gsignin=failed$/, "state cannot be replayed");
+  assert.match((await gcall(`/relay/gmail/callback?code=good-code&state=${"A".repeat(43)}`)).headers.get("location"), /#gmail=failed$/, "unknown state still goes to the Gmail handler");
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT * FROM auth_google_states").all()).includes("good-code"), false, "no code stored");
+}
+
 console.log("PASS shopper sign-in, single-use links, expiry, rate limits, ownership isolation, logout and deletion (fake email delivery)");

@@ -22,7 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
-const findBodies = [], addBodies = [];
+const findBodies = [], addBodies = [], verifyBodies = [], googleStarts = [];
 let resaleListed = false, resaleBodies = [], chatSent = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
@@ -33,6 +33,8 @@ await context.route('https://**/*', route => {
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
   if (p === '/relay/auth/request') return j(200, { ok: true });
   if (p === '/relay/auth/verify-code') { const b = JSON.parse(req.postData()); return b.code === '123456' && b.email === 'alice@example.com' ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_code' }); }
+  if (p === '/relay/auth/verify') verifyBodies.push(JSON.parse(req.postData()));
+  if (p === '/relay/auth/google/start') { googleStarts.push(JSON.parse(req.postData())); return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' }); }
   if (p === '/relay/auth/verify') return JSON.parse(req.postData()).token === TOKEN ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_link' });
   if (p === '/relay/my/purchases') return h.authorization === 'Bearer ' + SESSION
     ? j(200, { purchases: [{ id: 'o1', amountMinor: 12999, currency: 'GBP', orderedAt: '2026-10-14T12:00:00Z', items: [{ title: '<img src=x onerror=window.__xss=1>Trainers', quantity: 1 }] }] }) : j(401, { error: 'not_signed_in' });
@@ -88,6 +90,28 @@ assert.ok(await page.evaluate(() => JSON.stringify(localStorage)).then(v => v.in
 await page.evaluate(() => localStorage.clear());
 await page.goto(origin + '/index.html');
 console.log('PASS requesting a sign-in link and signing in with the 6-digit code');
+// Continue with Google: starts with a browser secret, goes to Google, and the secret is sent back (once) when the sign-in completes.
+await page.locator('.avatar').click();
+await page.getByRole('button', { name: 'Continue with Google' }).click();
+await page.waitForURL(/accounts\.google\.com/);
+assert.equal(googleStarts.length, 1);
+assert.match(googleStarts[0].nonce, /^[A-Za-z0-9_-]{43}$/, 'browser secret sent to start the flow');
+await page.goto(origin + '/index.html');
+const NONCE = 'N'.repeat(43);
+await page.evaluate(n => localStorage.setItem('relay_gnonce', n), NONCE);
+verifyBodies.length = 0;
+await page.goto(origin + '/index.html#signin=' + TOKEN);
+await page.getByRole('heading', { name: 'Before you start' }).waitFor();
+assert.deepEqual(verifyBodies, [{ token: TOKEN, nonce: NONCE }], 'secret sent with the link token');
+assert.equal(await page.evaluate(() => localStorage.getItem('relay_gnonce')), null, 'secret used once');
+await page.evaluate(() => localStorage.clear());
+await page.goto(origin + '/index.html#gsignin=denied');
+await page.getByText('Google sign-in cancelled').waitFor();
+await page.goto(origin + '/index.html#gsignin=failed');
+await page.getByText("Google sign-in didn't work").waitFor();
+await page.evaluate(() => localStorage.clear());
+await page.goto(origin + '/index.html');
+console.log('PASS Continue with Google: starts safely, secret sent once, cancelled and failed shown clearly');
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Before you start' }).waitFor();
 assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');
