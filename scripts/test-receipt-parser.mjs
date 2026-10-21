@@ -352,4 +352,22 @@ t("order email titled 'Thanks for your <brand> order #REF' with Items Purchased 
   assert.equal(r.ok, true); assert.equal(r.orderRef, "UK04002516"); assert.equal(r.totalPence, 11800); assert.equal(r.orderDate, "2025-11-19");
 });
 
+// Real emails are MIME: encoded-word subject, quoted-printable / base64 HTML next to a skimpy plain part, UTF-8 "£".
+const qpEnc = (str) => Buffer.from(str, "utf8").toString("latin1").replace(/=/g, "=3D").replace(/[^\x20-\x7e\n]/g, (c) => "=" + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")).split("\n").map((l) => l.replace(/(.{70})/g, "$1=\n")).join("\n");
+const mimeHtml = `<html><body><table><tr><td><b>Items Purchased</b></td></tr><tr><td><p>Define Jacket</p><p>Nulu</p><p>1 x 074897 / Size US 8 (UK 12-14)</p></td><td>&pound;118.00</td></tr><tr><td>Subtotal (1 item)</td><td>\u00a398.33</td></tr><tr><td><b>Order Total</b></td><td>\u00a3118.00</td></tr><tr><td>Order Id: #UK04002516</td></tr><tr><td><b>Order Date</b></td></tr><tr><td>November 19, 2025</td></tr></table></body></html>`;
+for (const enc of ["quoted-printable", "base64"]) {
+  t(`multipart email with encoded-word subject and ${enc} HTML (UTF-8 £)`, () => {
+    const body = enc === "base64" ? Buffer.from(mimeHtml).toString("base64").replace(/(.{76})/g, "$1\r\n") : qpEnc(mimeHtml);
+    const raw = `From: Brand <hello@e.brand.test>\r\nSubject: =?UTF-8?Q?Thanks_for_your_brand_order_#UK04002516?=\r\nDate: Wed, 19 Nov 2025 22:09:00 +0000\r\nMIME-Version: 1.0\r\nContent-Type: multipart/alternative; boundary="b1"\r\n\r\n--b1\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qpEnc("Thanks for your Order!\nOrder Id: #UK04002516\nOrder Total \u00a3118.00")}\r\n--b1\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: ${enc}\r\n\r\n${body}\r\n--b1--\r\n`;
+    const r = parseReceiptEmail(raw);
+    assert.equal(r.ok, true); assert.equal(r.orderRef, "UK04002516"); assert.equal(r.totalPence, 11800);
+    assert.equal(r.orderDate, "2025-11-19"); assert.equal(r.items[0]?.name, "Define Jacket Nulu");
+  });
+}
+t("base64-encoded-word subject (=?UTF-8?B?...) is decoded", () => {
+  const subj = "=?UTF-8?B?" + Buffer.from("Thanks for your order #AB12345").toString("base64") + "?=";
+  const r = parseReceiptEmail(`From: S <s@shop.test>\nSubject: ${subj}\nContent-Type: text/plain\n\nOrder number: AB12345\nOrder total \u00a320.00\n`);
+  assert.equal(r.ok, true); assert.equal(r.totalPence, 2000);
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
