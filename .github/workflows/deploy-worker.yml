@@ -23,6 +23,7 @@ jobs:
           node --check worker/receipt-parser.js
           node --check worker/gmail.js
           node --check worker/resale.js
+          node --check worker/original.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
