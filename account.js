@@ -313,10 +313,62 @@
   var resaleErrors = { agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
     already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
     not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
-  function resaleView(sheet, onBack, focusReceipt) {
+
+  // A conversation between a seller and the member whose request they accepted.
+  var chatErrors = { no_contact_details: "Please keep emails, phone numbers and links out of messages for now.", too_many_messages: "That's a lot of messages. Try again in a bit.",
+    thread_full: "This conversation has reached its limit.", conversation_closed: "This conversation has ended.", empty_message: "Write a message first." };
+  function chatView(sheet, requestId, onBack) {
+    var log = el("div", { style: "margin:10px 0;max-height:42vh;overflow:auto" }), msg = el("div", { className: "rl-msg" });
+    var head = el("h2", { text: "Messages" }), sub = el("p", { text: "" });
+    var input = el("input", { placeholder: "Write a message", maxLength: 500 });
+    var send = el("button", { className: "rl-btn", text: "Send" });
+    var tools = el("div");
+    [head, sub, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
+    var timer = null, isOpen = false;
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    function load() {
+      if (!document.body.contains(sheet)) return stop();
+      api("/relay/my/resale/requests/" + requestId + "/messages").then(function (r) {
+        if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
+        var b = r.body; isOpen = b.open;
+        head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Payment and postage aren't built yet.";
+        log.textContent = "";
+        if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
+        b.messages.forEach(function (m) {
+          log.appendChild(el("div", { text: m.body, style: "margin:6px 0;padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;" +
+            (m.mine ? "margin-left:auto;background:#c7f567;color:#0f1b33" : "background:#f1ecdf;color:#0f1b33") }));
+        });
+        log.scrollTop = log.scrollHeight;
+        input.style.display = send.style.display = isOpen ? "" : "none";
+        if (!isOpen) say(msg, "This conversation has ended.");
+        tools.textContent = "";
+        if (isOpen) {
+          tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", style: "padding:9px 14px;font-size:14px", onclick: function () {
+            if (!confirm("End this conversation? The item goes back on sale.")) return;
+            api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); } }));
+          tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", style: "padding:9px 14px;font-size:14px", onclick: function () {
+            var why = prompt("What went wrong? (for example: asked me to pay outside Relay)");
+            if (why === null) return;
+            api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); } }));
+        }
+      });
+    }
+    send.onclick = function () {
+      var t = input.value.trim(); if (!t) return;
+      send.disabled = true;
+      api("/relay/my/resale/requests/" + requestId + "/messages", { method: "POST", body: { body: t } }).then(function (r) {
+        send.disabled = false;
+        if (r.ok) { input.value = ""; say(msg, ""); load(); } else say(msg, chatErrors[r.body && r.body.error] || "Couldn't send. Try again.", true);
+      });
+    };
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.onclick(); });
+    load(); timer = setInterval(load, 8000);
+  }
+  function resaleView(sheet, onBack, focusReceipt, startTab) {
     var body = el("div"), msg = el("div", { className: "rl-msg" });
     var tabs = el("div", { style: "display:flex;gap:6px;margin:10px 0" });
-    var cur = focusReceipt ? "sell" : "browse";
+    var cur = startTab || (focusReceipt ? "sell" : "browse");
+    function openChat(id) { sheet.textContent = ""; chatView(sheet, id, function () { sheet.textContent = ""; resaleView(sheet, onBack, null, "mine"); }); }
     [["browse", "Browse"], ["mine", "Mine"], ["sell", "Sell"]].forEach(function (t) {
       var b = el("button", { className: "rl-btn ghost", text: t[1], style: "margin:0;padding:9px 6px;font-size:14px", onclick: function () { cur = t[0]; focusReceipt = null; draw(); } });
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
@@ -358,6 +410,7 @@
           if (l.note) card.appendChild(el("span", { text: "“" + l.note + "”", style: "display:block;margin-top:4px" }));
           if (l.myRequest) {
             card.appendChild(el("span", { text: "You asked about this (" + l.myRequest.status + ")", style: "display:block;margin-top:6px;font-weight:600" }));
+            if (l.myRequest.status === "accepted") card.appendChild(el("button", { className: "rl-btn", text: "Message the seller", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openChat(l.myRequest.id); } }));
           } else {
             var add = function (label, kind, extra) {
               card.appendChild(el("button", { className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
@@ -400,7 +453,10 @@
                 row.appendChild(el("button", { className: a[2], text: a[0], style: "margin-top:6px;padding:8px 12px;font-size:14px", onclick: function () {
                   api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) { if (x.ok) drawMine(); else fail(x); }); } }));
               });
-            } else row.appendChild(el("span", { text: q.status === "accepted" ? "Accepted. Arranging the handover isn't built yet." : q.status, style: "display:block;margin-top:4px;opacity:.75" }));
+            } else {
+              row.appendChild(el("span", { text: q.status === "accepted" ? "Accepted. Payment and postage aren't built yet, so agree the handover by message." : q.status, style: "display:block;margin-top:4px;opacity:.75" }));
+              if (q.status === "accepted") row.appendChild(el("button", { className: "rl-btn", text: "Open messages", style: "margin-top:6px;padding:8px 12px;font-size:14px", onclick: function () { openChat(q.id); } }));
+            }
             card.appendChild(row);
           });
           card.appendChild(el("button", { className: "rl-btn ghost", text: "Take this down", style: "margin-top:8px;padding:8px 12px;font-size:14px", onclick: function () {
@@ -410,7 +466,10 @@
         var mr = r.body.myRequests || [];
         if (mr.length) {
           body.appendChild(el("h2", { text: "Your requests", style: "font-size:18px;margin-top:14px" }));
-          mr.forEach(function (q) { body.appendChild(el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "Swap offered" : "You'd like to buy") + " · " + q.status })])); });
+          mr.forEach(function (q) {
+            var c = el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "Swap offered" : "You'd like to buy") + " · " + q.status })]);
+            if (q.status === "accepted") c.appendChild(el("button", { className: "rl-btn", text: "Message the seller", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openChat(q.id); } }));
+            body.appendChild(c); });
         }
       });
     }
