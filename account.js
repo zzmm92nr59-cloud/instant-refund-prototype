@@ -179,6 +179,9 @@
     if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "Missed the window? Sell or swap it", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openResale(x.id); } }));
     }
+    if (x.id && /^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") && openOriginal) {
+      card.appendChild(el("button", { className: "rl-btn ghost", text: "View original receipt", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openOriginal(x.id); } }));
+    }
     var rt = x.returns;
     if (rt) {
       var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
@@ -188,8 +191,8 @@
       else if (rt.windowDays) line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery (check your delivery date)" : ""));
       if (rt.address) line("Send to: " + rt.address);
       (rt.instructions || []).forEach(function (t) { line("“" + t + "”"); });
-      if (rt.qrMentioned) line("This email mentions a QR code. Relay can't read it yet, so open the original email to use it.");
-      else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Check the original email.");
+      if (rt.qrMentioned) line("This email mentions a QR code. Tap “View original receipt” to see it.");
+      else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Tap “View original receipt” to see it.");
       if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
         rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return on the store's site", style: "display:block;margin-top:6px;font-weight:600" }));
       }
@@ -209,7 +212,9 @@
       if (rp.returnId) pl("Return ID: " + rp.returnId);
       (rp.steps || []).forEach(function (t) { pl("• " + t); });
       if (rp.estimatedRefundPence != null) pl("Estimated refund: " + money(rp.estimatedRefundPence, rp.currency) + " (an estimate from the email, not a confirmed refund)");
-      if (/^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "")) {
+      if (rp.id && /^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "") && openOriginal) {
+        pb.appendChild(el("button", { className: "rl-btn", text: "Show my QR code / return email", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openOriginal(rp.id); } }));
+      } else if (/^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "")) {
         pb.appendChild(el("a", { href: "https://mail.google.com/mail/u/0/#all/" + rp.gmailId, target: "_blank", rel: "noopener noreferrer", text: "Open the email with your QR code", style: "display:block;margin-top:6px;font-weight:600" }));
       }
       if (rp.trackUrl && /^https:\/\//.test(rp.trackUrl)) {
@@ -305,6 +310,42 @@
         api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
       if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
     }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+  }
+
+  // ---- View original receipt: fetched live from Gmail when opened; nothing is stored ----
+  var openOriginal = null;
+  function originalView(sheet, receiptId, onBack) {
+    var msg = el("div", { className: "rl-msg" });
+    var body = el("div");
+    [el("h2", { text: "Original receipt" }), el("p", { text: "Loading it from your Gmail…", style: "opacity:.7" }), body, msg,
+      el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+    var note = sheet.children[1];
+    api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
+      if (!r.ok) {
+        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? "Gmail needs to be reconnected. Go back and tap Connect Gmail."
+          : r.status === 404 ? "That email is no longer in your Gmail, so it can't be shown."
+          : "Couldn't load the original email. Try again in a moment.";
+        return;
+      }
+      note.textContent = "Shown straight from your Gmail. Relay doesn't keep a copy.";
+      note.style.fontSize = "13px";
+      var b = r.body || {};
+      (b.links || []).forEach(function (l) {
+        if (!/^https:\/\//.test(l.url || "")) return;
+        body.appendChild(el("a", { href: l.url, target: "_blank", rel: "noopener noreferrer", text: String(l.label), className: "rl-btn", style: "display:block;text-align:center;text-decoration:none;margin-bottom:8px" }));
+      });
+      (b.extraImages || []).forEach(function (u) {
+        if (!/^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(u)) return;
+        body.appendChild(el("img", { src: u, alt: "Picture attached to the email", style: "display:block;max-width:100%;margin:8px auto;background:#fff;border-radius:8px" }));
+      });
+      var frame = el("iframe", { title: "Original receipt email", style: "width:100%;height:60vh;border:1px solid #ece4d3;border-radius:12px;background:#fff;margin-top:8px" });
+      // No scripts, no same-origin: the email can show itself but cannot run code or touch Relay.
+      frame.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
+      frame.setAttribute("referrerpolicy", "no-referrer");
+      frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src https: data:; style-src \'unsafe-inline\'; font-src https:">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>body{margin:8px;font-family:-apple-system,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style>' + String(b.html || "");
+      body.appendChild(frame);
+    }).catch(function () { note.textContent = "Couldn't reach Relay."; });
   }
 
   // ---- Swap & resell (v1: matches members; no payments or postage through Relay yet) ----
@@ -518,6 +559,7 @@
     var gbox = el("div");
     [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
     if (notice) say(msg, notice.text, notice.bad);
+    openOriginal = function (id) { back.firstChild.textContent = ""; originalView(back.firstChild, id, function () { gate(back.firstChild, email); }); };
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     gmailSection(gbox, c || {}, msg);
     list.appendChild(el("p", { text: "Loading…" }));

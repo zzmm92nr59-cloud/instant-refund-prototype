@@ -70,6 +70,16 @@ const fetchImpl = async (url, init = {}) => {
     if (paging) return Response.json({ messages: ids.filter(k => k !== "m99").map(id => ({ id: id + "abcdef" })), nextPageToken: "page2" });
     return Response.json({ messages: ids.map(id => ({ id: id + "abcdef" })) });
   }
+  const full = /messages\/(m\d+)abcdef\?format=full$/.exec(url);
+  if (full) {
+    const html = `<html><body onload="steal()"><script>alert(1)</script><p onclick="x()">Order EO-${full[1]}</p><a href="javascript:alert(1)">bad</a><a href="https://shop.test/returns?o=1&amp;x=2">Start a return</a><img src="http://tracker.test/p.gif"><img src="cid:qr1" alt="QR"><iframe src="https://evil.test"></iframe></body></html>`;
+    return Response.json({ payload: { mimeType: "multipart/related", parts: [
+      { mimeType: "text/html", body: { data: b64url(html) } },
+      { mimeType: "image/png", headers: [{ name: "Content-ID", value: "<qr1>" }], body: { attachmentId: "att1", size: 3000 } },
+      { mimeType: "image/png", filename: "label.png", body: { attachmentId: "att2", size: 3000 } }] } });
+  }
+  const att = /messages\/m\d+abcdef\/attachments\/(att\d)$/.exec(url);
+  if (att) return Response.json({ data: PNG.toString("base64url") });
   const one = /messages\/(m\d+)abcdef\?format=raw$/.exec(url);
   if (one) return Response.json({ raw: b64url(gmailBox[one[1]]) });
   return new Response("blocked", { status: 500 });
@@ -198,6 +208,24 @@ paging = true;
 await scanAll();
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
+// 11b. "View original receipt": fetched live, cleaned, owner-only, needs consent, nothing stored.
+{
+  const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1");
+  const before = JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all());
+  const o = await call(`/relay/my/receipts/${mine.id}/original`, { token: alice });
+  assert.equal(o.status, 200);
+  const ob = await o.json();
+  assert.ok(ob.html.includes("Order EO-"), "body shown");
+  assert.ok(!/<script|onload|onclick|javascript:|<iframe|tracker\.test|evil\.test/i.test(ob.html), ob.html);
+  assert.ok(ob.html.includes('href="https://shop.test/returns?o=1&amp;x=2"') && /rel="noopener/.test(ob.html), "https links kept, safely");
+  assert.ok(ob.html.includes("src=\"data:image/png;base64,"), "embedded picture (QR) inlined");
+  assert.equal(ob.extraImages.length, 1, "attached picture not shown in the body is listed separately");
+  assert.deepEqual(ob.links.map(l => l.label), ["Start a return"]);
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()), before, "nothing stored");
+  assert.notEqual((await call(`/relay/my/receipts/${mine.id}/original`, { token: bob })).status, 200, "another shopper cannot open it");
+  assert.equal((await call(`/relay/my/receipts/${mine.id}/original`)).status, 401, "needs sign-in");
+}
+
 sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-99%'").run();
 delete gmailBox.m99;
 

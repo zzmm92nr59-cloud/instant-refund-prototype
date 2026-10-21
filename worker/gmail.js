@@ -12,6 +12,7 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
+import { buildOriginal } from "./original.js";
 import { ensureResaleTables } from "./resale.js";
 
 export const CONSENT_VERSION = "2026-10-v4";
@@ -443,6 +444,22 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/receipts" && m === "GET") {
     return json({ receipts: await listReceipts(env, shopper.id) }, 200, cors);
+  }
+  const orig = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/original$/.exec(path);
+  if (orig && m === "GET") {
+    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const rec = await env.RELAY_DB.prepare(
+      "SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(orig[1], shopper.id).first();
+    if (!rec) return json({ error: "not_found" }, 404, cors);
+    const gid = JSON.parse(rec.details).gmailId;
+    if (typeof gid !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(gid)) return json({ error: "email_not_found" }, 404, cors);
+    const conn = await env.RELAY_DB.prepare(
+      "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first();
+    if (!conn) return json({ error: "gmail_not_connected" }, 409, cors);
+    const token = await accessToken(env, await decrypt(env, conn.token_iv, conn.token_data), opts.fetchImpl);
+    if (!token) return json({ error: "gmail_reconnect_needed" }, 401, cors);
+    const r = await buildOriginal(opts.fetchImpl, token, gid);
+    return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
   }
   const act = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/(confirm|dismiss)$/.exec(path);
   if (act && m === "POST") {
