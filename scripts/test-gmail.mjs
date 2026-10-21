@@ -28,6 +28,12 @@ const b64url = s => Buffer.from(s).toString("base64url");
 const receiptMail = (n) => `From: Example Outfitters <orders@exampleoutfitters.test>\nSubject: Your order confirmation #EO-${n}\nContent-Type: text/plain\n\nOrder number: EO-${n}\nOrder date: 14 Oct 2026\nWool jumper - Qty 1 - £59.00\nOrder total: £59.00\nReturns accepted within 30 days of purchase.\nPRIVATE-BODY-MARKER-${n}\n`;
 const newsletter = `From: Shop <news@shop.test>\nSubject: 50% off this weekend\nContent-Type: text/plain\n\nJumpers from £19.99 PRIVATE-BODY-MARKER-news`;
 const gmailBox = { m1: receiptMail(1), m2: newsletter, m3: receiptMail(3) };
+// Emails that exist in Gmail but are not part of the normal scan window (found by name instead).
+const hidden = {
+  m77: `From: lululemon <hello@e.lululemon.test>\nSubject: Thanks for your lululemon order\nContent-Type: text/plain\n\nThanks for your Order, Sam!\nItems Purchased\nDefine Jacket\nNulu\n1 x 074897 / Size US 8\n£118.00\nOrder Total\n£118.00\nOrder Id: #UK04002516\nOrder Date\nNovember 19, 2025\nPRIVATE-BODY-MARKER-77\n`,
+  m78: `From: lululemon <news@e.lululemon.test>\nSubject: New arrivals\nContent-Type: text/plain\n\nNew jackets this week.`,
+  m79: `From: lululemon <hello@e.lululemon.test>\nSubject: Thanks for your return request for your lululemon order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-5551234\nOrder Id: #UK04002516\nSend it back no later than December 24.\nEstimated refund: £118.00\nOrder Total £118.00\n`
+};
 let calls = [];
 let refreshOk = true;
 let paging = false;
@@ -59,6 +65,9 @@ const fetchImpl = async (url, init = {}) => {
   }
   if (url === "https://oauth2.googleapis.com/revoke") return new Response("{}", { status: 200 });
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
+  if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?") && /q=findme|q=lululemon/i.test(url)) {
+    return Response.json({ messages: [{ id: "m77abcdef" }, { id: "m78abcdef" }, { id: "m79abcdef" }, { id: "bad id" }] });
+  }
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
         const q = decodeURIComponent(url);
     const win = /after:(\d{4}\/\d{2}\/\d{2}) before:(\d{4}\/\d{2}\/\d{2})/.exec(q);
@@ -80,8 +89,11 @@ const fetchImpl = async (url, init = {}) => {
   }
   const att = /messages\/m\d+abcdef\/attachments\/(att\d)$/.exec(url);
   if (att) return Response.json({ data: PNG.toString("base64url") });
+  const meta = /messages\/(m\d+)abcdef\?format=metadata/.exec(url);
+  if (meta) { const raw = hidden[meta[1]] || gmailBox[meta[1]]; const g = k => (new RegExp("^" + k + ": (.*)$", "m").exec(raw) || [])[1] || "";
+    return Response.json({ internalDate: String(clock), payload: { headers: [{ name: "Subject", value: g("Subject") }, { name: "From", value: g("From") }] } }); }
   const one = /messages\/(m\d+)abcdef\?format=raw$/.exec(url);
-  if (one) return Response.json({ raw: b64url(gmailBox[one[1]]) });
+  if (one) return Response.json({ raw: b64url(gmailBox[one[1]] ?? hidden[one[1]]) });
   return new Response("blocked", { status: 500 });
 };
 let clock = 1_800_000_000_000;
@@ -208,6 +220,38 @@ paging = true;
 await scanAll();
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
+// 11c. "Find a missing receipt": search by store name, pick one email, add it. Owner-only, consent-gated.
+{
+  const find = (q, token = alice) => post("/relay/my/gmail/find", token, { query: q });
+  assert.equal((await find("lululemon", bob)).status, 403, "needs consent");
+  assert.equal((await find("x")).status, 400, "too-short search refused");
+  const fr = await (await find("lululemon")).json();
+  assert.deepEqual(fr.results.map(x => x.id), ["m77abcdef", "m78abcdef", "m79abcdef"], "list of choices (bad ids dropped)");
+  assert.equal(fr.results[0].subject, "Thanks for your lululemon order");
+  assert.equal(fr.results[0].added, false);
+  const q1 = calls.filter(c => /messages\?/.test(c.url) && /lululemon/.test(c.url)).pop().url;
+  assert.ok(!/after:|before:/.test(decodeURIComponent(q1)), "search is by name only");
+  const before = JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all());
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()), before, "searching stores nothing");
+  const a1 = await (await post("/relay/my/gmail/add", alice, { messageId: "m77abcdef" })).json();
+  assert.ok(a1.ok && a1.kind === "receipt" && a1.store === "lululemon", JSON.stringify(a1));
+  const a2 = await (await post("/relay/my/gmail/add", alice, { messageId: "m78abcdef" })).json();
+  assert.equal(a2.ok, false); assert.equal(a2.reason, "not_recognised"); assert.ok(a2.signals && typeof a2.signals.subject === "boolean");
+  assert.ok(!JSON.stringify(a2).includes("New jackets"), "no email content in the explanation");
+  const a3 = await (await post("/relay/my/gmail/add", alice, { messageId: "m79abcdef" })).json();
+  assert.equal(a3.kind, "return_instructions", "a return email is never mistaken for the order");
+  assert.equal((await post("/relay/my/gmail/add", alice, { messageId: "../x" })).status, 400);
+  const cards = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
+  const lulu = cards.find(c => c.orderRef === "UK04002516");
+  assert.ok(lulu && lulu.kind === "receipt" && lulu.totalPence === 11800 && lulu.gmailId === "m77abcdef", JSON.stringify(lulu));
+  assert.equal(lulu.returnPlan && lulu.returnPlan.returnId, "RT-5551234", "order card and its return email are joined");
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("PRIVATE-BODY-MARKER-77"), "email text not stored");
+  assert.equal((await (await find("lululemon")).json()).results[0].added, true, "marked as already added");
+  // tidy up so later sections see the original two receipts
+  sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%UK04002516%' OR details LIKE '%m77abcdef%' OR details LIKE '%m79abcdef%'").run();
+  sqlite.prepare("DELETE FROM receipt_images").run();
+}
+
 // 11b. "View original receipt": fetched live, cleaned, owner-only, needs consent, nothing stored.
 {
   const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1");

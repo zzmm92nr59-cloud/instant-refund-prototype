@@ -22,6 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
+const findBodies = [], addBodies = [];
 let resaleListed = false, resaleBodies = [], chatSent = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
@@ -50,6 +51,8 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
   if (p === '/relay/my/gmail/scan') { const b = JSON.parse(req.postData() || '{}'); scanBodies.push(b); return b.cursor ? j(200, { ok: true, added: 0, more: false, cursor: null }) : j(200, { ok: true, added: 1, more: true, cursor: '2026/05/01', scannedBack: '2026/05/01' }); }
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
+  if (p === '/relay/my/gmail/find') { findBodies.push(JSON.parse(req.postData())); return j(200, { results: [{ id: 'm77abcdef', subject: '<img src=x onerror=window.__xss9=1>Thanks for your lululemon order', from: 'lululemon', date: '2025-11-19', added: false }, { id: 'm78abcdef', subject: 'New arrivals', from: 'lululemon', date: '2025-11-20', added: false }] }); }
+  if (p === '/relay/my/gmail/add') { const b = JSON.parse(req.postData()); addBodies.push(b); return b.messageId === 'm77abcdef' ? j(200, { ok: true, kind: 'receipt', store: 'lululemon', orderRef: 'UK04002516' }) : j(200, { ok: false, reason: 'not_recognised', signals: { subject: false, body: false } }); }
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/original') return j(200, { html: '<p>Order EO-1 body from the store</p>', extraImages: ['data:image/png;base64,' + PNG1.toString('base64'), 'javascript:alert(1)'], links: [{ label: 'Start a return', url: 'https://shop.test/returns' }, { label: 'Bad', url: 'http://shop.test/x' }] });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
@@ -143,6 +146,20 @@ await page.getByRole('button', { name: 'Back' }).last().click();
 await page.getByRole('button', { name: 'Looks right' }).waitFor();
 assert.equal(await page.evaluate(() => window.__xss4), undefined, 'return wording must never run as HTML');
 assert.equal(await page.getByRole('link', { name: /Start a return/ }).count(), 0, 'non-https return link is never shown');
+await page.getByRole('button', { name: /Can.t find a receipt/ }).click();
+await page.getByRole('heading', { name: 'Find a missing receipt' }).waitFor();
+await page.getByPlaceholder('Store name, e.g. lululemon').fill('lululemon');
+await page.getByRole('button', { name: 'Search my Gmail' }).click();
+await page.getByText('Thanks for your lululemon order').waitFor();
+assert.deepEqual(findBodies, [{ query: 'lululemon' }]);
+assert.equal(await page.evaluate(() => window.__xss9), undefined, 'email subjects from Gmail never run as HTML');
+await page.getByRole('button', { name: 'Add' }).nth(1).click();
+await page.getByText(/couldn.t read that email/).waitFor();
+await page.getByRole('button', { name: 'Add' }).first().click();
+await page.getByText(/Added lululemon · UK04002516/).waitFor();
+assert.deepEqual(addBodies.map(b => b.messageId), ['m78abcdef', 'm77abcdef']);
+await page.getByRole('button', { name: 'Back' }).last().click();
+await page.getByRole('button', { name: 'Looks right' }).waitFor();
 await page.getByRole('button', { name: 'Looks right' }).click();
 await page.getByText('Confirmed by you').waitFor();
 console.log('PASS returning from Google scans, lists captured receipts safely, shopper confirms');
