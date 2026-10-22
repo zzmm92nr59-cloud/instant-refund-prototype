@@ -25,6 +25,7 @@ jobs:
           node --check worker/resale.js
           node --check worker/original.js
           node --check worker/passkeys.js
+          node --check worker/totp.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs

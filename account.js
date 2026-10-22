@@ -60,7 +60,7 @@
   }
   var errors = { invalid_email: "That doesn't look like an email address.", too_many_requests: "Too many attempts. Please try again later.",
     sign_in_not_configured: "Sign-in isn't switched on yet.", email_send_failed: "We couldn't send the email. Please try again.",
-    no_deadline: "There's no return deadline to remind you about.", deadline_passed: "That deadline has already passed.", consent_required: "Please agree to the permission step first.", invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address." };
+    no_deadline: "There's no return deadline to remind you about.", deadline_passed: "That deadline has already passed.", consent_required: "Please agree to the permission step first.", invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address.", invalid_code: "That code isn't right. Check your authenticator app, or type a recovery code.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
 
   function signedOutView(sheet) {
@@ -86,6 +86,7 @@
       api("/relay/auth/verify-code", { method: "POST", body: { email: input.value, code: codeIn.value } }).then(function (r) {
         codeGo.disabled = false;
         if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
+        if (r.body.needsSecondStep) return secondStepView(sheet, r.body.pendingToken);
         save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
         keepStorage();
         var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
@@ -190,6 +191,85 @@
       }).catch(function (e) { add.disabled = false; say(note, passkeyProblem(e), true); });
     };
     refresh();
+  }
+
+  // ---- Authenticator-app 2-step ----
+  function secondStepView(sheet, pendingToken) {
+    sheet.textContent = "";
+    var input = el("input", { type: "text", placeholder: "6-digit code or recovery code", autocomplete: "one-time-code", maxLength: 20 });
+    var msg = el("div", { className: "rl-msg" });
+    var go = el("button", { className: "rl-btn", text: "Confirm" });
+    go.onclick = function () {
+      go.disabled = true; say(msg, "Checking…");
+      api("/relay/auth/2fa/verify", { method: "POST", body: { pendingToken: pendingToken, code: input.value } }).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
+        save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
+        keepStorage();
+        var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
+        show();
+      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    [el("h2", { text: "One more step" }),
+     el("p", { text: "Open your authenticator app and type the 6-digit code for Relay. Lost your phone? Type one of your saved recovery codes instead." }),
+     input, go, msg, el("button", { className: "rl-btn ghost", text: "Cancel", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+  }
+  function twoStepSection(box) {
+    var body = el("div"), note = el("div", { className: "rl-msg" });
+    box.appendChild(el("h2", { text: "Two-step sign-in", style: "font-size:18px;margin-top:8px" }));
+    box.appendChild(body); box.appendChild(note);
+    function codeInput(ph) { return el("input", { type: "text", placeholder: ph, autocomplete: "one-time-code", maxLength: 20 }); }
+    function render() {
+      body.textContent = "";
+      api("/relay/my/2fa").then(function (r) {
+        if (!r.ok) return;
+        if (!r.body.enabled) {
+          body.appendChild(el("p", { text: "Add an authenticator app (Google Authenticator, 1Password, Authy…) so signing in by email or Google also needs a code. Face ID sign-in is not affected." }));
+          body.appendChild(el("button", { className: "rl-btn ghost", text: "Set up authenticator app", onclick: setup }));
+        } else {
+          var left = r.body.recoveryCodesLeft;
+          body.appendChild(el("p", { text: "On. " + left + " recovery code" + (left === 1 ? "" : "s") + " left." + (left <= 2 ? " You're running low, so turn this off and on again to get a fresh set." : "") }));
+          var off = codeInput("App code or recovery code");
+          var offBtn = el("button", { className: "rl-btn ghost", text: "Turn off two-step sign-in" });
+          offBtn.onclick = function () {
+            offBtn.disabled = true;
+            api("/relay/my/2fa/disable", { method: "POST", body: { code: off.value } }).then(function (x) {
+              offBtn.disabled = false;
+              if (x.ok) { say(note, "Two-step sign-in is off."); render(); } else say(note, errors[x.body.error] || "Couldn't turn it off. Try again.", true);
+            }).catch(function () { offBtn.disabled = false; say(note, "Couldn't reach Relay.", true); });
+          };
+          body.appendChild(off); body.appendChild(offBtn);
+        }
+      }).catch(function () {});
+    }
+    function setup() {
+      say(note, "");
+      api("/relay/my/2fa/setup", { method: "POST", body: {} }).then(function (r) {
+        if (!r.ok) return say(note, "Couldn't start setup. Try again.", true);
+        body.textContent = "";
+        body.appendChild(el("p", { text: "1. In your authenticator app, add a new account and enter this key (or tap the link on your phone):" }));
+        body.appendChild(el("div", { className: "rl-order", style: "font-family:monospace;font-size:16px;word-break:break-all;user-select:all", text: r.body.secret }));
+        if (/^otpauth:\/\//.test(r.body.otpauthUrl || "")) body.appendChild(el("a", { href: r.body.otpauthUrl, text: "Open in authenticator app", style: "display:block;margin:0 0 12px;color:#0f1b33" }));
+        body.appendChild(el("p", { text: "2. Type the 6-digit code it shows:" }));
+        var c = codeInput("6-digit code");
+        var on = el("button", { className: "rl-btn", text: "Turn on" });
+        on.onclick = function () {
+          on.disabled = true;
+          api("/relay/my/2fa/enable", { method: "POST", body: { code: c.value } }).then(function (x) {
+            on.disabled = false;
+            if (!x.ok) return say(note, errors[x.body.error] || "Couldn't turn it on. Try again.", true);
+            body.textContent = ""; say(note, "");
+            body.appendChild(el("p", { text: "Two-step sign-in is on. Save these recovery codes somewhere safe, like a password manager. Each works once if you lose your phone. You won't see them again." }));
+            body.appendChild(el("div", { className: "rl-order", style: "font-family:monospace;font-size:16px;line-height:1.8;user-select:all", text: (x.body.recoveryCodes || []).join("\n") }));
+            body.lastChild.style.whiteSpace = "pre-line";
+            body.appendChild(el("button", { className: "rl-btn", text: "I've saved them", onclick: render }));
+          }).catch(function () { on.disabled = false; say(note, "Couldn't reach Relay.", true); });
+        };
+        body.appendChild(c); body.appendChild(on);
+        body.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: render }));
+      }).catch(function () { say(note, "Couldn't reach Relay.", true); });
+    }
+    render();
   }
   function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
   function receiptView(sheet, back) {
@@ -700,6 +780,7 @@
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     gmailSection(gbox, c || {}, msg);
     var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
+    var tbox = el("div"); sheet.insertBefore(tbox, list.previousSibling); twoStepSection(tbox);
     list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
       list.textContent = "";
@@ -750,6 +831,7 @@
       if (!r.ok) return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
         sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
         sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
+      if (r.body.needsSecondStep) return open(function (sheet) { secondStepView(sheet, r.body.pendingToken); });
       save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
       keepStorage();
       var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();

@@ -10,6 +10,7 @@
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
+import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
@@ -71,7 +72,8 @@ export async function ensureAuthTables(db) {
     `CREATE TABLE IF NOT EXISTS retailer_order_emails (
        order_id TEXT PRIMARY KEY, email_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_order_emails_hash ON retailer_order_emails(email_hash)`,
-    ...PASSKEY_TABLE_SQL
+    ...PASSKEY_TABLE_SQL,
+    ...TOTP_TABLE_SQL
   ];
   for (const sql of statements) await db.prepare(sql).run();
   await ensureGmailTables(db);
@@ -189,6 +191,12 @@ async function startSession(env, email, now, cors, opts = {}) {
     "INSERT OR IGNORE INTO shoppers (id,email,email_hash,created_at) VALUES (?,?,?,?)")
     .bind(crypto.randomUUID(), email, hash, now).run();
   const shopper = await env.RELAY_DB.prepare("SELECT id FROM shoppers WHERE email_hash = ?").bind(hash).first();
+  // Authenticator-app 2-step: a first factor (email link, code, Google) is not enough when the shopper switched it on.
+  if (!opts.skipSecondStep) {
+    const second = await secondStepFor(env, shopper.id, now);
+    if (second && second.tooMany) return json({ error: "too_many_requests" }, 429, cors);
+    if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, email }, 200, cors);
+  }
   const sessionToken = randomToken();
   await env.RELAY_DB.prepare(
     "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at) VALUES (?,?,?,?)")
@@ -331,6 +339,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       const pk = await handlePasskeyAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
       if (pk) return pk;
     }
+    if (path === "/relay/auth/2fa/verify" && configured(env)) {
+      await ensureAuthTables(env.RELAY_DB);
+      const t = await handleTotpAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
+      if (t) return t;
+    }
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
     if (path === "/relay/gmail/callback" && request.method === "GET") {
@@ -351,6 +364,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
+        ...totpDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
         env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
@@ -364,6 +378,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (resaleResponse) return resaleResponse;
     const passkeyResponse = await handlePasskeyShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
     if (passkeyResponse) return passkeyResponse;
+    const totpResponse = await handleTotpShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
+    if (totpResponse) return totpResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {

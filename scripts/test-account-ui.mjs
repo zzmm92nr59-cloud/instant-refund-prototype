@@ -22,6 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
+let tfEnabled = false; const tfCalls = [];
 let passkeyList = []; const passkeyLogins = [], passkeyRegs = [];
 const findBodies = [], addBodies = [], verifyBodies = [], googleStarts = [];
 let resaleListed = false, resaleBodies = [], chatSent = [];
@@ -33,6 +34,8 @@ await context.route('https://**/*', route => {
   const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: cors, body: JSON.stringify(body) });
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
   if (p === '/relay/auth/request') return j(200, { ok: true });
+  if (p === '/relay/auth/verify-code' && JSON.parse(req.postData()).email === 'bob@example.com') return j(200, { needsSecondStep: true, pendingToken: 'P'.repeat(43), email: 'bob@example.com' });
+  if (p === '/relay/auth/verify' && JSON.parse(req.postData()).token === 'W'.repeat(43)) return j(200, { needsSecondStep: true, pendingToken: 'P'.repeat(43), email: 'alice@example.com' });
   if (p === '/relay/auth/verify-code') { const b = JSON.parse(req.postData()); return b.code === '123456' && b.email === 'alice@example.com' ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_or_expired_code' }); }
   if (p === '/relay/auth/verify') verifyBodies.push(JSON.parse(req.postData()));
   if (p === '/relay/auth/google/start') { googleStarts.push(JSON.parse(req.postData())); return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' }); }
@@ -70,6 +73,11 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/resale/listings' && req.method() === 'POST') { const b = JSON.parse(req.postData()); resaleBodies.push(b); if (b.agree !== true) return j(400, { error: 'agreement_required' }); resaleListed = true; return j(200, { ok: true, id: '66666666-6666-6666-6666-666666666666' }); }
   if (/^\/relay\/my\/resale\/listings\/[0-9a-f-]{36}\/ask$/.test(p)) { resaleBodies.push(JSON.parse(req.postData())); return j(200, { ok: true }); }
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
+  if (p === '/relay/auth/2fa/verify') { const b = JSON.parse(req.postData()); tfCalls.push(b); return b.pendingToken === 'P'.repeat(43) && b.code === '654321' ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_code' }); }
+  if (p === '/relay/my/2fa' && req.method() === 'GET') return j(200, { enabled: tfEnabled, recoveryCodesLeft: tfEnabled ? 8 : 0 });
+  if (p === '/relay/my/2fa/setup') return j(200, { secret: 'ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567', otpauthUrl: 'otpauth://totp/Relay%3Aalice%40example.com?secret=ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&issuer=Relay' });
+  if (p === '/relay/my/2fa/enable') { const b = JSON.parse(req.postData()); tfCalls.push(b); if (b.code !== '111222') return j(400, { error: 'invalid_code' }); tfEnabled = true; return j(200, { ok: true, recoveryCodes: ['aaaaa-bbbbb', 'ccccc-ddddd', 'eeeee-fffff', 'ggggg-hhhhh', 'iiiii-jjjjj', 'kkkkk-mmmmm', 'nnnnn-ppppp', 'qqqqq-rrrrr'] }); }
+  if (p === '/relay/my/2fa/disable') { const b = JSON.parse(req.postData()); tfCalls.push(b); if (b.code !== '333444') return j(400, { error: 'invalid_code' }); tfEnabled = false; return j(200, { ok: true }); }
   if (p === '/relay/auth/passkey/options') return j(200, { challenge: 'Q'.repeat(43), rpId: 'zzmm92nr59-cloud.github.io', timeout: 60000, userVerification: 'required' });
   if (p === '/relay/auth/passkey/verify') { passkeyLogins.push(JSON.parse(req.postData())); return j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }); }
   if (p === '/relay/my/passkeys' && req.method() === 'GET') return j(200, { passkeys: passkeyList, rpId: 'zzmm92nr59-cloud.github.io' });
@@ -161,6 +169,62 @@ console.log('PASS Continue with Google: starts safely, secret sent once, cancell
   consentAccepted = false; await pk.close(); await plain.close();
 }
 console.log('PASS Face ID passkeys: sign in, add, list, remove, hidden when unsupported (stand-in Face ID prompt)');
+// Authenticator-app 2-step: sign-in stops at "One more step"; set up, recovery codes, turn off. (Mocked server, no real authenticator app.)
+{
+  const tp = await context.newPage(); const tpErrors = []; tp.on('pageerror', e => tpErrors.push(e.message));
+  await tp.goto(origin + '/index.html'); await tp.evaluate(() => localStorage.clear()); await tp.reload();
+  await tp.locator('.avatar').click();
+  await tp.getByPlaceholder('you@example.com').fill('bob@example.com');
+  await tp.getByRole('button', { name: 'Email me a sign-in link' }).click();
+  await tp.getByPlaceholder('6-digit code').fill('123456');
+  await tp.getByRole('button', { name: 'Sign in with code' }).click();
+  await tp.getByRole('heading', { name: 'One more step' }).waitFor();
+  assert.equal(await tp.evaluate(() => localStorage.getItem('relay.session.v1')), null, 'not signed in after the first step');
+  await tp.getByPlaceholder('6-digit code or recovery code').fill('000000');
+  await tp.getByRole('button', { name: 'Confirm' }).click();
+  await tp.getByText("That code isn't right").waitFor();
+  assert.equal(await tp.evaluate(() => localStorage.getItem('relay.session.v1')), null, 'still not signed in after a wrong code');
+  await tp.getByPlaceholder('6-digit code or recovery code').fill('654321');
+  await tp.getByRole('button', { name: 'Confirm' }).click();
+  await tp.getByRole('heading', { name: 'Before you start' }).waitFor();
+  assert.ok((await tp.evaluate(() => localStorage.getItem('relay.session.v1'))).includes(SESSION), 'signed in after the second step');
+  assert.deepEqual(tfCalls.filter(c => c.pendingToken).map(c => c.code), ['000000', '654321']);
+  // same prompt after an email link / Google sign-in
+  await tp.evaluate(() => localStorage.clear());
+  await tp.goto(origin + '/index.html#signin=' + 'W'.repeat(43));
+  await tp.getByRole('heading', { name: 'One more step' }).waitFor();
+  assert.equal(await tp.evaluate(() => localStorage.getItem('relay.session.v1')), null, 'link sign-in also waits for the second step');
+  // management
+  await tp.evaluate(s => localStorage.setItem('relay.session.v1', JSON.stringify({ token: s, email: 'alice@example.com', expiresAt: 9e12 })), SESSION);
+  consentAccepted = true;
+  await tp.goto(origin + '/index.html'); await tp.locator('.avatar').click();
+  await tp.getByRole('heading', { name: 'Two-step sign-in' }).waitFor();
+  await tp.getByRole('button', { name: 'Set up authenticator app' }).click();
+  await tp.getByText('ABCD EFGH IJKL MNOP').waitFor();
+  assert.equal(await tp.getByRole('link', { name: 'Open in authenticator app' }).getAttribute('href'), 'otpauth://totp/Relay%3Aalice%40example.com?secret=ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&issuer=Relay');
+  await tp.getByPlaceholder('6-digit code').fill('999999');
+  await tp.getByRole('button', { name: 'Turn on' }).click();
+  await tp.getByText("That code isn't right").waitFor();
+  assert.equal(tfEnabled, false, 'wrong code does not turn it on');
+  await tp.getByPlaceholder('6-digit code').fill('111222');
+  await tp.getByRole('button', { name: 'Turn on' }).click();
+  await tp.getByText('aaaaa-bbbbb').waitFor();
+  assert.equal(await tp.getByText('qqqqq-rrrrr').count(), 1, 'all eight recovery codes shown');
+  await tp.getByRole('button', { name: "I've saved them" }).click();
+  await tp.getByText('On. 8 recovery codes left.').waitFor();
+  assert.equal(await tp.getByText('aaaaa-bbbbb').count(), 0, 'recovery codes are not shown again');
+  await tp.getByPlaceholder('App code or recovery code').fill('000000');
+  await tp.getByRole('button', { name: 'Turn off two-step sign-in' }).click();
+  await tp.getByText("That code isn't right").waitFor();
+  assert.equal(tfEnabled, true, 'wrong code does not turn it off');
+  await tp.getByPlaceholder('App code or recovery code').fill('333444');
+  await tp.getByRole('button', { name: 'Turn off two-step sign-in' }).click();
+  await tp.getByText('Two-step sign-in is off.').waitFor();
+  await tp.getByRole('button', { name: 'Set up authenticator app' }).waitFor();
+  assert.deepEqual(tpErrors, []);
+  consentAccepted = false; await tp.close();
+}
+console.log('PASS Authenticator-app 2-step: sign-in waits for the code, setup shows key and recovery codes once, turn off needs a code (mocked server)');
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Before you start' }).waitFor();
 assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');
