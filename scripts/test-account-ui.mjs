@@ -22,6 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
+let passkeyList = []; const passkeyLogins = [], passkeyRegs = [];
 const findBodies = [], addBodies = [], verifyBodies = [], googleStarts = [];
 let resaleListed = false, resaleBodies = [], chatSent = [];
 let consentAccepted = false, gmailConnected = false, receiptStatus = 'pending', consentPosts = [];
@@ -69,6 +70,12 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/resale/listings' && req.method() === 'POST') { const b = JSON.parse(req.postData()); resaleBodies.push(b); if (b.agree !== true) return j(400, { error: 'agreement_required' }); resaleListed = true; return j(200, { ok: true, id: '66666666-6666-6666-6666-666666666666' }); }
   if (/^\/relay\/my\/resale\/listings\/[0-9a-f-]{36}\/ask$/.test(p)) { resaleBodies.push(JSON.parse(req.postData())); return j(200, { ok: true }); }
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
+  if (p === '/relay/auth/passkey/options') return j(200, { challenge: 'Q'.repeat(43), rpId: 'zzmm92nr59-cloud.github.io', timeout: 60000, userVerification: 'required' });
+  if (p === '/relay/auth/passkey/verify') { passkeyLogins.push(JSON.parse(req.postData())); return j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }); }
+  if (p === '/relay/my/passkeys' && req.method() === 'GET') return j(200, { passkeys: passkeyList, rpId: 'zzmm92nr59-cloud.github.io' });
+  if (p === '/relay/my/passkeys/options') return j(200, { challenge: 'R'.repeat(43), rp: { id: 'zzmm92nr59-cloud.github.io', name: 'Relay' }, user: { id: 'dXNlcg', name: 'alice@example.com', displayName: 'alice@example.com' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }], authenticatorSelection: { residentKey: 'required', requireResidentKey: true, userVerification: 'required' }, attestation: 'none', timeout: 60000, excludeCredentials: [] });
+  if (p === '/relay/my/passkeys/register') { passkeyRegs.push(JSON.parse(req.postData())); passkeyList = [{ id: 'cred1', name: '<img src=x onerror=window.__xssK=1>', createdAt: 1700000000000, lastUsedAt: null }]; return j(200, { ok: true, name: 'iPhone' }); }
+  if (p === '/relay/my/passkeys/remove') { passkeyList = []; return j(200, { ok: true }); }
   if (p === '/relay/auth/logout') return j(200, { ok: true });
   return j(403, { error: 'blocked' });
 });
@@ -112,6 +119,48 @@ await page.getByText("Google sign-in didn't work").waitFor();
 await page.evaluate(() => localStorage.clear());
 await page.goto(origin + '/index.html');
 console.log('PASS Continue with Google: starts safely, secret sent once, cancelled and failed shown clearly');
+// Face ID / passkeys. A stand-in for the phone's Face ID prompt: it proves Relay asks correctly, not that a real iPhone works.
+{
+  const ab = a => new Uint8Array(a).buffer;
+  const fake = () => {
+    window.__pk = [];
+    window.PublicKeyCredential = function () {};
+    navigator.credentials.create = async o => { window.__pk.push({ op: 'create', uv: o.publicKey.authenticatorSelection.userVerification, rk: o.publicKey.authenticatorSelection.residentKey, chal: o.publicKey.challenge.byteLength, att: o.publicKey.attestation });
+      return { id: 'cred1', response: { clientDataJSON: new Uint8Array([1, 2, 3]).buffer, attestationObject: new Uint8Array([4, 5, 6]).buffer } }; };
+    navigator.credentials.get = async o => { window.__pk.push({ op: 'get', uv: o.publicKey.userVerification, rpId: o.publicKey.rpId, chal: o.publicKey.challenge.byteLength, allow: o.publicKey.allowCredentials.length });
+      return { id: 'cred1', response: { clientDataJSON: new Uint8Array([1]).buffer, authenticatorData: new Uint8Array([2]).buffer, signature: new Uint8Array([3]).buffer, userHandle: new Uint8Array([9]).buffer } }; };
+  };
+  const pk = await context.newPage(); const pkErrors = []; pk.on('pageerror', e => pkErrors.push(e.message));
+  await pk.addInitScript(fake);
+  await pk.goto(origin + '/index.html'); await pk.locator('.avatar').click();
+  await pk.getByRole('button', { name: 'Sign in with Face ID / passkey' }).click();
+  await pk.getByRole('heading', { name: 'Before you start' }).waitFor();
+  assert.deepEqual(await pk.evaluate(() => window.__pk), [{ op: 'get', uv: 'required', rpId: 'zzmm92nr59-cloud.github.io', chal: 32, allow: 0 }], 'asks for Face ID with verification required');
+  assert.equal(passkeyLogins.length, 1); assert.equal(passkeyLogins[0].id, 'cred1');
+  assert.deepEqual(Object.keys(passkeyLogins[0].response).sort(), ['authenticatorData', 'clientDataJSON', 'signature', 'userHandle']);
+  assert.ok(await pk.evaluate(() => localStorage.getItem('relay.session.v1')).then(v => v.includes(SESSION)), 'signed in');
+  // signed-in management
+  consentAccepted = true;
+  await pk.reload(); await pk.locator('.avatar').click();
+  await pk.getByRole('heading', { name: 'Face ID sign-in' }).waitFor();
+  await pk.getByRole('button', { name: 'Add Face ID / passkey on this device' }).click();
+  await pk.getByText('Next time you can sign in with Face ID').waitFor();
+  assert.equal(passkeyRegs.length, 1); assert.ok(['iPhone', 'iPad', 'Android phone', 'Mac', 'Windows PC', 'This device'].includes(passkeyRegs[0].name));
+  assert.deepEqual((await pk.evaluate(() => window.__pk)).slice(-1)[0], { op: 'create', uv: 'required', rk: 'required', chal: 32, att: 'none' });
+  await pk.getByText(/Added \d/).waitFor();
+  assert.equal(await pk.evaluate(() => window.__xssK || 0), 0, 'passkey name shown as text only');
+  pk.once('dialog', d => d.accept());
+  await pk.getByRole('button', { name: 'Remove', exact: true }).click();
+  await pk.waitForFunction(() => !/Added \d/.test(document.body.innerText));
+  // a browser without passkey support shows no passkey buttons at all
+  const plain = await context.newPage(); await plain.addInitScript(() => { delete window.PublicKeyCredential; });
+  await plain.goto(origin + '/index.html'); await plain.evaluate(() => localStorage.clear()); await plain.reload(); await plain.locator('.avatar').click();
+  await plain.getByRole('heading', { name: 'Sign in to Relay' }).waitFor();
+  assert.equal(await plain.getByRole('button', { name: /Face ID/ }).count(), 0, 'hidden when the browser cannot do passkeys');
+  assert.deepEqual(pkErrors, []);
+  consentAccepted = false; await pk.close(); await plain.close();
+}
+console.log('PASS Face ID passkeys: sign in, add, list, remove, hidden when unsupported (stand-in Face ID prompt)');
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Before you start' }).waitFor();
 assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');

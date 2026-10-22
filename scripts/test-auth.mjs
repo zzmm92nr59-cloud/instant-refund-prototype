@@ -245,4 +245,118 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.equal(JSON.stringify(sqlite.prepare("SELECT * FROM auth_google_states").all()).includes("good-code"), false, "no code stored");
 }
 
+
+// Passkeys (Face ID). A FAKE authenticator makes real P-256 keys and signatures; nothing here proves a real iPhone works.
+{
+  const { generateKeyPairSync, randomBytes, createHash, sign: nodeSign } = await import("node:crypto");
+  const APP = "https://zzmm92nr59-cloud.github.io", RP = "zzmm92nr59-cloud.github.io";
+  const b64u = b => Buffer.from(b).toString("base64url");
+  const sha = b => createHash("sha256").update(b).digest();
+  const cbor = v => {
+    const head = (major, n) => n < 24 ? Buffer.from([(major << 5) | n]) : n < 256 ? Buffer.from([(major << 5) | 24, n]) : Buffer.from([(major << 5) | 25, n >> 8, n & 255]);
+    if (typeof v === "number") return v >= 0 ? head(0, v) : head(1, -1 - v);
+    if (typeof v === "string") { const t = Buffer.from(v); return Buffer.concat([head(3, t.length), t]); }
+    if (Buffer.isBuffer(v)) return Buffer.concat([head(2, v.length), v]);
+    if (v instanceof Map) return Buffer.concat([head(5, v.size), ...[...v].flatMap(([k, x]) => [cbor(k), cbor(x)])]);
+    throw new Error("cbor");
+  };
+  const newDevice = () => {
+    const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "P-256" });
+    const jwk = publicKey.export({ format: "jwk" });
+    return { privateKey, x: Buffer.from(jwk.x, "base64url"), y: Buffer.from(jwk.y, "base64url"), id: randomBytes(32), count: 0 };
+  };
+  const clientData = (type, challenge, origin = APP) => Buffer.from(JSON.stringify({ type, challenge, origin, crossOrigin: false }));
+  const authData = (flags, count, rp = RP, attested) => {
+    const h = Buffer.concat([sha(rp), Buffer.from([flags]), Buffer.from([count >>> 24, (count >> 16) & 255, (count >> 8) & 255, count & 255])]);
+    if (!attested) return h;
+    const cose = cbor(new Map([[1, 2], [3, -7], [-1, 1], [-2, attested.x], [-3, attested.y]]));
+    return Buffer.concat([h, Buffer.alloc(16), Buffer.from([attested.id.length >> 8, attested.id.length & 255]), attested.id, cose]);
+  };
+  const create = (dev, challenge, o = {}) => ({
+    id: b64u(dev.id), response: {
+      clientDataJSON: b64u(clientData("webauthn.create", challenge, o.origin)),
+      attestationObject: b64u(cbor(new Map([["fmt", "none"], ["attStmt", new Map()], ["authData", authData(o.flags ?? 0x45, 0, o.rp, dev)]])))
+    }
+  });
+  const get = (dev, challenge, o = {}) => {
+    dev.count = o.count ?? dev.count + 1;
+    const cd = clientData("webauthn.get", challenge, o.origin), ad = authData(o.flags ?? 0x05, dev.count, o.rp);
+    const sig = nodeSign("sha256", Buffer.concat([ad, sha(cd)]), o.key || dev.privateKey);
+    return { id: b64u(dev.id), response: { clientDataJSON: b64u(cd), authenticatorData: b64u(ad), signature: b64u(sig), userHandle: o.userHandle } };
+  };
+  const orig = { origin: APP };
+  async function link(email, ip) {
+    emails = [];
+    await call("/relay/auth/request", { method: "POST", body: { email }, ip });
+    const t = tokenFromEmail(emails[0]);
+    return (await (await call("/relay/auth/verify", { method: "POST", body: { token: t } })).json()).sessionToken;
+  }
+  const sess = await link("pk@example.com", "7.7.7.7");
+  const other = await link("other@example.com", "7.7.7.8");
+  const opts = async token => (await call("/relay/my/passkeys/options", { method: "POST", token, ...orig })).json();
+  const reg = (token, body) => call("/relay/my/passkeys/register", { method: "POST", token, body, ...orig });
+  const loginOpts = async () => (await call("/relay/auth/passkey/options", { method: "POST", ...orig })).json();
+  const login = body => call("/relay/auth/passkey/verify", { method: "POST", body, ...orig });
+
+  assert.equal((await call("/relay/my/passkeys/options", { method: "POST" })).status, 401, "adding a passkey needs sign-in");
+  const dev = newDevice();
+  const o1 = await opts(sess);
+  assert.equal(o1.rp.id, RP); assert.equal(o1.authenticatorSelection.userVerification, "required"); assert.deepEqual(o1.pubKeyCredParams, [{ type: "public-key", alg: -7 }]);
+  // refusals at registration
+  assert.equal((await reg(sess, create(dev, o1.challenge, { flags: 0x41 }))).status, 400, "no user verification refused");
+  const o2 = await opts(sess);
+  assert.equal((await reg(sess, create(dev, o2.challenge, { origin: "https://evil.test" }))).status, 400, "wrong origin refused");
+  const o3 = await opts(sess);
+  assert.equal((await reg(sess, create(dev, o3.challenge, { rp: "evil.test" }))).status, 400, "wrong relying party refused");
+  const o4 = await opts(other);
+  assert.equal((await reg(sess, create(dev, o4.challenge))).status, 400, "someone else's challenge refused");
+  assert.equal((await reg(sess, create(dev, "A".repeat(43)))).status, 400, "unknown challenge refused");
+  // success, and the challenge cannot be reused
+  const o5 = await opts(sess);
+  const okReg = await reg(sess, { ...create(dev, o5.challenge), name: "My <b>iPhone</b>" });
+  assert.equal(okReg.status, 200); assert.equal((await okReg.json()).name, "My biPhoneb iPhone".slice(0, 0) + "My biPhoneb");
+  assert.equal((await reg(sess, create(newDevice(), o5.challenge))).status, 400, "challenge is single-use");
+  const listed = await (await call("/relay/my/passkeys", { token: sess })).json();
+  assert.equal(listed.passkeys.length, 1); assert.ok(!JSON.stringify(listed).includes("public"), "public key never sent back");
+  assert.equal((await (await call("/relay/my/passkeys", { token: other })).json()).passkeys.length, 0, "private to the shopper");
+  const dup = await opts(other);
+  assert.equal((await reg(other, create(dev, dup.challenge))).status, 400, "same credential cannot be added to another shopper");
+
+  // sign in
+  const l1 = await loginOpts();
+  const good = get(dev, l1.challenge, { userHandle: b64u(Buffer.from(sqlite.prepare("SELECT id FROM shoppers WHERE email = ?").get("pk@example.com").id)) });
+  const res = await login(good);
+  assert.equal(res.status, 200);
+  const sj = await res.json();
+  assert.equal(sj.email, "pk@example.com");
+  assert.equal((await (await call("/relay/me", { token: sj.sessionToken })).json()).email, "pk@example.com", "real session issued");
+  assert.equal((await login(good)).status, 400, "the same sign-in cannot be replayed");
+  const l2 = await loginOpts();
+  assert.equal((await login(get(dev, l2.challenge, { flags: 0x01 }))).status, 400, "needs user verification");
+  const l3 = await loginOpts();
+  assert.equal((await login(get(dev, l3.challenge, { key: newDevice().privateKey }))).status, 400, "signature from a different key refused");
+  const l4 = await loginOpts();
+  assert.equal((await login(get(dev, l4.challenge, { origin: "https://evil.test" }))).status, 400, "wrong origin refused");
+  const l5 = await loginOpts();
+  assert.equal((await login(get(dev, l5.challenge, { rp: "evil.test" }))).status, 400, "wrong relying party refused");
+  const l6 = await loginOpts();
+  assert.equal((await login(get(dev, l6.challenge, { count: 1 }))).status, 400, "counter going backwards refused");
+  const l7 = await loginOpts();
+  assert.equal((await login(get(newDevice(), l7.challenge))).status, 400, "unknown passkey refused");
+  const l8 = await loginOpts();
+  assert.equal((await login(get(dev, l8.challenge, { userHandle: b64u(Buffer.from("someone-else")) }))).status, 400, "wrong user handle refused");
+  const l9 = await loginOpts();
+  assert.equal((await login(get(dev, l9.challenge))).status, 200, "still works after the refusals");
+  // removal and limits
+  assert.equal((await call("/relay/my/passkeys/remove", { method: "POST", token: other, body: { id: b64u(dev.id) }, ...orig })).status, 404, "cannot remove someone else's");
+  for (let i = 0; i < 4; i++) { const d = newDevice(); const oo = await opts(sess); assert.equal((await reg(sess, create(d, oo.challenge))).status, 200); }
+  assert.equal((await call("/relay/my/passkeys/options", { method: "POST", token: sess, ...orig })).status, 400, "at most five passkeys");
+  assert.equal((await call("/relay/my/passkeys/remove", { method: "POST", token: sess, body: { id: b64u(dev.id) }, ...orig })).status, 200);
+  const lx = await loginOpts();
+  assert.equal((await login(get(dev, lx.challenge))).status, 400, "a removed passkey no longer signs in");
+  assert.equal((await call("/relay/my/delete", { method: "POST", token: sess })).status, 200);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_passkeys").get().n, 0, "account deletion removes passkeys");
+  assert.equal(JSON.stringify(sqlite.prepare("SELECT * FROM auth_webauthn_challenges").all()).includes(l1.challenge), false, "challenges stored only hashed");
+}
+
 console.log("PASS shopper sign-in, single-use links, expiry, rate limits, ownership isolation, logout and deletion (fake email delivery)");

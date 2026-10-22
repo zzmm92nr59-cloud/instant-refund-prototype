@@ -10,6 +10,7 @@
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
+import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -69,7 +70,8 @@ export async function ensureAuthTables(db) {
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS retailer_order_emails (
        order_id TEXT PRIMARY KEY, email_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
-    `CREATE INDEX IF NOT EXISTS idx_order_emails_hash ON retailer_order_emails(email_hash)`
+    `CREATE INDEX IF NOT EXISTS idx_order_emails_hash ON retailer_order_emails(email_hash)`,
+    ...PASSKEY_TABLE_SQL
   ];
   for (const sql of statements) await db.prepare(sql).run();
   await ensureGmailTables(db);
@@ -181,7 +183,7 @@ async function verifyLink(request, env, cors, opts) {
   return startSession(env, claimed.email, now, cors);
 }
 
-async function startSession(env, email, now, cors) {
+async function startSession(env, email, now, cors, opts = {}) {
   const hash = await emailHash(env.AUTH_SECRET, email);
   await env.RELAY_DB.prepare(
     "INSERT OR IGNORE INTO shoppers (id,email,email_hash,created_at) VALUES (?,?,?,?)")
@@ -223,6 +225,9 @@ async function verifyCode(request, env, cors, opts) {
   await env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(email).run();
   return startSession(env, email, now, cors);
 }
+
+function rpId(env) { return new URL(env.RELAY_APP_URL || DEFAULT_APP_URL).hostname; }
+const passkeyHelpers = { json, readJson, allowedOrigins, startSession: (...a) => startSession(...a), sha256Hex, rpId };
 
 // ---- Sign in with Google (identity only: openid + email; no Gmail access) ----
 const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
@@ -321,6 +326,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
     if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
+    if (path.startsWith("/relay/auth/passkey/") && configured(env)) {
+      await ensureAuthTables(env.RELAY_DB);
+      const pk = await handlePasskeyAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
+      if (pk) return pk;
+    }
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
     if (path === "/relay/gmail/callback" && request.method === "GET") {
@@ -340,6 +350,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       await env.RELAY_DB.batch([
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
+        ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
         env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
@@ -351,6 +362,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (gmailResponse) return gmailResponse;
     const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);
     if (resaleResponse) return resaleResponse;
+    const passkeyResponse = await handlePasskeyShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
+    if (passkeyResponse) return passkeyResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {

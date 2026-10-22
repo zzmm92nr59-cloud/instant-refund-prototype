@@ -96,7 +96,8 @@
      el("p", { text: "No password. We email you a one-time link. Purchases you made with that email address appear in your wallet." }),
      input, go, codeRow, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
     sheet.insertBefore(googleButton(msg), sheet.children[2]);
-    sheet.insertBefore(el("p", { text: "or", style: "text-align:center;opacity:.6;margin:8px 0" }), sheet.children[3]);
+    if (passkeysSupported()) sheet.insertBefore(el("div", { style: "margin-top:10px" }, [passkeyButton(msg)]), sheet.children[3]);
+    sheet.insertBefore(el("p", { text: "or", style: "text-align:center;opacity:.6;margin:8px 0" }), sheet.children[passkeysSupported() ? 4 : 3]);
   }
   // Identity only: Google tells Relay your verified email. Relay gets no access to Gmail from this button.
   function googleButton(msg) {
@@ -112,6 +113,83 @@
       }).catch(function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
     return b;
+  }
+
+  // ---- Face ID / passkeys (WebAuthn). The phone keeps the private key; Relay stores only the public key. ----
+  function passkeysSupported() { try { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create && navigator.credentials.get); } catch (e) { return false; } }
+  function b64uToBytes(t) { t = String(t).replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; var b = atob(t), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function bytesToB64u(buf) { var u = new Uint8Array(buf), s = ""; for (var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  function passkeyProblem(e) {
+    var n = e && e.name;
+    if (n === "NotAllowedError" || n === "AbortError") return "That was cancelled or timed out. Try again when you're ready.";
+    if (n === "InvalidStateError") return "This device already has a passkey for Relay.";
+    return "Face ID / passkey isn't working on this device or browser. Use the email link instead.";
+  }
+  function passkeyButton(msg) {
+    var b = el("button", { className: "rl-btn", text: "Sign in with Face ID / passkey" });
+    b.onclick = function () {
+      b.disabled = true; say(msg, "Waiting for Face ID…");
+      api("/relay/auth/passkey/options", { method: "POST" }).then(function (o) {
+        if (!o.ok) { b.disabled = false; return say(msg, o.status === 503 ? "Passkey sign-in isn't switched on yet. Use the email link instead." : (errors[o.body.error] || "Couldn't start passkey sign-in. Try again."), true); }
+        return navigator.credentials.get({ publicKey: { challenge: b64uToBytes(o.body.challenge), rpId: o.body.rpId, timeout: o.body.timeout, userVerification: "required", allowCredentials: [] } }).then(function (cred) {
+          var r = cred.response;
+          return api("/relay/auth/passkey/verify", { method: "POST", body: { id: cred.id, response: {
+            clientDataJSON: bytesToB64u(r.clientDataJSON), authenticatorData: bytesToB64u(r.authenticatorData), signature: bytesToB64u(r.signature),
+            userHandle: r.userHandle ? bytesToB64u(r.userHandle) : undefined } } });
+        }).then(function (v) {
+          b.disabled = false;
+          if (!v.ok) return say(msg, "That passkey wasn't accepted. If you haven't added one yet, sign in another way first and add it from your account.", true);
+          save({ token: v.body.sessionToken, email: v.body.email, expiresAt: v.body.expiresAt });
+          keepStorage();
+          var a = document.querySelector(".avatar"); if (a) a.textContent = v.body.email.charAt(0).toUpperCase();
+          show();
+        });
+      }).catch(function (e) { b.disabled = false; say(msg, passkeyProblem(e), true); });
+    };
+    return b;
+  }
+  function passkeySection(box, msg) {
+    if (!passkeysSupported()) return;
+    var list = el("div"), note = el("div", { className: "rl-msg" });
+    box.appendChild(el("h2", { text: "Face ID sign-in", style: "font-size:18px;margin-top:8px" }));
+    box.appendChild(el("p", { text: "Sign in with Face ID, Touch ID or your phone's screen lock. No email needed." }));
+    box.appendChild(list);
+    var add = el("button", { className: "rl-btn ghost", text: "Add Face ID / passkey on this device" });
+    box.appendChild(add); box.appendChild(note);
+    function refresh() {
+      api("/relay/my/passkeys").then(function (r) {
+        list.textContent = "";
+        if (!r.ok) return;
+        ((r.body && r.body.passkeys) || []).forEach(function (k) {
+          var rm = el("button", { className: "rl-btn ghost", text: "Remove", style: "width:auto;display:inline-block;margin:6px 0 0;padding:8px 14px;font-size:14px" });
+          rm.onclick = function () {
+            if (!confirm("Remove this passkey? You can still sign in with an email link.")) return;
+            api("/relay/my/passkeys/remove", { method: "POST", body: { id: k.id } }).then(function (x) { if (x.ok) refresh(); else say(note, "Couldn't remove it. Try again.", true); });
+          };
+          list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: k.name || "Passkey" }),
+            el("span", { text: "Added " + new Date(k.createdAt).toLocaleDateString("en-GB") + (k.lastUsedAt ? " · last used " + new Date(k.lastUsedAt).toLocaleDateString("en-GB") : "") }), rm]));
+        });
+      }).catch(function () {});
+    }
+    add.onclick = function () {
+      add.disabled = true; say(note, "Waiting for Face ID…");
+      api("/relay/my/passkeys/options", { method: "POST" }).then(function (o) {
+        if (!o.ok) { add.disabled = false; return say(note, o.body.error === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : "Couldn't start. Try again.", true); }
+        var p = o.body;
+        return navigator.credentials.create({ publicKey: { challenge: b64uToBytes(p.challenge), rp: p.rp, user: { id: b64uToBytes(p.user.id), name: p.user.name, displayName: p.user.displayName },
+          pubKeyCredParams: p.pubKeyCredParams, authenticatorSelection: p.authenticatorSelection, attestation: "none", timeout: p.timeout,
+          excludeCredentials: (p.excludeCredentials || []).map(function (c) { return { type: "public-key", id: b64uToBytes(c.id) }; }) } }).then(function (cred) {
+          var ua = navigator.userAgent || "", name = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android phone" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows PC" : "This device";
+          return api("/relay/my/passkeys/register", { method: "POST", body: { id: cred.id, name: name, response: {
+            clientDataJSON: bytesToB64u(cred.response.clientDataJSON), attestationObject: bytesToB64u(cred.response.attestationObject) } } });
+        }).then(function (x) {
+          add.disabled = false;
+          if (x.ok) { say(note, "Added. Next time you can sign in with Face ID."); refresh(); }
+          else say(note, "That passkey couldn't be saved. Try again.", true);
+        });
+      }).catch(function (e) { add.disabled = false; say(note, passkeyProblem(e), true); });
+    };
+    refresh();
   }
   function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
   function receiptView(sheet, back) {
@@ -621,6 +699,7 @@
     openOriginal = function (id) { back.firstChild.textContent = ""; originalView(back.firstChild, id, function () { gate(back.firstChild, email); }); };
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     gmailSection(gbox, c || {}, msg);
+    var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
     list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
       list.textContent = "";
