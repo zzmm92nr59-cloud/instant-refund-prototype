@@ -357,6 +357,104 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.equal((await call("/relay/my/delete", { method: "POST", token: sess })).status, 200);
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_passkeys").get().n, 0, "account deletion removes passkeys");
   assert.equal(JSON.stringify(sqlite.prepare("SELECT * FROM auth_webauthn_challenges").all()).includes(l1.challenge), false, "challenges stored only hashed");
+
+  // ---- Authenticator-app 2-step (TOTP) ----
+  const { _codeAt } = await import("../worker/totp.js");
+  assert.equal(await _codeAt(new TextEncoder().encode("12345678901234567890"), 1), "287082", "matches the official RFC 6238 test vector");
+  const hotp = (key, step) => { const m = Buffer.alloc(8); m.writeBigUInt64BE(BigInt(step)); const h = createHmac("sha1", key).update(m).digest(); const o = h[19] & 15; return String((((h[o] & 127) << 24) | (h[o + 1] << 16) | (h[o + 2] << 8) | h[o + 3]) % 1e6).padStart(6, "0"); };
+  const unb32 = t => { const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"; let bits = 0, v = 0; const out = []; for (const c of t.replace(/ /g, "")) { v = (v << 5) | A.indexOf(c); bits += 5; if (bits >= 8) { out.push((v >>> (bits - 8)) & 255); bits -= 8; } } return Buffer.from(out); };
+  const stepNow = () => Math.floor(clock / 30000);
+  const post = (path, token, body) => call(path, { method: "POST", token, body, ...orig });
+  const firstFactor = async (email, ip) => { sqlite.exec("DELETE FROM auth_login_tokens"); emails = []; await call("/relay/auth/request", { method: "POST", body: { email }, ip }); return (await call("/relay/auth/verify", { method: "POST", body: { token: tokenFromEmail(emails[0]) } })).json(); };
+  const second = (pendingToken, code) => post("/relay/auth/2fa/verify", undefined, { pendingToken, code });
+
+  assert.equal((await call("/relay/my/2fa")).status, 401, "2-step settings need sign-in");
+  const first = await firstFactor("tf@example.com", "7.7.9.1");
+  const tfSession = first.sessionToken;
+  assert.ok(tfSession, "no 2-step yet: normal sign-in");
+  assert.deepEqual(await (await call("/relay/my/2fa", { token: tfSession })).json(), { enabled: false, recoveryCodesLeft: 0 });
+  assert.equal((await post("/relay/my/2fa/enable", tfSession, { code: "123456" })).status, 400, "cannot switch on before setup");
+  // a passkey registered now must keep working without the second step later
+  const pkDev = newDevice(); const po = await opts(tfSession); assert.equal((await reg(tfSession, create(pkDev, po.challenge))).status, 200);
+  const setup = await (await post("/relay/my/2fa/setup", tfSession, {})).json();
+  assert.match(setup.otpauthUrl, /^otpauth:\/\/totp\/Relay%3Atf%40example\.com\?secret=[A-Z2-7]{32}&issuer=Relay/);
+  const key = unb32(setup.secret);
+  assert.equal(key.length, 20);
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM auth_totp").all()).includes(setup.secret.replace(/ /g, "")), "secret is stored encrypted, not readable");
+  assert.equal((await post("/relay/my/2fa/enable", tfSession, { code: "000000" })).status, 400, "wrong code does not switch it on");
+  assert.equal((await post("/relay/my/2fa/enable", tfSession, { code: hotp(key, stepNow() + 2) })).status, 400, "a code from the future is refused");
+  assert.equal((await first && (await call("/relay/my/2fa", { token: tfSession })).status), 200);
+  const en = await post("/relay/my/2fa/enable", tfSession, { code: hotp(key, stepNow()) });
+  assert.equal(en.status, 200);
+  const recovery = (await en.json()).recoveryCodes;
+  assert.equal(recovery.length, 8); recovery.forEach(c => assert.match(c, /^[a-z2-9]{5}-[a-z2-9]{5}$/));
+  assert.equal(new Set(recovery).size, 8);
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM auth_totp_recovery").all()).includes(recovery[0]), "recovery codes stored only as hashes");
+  assert.deepEqual(await (await call("/relay/my/2fa", { token: tfSession })).json(), { enabled: true, recoveryCodesLeft: 8 });
+  assert.equal((await post("/relay/my/2fa/setup", tfSession, {})).status, 400, "cannot overwrite a live secret");
+
+  // sign-in now needs the second step
+  const p1 = await firstFactor("tf@example.com", "7.7.9.2");
+  assert.equal(p1.needsSecondStep, true); assert.equal(p1.sessionToken, undefined, "no session from the first step alone");
+  assert.equal((await call("/relay/me", { token: p1.pendingToken })).status, 401, "pending token is not a session");
+  assert.equal((await second(p1.pendingToken, "000000")).status, 400, "wrong code refused");
+  assert.equal((await second(p1.pendingToken, hotp(key, stepNow()))).status, 400, "the code already used to switch it on cannot be replayed");
+  clock += 30000;
+  const done = await second(p1.pendingToken, hotp(key, stepNow()));
+  assert.equal(done.status, 200); const dj = await done.json();
+  assert.equal((await (await call("/relay/me", { token: dj.sessionToken })).json()).email, "tf@example.com");
+  assert.equal((await second(p1.pendingToken, hotp(key, stepNow() + 1))).status, 400, "a finished sign-in cannot be reused");
+  // a code only works once, even for a different sign-in
+  const p2 = await firstFactor("tf@example.com", "7.7.9.3");
+  assert.equal((await second(p2.pendingToken, hotp(key, stepNow()))).status, 400, "same code twice refused");
+  // recovery code works once
+  const rc = await second(p2.pendingToken, recovery[0].toUpperCase().replace("-", " "));
+  assert.equal(rc.status, 200, "recovery code accepted (any case, dash optional)");
+  const p3 = await firstFactor("tf@example.com", "7.7.9.4");
+  assert.equal((await second(p3.pendingToken, recovery[0])).status, 400, "recovery code is single-use");
+  assert.equal((await second(p3.pendingToken, recovery[1])).status, 200);
+  assert.equal((await (await call("/relay/my/2fa", { token: dj.sessionToken })).json()).recoveryCodesLeft, 6);
+  // someone else's code or pending sign-in is useless
+  const otherPending = await firstFactor("other@example.com", "7.7.9.5");
+  assert.ok(otherPending.sessionToken, "other shopper without 2-step signs in normally");
+  const p4 = await firstFactor("tf@example.com", "7.7.9.6");
+  assert.equal((await second(p4.pendingToken, "abc")).status, 400); assert.equal((await second("A".repeat(43), "123456")).status, 400, "unknown pending token refused");
+  // limits: 5 wrong tries kill that sign-in, even if the right code follows (clock moved on so the account-wide limit is clear)
+  clock += 16 * 60 * 1000;
+  const p4b = await firstFactor("tf@example.com", "7.7.9.8");
+  for (let i = 0; i < 4; i++) assert.equal((await second(p4b.pendingToken, "111111")).status, 400);
+  assert.equal((await second(p4b.pendingToken, "222222")).status, 400);
+  assert.equal((await second(p4b.pendingToken, hotp(key, stepNow()))).status, 400, "sign-in is cancelled after five wrong tries");
+  // expiry
+  const p5 = await firstFactor("tf@example.com", "7.7.9.7");
+  clock += 11 * 60 * 1000;
+  assert.equal((await second(p5.pendingToken, hotp(key, stepNow()))).status, 400, "half-finished sign-in expires");
+  // account-wide limit on wrong codes
+  clock += 20 * 60 * 1000;
+  let limited = false;
+  for (let i = 0; i < 4 && !limited; i++) { const px = await firstFactor("tf@example.com", "7.7.10." + i); if (px.error) { limited = px.error === "too_many_requests"; break; } for (let k = 0; k < 4; k++) { const r = await second(px.pendingToken, "333333"); if (r.status === 429) { limited = true; break; } } }
+  assert.ok(limited, "too many wrong codes locks the account for a while");
+  const locked = await firstFactor("tf@example.com", "7.7.11.1");
+  if (locked.pendingToken) assert.equal((await second(locked.pendingToken, hotp(key, stepNow()))).status, 429, "correct code also paused during the lock");
+  clock += 16 * 60 * 1000;
+  // Face ID skips the second step (it already needs your face or fingerprint)
+  const lp = await loginOpts();
+  const pkLogin = await login(get(pkDev, lp.challenge, { userHandle: b64u(Buffer.from(sqlite.prepare("SELECT id FROM shoppers WHERE email = ?").get("tf@example.com").id)) }));
+  assert.equal(pkLogin.status, 200); assert.ok((await pkLogin.json()).sessionToken, "passkey sign-in gives a session directly");
+  // switching off needs a valid code
+  const live = (await (await call("/relay/auth/request", { method: "POST", body: { email: "tf@example.com" }, ip: "7.7.12.1" })).status, (await firstFactor("tf@example.com", "7.7.12.2")));
+  const live2 = await second(live.pendingToken, recovery[2]); assert.equal(live2.status, 200);
+  const liveToken = (await live2.json()).sessionToken;
+  assert.equal((await post("/relay/my/2fa/disable", liveToken, { code: "000000" })).status, 400, "cannot switch off with a wrong code");
+  assert.equal((await post("/relay/my/2fa/disable", other, { code: hotp(key, stepNow()) })).status, 400, "another shopper cannot switch it off");
+  assert.equal((await post("/relay/my/2fa/disable", liveToken, { code: recovery[3] })).status, 200);
+  assert.deepEqual(await (await call("/relay/my/2fa", { token: liveToken })).json(), { enabled: false, recoveryCodesLeft: 0 });
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_totp_recovery").get().n, 0, "recovery codes removed when switched off");
+  assert.ok((await firstFactor("tf@example.com", "7.7.12.3")).sessionToken, "after switching off, sign-in is normal again");
+  // deletion removes everything
+  const s2 = await post("/relay/my/2fa/setup", liveToken, {}); assert.equal(s2.status, 200);
+  assert.equal((await post("/relay/my/delete", liveToken, {})).status, 200);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_totp").get().n, 0, "account deletion removes 2-step data");
 }
 
 console.log("PASS shopper sign-in, single-use links, expiry, rate limits, ownership isolation, logout and deletion (fake email delivery)");
