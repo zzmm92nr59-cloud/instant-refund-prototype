@@ -565,9 +565,49 @@
   }
 
   // ---- Swap & resell (v1: matches members; no payments or postage through Relay yet) ----
+  // ---- Report review (only shown to the Relay admin; the server refuses everyone else) ----
+  function adminView(sheet, onBack) {
+    var list = el("div"), msg = el("div", { className: "rl-msg" });
+    [el("h2", { text: "Reports to review" }),
+     el("p", { text: "You see the conversation only, never who the members are. Dismiss, take the listing down, or block the member." }),
+     list, msg, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+    function act(id, outcome, ask) {
+      if (ask && !confirm(ask)) return;
+      api("/relay/my/admin/reports/" + id + "/review", { method: "POST", body: { outcome: outcome } }).then(function (r) {
+        if (r.ok) { say(msg, "Done."); load(); }
+        else say(msg, r.body.error === "conflict_of_interest" ? "You're part of this conversation, so another admin has to review it." : "That didn't work. Try again.", true);
+      }).catch(function () { say(msg, "Couldn't reach Relay.", true); });
+    }
+    function load() {
+      list.textContent = "";
+      api("/relay/my/admin/reports").then(function (r) {
+        if (!r.ok) return say(msg, "You can't review reports from this account.", true);
+        var rows = r.body.reports || [];
+        if (!rows.length) list.appendChild(el("p", { text: "No reports waiting. Nice and quiet." }));
+        rows.forEach(function (x) {
+          var card = el("div", { className: "rl-order" });
+          card.appendChild(el("b", { text: x.reason || "(no reason given)" }));
+          card.appendChild(el("span", { text: x.item.title + (x.item.store ? " · " + x.item.store : "") + " · " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
+          card.appendChild(el("span", { style: "display:block;margin-top:4px", text: "Reported by the " + x.reporterRole + " about the " + x.reportedRole + ". Reports against this member: " + x.reportsAgainstReported + (x.reportedAlreadyBlocked ? " (already blocked)" : "") + "." }));
+          var log = el("div", { style: "margin:8px 0;max-height:180px;overflow:auto;border-top:1px solid #ece4d3;padding-top:6px" });
+          (x.messages || []).forEach(function (m) {
+            log.appendChild(el("div", { style: "font-size:13px;margin:4px 0" }, [el("b", { text: m.from + ": " }), el("span", { text: m.body })]));
+          });
+          if (!(x.messages || []).length) log.appendChild(el("span", { text: "No messages in this conversation." }));
+          card.appendChild(log);
+          var small = "padding:9px 14px;font-size:14px;margin:4px 6px 0 0;width:auto;display:inline-block";
+          card.appendChild(el("button", { className: "rl-btn ghost", text: "Dismiss", style: small, onclick: function () { act(x.id, "dismiss"); } }));
+          if (x.canRemoveListing) card.appendChild(el("button", { className: "rl-btn ghost", text: "Take listing down", style: small, onclick: function () { act(x.id, "remove_listing", "Take this listing down?"); } }));
+          card.appendChild(el("button", { className: "rl-btn ghost", text: "Block member", style: small, onclick: function () { act(x.id, "block", "Block this member? Their listings come down and they can't list, ask or message again."); } }));
+          list.appendChild(card);
+        });
+      }).catch(function () { say(msg, "Couldn't reach Relay.", true); });
+    }
+    load();
+  }
   var openResale = null;
   var CONDITION = { new_with_tags: "New with tags", like_new: "Like new", good: "Good", fair: "Fair" };
-  var resaleErrors = { agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
+  var resaleErrors = { account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
     already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
     not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
 
@@ -604,7 +644,7 @@
             if (!confirm("End this conversation? The item goes back on sale.")) return;
             api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); } }));
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", style: "padding:9px 14px;font-size:14px", onclick: function () {
-            var why = prompt("What went wrong? (for example: asked me to pay outside Relay)");
+            var why = prompt("What went wrong? (for example: asked me to pay outside Relay)\n\nReporting lets the Relay team read this conversation to review it. They won't see who either of you is.");
             if (why === null) return;
             api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); } }));
         }
@@ -775,6 +815,12 @@
     var gbox = el("div");
     [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
     if (notice) say(msg, notice.text, notice.bad);
+    var abox = el("div"); sheet.insertBefore(abox, gbox.nextSibling);
+    api("/relay/my/admin/me").then(function (r) {
+      if (!r.ok || !r.body || r.body.admin !== true) return;
+      abox.appendChild(el("button", { className: "rl-btn ghost", text: "Review reports (" + (r.body.openReports || 0) + ")", style: "margin-bottom:8px",
+        onclick: function () { back.firstChild.textContent = ""; adminView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
+    }).catch(function () {});
     openFind = function () { back.firstChild.textContent = ""; findView(back.firstChild, function () { gate(back.firstChild, email); }); };
     openOriginal = function (id) { back.firstChild.textContent = ""; originalView(back.firstChild, id, function () { gate(back.firstChild, email); }); };
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
