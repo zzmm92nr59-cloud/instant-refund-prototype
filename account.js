@@ -1167,8 +1167,10 @@
   // ---- Phone alerts: price drops sent to this device. Nothing is sent unless the shopper turns it on here. ----
   function pushOk() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
   function keyBytes(t) { var s = t.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
-  function thisDevice() { return pushOk() ? navigator.serviceWorker.ready.then(function (r) { return r.pushManager.getSubscription(); }).catch(function () { return null; }) : Promise.resolve(null); }
-  function alertStatus() { memoDrop("alerts"); return cachedGet("alerts", "/relay/my/alerts/status").then(function (r) { return r.ok ? r.body : null; }); }
+  function race(p, ms, fallback) { return new Promise(function (res) { var t = setTimeout(function () { res(fallback); }, ms); p.then(function (v) { clearTimeout(t); res(v); }, function () { clearTimeout(t); res(fallback); }); }); }
+  function swReady() { return race(navigator.serviceWorker.ready, 10000, null).then(function (r) { if (!r) throw new Error("sw_not_ready"); return r; }); }
+  function thisDevice() { return pushOk() ? race(swReady().then(function (r) { return r.pushManager.getSubscription(); }), 12000, null) : Promise.resolve(null); }
+  function alertStatus() { memoDrop("alerts"); return race(cachedGet("alerts", "/relay/my/alerts/status").then(function (r) { return r.ok ? r.body : null; }), 20000, null); }
   function syncWatch(p, on) {
     var s = load(); if (!s || !s.token || !p || !p.sku) return Promise.resolve();
     memoDrop("alerts");
@@ -1182,7 +1184,7 @@
     if (!pushOk()) return Promise.resolve({ ok: false, reason: "unsupported" });
     return Notification.requestPermission().then(function (perm) {
       if (perm !== "granted") return { ok: false, reason: "denied" };
-      return Promise.all([navigator.serviceWorker.ready, api("/relay/my/push/key")]).then(function (x) {
+      return Promise.all([swReady(), api("/relay/my/push/key")]).then(function (x) {
         if (!x[1].ok) return { ok: false, reason: "server" };
         return x[0].pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(x[1].body.publicKey) }).then(function (sub) {
           var j = sub.toJSON();
