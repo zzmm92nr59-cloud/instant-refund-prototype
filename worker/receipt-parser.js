@@ -441,7 +441,11 @@ export function parseReturnEmail(rawEmail) {
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
-  const text = (parts.text.join("\n") || htmlToText(html)).trim();
+  // Some senders ship an empty or skimpy text part beside the full HTML one: use whichever actually has the return details.
+  const plainText = parts.text.join("\n").trim();
+  const htmlText = html ? htmlToText(html).trim() : "";
+  const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t);
+  const text = plainText && (hasReturn(plainText) || !hasReturn(htmlText)) ? plainText : htmlText || plainText;
   const subject = headers.subject || "";
   const sender = retailerFromFrom(headers.from);
   const refDate = headers.date ? new Date(headers.date) : null;
