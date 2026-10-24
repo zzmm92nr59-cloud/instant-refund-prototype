@@ -153,7 +153,7 @@ function resetWalletHistory(){
  real=[];selected=null;exchangeContext=false;page="wallet";retailer=false;render();loadVerified();
 }
 let page=testing?"profile":"wallet",demo=true,real=[],error="",catalog=[],watch={},reason="design",selected=sample,chosen=null,history={},retailer=false,exchangeContext=false,storeFilter="all";try{watch=JSON.parse(localStorage.getItem("relay-radar-v2")||"{}")||{}}catch{}try{history=JSON.parse(localStorage.getItem("relay-radar-history-v2")||"{}")||{}}catch{}
-const nav=[["wallet","⌂","Wallet"],["receipts","▤","Receipts"],["discover","✦","Discover"],["radar","◎","Radar"],["wrapped","◈","Wrapped"],["profile","◯","Profile"]];
+const nav=[["wallet","⌂","Wallet"],["receipts","▤","Receipts"],["market","⇄","Market"],["discover","✦","Discover"],["radar","◎","Radar"],["wrapped","◈","Wrapped"],["profile","◯","Profile"]];
 let personalise=false;
 try{personalise=localStorage.getItem("relay-discover-personalise-v1")==="true"}catch{}
 function togglePersonalise(){
@@ -218,7 +218,8 @@ function readTestStorePurchases(){
  }catch{return []}
 }
 function getPurchases(){return demo?RelayWalletLedger.project({purchases:[...readTestStorePurchases(),...real],events:readDemoLog(),customer:activeShopper()}):real}
-function render(){navRender();$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="bank"?bankView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();loadReceiptPurchases()}if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus()}if(page==="wrapped"&&!retailer)bindWrappedFrame()}
+function render(){navRender();$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="market"?marketView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="bank"?bankView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();loadReceiptPurchases()}if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="market"&&!retailer&&window.RelayAccount)RelayAccount.mountMarket($("marketPage"));if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus()}if(page==="wrapped"&&!retailer)bindWrappedFrame()}
+function marketView(){return '<div class="eyebrow wallet-eyebrow">MARKET</div><h1 class="title">Swap and sell with other members.</h1><p class="sub">Passed your return window? List an item from your receipts, or browse what other Relay members are offering. Relay introduces you; payment and postage aren\'t built yet.</p><div id="marketPage"></div>'}
 function receiptsView(){return '<div class="eyebrow wallet-eyebrow">RECEIPTS</div><h1 class="title">Your receipts, in one place.</h1><p class="sub">Receipts from your email and in-store purchases, grouped by type. Tap one to see the return deadline and the original email.</p><div id="receiptsPage"></div>'}
 function wallet(){
  const list=getPurchases();

@@ -107,6 +107,9 @@ export async function ensureGmailTables(db) {
     `CREATE TABLE IF NOT EXISTS receipt_learning (
        shopper_id TEXT NOT NULL, store_key TEXT NOT NULL, category TEXT, promo INTEGER NOT NULL DEFAULT 0,
        updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, store_key))`,
+    // Public store logos, fetched from the store's own website and shared by everyone. Holds no personal data.
+    `CREATE TABLE IF NOT EXISTS retailer_logos (
+       domain TEXT PRIMARY KEY, type TEXT, data TEXT, found INTEGER NOT NULL, fetched_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_receipt_learning_store ON receipt_learning(store_key, category)`
   ];
   for (const sql of statements) await db.prepare(sql).run();
@@ -206,6 +209,45 @@ async function fetchProductImage(fetchImpl, urls) {
     } catch { /* try the next one */ }
   }
   return null;
+}
+
+// ---- Store logos ----
+// The sender's address is often a mail subdomain (e.mail.sainsburys.co.uk): the logo lives on the main site.
+const TWO_PART_TLDS = new Set(["co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "co.nz", "co.jp", "com.br", "co.za", "co.in"]);
+export function logoDomain(host) {
+  const h = String(host || "").toLowerCase().trim();
+  if (h.length > 80 || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || /(^|\.)(localhost|local|internal|test|invalid)$/.test(h)) return null;
+  const parts = h.split(".");
+  const n = TWO_PART_TLDS.has(parts.slice(-2).join(".")) ? 3 : 2;
+  return parts.slice(-n).join(".");
+}
+function logoTypeOf(bytes) {
+  const t = imageTypeOf(bytes);
+  if (t) return t;
+  if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && bytes[3] === 0) return "image/x-icon";
+  return null;
+}
+const LOGO_MAX_BYTES = 150000, LOGO_MIN_BYTES = 200, LOGO_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
+async function fetchLogo(fetchImpl, domain) {
+  for (const u of [`https://${domain}/apple-touch-icon.png`, `https://www.${domain}/apple-touch-icon.png`, `https://${domain}/favicon.ico`, `https://www.${domain}/favicon.ico`]) {
+    try {
+      const res = await fetchImpl(u, { headers: { Accept: "image/*" }, redirect: "follow" });
+      if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
+      const type = logoTypeOf(bytes);
+      if (type) return { type, data: b64Chunked(bytes) };
+    } catch { /* try the next address */ }
+  }
+  return null;
+}
+async function logoFor(env, fetchImpl, domain, now) {
+  const row = await env.RELAY_DB.prepare("SELECT type, data, found, fetched_at FROM retailer_logos WHERE domain = ?").bind(domain).first();
+  if (row && (row.found || now - row.fetched_at < LOGO_RETRY_MS)) return row.found ? row : null;
+  const img = await fetchLogo(fetchImpl, domain);
+  await env.RELAY_DB.prepare("INSERT OR REPLACE INTO retailer_logos (domain,type,data,found,fetched_at) VALUES (?,?,?,?,?)")
+    .bind(domain, img ? img.type : null, img ? img.data : null, img ? 1 : 0, now).run();
+  return img ? { type: img.type, data: img.data } : null;
 }
 
 // Reads one email and decides what it is. Only extracted fields are kept; the email text is dropped.
@@ -453,17 +495,16 @@ async function listReceipts(env, shopperId) {
   const gone = await env.RELAY_DB.prepare(
     "SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all();
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
-  const loose = [];
   for (const p of plans) {
     if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
     const o = p.orderRef && byOrder.get(p.orderRef);
-    if (o) { o.returnPlan = p; } else loose.push(p);
+    // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
+    if (o) o.returnPlan = p;
   }
   const rem = await env.RELAY_DB.prepare(
     "SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all();
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
-  // A return whose original order email was not found still gets its own card.
-  const cards = [...orders, ...loose];
+  const cards = [...orders];
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
   // What the app has been taught. A shopper's own choice always wins. Otherwise a category is used only when at least two
   // different shoppers chose it for the same store and it clearly leads, so one person's mistake never changes anyone else's list.
@@ -626,6 +667,15 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
         .bind(shopper.id, k, Date.now()).run();
     }
     return json({ ok: true }, 200, cors);
+  }
+  const lg = /^\/relay\/my\/logo\/([A-Za-z0-9.-]{3,80})$/.exec(path);
+  if (lg && m === "GET") {
+    const d = logoDomain(lg[1]);
+    if (!d) return json({ error: "not_found" }, 404, cors);
+    const row = await logoFor(env, opts.fetchImpl, d, opts.now || Date.now());
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
+      status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=604800", "X-Content-Type-Options": "nosniff" } });
   }
   const cat = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/category$/.exec(path);
   if (cat && m === "POST") {

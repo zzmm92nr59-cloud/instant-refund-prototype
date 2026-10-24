@@ -63,6 +63,11 @@ const fetchImpl = async (url, init = {}) => {
     if (url.endsWith("fake.png")) return new Response("<svg onload=alert(1)>" .repeat(200), { headers: { "content-type": "image/png" } });
     return new Response("nope", { status: 404 });
   }
+  if (/^https:\/\/(www\.)?(sainsburys\.co\.uk|logo-less\.test)\//.test(url)) {
+    logoCalls.push(url);
+    if (url === "https://sainsburys.co.uk/apple-touch-icon.png") return new Response(Buffer.concat([PNG, Buffer.alloc(400)]), { headers: { "content-type": "image/png" } });
+    return new Response("nope", { status: 404 });
+  }
   if (url === "https://oauth2.googleapis.com/revoke") return new Response("{}", { status: 200 });
   if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "alice.gmail@gmail.com" });
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?") && /q=findme|q=lululemon/i.test(url)) {
@@ -96,6 +101,7 @@ const fetchImpl = async (url, init = {}) => {
   if (one) return Response.json({ raw: b64url(gmailBox[one[1]] ?? hidden[one[1]]) });
   return new Response("blocked", { status: 500 });
 };
+const logoCalls = [];
 let clock = 1_800_000_000_000;
 const call = (path, { method = "GET", body, token, ip = "1.1.1.1", e = env } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method,
@@ -345,6 +351,24 @@ assert.equal((await (await call("/relay/my/receipts", { token: alice })).json())
   assert.ok(bobsSame.every(x => x.category !== "beauty" || !x.categoryLearned), "one shopper's choice does not change another's list");
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM receipt_learning").get().n, 1);
 }
+// 11d. Only purchases get cards; store logos come from the store's own site, are cached, and bad hosts are refused.
+{
+  const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email='alice@example.com'").get().id;
+  sqlite.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+    .run("99999999-9999-4999-8999-999999999999", aliceId, "orphan-return-ref", "pending", JSON.stringify({ kind: "return_instructions", retailer: { name: "Orphan" }, orderRef: "NOPE-1", returnId: "R-1", parserVersion: 11 }), Date.now());
+  const cards = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
+  assert.ok(cards.every(c => c.kind !== "return_instructions"), "a return email with no purchase email gets no card of its own");
+  sqlite.prepare("DELETE FROM captured_receipts WHERE message_ref = 'orphan-return-ref'").run();
+  assert.equal((await call("/relay/my/logo/sainsburys.co.uk")).status, 401, "logos need sign-in");
+  const lg = await call("/relay/my/logo/e.mail.sainsburys.co.uk", { token: alice });
+  assert.equal(lg.status, 200); assert.equal(lg.headers.get("content-type"), "image/png");
+  const n = logoCalls.length;
+  assert.equal((await call("/relay/my/logo/email.sainsburys.co.uk", { token: bob })).status, 200);
+  assert.equal(logoCalls.length, n, "a logo is fetched once and shared");
+  for (const bad of ["127.0.0.1", "localhost", "evil.test", "a_b.com"]) assert.equal((await call("/relay/my/logo/" + bad, { token: alice })).status, 404, bad + " refused");
+  assert.equal((await call("/relay/my/logo/nologo.example", { token: alice })).status, 404, "no logo found is a clean 404");
+}
+
 // A dismissed item gets no reminder.
 clock = Date.parse("2026-11-22T08:00:00Z");
 await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true });

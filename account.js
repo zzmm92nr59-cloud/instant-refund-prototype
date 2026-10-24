@@ -410,7 +410,11 @@
     });
     return card;
   }
-  function gmailSection(box, c, msg) {
+  function disconnectGmail(done, msg) {
+    if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
+    api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) done(); else say(msg, "Couldn't disconnect. Try again.", true); });
+  }
+  function gmailSection(box, c, msg, onPage) {
     box.textContent = "";
     box.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
     var list = el("div");
@@ -454,9 +458,20 @@
         var wrap = el("div", { className: "rl-order", style: "padding:12px" });
         var top = el("div", { style: "display:flex;gap:12px;align-items:center" });
         var thumb = el("div", { style: "flex:0 0 56px;width:56px;height:56px;border-radius:14px;background:#f1ecdf;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800;font-size:22px;color:#46601b" }, [el("span", { text: who.charAt(0).toUpperCase() })]);
-        if (row.hasImage && row.id) {
+        var single = (row.items || []).length <= 1;
+        if (single && row.hasImage && row.id) {
           var im = el("img", { alt: "", style: "width:56px;height:56px;object-fit:cover" });
-          apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; im.src = u; thumb.appendChild(im); } });
+          apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; im.src = u; thumb.appendChild(im); } else showLogo(); });
+        } else showLogo();
+        // More than one product (or no photo): the store's own logo, fetched once from the store's website.
+        function showLogo() {
+          var dom = row.retailer && row.retailer.domain;
+          if (!dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return;
+          apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) {
+            if (!u) return;
+            thumb.textContent = ""; thumb.style.background = "#fff"; thumb.style.border = "1px solid #e7e1d2";
+            thumb.appendChild(el("img", { alt: "", src: u, style: "width:40px;height:40px;object-fit:contain" }));
+          });
         }
         var canOpen = row.id && /^[A-Za-z0-9]{6,40}$/.test(row.gmailId || "") && openOriginal;
         var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
@@ -544,12 +559,14 @@
       };
       scanBtn.onclick = function () { doScan(false); };
       box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); loadList();
-      if (lastScan) box.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { doScan(true); } }));
-      if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
-      box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
-        if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
-        api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) gmailSection(box, c, msg); else say(msg, "Couldn't disconnect. Try again.", true); }); } }));
-      if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
+      // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
+      if (!onPage) {
+        if (lastScan) box.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { doScan(true); } }));
+        if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
+        box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () { disconnectGmail(function () { gmailSection(box, c, msg, onPage); }, msg); } }));
+      }
+      if (window.__relayAutoFull) { window.__relayAutoFull = false; window.__relayAutoScan = false; doScan(true); }
+      else if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
     }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
 
@@ -735,10 +752,11 @@
       var b = el("button", { className: "rl-btn ghost", text: t[1], style: "margin:0;padding:9px 6px;font-size:14px", onclick: function () { cur = t[0]; focusReceipt = null; draw(); } });
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
-    [el("h2", { text: "Swap & resell" }),
+    // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
+    [onBack ? el("h2", { text: "Swap & resell" }) : null,
      el("p", { text: "Passed your return window? Sell or swap with other Relay members. For now Relay only matches people. Payment and postage aren't built yet, so nothing is bought or sent through Relay." }),
      tabs, body, msg,
-     el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+     onBack ? el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
     function fail(r) { tell(resaleErrors[r.body && r.body.error] || "Something went wrong. Please try again.", true); }
     function photo(card, id, has) {
@@ -893,6 +911,12 @@
       gbox.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
       gbox.appendChild(el("p", { text: "Connect Gmail, scan for receipts and see them grouped by store type. Everything lives on the Receipts page." }));
       gbox.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", onclick: function () { close(); window.go("receipts"); } }));
+      api("/relay/my/gmail").then(function (g) {
+        if (!g.ok || !g.body || !g.body.connected) return;
+        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
+        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
+        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () { disconnectGmail(function () { back.firstChild.textContent = ""; gate(back.firstChild, email); }, msg); } }));
+      });
     } else gmailSection(gbox, c || {}, msg);
     var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
     var tbox = el("div"); sheet.insertBefore(tbox, list.previousSibling); twoStepSection(tbox);
@@ -1003,10 +1027,32 @@
       var box = el("div");
       host.appendChild(box); host.appendChild(msg);
       if (notice) say(msg, notice.text, notice.bad);
-      gmailSection(box, r.body, msg);
+      gmailSection(box, r.body, msg, true);
     }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
-  window.RelayAccount = { mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
+  // The Market page: swap and resell with other members, on a page of its own.
+  function mountMarket(host) {
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) {
+      host.appendChild(el("p", { text: "Sign in to see what other Relay members are swapping and selling, or to list something of your own." }));
+      host.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:260px", onclick: show }));
+      return;
+    }
+    host.appendChild(el("p", { text: "Loading…" }));
+    api("/relay/my/consent").then(function (r) {
+      host.textContent = "";
+      if (r.status === 401) { save(null); mountMarket(host); return; }
+      if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
+      if (!r.body.accepted) {
+        host.appendChild(el("p", { text: "Relay needs your OK before it can list anything from your receipts. It takes a moment." }));
+        host.appendChild(el("button", { className: "rl-btn", text: "Review and agree", style: "max-width:260px", onclick: show }));
+        return;
+      }
+      resaleView(host, null, null, "browse");
+    }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+  }
+  window.RelayAccount = { mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
