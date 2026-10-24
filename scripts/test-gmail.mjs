@@ -367,6 +367,11 @@ assert.equal((await (await call("/relay/my/receipts", { token: alice })).json())
   assert.equal(logoCalls.length, n, "a logo is fetched once and shared");
   for (const bad of ["127.0.0.1", "localhost", "evil.test", "a_b.com"]) assert.equal((await call("/relay/my/logo/" + bad, { token: alice })).status, 404, bad + " refused");
   assert.equal((await call("/relay/my/logo/nologo.example", { token: alice })).status, 404, "no logo found is a clean 404");
+  // Speed: database set-up runs once per worker instance, not on every request (it used to add seconds to each call).
+  let creates = 0; const realPrepare = db.prepare; db.prepare = (sql) => { if (/CREATE (TABLE|INDEX)/i.test(sql)) creates++; return realPrepare(sql); };
+  for (let i = 0; i < 3; i++) assert.equal((await call("/relay/my/receipts", { token: alice })).status, 200);
+  db.prepare = realPrepare;
+  assert.equal(creates, 0, "no table set-up on ordinary requests");
 }
 
 // A dismissed item gets no reminder.
