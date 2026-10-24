@@ -168,11 +168,11 @@ assert.ok(!stored.includes("PLAINTEXT-marker") && !stored.includes("refresh-toke
 // (covered below with withdraw)
 
 // Follows the scan cursor the way the app does; returns the summed counts.
-const scanAll = async (token = alice, max = 60) => {
+const scanAll = async (token = alice, max = 60, full = false) => {
   const tot = { added: 0, updated: 0, alreadyCaptured: 0, notReceipts: 0, calls: 0 };
   let cursor, res;
   do {
-    res = await post("/relay/my/gmail/scan", token, cursor ? { cursor } : undefined);
+    res = await post("/relay/my/gmail/scan", token, { ...(cursor ? { cursor } : {}), ...(full ? { full: true } : {}) });
     assert.equal(res.status, 200);
     const j = await res.json();
     for (const k of ["added", "updated", "alreadyCaptured", "notReceipts"]) tot[k] += j[k];
@@ -207,17 +207,18 @@ assert.deepEqual({ ...(await scanAll()), calls: 0 }, { added: 0, updated: 0, alr
 gmailBox.m4 = `From: Example Outfitters <returns@exampleoutfitters.test>\nSubject: Your return QR code for order EO-1\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-778812\nReturn by Friday 27 November 2026\nReturn Instructions\nTake your parcel to any Evri ParcelShop.\nShow the QR code to the shop.\nEstimated refund: £59.00\n`;
 for (let i = 10; i < 70; i++) gmailBox["m" + i] = newsletter + i;
 let last;
-const big = await scanAll();
+const big = await scanAll(alice, 60, true);
 assert.ok(big.calls >= 4, "a busy window takes several calls, then the older windows follow");
 const merged = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(merged.length, 2, "return email is not a separate card when its order exists");
 const eo1 = merged.find(x => x.orderRef === "EO-1");
 assert.ok(eo1 && eo1.returnPlan && eo1.returnPlan.returnId === "RT-778812" && eo1.returnPlan.deadline === "2026-11-27" && eo1.returnPlan.carrier === "Evri", JSON.stringify(eo1 && eo1.returnPlan));
 assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
+assert.ok(eo1.category && typeof eo1.returnable === "boolean" && eo1.categoryLabel, "each receipt carries a group and a can-it-be-returned flag");
 // 7c. Older receipts on later Gmail result pages are reached.
 gmailBox.m99 = receiptMail(99).replace("14 Oct 2026", "19 Nov 2025");
 paging = true;
-await scanAll();
+await scanAll(alice, 60, true);
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
 // 11c. "Find a missing receipt": search by store name, pick one email, add it. Owner-only, consent-gated.
@@ -279,7 +280,12 @@ delete gmailBox.m99;
 gmailBox.m7 = receiptMail(7).replace("14 Oct 2026", "19 Nov 2025"); boxDates.m7 = ymdOf(clock - 300 * 86400000);
 gmailBox.m8 = receiptMail(8); boxDates.m8 = ymdOf(clock - 700 * 86400000);
 listQueries.length = 0;
+// After a complete scan, a normal scan only looks at recent mail: it does not re-read the whole mailbox.
 await scanAll();
+assert.ok(!JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-7"), "a normal scan does not go back over old mail again");
+assert.ok(listQueries.length >= 1 && listQueries.length <= 3, "normal scan looks at only the newest windows: " + listQueries.length);
+listQueries.length = 0;
+await scanAll(alice, 60, true);
 const dumpOld = JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all());
 assert.ok(dumpOld.includes("EO-7"), "a receipt from 300 days ago is found");
 assert.ok(!dumpOld.includes("EO-8"), "nothing beyond the look-back period is read");
