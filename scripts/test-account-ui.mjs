@@ -63,7 +63,7 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/original') return j(200, { html: '<p>Order EO-1 body from the store</p>', extraImages: ['data:image/png;base64,' + PNG1.toString('base64'), 'javascript:alert(1)'], links: [{ label: 'Start a return', url: 'https://shop.test/returns' }, { label: 'Bad', url: 'http://shop.test/x' }] });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
-  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', gmailId: 'zz9876abcdef', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
+  if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', gmailId: 'zz9876abcdef', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], category: 'fashion', categoryLabel: 'Fashion', returnable: true, needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
   if (p === '/relay/my/resale/items') return j(200, { items: [{ receiptId: '11111111-1111-1111-1111-111111111111', itemIndex: 0, title: 'Wool jumper', store: 'Example Outfitters', pricePence: 5900, currency: 'GBP', orderDate: '2026-10-14', returnWindowOpen: true, returnDeadline: '2026-11-20', alreadyListed: resaleListed }] });
   if (p === '/relay/my/resale/feed') return j(200, { listings: [{ id: '55555555-5555-5555-5555-555555555555', title: '<img src=x onerror=window.__xss7=1>Trail shell', store: 'Alpine Active', size: 'M', condition: 'good', askPence: 4500, currency: 'GBP', swapOk: false, note: null, hasImage: false, status: 'active', myRequest: null }] });
   if (p === '/relay/my/resale/mine') return j(200, { listings: resaleListed ? [{ id: '66666666-6666-6666-6666-666666666666', title: 'Wool jumper', store: 'Example Outfitters', size: 'L', condition: 'good', askPence: 2500, currency: 'GBP', swapOk: true, hasImage: false, status: 'active', requests: [{ id: '77777777-7777-7777-7777-777777777777', who: 'Member 1', kind: 'buy', message: null, status: 'accepted', offered: null }] }] : [], myRequests: [] });
@@ -295,8 +295,15 @@ assert.equal(await page.locator('a[href^="https://mail.google.com/mail/u/0/#all/
 assert.equal(await page.getByText('Track your return').count(), 0, 'non-https track link is never shown');
 assert.ok(await page.getByText('Estimated refund').count() === 1);
 assert.equal(await page.evaluate(() => window.__xss6), undefined);
-await page.getByText('Wool jumper').waitFor();
+await page.locator('.rl-sheet').getByText('Wool jumper').waitFor();
 assert.equal(await page.evaluate(() => window.__xss3), undefined, 'captured receipt text must never run as HTML');
+await page.locator('.rl-sheet').getByText('Fashion (1)').waitFor();
+// The same receipt shows in the wallet's purchases, safely, once the sheet is closed.
+await page.locator('.rl-sheet').getByRole('button', { name: 'Close' }).click();
+await page.locator('#receiptPurchases').getByText('From your receipts').waitFor();
+assert.ok(await page.locator('#receiptPurchases h3', { hasText: 'Wool jumper' }).count() === 1, 'receipt appears under purchases');
+assert.equal(await page.evaluate(() => window.__xss3), undefined, 'receipt text in the wallet never runs as HTML');
+await page.locator('.avatar').click();
 await page.getByText('Return by 20 November 2026').waitFor();
 await page.getByText('Send to: Returns, Unit 4, Leeds LS1 4AB').waitFor();
 await page.getByText('mentions a QR code').waitFor();
@@ -383,7 +390,7 @@ await page.getByRole('button', { name: 'Read this receipt' }).click();
 await page.getByText("doesn't look like an order confirmation").waitFor();
 await page.locator('textarea').fill('Order number: EO-1 total £59.00');
 await page.getByRole('button', { name: 'Read this receipt' }).click();
-await page.getByText('Wool jumper').waitFor();
+await page.locator('.rl-sheet').getByText('Wool jumper').waitFor();
 await page.getByText('£59.00').first().waitFor();
 await page.getByText("can't start an automatic refund").waitFor();
 assert.equal(await page.evaluate(() => window.__xss2), undefined, 'receipt text must never run as HTML');

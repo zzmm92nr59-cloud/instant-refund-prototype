@@ -31,6 +31,7 @@ jobs:
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
           node scripts/test-receipt-parser.mjs
+          node scripts/test-receipt-category.mjs
           node scripts/test-gmail.mjs
           node scripts/test-resale.mjs
           node scripts/test-resale-admin.mjs
