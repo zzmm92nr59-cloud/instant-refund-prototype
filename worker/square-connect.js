@@ -62,7 +62,15 @@ export async function listSquareAccounts(env, o = {}) {
   if (env.SQUARE_ACCESS_TOKEN) out.push({ id: "default", label: env.SQUARE_DEFAULT_LABEL || "Relay Demo Store", token: env.SQUARE_ACCESS_TOKEN });
   if (!env.RELAY_DB || !env.AUTH_SECRET) return out;
   await ensureSquareMerchantSchema(env.RELAY_DB);
-  const rows = ((await env.RELAY_DB.prepare("SELECT * FROM square_merchants ORDER BY created_at").all()).results || []);
+  let rows = ((await env.RELAY_DB.prepare("SELECT * FROM square_merchants ORDER BY created_at").all()).results || []);
+  // If a shop was connected that is really the default shop, read it once (under the default shop's name).
+  if (env.SQUARE_ACCESS_TOKEN && rows.length) {
+    try {
+      const r = await f(HOST + "/v2/merchants/me", { headers: { Authorization: "Bearer " + env.SQUARE_ACCESS_TOKEN, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
+      const me = (await r.json()).merchant;
+      if (me && me.id) rows = rows.filter(m => m.merchant_id !== me.id);
+    } catch { /* if the default shop can't be identified, nothing is dropped */ }
+  }
   for (const m of rows) {
     try {
       let token = await open(env, m.access_iv, m.access_data);
