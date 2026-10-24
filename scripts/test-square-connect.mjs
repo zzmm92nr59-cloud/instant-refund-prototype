@@ -34,7 +34,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (shop === null) return json({ errors: [{ code: "UNAUTHORIZED" }] }, 401);
   if (!shop) throw Error("unexpected token " + token);
   if (url.endsWith("/v2/locations")) return json({ locations: [{ id: shop.loc, status: "ACTIVE", name: "Main" }] });
-  if (url.includes("/v2/catalog/list")) return json({ objects: shop.items.map(i => ({ type: "ITEM", id: i.id, item_data: { name: i.name, variations: [{ id: i.var, item_variation_data: { name: "Reg", sku: i.sku, price_money: { amount: i.price, currency: "GBP" } } }] } })) });
+  if (url.includes("/v2/catalog/list")) return json({ objects: [...shop.items.filter(i => i.img).map(i => ({ type: "IMAGE", id: "IMG-" + i.id, image_data: { url: i.img } })), ...shop.items.map(i => ({ type: "ITEM", id: i.id, item_data: { name: i.name, ...(i.img ? { image_ids: ["IMG-" + i.id] } : {}), variations: [{ id: i.var, item_variation_data: { name: "Reg", sku: i.sku, price_money: { amount: i.price, currency: "GBP" } } }] } }))] });
   if (url.endsWith("/inventory/counts/batch-retrieve")) return json({ counts: JSON.parse(init.body).catalog_object_ids.map(id => ({ catalog_object_id: id, location_id: shop.loc, quantity: "4", state: "IN_STOCK" })) });
   throw Error("unexpected call " + url);
 };
@@ -78,10 +78,18 @@ assert.deepEqual((await listSquareAccounts(env, { now })).map(a => a.id), ["defa
 globalThis.__defaultMerchant = "MDEFAULT1";
 
 // 4. One sync reads both shops, each product labelled with its own shop.
+// A shop's own https picture is stored; a non-https picture is ignored; items without a picture stay empty.
+shops["northco-token"].items[0].img = "https://images.example/shirt.png";
+const defaultShopKey = Object.keys(shops).find(k => k !== "northco-token" && shops[k]);
+shops[defaultShopKey].items[0].img = "http://insecure.example/tee.png";
 const res = await syncSquareCatalogue(env);
 assert.equal(res.shops, 2); assert.equal(res.products, 2);
 const rows = sqlite.prepare("SELECT i.title, i.store_label, v.sku, v.price_minor FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id=i.id WHERE i.provider='square_sandbox' ORDER BY i.title").all();
 assert.deepEqual(rows.map(r => [r.title, r.store_label, r.sku, r.price_minor]), [["Demo Tee", "Relay Demo Store", "DEMO-TEE", 2500], ["Oversized Shirt", "North & Co.", "OVER-NAV-M", 12999]]);
+
+const pics = Object.fromEntries(sqlite.prepare("SELECT title, image_url FROM retailer_catalog_items WHERE provider='square_sandbox'").all().map(r => [r.title, r.image_url]));
+assert.equal(pics["Oversized Shirt"], "https://images.example/shirt.png", "the shop's own picture is stored");
+assert.equal(pics["Demo Tee"], null, "an insecure or missing picture is never stored");
 
 // 5. A price change in one shop is picked up on the next sync, and the other shop is untouched.
 shops["northco-token"].items[0].price = 9999;
