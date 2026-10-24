@@ -1237,7 +1237,7 @@
         var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
         row.appendChild(el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () {
           say(msg, "Sending…");
-          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered. Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
+          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered" + (x.body && x.body.why ? " (" + x.body.why + ")" : "") + ". Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
         } }));
         row.appendChild(el("button", { className: "rl-btn ghost", text: "Check prices now", style: "width:auto", onclick: function () {
           say(msg, "Checking the shops…");
