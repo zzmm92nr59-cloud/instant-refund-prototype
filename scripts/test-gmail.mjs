@@ -205,10 +205,10 @@ assert.deepEqual({ ...(await scanAll()), calls: 0 }, { added: 0, updated: 0, alr
 
 // 7b. Return emails join their order; a long mailbox is read in steps.
 gmailBox.m4 = `From: Example Outfitters <returns@exampleoutfitters.test>\nSubject: Your return QR code for order EO-1\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-778812\nReturn by Friday 27 November 2026\nReturn Instructions\nTake your parcel to any Evri ParcelShop.\nShow the QR code to the shop.\nEstimated refund: £59.00\n`;
-for (let i = 10; i < 40; i++) gmailBox["m" + i] = newsletter + i;
+for (let i = 10; i < 70; i++) gmailBox["m" + i] = newsletter + i;
 let last;
 const big = await scanAll();
-assert.ok(big.calls >= 8, "a busy window takes several calls, then the older windows follow");
+assert.ok(big.calls >= 4, "a busy window takes several calls, then the older windows follow");
 const merged = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(merged.length, 2, "return email is not a separate card when its order exists");
 const eo1 = merged.find(x => x.orderRef === "EO-1");

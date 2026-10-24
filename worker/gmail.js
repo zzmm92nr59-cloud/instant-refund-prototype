@@ -30,12 +30,12 @@ const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const STATE_TTL_MS = 10 * 60 * 1000;
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
-const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
+const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 24, FETCH_PARALLEL = 6;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 10;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
-const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
+const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
   '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR "QR code"))';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
@@ -270,6 +270,21 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn) {
         .bind(shopperId, ...chunk).all();
       for (const r of found.results || []) known.set(r.message_ref, r);
     }
+    // Read the emails that need reading several at a time instead of one by one (this is most of the scan's waiting time).
+    const toRead = [];
+    for (let i = 0; i < ids.length && fetched + toRead.length < MAX_FETCH_PER_SCAN; i++) {
+      const sn = known.get(refs[i]);
+      if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
+    }
+    const rawById = new Map();
+    for (let i = 0; i < toRead.length; i += FETCH_PARALLEL) {
+      await Promise.all(toRead.slice(i, i + FETCH_PARALLEL).map(async (mid) => {
+        try {
+          const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${mid}?format=raw`, { headers: auth });
+          rawById.set(mid, r.ok ? ((await r.json().catch(() => ({}))).raw) : null);
+        } catch (e) { rawById.set(mid, null); }
+      }));
+    }
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i], ref = refs[i];
       const seen = known.get(ref);
@@ -278,10 +293,7 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn) {
       if (seen && !stale) { skipped++; continue; }
       if (fetched >= MAX_FETCH_PER_SCAN) { incomplete = true; continue; }
       fetched++;
-      const res = await fetchImpl(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
-      if (!res.ok) continue;
-      const raw = (await res.json().catch(() => ({}))).raw;
+      const raw = rawById.get(id);
       if (typeof raw !== "string") continue;
       const rawText = new TextDecoder().decode(unb64url(raw));
       const cls = classify(rawText, id);
