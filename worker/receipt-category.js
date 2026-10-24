@@ -7,7 +7,7 @@ export const CATEGORIES = {
 const RULES = [
   ["digital", /\b(app store|itunes|icloud|apple music|apple tv|google play|spotify|netflix|disney\+?|prime video|subscription|membership|gift card|e-?gift|steam|playstation store|xbox|nintendo eshop|audible|kindle|youtube premium|microsoft 365|adobe|dropbox|openai|chatgpt)\b/i],
   ["travel", /\b(uber|bolt|trainline|tfl|ryanair|easyjet|british airways|jet2|booking\.com|airbnb|expedia|hotels?|eurostar|national rail|lner|avanti|flights?|taxi|parking)\b/i],
-  ["food", /\b(deliveroo|just eat|uber eats|tesco|sainsbury|asda|morrisons|waitrose|lidl|aldi|ocado|co-?op|greggs|pret|costa|starbucks|nando|mcdonald|kfc|domino|pizza|restaurant|cafe|coffee|grocer|groceries|bakery|takeaway|wine|beer)\b/i],
+  ["food", /\b(deliveroo|just eat|uber eats|tesco|sainsbury|asda|morrisons|waitrose|lidl|aldi|ocado|co-?op|greggs|pret|costa|starbucks|nando|mcdonald|kfc|domino|pizza|restaurant|cafe|coffee|pub|tavern|bistro|brasserie|diner|burger|sushi|ramen|curry|wetherspoon|leon|itsu|wagamama|five guys|subway|tortilla|wasabi|honest burgers|dishoom|bubble tea|grocer|groceries|bakery|takeaway|wine|beer)\b/i],
   ["electronics", /\b(apple|iphone|ipad|macbook|airpods|samsung|currys|argos|ao\.com|very|dell|lenovo|hp\b|sony|bose|dyson|gopro|nintendo|playstation|laptop|phone|tablet|headphones|charger|cable|monitor|keyboard|camera|television|tv\b|console|smart ?watch)\b/i],
   ["beauty", /\b(boots|superdrug|lookfantastic|space nk|sephora|cult beauty|the body shop|holland & barrett|beauty|skincare|perfume|fragrance|makeup|cosmetic|shampoo|vitamin|pharmacy|optician|specsavers)\b/i],
   ["home", /\b(ikea|b&q|wickes|screwfix|dunelm|john lewis|wayfair|made\.com|homebase|garden|furniture|sofa|mattress|bedding|lamp|kitchen|candle|rug|curtain|plant)\b/i],
@@ -15,7 +15,16 @@ const RULES = [
 ];
 const HARDWARE = /\b(iphone|ipad|macbook|imac|mac mini|airpods|apple watch|airtag|charger|cable|case|keyboard|mouse|monitor|laptop|phone|tablet|headphones)\b/i;
 
-export function categorise(card) {
+// A stable key for a store, so what the app learns about "Zara" applies to every Zara email.
+export function storeKey(card) {
+  const r = card && card.retailer || {};
+  const raw = (r.domain || r.name || "").toLowerCase().replace(/^www\./, "").replace(/\.(co\.uk|com|uk|net|org|io|eu)$/, "");
+  return raw.replace(/[^a-z0-9]+/g, "").slice(0, 60);
+}
+
+// `learned` is what the app has been taught about this store (a category the shopper chose, or one many shoppers agree on).
+export function categorise(card, learned) {
+  if (learned && CATEGORIES[learned]) return finish(learned);
   const store = [card.retailer && card.retailer.name, card.retailer && card.retailer.domain].filter(Boolean).join(" ");
   const items = (card.items || []).map(i => i && i.name).filter(Boolean).join(" ");
   const all = store + " " + items;
@@ -25,6 +34,9 @@ export function categorise(card) {
   else {
     for (const [cat, re] of RULES) { if (re.test(items) || re.test(store)) { category = cat; break; } }
   }
+  return finish(category);
+}
+function finish(category) {
   const returnable = category !== "digital" && category !== "food" && category !== "travel";
   const reason = returnable ? null :
     category === "digital" ? "Digital purchases and subscriptions usually can't be returned. Cancel or ask the provider instead." :
