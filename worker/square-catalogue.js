@@ -4,11 +4,13 @@ import { listSquareAccounts, ensureSquareMerchantSchema } from "./square-connect
 // Catalogue snapshots are retailer-side data. Never treat stock as reserved or guaranteed.
 // Reads every connected Square shop (the default one plus any that approved "Connect with Square").
 // One shop failing never stops the others; it only throws if every shop failed.
-export async function syncSquareCatalogue(env) {
+export async function syncSquareCatalogue(env, opts = {}) {
   const db = env.RELAY_DB;
   if (!db) throw Error("RELAY_DB missing");
   await ensureSquareMerchantSchema(db);
-  const accounts = await listSquareAccounts(env);
+  let accounts = await listSquareAccounts(env);
+  // opts.only: read just one connected shop (used straight after it connects).
+  if (opts.only) accounts = accounts.filter(a => a.id === opts.only);
   if (!accounts.length) throw Error("Square access token missing");
   const total = { products: 0, variants: 0, inventoryCounts: 0, pages: 0, morePages: false, shops: 0, shopErrors: [] };
   let firstError = null;

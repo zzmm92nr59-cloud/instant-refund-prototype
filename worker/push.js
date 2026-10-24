@@ -106,7 +106,7 @@ export async function sendPush(env, sub, message, o = {}) {
   if (!(res.status >= 200 && res.status < 300)) { try { reason = String(await res.text()).replace(/[^\w ,.:{}"\-]/g, "").slice(0, 120); } catch { /* ignore */ } }
   return { ok: res.status >= 200 && res.status < 300, status: res.status, reason };
 }
-async function subsOf(db, shopperId) {
+export async function subsOf(db, shopperId) {
   return ((await db.prepare("SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE shopper_id = ?").bind(shopperId).all()).results || []);
 }
 const pounds = (m) => "£" + (m / 100).toFixed(2);

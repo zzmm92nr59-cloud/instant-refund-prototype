@@ -7,6 +7,7 @@ import { handleAuthRoute } from "./auth.js";
 import { sendReturnReminders } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
+import { handleRetailerRoute } from "./retailer.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
@@ -39,8 +40,13 @@ export default {
 
     const url = new URL(request.url);
     if (url.pathname.startsWith("/relay/square/")) {
-      const connectResponse = await handleSquareConnect(request, env, url, { afterConnect: () => { try { ctx.waitUntil(syncSquareCatalogue(env).catch(() => {})); } catch {} } });
+      // After a shop connects, only that shop's catalogue is read in the background (reading every shop took too long to finish).
+      const connectResponse = await handleSquareConnect(request, env, url, { afterConnect: (merchantId) => { try { ctx.waitUntil(syncSquareCatalogue(env, { only: merchantId }).catch(() => {})); } catch {} } });
       if (connectResponse) return connectResponse;
+    }
+    if (url.pathname.startsWith("/relay/retailer/")) {
+      const retailerResponse = await handleRetailerRoute(request, env, url, corsHeaders);
+      if (retailerResponse) return retailerResponse;
     }
     const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
       // "Check prices now" refreshes the shops' catalogues first, then compares prices.
