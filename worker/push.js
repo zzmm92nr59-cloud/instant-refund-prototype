@@ -46,7 +46,7 @@ export async function encryptPayload(payload, uaPublicB64u, authB64u, fixed = {}
 }
 
 // ---- Relay's own signing key (VAPID) ----
-async function wrapKey(env) {
+export async function wrapKey(env) {
   const raw = await crypto.subtle.digest("SHA-256", enc.encode("relay-push-key:" + env.AUTH_SECRET));
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }

@@ -6,9 +6,11 @@ const MAX_PAGES_PER_LOCATION = 10;
 const connectionId = location => "square:sandbox:" + location;
 const minor = money => Number.isSafeInteger(money?.amount) ? money.amount : 0;
 export async function squareRequest(env, path, init = {}) {
-  if (!env.SQUARE_ACCESS_TOKEN) throw Error("Square access token missing");
+  const { token, ...rest } = init;
+  const key = token || env.SQUARE_ACCESS_TOKEN;
+  if (!key) throw Error("Square access token missing");
   const response = await fetch(API + path, {
-    ...init, headers: { Authorization: "Bearer " + env.SQUARE_ACCESS_TOKEN,
+    ...rest, headers: { Authorization: "Bearer " + key,
       "Square-Version": "2026-09-16", "Content-Type": "application/json" },
     signal: AbortSignal.timeout(15000)
   });
@@ -17,8 +19,8 @@ export async function squareRequest(env, path, init = {}) {
     (body.errors?.[0]?.code || "unknown"));
   return body;
 }
-export async function listSquareLocations(env) {
-  const data = await squareRequest(env, "/v2/locations");
+export async function listSquareLocations(env, token) {
+  const data = await squareRequest(env, "/v2/locations", { token });
   return (data.locations || []).filter(l => l.id && l.status === "ACTIVE")
     .map(l => ({ id: l.id, name: l.name || "Square location", currency: l.currency || "GBP" }));
 }

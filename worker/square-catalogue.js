@@ -1,24 +1,52 @@
 import { squareRequest, listSquareLocations } from "./square-history.js";
+import { listSquareAccounts, ensureSquareMerchantSchema } from "./square-connect.js";
 
 // Catalogue snapshots are retailer-side data. Never treat stock as reserved or guaranteed.
+// Reads every connected Square shop (the default one plus any that approved "Connect with Square").
+// One shop failing never stops the others; it only throws if every shop failed.
 export async function syncSquareCatalogue(env) {
   const db = env.RELAY_DB;
   if (!db) throw Error("RELAY_DB missing");
-  const locations = await listSquareLocations(env);
+  await ensureSquareMerchantSchema(db);
+  const accounts = await listSquareAccounts(env);
+  if (!accounts.length) throw Error("Square access token missing");
+  const total = { products: 0, variants: 0, inventoryCounts: 0, pages: 0, morePages: false, shops: 0, shopErrors: [] };
+  let firstError = null;
+  for (const account of accounts) {
+    try {
+      const r = await syncOneShop(env, account);
+      total.products += r.products; total.variants += r.variants; total.inventoryCounts += r.inventoryCounts;
+      total.pages += r.pages; total.morePages = total.morePages || r.morePages; total.shops++;
+    } catch (e) {
+      firstError = firstError || e;
+      total.shopErrors.push({ shop: account.label, error: String(e && e.message || e).slice(0, 120) });
+    }
+  }
+  if (!total.shops && firstError) throw firstError;
+  return total;
+}
+
+async function syncOneShop(env, account) {
+  const db = env.RELAY_DB, token = account.token, label = account.label;
+  const locations = await listSquareLocations(env, token);
+  for (const l of locations) {
+    await db.prepare("INSERT OR IGNORE INTO retailer_connections (id,provider,merchant_external_id) VALUES (?,?,?)")
+      .bind("square:sandbox:" + l.id, "square_sandbox", l.id).run();
+  }
   let cursor, pages = 0, products = 0, variants = 0;
   const variantIds = [];
   do {
     const data = await squareRequest(env, "/v2/catalog/list?types=ITEM&limit=100" +
-      (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""));
+      (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""), { token });
     for (const item of data.objects || []) {
       if (item.type !== "ITEM" || !item.id) continue;
       const productId = "square:sandbox:item:" + item.id;
       await db.prepare(`INSERT INTO retailer_catalog_items
-        (id,provider,external_item_id,title,description)
-        VALUES (?,?,?,?,?) ON CONFLICT(provider,external_item_id) DO UPDATE SET
-        title=excluded.title,description=excluded.description,updated_at=CURRENT_TIMESTAMP`)
+        (id,provider,external_item_id,title,description,store_label)
+        VALUES (?,?,?,?,?,?) ON CONFLICT(provider,external_item_id) DO UPDATE SET
+        title=excluded.title,description=excluded.description,store_label=excluded.store_label,updated_at=CURRENT_TIMESTAMP`)
         .bind(productId, "square_sandbox", item.id, item.item_data?.name || "Unnamed product",
-          item.item_data?.description || null).run();
+          item.item_data?.description || null, label).run();
       products++;
       for (const variant of item.item_data?.variations || []) {
         if (!variant.id) continue;
@@ -42,7 +70,7 @@ export async function syncSquareCatalogue(env) {
   for (let start = 0; start < variantIds.length; start += 100) {
     const batch = variantIds.slice(start, start + 100);
     const data = await squareRequest(env, "/v2/inventory/counts/batch-retrieve", {
-      method: "POST", body: JSON.stringify({
+      token, method: "POST", body: JSON.stringify({
         catalog_object_ids: batch, location_ids: locations.map(l => l.id)
       })
     });
@@ -66,6 +94,6 @@ export async function syncSquareCatalogue(env) {
     VALUES (?,?,?,?,?,?,?)`)
     .bind(crypto.randomUUID(), "system", "square_catalogue", "catalogue_sync",
       "retailer_connection", "square:sandbox",
-      JSON.stringify({ products, variants, inventoryCounts, pages, morePages: !!cursor })).run();
+      JSON.stringify({ shop: label, products, variants, inventoryCounts, pages, morePages: !!cursor })).run();
   return { products, variants, inventoryCounts, pages, morePages: !!cursor };
 }
