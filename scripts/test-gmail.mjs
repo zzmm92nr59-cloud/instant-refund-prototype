@@ -229,6 +229,7 @@ assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts")
   assert.deepEqual(fr.results.map(x => x.id), ["m77abcdef", "m78abcdef", "m79abcdef"], "list of choices (bad ids dropped)");
   assert.equal(fr.results[0].subject, "Thanks for your lululemon order");
   assert.equal(fr.results[0].added, false);
+  assert.ok(calls.some(c => /messages\?/.test(c.url) && /subject%3A\(order/.test(c.url) && /-category%3Apromotions/.test(c.url)), "order/return emails are searched first, promotions left out");
   const q1 = calls.filter(c => /messages\?/.test(c.url) && /lululemon/.test(c.url)).pop().url;
   assert.ok(!/after:|before:/.test(decodeURIComponent(q1)), "search is by name only");
   const before = JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all());
