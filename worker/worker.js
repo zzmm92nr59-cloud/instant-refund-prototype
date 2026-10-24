@@ -6,6 +6,7 @@ import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
 import { sendReturnReminders } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
+import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
@@ -37,6 +38,10 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/relay/square/")) {
+      const connectResponse = await handleSquareConnect(request, env, url, { afterConnect: () => { try { ctx.waitUntil(syncSquareCatalogue(env).catch(() => {})); } catch {} } });
+      if (connectResponse) return connectResponse;
+    }
     const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
       // "Check prices now" refreshes the shops' catalogues first, then compares prices.
       syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), shopifyConfigured(env) ? syncShopifyCatalogues(env) : null]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
@@ -73,7 +78,8 @@ export default {
     // Public demo-only product selector; never exposes production merchant data.
     if (url.pathname === "/relay/live-test/products" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({products:[]},{headers:corsHeaders});
-      const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,
+      try { await ensureSquareMerchantSchema(env.RELAY_DB); } catch {}
+      const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,i.store_label AS storeName,
         v.sku,v.price_minor AS priceMinor,v.currency,i.provider AS provider,
         i.external_item_id AS externalItemId,
         MAX(s.quantity) AS quantity, MAX(s.observed_at) AS observedAt
