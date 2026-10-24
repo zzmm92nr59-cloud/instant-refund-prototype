@@ -51,6 +51,7 @@ await context.route('https://**/*', route => {
   }
   const authed = h.authorization === 'Bearer ' + SESSION;
   if (p.startsWith('/relay/my/') && p !== '/relay/my/purchases' && p !== '/relay/my/receipts/parse' && !authed) return j(401, { error: 'not_signed_in' });
+  if (p === '/relay/my/wrapped') return j(200, { year: 2026, receipts: 5, shops: 4, items: 7, spentPence: 12200, currency: 'GBP', coverage: { withTotal: 3, noTotal: 1, otherCurrency: 1 }, topShops: [{ name: '<img src=x onerror=window.__xss9=1>Zara', receipts: 3, spentPence: 7990 }], categories: [{ category: 'fashion', label: 'Fashion', receipts: 3, spentPence: 7990 }], byMonth: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => ({ month: m, receipts: i === 2 ? 3 : 0, spentPence: 0 })), busiestMonth: 'Mar', biggest: { shop: 'Zara', totalPence: 5990, date: '2026-03-10' }, returnsStarted: 1, personality: { label: 'Fashion regular', why: '3 of your 5 receipts were fashion.' }, note: "Based on the receipts and order emails Relay found. In-store card purchases without an email receipt aren't included." });
   if (p === '/relay/my/consent' && req.method() === 'GET') return j(200, { version: 'v-test', accepted: consentAccepted, gmailAvailable: true, text: ['Relay reads receipts in read-only mode.', 'You can disconnect and delete at any time.'] });
   if (p === '/relay/my/consent' && req.method() === 'POST') { consentPosts.push(JSON.parse(req.postData())); consentAccepted = true; return j(200, { ok: true }); }
   if (p === '/relay/my/consent/withdraw') { consentAccepted = false; gmailConnected = false; return j(200, { ok: true }); }
@@ -401,6 +402,24 @@ await page.locator('#marketPage').getByRole('button', { name: 'Browse', exact: t
 await page.locator('#marketPage').getByRole('button', { name: 'Sell', exact: true }).waitFor();
 assert.equal(await page.locator('#marketPage').getByRole('button', { name: 'Back', exact: true }).count(), 0, 'the Market page has nothing to go back to');
 console.log('PASS Market tab shows swap and resell on its own page');
+await page.getByRole('button', { name: /^.*Wrapped$/ }).first().click();
+await page.getByRole('heading', { name: 'Your 2026, in purchases.' }).waitFor();
+await page.getByText('£122.00').waitFor();
+await page.getByText('Spending is added up from 3 of 5 receipts (1 with no readable amount, 1 not in pounds left out).').waitFor();
+await page.getByText('Fashion regular').waitFor();
+await page.getByText('Busiest month: Mar.').waitFor();
+await page.getByText("In-store card purchases without an email receipt aren't included.", { exact: false }).waitFor();
+assert.equal(await page.evaluate(() => window.__xss9), undefined, 'shop names in Wrapped never run as HTML');
+console.log('PASS Wrapped shows real totals, says what was left out, and keeps shop names safe');
+await page.getByRole('button', { name: /^.*Discover$/ }).first().click();
+await page.getByRole('button', { name: 'Enable', exact: true }).click();
+await page.getByText('What Relay has noticed').waitFor();
+await page.getByText('tops', { exact: false }).first().waitFor();
+await page.getByText('purchased item', { exact: false }).waitFor();
+await page.getByRole('button', { name: /Forget what Relay has learned/ }).click();
+await page.getByText('Nothing yet.', { exact: false }).waitFor();
+console.log('PASS Discover learns from receipts, explains what it noticed, and can forget it');
+await page.getByRole('button', { name: /^.*Wallet$/ }).first().click();
 await page.getByRole('button', { name: 'Disconnect Gmail' }).click().catch(() => {});
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Your account' }).waitFor();

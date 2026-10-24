@@ -5,12 +5,17 @@ import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues, ensureImage
 import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
 import { sendReturnReminders } from "./gmail.js";
+import { runPriceAlerts } from "./push.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
-    ctx.waitUntil(importHistoricalSquareOrders(env));
-    ctx.waitUntil(syncSquareCatalogue(env));
-    if (shopifyConfigured(env)) ctx.waitUntil(syncShopifyCatalogues(env));
+    // Catalogues are refreshed first so price alerts compare against the newest prices.
+    const syncs = Promise.allSettled([
+      importHistoricalSquareOrders(env),
+      syncSquareCatalogue(env),
+      shopifyConfigured(env) ? syncShopifyCatalogues(env) : null
+    ]);
+    ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(() => {}));
   },
   async fetch(request, env, ctx) {
     const corsHeaders = {
@@ -32,7 +37,10 @@ export default {
     }
 
     const url = new URL(request.url);
-    const authResponse = await handleAuthRoute(request, env, url, corsHeaders);
+    const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
+      // "Check prices now" refreshes the shops' catalogues first, then compares prices.
+      syncCatalogues: async () => { await Promise.allSettled([syncSquareCatalogue(env), shopifyConfigured(env) ? syncShopifyCatalogues(env) : null]); }
+    });
     if (authResponse) return authResponse;
     if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {
       return receiveShopifyWebhook(request, env);

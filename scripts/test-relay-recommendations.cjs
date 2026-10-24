@@ -26,6 +26,16 @@ assert.equal(withoutHistory[0].sku,"DEMO-1","No history should preserve original
 assert.deepEqual(products.map(x=>x.sku),["DEMO-1","DEMO-2","DEMO-3"],"Inputs must not be mutated");
 const contextual=engine.rank(products,history,{original:history[0],reason:"design"});
 assert.equal(contextual[0].sku,"DEMO-2","Contextual design suggestions should prioritise related styles");
+// Looked-at products nudge the order, but a purchase counts for more, and a tap is described honestly.
+const looks=[engine.tapOf({product:"Retro Suede Trainers",variation:"Cream / UK 8",priceMinor:12999,store:"North & Co."}),engine.tapOf({product:"Retro Suede Trainers",variation:"Cream",priceMinor:12999})];
+assert.equal(looks[0].category,"footwear");
+const byLook=engine.rank(products,[],{interest:looks});
+assert.equal(byLook[0].sku,"DEMO-2","things the shopper looked at move similar items up");
+assert.match(byLook[0]._relayReason,/looked at/i);
+assert.equal(engine.rank(products,[],{interest:[{category:"other",colour:null}]})[0].sku,"DEMO-1","'other' is never treated as a taste");
+const prof=engine.profile(history,looks);
+assert.equal(prof.bought,3);assert.equal(prof.looked,2);assert.equal(prof.categories[0].name,"footwear");assert.ok(prof.colours.some(c=>c.name==="cream"));assert.equal(prof.typicalPriceMinor,8999);
+assert.equal(engine.profile([],[]).categories.length,0,"no history means no invented taste");
 const html=fs.readFileSync(new URL("../index.html","file://"+__filename),"utf8");
 assert.ok(html.includes('relay-recommendation-engine.js'),"App must load recommendation module");
 assert.ok(html.includes('relay-discover-personalise-v1'),"Consent must be opt-in, persisted per browser");

@@ -10,6 +10,7 @@
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce } from "./once.js";
+import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
@@ -362,11 +363,13 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       return json({ ok: true }, 200, cors);
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
+      await ensurePushTables(env.RELAY_DB);
       await env.RELAY_DB.batch([
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
         ...totpDeleteStatements(env.RELAY_DB, shopper.id),
+        ...pushDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
         env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
@@ -378,6 +381,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (gmailResponse) return gmailResponse;
     const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);
     if (resaleResponse) return resaleResponse;
+    const pushResponse = await handlePushRoute(request, env, url, cors, shopper, o);
+    if (pushResponse) return pushResponse;
     const passkeyResponse = await handlePasskeyShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
     if (passkeyResponse) return passkeyResponse;
     const totpResponse = await handleTotpShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
