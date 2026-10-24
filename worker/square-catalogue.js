@@ -35,11 +35,15 @@ async function syncOneShop(env, account) {
   }
   let cursor, pages = 0, products = 0, variants = 0;
   const variantIds = [];
+  // Pictures are separate IMAGE objects in the shop's catalogue; an item points at them by id.
+  const imageUrlById = new Map(), itemImage = new Map();
   do {
-    const data = await squareRequest(env, "/v2/catalog/list?types=ITEM&limit=100" +
+    const data = await squareRequest(env, "/v2/catalog/list?types=ITEM,IMAGE&limit=100" +
       (cursor ? "&cursor=" + encodeURIComponent(cursor) : ""), { token });
     for (const item of data.objects || []) {
+      if (item.type === "IMAGE" && item.id && /^https:\/\//.test(item.image_data?.url || "")) imageUrlById.set(item.id, item.image_data.url);
       if (item.type !== "ITEM" || !item.id) continue;
+      if (item.item_data?.image_ids?.length) itemImage.set(item.id, item.item_data.image_ids[0]);
       const productId = "square:sandbox:item:" + item.id;
       await db.prepare(`INSERT INTO retailer_catalog_items
         (id,provider,external_item_id,title,description,store_label)
@@ -66,6 +70,14 @@ async function syncOneShop(env, account) {
     cursor = data.cursor || null;
     pages++;
   } while (cursor && pages < 10);
+  // Only a picture the shop itself supplied is ever stored; items without one stay empty.
+  let images = 0;
+  for (const [itemId, imageId] of itemImage) {
+    const url = imageUrlById.get(imageId);
+    if (!url) continue;
+    await db.prepare("UPDATE retailer_catalog_items SET image_url=? WHERE provider='square_sandbox' AND external_item_id=?").bind(url, itemId).run();
+    images++;
+  }
   let inventoryCounts = 0;
   for (let start = 0; start < variantIds.length; start += 100) {
     const batch = variantIds.slice(start, start + 100);
@@ -94,6 +106,6 @@ async function syncOneShop(env, account) {
     VALUES (?,?,?,?,?,?,?)`)
     .bind(crypto.randomUUID(), "system", "square_catalogue", "catalogue_sync",
       "retailer_connection", "square:sandbox",
-      JSON.stringify({ shop: label, products, variants, inventoryCounts, pages, morePages: !!cursor })).run();
+      JSON.stringify({ shop: label, products, variants, images, inventoryCounts, pages, morePages: !!cursor })).run();
   return { products, variants, inventoryCounts, pages, morePages: !!cursor };
 }
