@@ -84,7 +84,7 @@ assert.equal((await post("/relay/my/push/subscribe", bob, { endpoint: "https://w
 
 // 5. The test alert reaches the right device only, is encrypted for it, and is signed by Relay.
 let r = await post("/relay/my/push/test", alice, {});
-assert.deepEqual(await r.json(), { sent: 1, failed: 0 });
+assert.deepEqual(await r.json(), { sent: 1, failed: 0, why: "" });
 assert.equal(pushes.length, 1); assert.equal(pushes[0].url, "https://fcm.googleapis.com/fcm/send/alice-phone");
 assert.equal((await read(pa, pushes[0].body)).title, "Relay test alert");
 const auth = pushes[0].headers.Authorization, m = /^vapid t=([\w-]+)\.([\w-]+)\.([\w-]+), k=([\w-]+)$/.exec(auth);
