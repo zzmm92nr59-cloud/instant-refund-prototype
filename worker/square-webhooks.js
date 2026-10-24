@@ -30,6 +30,12 @@ export async function receiveSquareWebhook(request, env, ctx) {
       const result=await syncSquareCatalogue(env);
       // A shop changed something: tell anyone watching a product whose price just dropped.
       await runPriceAlerts(env).catch(()=>{});
+      // Square's catalogue can lag a few seconds behind its own message, so look once more shortly after.
+      if(event.type==="catalog.version.updated"){
+        await new Promise(r=>setTimeout(r,20000));
+        await syncSquareCatalogue(env).catch(e=>console.error("Square second sync failed",String(e)));
+        await runPriceAlerts(env).catch(()=>{});
+      }
       await env.RELAY_DB.prepare(`INSERT INTO audit_events
         (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
         VALUES (?,?,?,?,?,?,?)`)

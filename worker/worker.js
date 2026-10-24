@@ -39,7 +39,7 @@ export default {
     const url = new URL(request.url);
     const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
       // "Check prices now" refreshes the shops' catalogues first, then compares prices.
-      syncCatalogues: async () => { await Promise.allSettled([syncSquareCatalogue(env), shopifyConfigured(env) ? syncShopifyCatalogues(env) : null]); }
+      syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), shopifyConfigured(env) ? syncShopifyCatalogues(env) : null]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
     });
     if (authResponse) return authResponse;
     if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {

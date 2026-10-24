@@ -9,7 +9,8 @@ export async function squareRequest(env, path, init = {}) {
   if (!env.SQUARE_ACCESS_TOKEN) throw Error("Square access token missing");
   const response = await fetch(API + path, {
     ...init, headers: { Authorization: "Bearer " + env.SQUARE_ACCESS_TOKEN,
-      "Square-Version": "2026-09-16", "Content-Type": "application/json" }
+      "Square-Version": "2026-09-16", "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(15000)
   });
   const body = await response.json();
   if (!response.ok) throw Error("Square HTTP " + response.status + " " +
