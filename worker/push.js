@@ -83,7 +83,7 @@ export async function getVapid(env) {
 async function vapidAuth(env, endpoint, now) {
   const { publicKey, key } = await getVapid(env);
   const head = b64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
-  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(now / 1000) + 12 * 3600, sub: env.PUSH_CONTACT || "mailto:hello@relay.example" })));
+  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(now / 1000) + 12 * 3600, sub: env.PUSH_CONTACT || "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/" })));
   const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(head + "." + claims)));
   return "vapid t=" + head + "." + claims + "." + b64u(sig) + ", k=" + publicKey;
 }
@@ -102,7 +102,9 @@ export async function sendPush(env, sub, message, o = {}) {
   const body = await encryptPayload(JSON.stringify(message), sub.p256dh, sub.auth);
   const res = await f(sub.endpoint, { method: "POST", headers: { Authorization: await vapidAuth(env, sub.endpoint, now), "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", TTL: "86400", Urgency: "normal" }, body });
   if (res.status === 404 || res.status === 410) await env.RELAY_DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(sub.id).run();
-  return { ok: res.status >= 200 && res.status < 300, status: res.status };
+  let reason = "";
+  if (!(res.status >= 200 && res.status < 300)) { try { reason = String(await res.text()).replace(/[^\w ,.:{}"\-]/g, "").slice(0, 120); } catch { /* ignore */ } }
+  return { ok: res.status >= 200 && res.status < 300, status: res.status, reason };
 }
 async function subsOf(db, shopperId) {
   return ((await db.prepare("SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE shopper_id = ?").bind(shopperId).all()).results || []);
@@ -179,9 +181,9 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     const last = (await db.prepare("SELECT MAX(last_test_at) AS t FROM push_subscriptions WHERE shopper_id = ?").bind(shopper.id).first()).t || 0;
     if (o.now - last < 15000) return json({ error: "slow_down" }, 429, cors);
     await db.prepare("UPDATE push_subscriptions SET last_test_at = ? WHERE shopper_id = ?").bind(o.now, shopper.id).run();
-    let sent = 0, failed = 0;
-    for (const s of subs) { try { (await sendPush(env, s, { title: "Relay test alert", body: "If you can read this, price alerts will reach this device.", url: "./" }, o)).ok ? sent++ : failed++; } catch { failed++; } }
-    return json({ sent, failed }, 200, cors);
+    let sent = 0, failed = 0, why = "";
+    for (const s of subs) { try { const r = await sendPush(env, s, { title: "Relay test alert", body: "If you can read this, price alerts will reach this device.", url: "./" }, o); if (r.ok) sent++; else { failed++; why = why || ("push service said " + r.status + (r.reason ? " " + r.reason : "")); } } catch (e) { failed++; why = why || ("could not send: " + String(e && e.message || e).slice(0, 80)); } }
+    return json({ sent, failed, why }, 200, cors);
   }
   if (path === "/relay/my/alerts/watch" && m === "POST") {
     const sku = body && body.sku;
