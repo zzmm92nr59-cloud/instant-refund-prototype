@@ -566,7 +566,7 @@
           var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
           memo.receipts = { rows: rows, sig: sig, at: Date.now() };
           if (sig === drawnSig) return;
-          allRows = rows; drawnSig = sig; drawList();
+          allRows = rows; drawnSig = sig; memoDrop("wrapped"); drawList();
         });
       }
       var doScan = function (full) {
@@ -1087,7 +1087,174 @@
       resaleView(host, null, null, "browse");
     }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
-  window.RelayAccount = { mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
+
+  // ---- Wrapped: a year of purchases, built only from the shopper's own captured receipts ----
+  function memoDrop(prefix) { Object.keys(memo).forEach(function (k) { if (k.indexOf(prefix) === 0) delete memo[k]; }); }
+  function mountWrapped(host, year) {
+    host.textContent = "";
+    year = year || new Date().getFullYear();
+    var s = load();
+    var dark = "background:#101828;color:#fff;border-radius:24px;padding:22px;max-width:520px;margin:0 auto";
+    var box = el("div", { style: dark }, []);
+    host.appendChild(box);
+    box.appendChild(el("div", { text: "✦ RELAY WRAPPED " + year, style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:2px" }));
+    box.appendChild(el("h2", { text: "Your " + year + ", in purchases.", style: "font-size:34px;letter-spacing:-1.5px;line-height:1.08;margin:12px 0" }));
+    if (!s || !s.token) {
+      box.appendChild(el("p", { text: "Sign in and connect Gmail, and Relay builds this from your real receipts.", style: "color:#d4d4e5;line-height:1.5" }));
+      box.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:240px", onclick: show }));
+      box.appendChild(el("p", { style: "font-size:12px;margin-top:16px" }, [el("a", { href: "wrapped.html", text: "See a sample with made-up numbers", style: "color:#d6f9a8" })]));
+      return;
+    }
+    var yrs = el("div", { style: "display:flex;gap:8px;margin:0 0 14px" });
+    [year === new Date().getFullYear() ? year : new Date().getFullYear(), new Date().getFullYear() - 1].forEach(function (y) {
+      yrs.appendChild(el("button", { type: "button", text: String(y), "aria-pressed": y === year ? "true" : "false", style: "border:1px solid #5a5276;border-radius:20px;padding:6px 14px;font-weight:800;color:" + (y === year ? "#243113" : "#fff") + ";background:" + (y === year ? "#c7f567" : "transparent"), onclick: function () { mountWrapped(host, y); } }));
+    });
+    box.appendChild(yrs);
+    var body = el("div", {}, [el("p", { text: "Adding it up…", style: "color:#d4d4e5" })]);
+    box.appendChild(body);
+    function draw(w) {
+      body.textContent = "";
+      if (!w.receipts) {
+        body.appendChild(el("p", { text: "No receipts found for " + year + " yet. Connect Gmail on the Receipts tab and Relay will find your order emails.", style: "color:#d4d4e5;line-height:1.5" }));
+        body.appendChild(el("button", { className: "rl-btn", text: "Go to Receipts", style: "max-width:240px", onclick: function () { if (window.go) window.go("receipts"); } }));
+        return;
+      }
+      function tile(label, big, small, bg, fg) {
+        return el("div", { style: "border-radius:20px;padding:16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;background:" + bg + ";color:" + fg }, [
+          el("span", { text: label, style: "font-size:12px;font-weight:700" }), el("strong", { text: big, style: "font-size:28px;letter-spacing:-1px;line-height:1.05;word-break:break-word" }), el("small", { text: small, style: "font-size:11px" })]);
+      }
+      var cat = w.categories[0];
+      var grid = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:10px" }, [
+        tile("Total spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", w.coverage.withTotal ? "Across " + w.shops + (w.shops === 1 ? " shop" : " shops") : "No readable amounts yet", "#30255d", "#e4d8ff"),
+        tile("Items bought", String(w.items), w.receipts + (w.receipts === 1 ? " receipt" : " receipts"), "#c7f567", "#243113"),
+        tile("Favourite group", cat ? cat.label : "—", cat ? cat.receipts + (cat.receipts === 1 ? " receipt" : " receipts") : "", "#f6c7e2", "#57233f"),
+        tile("Returns started", String(w.returnsStarted), "Return emails matched to a purchase", "#263f8c", "#d7e4ff")
+      ]);
+      body.appendChild(grid);
+      var gaps = [];
+      if (w.coverage.noTotal) gaps.push(w.coverage.noTotal + " with no readable amount");
+      if (w.coverage.otherCurrency) gaps.push(w.coverage.otherCurrency + " not in pounds");
+      body.appendChild(el("p", { text: "Spending is added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts" + (gaps.length ? " (" + gaps.join(", ") + " left out)." : "."), style: "font-size:12px;color:#cfc9e4;margin:10px 0" }));
+      if (w.personality) body.appendChild(el("div", { style: "background:#241c46;border-radius:20px;padding:18px;margin-top:6px" }, [
+        el("div", { text: "WHAT YOUR RECEIPTS SAY", style: "color:#d9cbff;font-size:12px;font-weight:800;letter-spacing:1px" }),
+        el("h3", { text: w.personality.label, style: "font-size:26px;margin:8px 0;color:#fff" }),
+        el("p", { text: w.personality.why, style: "color:#e3dff0;font-size:14px;margin:0" })]));
+      var facts = [];
+      if (w.biggest) facts.push("Biggest single purchase: " + money(w.biggest.totalPence, "GBP") + " at " + w.biggest.shop + (w.biggest.date ? " on " + w.biggest.date : "") + ".");
+      if (w.busiestMonth) facts.push("Busiest month: " + w.busiestMonth + ".");
+      facts.forEach(function (f) { body.appendChild(el("p", { text: f, style: "color:#e3dff0;font-size:14px;margin:10px 0 0" })); });
+      var tops = el("div", { style: "background:#171d37;border-radius:20px;padding:16px;margin-top:12px" }, [el("div", { text: "YOUR TOP SHOPS", style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:1.3px;margin-bottom:8px" })]);
+      w.topShops.forEach(function (sh, i) {
+        tops.appendChild(el("div", { style: "display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #2a3150;font-size:14px" }, [
+          el("span", { text: (i + 1) + ". " + sh.name }), el("span", { text: (sh.spentPence ? money(sh.spentPence, "GBP") + " · " : "") + sh.receipts + (sh.receipts === 1 ? " receipt" : " receipts"), style: "color:#cfc9e4;white-space:nowrap" })]));
+      });
+      body.appendChild(tops);
+      var max = Math.max.apply(null, w.byMonth.map(function (m) { return m.receipts; })) || 1;
+      var bars = el("div", { style: "display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:12px" });
+      w.byMonth.forEach(function (m) { bars.appendChild(el("div", { title: m.month + ": " + m.receipts + (m.receipts === 1 ? " receipt" : " receipts"), style: "flex:1;background:#9d87ee;border-radius:6px 6px 0 0;min-height:4px;height:" + Math.max(4, Math.round(m.receipts / max * 100)) + "%" })); });
+      var labels = el("div", { style: "display:flex;gap:5px;color:#c7c5d7;font-size:9px;margin-top:6px" });
+      w.byMonth.forEach(function (m) { labels.appendChild(el("span", { text: m.month.slice(0, 1), style: "flex:1;text-align:center" })); });
+      body.appendChild(el("div", { style: "background:#171d37;border-radius:20px;padding:16px;margin-top:12px" }, [el("div", { text: "RECEIPTS PER MONTH", style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:1.3px" }), bars, labels]));
+      body.appendChild(el("p", { text: w.note, style: "font-size:12px;color:#cfc9e4;margin-top:14px;border:1px solid #5a5276;border-radius:14px;padding:12px" }));
+    }
+    cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
+      if (r.status === 401) { save(null); mountWrapped(host, year); return; }
+      if (!r.ok) { body.textContent = ""; body.appendChild(el("p", { text: "Couldn't build Wrapped just now. Please try again.", style: "color:#d4d4e5" })); return; }
+      draw(r.body);
+    }).catch(function () { body.textContent = ""; body.appendChild(el("p", { text: "Couldn't reach Relay.", style: "color:#d4d4e5" })); });
+  }
+
+  // ---- Phone alerts: price drops sent to this device. Nothing is sent unless the shopper turns it on here. ----
+  function pushOk() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+  function keyBytes(t) { var s = t.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
+  function thisDevice() { return pushOk() ? navigator.serviceWorker.ready.then(function (r) { return r.pushManager.getSubscription(); }).catch(function () { return null; }) : Promise.resolve(null); }
+  function alertStatus() { memoDrop("alerts"); return cachedGet("alerts", "/relay/my/alerts/status").then(function (r) { return r.ok ? r.body : null; }); }
+  function syncWatch(p, on) {
+    var s = load(); if (!s || !s.token || !p || !p.sku) return Promise.resolve();
+    memoDrop("alerts");
+    return api("/relay/my/alerts/watch", { method: "POST", body: on === false ? { sku: String(p.sku), on: false } : { sku: String(p.sku), product: p.product, variant: p.variation, store: p.store, priceMinor: Math.round(Number(p.priceMinor)) } }).catch(function () {});
+  }
+  function syncStore(store, on, items) {
+    memoDrop("alerts");
+    return api("/relay/my/alerts/store", { method: "POST", body: on === false ? { store: store, on: false } : { store: store, items: (items || []).map(function (p) { return { sku: String(p.sku), product: p.product, variant: p.variation, priceMinor: Math.round(Number(p.priceMinor)) }; }) } });
+  }
+  function enablePush() {
+    if (!pushOk()) return Promise.resolve({ ok: false, reason: "unsupported" });
+    return Notification.requestPermission().then(function (perm) {
+      if (perm !== "granted") return { ok: false, reason: "denied" };
+      return Promise.all([navigator.serviceWorker.ready, api("/relay/my/push/key")]).then(function (x) {
+        if (!x[1].ok) return { ok: false, reason: "server" };
+        return x[0].pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(x[1].body.publicKey) }).then(function (sub) {
+          var j = sub.toJSON();
+          return api("/relay/my/push/subscribe", { method: "POST", body: { endpoint: j.endpoint, keys: j.keys } }).then(function (r) {
+            if (!r.ok) return { ok: false, reason: "server" };
+            // Anything already on the watchlist starts being watched by the server too.
+            var local = (window.relayLocalWatches && window.relayLocalWatches()) || [];
+            return Promise.all(local.map(function (p) { return syncWatch(p, true); })).then(function () { memoDrop("alerts"); return { ok: true }; });
+          });
+        });
+      });
+    }).catch(function () { return { ok: false, reason: "failed" }; });
+  }
+  function disablePush() {
+    return thisDevice().then(function (sub) {
+      if (!sub) return;
+      var ep = sub.endpoint;
+      return sub.unsubscribe().catch(function () {}).then(function () { return api("/relay/my/push/unsubscribe", { method: "POST", body: { endpoint: ep } }); });
+    }).then(function () { memoDrop("alerts"); });
+  }
+  function mountAlerts(host) {
+    host.textContent = "";
+    var box = el("div", { className: "card" }); host.appendChild(box);
+    box.appendChild(el("h3", { text: "Phone alerts", style: "margin:0 0 6px" }));
+    var s = load();
+    if (!s || !s.token) {
+      box.appendChild(el("p", { text: "Sign in to get a message on your phone when something you watch drops in price.", className: "sub" }));
+      box.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:240px", onclick: show }));
+      return;
+    }
+    if (!pushOk()) {
+      box.appendChild(el("p", { className: "sub", text: "This browser can't receive alerts. On an iPhone: open Relay in Safari, tap Share, choose Add to Home Screen, then open Relay from your home screen and come back here." }));
+      return;
+    }
+    var msg = el("p", { className: "small muted", style: "min-height:18px;margin:10px 0 0" });
+    var body = el("div", {}, [el("p", { text: "Checking…", className: "small muted" })]);
+    box.appendChild(body); box.appendChild(msg);
+    function draw() {
+      Promise.all([thisDevice(), alertStatus()]).then(function (r) {
+        var sub = r[0], st = r[1]; body.textContent = "";
+        if (Notification.permission === "denied") { body.appendChild(el("p", { className: "sub", text: "Alerts are blocked for Relay in this browser. Allow notifications for this site in your browser or phone settings, then come back." })); return; }
+        var on = Boolean(sub) && st && st.devices > 0;
+        if (!on) {
+          body.appendChild(el("p", { className: "sub", text: "Get a message on this device when a product you watch (or any product at a shop you choose) drops in price. Nothing is sent unless you turn this on, and you can turn it off any time." }));
+          body.appendChild(el("button", { className: "rl-btn", text: "Turn on alerts", style: "max-width:240px", onclick: function () {
+            say(msg, "Asking your device…");
+            enablePush().then(function (x) { if (x.ok) { say(msg, "Alerts are on. Send yourself a test to make sure they reach you."); draw(); } else say(msg, x.reason === "denied" ? "You said no, so nothing was turned on." : "Couldn't turn alerts on just now. Please try again.", true); });
+          } }));
+          return;
+        }
+        body.appendChild(el("p", { className: "sub", text: "✓ Alerts are on for this device. Watching " + st.watches.length + " item" + (st.watches.length === 1 ? "" : "s") + (st.stores.length ? " and every product at: " + st.stores.join(", ") : "") + "." }));
+        var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
+        row.appendChild(el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () {
+          say(msg, "Sending…");
+          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered. Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
+        } }));
+        row.appendChild(el("button", { className: "rl-btn ghost", text: "Check prices now", style: "width:auto", onclick: function () {
+          say(msg, "Checking the shops…");
+          api("/relay/my/alerts/check", { method: "POST" }).then(function (x) {
+            if (x.status === 429) return say(msg, "Just checked. Try again in a few seconds.");
+            if (!x.ok) return say(msg, "Couldn't check just now.", true);
+            say(msg, "Checked " + x.body.checked + " item" + (x.body.checked === 1 ? "" : "s") + ". " + (x.body.drops ? x.body.drops + " price drop" + (x.body.drops === 1 ? "" : "s") + ", " + x.body.sent + " alert" + (x.body.sent === 1 ? "" : "s") + " sent." : "No price drops."));
+          });
+        } }));
+        row.appendChild(el("button", { className: "rl-btn ghost", text: "Turn off", style: "width:auto", onclick: function () { disablePush().then(function () { say(msg, "Alerts are off for this device."); draw(); }); } }));
+        body.appendChild(row);
+        body.appendChild(el("p", { className: "small muted", style: "margin-top:10px", text: "Prices are compared whenever a connected shop updates its catalogue, and every hour. Only shops connected to Relay have prices to watch." }));
+      });
+    }
+    draw();
+  }
+  window.RelayAccount = { mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

@@ -28,7 +28,7 @@
  }
  function decorate(product,history,options={}){
   const c=category(product.product),colour=colourOf(product.variation);
-  const sameCategory=history.filter(p=>p.category===c);
+  const sameCategory=c==='other'?[]:history.filter(p=>p.category===c);
   const sameColour=colour?sameCategory.filter(p=>p.colour===colour):[];
   const stores=new Set(sameCategory.map(p=>p.merchant));
   let score=0,explanation="";
@@ -39,6 +39,8 @@
     const avg=sameCategory.reduce((sum,p)=>sum+p.priceMinor,0)/sameCategory.length;
     if(avg>0){const ratio=Math.abs(Number(product.priceMinor)-avg)/avg;score+=Math.max(0,8-Math.round(ratio*12))}
   }
+  const looked=c==='other'?[]:(options.interest||[]).filter(t=>t.category===c);
+  if(looked.length){score+=Math.min(looked.length,4)*3;if(colour&&looked.some(t=>t.colour===colour))score+=3;explanation=explanation||"Similar to things you've looked at";}
   if(product.fixture===true&&Number(product.quantity)>0)score+=4;
   if(options.original){
    const original=options.original;
@@ -55,5 +57,15 @@
   prepared.sort((a,b)=>b._relayRecScore-a._relayRecScore||a._relayOriginalIndex-b._relayOriginalIndex);
   return prepared;
  }
- return Object.freeze({rank,category,colourOf,getHistory});
+ // What a shopper looked at (opened or watched). A tap is a weaker signal than a purchase, so it only nudges the order.
+ function tapOf(product){return {category:category(product.product||product.item),colour:colourOf(product.variation||product.detail),merchant:normal(product.store||product.merchant||product.storeName),priceMinor:Math.round(Number(product.priceMinor||0))};}
+ function top(list,key,n){const m=new Map();list.forEach(x=>{const k=x[key];if(k&&k!=="other")m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1)).slice(0,n).map(([name,count])=>({name,count}));}
+ // A plain summary of what Relay has noticed, shown to the shopper so nothing is hidden. Counts only: no guesses.
+ function profile(purchases,taps){
+  const buys=getHistory(purchases),looks=(Array.isArray(taps)?taps:[]).filter(t=>t&&t.category);
+  const all=buys.concat(looks),prices=buys.map(b=>b.priceMinor).filter(n=>n>0).sort((a,b)=>a-b);
+  return {bought:buys.length,looked:looks.length,categories:top(all,"category",3),colours:top(all,"colour",3),shops:top(buys,"merchant",3),
+   typicalPriceMinor:prices.length?prices[Math.floor(prices.length/2)]:null};
+ }
+ return Object.freeze({rank,category,colourOf,getHistory,tapOf,profile});
 });
