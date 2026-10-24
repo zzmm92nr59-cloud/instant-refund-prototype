@@ -505,7 +505,7 @@
           return;
         }
         openCat = null;
-        var grid = el("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px" });
+        var grid = el("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px;max-width:520px" });
         keys.forEach(function (k) {
           var soon = by[k].filter(function (r) { var d = daysLeft(deadlineOf(r)); return d !== null && d >= 0 && d <= 7; }).length;
           var check = by[k].filter(function (r) { return r.status !== "confirmed" && r.needsShopperConfirmation; }).length;
