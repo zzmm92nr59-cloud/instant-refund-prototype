@@ -153,7 +153,7 @@ function resetWalletHistory(){
  real=[];selected=null;exchangeContext=false;page="wallet";retailer=false;render();loadVerified();
 }
 let page=testing?"profile":"wallet",demo=true,real=[],error="",catalog=[],watch={},reason="design",selected=sample,chosen=null,history={},retailer=false,exchangeContext=false,storeFilter="all";try{watch=JSON.parse(localStorage.getItem("relay-radar-v2")||"{}")||{}}catch{}try{history=JSON.parse(localStorage.getItem("relay-radar-history-v2")||"{}")||{}}catch{}
-const nav=[["wallet","⌂","Wallet"],["discover","✦","Discover"],["radar","◎","Radar"],["wrapped","◈","Wrapped"],["profile","◯","Profile"]];
+const nav=[["wallet","⌂","Wallet"],["receipts","▤","Receipts"],["discover","✦","Discover"],["radar","◎","Radar"],["wrapped","◈","Wrapped"],["profile","◯","Profile"]];
 let personalise=false;
 try{personalise=localStorage.getItem("relay-discover-personalise-v1")==="true"}catch{}
 function togglePersonalise(){
@@ -218,7 +218,8 @@ function readTestStorePurchases(){
  }catch{return []}
 }
 function getPurchases(){return demo?RelayWalletLedger.project({purchases:[...readTestStorePurchases(),...real],events:readDemoLog(),customer:activeShopper()}):real}
-function render(){navRender();$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="bank"?bankView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();loadReceiptPurchases()}if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus()}if(page==="wrapped"&&!retailer)bindWrappedFrame()}
+function render(){navRender();$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="bank"?bankView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();loadReceiptPurchases()}if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="discover")renderCatalog();if(page==="radar")showRadar();if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus()}if(page==="wrapped"&&!retailer)bindWrappedFrame()}
+function receiptsView(){return '<div class="eyebrow wallet-eyebrow">RECEIPTS</div><h1 class="title">Your receipts, in one place.</h1><p class="sub">Receipts from your email and in-store purchases, grouped by type. Tap one to see the return deadline and the original email.</p><div id="receiptsPage"></div>'}
 function wallet(){
  const list=getPurchases();
  return '<div class="eyebrow wallet-eyebrow">WALLET</div><h1 class="title">Everything you&#39;ve bought, in one place.</h1><p class="sub">Your purchases, returns and exchanges, with instant refund offers and better alternatives in one place.</p>'+
@@ -235,7 +236,7 @@ function wallet(){
 
 // In-store and email-receipt purchases: read from the shopper's own scanned receipts (shopper-supplied evidence, never a verified refund).
 function loadReceiptPurchases(){
- const box=$("receiptPurchases");if(!box||!window.RelayAccount||!RelayAccount.signedIn())return;
+ const box=$("receiptPurchases");if(!box||!window.RelayAccount)return;if(!RelayAccount.signedIn()){box.appendChild(Object.assign(document.createElement("div"),{className:"card",innerHTML:'<h3>Bring in your email receipts</h3><p class="sub">Sign in to add purchases from your email, including in-store ones.</p>'}));const b=Object.assign(document.createElement("button"),{className:"darkbtn",textContent:"Sign in or connect Gmail →",onclick:()=>RelayAccount.open()});box.firstChild.appendChild(b);return}
  RelayAccount.receipts().then(r=>{
   const host=$("receiptPurchases");if(!host||!r.ok)return;
   const known=new Set((real||[]).map(p=>String(p.orderId||"").replace(/^#/,"").toLowerCase()).filter(Boolean));
@@ -249,28 +250,19 @@ function loadReceiptPurchases(){
    const names=(x.items||[]).map(i=>i.name).filter(Boolean).join(", ")||"Order"+(x.orderRef?" "+x.orderRef:"");
    const dl=(x.returnPlan&&x.returnPlan.deadline)||(x.returns&&x.returns.deadline)||"";
    const note=x.returnable===false?"Usually can't be returned":x.status==="confirmed"?"Checked by you":"Please check details";
-   return mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>RelayAccount.open()},[mk("div",{className:"details"},[
+   return mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>go("receipts")},[mk("div",{className:"details"},[
     mk("div",{className:"eyebrow",textContent:who.toUpperCase()}),
     mk("h3",{textContent:names}),
     mk("div",{className:"small muted",textContent:(x.orderDate||"Date not found")+(dl?" · return by "+dl:"")}),
     mk("div",{className:"price",textContent:"£"+(x.totalPence/100).toFixed(2)}),
     mk("span",{className:"relay-status ordered",textContent:note}),
-    mk("div",{className:"tile-arrow",textContent:"Open receipt →"})])]);
+    mk("div",{className:"tile-arrow",textContent:"See in Receipts →"})])]);
   };
-  // Groups by shopping category (biggest first). Things that usually can't be returned sit in a folded section at the end.
-  const section=(parent,list)=>{
-   const by={};list.forEach(x=>{const g=x.categoryLabel||"Other";(by[g]=by[g]||[]).push(x)});
-   Object.keys(by).sort((a,b)=>by[b].length-by[a].length).forEach(g=>{
-    parent.appendChild(mk("h3",{textContent:g+" ("+by[g].length+")",style:"margin:18px 0 8px;font-size:17px"}));
-    const grid=mk("div",{className:"purchase-grid"});by[g].forEach(x=>grid.appendChild(tile(x)));parent.appendChild(grid);
-   });
-  };
-  const back=rows.filter(x=>x.returnable!==false),nope=rows.filter(x=>x.returnable===false);
-  section(host,back);
-  if(nope.length){
-   const d=mk("details",{style:"margin-top:20px"},[mk("summary",{textContent:nope.length+" that usually can't be returned (digital, subscriptions, food, travel)",style:"cursor:pointer;font-weight:700"})]);
-   section(d,nope);host.appendChild(d);
-  }
+  // The wallet shows a short preview; the Receipts tab has everything, grouped.
+  const back=rows.filter(x=>x.returnable!==false);
+  const grid=mk("div",{className:"purchase-grid"});back.slice(0,3).forEach(x=>grid.appendChild(tile(x)));host.appendChild(grid);
+  host.appendChild(mk("button",{className:"outline",textContent:"See all "+rows.length+" receipts, grouped →",style:"margin-top:12px",onclick:()=>go("receipts")}));
+
  }).catch(()=>{});
 }
 function bindPurchaseCards(){

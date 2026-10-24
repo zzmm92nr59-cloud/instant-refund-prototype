@@ -148,11 +148,11 @@ async function requestLink(request, env, cors, opts) {
       method: "POST",
       headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: env.RELAY_EMAIL_FROM || DEFAULT_FROM, to: [email], subject: "Your Relay sign-in link",
-        text: "Open this link to sign in to Relay. It works once and expires in 15 minutes.\n\n" + link +
-          "\n\nOr type this code into the Relay app: " + code + "\n\nIf you didn't ask for this, you can ignore this email.",
-        html: '<p>Open this link to sign in to Relay. It works once and expires in 15 minutes.</p><p><a href="' +
-          link + '">Sign in to Relay</a></p><p>Or type this code into the Relay app: <b style="font-size:20px;letter-spacing:3px">' + code + '</b></p><p>If you didn\'t ask for this, you can ignore this email.</p>'
+        from: env.RELAY_EMAIL_FROM || DEFAULT_FROM, to: [email], subject: code + " is your Relay sign-in code",
+        text: "Your Relay code is " + code + "\n\nOpen this link to sign in to Relay. It works once and expires in 15 minutes.\n\n" + link +
+          "\n\nIf you didn't ask for this, you can ignore this email.",
+        html: '<p style="font-size:16px">Your Relay code is <b style="font-size:24px;letter-spacing:3px">' + code + '</b></p><p>Open this link to sign in to Relay. It works once and expires in 15 minutes.</p><p><a href="' +
+          link + '">Sign in to Relay</a></p><p>If you didn\'t ask for this, you can ignore this email.</p>'
       })
     });
     sent = res.ok;
