@@ -32,7 +32,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 9;
+const PARSER_VERSION = 10;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
