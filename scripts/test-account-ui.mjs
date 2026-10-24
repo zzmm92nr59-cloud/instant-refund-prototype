@@ -21,7 +21,7 @@ const PORTAL = 'javascript:window.__xss5=1';
 const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
-let reminderState = 'off', remindPosts = [];
+let reminderState = 'off', remindPosts = [], categoryPosts = [];
 let adminOn = false, adminReports = [{ id: '88888888-8888-8888-8888-888888888888', createdAt: 1700000000000, reason: '<img src=x onerror=window.__xssR=1>Asked me to pay outside Relay', item: { title: 'Wool jumper', store: 'Example Outfitters', status: 'matched' }, reporterRole: 'buyer', reportedRole: 'seller', reportsAgainstReported: 2, reportedAlreadyBlocked: false, canRemoveListing: true, messages: [{ from: 'reporter', body: 'Can we do it off the app?', createdAt: 1 }, { from: 'reported member', body: '<img src=x onerror=window.__xssM=1>Sure, text me', createdAt: 2 }] }]; const adminActions = [];
 let tfEnabled = false; const tfCalls = [];
 let passkeyList = []; const passkeyLogins = [], passkeyRegs = [];
@@ -62,6 +62,7 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/gmail/add') { const b = JSON.parse(req.postData()); addBodies.push(b); return b.messageId === 'm77abcdef' ? j(200, { ok: true, kind: 'receipt', store: 'lululemon', orderRef: 'UK04002516' }) : j(200, { ok: false, reason: 'not_recognised', signals: { subject: false, body: false } }); }
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/original') return j(200, { html: '<p>Order EO-1 body from the store</p>', extraImages: ['data:image/png;base64,' + PNG1.toString('base64'), 'javascript:alert(1)'], links: [{ label: 'Start a return', url: 'https://shop.test/returns' }, { label: 'Bad', url: 'http://shop.test/x' }] });
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/image') return route.fulfill({ status: 200, contentType: 'image/png', headers: cors, body: PNG1 });
+  if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/category') { categoryPosts.push(JSON.parse(req.postData())); return j(200, { ok: true }); }
   if (p === '/relay/my/receipts/11111111-1111-1111-1111-111111111111/remind') { const b = JSON.parse(req.postData()); remindPosts.push(b); reminderState = b.on ? 'on' : 'off'; return j(200, { ok: true }); }
   if (p === '/relay/my/receipts' && req.method() === 'GET') return j(200, { receipts: gmailConnected ? [{ id: '11111111-1111-1111-1111-111111111111', status: receiptStatus, retailer: { name: '<img src=x onerror=window.__xss3=1>Example Outfitters' }, orderRef: 'EO-1', gmailId: 'zz9876abcdef', orderDate: '2026-10-14', currency: 'GBP', totalPence: 5900, items: [{ name: 'Wool jumper', qty: 1, pricePence: 5900 }], category: 'fashion', categoryLabel: 'Fashion', returnable: true, needsShopperConfirmation: false, hasImage: true, reminder: reminderState, returns: { windowDays: 28, windowFrom: 'delivery', deadline: '2026-11-20', address: 'Returns, Unit 4, Leeds LS1 4AB', instructions: ['<img src=x onerror=window.__xss4=1>Return within 28 days.'], portalUrl: PORTAL, qrMentioned: true, labelMentioned: false }, returnPlan: { kind: 'return_instructions', deadline: inDays(5), carrier: '<img src=x onerror=window.__xss6=1>Evri', returnId: 'RT-1', steps: ['Show the QR code.'], estimatedRefundPence: 5900, currency: 'GBP', gmailId: 'abc123def456', trackUrl: PORTAL } }] : [] });
   if (p === '/relay/my/resale/items') return j(200, { items: [{ receiptId: '11111111-1111-1111-1111-111111111111', itemIndex: 0, title: 'Wool jumper', store: 'Example Outfitters', pricePence: 5900, currency: 'GBP', orderDate: '2026-10-14', returnWindowOpen: true, returnDeadline: '2026-11-20', alreadyListed: resaleListed }] });
@@ -283,9 +284,12 @@ await page.getByPlaceholder('Search your receipts').fill('lululemon');
 await page.getByText('No receipts match that search.').waitFor();
 assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 0);
 await page.getByPlaceholder('Search your receipts').fill('');
-assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1);
+assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 0, 'with no search, receipts sit behind group tiles');
+await page.getByRole('button', { name: 'Fashion, 1 receipts' }).click();
+assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1, 'opening a group shows its receipts');
+await page.getByRole('button', { name: 'Details' }).click();
 await page.getByText('Open the email with your QR code').waitFor();
-await page.getByText('5 days left').waitFor();
+await page.getByText('5 days left').first().waitFor();
 await page.waitForFunction(() => { const i = document.querySelector('.rl-order img'); return i && i.src.startsWith('blob:') && i.naturalWidth === 1; });
 await page.getByRole('button', { name: 'Remind me 3 days before' }).click();
 await page.getByRole('button', { name: 'Reminder set · turn off' }).waitFor();
@@ -307,6 +311,8 @@ assert.ok(await page.locator('#receiptPurchases h3', { hasText: 'Wool jumper' })
 assert.equal(await page.evaluate(() => window.__xss3), undefined, 'receipt text in the wallet never runs as HTML');
 await page.getByRole('button', { name: /See all 1 receipts/ }).click();
 await page.getByRole('heading', { name: 'Your receipts, in one place.' }).waitFor();
+await page.getByRole('button', { name: 'Fashion, 1 receipts' }).click();
+await page.getByRole('button', { name: 'Details' }).click();
 await page.getByText('Return by 20 November 2026').waitFor();
 await page.getByText('Send to: Returns, Unit 4, Leeds LS1 4AB').waitFor();
 await page.getByText('mentions a QR code').waitFor();
@@ -337,8 +343,13 @@ await page.getByRole('button', { name: 'Add' }).first().click();
 await page.getByText(/Added lululemon · UK04002516/).waitFor();
 assert.deepEqual(addBodies.map(b => b.messageId), ['m78abcdef', 'm77abcdef']);
 await page.getByRole('button', { name: 'Back' }).last().click();
-await page.getByRole('button', { name: 'Looks right' }).waitFor();
-await page.getByRole('button', { name: 'Looks right' }).click();
+await page.getByRole('button', { name: /^Fashion, / }).click();
+await page.getByRole('button', { name: 'Details' }).first().click();
+await page.getByRole('button', { name: 'Looks right' }).first().waitFor();
+await page.getByLabel('Move to another group').selectOption('home');
+await page.getByText('Relay will remember this').waitFor();
+assert.deepEqual(categoryPosts, [{ category: 'home' }], 'a correction is sent to the server so the app can learn');
+await page.getByRole('button', { name: 'Looks right' }).first().click();
 await page.getByText('Confirmed by you').waitFor();
 console.log('PASS returning from Google scans, lists captured receipts safely, shopper confirms');
 await page.locator('.avatar').click();

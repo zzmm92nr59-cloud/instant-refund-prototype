@@ -13,7 +13,8 @@
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
 import { buildOriginal } from "./original.js";
-import { categorise } from "./receipt-category.js";
+import { categorise, storeKey, CATEGORIES } from "./receipt-category.js";
+const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 
 export const CONSENT_VERSION = "2026-10-v4";
@@ -33,7 +34,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 24, FETCH_PARALLEL = 6;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 10;
+const PARSER_VERSION = 11;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
@@ -101,7 +102,12 @@ export async function ensureGmailTables(db) {
        receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS return_reminders (
        receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, deadline TEXT NOT NULL, remind_at INTEGER NOT NULL,
-       title TEXT NOT NULL, sent_at INTEGER)`
+       title TEXT NOT NULL, sent_at INTEGER)`,
+    // What the app has been taught: the shopper's own corrections, per store. Holds no email text, only a store key and a choice.
+    `CREATE TABLE IF NOT EXISTS receipt_learning (
+       shopper_id TEXT NOT NULL, store_key TEXT NOT NULL, category TEXT, promo INTEGER NOT NULL DEFAULT 0,
+       updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, store_key))`,
+    `CREATE INDEX IF NOT EXISTS idx_receipt_learning_store ON receipt_learning(store_key, category)`
   ];
   for (const sql of statements) await db.prepare(sql).run();
   await ensureResaleTables(db);
@@ -116,6 +122,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").bind(shopperId)
@@ -458,7 +465,30 @@ async function listReceipts(env, shopperId) {
   // A return whose original order email was not found still gets its own card.
   const cards = [...orders, ...loose];
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
-  return cards.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100).map(c => ({ ...c, ...categorise(c) }));
+  // What the app has been taught. A shopper's own choice always wins. Otherwise a category is used only when at least two
+  // different shoppers chose it for the same store and it clearly leads, so one person's mistake never changes anyone else's list.
+  const mine = new Map(), crowd = new Map();
+  const keys = [...new Set(cards.map(storeKey).filter(Boolean))];
+  for (let i = 0; i < keys.length; i += 40) {
+    const chunk = keys.slice(i, i + 40), qs = chunk.map(() => "?").join(",");
+    const own = await env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all();
+    for (const r of own.results || []) mine.set(r.k, r);
+    const all2 = await env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all();
+    for (const r of all2.results || []) { const a = crowd.get(r.k) || []; a.push(r); crowd.set(r.k, a); }
+  }
+  const crowdPick = (k) => {
+    const a = (crowd.get(k) || []).slice().sort((x, y) => y.n - x.n);
+    return a.length && a[0].n >= 2 && (a.length === 1 || a[0].n > a[1].n) ? a[0].category : null;
+  };
+  return cards.filter(c => {
+    // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
+    const l = mine.get(storeKey(c));
+    return !(l && l.promo && !c.orderRef && c.kind !== "return_instructions");
+  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, 100).map(c => {
+    const k = storeKey(c), l = mine.get(k);
+    const learned = (l && l.category) || crowdPick(k) || null;
+    return { ...c, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
+  });
 }
 
 // Google redirects the browser here. No bearer token is available, so the single-use
@@ -584,9 +614,30 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   const act = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/(confirm|dismiss)$/.exec(path);
   if (act && m === "POST") {
     const res = await env.RELAY_DB.prepare(
-      "UPDATE captured_receipts SET status = ? WHERE id = ? AND shopper_id = ? RETURNING id")
+      "UPDATE captured_receipts SET status = ? WHERE id = ? AND shopper_id = ? RETURNING id, details")
       .bind(act[2] === "confirm" ? "confirmed" : "dismissed", act[1], shopper.id).first();
-    return res ? json({ ok: true }, 200, cors) : json({ error: "not_found" }, 404, cors);
+    if (!res) return json({ error: "not_found" }, 404, cors);
+    // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
+    const b = await request.json().catch(() => ({}));
+    if (act[2] === "dismiss" && b && b.reason === "promo") {
+      const k = storeKey(JSON.parse(res.details));
+      if (k) await env.RELAY_DB.prepare(
+        "INSERT INTO receipt_learning (shopper_id, store_key, category, promo, updated_at) VALUES (?,?,NULL,1,?) ON CONFLICT (shopper_id, store_key) DO UPDATE SET promo = 1, updated_at = excluded.updated_at")
+        .bind(shopper.id, k, Date.now()).run();
+    }
+    return json({ ok: true }, 200, cors);
+  }
+  const cat = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/category$/.exec(path);
+  if (cat && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    if (!b || typeof b.category !== "string" || !CATEGORY_KEYS.includes(b.category)) return json({ error: "bad_category" }, 400, cors);
+    const row = await env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(cat[1], shopper.id).first();
+    const k = row && storeKey(JSON.parse(row.details));
+    if (!k) return json({ error: "not_found" }, 404, cors);
+    await env.RELAY_DB.prepare(
+      "INSERT INTO receipt_learning (shopper_id, store_key, category, promo, updated_at) VALUES (?,?,?,0,?) ON CONFLICT (shopper_id, store_key) DO UPDATE SET category = excluded.category, updated_at = excluded.updated_at")
+      .bind(shopper.id, k, b.category, Date.now()).run();
+    return json({ ok: true }, 200, cors);
   }
   const img = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(path);
   if (img && m === "GET") {

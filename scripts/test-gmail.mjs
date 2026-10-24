@@ -332,6 +332,19 @@ assert.deepEqual(emails[0].to, ["alice@example.com"]);
 assert.match(emails[0].subject, /^Return deadline in 4 days: Example Outfitters/);
 assert.equal((await sendReturnReminders(env, clock, fetchImpl)).sent, 0, "only ever sent once");
 assert.equal((await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1").reminder, "sent");
+// 11b. The app learns from corrections: a shopper's own category choice sticks, is private to them, and bad input is refused.
+{
+  const list = async (t) => (await (await call("/relay/my/receipts", { token: t })).json()).receipts;
+  const eo = (await list(alice)).find(x => x.orderRef === "EO-1");
+  assert.equal((await post(`/relay/my/receipts/${eo.id}/category`, alice, { category: "not-a-group" })).status, 400, "unknown group refused");
+  assert.equal((await post(`/relay/my/receipts/${eo.id}/category`, bob, { category: "beauty" })).status, 404, "cannot teach from someone else's receipt");
+  assert.equal((await post(`/relay/my/receipts/${eo.id}/category`, alice, { category: "beauty" })).status, 200);
+  const after = (await list(alice)).find(x => x.orderRef === "EO-1");
+  assert.equal(after.category, "beauty"); assert.equal(after.categoryLearned, true);
+  const bobsSame = (await list(bob)).filter(x => x.storeKey === after.storeKey);
+  assert.ok(bobsSame.every(x => x.category !== "beauty" || !x.categoryLearned), "one shopper's choice does not change another's list");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM receipt_learning").get().n, 1);
+}
 // A dismissed item gets no reminder.
 clock = Date.parse("2026-11-22T08:00:00Z");
 await post(`/relay/my/receipts/${eoOne.id}/remind`, alice, { on: true });
@@ -408,7 +421,7 @@ await cb("code=good-code&state=" + s6);
 await post("/relay/my/gmail/scan", bob);
 assert.ok(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n > 0);
 assert.equal((await post("/relay/my/delete", bob)).status, 200);
-for (const t of ["captured_receipts", "gmail_connections", "gmail_oauth_states", "shopper_consents"])
+for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "gmail_oauth_states", "shopper_consents"])
   assert.equal(sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE shopper_id NOT IN (SELECT id FROM shoppers)`).get().n, 0, t + " cleaned on account deletion");
 
 console.log("PASS consent record, Gmail connect/callback rules, encrypted token, receipts-only scan, privacy of captured receipts, disconnect, withdrawal and deletion (FAKE Google and Gmail)");

@@ -407,3 +407,16 @@ t("return email with an empty text part falls back to the HTML", () => {
   assert.equal(r.deadline, "2025-12-24");
   assert.equal(r.carrier, "Evri");
 });
+
+// Promotions that look like receipts must not become receipts; real orders must survive.
+t("promo emails are not receipts, order emails still are", () => {
+  const promo = `From: Sainsbury's <hello@email.sainsburys.test>\nSubject: You've saved £4.20 with Nectar prices\nContent-Type: text/plain\n\nThanks for shopping. Your total savings £4.20. Order total £31.00 Nectar points earned.\n`;
+  assert.equal(parseReceiptEmail(promo).ok, false);
+  const mk = (sub) => `From: S <hello@e.s.test>\nSubject: ${sub}\nContent-Type: text/plain\n\nThanks for your purchase. Total £31.00\n1 x Jumper £31.00\n`;
+  assert.equal(parseReceiptEmail(mk("Purchase receipt - earn points")).reason, "promotional");
+  assert.equal(parseReceiptEmail(mk("Your receipt - you earned 50 points")).ok, true);
+  const order = `From: Shop <hello@shop.test>\nSubject: Thanks for your order #AB12345\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: AB12345\nOrder total £31.00\n1 x Blue jumper £31.00\n`;
+  assert.equal(parseReceiptEmail(order).ok, true);
+  const saleWithRef = `From: Shop <hello@shop.test>\nSubject: Your order AB12345 is confirmed - sale items included\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: AB12345\nOrder total £31.00\n1 x Blue jumper £31.00\n`;
+  assert.equal(parseReceiptEmail(saleWithRef).ok, true);
+});

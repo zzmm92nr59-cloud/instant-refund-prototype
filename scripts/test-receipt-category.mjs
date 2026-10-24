@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise } from "../worker/receipt-category.js";
+import { categorise, storeKey } from "../worker/receipt-category.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
 t("lululemon is fashion and returnable", () => { const r = c("lululemon", "lululemon.com", ["Align Leggings"]); assert.equal(r.category, "fashion"); assert.equal(r.returnable, true); });
@@ -9,4 +9,8 @@ t("food delivery and supermarkets are food, not returnable", () => { assert.equa
 t("Currys is electronics", () => assert.equal(c("Currys", "currys.co.uk", ["Kettle"]).category, "electronics"));
 t("IKEA is home", () => assert.equal(c("IKEA", "ikea.com", ["Lamp"]).category, "home"));
 t("unknown store is other and returnable", () => { const r = c("Tiny Shop", "tiny.test", ["Thing"]); assert.equal(r.category, "other"); assert.equal(r.returnable, true); });
+t("pubs and restaurants are food", () => { assert.equal(c("The Red Lion Pub", "redlion.test").category, "food"); assert.equal(c("Dishoom", "dishoom.com").category, "food"); });
+t("a kitchen item is not food", () => assert.equal(c("Dunelm", "dunelm.com", ["Kitchen towel set"]).category, "home"));
+t("a learned category beats the keyword guess", () => { const r = categorise({ retailer: { name: "Zara", domain: "zara.com" }, items: [] }, "home"); assert.equal(r.category, "home"); assert.equal(r.returnable, true); });
+t("store keys ignore www and endings", () => { assert.equal(storeKey({ retailer: { domain: "www.Zara.co.uk" } }), storeKey({ retailer: { domain: "zara.com" } })); });
 console.log(`\n${n} category tests passed`);

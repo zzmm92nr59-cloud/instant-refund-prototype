@@ -362,6 +362,18 @@ function looksLikeReceipt(subject, text) {
   return subjectHit && bodyHit;
 }
 
+// Marketing and loyalty emails that merely look like receipts ("You've saved £4 with Nectar", "20% off", "rate your order").
+// Promotions have their own place in Relay, so these are not receipts. An email that carries an order number is never treated as a promotion.
+const PROMO_SUBJECT = /\b(you(?:'|’)?ve saved|you saved|\d{1,3}\s?% off|up to \d{1,3}\s?%|sale\b|offers?\b|deals?\b|win\b|rewards?|earn(?:ed)? (?:\d+ )?points|your points|nectar|clubcard|new in\b|back in stock|just for you|don'?t miss|last chance|exclusive|voucher|refer a friend|rate your|how did we do|leave a review|review your|survey|newsletter|wishlist|abandoned|still thinking)\b/i;
+const ORDERISH_SUBJECT = /\b(order (?:confirmation|confirmed|received|number|summary)|your order|your receipt|receipt for|thanks? for your (?:order|purchase)|invoice|payment received)\b/i;
+export function looksPromotional(subject, headers, hasOrderRef) {
+  if (hasOrderRef) return false;
+  const sub = String(subject || "");
+  if (ORDERISH_SUBJECT.test(sub)) return false;
+  if (PROMO_SUBJECT.test(sub)) return true;
+  return /^(bulk|list)$/i.test(String((headers && headers.precedence) || "").trim());
+}
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -407,6 +419,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
+    return { ok: false, reason: "promotional", source: "shopper_email" };
+  }
   if (opts.lenient && !result.orderRef && result.totalPence == null && !result.items.length) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length, nothingFound: true } };
   }

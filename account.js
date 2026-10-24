@@ -327,12 +327,13 @@
       signedInView(sheet, email, notice, r.body);
     }).catch(function () { sheet.textContent = ""; sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
-  function receiptCard(x, refresh) {
+  function receiptCard(x, refresh, slim) {
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name; }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
       el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (x.orderDate ? " · " + x.orderDate : "") })]);
-    if (x.hasImage && x.id) {
+    if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
+    if (!slim && x.hasImage && x.id) {
       var ph = el("img", { alt: "", style: "float:right;width:64px;height:64px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:#f1ecdf" });
       card.insertBefore(ph, card.firstChild);
       apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
@@ -402,9 +403,10 @@
     }
     if (x.status === "confirmed") { card.appendChild(el("span", { text: " · Confirmed by you", style: "display:block;margin-top:4px" })); return card; }
     card.appendChild(el("span", { text: x.needsShopperConfirmation ? "Some details may be missing or wrong. Please check." : "Please check this is right.", style: "display:block;margin-top:4px" }));
-    [["Looks right", "confirm", "rl-btn"], ["Not mine / ignore", "dismiss", "rl-btn ghost"]].forEach(function (b) {
+    [["Looks right", "confirm", "rl-btn", null], ["Not mine / ignore", "dismiss", "rl-btn ghost", null], ["Just a promotion, hide it", "dismiss", "rl-btn ghost", "promo"]].forEach(function (b) {
+      if (b[3] && !slim) return;
       card.appendChild(el("button", { className: b[2], text: b[0], style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
-        api("/relay/my/receipts/" + x.id + "/" + b[1], { method: "POST" }).then(refresh); } }));
+        api("/relay/my/receipts/" + x.id + "/" + b[1], { method: "POST", body: b[3] ? { reason: b[3] } : {} }).then(refresh); } }));
     });
     return card;
   }
@@ -431,7 +433,7 @@
       if (lastScan) status.textContent = "Your receipts are saved. Last checked " + lastScan.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ".";
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
-      search.addEventListener("input", function () { query = search.value.trim().toLowerCase(); applyFilter(); });
+      search.addEventListener("input", function () { var was = Boolean(query); query = search.value.trim().toLowerCase(); if (was !== Boolean(query)) drawList(); else applyFilter(); });
       function applyFilter() {
         var shown = 0;
         Array.prototype.forEach.call(list.children, function (c) {
@@ -442,35 +444,81 @@
         var none = list.querySelector(".rl-none");
         if (none) none.style.display = query && !shown ? "" : "none";
       }
-      function loadList() {
-        api("/relay/my/receipts").then(function (x) {
-          list.textContent = "";
-          var rows = (x.body && x.body.receipts) || [];
-          if (!rows.length) list.appendChild(el("p", { text: "No receipts found yet." }));
-          // Soonest deadline first, then everything without one, then expired ones.
-          var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
-          rows.sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
-          var lastGroup = null;
-          // Group by shopping category, biggest group first; "can't be returned" groups go last.
-          var counts = {}; rows.forEach(function (r) { var g = r.categoryLabel || "Other"; counts[g] = (counts[g] || 0) + 1; });
-          var order = function (r) { return (r.returnable === false ? 1000 : 0) - (counts[r.categoryLabel || "Other"] || 0); };
-          rows = rows.map(function (r, i) { return [r, i]; }).sort(function (a, b) { return order(a[0]) - order(b[0]) || (a[0].categoryLabel || "Other").localeCompare(b[0].categoryLabel || "Other") || a[1] - b[1]; }).map(function (a) { return a[0]; });
-          rows.forEach(function (row) {
-            var g = row.categoryLabel || "Other";
-            if (g !== lastGroup) {
-              lastGroup = g;
-              list.appendChild(el("h3", { text: g + " (" + counts[g] + ")", style: "font-size:16px;margin:18px 0 2px;color:#0f1b33" }));
-              if (row.returnable === false && row.notReturnableReason) list.appendChild(el("p", { text: row.notReturnableReason, style: "font-size:13px;margin:0 0 4px" }));
-            }
-            var card = receiptCard(row, loadList);
-            var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef,
-              (row.items || []).map(function (i) { return i.name; }).join(" ")].filter(Boolean).join(" ").toLowerCase();
-            card.setAttribute("data-find", find);
-            list.appendChild(card);
-          });
-          if (rows.length) list.appendChild(el("p", { className: "rl-none", text: "No receipts match that search.", style: "display:none" }));
-          applyFilter();
+      var glyphs = { fashion: "👕", electronics: "🔌", food: "🍽️", home: "🏠", beauty: "💄", travel: "🧳", digital: "☁️", other: "🧾" };
+      var openCat = null, allRows = [], openIds = {};
+      function pill(text, bg, fg) { return el("span", { text: text, style: "display:inline-block;margin-top:4px;padding:3px 9px;border-radius:999px;font-weight:700;font-size:12px;background:" + bg + ";color:" + fg }); }
+      // One tidy line per receipt: picture, shop name (opens the original email), what was bought, price and date.
+      function receiptRow(row) {
+        var who = (row.retailer && (row.retailer.name || row.retailer.domain)) || "Unknown store";
+        var names = (row.items || []).map(function (i) { return i.name; }).join(", ");
+        var wrap = el("div", { className: "rl-order", style: "padding:12px" });
+        var top = el("div", { style: "display:flex;gap:12px;align-items:center" });
+        var thumb = el("div", { style: "flex:0 0 56px;width:56px;height:56px;border-radius:14px;background:#f1ecdf;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800;font-size:22px;color:#46601b" }, [el("span", { text: who.charAt(0).toUpperCase() })]);
+        if (row.hasImage && row.id) {
+          var im = el("img", { alt: "", style: "width:56px;height:56px;object-fit:cover" });
+          apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; im.src = u; thumb.appendChild(im); } });
+        }
+        var canOpen = row.id && /^[A-Za-z0-9]{6,40}$/.test(row.gmailId || "") && openOriginal;
+        var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
+          : el("b", { text: who, style: "display:block;font-size:16px" });
+        var meta = [names ? (names.length > 60 ? names.slice(0, 57) + "…" : names) : null, row.totalPence == null ? null : money(row.totalPence, row.currency), row.orderDate].filter(Boolean).join(" · ");
+        var mid = el("div", { style: "flex:1;min-width:0" }, [shop, el("span", { text: meta || "Details not found", style: "display:block;font-size:13px;opacity:.75;margin-top:2px" })]);
+        var left = daysLeft(deadlineOf(row));
+        if (left !== null) mid.appendChild(left < 0 ? pill("Deadline passed", "#ece8dd", "#5b6475") : left <= 2 ? pill(left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left", "#fde0dd", "#b3261e") : left <= 7 ? pill(left + " days left", "#ffefc9", "#77520a") : pill(left + " days left", "#e3f4c8", "#46601b"));
+        else if (row.returnable === false) mid.appendChild(pill("Usually can't be returned", "#ece8dd", "#5b6475"));
+        var more = el("button", { className: "rl-btn ghost", text: "Details", style: "flex:0 0 auto;padding:8px 12px;font-size:13px;width:auto" });
+        top.appendChild(thumb); top.appendChild(mid); top.appendChild(more); wrap.appendChild(top);
+        var detail = null;
+        more.onclick = function () {
+          if (detail) { delete openIds[row.id]; detail.remove(); detail = null; more.textContent = "Details"; more.setAttribute("aria-expanded", "false"); return; }
+          detail = el("div", { style: "margin-top:10px" });
+          detail.appendChild(receiptCard(row, loadList, true));
+          var pick = el("select", { ariaLabel: "Move to another group", style: "margin-top:10px;width:100%" }, [el("option", { value: "", text: "Wrong group? Move it to…" })]);
+          Object.keys(glyphs).forEach(function (k) { pick.appendChild(el("option", { value: k, text: groupNames[k] || k })); });
+          pick.onchange = function () { if (!pick.value) return;
+            api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
+          detail.appendChild(pick);
+          if (row.categoryLearned) detail.appendChild(el("span", { text: "Grouped the way you taught Relay.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
+          wrap.appendChild(detail); openIds[row.id] = true; more.textContent = "Hide"; more.setAttribute("aria-expanded", "true");
+        };
+        var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names].filter(Boolean).join(" ").toLowerCase();
+        wrap.setAttribute("data-find", find);
+        if (openIds[row.id]) more.onclick();
+        return wrap;
+      }
+      var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other" };
+      function drawList() {
+        list.textContent = "";
+        var rows = allRows;
+        if (!rows.length) { list.appendChild(el("p", { text: "No receipts found yet." })); return; }
+        // Soonest deadline first, then no deadline, then expired.
+        var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
+        var sorted = rows.slice().sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
+        if (query) { sorted.forEach(function (r) { list.appendChild(receiptRow(r)); }); list.appendChild(el("p", { className: "rl-none", text: "No receipts match that search.", style: "display:none" })); applyFilter(); return; }
+        var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
+        var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return na - nb || by[b].length - by[a].length; });
+        if (openCat && by[openCat]) {
+          list.appendChild(el("button", { className: "rl-btn ghost", text: "‹ All groups", style: "width:auto;padding:8px 14px;font-size:14px", onclick: function () { openCat = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }));
+          list.appendChild(el("h3", { text: (glyphs[openCat] || "") + " " + groupNames[openCat] + " (" + by[openCat].length + ")", style: "font-size:20px;margin:14px 0 4px;color:#0f1b33" }));
+          if (by[openCat][0].returnable === false && by[openCat][0].notReturnableReason) list.appendChild(el("p", { text: by[openCat][0].notReturnableReason, style: "font-size:13px;margin:0 0 8px" }));
+          by[openCat].forEach(function (r) { list.appendChild(receiptRow(r)); });
+          return;
+        }
+        openCat = null;
+        var grid = el("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px" });
+        keys.forEach(function (k) {
+          var soon = by[k].filter(function (r) { var d = daysLeft(deadlineOf(r)); return d !== null && d >= 0 && d <= 7; }).length;
+          var check = by[k].filter(function (r) { return r.status !== "confirmed" && r.needsShopperConfirmation; }).length;
+          var sub = soon ? soon + " return deadline" + (soon === 1 ? "" : "s") + " soon" : by[k][0].returnable === false ? "Usually can't be returned" : check ? check + " to check" : "All looks fine";
+          grid.appendChild(el("button", { type: "button", ariaLabel: groupNames[k] + ", " + by[k].length + " receipts", onclick: function () { openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); },
+            style: "all:unset;cursor:pointer;box-sizing:border-box;aspect-ratio:1/1;border-radius:22px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;background:#fff;border:1px solid #e7e1d2;box-shadow:0 2px 10px rgba(15,27,51,.06)" },
+            [el("span", { text: glyphs[k] || "🧾", style: "font-size:34px" }),
+             el("span", {}, [el("b", { text: groupNames[k], style: "display:block;font-size:17px;color:#0f1b33" }), el("span", { text: by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), style: "display:block;font-size:14px;opacity:.8;margin-top:2px" }), el("span", { text: sub, style: "display:block;font-size:12px;margin-top:6px;color:" + (soon ? "#b3261e" : "#5b6475") + ";font-weight:" + (soon ? "700" : "400") })])]));
         });
+        list.appendChild(grid);
+      }
+      function loadList() {
+        api("/relay/my/receipts").then(function (x) { allRows = (x.body && x.body.receipts) || []; drawList(); });
       }
       var doScan = function (full) {
         scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
