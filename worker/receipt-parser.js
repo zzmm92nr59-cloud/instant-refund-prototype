@@ -449,7 +449,9 @@ export function parseReturnEmail(rawEmail) {
   const isReturn = /\breturn id\b/i.test(text) || /(?:thanks for your|your) return request/i.test(text);
   if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
 
-  const idm = text.match(/return id\s*[:#\s]*([A-Z0-9-]{5,30})/i);
+  // A real return ID has at least one digit and ends at a space or line break ("RETURN ID: nuk0400251601"),
+  // so words like "https" from a link, or the first word of a sentence, are never taken for one.
+  const idm = text.match(/return id\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
   const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#\s]*([A-Z0-9-]{4,24})/i);
 
