@@ -32,7 +32,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 12;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 8;
+const PARSER_VERSION = 9;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 2, DAY_MS = 24 * 60 * 60 * 1000;
@@ -347,9 +347,16 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
   const t = await tokenFor(env, shopperId, fetchImpl);
   if (!t.token) return t;
   const auth = { Authorization: "Bearer " + t.token };
-  const list = await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=" + encodeURIComponent(q), { headers: auth });
-  if (!list.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const ids = ((await list.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id)).slice(0, 10);
+  // Order, shipping and return emails first (a shop's marketing and payment-plan emails otherwise bury them), then anything else.
+  const listIds = async query => {
+    const l = await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=" + encodeURIComponent(query), { headers: auth });
+    if (!l.ok) return null;
+    return ((await l.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id));
+  };
+  const first = await listIds(q + ' subject:(order OR receipt OR confirmation OR "thanks for your" OR return OR "QR code" OR shipping OR delivered OR invoice) -category:promotions');
+  const rest = await listIds(q);
+  if (first === null && rest === null) return { status: 502, body: { error: "gmail_unavailable" } };
+  const ids = [...new Set([...(first || []), ...(rest || [])])].slice(0, 15);
   const results = [];
   for (const id of ids) {
     const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: auth });

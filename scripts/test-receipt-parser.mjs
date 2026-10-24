@@ -383,3 +383,11 @@ t("lenient mode (shopper picked the email) accepts one signal but still needs re
 });
 
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
+
+// Real-world lesson (lululemon, 2025): a message that says "Return ID: https://..." must not yield the ID "https",
+// while a real "RETURN ID: nuk0400251601" still must.
+t("return id is never a link scheme or plain word", () => {
+  const mk = (line) => `From: Shop <noreply@shop.test>\nSubject: Your return\nContent-Type: text/plain\n\n${line}\nThanks for your return request.\nPlease send it back no later than Wednesday, December 24.\n`;
+  assert.equal(parseReturnEmail(mk("Return ID: https://shop.test/r/abc")).returnId, null);
+  assert.equal(parseReturnEmail(mk("RETURN ID: nuk0400251601")).returnId, "nuk0400251601");
+});
