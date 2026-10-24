@@ -1,0 +1,147 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0f1b33"><title>Relay for shops — Watch demand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--cream:#f6f3ec;--navy:#0f1b33;--ink:#141827;--muted:#6b7280;--line:#e6e1d6;--lime:#c9f26b;--card:#fff;--serif:Fraunces,Georgia,serif}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:15px Inter,system-ui,-apple-system,sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}
+.wrap{max-width:980px;margin:0 auto;padding:28px 20px 90px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{font-family:var(--serif);font-weight:600;font-size:28px;letter-spacing:-.5px}.logo small{font-family:Inter;font-size:12px;font-weight:700;color:var(--muted);margin-left:8px;letter-spacing:.4px;text-transform:uppercase}
+.tag{background:#fff3d7;color:#7a540c;border-radius:99px;padding:6px 11px;font-size:11px;font-weight:800}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-height:1.05;letter-spacing:-.02em;margin:26px 0 8px}
+.sub{color:var(--muted);line-height:1.55;max-width:40em;margin:0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:26px 0}
+.stat{background:var(--navy);color:#fff;border-radius:20px;padding:18px 20px}.stat strong{display:block;font-family:var(--serif);font-size:34px;font-weight:600}.stat span{color:#c9d0df;font-size:13px}
+.stat.l{background:var(--lime);color:#1d2911}.stat.l span{color:#3c5219}.stat.w{background:#fff;color:var(--ink);border:1px solid var(--line)}.stat.w span{color:var(--muted)}
+.head{display:flex;justify-content:space-between;align-items:end;gap:10px;margin:30px 0 12px}.head h2{font-family:var(--serif);font-weight:600;font-size:24px;margin:0}
+.list{display:grid;gap:12px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;grid-template-columns:76px 1fr auto;gap:16px;align-items:center}
+.pic{width:76px;height:76px;border-radius:14px;background:#efeae0 center/cover no-repeat;display:grid;place-items:center;font-family:var(--serif);font-size:28px;color:#8a7f69}
+.row h3{margin:0 0 3px;font-size:16px}.row .meta{color:var(--muted);font-size:13px}
+.count{text-align:right}.count strong{font-family:var(--serif);font-size:30px;font-weight:600;display:block;line-height:1}.count span{font-size:12px;color:var(--muted)}
+.chip{display:inline-block;margin-top:6px;background:#eef6dc;color:#3f6212;border-radius:99px;padding:3px 9px;font-size:11px;font-weight:800}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.dark{background:var(--navy);color:#fff}.limebtn{background:var(--lime);color:#1d2911}.ghost{background:#fff;border:1px solid #d9d3c6}
+.offerbox{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.offerbox label{font-size:12px;font-weight:700;color:var(--muted);display:grid;gap:5px}.offerbox input,.offerbox select{border:1px solid #d9d3c6;border-radius:11px;padding:10px 12px;background:#fff;min-width:120px}
+.offerbox .grow{flex:1;min-width:180px}.offerbox .grow input{width:100%}
+.msg{grid-column:1/-1;font-size:13px;border-radius:12px;padding:10px 12px}.ok{background:#eef6dc;color:#3f6212}.bad{background:#fff0ef;color:#9c3328}
+.empty,.signin{background:#fff;border:1px solid var(--line);border-radius:22px;padding:28px;text-align:center;color:var(--muted)}
+.signin h2{font-family:var(--serif);color:var(--ink);font-weight:600;font-size:26px;margin:0 0 8px}
+.offers .row{grid-template-columns:1fr auto}.state{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px}.live{background:#eef6dc;color:#3f6212}.ended{background:#efeae0;color:#6b6252}
+.fine{font-size:12px;color:var(--muted);line-height:1.6;margin-top:30px}
+.hidden{display:none!important}
+@media(max-width:640px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}.row{grid-template-columns:60px 1fr;gap:12px}.pic{width:60px;height:60px}.count{grid-column:2;text-align:left;display:flex;gap:8px;align-items:baseline}.count strong{font-size:24px}}
+</style></head><body><div class="wrap">
+<div class="top"><div class="logo">Relay<small>for shops</small></div><span class="tag">Square Sandbox · test shops</span></div>
+
+<section id="signin" class="signin hidden" style="margin-top:40px">
+  <h2>See what Relay shoppers are waiting for</h2>
+  <p>Sign in with the Square account that runs your shop. Relay only reads your products and prices.</p>
+  <p><a class="btn dark" style="display:inline-block;text-decoration:none" href="https://relay-square-api2.9pts72cy5j.workers.dev/relay/square/connect?for=dashboard">Sign in with Square</a></p>
+</section>
+
+<main id="app" class="hidden">
+  <h1 id="shop">Your shop</h1>
+  <p class="sub">How many Relay shoppers are watching each of your items right now. You see totals only — never who they are. Send watchers an offer and Relay alerts their phones.</p>
+  <div class="stats">
+    <div class="stat"><strong id="sWatch">–</strong><span>shoppers watching your items</span></div>
+    <div class="stat l"><strong id="sItems">–</strong><span>items being watched</span></div>
+    <div class="stat w"><strong id="sFollow">–</strong><span>follow your whole shop</span></div>
+  </div>
+  <div class="head"><h2>Most watched</h2><button class="btn ghost" id="refresh">Refresh</button></div>
+  <div class="list" id="items"><div class="empty">Loading…</div></div>
+  <div class="head"><h2>Offers you've sent</h2></div>
+  <div class="list offers" id="offers"></div>
+  <p class="fine">An offer sends a phone alert to everyone watching that item (and people following your whole shop). It doesn't change your price in Square and Relay doesn't take payment — you honour the offer price at your till or checkout. One offer per item at a time, up to 10 a day. Figures update when Relay next reads your catalogue (at least hourly).<br>
+  <button class="btn ghost" id="signout" style="margin-top:10px">Sign out on this device</button></p>
+</main>
+</div>
+<script>
+const API = "https://relay-square-api2.9pts72cy5j.workers.dev";
+const KEY_STORE = "relay.retailer.key";
+const $ = (id) => document.getElementById(id);
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const gbp = (m) => Number.isFinite(m) ? "£" + (m / 100).toFixed(2) : "—";
+function store(get, v) { try { if (get) return localStorage.getItem(KEY_STORE); if (v === null) localStorage.removeItem(KEY_STORE); else localStorage.setItem(KEY_STORE, v); } catch { return null; } }
+// The key arrives after "#" (never sent to any server), is kept on this device, and is removed from the address bar.
+const fromLink = /(?:^|[#&])key=(rk_[A-Za-z0-9_-]{20,80})/.exec(location.hash);
+if (fromLink) { store(false, fromLink[1]); history.replaceState(null, "", location.pathname); }
+let key = fromLink ? fromLink[1] : store(true);
+let demand = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" } });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { store(false, null); key = null; show(); throw Error("signed_out"); }
+  return { status: r.status, body: j };
+}
+function show() { $("signin").classList.toggle("hidden", !!key); $("app").classList.toggle("hidden", !key); }
+
+const ERR = { offer_must_be_lower: "An offer has to be lower than today's price.", offer_already_running: "There's already an offer running on this item.",
+  too_many_offers_today: "You've sent 10 offers today — try again tomorrow.", bad_price: "Enter a price like 12.99.", not_your_item: "This item isn't in your shop's catalogue any more.", bad_duration: "Choose how long the offer lasts." };
+
+function itemRow(i) {
+  const pic = i.imageUrl ? `style="background-image:url('${esc(i.imageUrl)}')"` : "";
+  const suggested = Math.max(1, Math.round(i.priceMinor * 0.85));
+  return `<div class="row" data-sku="${esc(i.sku)}">
+    <div class="pic" ${pic}>${i.imageUrl ? "" : esc((i.product || "?")[0])}</div>
+    <div><h3>${esc(i.product)}</h3><div class="meta">${esc(i.variant || "")}${i.variant ? " · " : ""}${gbp(i.priceMinor)} · SKU ${esc(i.sku)}</div>
+      ${i.newThisWeek ? `<span class="chip">+${i.newThisWeek} this week</span>` : ""}${i.viaShopFollow ? ` <span class="meta">+${i.viaShopFollow} via shop follow</span>` : ""}</div>
+    <div class="count"><strong>${i.watchers}</strong><span>watching</span><div><button class="btn limebtn" data-open style="margin-top:8px">Send offer</button></div></div>
+    <form class="offerbox hidden" data-form>
+      <label>Offer price<input name="price" inputmode="decimal" value="${(suggested / 100).toFixed(2)}" required></label>
+      <label>Lasts<select name="hours"><option value="24">24 hours</option><option value="48" selected>2 days</option><option value="72">3 days</option><option value="168">1 week</option></select></label>
+      <label class="grow">Message (optional)<input name="note" maxlength="80" placeholder="e.g. In store and online"></label>
+      <button class="btn dark" type="submit">Send to ${i.watchers + i.viaShopFollow} watcher${i.watchers + i.viaShopFollow === 1 ? "" : "s"}</button>
+    </form><div class="msg hidden" data-msg></div></div>`;
+}
+function offerRow(o) {
+  const ends = new Date(o.endsAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `<div class="row"><div><h3>${esc(o.product)}${o.variant ? " · " + esc(o.variant) : ""}</h3>
+    <div class="meta">${gbp(o.offerMinor)} (was ${gbp(o.wasMinor)}) · sent to ${o.shoppers} shopper${o.shoppers === 1 ? "" : "s"} · ${o.active ? "ends" : "ended"} ${ends}</div>
+    ${o.note ? `<div class="meta">“${esc(o.note)}”</div>` : ""}</div><span class="state ${o.active ? "live" : "ended"}">${o.active ? "Live" : "Ended"}</span></div>`;
+}
+async function load() {
+  show(); if (!key) return;
+  try {
+    const [d, o] = await Promise.all([api("/relay/retailer/demand"), api("/relay/retailer/offers")]);
+    demand = d.body;
+    $("shop").textContent = demand.store || "Your shop";
+    $("sWatch").textContent = demand.shoppersWatchingItems ?? 0;
+    $("sItems").textContent = (demand.watchedItems || []).length;
+    $("sFollow").textContent = demand.followers ?? 0;
+    $("items").innerHTML = (demand.watchedItems || []).length ? demand.watchedItems.map(itemRow).join("")
+      : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
+    const offers = o.body.offers || [];
+    $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
+  } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
+}
+$("items").addEventListener("click", (e) => {
+  if (!e.target.matches("[data-open]")) return;
+  const row = e.target.closest(".row"); row.querySelector("[data-form]").classList.toggle("hidden");
+});
+$("items").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target, row = form.closest(".row"), msg = row.querySelector("[data-msg]"), btn = form.querySelector("button");
+  const pounds = Number(String(form.price.value).replace(/[£,\s]/g, ""));
+  const say = (cls, text) => { msg.className = "msg " + cls; msg.textContent = text; };
+  if (!Number.isFinite(pounds) || pounds <= 0) return say("bad", ERR.bad_price);
+  btn.disabled = true; btn.textContent = "Sending…";
+  try {
+    const r = await api("/relay/retailer/offers", { method: "POST", body: JSON.stringify({ sku: row.dataset.sku, offerMinor: Math.round(pounds * 100), hours: Number(form.hours.value), note: form.note.value }) });
+    if (r.status === 200) {
+      const o = r.body.offer;
+      say("ok", o.shoppers ? `Sent. ${o.shoppers} shopper${o.shoppers === 1 ? "" : "s"} alerted on ${o.devices} device${o.devices === 1 ? "" : "s"}.` : "Saved, but nobody watching this item has phone alerts turned on, so no alerts went out.");
+      form.classList.add("hidden");
+      const offers = (await api("/relay/retailer/offers")).body.offers || [];
+      $("offers").innerHTML = offers.map(offerRow).join("");
+    } else say("bad", ERR[r.body.error] || "That didn't go through. Please try again.");
+  } catch { say("bad", "Couldn't reach Relay just now."); }
+  btn.disabled = false; btn.textContent = "Send";
+});
+$("refresh").onclick = load;
+$("signout").onclick = () => { store(false, null); key = null; show(); };
+load();
+</script></body></html>

@@ -3,10 +3,12 @@
 // Tokens never reach the browser. The only scopes asked for are read-only: items, inventory and the shop's name.
 import { ensureOnce } from "./once.js";
 import { wrapKey } from "./push.js";
+import { issueRetailerKey } from "./retailer.js";
 
 const HOST = "https://connect.squareupsandbox.com";
 const APP_ID = "sandbox-sq0idb-S-JwqxshuoQuUVeJdZ6HBw"; // public identifier of Relay's Sandbox app, not a secret
 const SCOPES = "ITEMS_READ INVENTORY_READ MERCHANT_PROFILE_READ";
+const DASHBOARD_BASE = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
 const enc = new TextEncoder(), dec = new TextDecoder();
 const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
@@ -33,8 +35,9 @@ async function hmac(env, text) {
   const key = await crypto.subtle.importKey("raw", enc.encode("relay-square-state:" + env.AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", key, enc.encode(text))));
 }
-async function makeState(env, now) {
-  const body = b64u(crypto.getRandomValues(new Uint8Array(12))) + "." + (now + 15 * 60 * 1000);
+// The first letter of the state says where to go afterwards: "d" = the shop's Relay dashboard, "c" = a plain "connected" page.
+async function makeState(env, now, purpose = "c") {
+  const body = purpose + b64u(crypto.getRandomValues(new Uint8Array(12))) + "." + (now + 15 * 60 * 1000);
   return body + "." + await hmac(env, body);
 }
 async function goodState(env, state, now) {
@@ -97,7 +100,7 @@ export async function handleSquareConnect(request, env, url, o = {}) {
   if (!env.RELAY_DB || !env.AUTH_SECRET || String(env.AUTH_SECRET).length < 16) return page("Not available yet", "Relay's server is not fully set up for connecting shops.", 503);
   await ensureSquareMerchantSchema(env.RELAY_DB);
   if (path === "/relay/square/connect" && request.method === "GET") {
-    const state = await makeState(env, now);
+    const state = await makeState(env, now, url.searchParams.get("for") === "dashboard" ? "d" : "c");
     const to = HOST + "/oauth2/authorize?client_id=" + encodeURIComponent(env.SQUARE_APPLICATION_ID || APP_ID) + "&scope=" + encodeURIComponent(SCOPES).replace(/%20/g, "+") +
       "&session=false&state=" + encodeURIComponent(state);
     return Response.redirect(to, 302);
@@ -126,8 +129,14 @@ export async function handleSquareConnect(request, env, url, o = {}) {
       await env.RELAY_DB.prepare(`INSERT INTO square_merchants (merchant_id, label, access_iv, access_data, refresh_iv, refresh_data, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)
         ON CONFLICT(merchant_id) DO UPDATE SET label = excluded.label, access_iv = excluded.access_iv, access_data = excluded.access_data, refresh_iv = excluded.refresh_iv, refresh_data = excluded.refresh_data, expires_at = excluded.expires_at`)
         .bind(merchantId, label, a.iv, a.data, r.iv, r.data, j.expires_at ? Date.parse(j.expires_at) : null, now).run();
-      if (typeof o.afterConnect === "function") o.afterConnect();
-      return page("Connected", `${esc(label)} is connected to Relay. Relay can read this shop's products and prices (read-only). You can close this page.`);
+      if (typeof o.afterConnect === "function") o.afterConnect(merchantId);
+      // A fresh key for the shop's own Relay dashboard. It travels in the page address after "#", which browsers never send to any server.
+      const key = await issueRetailerKey(env, { provider: "square", shopRef: merchantId, storeLabel: label }, now);
+      const dash = (env.RELAY_APP_URL || DASHBOARD_BASE).replace(/\/?$/, "/") + "retailer.html#key=" + encodeURIComponent(key);
+      if (String(url.searchParams.get("state") || "").startsWith("d")) return new Response(null, { status: 302, headers: { location: dash, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
+      return page("Connected", `${esc(label)} is connected to Relay. Relay can read this shop's products and prices (read-only).</p>
+<p><a href="${esc(dash)}" rel="noreferrer" style="display:inline-block;background:#141827;color:#fff;padding:12px 18px;border-radius:12px;text-decoration:none">Open your Relay shop dashboard</a></p>
+<p style="color:#5b6275;font-size:14px">See which of your items shoppers are watching and send them offers. Keep this link private: anyone with it can see your shop's figures.`);
     } catch (e) {
       return page("Could not connect", esc(String(e && e.message || e).slice(0, 160)), 502);
     }
