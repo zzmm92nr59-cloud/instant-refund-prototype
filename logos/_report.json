@@ -1,0 +1,894 @@
+{
+ "hits": {
+  "morrisons.com": {
+   "file": "morrisons.com.png",
+   "from": "https://morrisons.com/_next/static/media/apple-touch-icon.0-dlucwqcd-nz.png",
+   "bytes": 6472
+  },
+  "aldi.co.uk": {
+   "file": "aldi.co.uk.png",
+   "from": "https://aldi.co.uk/apple-touch-icon.png",
+   "bytes": 914
+  },
+  "lidl.co.uk": {
+   "file": "lidl.co.uk.svg",
+   "from": "https://www.lidl.co.uk/cdn/assets/logos/1.0.1/lidl-logo-shop-cdn.svg",
+   "bytes": 1751
+  },
+  "marksandspencer.com": {
+   "file": "marksandspencer.com.png",
+   "from": "https://static.marksandspencer.com/images/favicon.ico",
+   "bytes": 1361
+  },
+  "coop.co.uk": {
+   "file": "coop.co.uk.png",
+   "from": "https://coop.co.uk/apple-touch-icon.png",
+   "bytes": 6792
+  },
+  "boots.com": {
+   "file": "boots.com.ico",
+   "from": "https://boots.com/favicon.ico",
+   "bytes": 169662
+  },
+  "iceland.co.uk": {
+   "file": "iceland.co.uk.png",
+   "from": "https://iceland.co.uk/favicon.ico",
+   "bytes": 877
+  },
+  "amazon.co.uk": {
+   "file": "amazon.co.uk.ico",
+   "from": "https://amazon.co.uk/favicon.ico",
+   "bytes": 15086
+  },
+  "spacenk.com": {
+   "file": "spacenk.com.ico",
+   "from": "https://spacenk.com/favicon.ico",
+   "bytes": 318
+  },
+  "debenhams.com": {
+   "file": "debenhams.com.ico",
+   "from": "https://debenhams.com/favicon.ico",
+   "bytes": 5430
+  },
+  "selfridges.com": {
+   "file": "selfridges.com.ico",
+   "from": "https://www.selfridges.com/favicon.ico",
+   "bytes": 9662
+  },
+  "boohoo.com": {
+   "file": "boohoo.com.ico",
+   "from": "https://boohoo.com/favicon.ico",
+   "bytes": 15086
+  },
+  "ebay.co.uk": {
+   "file": "ebay.co.uk.ico",
+   "from": "https://ebay.co.uk/favicon.ico",
+   "bytes": 1150
+  },
+  "prettylittlething.com": {
+   "file": "prettylittlething.com.ico",
+   "from": "https://prettylittlething.com/favicon.ico",
+   "bytes": 15086
+  },
+  "missguided.co.uk": {
+   "file": "missguided.co.uk.png",
+   "from": "https://img.ltwebstatic.com/v4/w/er/2026/02/04/11/17701852068204464f53bfb9676d52dd5dac0294ca.png?r=1792868302207",
+   "bytes": 8588
+  },
+  "newlook.com": {
+   "file": "newlook.com.png",
+   "from": "https://www.newlook.com/favicon.ico",
+   "bytes": 680
+  },
+  "riverisland.com": {
+   "file": "riverisland.com.png",
+   "from": "https://www.riverisland.com/Assets/RiverIsland/Core/images/touch-icon-180x180.png",
+   "bytes": 4555
+  },
+  "topshop.com": {
+   "file": "topshop.com.png",
+   "from": "https://assets.asosservices.com/shops/topshop/favicons/apple-touch-icon.png",
+   "bytes": 3613
+  },
+  "primark.com": {
+   "file": "primark.com.ico",
+   "from": "https://primark.com/favicon.ico",
+   "bytes": 2238
+  },
+  "matalan.co.uk": {
+   "file": "matalan.co.uk.png",
+   "from": "https://matalan.co.uk/apple-touch-icon.png",
+   "bytes": 1549
+  },
+  "peacocks.co.uk": {
+   "file": "peacocks.co.uk.png",
+   "from": "https://www.peacocks.co.uk/on/demandware.static/-/Library-Sites-PCKSharedLibrary/default/dw95130b03/images/favicons/apple-touch-icon.png",
+   "bytes": 1727
+  },
+  "dorothyperkins.com": {
+   "file": "dorothyperkins.com.ico",
+   "from": "https://dorothyperkins.com/favicon.ico",
+   "bytes": 7406
+  },
+  "burton.co.uk": {
+   "file": "burton.co.uk.ico",
+   "from": "https://burton.co.uk/favicon.ico",
+   "bytes": 7406
+  },
+  "bonmarche.co.uk": {
+   "file": "bonmarche.co.uk.ico",
+   "from": "https://www.bonmarche.co.uk/favicon.ico",
+   "bytes": 16958
+  },
+  "wallis.co.uk": {
+   "file": "wallis.co.uk.ico",
+   "from": "https://wallis.co.uk/favicon.ico",
+   "bytes": 7406
+  },
+  "nike.com": {
+   "file": "nike.com.png",
+   "from": "https://nike.com/apple-touch-icon.png",
+   "bytes": 2388
+  },
+  "jdsports.co.uk": {
+   "file": "jdsports.co.uk.png",
+   "from": "https://www.jdsports.co.uk/apple-touch-icon.png",
+   "bytes": 5340
+  },
+  "schuh.co.uk": {
+   "file": "schuh.co.uk.png",
+   "from": "https://schuh.co.uk/apple-touch-icon.png",
+   "bytes": 428
+  },
+  "office.co.uk": {
+   "file": "office.co.uk.ico",
+   "from": "https://www.office.co.uk/office/styles/images/icon.ico",
+   "bytes": 85886
+  },
+  "drmartens.com": {
+   "file": "drmartens.com.png",
+   "from": "https://www.drmartens.com/assets/apple-icon.png",
+   "bytes": 1374
+  },
+  "gymshark.com": {
+   "file": "gymshark.com.png",
+   "from": "https://us.checkout.gymshark.com/cdn/shop/files/icon-200_767692d6-7327-4714-8ce6-69826dd054a5_180x180.png?v=1613146345",
+   "bytes": 11494
+  },
+  "ugg.com": {
+   "file": "ugg.com.ico",
+   "from": "https://ugg.com/favicon.ico",
+   "bytes": 15086
+  },
+  "trespass.com": {
+   "file": "trespass.com.png",
+   "from": "https://www.trespass.com/media/favicon/websites/2/trepass-favicon.png",
+   "bytes": 888
+  },
+  "ikea.com": {
+   "file": "ikea.com.ico",
+   "from": "https://www.ikea.com/global/en/images/favicon.ico",
+   "bytes": 15086
+  },
+  "dunelm.com": {
+   "file": "dunelm.com.png",
+   "from": "https://dunelm.com/apple-touch-icon.png",
+   "bytes": 3121
+  },
+  "wayfair.co.uk": {
+   "file": "wayfair.co.uk.ico",
+   "from": "https://wayfair.co.uk/favicon.ico",
+   "bytes": 17542
+  },
+  "wickes.co.uk": {
+   "file": "wickes.co.uk.png",
+   "from": "https://www.wickes.co.uk/_ui/addons/b2caddon/shared/common/images/apple-touch-icon-180x180.png?v=260904112557",
+   "bytes": 1811
+  },
+  "screwfix.com": {
+   "file": "screwfix.com.png",
+   "from": "https://www.screwfix.com/fusionx/apple-touch-icon.png",
+   "bytes": 1483
+  },
+  "toolstation.com": {
+   "file": "toolstation.com.png",
+   "from": "https://www.toolstation.com/icon/favicon-180-x-180.png",
+   "bytes": 12196
+  },
+  "sofology.co.uk": {
+   "file": "sofology.co.uk.ico",
+   "from": "https://sofology.co.uk/favicon.ico",
+   "bytes": 6076
+  },
+  "furniturevillage.co.uk": {
+   "file": "furniturevillage.co.uk.png",
+   "from": "https://www.furniturevillage.co.uk/on/demandware.static/Sites-fv-Site/-/default/dw205a1ae3/images/favicon-180.png",
+   "bytes": 3810
+  },
+  "made.com": {
+   "file": "made.com.ico",
+   "from": "https://www.made.com/static-content/icons/favicon/made.ico",
+   "bytes": 15406
+  },
+  "dreams.co.uk": {
+   "file": "dreams.co.uk.ico",
+   "from": "https://dreams.co.uk/favicon.ico",
+   "bytes": 15086
+  },
+  "apple.com": {
+   "file": "apple.com.png",
+   "from": "https://apple.com/apple-touch-icon.png",
+   "bytes": 4506
+  },
+  "box.co.uk": {
+   "file": "box.co.uk.ico",
+   "from": "https://box.co.uk/favicon.ico",
+   "bytes": 15406
+  },
+  "samsung.com": {
+   "file": "samsung.com.png",
+   "from": "https://resources.samsung.com/etc.clientlibs/samsung/clientlibs/consumer/global/clientlib-common/resources/images/app_ico.png",
+   "bytes": 6822
+  },
+  "laptopsdirect.co.uk": {
+   "file": "laptopsdirect.co.uk.png",
+   "from": "https://www.laptopsdirect.co.uk/apple-touch-icon-180x180.png",
+   "bytes": 981
+  },
+  "overclockers.co.uk": {
+   "file": "overclockers.co.uk.ico",
+   "from": "https://overclockers.co.uk/favicon.ico",
+   "bytes": 15406
+  },
+  "hughes.co.uk": {
+   "file": "hughes.co.uk.ico",
+   "from": "https://cdn6.hughes.co.uk/media/a7/3f/9f/1716287512/favicon.ico",
+   "bytes": 7406
+  },
+  "jessops.com": {
+   "file": "jessops.com.png",
+   "from": "https://jessops.com/apple-touch-icon.png",
+   "bytes": 1818
+  },
+  "smythstoys.com": {
+   "file": "smythstoys.com.png",
+   "from": "https://smythstoys.com/apple-touch-icon.png",
+   "bytes": 2704
+  },
+  "game.co.uk": {
+   "file": "game.co.uk.png",
+   "from": "https://www.game.co.uk/images/touchicons/apple-icon-144x144.png",
+   "bytes": 1274
+  },
+  "hmv.com": {
+   "file": "hmv.com.ico",
+   "from": "https://hmv.com/favicon.ico",
+   "bytes": 7406
+  },
+  "zooplus.co.uk": {
+   "file": "zooplus.co.uk.png",
+   "from": "https://zooplus.co.uk/apple-touch-icon.png",
+   "bytes": 10638
+  },
+  "petsathome.com": {
+   "file": "petsathome.com.ico",
+   "from": "https://www.petsathome.com/favicon.ico",
+   "bytes": 15406
+  },
+  "just-eat.co.uk": {
+   "file": "just-eat.co.uk.png",
+   "from": "https://www.just-eat.co.uk/apple-touch-icon.png",
+   "bytes": 2048
+  },
+  "deliveroo.co.uk": {
+   "file": "deliveroo.co.uk.png",
+   "from": "https://cwa.roocdn.com/_next/static/apple-touch-icon.870581c7.png",
+   "bytes": 2182
+  },
+  "greggs.co.uk": {
+   "file": "greggs.co.uk.png",
+   "from": "https://www.greggs.com/apple-touch-icon.png",
+   "bytes": 1362
+  },
+  "ebuyer.com": {
+   "file": "ebuyer.com.png",
+   "from": "https://www.ebuyer.com/images/touchicons/icon-hires.png",
+   "bytes": 1461
+  },
+  "ubereats.com": {
+   "file": "ubereats.com.png",
+   "from": "https://www.ubereats.com/_static/9d965730ecb40206.png",
+   "bytes": 51268
+  },
+  "pret.co.uk": {
+   "file": "pret.co.uk.svg",
+   "from": "https://www.pret.co.uk/favicon.svg",
+   "bytes": 253
+  },
+  "nandos.co.uk": {
+   "file": "nandos.co.uk.png",
+   "from": "https://www.nandos.co.uk/apple-touch-icon.png",
+   "bytes": 11112
+  },
+  "starbucks.co.uk": {
+   "file": "starbucks.co.uk.png",
+   "from": "https://www.starbucks.co.uk/assets/app/icons/apple-icon.png",
+   "bytes": 8613
+  },
+  "costa.co.uk": {
+   "file": "costa.co.uk.png",
+   "from": "https://www.costa.co.uk/favicon.png",
+   "bytes": 15530
+  },
+  "nationalrail.co.uk": {
+   "file": "nationalrail.co.uk.png",
+   "from": "https://www.nationalrail.co.uk/nrestatic/images/app/apple/apple-touch-icon.png",
+   "bytes": 1554
+  },
+  "trainline.com": {
+   "file": "trainline.com.png",
+   "from": "https://static.trainlinecontent.com/content/WEB/images/favicon.ico",
+   "bytes": 2318
+  },
+  "booking.com": {
+   "file": "booking.com.png",
+   "from": "https://booking.com/apple-touch-icon.png",
+   "bytes": 4824
+  },
+  "airbnb.co.uk": {
+   "file": "airbnb.co.uk.ico",
+   "from": "https://airbnb.co.uk/favicon.ico",
+   "bytes": 4286
+  },
+  "easyjet.com": {
+   "file": "easyjet.com.ico",
+   "from": "https://www.easyjet.com/favicon.ico",
+   "bytes": 3262
+  },
+  "ryanair.com": {
+   "file": "ryanair.com.png",
+   "from": "https://assets.ryanair.com/resources/ui/ryanair3.0/favicons/apple-touch-icon-152x152.png",
+   "bytes": 7003
+  },
+  "britishairways.com": {
+   "file": "britishairways.com.png",
+   "from": "https://www.britishairways.com/nx/b/homepage/homepage/favicon/apple-touch-icon.png",
+   "bytes": 2952
+  }
+ },
+ "misses": [
+  {
+   "domain": "asda.com",
+   "tried": [
+    "https://asda.com/apple-touch-icon.png http 403",
+    "https://asda.com/favicon.ico http 403",
+    "https://www.asda.com/apple-touch-icon.png http 403",
+    "https://www.asda.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "tesco.com",
+   "tried": [
+    "https://tesco.com/apple-touch-icon.png http 403",
+    "https://tesco.com/favicon.ico http 403",
+    "https://www.tesco.com/apple-touch-icon.png http 403",
+    "https://www.tesco.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "sainsburys.co.uk",
+   "tried": [
+    "https://sainsburys.co.uk/apple-touch-icon.png http 403",
+    "https://sainsburys.co.uk/favicon.ico http 403",
+    "https://www.sainsburys.co.uk/apple-touch-icon.png http 403",
+    "https://www.sainsburys.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "ocado.com",
+   "tried": [
+    "https://ocado.com/apple-touch-icon.png http 404",
+    "https://ocado.com/favicon.ico not an image",
+    "https://www.ocado.com/apple-touch-icon.png http 404",
+    "https://www.ocado.com/favicon.ico not an image"
+   ]
+  },
+  {
+   "domain": "superdrug.com",
+   "tried": [
+    "https://superdrug.com/apple-touch-icon.png http 403",
+    "https://superdrug.com/favicon.ico http 403",
+    "https://www.superdrug.com/apple-touch-icon.png http 403",
+    "https://www.superdrug.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "sephora.co.uk",
+   "tried": [
+    "https://sephora.co.uk/apple-touch-icon.png http 403",
+    "https://sephora.co.uk/favicon.ico http 403",
+    "https://www.sephora.co.uk/apple-touch-icon.png http 403",
+    "https://www.sephora.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "theperfumeshop.com",
+   "tried": [
+    "https://theperfumeshop.com/apple-touch-icon.png http 403",
+    "https://theperfumeshop.com/favicon.ico http 403",
+    "https://www.theperfumeshop.com/apple-touch-icon.png http 403",
+    "https://www.theperfumeshop.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "fragrancedirect.co.uk",
+   "tried": [
+    "https://www.fragrancedirect.co.uk/ssr-assets/fragrancedir/favicon.ico http 404",
+    "https://fragrancedirect.co.uk/apple-touch-icon.png http 404",
+    "https://fragrancedirect.co.uk/favicon.ico http 404",
+    "https://www.fragrancedirect.co.uk/apple-touch-icon.png http 404"
+   ]
+  },
+  {
+   "domain": "cultbeauty.com",
+   "tried": [
+    "https://cultbeauty.com/apple-touch-icon.png http 404",
+    "https://cultbeauty.com/favicon.ico http 404",
+    "https://www.cultbeauty.com/apple-touch-icon.png http 404",
+    "https://www.cultbeauty.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "lookfantastic.com",
+   "tried": [
+    "https://lookfantastic.com/apple-touch-icon.png http 404",
+    "https://lookfantastic.com/favicon.ico http 404",
+    "https://www.lookfantastic.com/apple-touch-icon.png http 404",
+    "https://www.lookfantastic.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "argos.co.uk",
+   "tried": [
+    "https://argos.co.uk/apple-touch-icon.png http 403",
+    "https://argos.co.uk/favicon.ico http 403",
+    "https://www.argos.co.uk/apple-touch-icon.png http 403",
+    "https://www.argos.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "holland-and-barrett.com",
+   "tried": [
+    "https://holland-and-barrett.com/apple-touch-icon.png too big",
+    "https://holland-and-barrett.com/favicon.ico too big",
+    "https://www.holland-and-barrett.com/apple-touch-icon.png too big",
+    "https://www.holland-and-barrett.com/favicon.ico too big"
+   ]
+  },
+  {
+   "domain": "currys.co.uk",
+   "tried": [
+    "https://currys.co.uk/apple-touch-icon.png http 403",
+    "https://currys.co.uk/favicon.ico http 403",
+    "https://www.currys.co.uk/apple-touch-icon.png http 403",
+    "https://www.currys.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "very.co.uk",
+   "tried": [
+    "https://very.co.uk/apple-touch-icon.png http 403",
+    "https://very.co.uk/favicon.ico http 403",
+    "https://www.very.co.uk/apple-touch-icon.png http 404",
+    "https://www.very.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "next.co.uk",
+   "tried": [
+    "https://next.co.uk/apple-touch-icon.png http 403",
+    "https://next.co.uk/favicon.ico http 403",
+    "https://www.next.co.uk/apple-touch-icon.png http 403",
+    "https://www.next.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "houseoffraser.co.uk",
+   "tried": [
+    "https://houseoffraser.co.uk/apple-touch-icon.png http 404",
+    "https://houseoffraser.co.uk/favicon.ico http 404",
+    "https://www.houseoffraser.co.uk/apple-touch-icon.png http 404",
+    "https://www.houseoffraser.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "hm.com",
+   "tried": [
+    "https://hm.com/apple-touch-icon.png http 403",
+    "https://hm.com/favicon.ico http 403",
+    "https://www.hm.com/apple-touch-icon.png http 403",
+    "https://www.hm.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "zara.com",
+   "tried": [
+    "https://zara.com/apple-touch-icon.png http 403",
+    "https://zara.com/favicon.ico http 403",
+    "https://www.zara.com/apple-touch-icon.png http 403",
+    "https://www.zara.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "tkmaxx.com",
+   "tried": [
+    "https://tkmaxx.com/apple-touch-icon.png http 403",
+    "https://tkmaxx.com/favicon.ico http 403",
+    "https://www.tkmaxx.com/apple-touch-icon.png http 403",
+    "https://www.tkmaxx.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "evans.co.uk",
+   "tried": [
+    "https://evans.co.uk/apple-touch-icon.png http 403",
+    "https://evans.co.uk/favicon.ico http 403",
+    "https://www.evans.co.uk/apple-touch-icon.png http 403",
+    "https://www.evans.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "millets.co.uk",
+   "tried": [
+    "https://millets.co.uk/apple-touch-icon.png http 404",
+    "https://millets.co.uk/favicon.ico http 404",
+    "https://www.millets.co.uk/apple-touch-icon.png http 404",
+    "https://www.millets.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "adidas.co.uk",
+   "tried": [
+    "https://adidas.co.uk/apple-touch-icon.png http 403",
+    "https://adidas.co.uk/favicon.ico http 403",
+    "https://www.adidas.co.uk/apple-touch-icon.png http 403",
+    "https://www.adidas.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "footlocker.co.uk",
+   "tried": [
+    "https://footlocker.co.uk/apple-touch-icon.png too big",
+    "https://footlocker.co.uk/favicon.ico http 404",
+    "https://www.footlocker.co.uk/apple-touch-icon.png too big",
+    "https://www.footlocker.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "clarks.co.uk",
+   "tried": [
+    "https://clarks.co.uk/apple-touch-icon.png TypeError",
+    "https://clarks.co.uk/favicon.ico TypeError",
+    "https://www.clarks.co.uk/apple-touch-icon.png http 404",
+    "https://www.clarks.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "sportsdirect.com",
+   "tried": [
+    "https://sportsdirect.com/apple-touch-icon.png http 404",
+    "https://sportsdirect.com/favicon.ico http 404",
+    "https://www.sportsdirect.com/apple-touch-icon.png http 404",
+    "https://www.sportsdirect.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "size.co.uk",
+   "tried": [
+    "https://size.co.uk/apple-touch-icon.png http 404",
+    "https://size.co.uk/favicon.ico http 404",
+    "https://www.size.co.uk/apple-touch-icon.png http 404",
+    "https://www.size.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "fabletics.co.uk",
+   "tried": [
+    "https://fabletics.co.uk/apple-touch-icon.png http 403",
+    "https://fabletics.co.uk/favicon.ico http 403",
+    "https://www.fabletics.co.uk/apple-touch-icon.png http 403",
+    "https://www.fabletics.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "sweaty-betty.com",
+   "tried": [
+    "https://sweaty-betty.com/apple-touch-icon.png TypeError",
+    "https://sweaty-betty.com/favicon.ico TypeError",
+    "https://www.sweaty-betty.com/apple-touch-icon.png TypeError",
+    "https://www.sweaty-betty.com/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "thenorthface.co.uk",
+   "tried": [
+    "https://thenorthface.co.uk/apple-touch-icon.png http 403",
+    "https://thenorthface.co.uk/favicon.ico http 403",
+    "https://www.thenorthface.co.uk/apple-touch-icon.png http 403",
+    "https://www.thenorthface.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "patagonia.com",
+   "tried": [
+    "https://patagonia.com/apple-touch-icon.png not an image",
+    "https://patagonia.com/favicon.ico not an image",
+    "https://www.patagonia.com/apple-touch-icon.png not an image",
+    "https://www.patagonia.com/favicon.ico not an image"
+   ]
+  },
+  {
+   "domain": "cotswoldoutdoor.com",
+   "tried": [
+    "https://cotswoldoutdoor.com/apple-touch-icon.png http 404",
+    "https://cotswoldoutdoor.com/favicon.ico http 404",
+    "https://www.cotswoldoutdoor.com/apple-touch-icon.png http 404",
+    "https://www.cotswoldoutdoor.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "go-outdoors.co.uk",
+   "tried": [
+    "https://go-outdoors.co.uk/apple-touch-icon.png TypeError",
+    "https://go-outdoors.co.uk/favicon.ico TypeError",
+    "https://www.go-outdoors.co.uk/apple-touch-icon.png TypeError",
+    "https://www.go-outdoors.co.uk/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "bandq.co.uk",
+   "tried": [
+    "https://bandq.co.uk/apple-touch-icon.png TypeError",
+    "https://bandq.co.uk/favicon.ico TypeError",
+    "https://www.bandq.co.uk/apple-touch-icon.png TypeError",
+    "https://www.bandq.co.uk/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "homebase.co.uk",
+   "tried": [
+    "https://homebase.co.uk/apple-touch-icon.png http 403",
+    "https://homebase.co.uk/favicon.ico http 403",
+    "https://www.homebase.co.uk/apple-touch-icon.png http 403",
+    "https://www.homebase.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "therange.co.uk",
+   "tried": [
+    "https://therange.co.uk/apple-touch-icon.png http 403",
+    "https://therange.co.uk/favicon.ico http 403",
+    "https://www.therange.co.uk/apple-touch-icon.png http 403",
+    "https://www.therange.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "waitrose.com",
+   "tried": [
+    "https://waitrose.com/apple-touch-icon.png AbortError",
+    "https://waitrose.com/favicon.ico AbortError",
+    "https://www.waitrose.com/apple-touch-icon.png AbortError",
+    "https://www.waitrose.com/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "homesense.com",
+   "tried": [
+    "https://homesense.com/apple-touch-icon.png http 404",
+    "https://homesense.com/favicon.ico http 404",
+    "https://www.homesense.com/apple-touch-icon.png http 404",
+    "https://www.homesense.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "johnlewis.com",
+   "tried": [
+    "https://johnlewis.com/apple-touch-icon.png AbortError",
+    "https://johnlewis.com/favicon.ico AbortError",
+    "https://www.johnlewis.com/apple-touch-icon.png AbortError",
+    "https://www.johnlewis.com/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "asos.com",
+   "tried": [
+    "https://asos.com/apple-touch-icon.png AbortError",
+    "https://asos.com/favicon.ico AbortError",
+    "https://www.asos.com/apple-touch-icon.png AbortError",
+    "https://www.asos.com/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "oak-furniture-land.co.uk",
+   "tried": [
+    "https://oak-furniture-land.co.uk/apple-touch-icon.png TypeError",
+    "https://oak-furniture-land.co.uk/favicon.ico TypeError",
+    "https://www.oak-furniture-land.co.uk/apple-touch-icon.png TypeError",
+    "https://www.oak-furniture-land.co.uk/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "dfs.co.uk",
+   "tried": [
+    "https://dfs.co.uk/apple-touch-icon.png http 403",
+    "https://dfs.co.uk/favicon.ico http 403",
+    "https://www.dfs.co.uk/apple-touch-icon.png http 403",
+    "https://www.dfs.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "habitat.co.uk",
+   "tried": [
+    "https://habitat.co.uk/apple-touch-icon.png http 403",
+    "https://habitat.co.uk/favicon.ico http 403",
+    "https://www.habitat.co.uk/apple-touch-icon.png http 403",
+    "https://www.habitat.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "robertdyas.co.uk",
+   "tried": [
+    "https://robertdyas.co.uk/apple-touch-icon.png http 403",
+    "https://robertdyas.co.uk/favicon.ico http 403",
+    "https://www.robertdyas.co.uk/apple-touch-icon.png http 403",
+    "https://www.robertdyas.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "lakeland.co.uk",
+   "tried": [
+    "https://lakeland.co.uk/apple-touch-icon.png http 404",
+    "https://lakeland.co.uk/favicon.ico http 404",
+    "https://www.lakeland.co.uk/apple-touch-icon.png http 404",
+    "https://www.lakeland.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "bensons-for-beds.co.uk",
+   "tried": [
+    "https://bensons-for-beds.co.uk/apple-touch-icon.png TypeError",
+    "https://bensons-for-beds.co.uk/favicon.ico TypeError",
+    "https://www.bensons-for-beds.co.uk/apple-touch-icon.png TypeError",
+    "https://www.bensons-for-beds.co.uk/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "ao.com",
+   "tried": [
+    "https://ao.com/apple-touch-icon.png http 404",
+    "https://ao.com/favicon.ico http 404",
+    "https://www.ao.com/apple-touch-icon.png http 404",
+    "https://www.ao.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "scan.co.uk",
+   "tried": [
+    "https://scan.co.uk/apple-touch-icon.png http 403",
+    "https://scan.co.uk/favicon.ico http 403",
+    "https://www.scan.co.uk/apple-touch-icon.png http 403",
+    "https://www.scan.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "uniqlo.com",
+   "tried": [
+    "https://uniqlo.com/apple-touch-icon.png AbortError",
+    "https://uniqlo.com/favicon.ico AbortError",
+    "https://www.uniqlo.com/apple-touch-icon.png AbortError",
+    "https://www.uniqlo.com/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "waterstones.com",
+   "tried": [
+    "https://waterstones.com/apple-touch-icon.png http 403",
+    "https://waterstones.com/favicon.ico http 403",
+    "https://www.waterstones.com/apple-touch-icon.png http 403",
+    "https://www.waterstones.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "pets-corner.co.uk",
+   "tried": [
+    "https://pets-corner.co.uk/apple-touch-icon.png not an image",
+    "https://pets-corner.co.uk/favicon.ico http 404",
+    "https://www.pets-corner.co.uk/apple-touch-icon.png not an image",
+    "https://www.pets-corner.co.uk/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "mcdonalds.com",
+   "tried": [
+    "https://mcdonalds.com/apple-touch-icon.png http 403",
+    "https://mcdonalds.com/favicon.ico http 403",
+    "https://www.mcdonalds.com/apple-touch-icon.png http 403",
+    "https://www.mcdonalds.com/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "dominos.co.uk",
+   "tried": [
+    "https://dominos.co.uk/apple-touch-icon.png http 403",
+    "https://dominos.co.uk/favicon.ico http 403",
+    "https://www.dominos.co.uk/apple-touch-icon.png http 403",
+    "https://www.dominos.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "tui.co.uk",
+   "tried": [
+    "https://tui.co.uk/apple-touch-icon.png http 403",
+    "https://tui.co.uk/favicon.ico http 403",
+    "https://www.tui.co.uk/apple-touch-icon.png http 403",
+    "https://www.tui.co.uk/favicon.ico http 403"
+   ]
+  },
+  {
+   "domain": "klarna.com",
+   "tried": [
+    "https://klarna.com/apple-touch-icon.png not an image",
+    "https://klarna.com/favicon.ico not an image",
+    "https://www.klarna.com/apple-touch-icon.png not an image",
+    "https://www.klarna.com/favicon.ico not an image"
+   ]
+  },
+  {
+   "domain": "lululemon.com",
+   "tried": [
+    "https://lululemon.com/apple-touch-icon.png AbortError",
+    "https://lululemon.com/favicon.ico AbortError",
+    "https://www.lululemon.com/apple-touch-icon.png AbortError",
+    "https://www.lululemon.com/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "jet2.com",
+   "tried": [
+    "https://jet2.com/apple-touch-icon.png http 404",
+    "https://jet2.com/favicon.ico http 404",
+    "https://www.jet2.com/apple-touch-icon.png http 404",
+    "https://www.jet2.com/favicon.ico http 404"
+   ]
+  },
+  {
+   "domain": "whsmith.co.uk",
+   "tried": [
+    "https://whsmith.co.uk/apple-touch-icon.png TypeError",
+    "https://whsmith.co.uk/favicon.ico TypeError",
+    "https://www.whsmith.co.uk/apple-touch-icon.png TypeError",
+    "https://www.whsmith.co.uk/favicon.ico TypeError"
+   ]
+  },
+  {
+   "domain": "kfc.co.uk",
+   "tried": [
+    "https://kfc.co.uk/apple-touch-icon.png AbortError",
+    "https://kfc.co.uk/favicon.ico AbortError",
+    "https://www.kfc.co.uk/apple-touch-icon.png AbortError",
+    "https://www.kfc.co.uk/favicon.ico AbortError"
+   ]
+  },
+  {
+   "domain": "pizzahut.co.uk",
+   "tried": [
+    "https://pizzahut.co.uk/apple-touch-icon.png AbortError",
+    "https://pizzahut.co.uk/favicon.ico AbortError",
+    "https://www.pizzahut.co.uk/apple-touch-icon.png AbortError",
+    "https://www.pizzahut.co.uk/favicon.ico AbortError"
+   ]
+  }
+ ],
+ "total": 130,
+ "found": 71
+}
