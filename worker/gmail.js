@@ -12,6 +12,7 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
+import { ensureOnce } from "./once.js";
 import { buildOriginal } from "./original.js";
 import { categorise, storeKey, CATEGORIES } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
@@ -83,7 +84,8 @@ function json(body, status = 200, cors = {}) {
   return Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 }
 
-export async function ensureGmailTables(db) {
+export function ensureGmailTables(db) { return ensureOnce(db, "gmail", () => ensureGmailTablesRun(db)); }
+async function ensureGmailTablesRun(db) {
   const statements = [
     `CREATE TABLE IF NOT EXISTS shopper_consents (
        shopper_id TEXT NOT NULL, version TEXT NOT NULL, text_hash TEXT NOT NULL,
@@ -492,8 +494,19 @@ async function listReceipts(env, shopperId) {
   const orders = all.filter(x => x.kind !== "return_instructions");
   const plans = all.filter(x => x.kind === "return_instructions");
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
-  const gone = await env.RELAY_DB.prepare(
-    "SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all();
+  // The remaining lookups do not depend on each other, so they run together instead of one after another.
+  const keys = [...new Set(orders.map(storeKey).filter(Boolean))];
+  const lookups = [];
+  for (let i = 0; i < keys.length; i += 40) {
+    const chunk = keys.slice(i, i + 40), qs = chunk.map(() => "?").join(",");
+    lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
+    lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
+  }
+  const [gone, rem, ...learned] = await Promise.all([
+    env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
+    env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
+    ...lookups
+  ]);
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   for (const p of plans) {
     if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
@@ -501,21 +514,15 @@ async function listReceipts(env, shopperId) {
     // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
     if (o) o.returnPlan = p;
   }
-  const rem = await env.RELAY_DB.prepare(
-    "SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all();
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
   const cards = [...orders];
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
   // What the app has been taught. A shopper's own choice always wins. Otherwise a category is used only when at least two
   // different shoppers chose it for the same store and it clearly leads, so one person's mistake never changes anyone else's list.
   const mine = new Map(), crowd = new Map();
-  const keys = [...new Set(cards.map(storeKey).filter(Boolean))];
-  for (let i = 0; i < keys.length; i += 40) {
-    const chunk = keys.slice(i, i + 40), qs = chunk.map(() => "?").join(",");
-    const own = await env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all();
-    for (const r of own.results || []) mine.set(r.k, r);
-    const all2 = await env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all();
-    for (const r of all2.results || []) { const a = crowd.get(r.k) || []; a.push(r); crowd.set(r.k, a); }
+  for (let i = 0; i < learned.length; i += 2) {
+    for (const r of learned[i].results || []) mine.set(r.k, r);
+    for (const r of learned[i + 1].results || []) { const a = crowd.get(r.k) || []; a.push(r); crowd.set(r.k, a); }
   }
   const crowdPick = (k) => {
     const a = (crowd.get(k) || []).slice().sort((x, y) => y.n - x.n);

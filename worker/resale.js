@@ -11,10 +11,12 @@
 
 const DAY = 24 * 60 * 60 * 1000;
 import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
+import { ensureOnce } from "./once.js";
 export const CONDITIONS = ["new_with_tags", "like_new", "good", "fair"];
 const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000;
 
-export async function ensureResaleTables(db) {
+export function ensureResaleTables(db) { return ensureOnce(db, "resale", () => ensureResaleTablesRun(db)); }
+async function ensureResaleTablesRun(db) {
   const statements = [
     `CREATE TABLE IF NOT EXISTS resale_listings (
        id TEXT PRIMARY KEY, seller_id TEXT NOT NULL, receipt_id TEXT NOT NULL, item_index INTEGER NOT NULL,
