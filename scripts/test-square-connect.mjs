@@ -61,7 +61,17 @@ assert.equal(late.status, 400);
 // 3. A good approval stores the shop, with the token encrypted.
 const ok = await go("/relay/square/oauth/callback?code=good&state=" + state);
 assert.equal(ok.status, 200);
-assert.match(await ok.text(), /North &amp; Co\./);
+const okPage = await ok.text();
+assert.match(okPage, /North &amp; Co\./);
+// The shop also gets a private link to its Relay dashboard; only a hash of the key is kept.
+const dashKey = /retailer\.html#key=(rk_[A-Za-z0-9_-]{43})/.exec(okPage)[1];
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_keys WHERE shop_ref = 'MNORTH123'").get().n, 1);
+assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM retailer_keys").all()).includes(dashKey));
+// Starting from "Sign in to your shop dashboard" goes straight to the dashboard.
+const dState = new URL((await go("/relay/square/connect?for=dashboard")).headers.get("location")).searchParams.get("state");
+const toDash = await go("/relay/square/oauth/callback?code=good&state=" + dState);
+assert.equal(toDash.status, 302);
+assert.match(toDash.headers.get("location"), /^https:\/\/zzmm92nr59-cloud\.github\.io\/instant-refund-prototype\/retailer\.html#key=rk_/);
 const row = sqlite.prepare("SELECT * FROM square_merchants").get();
 assert.equal(row.label, "North & Co.");
 assert.ok(!JSON.stringify(row).includes("northco-token") && !JSON.stringify(row).includes("r1\""));
@@ -84,6 +94,9 @@ const defaultShopKey = Object.keys(shops).find(k => k !== "northco-token" && sho
 shops[defaultShopKey].items[0].img = "http://insecure.example/tee.png";
 const res = await syncSquareCatalogue(env);
 assert.equal(res.shops, 2); assert.equal(res.products, 2);
+// Straight after a shop connects, only that shop is read.
+const one = await syncSquareCatalogue(env, { only: "MNORTH123" });
+assert.equal(one.shops, 1); assert.equal(one.products, 1);
 const rows = sqlite.prepare("SELECT i.title, i.store_label, v.sku, v.price_minor FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id=i.id WHERE i.provider='square_sandbox' ORDER BY i.title").all();
 assert.deepEqual(rows.map(r => [r.title, r.store_label, r.sku, r.price_minor]), [["Demo Tee", "Relay Demo Store", "DEMO-TEE", 2500], ["Oversized Shirt", "North & Co.", "OVER-NAV-M", 12999]]);
 
