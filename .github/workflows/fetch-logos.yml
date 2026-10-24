@@ -1,0 +1,20 @@
+name: Fetch store logos
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  logos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node scripts/fetch-logos.mjs | tee logos-summary.txt
+      - name: Save logos to a branch
+        run: |
+          git config user.name "relay-logo-bot"
+          git config user.email "relay-logo-bot@users.noreply.github.com"
+          git checkout -b store-logos
+          git add logos
+          git commit -m "Add UK store logos"
+          git push --force origin store-logos
