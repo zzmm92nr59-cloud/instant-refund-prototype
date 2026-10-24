@@ -17,6 +17,7 @@ export function ensureSquareMerchantSchema(db) {
       refresh_iv TEXT, refresh_data TEXT, expires_at INTEGER, created_at INTEGER NOT NULL)`).run();
     const cols = ((await db.prepare("PRAGMA table_info(retailer_catalog_items)").all()).results || []).map(c => c.name);
     if (!cols.includes("store_label")) await db.prepare("ALTER TABLE retailer_catalog_items ADD COLUMN store_label TEXT").run();
+    if (!cols.includes("image_url")) await db.prepare("ALTER TABLE retailer_catalog_items ADD COLUMN image_url TEXT").run();
   });
 }
 

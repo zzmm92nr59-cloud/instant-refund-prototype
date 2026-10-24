@@ -147,11 +147,11 @@ assert.equal((await post("/relay/my/alerts/store", bob, { store: "Test Shop", on
 assert.equal((await (await get("/relay/my/alerts/status", bob)).json()).stores.length, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM price_watches WHERE shopper_id = ?").get(idOf("bob@example.com")).n, 0);
 
-// 8. Several drops become one message. A phone that has gone away is forgotten.
+// 8. Each drop gets its own alert. A phone that has gone away is forgotten.
 await post("/relay/my/alerts/watch", alice, { sku: "DEMO-BOOT", product: "Boot", priceMinor: 6000 }); await post("/relay/my/alerts/watch", alice, { sku: "DEMO-HAT", product: "Hat", priceMinor: 1500 });
 setPrice("DEMO-BOOT", 5000); setPrice("DEMO-HAT", 1000); pushes = []; pushStatus = 410; clock += 60000;
 await runPriceAlerts(env, { now: clock, fetchImpl });
-assert.equal(pushes.length, 1, "one message for two drops");
+assert.equal(pushes.length, 2, "two drops at the same time give two separate alerts, one per product");
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?").get(idOf("alice@example.com")).n, 0, "a device the push service says is gone is removed");
 
 // 9. Deleting the account removes everything.

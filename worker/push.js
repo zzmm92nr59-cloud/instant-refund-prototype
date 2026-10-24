@@ -133,12 +133,19 @@ export async function runPriceAlerts(env, o = {}) {
       await db.prepare("UPDATE price_watches SET last_seen_minor = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, w.shopper_id, w.sku).run();
     }
   }
+  // One alert per product, so each shows its own shop, product and prices.
+  // A very large catalogue update is capped at 10 alerts plus one summary so a phone is never flooded.
   for (const [shopperId, list] of byShopper) {
-    const one = list.length === 1 ? list[0] : null;
-    const message = one
-      ? { title: "Price drop" + (one.w.store ? " at " + one.w.store : ""), body: one.w.product + (one.w.variant ? " · " + one.w.variant : "") + " is now " + pounds(one.now) + " (was " + pounds(one.was) + ")", url: "./" }
-      : { title: list.length + " price drops on things you watch", body: list.slice(0, 2).map(x => x.w.product + " " + pounds(x.now)).join(", ") + (list.length > 2 ? " and more" : ""), url: "./" };
-    for (const s of await subsOf(db, shopperId)) { try { const r = await sendPush(env, s, message, o); if (r.ok) sent++; } catch {} }
+    const subs = await subsOf(db, shopperId);
+    const messages = list.slice(0, 10).map(x => ({
+      title: "Price drop" + (x.w.store ? " at " + x.w.store : ""),
+      body: x.w.product + (x.w.variant ? " · " + x.w.variant : "") + " is now " + pounds(x.now) + " (was " + pounds(x.was) + ")",
+      url: "./"
+    }));
+    if (list.length > 10) messages.push({ title: (list.length - 10) + " more price drops", body: "Open Relay to see everything you watch.", url: "./" });
+    for (const message of messages) {
+      for (const s of subs) { try { const r = await sendPush(env, s, message, o); if (r.ok) sent++; } catch {} }
+    }
   }
   return { checked, drops, sent };
 }

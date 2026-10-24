@@ -79,7 +79,7 @@ export default {
     if (url.pathname === "/relay/live-test/products" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({products:[]},{headers:corsHeaders});
       try { await ensureSquareMerchantSchema(env.RELAY_DB); } catch {}
-      const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,i.store_label AS storeName,
+      const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,i.store_label AS storeName,i.image_url AS imageUrl,
         v.sku,v.price_minor AS priceMinor,v.currency,i.provider AS provider,
         i.external_item_id AS externalItemId,
         MAX(s.quantity) AS quantity, MAX(s.observed_at) AS observedAt
