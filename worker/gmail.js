@@ -13,6 +13,7 @@
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
 import { ensureOnce } from "./once.js";
+import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
 import { categorise, storeKey, CATEGORIES } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
@@ -486,10 +487,11 @@ async function saveImage(env, shopperId, img, now) {
     .bind(img.receiptId, shopperId, img.type, img.data, now).run();
 }
 
-async function listReceipts(env, shopperId, timing) {
+async function listReceipts(env, shopperId, timing, opts = {}) {
+  const maxRows = opts.rows || 300, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
   const rows = await env.RELAY_DB.prepare(
-    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT 300")
+    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT " + maxRows)
     .bind(shopperId).all();
   lap("rowsMs"); if (timing) timing.rowCount = (rows.results || []).length;
   const all = (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
@@ -537,7 +539,7 @@ async function listReceipts(env, shopperId, timing) {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
     const l = mine.get(storeKey(c));
     return !(l && l.promo && !c.orderRef && c.kind !== "return_instructions");
-  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, 100).map(c => {
+  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
     const k = storeKey(c), l = mine.get(k);
     const learned = (l && l.category) || crowdPick(k) || null;
     return { ...c, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
@@ -644,6 +646,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/gmail/disconnect" && m === "POST") {
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: false })) }, 200, cors);
+  }
+  if (path === "/relay/my/wrapped" && m === "GET") {
+    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    return json(buildWrapped(cards, url.searchParams.get("year"), opts.now), 200, cors);
   }
   if (path === "/relay/my/receipts" && m === "GET") {
     const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing);

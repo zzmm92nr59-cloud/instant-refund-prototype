@@ -1,4 +1,5 @@
 import { syncSquareCatalogue } from "./square-catalogue.js";
+import { runPriceAlerts } from "./push.js";
 
 const ENDPOINT = "https://relay-square-api2.9pts72cy5j.workers.dev/relay/webhooks/square";
 const TYPES = new Set(["inventory.count.updated", "catalog.version.updated"]);
@@ -27,6 +28,8 @@ export async function receiveSquareWebhook(request, env, ctx) {
   ctx.waitUntil((async()=>{
     try {
       const result=await syncSquareCatalogue(env);
+      // A shop changed something: tell anyone watching a product whose price just dropped.
+      await runPriceAlerts(env).catch(()=>{});
       await env.RELAY_DB.prepare(`INSERT INTO audit_events
         (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
         VALUES (?,?,?,?,?,?,?)`)
