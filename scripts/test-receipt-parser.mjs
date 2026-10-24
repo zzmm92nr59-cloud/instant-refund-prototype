@@ -391,3 +391,19 @@ t("return id is never a link scheme or plain word", () => {
   assert.equal(parseReturnEmail(mk("Return ID: https://shop.test/r/abc")).returnId, null);
   assert.equal(parseReturnEmail(mk("RETURN ID: nuk0400251601")).returnId, "nuk0400251601");
 });
+
+// Real-world lesson (lululemon QR email): empty text/plain part, quoted-printable HTML, ID inside a link.
+t("return email with an empty text part falls back to the HTML", () => {
+  const html = `<html><head><style>.x{color:red}</style></head><body><div>RETURN ID: <a href=3D"https://returns.shop.test/t"> nuk0400251601</a></div>=
+<div>Order Date: Nov. 19, 2025</div><div>Thanks for your return request.</div>=
+<div>Please send it back no later than Wednesday, December 24.<br/></div>=
+<img alt=3D"QR Code" src=3D"https://returns.shop.test/viewPrinterlessLabel?return_id=3Dabc">=
+<ol><li>Pack your items securely and take them to an Evri ParcelShop.</li></ol></body></html>`;
+  const raw = `From: Shop <noreply@shop.test>\nSubject: Your Evri QR code for your order UK04002516\nDate: Thu, 20 Nov 2025 10:00:00 +0000\nContent-Type: multipart/alternative; boundary="b"\n\n--b\nContent-Type: text/plain; charset=utf-8\n\n \n\n--b\nContent-Type: text/html; charset=utf-8\nContent-Transfer-Encoding: quoted-printable\n\n${html}\n--b--\n`;
+  const r = parseReturnEmail(raw);
+  assert.equal(r.ok, true);
+  assert.equal(r.returnId, "nuk0400251601");
+  assert.equal(r.orderRef, "UK04002516");
+  assert.equal(r.deadline, "2025-12-24");
+  assert.equal(r.carrier, "Evri");
+});
