@@ -244,22 +244,33 @@ function loadReceiptPurchases(){
   const mk=(t,props,kids)=>{const n=document.createElement(t);Object.assign(n,props||{});(kids||[]).forEach(k=>n.appendChild(k));return n};
   host.appendChild(mk("div",{className:"sectionhead"},[mk("h2",{textContent:"From your receipts"}),mk("span",{className:"pill",textContent:rows.length+" found"})]));
   host.appendChild(mk("p",{className:"small muted",textContent:"Found in your email receipts. Relay can't confirm these with the store, so refunds happen through the store's own returns process."}));
-  const grid=mk("div",{className:"purchase-grid"});
-  rows.forEach(x=>{
+  const tile=x=>{
    const who=(x.retailer&&(x.retailer.name||x.retailer.domain))||"Unknown store";
    const names=(x.items||[]).map(i=>i.name).filter(Boolean).join(", ")||"Order"+(x.orderRef?" "+x.orderRef:"");
    const dl=(x.returnPlan&&x.returnPlan.deadline)||(x.returns&&x.returns.deadline)||"";
    const note=x.returnable===false?"Usually can't be returned":x.status==="confirmed"?"Checked by you":"Please check details";
-   const card=mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>RelayAccount.open()},[mk("div",{className:"details"},[
-    mk("div",{className:"eyebrow",textContent:(who+" · "+(x.categoryLabel||"Receipt")).toUpperCase()}),
+   return mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>RelayAccount.open()},[mk("div",{className:"details"},[
+    mk("div",{className:"eyebrow",textContent:who.toUpperCase()}),
     mk("h3",{textContent:names}),
     mk("div",{className:"small muted",textContent:(x.orderDate||"Date not found")+(dl?" · return by "+dl:"")}),
     mk("div",{className:"price",textContent:"£"+(x.totalPence/100).toFixed(2)}),
     mk("span",{className:"relay-status ordered",textContent:note}),
     mk("div",{className:"tile-arrow",textContent:"Open receipt →"})])]);
-   grid.appendChild(card);
-  });
-  host.appendChild(grid);
+  };
+  // Groups by shopping category (biggest first). Things that usually can't be returned sit in a folded section at the end.
+  const section=(parent,list)=>{
+   const by={};list.forEach(x=>{const g=x.categoryLabel||"Other";(by[g]=by[g]||[]).push(x)});
+   Object.keys(by).sort((a,b)=>by[b].length-by[a].length).forEach(g=>{
+    parent.appendChild(mk("h3",{textContent:g+" ("+by[g].length+")",style:"margin:18px 0 8px;font-size:17px"}));
+    const grid=mk("div",{className:"purchase-grid"});by[g].forEach(x=>grid.appendChild(tile(x)));parent.appendChild(grid);
+   });
+  };
+  const back=rows.filter(x=>x.returnable!==false),nope=rows.filter(x=>x.returnable===false);
+  section(host,back);
+  if(nope.length){
+   const d=mk("details",{style:"margin-top:20px"},[mk("summary",{textContent:nope.length+" that usually can't be returned (digital, subscriptions, food, travel)",style:"cursor:pointer;font-weight:700"})]);
+   section(d,nope);host.appendChild(d);
+  }
  }).catch(()=>{});
 }
 function bindPurchaseCards(){
