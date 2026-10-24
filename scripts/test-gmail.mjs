@@ -217,6 +217,14 @@ const big = await scanAll(alice, 60, true);
 assert.ok(big.calls >= 4, "a busy window takes several calls, then the older windows follow");
 const merged = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(merged.length, 2, "return email is not a separate card when its order exists");
+{
+  const wr = await call("/relay/my/wrapped?year=2026", { token: alice });
+  assert.equal(wr.status, 200);
+  const w = await wr.json();
+  assert.ok(w.receipts >= 0 && w.year === 2026 && Array.isArray(w.byMonth) && w.byMonth.length === 12 && w.coverage && /in-store/i.test(w.note), JSON.stringify(w).slice(0, 300));
+  assert.equal((await call("/relay/my/wrapped")).status, 401, "Wrapped needs sign-in");
+  assert.equal(JSON.stringify(await (await call("/relay/my/wrapped?year=2026", { token: bob })).json()).includes("EO-1"), false, "another shopper's receipts never appear");
+}
 const eo1 = merged.find(x => x.orderRef === "EO-1");
 assert.ok(eo1 && eo1.returnPlan && eo1.returnPlan.returnId === "RT-778812" && eo1.returnPlan.deadline === "2026-11-27" && eo1.returnPlan.carrier === "Evri", JSON.stringify(eo1 && eo1.returnPlan));
 assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
