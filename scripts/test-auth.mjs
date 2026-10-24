@@ -84,9 +84,10 @@ assert.equal((await call("/relay/auth/verify", { method: "POST", body: { token: 
 assert.equal((await call("/relay/auth/verify", { method: "POST", body: { token: "x".repeat(43) } })).status, 400);
 
 // 3b. Six-digit code sign-in: same email, single use, expires, limited guesses, never stored in clear.
-const codeOf = e => /code into the Relay app: (\d{6})/.exec(e.body.text)[1];
+const codeOf = e => /Your Relay code is (\d{6})/.exec(e.body.text)[1];
 emails = [];
 await call("/relay/auth/request", { method: "POST", body: { email: "dana@example.com" }, ip: "7.7.7.7" });
+assert.match(emails[0].body.subject, /^\d{6} is your Relay sign-in code$/, "the code leads the subject so phones can offer it to type in");
 const dcode = codeOf(emails[0]);
 assert.match(emails[0].body.html, new RegExp(dcode));
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE token_hash = ?").get(dcode).n, 0, "raw code never stored");
