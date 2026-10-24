@@ -122,7 +122,7 @@ export async function runPriceAlerts(env, o = {}) {
   const byShopper = new Map();
   let checked = 0, drops = 0, sent = 0;
   for (const w of rows) {
-    const cur = await db.prepare("SELECT price_minor AS p FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL LIMIT 1").bind(w.sku, w.sku).first();
+    const cur = await db.prepare("SELECT price_minor AS p FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
     if (!cur || !Number.isFinite(cur.p)) continue;
     checked++;
     if (w.last_seen_minor != null && cur.p < w.last_seen_minor) {
