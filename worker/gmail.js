@@ -486,11 +486,14 @@ async function saveImage(env, shopperId, img, now) {
     .bind(img.receiptId, shopperId, img.type, img.data, now).run();
 }
 
-async function listReceipts(env, shopperId) {
+async function listReceipts(env, shopperId, timing) {
+  const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
   const rows = await env.RELAY_DB.prepare(
     "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT 300")
     .bind(shopperId).all();
+  lap("rowsMs"); if (timing) timing.rowCount = (rows.results || []).length;
   const all = (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
+  lap("parseMs");
   const orders = all.filter(x => x.kind !== "return_instructions");
   const plans = all.filter(x => x.kind === "return_instructions");
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
@@ -507,6 +510,7 @@ async function listReceipts(env, shopperId) {
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     ...lookups
   ]);
+  lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   for (const p of plans) {
     if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
@@ -528,6 +532,7 @@ async function listReceipts(env, shopperId) {
     const a = (crowd.get(k) || []).slice().sort((x, y) => y.n - x.n);
     return a.length && a[0].n >= 2 && (a.length === 1 || a[0].n > a[1].n) ? a[0].category : null;
   };
+  lap("prepMs");
   return cards.filter(c => {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
     const l = mine.get(storeKey(c));
@@ -641,7 +646,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: false })) }, 200, cors);
   }
   if (path === "/relay/my/receipts" && m === "GET") {
-    return json({ receipts: await listReceipts(env, shopper.id) }, 200, cors);
+    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing);
+    timing.totalMs = Date.now() - t0;
+    return json({ receipts: list, timing }, 200, cors);
   }
   const orig = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/original$/.exec(path);
   if (orig && m === "GET") {
