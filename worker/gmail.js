@@ -13,6 +13,7 @@
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
 import { buildOriginal } from "./original.js";
+import { categorise } from "./receipt-category.js";
 import { ensureResaleTables } from "./resale.js";
 
 export const CONSENT_VERSION = "2026-10-v4";
@@ -232,16 +233,19 @@ function classify(rawText, id, lenient = false) {
   return { details, status };
 }
 
-async function scan(env, shopperId, fetchImpl, now, cursorIn) {
+async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, last_scan_at FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
   const refresh = await decrypt(env, row.token_iv, row.token_data);
   const token = await accessToken(env, refresh, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
   const auth = { Authorization: "Bearer " + token };
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
-  const limitDay = ymd(now - LOOKBACK_DAYS * DAY_MS);
+  // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
+  const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
+  const sinceLast = !full && row.last_scan_at ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
+  const limitDay = ymd(sinceLast);
   let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= ymd(now + DAY_MS) ? cursorIn : ymd(now + DAY_MS);
   let incomplete = false, windows = 0;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
@@ -454,7 +458,7 @@ async function listReceipts(env, shopperId) {
   // A return whose original order email was not found still gets its own card.
   const cards = [...orders, ...loose];
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
-  return cards.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+  return cards.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100).map(c => ({ ...c, ...categorise(c) }));
 }
 
 // Google redirects the browser here. No bearer token is available, so the single-use
@@ -540,7 +544,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/gmail/scan" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const sb = await request.json().catch(() => ({}));
-    const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "");
+    const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true));
     return json(r.body, r.status, cors);
   }
   if (path === "/relay/my/gmail/find" && m === "POST") {
