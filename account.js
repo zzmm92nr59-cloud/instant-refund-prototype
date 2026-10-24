@@ -6,7 +6,17 @@
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
   // Ask the browser not to clear Relay's saved sign-in when it tidies up storage.
   function keepStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
-  function save(v) { try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
+  // Keeps what the app has already loaded so moving between tabs is instant. It lives in memory only and is wiped on sign-out.
+  var memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} };
+  var MEMO_MS = 5 * 60 * 1000;
+  function memoFresh(e) { return e && Date.now() - e.at < MEMO_MS; }
+  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; }
+  // Asks the server only when the answer isn't already remembered (and recent enough).
+  function cachedGet(kind, path) {
+    if (memoFresh(memo[kind])) return Promise.resolve(memo[kind].r);
+    return api(path).then(function (r) { if (r.ok) memo[kind] = { at: Date.now(), r: r }; return r; });
+  }
+  function save(v) { if (!v) memoReset(); try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
   function api(path, opts) {
     opts = opts || {};
     var s = load(), headers = { "Content-Type": "application/json" };
@@ -16,6 +26,11 @@
   }
   // Fetches a signed-in image and returns a local address for it (or null).
   function apiBlob(path) {
+    // Pictures and logos are fetched once per visit, not every time a list is redrawn.
+    if (!memo.blobs[path]) memo.blobs[path] = apiBlobFetch(path).then(function (u) { if (!u) delete memo.blobs[path]; return u; });
+    return memo.blobs[path];
+  }
+  function apiBlobFetch(path) {
     var s = load(), headers = {};
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     return fetch(API + path, { headers: headers }).then(function (r) { return r.ok ? r.blob() : null; })
@@ -303,7 +318,7 @@
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
     agree.onclick = function () {
       agree.disabled = true; say(msg, "Saving…");
-      api("/relay/my/consent", { method: "POST", body: { version: c.version } }).then(function (r) {
+      api("/relay/my/consent", { method: "POST", body: { version: c.version } }).then(function (r) { memo.consent = null; memo.gmail = null;
         if (r.status === 401) { save(null); close(); return; }
         if (!r.ok) { agree.disabled = false; return say(msg, "Couldn't save your choice. Please try again.", true); }
         open(function (s) { gate(s, email); });
@@ -412,13 +427,13 @@
   }
   function disconnectGmail(done, msg) {
     if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
-    api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) done(); else say(msg, "Couldn't disconnect. Try again.", true); });
+    api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
   }
   function gmailSection(box, c, msg, onPage) {
     box.textContent = "";
     box.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
     var list = el("div");
-    api("/relay/my/gmail").then(function (r) {
+    cachedGet("gmail", "/relay/my/gmail").then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your Gmail status." })); return; }
       if (!r.body.connected) {
@@ -449,7 +464,7 @@
         if (none) none.style.display = query && !shown ? "" : "none";
       }
       var glyphs = { fashion: "👕", electronics: "🔌", food: "🍽️", home: "🏠", beauty: "💄", travel: "🧳", digital: "☁️", other: "🧾" };
-      var openCat = null, allRows = [], openIds = {};
+      var allRows = memo.receipts ? memo.receipts.rows : [];
       function pill(text, bg, fg) { return el("span", { text: text, style: "display:inline-block;margin-top:4px;padding:3px 9px;border-radius:999px;font-weight:700;font-size:12px;background:" + bg + ";color:" + fg }); }
       // One tidy line per receipt: picture, shop name (opens the original email), what was bought, price and date.
       function receiptRow(row) {
@@ -485,7 +500,7 @@
         top.appendChild(thumb); top.appendChild(mid); top.appendChild(more); wrap.appendChild(top);
         var detail = null;
         more.onclick = function () {
-          if (detail) { delete openIds[row.id]; detail.remove(); detail = null; more.textContent = "Details"; more.setAttribute("aria-expanded", "false"); return; }
+          if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; more.textContent = "Details"; more.setAttribute("aria-expanded", "false"); return; }
           detail = el("div", { style: "margin-top:10px" });
           detail.appendChild(receiptCard(row, loadList, true));
           var pick = el("select", { ariaLabel: "Move to another group", style: "margin-top:10px;width:100%" }, [el("option", { value: "", text: "Wrong group? Move it to…" })]);
@@ -494,11 +509,11 @@
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
           detail.appendChild(pick);
           if (row.categoryLearned) detail.appendChild(el("span", { text: "Grouped the way you taught Relay.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
-          wrap.appendChild(detail); openIds[row.id] = true; more.textContent = "Hide"; more.setAttribute("aria-expanded", "true");
+          wrap.appendChild(detail); memo.openIds[row.id] = true; more.textContent = "Hide"; more.setAttribute("aria-expanded", "true");
         };
         var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names].filter(Boolean).join(" ").toLowerCase();
         wrap.setAttribute("data-find", find);
-        if (openIds[row.id]) more.onclick();
+        if (memo.openIds[row.id]) more.onclick();
         return wrap;
       }
       var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other" };
@@ -512,28 +527,37 @@
         if (query) { sorted.forEach(function (r) { list.appendChild(receiptRow(r)); }); list.appendChild(el("p", { className: "rl-none", text: "No receipts match that search.", style: "display:none" })); applyFilter(); return; }
         var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return na - nb || by[b].length - by[a].length; });
-        if (openCat && by[openCat]) {
-          list.appendChild(el("button", { className: "rl-btn ghost", text: "‹ All groups", style: "width:auto;padding:8px 14px;font-size:14px", onclick: function () { openCat = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }));
-          list.appendChild(el("h3", { text: (glyphs[openCat] || "") + " " + groupNames[openCat] + " (" + by[openCat].length + ")", style: "font-size:20px;margin:14px 0 4px;color:#0f1b33" }));
-          if (by[openCat][0].returnable === false && by[openCat][0].notReturnableReason) list.appendChild(el("p", { text: by[openCat][0].notReturnableReason, style: "font-size:13px;margin:0 0 8px" }));
-          by[openCat].forEach(function (r) { list.appendChild(receiptRow(r)); });
+        if (memo.openCat && by[memo.openCat]) {
+          list.appendChild(el("button", { className: "rl-btn ghost", text: "‹ All groups", style: "width:auto;padding:8px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }));
+          list.appendChild(el("h3", { text: (glyphs[memo.openCat] || "") + " " + groupNames[memo.openCat] + " (" + by[memo.openCat].length + ")", style: "font-size:20px;margin:14px 0 4px;color:#0f1b33" }));
+          if (by[memo.openCat][0].returnable === false && by[memo.openCat][0].notReturnableReason) list.appendChild(el("p", { text: by[memo.openCat][0].notReturnableReason, style: "font-size:13px;margin:0 0 8px" }));
+          by[memo.openCat].forEach(function (r) { list.appendChild(receiptRow(r)); });
           return;
         }
-        openCat = null;
+        memo.openCat = null;
         var grid = el("div", { style: "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:8px;max-width:520px" });
         keys.forEach(function (k) {
           var soon = by[k].filter(function (r) { var d = daysLeft(deadlineOf(r)); return d !== null && d >= 0 && d <= 7; }).length;
           var check = by[k].filter(function (r) { return r.status !== "confirmed" && r.needsShopperConfirmation; }).length;
           var sub = soon ? soon + " return deadline" + (soon === 1 ? "" : "s") + " soon" : by[k][0].returnable === false ? "Usually can't be returned" : check ? check + " to check" : "All looks fine";
-          grid.appendChild(el("button", { type: "button", ariaLabel: groupNames[k] + ", " + by[k].length + " receipts", onclick: function () { openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); },
+          grid.appendChild(el("button", { type: "button", ariaLabel: groupNames[k] + ", " + by[k].length + " receipts", onclick: function () { memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); },
             style: "all:unset;cursor:pointer;box-sizing:border-box;aspect-ratio:1/1;border-radius:22px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;background:#fff;border:1px solid #e7e1d2;box-shadow:0 2px 10px rgba(15,27,51,.06)" },
             [el("span", { text: glyphs[k] || "🧾", style: "font-size:34px" }),
              el("span", {}, [el("b", { text: groupNames[k], style: "display:block;font-size:17px;color:#0f1b33" }), el("span", { text: by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), style: "display:block;font-size:14px;opacity:.8;margin-top:2px" }), el("span", { text: sub, style: "display:block;font-size:12px;margin-top:6px;color:" + (soon ? "#b3261e" : "#5b6475") + ";font-weight:" + (soon ? "700" : "400") })])]));
         });
         list.appendChild(grid);
       }
+      var drawnSig = null;
       function loadList() {
-        api("/relay/my/receipts").then(function (x) { allRows = (x.body && x.body.receipts) || []; drawList(); });
+        // Show what was loaded last time straight away, then quietly update if anything changed.
+        if (drawnSig === null && memo.receipts) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); }
+        api("/relay/my/receipts").then(function (x) {
+          if (!x.ok) { if (drawnSig === null) drawList(); return; }
+          var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
+          memo.receipts = { rows: rows, sig: sig, at: Date.now() };
+          if (sig === drawnSig) return;
+          allRows = rows; drawnSig = sig; drawList();
+        });
       }
       var doScan = function (full) {
         scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
@@ -551,7 +575,7 @@
               say(status, "Scanning" + (label ? " back to " + label : " older emails") + "… " + added + " found so far");
               return step(x.body.cursor);
             }
-            scanBtn.disabled = false;
+            scanBtn.disabled = false; memo.gmail = null;
             say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
           });
         }
@@ -943,7 +967,7 @@
       api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Withdraw my permission for Relay to read my receipts", onclick: function () {
       if (!confirm("Withdraw permission? Relay will disconnect Gmail and delete everything it captured. You'll be asked again next time you open your account.")) return;
-      api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) gate(sheet, email); else say(msg, "Couldn't withdraw. Try again.", true); }); } }));
+      api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else say(msg, "Couldn't withdraw. Try again.", true); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
   }
   function show() {
@@ -984,6 +1008,7 @@
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
+    memo.gmail = null; memo.receipts = null;
     window.__relayAutoScan = m[1] === "connected";
     if (window.go) { window.__relayReceiptsNote = { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }; window.go("receipts"); return; }
     open(function (sheet) { gate(sheet, s.email || "", { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }); });
@@ -1015,7 +1040,7 @@
     };
     pageLaunchers();
     host.appendChild(el("p", { text: "Loading…" }));
-    api("/relay/my/consent").then(function (r) {
+    cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountReceipts(host); return; }
       if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
@@ -1040,7 +1065,7 @@
       return;
     }
     host.appendChild(el("p", { text: "Loading…" }));
-    api("/relay/my/consent").then(function (r) {
+    cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountMarket(host); return; }
       if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }

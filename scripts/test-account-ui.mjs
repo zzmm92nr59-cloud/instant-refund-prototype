@@ -311,8 +311,8 @@ assert.ok(await page.locator('#receiptPurchases h3', { hasText: 'Wool jumper' })
 assert.equal(await page.evaluate(() => window.__xss3), undefined, 'receipt text in the wallet never runs as HTML');
 await page.getByRole('button', { name: /See all 1 receipts/ }).click();
 await page.getByRole('heading', { name: 'Your receipts, in one place.' }).waitFor();
-await page.getByRole('button', { name: 'Fashion, 1 receipts' }).click();
-await page.getByRole('button', { name: 'Details' }).click();
+// Coming back to Receipts puts you where you left it (same group, same receipt open), straight away.
+await page.locator('#receiptsPage').getByRole('button', { name: 'Hide' }).first().waitFor();
 await page.getByText('Return by 20 November 2026').waitFor();
 await page.getByText('Send to: Returns, Unit 4, Leeds LS1 4AB').waitFor();
 await page.getByText('mentions a QR code').waitFor();

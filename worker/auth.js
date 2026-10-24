@@ -9,6 +9,7 @@
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { parseReceiptEmail } from "./receipt-parser.js";
+import { ensureOnce } from "./once.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
@@ -52,7 +53,8 @@ function randomToken() {
 }
 const TOKEN_SHAPE = /^[A-Za-z0-9_-]{43}$/;
 
-export async function ensureAuthTables(db) {
+export function ensureAuthTables(db) { return ensureOnce(db, "auth", () => ensureAuthTablesRun(db)); }
+async function ensureAuthTablesRun(db) {
   const statements = [
     `CREATE TABLE IF NOT EXISTS shoppers (
        id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, email_hash TEXT NOT NULL UNIQUE,
