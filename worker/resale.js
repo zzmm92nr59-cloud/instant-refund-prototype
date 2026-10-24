@@ -10,6 +10,7 @@
 //  - Only the seller sees who asked about their listing; only the asker sees their own requests.
 
 const DAY = 24 * 60 * 60 * 1000;
+import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
 export const CONDITIONS = ["new_with_tags", "like_new", "good", "fair"];
 const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000;
 
@@ -32,7 +33,8 @@ export async function ensureResaleTables(db) {
        id TEXT PRIMARY KEY, request_id TEXT NOT NULL, sender_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_resale_msg ON resale_messages(request_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS resale_reports (
-       id TEXT PRIMARY KEY, request_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL)`
+       id TEXT PRIMARY KEY, request_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL)`,
+    ...ADMIN_TABLE_SQL
   ];
   for (const sql of statements) await db.prepare(sql).run();
 }
@@ -255,9 +257,14 @@ async function endConversation(env, shopper, requestId, reason, now) {
 
 export async function handleResaleRoute(request, env, url, cors, shopper, opts) {
   const path = url.pathname;
-  if (!path.startsWith("/relay/my/resale/")) return null;
+  if (!path.startsWith("/relay/my/resale/") && !path.startsWith("/relay/my/admin/")) return null;
   await ensureResaleTables(env.RELAY_DB);
   const m = request.method;
+  const adminResponse = await handleResaleAdminRoute(path, m, request, env, cors, shopper, opts.now);
+  if (adminResponse) return adminResponse;
+  // A blocked member can still read and withdraw, but cannot list, ask or message.
+  if (m === "POST" && /\/resale\/(listings|listings\/[0-9a-f-]{36}\/ask|requests\/[0-9a-f-]{36}\/messages)$/.test(path) && await isBlocked(env, shopper))
+    return json({ error: "account_restricted" }, 403, cors);
   const body = async () => { const t = await request.text(); if (t.length > 5000) return null; try { return JSON.parse(t || "{}"); } catch (e) { return null; } };
   const send = r => json(r.body, r.status, cors);
   if (path === "/relay/my/resale/items" && m === "GET") return json({ items: await listable(env, shopper.id, opts.now) }, 200, cors);

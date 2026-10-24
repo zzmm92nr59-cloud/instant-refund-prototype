@@ -22,6 +22,7 @@ const inDays = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==', 'base64');
 const scanBodies = [];
 let reminderState = 'off', remindPosts = [];
+let adminOn = false, adminReports = [{ id: '88888888-8888-8888-8888-888888888888', createdAt: 1700000000000, reason: '<img src=x onerror=window.__xssR=1>Asked me to pay outside Relay', item: { title: 'Wool jumper', store: 'Example Outfitters', status: 'matched' }, reporterRole: 'buyer', reportedRole: 'seller', reportsAgainstReported: 2, reportedAlreadyBlocked: false, canRemoveListing: true, messages: [{ from: 'reporter', body: 'Can we do it off the app?', createdAt: 1 }, { from: 'reported member', body: '<img src=x onerror=window.__xssM=1>Sure, text me', createdAt: 2 }] }]; const adminActions = [];
 let tfEnabled = false; const tfCalls = [];
 let passkeyList = []; const passkeyLogins = [], passkeyRegs = [];
 const findBodies = [], addBodies = [], verifyBodies = [], googleStarts = [];
@@ -73,6 +74,9 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/resale/listings' && req.method() === 'POST') { const b = JSON.parse(req.postData()); resaleBodies.push(b); if (b.agree !== true) return j(400, { error: 'agreement_required' }); resaleListed = true; return j(200, { ok: true, id: '66666666-6666-6666-6666-666666666666' }); }
   if (/^\/relay\/my\/resale\/listings\/[0-9a-f-]{36}\/ask$/.test(p)) { resaleBodies.push(JSON.parse(req.postData())); return j(200, { ok: true }); }
   if (p.endsWith('/confirm')) { receiptStatus = 'confirmed'; return j(200, { ok: true }); }
+  if (p === '/relay/my/admin/me') return j(200, adminOn ? { admin: true, openReports: adminReports.length } : { admin: false });
+  if (p === '/relay/my/admin/reports') return adminOn ? j(200, { reports: adminReports }) : j(404, { error: 'not_found' });
+  if (/^\/relay\/my\/admin\/reports\/[0-9a-f-]{36}\/review$/.test(p)) { const b = JSON.parse(req.postData()); adminActions.push([p.split('/')[5], b.outcome]); adminReports = []; return j(200, { ok: true }); }
   if (p === '/relay/auth/2fa/verify') { const b = JSON.parse(req.postData()); tfCalls.push(b); return b.pendingToken === 'P'.repeat(43) && b.code === '654321' ? j(200, { sessionToken: SESSION, email: 'alice@example.com', expiresAt: 1 }) : j(400, { error: 'invalid_code' }); }
   if (p === '/relay/my/2fa' && req.method() === 'GET') return j(200, { enabled: tfEnabled, recoveryCodesLeft: tfEnabled ? 8 : 0 });
   if (p === '/relay/my/2fa/setup') return j(200, { secret: 'ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567', otpauthUrl: 'otpauth://totp/Relay%3Aalice%40example.com?secret=ABCDEFGHIJKLMNOPQRSTUVWXYZ234567&issuer=Relay' });
@@ -225,6 +229,33 @@ console.log('PASS Face ID passkeys: sign in, add, list, remove, hidden when unsu
   consentAccepted = false; await tp.close();
 }
 console.log('PASS Authenticator-app 2-step: sign-in waits for the code, setup shows key and recovery codes once, turn off needs a code (mocked server)');
+// Report review: only the admin sees it; message text is shown as plain text; actions go to the server.
+{
+  const ap = await context.newPage(); const apErrors = []; ap.on('pageerror', e => apErrors.push(e.message));
+  await ap.goto(origin + '/index.html');
+  await ap.evaluate(s => localStorage.setItem('relay.session.v1', JSON.stringify({ token: s, email: 'alice@example.com', expiresAt: 9e12 })), SESSION);
+  consentAccepted = true; adminOn = false;
+  await ap.reload(); await ap.locator('.avatar').click();
+  await ap.getByRole('heading', { name: 'Your account' }).waitFor();
+  await ap.getByRole('heading', { name: 'Two-step sign-in' }).waitFor();
+  assert.equal(await ap.getByRole('button', { name: /Review reports/ }).count(), 0, 'ordinary members never see the review button');
+  adminOn = true;
+  await ap.reload(); await ap.locator('.avatar').click();
+  await ap.getByRole('button', { name: 'Review reports (1)' }).click();
+  await ap.getByRole('heading', { name: 'Reports to review' }).waitFor();
+  await ap.getByText('Asked me to pay outside Relay').waitFor();
+  await ap.getByText('Reports against this member: 2').waitFor();
+  await ap.getByText('Sure, text me').waitFor();
+  assert.equal(await ap.evaluate(() => (window.__xssR || 0) + (window.__xssM || 0)), 0, 'reason and messages are shown as text only');
+  assert.equal(await ap.getByRole('button', { name: 'Take listing down' }).count(), 1);
+  ap.once('dialog', d => d.accept());
+  await ap.getByRole('button', { name: 'Block member' }).click();
+  await ap.getByText('No reports waiting').waitFor();
+  assert.deepEqual(adminActions, [['88888888-8888-8888-8888-888888888888', 'block']]);
+  assert.deepEqual(apErrors, []);
+  adminOn = false; consentAccepted = false; await ap.close();
+}
+console.log('PASS Report review: hidden from members, shown as text, block goes to the server (mocked server)');
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Before you start' }).waitFor();
 assert.equal(await page.getByRole('button', { name: /no thanks|skip|later|decline/i }).count(), 0, 'permission step has no skip option');
