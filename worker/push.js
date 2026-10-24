@@ -227,9 +227,9 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     const last = (checkedAt.get(shopper.id) || 0);
     if (o.now - last < 20000) return json({ error: "slow_down" }, 429, cors);
     checkedAt.set(shopper.id, o.now);
-    let synced = false;
-    if (typeof o.syncCatalogues === "function") { try { await o.syncCatalogues(); synced = true; } catch {} }
-    return json({ synced, ...(await runPriceAlerts(env, { ...o, shopperId: shopper.id })) }, 200, cors);
+    let synced = false, syncError = "";
+    if (typeof o.syncCatalogues === "function") { try { await o.syncCatalogues(); synced = true; } catch (e) { syncError = String(e && e.message || e).slice(0, 120); } }
+    return json({ synced, syncError, ...(await runPriceAlerts(env, { ...o, shopperId: shopper.id })) }, 200, cors);
   }
   return null;
 }
