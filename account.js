@@ -336,6 +336,7 @@
       card.insertBefore(ph, card.firstChild);
       apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
     }
+    if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:#ece8dd;color:#5b6475" }));
     var left = daysLeft(deadlineOf(x));
     if (left !== null) {
       var pill = left < 0 ? ["Deadline passed", "#ece8dd", "#5b6475"] : left === 0 ? ["Return today", "#fde0dd", "#b3261e"] :
@@ -423,8 +424,10 @@
         return;
       }
       box.appendChild(el("p", { text: "Gmail connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
-      var scanBtn = el("button", { className: "rl-btn", text: "Scan my Gmail for receipts" });
+      var lastScan = r.body.lastScanAt ? new Date(r.body.lastScanAt) : null;
+      var scanBtn = el("button", { className: "rl-btn", text: lastScan ? "Check for new receipts" : "Scan my Gmail for receipts" });
       var status = el("div", { className: "rl-msg" });
+      if (lastScan) status.textContent = "Your receipts are saved. Last checked " + lastScan.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ".";
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
       search.addEventListener("input", function () { query = search.value.trim().toLowerCase(); applyFilter(); });
@@ -446,7 +449,18 @@
           // Soonest deadline first, then everything without one, then expired ones.
           var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
           rows.sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
+          var lastGroup = null;
+          // Group by shopping category, biggest group first; "can't be returned" groups go last.
+          var counts = {}; rows.forEach(function (r) { var g = r.categoryLabel || "Other"; counts[g] = (counts[g] || 0) + 1; });
+          var order = function (r) { return (r.returnable === false ? 1000 : 0) - (counts[r.categoryLabel || "Other"] || 0); };
+          rows = rows.map(function (r, i) { return [r, i]; }).sort(function (a, b) { return order(a[0]) - order(b[0]) || (a[0].categoryLabel || "Other").localeCompare(b[0].categoryLabel || "Other") || a[1] - b[1]; }).map(function (a) { return a[0]; });
           rows.forEach(function (row) {
+            var g = row.categoryLabel || "Other";
+            if (g !== lastGroup) {
+              lastGroup = g;
+              list.appendChild(el("h3", { text: g + " (" + counts[g] + ")", style: "font-size:16px;margin:18px 0 2px;color:#0f1b33" }));
+              if (row.returnable === false && row.notReturnableReason) list.appendChild(el("p", { text: row.notReturnableReason, style: "font-size:13px;margin:0 0 4px" }));
+            }
             var card = receiptCard(row, loadList);
             var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef,
               (row.items || []).map(function (i) { return i.name; }).join(" ")].filter(Boolean).join(" ").toLowerCase();
@@ -457,11 +471,11 @@
           applyFilter();
         });
       }
-      scanBtn.onclick = function () {
-        scanBtn.disabled = true; say(status, "Scanning…");
+      var doScan = function (full) {
+        scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
         var added = 0, rounds = 0, saved = ""; try { saved = localStorage.getItem("relay_scan_cursor") || ""; } catch (e) {}
         function step(cursor) {
-          return api("/relay/my/gmail/scan", { method: "POST", body: cursor ? { cursor: cursor } : {} }).then(function (x) {
+          return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}) }).then(function (x) {
             if (x.status === 401) { scanBtn.disabled = false; return say(status, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
             if (!x.ok) { scanBtn.disabled = false; return say(status, "Couldn't scan Gmail right now. Please try again.", true); }
             added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
@@ -477,9 +491,11 @@
             say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
           });
         }
-        step(saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay.", true); });
+        step(full ? "" : saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay.", true); });
       };
+      scanBtn.onclick = function () { doScan(false); };
       box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); loadList();
+      if (lastScan) box.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { doScan(true); } }));
       if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
       box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () {
         if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
@@ -904,6 +920,7 @@
       sheet.appendChild(el("button", { className: "rl-btn", text: "Back to sign in", onclick: show }));
     });
   }
+  window.RelayAccount = { open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
