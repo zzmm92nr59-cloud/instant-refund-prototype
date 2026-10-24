@@ -28,6 +28,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (b.code === "good") return json({ access_token: "northco-token", refresh_token: "r1", merchant_id: "MNORTH123", expires_at: "2030-01-01T00:00:00Z" });
     return json({ errors: [{ code: "INVALID_REQUEST_ERROR" }] }, 400);
   }
+  if (url.endsWith("/v2/merchants/me")) return json({ merchant: { id: globalThis.__defaultMerchant || "MDEFAULT1" } });
   if (url.includes("/v2/merchants/")) return json({ merchant: { business_name: "North & Co." } });
   const token = String(init.headers?.Authorization || "").replace("Bearer ", ""), shop = shops[token];
   if (shop === null) return json({ errors: [{ code: "UNAUTHORIZED" }] }, 401);
@@ -70,6 +71,11 @@ assert.equal((await go("/relay/square/oauth/callback?code=bad&state=" + state)).
 // The public list never shows tokens.
 const list = await (await go("/relay/square/merchants")).text();
 assert.ok(!list.includes("northco-token") && list.includes("North & Co."));
+
+// 3b. If the "connected" shop is really the default shop, it is read only once.
+globalThis.__defaultMerchant = "MNORTH123";
+assert.deepEqual((await listSquareAccounts(env, { now })).map(a => a.id), ["default"]);
+globalThis.__defaultMerchant = "MDEFAULT1";
 
 // 4. One sync reads both shops, each product labelled with its own shop.
 const res = await syncSquareCatalogue(env);
