@@ -8,6 +8,8 @@
   function keepStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
   // Keeps what the app has already loaded so moving between tabs is instant. It lives in memory only and is wiped on sign-out.
   var memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} };
+  // Logos fetched ahead of time for popular UK stores (domain -> file type). Anything else falls back to a live lookup.
+  var STORE_LOGOS = {"morrisons.com":"png","aldi.co.uk":"png","lidl.co.uk":"svg","marksandspencer.com":"png","coop.co.uk":"png","boots.com":"ico","iceland.co.uk":"png","amazon.co.uk":"ico","spacenk.com":"ico","debenhams.com":"ico","selfridges.com":"ico","boohoo.com":"ico","ebay.co.uk":"ico","prettylittlething.com":"ico","missguided.co.uk":"png","newlook.com":"png","riverisland.com":"png","topshop.com":"png","primark.com":"ico","matalan.co.uk":"png","peacocks.co.uk":"png","dorothyperkins.com":"ico","burton.co.uk":"ico","bonmarche.co.uk":"ico","wallis.co.uk":"ico","nike.com":"png","jdsports.co.uk":"png","schuh.co.uk":"png","office.co.uk":"ico","drmartens.com":"png","gymshark.com":"png","ugg.com":"ico","trespass.com":"png","ikea.com":"ico","dunelm.com":"png","wayfair.co.uk":"ico","wickes.co.uk":"png","screwfix.com":"png","toolstation.com":"png","sofology.co.uk":"ico","furniturevillage.co.uk":"png","made.com":"ico","dreams.co.uk":"ico","apple.com":"png","box.co.uk":"ico","samsung.com":"png","laptopsdirect.co.uk":"png","overclockers.co.uk":"ico","hughes.co.uk":"ico","jessops.com":"png","smythstoys.com":"png","game.co.uk":"png","hmv.com":"ico","zooplus.co.uk":"png","petsathome.com":"ico","just-eat.co.uk":"png","deliveroo.co.uk":"png","greggs.co.uk":"png","ebuyer.com":"png","ubereats.com":"png","pret.co.uk":"svg","nandos.co.uk":"png","starbucks.co.uk":"png","costa.co.uk":"png","nationalrail.co.uk":"png","trainline.com":"png","booking.com":"png","airbnb.co.uk":"ico","easyjet.com":"ico","ryanair.com":"png","britishairways.com":"png"};
   var MEMO_MS = 5 * 60 * 1000;
   function memoFresh(e) { return e && Date.now() - e.at < MEMO_MS; }
   function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; }
@@ -482,6 +484,14 @@
         function showLogo() {
           var dom = row.retailer && row.retailer.domain;
           if (!dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return;
+          var known = Object.keys(STORE_LOGOS).filter(function (k) { return dom === k || dom.slice(-(k.length + 1)) === "." + k; })[0];
+          if (known) {
+            var pic = el("img", { alt: "", style: "width:40px;height:40px;object-fit:contain" });
+            pic.onerror = function () { pic.remove(); thumb.style.background = ""; thumb.style.border = ""; };
+            pic.onload = function () { thumb.textContent = ""; thumb.style.background = "#fff"; thumb.style.border = "1px solid #e7e1d2"; thumb.appendChild(pic); };
+            pic.src = "logos/" + known + "." + STORE_LOGOS[known];
+            return;
+          }
           apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) {
             if (!u) return;
             thumb.textContent = ""; thumb.style.background = "#fff"; thumb.style.border = "1px solid #e7e1d2";
