@@ -122,6 +122,17 @@ setPrice("DEMO-JACKET", 4400); clock += 60000; await post("/relay/my/alerts/chec
 assert.equal(pushes.length, 1, "a later fall from the new price is");
 assert.equal((await post("/relay/my/alerts/watch", alice, { sku: "DEMO-JACKET", on: false })).status, 200);
 
+// A stale second copy of the same SKU (an old seed row, listed first) must never hide the shop's current price.
+sqlite.prepare("INSERT INTO retailer_catalog_items (id, provider, external_item_id, title) VALUES (?,?,?,?)").run("iold", "relay_demo", "xold", "Old copy");
+sqlite.prepare("INSERT INTO retailer_catalog_variants (id, item_id, external_variant_id, title, sku, price_minor, currency, updated_at) VALUES (?,?,?,?,?,?,?,?)").run("vold", "iold", "evold", "Cream", "DEMO-SCARF", 3000, "GBP", "2020-01-01 00:00:00");
+item(4, "DEMO-SCARF", 3000);
+assert.equal((await post("/relay/my/alerts/watch", alice, { sku: "DEMO-SCARF", product: "Scarf", variant: "Cream", store: "Test Shop", priceMinor: 3000 })).status, 200);
+pushes = []; clock += 60000; await post("/relay/my/alerts/check", alice, {});
+sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 1500 WHERE id = 'v4'").run(); clock += 60000;
+c = await (await post("/relay/my/alerts/check", alice, {})).json();
+assert.equal(c.drops, 1, "the shop's current price wins over a stale duplicate row"); assert.equal(pushes.length, 1);
+assert.equal((await post("/relay/my/alerts/watch", alice, { sku: "DEMO-SCARF", on: false })).status, 200);
+
 // 7. Shop-wide alerts: only the shopper who opted in hears about that shop, and unwatching one's own items does not affect them.
 pushes = []; clock += 60000;
 assert.equal((await post("/relay/my/alerts/store", bob, { store: "Test Shop", items: [{ sku: "DEMO-BOOT", product: "Boot", priceMinor: 8000 }, { sku: "DEMO-HAT", product: "Hat", priceMinor: 1500 }, { sku: "not ok!" }] })).status, 200);
