@@ -571,7 +571,7 @@ async function loadCatalog(manual=false){
   const response=await fetch(API+"/relay/live-test/products",{cache:"no-store"});
   if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
   const data=await response.json();
-  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:"North & Co.",fixture:false})),...next];
+  next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:p.storeName||"Relay Demo Store",fixture:false})),...next];
  }catch(e){squareError=e.message}
  // Independent retailer feed: a Square outage must not suppress a connected Shopify catalogue.
  try{
