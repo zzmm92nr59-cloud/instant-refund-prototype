@@ -427,7 +427,7 @@ await page.getByRole('button', { name: /^.*Wallet$/ }).first().click();
 await page.getByRole('button', { name: 'Disconnect Gmail' }).click().catch(() => {});
 await page.goto(origin + '/index.html#signin=' + TOKEN);
 await page.getByRole('heading', { name: 'Your account' }).waitFor();
-await page.getByText('Trainers', { exact: false }).waitFor();
+await page.getByText('Trainers', { exact: false }).first().waitFor();
 assert.equal(await page.evaluate(() => window.__xss), undefined, 'server text must never run as HTML');
 assert.ok(!page.url().includes('signin='), 'token removed from the address bar');
 assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('relay.session.v1')).token), SESSION);

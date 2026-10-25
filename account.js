@@ -1205,6 +1205,68 @@
       return sub.unsubscribe().catch(function () {}).then(function () { return api("/relay/my/push/unsubscribe", { method: "POST", body: { endpoint: ep } }); });
     }).then(function () { memoDrop("alerts"); });
   }
+  // ---- Purchases the shop confirmed (orders placed with the shopper's Relay email), with exchanges done through Relay. ----
+  var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
+    different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
+    already_exchanged: "This item has already been exchanged.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled." };
+  function openExchange(o, it, done) {
+    open(function (sheet) {
+      sheet.appendChild(el("h2", { text: "Exchange " + it.title, style: "margin:0 0 4px" }));
+      sheet.appendChild(el("p", { className: "small muted", text: (o.store || "The shop") + " · you have " + (it.variant || "this item") + ". Choose what you'd like instead. Same price, so there's nothing to pay or refund." }));
+      var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
+      var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
+      api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
+        list.textContent = "";
+        var opts = (r.ok && r.body && r.body.options) || [];
+        if (!opts.length) { list.appendChild(el("p", { text: r.ok ? "This product has no other sizes or colours." : "Couldn't load the options." })); return; }
+        opts.forEach(function (x) {
+          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available, style: "margin:6px 0;text-align:left",
+            text: x.title + (x.available ? (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
+          b.onclick = function () {
+            if (!confirm("Swap " + (it.variant || it.title) + " for " + x.title + "? " + (o.store || "The shop") + " will update your order.")) return;
+            list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
+            say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
+            api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key } }).then(function (res) {
+              if (res.ok) { say(msg, res.body.message); list.textContent = ""; list.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } })); return; }
+              say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
+              list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
+            });
+          };
+          list.appendChild(b);
+        });
+      });
+      sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
+    });
+  }
+  function mountConfirmed(host) {
+    if (!host) return;
+    host.textContent = "";
+    var s = load(); if (!s || !s.token) return;
+    api("/relay/my/purchases").then(function (r) {
+      var rows = (r.ok && r.body && r.body.purchases) || [];
+      if (!rows.length) return;
+      host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
+      host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can exchange items here." }));
+      var grid = el("div", { className: "purchase-grid" }); host.appendChild(grid);
+      rows.forEach(function (o) {
+        (o.items || []).forEach(function (it) {
+          var card = el("div", { className: "card product" });
+          var art = el("div", { className: "art" });
+          if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) art.appendChild(el("img", { src: it.imageUrl, alt: "", style: "width:100%;height:100%;object-fit:cover;border-radius:16px" })); else art.textContent = "🛍";
+          card.appendChild(art);
+          var d = el("div", { className: "details" });
+          d.appendChild(el("div", { className: "eyebrow", text: String(o.store || "Shop").toUpperCase() + " · ✓ CONFIRMED BY THE SHOP" }));
+          d.appendChild(el("h3", { text: it.title }));
+          d.appendChild(el("div", { className: "small muted", text: (it.variant ? it.variant + " · " : "") + "Qty " + it.quantity + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") }));
+          d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
+          if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
+          if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { mountConfirmed(host); }); } }));
+          card.appendChild(d); grid.appendChild(card);
+        });
+      });
+    }).catch(function () {});
+  }
+
   // ---- Offers: shops can send Relay watchers a lower price on an item. Shown here while they last (also sent as phone alerts). ----
   function pounds(m) { return "£" + (Number(m) / 100).toFixed(2); }
   function mountOffers(host) {
@@ -1261,6 +1323,15 @@
           return;
         }
         body.appendChild(el("p", { className: "sub", text: "✓ Alerts are on for this device. Watching " + st.watches.length + " item" + (st.watches.length === 1 ? "" : "s") + (st.stores.length ? " and every product at: " + st.stores.join(", ") : "") + "." }));
+        // Two choices: just the watchlist, or price drops at every connected shop.
+        var modes = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 12px" });
+        [["watchlist", "Only my watchlist"], ["all", "Price drops at every shop"]].forEach(function (mode) {
+          var on = (mode[0] === "all") === Boolean(st.allShops);
+          modes.appendChild(el("button", { className: "toggle" + (on ? " on" : ""), text: (on ? "✓ " : "") + mode[1], onclick: function () {
+            api("/relay/my/alerts/mode", { method: "POST", body: { mode: mode[0] } }).then(function (x) { if (x.ok) { memoDrop("alerts"); draw(); say(msg, mode[0] === "all" ? "You'll get an alert when anything drops in price at any shop connected to Relay." : "You'll only get alerts for items on your watchlist (and shops you follow)."); } });
+          } }));
+        });
+        body.appendChild(modes);
         var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
         row.appendChild(el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () {
           say(msg, "Sending…");
@@ -1281,7 +1352,7 @@
     }
     draw();
   }
-  window.RelayAccount = { mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
+  window.RelayAccount = { mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

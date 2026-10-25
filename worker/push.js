@@ -57,12 +57,16 @@ async function ensurePushTablesRun(db) {
     `CREATE TABLE IF NOT EXISTS push_subscriptions (id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at INTEGER NOT NULL, last_test_at INTEGER)`,
     `CREATE INDEX IF NOT EXISTS idx_push_subs_shopper ON push_subscriptions(shopper_id)`,
     `CREATE TABLE IF NOT EXISTS price_watches (shopper_id TEXT NOT NULL, sku TEXT NOT NULL, product TEXT NOT NULL, variant TEXT, store TEXT, via TEXT NOT NULL DEFAULT 'item', baseline_minor INTEGER, last_seen_minor INTEGER, last_alert_at INTEGER, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, sku))`,
-    `CREATE TABLE IF NOT EXISTS store_optins (shopper_id TEXT NOT NULL, store TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, store))`
+    `CREATE TABLE IF NOT EXISTS store_optins (shopper_id TEXT NOT NULL, store TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, store))`,
+    // A shopper's alert choice: only their watchlist (default) or price drops at every connected shop.
+    `CREATE TABLE IF NOT EXISTS alert_prefs (shopper_id TEXT PRIMARY KEY, all_shops INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL)`,
+    // The last price Relay saw for every item in every connected shop, so a drop anywhere can be spotted.
+    `CREATE TABLE IF NOT EXISTS catalogue_price_seen (variant_id TEXT PRIMARY KEY, price_minor INTEGER NOT NULL, seen_at INTEGER NOT NULL)`
   ];
   for (const s of statements) await db.prepare(s).run();
 }
 export function pushDeleteStatements(db, shopperId) {
-  return ["push_subscriptions", "price_watches", "store_optins"].map(t => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
+  return ["push_subscriptions", "price_watches", "store_optins", "alert_prefs"].map(t => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
 }
 export async function getVapid(env) {
   const db = env.RELAY_DB;
@@ -118,6 +122,22 @@ export function priceText(minor, currency) {
 }
 
 // Looks at every watched item (UK shops selling in pounds only). A price lower than the last one Relay saw is a drop; the first look only records the price.
+// Every pound-priced item in every connected shop whose price fell since the last look. The first look only records prices.
+async function catalogueDrops(db, now) {
+  const rows = ((await db.prepare(`SELECT v.id AS key, v.sku, v.title AS variant, v.price_minor AS p, i.title AS product, i.store_label AS store, i.provider
+    FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
+    WHERE v.price_minor IS NOT NULL AND v.currency = 'GBP' AND (i.provider = 'square_sandbox' OR i.provider LIKE 'shopify:%') LIMIT 5000`).all()).results || []);
+  const seen = new Map(((await db.prepare("SELECT variant_id, price_minor FROM catalogue_price_seen").all()).results || []).map(r => [r.variant_id, r.price_minor]));
+  const drops = [], updates = [];
+  for (const r of rows) {
+    const was = seen.get(r.key);
+    if (was !== undefined && r.p < was) drops.push({ key: r.provider.startsWith("shopify:") ? r.key : (r.sku || r.key), sku: r.sku, product: r.product, variant: r.variant && r.variant !== "Default Title" ? r.variant : null, store: r.store, was, now: r.p });
+    if (was !== r.p) updates.push(db.prepare("INSERT INTO catalogue_price_seen (variant_id, price_minor, seen_at) VALUES (?,?,?) ON CONFLICT(variant_id) DO UPDATE SET price_minor = excluded.price_minor, seen_at = excluded.seen_at").bind(r.key, r.p, now));
+  }
+  for (let i = 0; i < updates.length; i += 50) await db.batch(updates.slice(i, i + 50));
+  return drops;
+}
+
 export async function runPriceAlerts(env, o = {}) {
   const db = env.RELAY_DB; if (!db) return { checked: 0, drops: 0, sent: 0 };
   await ensurePushTables(db);
@@ -137,6 +157,19 @@ export async function runPriceAlerts(env, o = {}) {
       await db.prepare("UPDATE price_watches SET last_seen_minor = ?, last_alert_at = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, now, w.shopper_id, w.sku).run();
     } else if (w.last_seen_minor !== cur.p) {
       await db.prepare("UPDATE price_watches SET last_seen_minor = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, w.shopper_id, w.sku).run();
+    }
+  }
+  // Shoppers who chose "price drops at every shop": every item that dropped since Relay last looked, anywhere.
+  // Prices are compared for every shopper at once, so this runs the same whether one shopper or the hourly check asked.
+  let everywhere = [];
+  try { everywhere = await catalogueDrops(db, now); } catch (e) { console.error("Catalogue-wide price check skipped", String(e && e.message || e).slice(0, 120)); }
+  if (everywhere.length) {
+    const fans = ((await db.prepare("SELECT shopper_id FROM alert_prefs WHERE all_shops = 1").all()).results || []).map(r => r.shopper_id);
+    for (const id of fans) {
+      const l = byShopper.get(id) || [];
+      const have = new Set(l.map(x => x.w.sku));
+      for (const d of everywhere) if (!have.has(d.sku) && !have.has(d.key)) l.push({ w: { product: d.product, variant: d.variant, store: d.store, sku: d.key }, was: d.was, now: d.now, currency: "GBP" });
+      if (l.length) byShopper.set(id, l);
     }
   }
   // One alert per product, so each shows its own shop, product and prices.
@@ -187,7 +220,8 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     const subs = (await db.prepare("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?").bind(shopper.id).first()).n;
     const watches = ((await db.prepare("SELECT sku, product, variant, store, via, last_seen_minor AS lastSeenMinor FROM price_watches WHERE shopper_id = ? ORDER BY created_at DESC LIMIT 500").bind(shopper.id).all()).results || []);
     const stores = ((await db.prepare("SELECT store FROM store_optins WHERE shopper_id = ?").bind(shopper.id).all()).results || []).map(r => r.store);
-    return json({ devices: subs, watches: watches.filter(w => w.via === "item"), storeWatchCount: watches.filter(w => w.via === "store").length, stores }, 200, cors);
+    const pref = await db.prepare("SELECT all_shops FROM alert_prefs WHERE shopper_id = ?").bind(shopper.id).first();
+    return json({ devices: subs, watches: watches.filter(w => w.via === "item"), storeWatchCount: watches.filter(w => w.via === "store").length, stores, allShops: Boolean(pref && pref.all_shops) }, 200, cors);
   }
   if (path === "/relay/my/push/test" && m === "POST") {
     const subs = await subsOf(db, shopper.id);
@@ -236,6 +270,13 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     }
     if (st.length) await db.batch(st);
     return json({ ok: true, watching: items.length }, 200, cors);
+  }
+  if (path === "/relay/my/alerts/mode" && m === "POST") {
+    // "watchlist": only items the shopper watches (and shops they follow). "all": price drops at every connected shop too.
+    const all = body && body.mode === "all";
+    await db.prepare("INSERT INTO alert_prefs (shopper_id, all_shops, updated_at) VALUES (?,?,?) ON CONFLICT(shopper_id) DO UPDATE SET all_shops = excluded.all_shops, updated_at = excluded.updated_at")
+      .bind(shopper.id, all ? 1 : 0, o.now).run();
+    return json({ ok: true, allShops: all }, 200, cors);
   }
   if (path === "/relay/my/alerts/offers" && m === "GET") {
     // Live offers shops have sent for items this shopper watches (on their own or by following the shop). Nothing about other shoppers.
