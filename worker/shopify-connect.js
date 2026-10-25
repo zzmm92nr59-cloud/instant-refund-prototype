@@ -1,7 +1,8 @@
 // "Connect with Shopify": a Shopify shop owner approves Relay from inside their own Shopify admin.
 // Only someone who can run that shop can approve, so finishing the approval also signs them in to their Relay shop dashboard.
 // What is stored per shop: its myshopify address, its name and its access/refresh tokens, encrypted with a key derived from AUTH_SECRET.
-// Tokens never reach the browser. Relay asks only for read-only products and stock.
+// Tokens never reach the browser. Relay asks only for read-only access: products, stock and orders. Orders are used for one thing:
+// showing a shopper their own purchases, matched by the email they verified with Relay (only a hash of the order email is kept).
 // Approving is also the shop's consent for Relay to show its products and prices to Relay shoppers (the page says so).
 // Relay is for UK shops that sell in pounds: a shop whose Shopify currency isn't GBP is turned away (nothing is stored).
 // After approval Relay asks Shopify to tell it straight away when the shop's products change or the app is removed (webhooks).
@@ -11,7 +12,7 @@ import { issueRetailerKey } from "./retailer.js";
 import { ensureSquareMerchantSchema } from "./square-connect.js";
 import { getShopifyStores, syncShopifyCatalogues } from "./shopify.js";
 
-const SCOPES = "read_products,read_inventory";
+const SCOPES = "read_products,read_inventory,read_orders";
 const API_VERSION = "2026-07";
 const DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 const DASHBOARD_BASE = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
@@ -84,7 +85,7 @@ const page = (title, html, status = 200) => new Response(`<!doctype html><meta c
 <body style="font:16px system-ui;max-width:520px;margin:12vh auto;padding:0 20px;color:#141827;line-height:1.5"><h1 style="font-size:24px">${esc(title)}</h1>${html}`,
   { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 const askForShop = (note, purpose) => page("Connect your Shopify shop", `${note ? `<p style="color:#9c3328">${esc(note)}</p>` : ""}
-<p>Enter your shop's Shopify address. You'll approve Relay inside your own Shopify admin. Relay only reads your products, prices and stock.</p>
+<p>Enter your shop's Shopify address. You'll approve Relay inside your own Shopify admin. Relay only reads your products, prices, stock and paid orders (so shoppers can see their own purchases), and never changes anything.</p>
 <form method="get" action="/relay/shopify/connect"><input name="shop" placeholder="your-shop.myshopify.com" required autocomplete="off" style="font:inherit;padding:12px;border:1px solid #ccc;border-radius:10px;width:100%;box-sizing:border-box">
 ${purpose === "d" ? '<input type="hidden" name="for" value="dashboard">' : ""}<button style="margin-top:10px;font:inherit;font-weight:700;background:#141827;color:#fff;border:0;border-radius:10px;padding:12px 18px">Continue to Shopify</button></form>`, note ? 400 : 200);
 
@@ -116,7 +117,7 @@ async function shopInfo(shop, token, f) {
 
 // Webhooks: Shopify tells Relay at once when a product is added, changed or removed, and when the shop removes the app.
 // Each is signed by Shopify with the app's secret and checked in shopify-webhooks.js. Asking twice never makes duplicates.
-export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE"];
+export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE", "ORDERS_PAID"];
 export async function registerShopifyWebhooks(shop, token, origin, f) {
   const uri = origin.replace(/\/$/, "") + "/relay/webhooks/shopify";
   const gql = async (query, variables) => {
@@ -233,7 +234,7 @@ export async function handleShopifyConnect(request, env, url, o = {}) {
     const key = await issueRetailerKey(env, { provider: "shopify", shopRef: shop, storeLabel: label }, now);
     const dash = (env.RELAY_APP_URL || DASHBOARD_BASE).replace(/\/?$/, "/") + "retailer.html#key=" + encodeURIComponent(key);
     if (state.p === "d") return new Response(null, { status: 302, headers: { location: dash, "cache-control": "no-store", "referrer-policy": "no-referrer" } });
-    return page("Connected", `<p>${esc(label)} is connected to Relay. Relay can read this shop's products, prices and stock (read-only) and shows them to Relay shoppers.</p>
+    return page("Connected", `<p>${esc(label)} is connected to Relay. Relay can read this shop's products, prices, stock and paid orders (read-only). Products are shown to Relay shoppers; an order is only ever shown to the shopper whose verified email it was placed with.</p>
 <p><a href="${esc(dash)}" rel="noreferrer" style="display:inline-block;background:#141827;color:#fff;padding:12px 18px;border-radius:12px;text-decoration:none">Open your Relay shop dashboard</a></p>
 <p style="color:#5b6275;font-size:14px">See which of your items shoppers are watching and send them offers. Keep this link private: anyone with it can see your shop's figures.</p>`);
   } catch (e) {

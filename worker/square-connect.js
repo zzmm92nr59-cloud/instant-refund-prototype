@@ -4,9 +4,8 @@
 import { ensureOnce } from "./once.js";
 import { wrapKey } from "./push.js";
 import { issueRetailerKey } from "./retailer.js";
+import { squareHost, squareAppId } from "./square-env.js";
 
-const HOST = "https://connect.squareupsandbox.com";
-const APP_ID = "sandbox-sq0idb-S-JwqxshuoQuUVeJdZ6HBw"; // public identifier of Relay's Sandbox app, not a secret
 const SCOPES = "ITEMS_READ INVENTORY_READ MERCHANT_PROFILE_READ";
 const DASHBOARD_BASE = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -52,8 +51,8 @@ const page = (title, text, status = 200) => new Response(`<!doctype html><meta c
 const esc = (t) => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 async function tokenCall(env, body, f) {
-  const r = await f(HOST + "/oauth2/token", { method: "POST", headers: { "content-type": "application/json", "Square-Version": "2026-09-16" },
-    body: JSON.stringify({ client_id: env.SQUARE_APPLICATION_ID || APP_ID, client_secret: env.SQUARE_APPLICATION_SECRET, ...body }), signal: AbortSignal.timeout(15000) });
+  const r = await f(squareHost(env) + "/oauth2/token", { method: "POST", headers: { "content-type": "application/json", "Square-Version": "2026-09-16" },
+    body: JSON.stringify({ client_id: squareAppId(env), client_secret: env.SQUARE_APPLICATION_SECRET, ...body }), signal: AbortSignal.timeout(15000) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.access_token) throw new Error("Square token step failed (" + r.status + " " + (j.errors && j.errors[0] && j.errors[0].code || "unknown") + ")");
   return j;
@@ -70,7 +69,7 @@ export async function listSquareAccounts(env, o = {}) {
   // If a shop was connected that is really the default shop, read it once (under the default shop's name).
   if (env.SQUARE_ACCESS_TOKEN && rows.length) {
     try {
-      const r = await f(HOST + "/v2/merchants/me", { headers: { Authorization: "Bearer " + env.SQUARE_ACCESS_TOKEN, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
+      const r = await f(squareHost(env) + "/v2/merchants/me", { headers: { Authorization: "Bearer " + env.SQUARE_ACCESS_TOKEN, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
       const me = (await r.json()).merchant;
       if (me && me.id) rows = rows.filter(m => m.merchant_id !== me.id);
     } catch { /* if the default shop can't be identified, nothing is dropped */ }
@@ -101,7 +100,8 @@ export async function handleSquareConnect(request, env, url, o = {}) {
   await ensureSquareMerchantSchema(env.RELAY_DB);
   if (path === "/relay/square/connect" && request.method === "GET") {
     const state = await makeState(env, now, url.searchParams.get("for") === "dashboard" ? "d" : "c");
-    const to = HOST + "/oauth2/authorize?client_id=" + encodeURIComponent(env.SQUARE_APPLICATION_ID || APP_ID) + "&scope=" + encodeURIComponent(SCOPES).replace(/%20/g, "+") +
+    if (!squareAppId(env)) return page("Almost there", "Relay is missing its Square app details on the server, so it can't connect Square shops yet.", 503);
+    const to = squareHost(env) + "/oauth2/authorize?client_id=" + encodeURIComponent(squareAppId(env)) + "&scope=" + encodeURIComponent(SCOPES).replace(/%20/g, "+") +
       "&session=false&state=" + encodeURIComponent(state);
     return Response.redirect(to, 302);
   }
@@ -122,7 +122,7 @@ export async function handleSquareConnect(request, env, url, o = {}) {
       if (!/^[A-Za-z0-9_-]{5,64}$/.test(merchantId)) throw new Error("Square did not say which shop this is");
       let label = "Square shop", currency = null;
       try {
-        const r = await f(HOST + "/v2/merchants/" + encodeURIComponent(merchantId), { headers: { Authorization: "Bearer " + j.access_token, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
+        const r = await f(squareHost(env) + "/v2/merchants/" + encodeURIComponent(merchantId), { headers: { Authorization: "Bearer " + j.access_token, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
         const m = (await r.json()).merchant; if (m && m.business_name) label = String(m.business_name).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80) || label;
         if (m && typeof m.currency === "string" && /^[A-Z]{3}$/.test(m.currency)) currency = m.currency;
       } catch { /* the shop keeps a generic name */ }
