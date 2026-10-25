@@ -964,7 +964,7 @@
       rows.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
         list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
-          el("span", { text: money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
+          el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") + " · ✓ confirmed by the shop" })]));
       });
     }).catch(function () { list.textContent = ""; list.appendChild(el("p", { text: "Couldn't reach Relay." })); });
     sheet.appendChild(el("button", { className: "rl-btn", text: "Swap & resell", style: "margin-top:10px", onclick: function () { openResale(); } }));

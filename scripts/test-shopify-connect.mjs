@@ -5,7 +5,8 @@ import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import { handleShopifyConnect, listConnectedShopifyStores, syncAllShopify, shopifyShopsForDisplay, normaliseShop, shopifySigned } from "../worker/shopify-connect.js";
 import { handleRetailerRoute } from "../worker/retailer.js";
-import { receiveShopifyWebhook } from "../worker/shopify-webhooks.js";
+import { receiveShopifyWebhook, backfillShopifyOrders } from "../worker/shopify-webhooks.js";
+import { emailHash } from "../worker/auth.js";
 import { ensurePushTables, priceText } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
 
@@ -34,7 +35,7 @@ const shops = {
   "volt-tech.myshopify.com": { name: "Volt Tech", products: [
     { id: "gid://shopify/Product/1", title: "USB-C Charger", img: "https://cdn.shopify.com/s/files/charger.png", variants: [{ id: "gid://shopify/ProductVariant/11", title: "65W", sku: "CUSH-SAGE", price: "39.99", qty: 3 }] }] }
 };
-let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "";
+let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "", shopOrders = {};
 let tokenCalls = [], apiCalls = [], codeToShop = { "code-oak": "oak-thread.myshopify.com", "code-volt": "volt-tech.myshopify.com" }, grantScope = "read_products,read_inventory";
 globalThis.fetch = async (url, init = {}) => {
   url = String(url);
@@ -61,6 +62,10 @@ globalThis.fetch = async (url, init = {}) => {
     (hooks[shop] = hooks[shop] || []).push({ topic: variables.topic, uri: variables.sub.uri });
     return json({ data: { webhookSubscriptionCreate: { webhookSubscription: { id: "gid://shopify/WebhookSubscription/x" }, userErrors: [] } } });
   }
+  if (/orders\(first/.test(q)) {
+    assert.match(variables.q, /financial_status:paid/);
+    return json({ data: { orders: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: (shopOrders[shop] || []) } } });
+  }
   lastProductQuery = q;
   return json({ data: { shop: { currencyCode: currencies[shop] || "GBP" }, products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: shops[shop].products.map(p => ({
     id: p.id, title: p.title, description: "", featuredMedia: p.img ? { preview: { image: { url: p.img } } } : null,
@@ -82,7 +87,7 @@ assert.equal(r1.status, 302);
 const to = new URL(r1.headers.get("location"));
 assert.equal(to.origin + to.pathname, "https://oak-thread.myshopify.com/admin/oauth/authorize");
 assert.equal(to.searchParams.get("client_id"), "client-id-1");
-assert.equal(to.searchParams.get("scope"), "read_products,read_inventory");
+assert.equal(to.searchParams.get("scope"), "read_products,read_inventory,read_orders");
 assert.equal(to.searchParams.get("redirect_uri"), "https://w.test/relay/shopify/oauth/callback");
 const state = to.searchParams.get("state");
 const cb = (params) => go("/relay/shopify/oauth/callback?" + params.toString());
@@ -108,7 +113,7 @@ const okPage = await ok.text();
 assert.match(okPage, /Oak &amp; Thread is connected to Relay/);
 const key = /retailer\.html#key=(rk_[A-Za-z0-9_-]{43})/.exec(okPage)[1];
 // Shopify is asked to send change notices (products added, changed, removed; app removed) to Relay, once each.
-assert.deepEqual(hooks["oak-thread.myshopify.com"].map(h => h.topic).sort(), ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_DELETE", "PRODUCTS_UPDATE"]);
+assert.deepEqual(hooks["oak-thread.myshopify.com"].map(h => h.topic).sort(), ["APP_UNINSTALLED", "ORDERS_PAID", "PRODUCTS_CREATE", "PRODUCTS_DELETE", "PRODUCTS_UPDATE"]);
 assert.ok(hooks["oak-thread.myshopify.com"].every(h => h.uri === "https://w.test/relay/webhooks/shopify"));
 const row = sqlite.prepare("SELECT * FROM shopify_shops").get();
 assert.equal(row.domain, "oak-thread.myshopify.com"); assert.equal(row.label, "Oak & Thread");
@@ -197,8 +202,31 @@ assert.deepEqual(changed, ["oak-thread.myshopify.com"], "a product change makes 
 // A deleted product disappears at once.
 assert.equal((await (await hook("oak-thread.myshopify.com", "products/delete", { id: 2 })).json()).removed, 1);
 assert.deepEqual(sqlite.prepare("SELECT title FROM retailer_catalog_items WHERE provider = 'shopify:oak-thread.myshopify.com' ORDER BY title").all().map(r => r.title), ["Linen Cushion"]);
+// Paid orders from a shop that connected itself are kept with only a hash of the order email, so the shopper who
+// verified that email (and nobody else) sees the purchase in Relay.
+const paid = { id: 7001, created_at: "2026-10-20T10:00:00Z", currency: "GBP", total_price: "24.00", email: "Alice@Example.com", customer: { id: 5 },
+  line_items: [{ id: 9001, title: "Linen Cushion", quantity: 1, price: "24.00", product_id: 1, variant_id: 11 }] };
+assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", paid)).status, 200);
+const ord = sqlite.prepare("SELECT o.id, o.amount_minor, e.email_hash FROM retailer_orders o JOIN retailer_order_emails e ON e.order_id = o.id WHERE o.connection_id = 'shopify:oak-thread.myshopify.com'").all();
+assert.equal(ord.length, 1); assert.equal(ord[0].amount_minor, 2400);
+assert.equal(ord[0].email_hash, await emailHash(env.AUTH_SECRET, "alice@example.com"));
+assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM retailer_orders").all()).toLowerCase().includes("alice@"), "the email address itself is never stored");
+assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", { ...paid, id: 7002, currency: "USD" })).status, 422, "orders in another currency are refused");
+assert.equal((await (await hook("unknown-shop.myshopify.com", "orders/paid", { ...paid, id: 7003 })).json()).ignored, true, "orders from a shop that never connected are ignored");
+// Catch-up read on connect: recent paid orders, the same order twice is stored once.
+shopOrders["oak-thread.myshopify.com"] = [
+  { legacyResourceId: "7001", email: "alice@example.com", createdAt: "2026-10-20T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "24.0" } }, customer: { legacyResourceId: "5" },
+    lineItems: { nodes: [{ id: "gid://shopify/LineItem/9001", title: "Linen Cushion", quantity: 1, originalUnitPriceSet: { shopMoney: { amount: "24.0" } }, product: { legacyResourceId: "1" }, variant: { legacyResourceId: "11" } }] } },
+  { legacyResourceId: "7004", email: null, createdAt: "2026-10-21T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "12.5" } }, customer: null,
+    lineItems: { nodes: [{ id: "gid://shopify/LineItem/9004", title: "Stoneware Mug", quantity: 2, originalUnitPriceSet: { shopMoney: { amount: "6.25" } }, product: null, variant: null }] } }];
+const bf = await backfillShopifyOrders(env, "oak-thread.myshopify.com", "token-oak-thread.myshopify.com", { now });
+assert.deepEqual(bf, { orders: 2, emailLinked: 1, skipped: 0, error: null });
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = 'shopify:oak-thread.myshopify.com'").get().n, 2);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM order_items WHERE order_id LIKE 'shopify:oak-thread.myshopify.com:order:7001%'").get().n, 1, "webhook and catch-up never duplicate a line");
 // Privacy requests are answered.
 for (const t of ["customers/data_request", "customers/redact"]) assert.equal((await hook("oak-thread.myshopify.com", t, { customer: { id: 5 } })).status, 200, t);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE external_customer_id = '5'").get().n, 0, "a redact request deletes that customer's orders");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = 'shopify:oak-thread.myshopify.com'").get().n, 1, "other orders stay");
 // Removing the app: Volt's tokens, dashboard keys and products are deleted and it no longer shows to shoppers.
 assert.equal((await hook("volt-tech.myshopify.com", "app/uninstalled", { id: 9 })).status, 200);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopify_shops WHERE domain = 'volt-tech.myshopify.com'").get().n, 0);

@@ -2,13 +2,13 @@ import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
-import { receiveShopifyWebhook } from "./shopify-webhooks.js";
+import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
 import { sendReturnReminders } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
-import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay } from "./shopify-connect.js";
+import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConnectedShopifyStores } from "./shopify-connect.js";
 import { ensureOnce } from "./once.js";
 // The fictional demo products seeded by migration 0003 had no shop name or picture. They belong to three made-up shops;
 // this names them and adds their pictures (served from the Relay site). Only rows still missing a name are touched.
@@ -80,7 +80,12 @@ export default {
     }
     if (url.pathname.startsWith("/relay/shopify/")) {
       // After a Shopify shop connects, only that shop is read in the background.
-      const shopifyConnect = await handleShopifyConnect(request, env, url, { afterConnect: (shop) => { try { ctx.waitUntil(syncAllShopify(env, { only: shop }).catch(() => {})); } catch {} } });
+      // Its recent paid orders are read once too, so shoppers who bought there can see those purchases.
+      const shopifyConnect = await handleShopifyConnect(request, env, url, { afterConnect: (shop) => { try { ctx.waitUntil((async () => {
+        await syncAllShopify(env, { only: shop }).catch(() => {});
+        const st = (await listConnectedShopifyStores(env).catch(() => [])).find(x => x.domain === shop);
+        if (st) await backfillShopifyOrders(env, shop, st.token).catch(() => {});
+      })()); } catch {} } });
       if (shopifyConnect) return shopifyConnect;
     }
     if (url.pathname.startsWith("/relay/retailer/")) {
@@ -208,6 +213,13 @@ export default {
         if (row) { const m = JSON.parse(row.metadata_json); lastSync = {at:row.created_at, success:!!m.success,
           products:m.products ?? null, variants:m.variants ?? null, images:m.images ?? null, error:m.error || null}; }
       } catch {}
+      // The catch-up read of each shop's recent paid orders (counts only).
+      let orderCatchUp = [];
+      try {
+        const rows = env.RELAY_DB && ((await env.RELAY_DB.prepare(`SELECT subject_id AS shop, created_at AS at, metadata_json FROM audit_events WHERE event_type='shopify_orders_backfill'
+          AND created_at = (SELECT MAX(created_at) FROM audit_events a2 WHERE a2.event_type='shopify_orders_backfill' AND a2.subject_id = audit_events.subject_id) LIMIT 50`).all()).results || []);
+        orderCatchUp = (rows || []).map(r => ({ shop: r.shop, at: r.at, ...JSON.parse(r.metadata_json) }));
+      } catch {}
       // Whether Shopify was asked to send change notices, per connected shop (latest attempt only; no tokens or shop data).
       let webhooks = [];
       try {
@@ -222,7 +234,7 @@ export default {
         selfConnectedStoreCount: shown.filter(s => s.connected).length, connectWithShopify: Boolean(env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET),
         historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
         publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
-        lastSync, webhooks, ukShopsOnly: true,
+        lastSync, webhooks, orderCatchUp, ukShopsOnly: true,
         note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
       }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }

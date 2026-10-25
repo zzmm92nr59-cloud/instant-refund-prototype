@@ -94,22 +94,33 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     return Response.json({ received: true });
   }
   if (PRIVACY_TOPICS.has(topic)) {
-    // Relay never reads Shopify customers for shops that connected themselves; orders exist only for server-configured shops.
+    // Relay keeps only order lines, totals and a hash of the order email; a redact request deletes that customer's orders.
     let deleted = 0;
     if (topic === "customers/redact" && payload && payload.customer && payload.customer.id != null) deleted = await deleteOrders(db, connection, String(payload.customer.id));
     if (topic === "shop/redact") { await forgetShopifyShop(env, shop, { everything: true }); deleted = await deleteOrders(db, connection, null); }
     await audit(env, "shopify_privacy_request", shop, deliveryId, { topic, deleted });
     return Response.json({ received: true });
   }
-  if (topic !== "orders/paid" || !store) return Response.json({ received: true, ignored: true });
-  let event;
-  try { event = JSON.parse(new TextDecoder().decode(body)); }
-  catch { return new Response("Invalid JSON", { status: 400 }); }
+  if (topic !== "orders/paid") return Response.json({ received: true, ignored: true });
+  // Orders are taken from shops set up in the server settings, and from shops that connected themselves to Relay.
+  let connected = false;
+  try { connected = !!(await db.prepare("SELECT 1 AS x FROM shopify_shops WHERE domain = ?").bind(shop).first()); } catch { connected = false; }
+  if (!store && !connected) return Response.json({ received: true, ignored: true });
+  if (!payload) return new Response("Invalid JSON", { status: 400 });
+  const r = await ingestShopifyOrder(env, shop, payload, "webhook:" + deliveryId, topic);
+  return Response.json(r.body, { status: r.status });
+}
+
+// Stores one paid Shopify order (webhook or catch-up read). Shape: Shopify's REST order (id, created_at, currency, total_price,
+// email, customer, line_items[]). Only a keyed hash of the order email is kept, never the address, so it can be matched later
+// against a shopper's verified sign-in email. Returns { status, body }.
+export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "orders/paid") {
+  const connection = "shopify:" + shop;
   if (!event || !event.id || !event.created_at || !Array.isArray(event.line_items))
-    return new Response("Invalid order payload", { status: 400 });
+    return { status: 400, body: { error: "invalid_order" } };
   if (String(event.currency || "").toUpperCase() !== "GBP")
-    return Response.json({ received: false, error: "GBP_only_MVP" }, { status: 422 });
-  if (event.line_items.length > 100) return new Response("Too many lines", { status: 413 });
+    return { status: 422, body: { received: false, error: "GBP_only_MVP" } };
+  if (event.line_items.length > 100) return { status: 413, body: { error: "too_many_lines" } };
   const externalId = String(event.id);
   const orderId = connection + ":order:" + externalId;
   let statements;
@@ -144,27 +155,66 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
       env.RELAY_DB.prepare(`INSERT OR IGNORE INTO audit_events
         (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
         VALUES (?,?,?,?,?,?,?)`)
-        .bind("shopify:webhook:" + shop + ":" + deliveryId, "system", "shopify_webhook",
+        .bind("shopify:order:" + shop + ":" + sourceId, "system", "shopify_webhook",
           "shopify_paid_order_ingested", "retailer_order", orderId, JSON.stringify({ topic, shop, lines: lines.length }))
     ];
   } catch {
-    return new Response("Invalid order amount or lines", { status: 400 });
+    return { status: 400, body: { error: "invalid_amount_or_lines" } };
   }
   try {
-    // Ownership link: only a keyed hash of the order email is kept (never the address itself),
-    // and only when sign-in is configured. Matched later against a shopper's verified email.
     const orderEmail = normaliseEmail(event.email || event.contact_email || (event.customer && event.customer.email));
+    let linked = false;
     if (orderEmail && env.AUTH_SECRET && String(env.AUTH_SECRET).length >= 16) {
+      linked = true;
       await ensureAuthTables(env.RELAY_DB);
       statements.push(env.RELAY_DB.prepare(`INSERT INTO retailer_order_emails (order_id,email_hash,created_at)
         VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET email_hash=excluded.email_hash`)
         .bind(orderId, await emailHash(env.AUTH_SECRET, orderEmail), Date.now()));
     }
     await env.RELAY_DB.batch(statements);
-    // Deliberately DO NOT create a verified match or expose orders to the public wallet.
-    return Response.json({ received: true });
+    // Ownership is shown to a shopper only when this order's email matches their own verified sign-in email.
+    return { status: 200, body: { received: true, ...(linked ? { emailLinked: true } : {}) } };
   } catch (error) {
     console.error("Shopify order ingest failed", String(error));
-    return Response.json({ error: "ingest_failed" }, { status: 503 });
+    return { status: 503, body: { error: "ingest_failed" } };
   }
+}
+
+// Catch-up: paid orders from the last 60 days, read once when a shop connects (webhooks cover everything after that).
+// Needs the shop's approval for orders; if Shopify refuses (for example the app isn't yet allowed customer emails), that is recorded and nothing breaks.
+const gidNumber = (g) => (g == null ? null : String(g).split("/").pop());
+export async function backfillShopifyOrders(env, shop, token, o = {}) {
+  const f = o.fetchImpl || ((...a) => fetch(...a)), now = o.now || Date.now();
+  const since = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
+  const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
+    pageInfo { hasNextPage endCursor }
+    nodes { legacyResourceId email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } } customer { legacyResourceId }
+      lineItems(first: 100) { nodes { id title quantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
+  let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
+  try {
+    do {
+      const r = await f("https://" + shop + "/admin/api/2026-07/graphql.json", { method: "POST", headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" },
+        body: JSON.stringify({ query, variables: { cursor, q: "created_at:>=" + since + " financial_status:paid" } }), signal: AbortSignal.timeout(20000) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || (j.errors && j.errors.length)) throw new Error("Shopify said " + r.status + " " + String((j.errors && j.errors[0] && j.errors[0].message) || "").slice(0, 120));
+      const page = j.data && j.data.orders || {};
+      for (const n of page.nodes || []) {
+        const event = { id: n.legacyResourceId, created_at: n.createdAt, processed_at: n.processedAt, currency: n.currencyCode, email: n.email,
+          total_price: n.totalPriceSet && n.totalPriceSet.shopMoney && n.totalPriceSet.shopMoney.amount, customer: n.customer ? { id: n.customer.legacyResourceId } : null,
+          line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity,
+            price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
+            product_id: l.product ? l.product.legacyResourceId : null, variant_id: l.variant ? l.variant.legacyResourceId : null })) };
+        const res = await ingestShopifyOrder(env, shop, event, "backfill:" + event.id, "orders/backfill");
+        if (res.status === 200) { orders++; if (res.body.emailLinked) linked++; } else skipped++;
+      }
+      cursor = page.pageInfo && page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
+      pages++;
+    } while (cursor && pages < 10);
+  } catch (e) { error = String(e && e.message || e).slice(0, 160); }
+  const out = { orders, emailLinked: linked, skipped, error };
+  try {
+    await env.RELAY_DB.prepare(`INSERT INTO audit_events (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json) VALUES (?,?,?,?,?,?,?)`)
+      .bind(crypto.randomUUID(), "system", null, "shopify_orders_backfill", "shopify_store", shop, JSON.stringify(out)).run();
+  } catch { /* the record is a nice-to-have */ }
+  return out;
 }

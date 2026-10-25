@@ -1,6 +1,6 @@
 // Multi-location Square Sandbox adapter. Retailer records are not consumer-owned.
 // Uses the merchant-authorised Square token only; no customer order endpoints.
-const API = "https://connect.squareupsandbox.com";
+import { squareHost } from "./square-env.js";
 const DAYS = 60;
 const MAX_PAGES_PER_LOCATION = 10;
 const connectionId = location => "square:sandbox:" + location;
@@ -9,7 +9,7 @@ export async function squareRequest(env, path, init = {}) {
   const { token, ...rest } = init;
   const key = token || env.SQUARE_ACCESS_TOKEN;
   if (!key) throw Error("Square access token missing");
-  const response = await fetch(API + path, {
+  const response = await fetch(squareHost(env) + path, {
     ...rest, headers: { Authorization: "Bearer " + key,
       "Square-Version": "2026-09-16", "Content-Type": "application/json" },
     signal: AbortSignal.timeout(15000)

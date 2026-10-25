@@ -321,7 +321,14 @@ async function listPurchases(env, shopper, orderId) {
     const items = await env.RELAY_DB.prepare(
       `SELECT title, quantity, price_minor AS priceMinor, currency FROM order_items WHERE order_id = ?
        ORDER BY title LIMIT 100`).bind(order.id).all();
-    result.push({ ...order, ownership: "retailer_email_matched", items: items.results || [] });
+    // The shop's name for orders from Shopify shops that connected themselves (their address otherwise).
+    let store = null;
+    const m = /^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(order.retailer || ""));
+    if (m) {
+      try { store = (await env.RELAY_DB.prepare("SELECT label FROM shopify_shops WHERE domain = ?").bind(m[1]).first())?.label || null; } catch { store = null; }
+      store = store || m[1].replace(/\.myshopify\.com$/, "");
+    }
+    result.push({ ...order, store, ownership: "retailer_email_matched", items: items.results || [] });
   }
   return result;
 }
