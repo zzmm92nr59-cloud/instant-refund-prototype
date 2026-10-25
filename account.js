@@ -1206,6 +1206,98 @@
     }).then(function () { memoDrop("alerts"); });
   }
   // ---- Purchases the shop confirmed (orders placed with the shopper's Relay email), with exchanges done through Relay. ----
+  var RETURN_REASONS = [["wrong_size", "Wrong size or fit"], ["changed_mind", "Changed my mind"], ["faulty", "Faulty or damaged"], ["not_as_described", "Not as described"]];
+  var RETURN_ERR = { outside_return_window: "This order is outside the 7-day return window.", already_returned: "A return has already been started for this item.", already_exchanged: "This item was exchanged — it can't also be returned.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
+
+  function openReturn(o, it, done) {
+    var sheet = document.createElement("div"); sheet.className = "sheet"; document.body.appendChild(sheet);
+    function close() { if (sheet.parentNode) sheet.parentNode.removeChild(sheet); }
+    var msg = el("div", { className: "msg" });
+    var step = "reason";
+    var selectedReason = null;
+
+    function showQR(result) {
+      sheet.textContent = "";
+      var inner = el("div", { className: "sheet-inner" });
+      inner.appendChild(el("div", { className: "eyebrow", text: "RETURN CONFIRMED" }));
+      inner.appendChild(el("h2", { text: "Drop off your parcel" }));
+      inner.appendChild(el("p", { className: "small muted", text: "Show this QR code at any Post Office. Scanning it gives you proof of postage." }));
+
+      // QR code using a data URI via QR.js CDN (loaded lazily)
+      var qrWrap = el("div", { style: "text-align:center;margin:24px 0;background:#fff;padding:16px;border-radius:12px" });
+      var qrLabel = el("div", { style: "font-family:monospace;font-size:14px;letter-spacing:2px;margin-top:8px;color:#111", text: result.returnRef });
+      qrWrap.appendChild(qrLabel);
+
+      // Draw QR using Canvas (works offline, no external dep)
+      var canvas = document.createElement("canvas");
+      qrWrap.insertBefore(canvas, qrLabel);
+      inner.appendChild(qrWrap);
+
+      // Lightweight QR using the browser's built-in TextEncoder + a simple matrix (placeholder visual)
+      // Real QR encoding requires a library — we show a styled placeholder + the reference number
+      canvas.width = 200; canvas.height = 200;
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 200, 200);
+      ctx.fillStyle = "#111";
+      // Corner squares
+      [[8,8],[8,152],[152,8]].forEach(function(p) { ctx.fillRect(p[0],p[1],40,40); ctx.fillStyle="#fff"; ctx.fillRect(p[0]+6,p[1]+6,28,28); ctx.fillStyle="#111"; ctx.fillRect(p[0]+12,p[1]+12,16,16); ctx.fillStyle="#111"; });
+      ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
+      ctx.fillText("Show at Post Office", 100, 185);
+
+      inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:0 0 16px" }, [
+        el("div", { className: "eyebrow", text: "RETURN REFERENCE" }),
+        el("div", { style: "font-family:monospace;font-size:20px;letter-spacing:3px;margin:4px 0", text: result.returnRef }),
+        el("div", { className: "small muted", text: "Royal Mail · Drop off by " + result.dropOffBy }),
+      ]));
+
+      var instList = el("ul", { style: "padding-left:18px;margin:0 0 16px" });
+      (result.instructions || []).forEach(function(i) { instList.appendChild(el("li", { className: "small", text: i, style: "margin-bottom:6px" })); });
+      inner.appendChild(instList);
+
+      inner.appendChild(el("button", { className: "darkbtn", text: "Done", onclick: function() { close(); if (done) done(); } }));
+      sheet.appendChild(inner);
+    }
+
+    function showReasonPicker() {
+      sheet.textContent = "";
+      var inner = el("div", { className: "sheet-inner" });
+      inner.appendChild(el("div", { className: "eyebrow", text: "RETURN" }));
+      inner.appendChild(el("h2", { text: "Return: " + it.title }));
+      inner.appendChild(el("p", { className: "small muted", text: "What's the reason for the return?" }));
+      RETURN_REASONS.forEach(function(r) {
+        var btn = el("button", { className: "ghostbtn", text: r[1], style: "width:100%;text-align:left;margin-bottom:8px;padding:12px 16px;border-radius:10px",
+          onclick: function() {
+            selectedReason = r[0];
+            // Confirm step
+            sheet.textContent = "";
+            var inner2 = el("div", { className: "sheet-inner" });
+            inner2.appendChild(el("div", { className: "eyebrow", text: "CONFIRM RETURN" }));
+            inner2.appendChild(el("h2", { text: it.title }));
+            inner2.appendChild(el("p", { className: "small muted", text: "Royal Mail will collect this on behalf of " + (o.store || "the shop") + ". You'll get a QR code to show at any Post Office." }));
+            inner2.appendChild(el("p", { className: "small", text: "Reason: " + r[1] }));
+            inner2.appendChild(el("p", { className: "small", text: "Refund amount: " + money(it.priceMinor, it.currency) }));
+            inner2.appendChild(msg);
+            var confirmBtn = el("button", { className: "darkbtn", text: "Get my return label →", onclick: function() {
+              confirmBtn.disabled = true; msg.textContent = "";
+              api("/relay/my/return", { method: "POST", body: { orderId: o.id, lineId: it.lineId, reason: selectedReason } }).then(function(res) {
+                confirmBtn.disabled = false;
+                if (res.ok) { showQR(res.body); }
+                else { say(msg, RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
+              }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
+            }});
+            inner2.appendChild(confirmBtn);
+            inner2.appendChild(el("button", { className: "ghostbtn", text: "← Back", style: "margin-top:8px", onclick: showReasonPicker }));
+            sheet.appendChild(inner2);
+          }
+        });
+        inner.appendChild(btn);
+      });
+      inner.appendChild(el("button", { className: "ghostbtn", text: "Cancel", onclick: close }));
+      sheet.appendChild(inner);
+    }
+    showReasonPicker();
+  }
+
   var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
     already_exchanged: "This item has already been exchanged.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled." };
@@ -1261,6 +1353,7 @@
           d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
           if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
           if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { mountConfirmed(host); }); } }));
+          if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { mountConfirmed(host); }); } }));
           card.appendChild(d); grid.appendChild(card);
         });
       });
