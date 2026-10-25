@@ -12,6 +12,7 @@ import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
+import { handleReturnRoute } from "./returns.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
@@ -397,6 +398,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (totpResponse) return totpResponse;
     const exchangeResponse = await handleExchangeRoute(request, env, url, cors, shopper, o);
     if (exchangeResponse) return exchangeResponse;
+    const returnResponse = await handleReturnRoute(request, env, url, cors, shopper);
+    if (returnResponse) return returnResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
       return json({ purchases: await enrichPurchases(env, await listPurchases(env, shopper)) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {

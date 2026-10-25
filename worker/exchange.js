@@ -28,10 +28,14 @@ const variantKey = (shop, variantId) => "shopify:" + shop + ":variant:gid://shop
 export async function enrichPurchases(env, purchases) {
   const db = env.RELAY_DB;
   await ensureExchangeTables(db);
+  const RETURN_WINDOW_DAYS = 7;
+  const now = Date.now();
   for (const o of purchases) {
     const m = SHOP.exec(String(o.retailer || ""));
+    const daysSinceOrder = o.orderedAt ? (now - new Date(o.orderedAt).getTime()) / (1000 * 60 * 60 * 24) : 999;
     for (const it of o.items || []) {
       it.exchangeable = false;
+      it.returnable = false;
       if (!m || !it.variantId) continue;
       const v = await db.prepare(`SELECT v.title AS variant, i.image_url AS imageUrl, i.title AS product FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id = ?`)
         .bind(variantKey(m[1], it.variantId)).first();
@@ -40,6 +44,16 @@ export async function enrichPurchases(env, purchases) {
         .bind(o.id, it.lineId).first();
       if (ex) { it.exchange = ex; it.variant = ex.toTitle || it.variant; }
       it.exchangeable = !ex && Boolean(it.productId);
+      // returnable: within window, no completed return, no completed exchange
+      if (daysSinceOrder <= RETURN_WINDOW_DAYS && !ex) {
+        let hasReturn = false;
+        try {
+          const ret = await db.prepare("SELECT 1 AS x FROM relay_returns WHERE order_id = ? AND line_id = ? AND status != 'cancelled' LIMIT 1")
+            .bind(o.id, it.lineId).first();
+          hasReturn = !!ret;
+        } catch { /* relay_returns table may not exist yet — treat as no return */ }
+        it.returnable = !hasReturn;
+      }
     }
   }
   return purchases;
