@@ -3,7 +3,7 @@ import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems } from "./shopify-connect.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
-// - products/create|update|delete: a shop changed its products, so Relay reads that shop again at once (and checks price alerts).
+// - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
 // - app/uninstalled: the shop removed Relay, so its tokens, dashboard keys and products are deleted.
 // - customers/data_request, customers/redact, shop/redact: Shopify's required privacy requests.
 // Shopify signs webhooks for Relay's app with the app's secret; a shop set up in the server settings may have its own secret.
@@ -34,7 +34,7 @@ async function validSignature(raw, encoded, secret) {
     return compare(signed, supplied);
   } catch { return false; }
 }
-const PRODUCT_TOPICS = new Set(["products/create", "products/update", "products/delete"]);
+const PRODUCT_TOPICS = new Set(["products/create", "products/update", "products/delete", "inventory_levels/update"]);
 const PRIVACY_TOPICS = new Set(["customers/data_request", "customers/redact", "shop/redact"]);
 async function audit(env, type, shop, deliveryId, meta) {
   try {
