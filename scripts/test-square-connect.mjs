@@ -29,7 +29,7 @@ globalThis.fetch = async (url, init = {}) => {
     return json({ errors: [{ code: "INVALID_REQUEST_ERROR" }] }, 400);
   }
   if (url.endsWith("/v2/merchants/me")) return json({ merchant: { id: globalThis.__defaultMerchant || "MDEFAULT1" } });
-  if (url.includes("/v2/merchants/")) return json({ merchant: { business_name: "North & Co." } });
+  if (url.includes("/v2/merchants/")) return json({ merchant: { business_name: "North & Co.", ...(globalThis.__merchantCurrency ? { currency: globalThis.__merchantCurrency } : {}) } });
   const token = String(init.headers?.Authorization || "").replace("Bearer ", ""), shop = shops[token];
   if (shop === null) return json({ errors: [{ code: "UNAUTHORIZED" }] }, 401);
   if (!shop) throw Error("unexpected token " + token);
@@ -58,6 +58,12 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM square_merchants").get().n, 
 const late = await handleSquareConnect(new Request("https://w.test/x"), env, new URL("https://w.test/relay/square/oauth/callback?code=good&state=" + state), { now: now + 3600_000 });
 assert.equal(late.status, 400);
 
+// 2b. A shop that sells in another currency is turned away: Relay is for UK shops selling in pounds.
+globalThis.__merchantCurrency = "USD";
+const usd = await go("/relay/square/oauth/callback?code=good&state=" + state);
+assert.equal(usd.status, 400); assert.match(await usd.text(), /UK shops that sell in pounds/);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM square_merchants").get().n, 0);
+globalThis.__merchantCurrency = "GBP";
 // 3. A good approval stores the shop, with the token encrypted.
 const ok = await go("/relay/square/oauth/callback?code=good&state=" + state);
 assert.equal(ok.status, 200);
