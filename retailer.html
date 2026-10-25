@@ -32,14 +32,23 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .offers .row{grid-template-columns:1fr auto}.state{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px}.live{background:#eef6dc;color:#3f6212}.ended{background:#efeae0;color:#6b6252}
 .fine{font-size:12px;color:var(--muted);line-height:1.6;margin-top:30px}
 .hidden{display:none!important}
+.shopify{margin:22px auto 0;max-width:420px;text-align:left;border-top:1px solid var(--line);padding-top:18px}.shopify label{font-size:12px;font-weight:700;color:var(--muted)}
+.shopify-row{display:flex;gap:8px;margin-top:6px}.shopify-row input{flex:1;min-width:0;border:1px solid #d9d3c6;border-radius:12px;padding:11px 12px;background:#fff}
+@media(max-width:480px){.shopify-row{flex-direction:column}}
 @media(max-width:640px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}.row{grid-template-columns:60px 1fr;gap:12px}.pic{width:60px;height:60px}.count{grid-column:2;text-align:left;display:flex;gap:8px;align-items:baseline}.count strong{font-size:24px}}
 </style></head><body><div class="wrap">
-<div class="top"><div class="logo">Relay<small>for shops</small></div><span class="tag">Square Sandbox · test shops</span></div>
+<div class="top"><div class="logo">Relay<small>for shops</small></div><span class="tag" id="platformTag">Test shops</span></div>
 
 <section id="signin" class="signin hidden" style="margin-top:40px">
   <h2>See what Relay shoppers are waiting for</h2>
-  <p>Sign in with the Square account that runs your shop. Relay only reads your products and prices.</p>
+  <p>Sign in with the account that runs your shop. Relay only reads your products, prices and stock.</p>
   <p><a class="btn dark" style="display:inline-block;text-decoration:none" href="https://relay-square-api2.9pts72cy5j.workers.dev/relay/square/connect?for=dashboard">Sign in with Square</a></p>
+  <form class="shopify" action="https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/connect" method="get">
+    <input type="hidden" name="for" value="dashboard">
+    <label for="shopAddr">Shopify shop</label>
+    <div class="shopify-row"><input id="shopAddr" name="shop" placeholder="your-shop.myshopify.com" required autocomplete="off" autocapitalize="off" spellcheck="false">
+    <button class="btn limebtn" type="submit">Sign in with Shopify</button></div>
+  </form>
 </section>
 
 <main id="app" class="hidden">
@@ -54,7 +63,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
   <div class="list" id="items"><div class="empty">Loading…</div></div>
   <div class="head"><h2>Offers you've sent</h2></div>
   <div class="list offers" id="offers"></div>
-  <p class="fine">An offer sends a phone alert to everyone watching that item (and people following your whole shop). It doesn't change your price in Square and Relay doesn't take payment — you honour the offer price at your till or checkout. One offer per item at a time, up to 10 a day. Figures update when Relay next reads your catalogue (at least hourly).<br>
+  <p class="fine">An offer sends a phone alert to everyone watching that item (and people following your whole shop). It doesn't change your price in <span id="platform">your shop system</span> and Relay doesn't take payment — you honour the offer price at your till or checkout. One offer per item at a time, up to 10 a day. Figures update when Relay next reads your catalogue (at least hourly).<br>
   <button class="btn ghost" id="signout" style="margin-top:10px">Sign out on this device</button></p>
 </main>
 </div>
@@ -87,7 +96,7 @@ function itemRow(i) {
   const suggested = Math.max(1, Math.round(i.priceMinor * 0.85));
   return `<div class="row" data-sku="${esc(i.sku)}">
     <div class="pic" ${pic}>${i.imageUrl ? "" : esc((i.product || "?")[0])}</div>
-    <div><h3>${esc(i.product)}</h3><div class="meta">${esc(i.variant || "")}${i.variant ? " · " : ""}${gbp(i.priceMinor)} · SKU ${esc(i.sku)}</div>
+    <div><h3>${esc(i.product)}</h3><div class="meta">${esc(i.variant || "")}${i.variant ? " · " : ""}${gbp(i.priceMinor)}${i.retailerSku ? " · SKU " + esc(i.retailerSku) : ""}</div>
       ${i.newThisWeek ? `<span class="chip">+${i.newThisWeek} this week</span>` : ""}${i.viaShopFollow ? ` <span class="meta">+${i.viaShopFollow} via shop follow</span>` : ""}</div>
     <div class="count"><strong>${i.watchers}</strong><span>watching</span><div><button class="btn limebtn" data-open style="margin-top:8px">Send offer</button></div></div>
     <form class="offerbox hidden" data-form>
@@ -109,6 +118,8 @@ async function load() {
     const [d, o] = await Promise.all([api("/relay/retailer/demand"), api("/relay/retailer/offers")]);
     demand = d.body;
     $("shop").textContent = demand.store || "Your shop";
+    $("platformTag").textContent = demand.platform === "shopify" ? "Shopify · development shop" : "Square Sandbox · test shop";
+    $("platform").textContent = demand.platform === "shopify" ? "Shopify" : "Square";
     $("sWatch").textContent = demand.shoppersWatchingItems ?? 0;
     $("sItems").textContent = (demand.watchedItems || []).length;
     $("sFollow").textContent = demand.followers ?? 0;
