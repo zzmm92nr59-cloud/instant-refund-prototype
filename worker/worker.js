@@ -207,7 +207,7 @@ export default {
             LEFT JOIN retailer_item_images img ON img.item_id=i.id
             LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
             WHERE i.provider=? AND v.price_minor IS NOT NULL
-              AND v.currency='GBP'
+              AND v.currency IS NOT NULL
             GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
             .bind("shopify:" + store.domain).all();
           for (const row of rows.results || []) {

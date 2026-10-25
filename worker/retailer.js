@@ -7,7 +7,7 @@
 // What an offer does: sends a phone alert to the shoppers watching that item. It does not change the shop's price in Square
 // or Shopify and Relay does not take payment; the shop honours the offer price itself.
 import { ensureOnce } from "./once.js";
-import { ensurePushTables, sendPush, subsOf } from "./push.js";
+import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -15,7 +15,6 @@ const SKU = /^[A-Za-z0-9:_.\-\/]{1,200}$/;
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const clean = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n) : "");
 const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const pounds = (m) => "£" + (m / 100).toFixed(2);
 async function hashKey(env, key) {
   const k = await crypto.subtle.importKey("raw", enc.encode("relay-retailer-key:" + env.AUTH_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return b64u(new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(key))));
@@ -69,7 +68,7 @@ async function shopFromRequest(request, env, now) {
 // and Relay's shop-scoped variant id for Shopify (Shopify SKUs are optional and can repeat between shops).
 async function shopVariants(db, shop) {
   const shopify = shop.provider === "shopify";
-  const sql = `SELECT ${shopify ? "v.id" : "v.sku"} AS sku, v.sku AS retailerSku, v.title AS variant, v.price_minor AS priceMinor, i.title AS product, i.image_url AS imageUrl
+  const sql = `SELECT ${shopify ? "v.id" : "v.sku"} AS sku, v.sku AS retailerSku, v.title AS variant, v.price_minor AS priceMinor, v.currency AS currency, i.title AS product, i.image_url AS imageUrl
       FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
      WHERE ${shopify ? "i.provider = ?" : "i.provider = 'square_sandbox' AND i.store_label = ? AND v.sku IS NOT NULL"} LIMIT 2000`;
   return ((await db.prepare(sql).bind(shopify ? "shopify:" + shop.shop_ref : shop.store_label).all()).results || []);
@@ -87,7 +86,7 @@ export async function shopDemand(env, shop, now = Date.now()) {
   for (const r of rows) {
     const v = bySku.get(r.sku);
     if (!v) continue; // only items still in the shop's own catalogue
-    const it = items.get(r.sku) || { sku: r.sku, retailerSku: v.retailerSku || null, product: v.product, variant: v.variant, priceMinor: v.priceMinor, imageUrl: v.imageUrl || null, watchers: 0, viaShopFollow: 0, newThisWeek: 0 };
+    const it = items.get(r.sku) || { sku: r.sku, retailerSku: v.retailerSku || null, product: v.product, variant: v.variant, priceMinor: v.priceMinor, currency: v.currency || "GBP", imageUrl: v.imageUrl || null, watchers: 0, viaShopFollow: 0, newThisWeek: 0 };
     if (r.via === "item") { it.watchers++; people.add(r.shopper_id); } else it.viaShopFollow++;
     if (r.via === "item" && r.created_at >= week) it.newThisWeek++;
     items.set(r.sku, it);
@@ -95,7 +94,7 @@ export async function shopDemand(env, shop, now = Date.now()) {
   const followers = (await db.prepare("SELECT COUNT(*) AS n FROM store_optins WHERE store = ?").bind(label).first()).n;
   const list = [...items.values()].filter(i => i.watchers > 0)
     .sort((a, b) => b.watchers - a.watchers || b.newThisWeek - a.newThisWeek || a.product.localeCompare(b.product));
-  return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", generatedAt: new Date(now).toISOString(), followers, shoppersWatchingItems: people.size, itemsInCatalogue: variants.length, watchedItems: list };
+  return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", currency: (variants.find(v => v.currency) || {}).currency || "GBP", generatedAt: new Date(now).toISOString(), followers, shoppersWatchingItems: people.size, itemsInCatalogue: variants.length, watchedItems: list };
 }
 
 async function listOffers(db, shop, now) {
@@ -124,7 +123,7 @@ async function sendOffer(env, shop, body, o) {
   const endText = new Date(ends).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
   const message = {
     title: "Offer from " + shop.store_label,
-    body: v.product + (v.variant ? " · " + v.variant : "") + ": " + pounds(offer) + " for Relay watchers (usually " + pounds(v.priceMinor) + "). Ends " + endText + "." + (note ? " " + note : ""),
+    body: v.product + (v.variant ? " · " + v.variant : "") + ": " + priceText(offer, v.currency) + " for Relay watchers (usually " + priceText(v.priceMinor, v.currency) + "). Ends " + endText + "." + (note ? " " + note : ""),
     url: "./"
   };
   let devices = 0;

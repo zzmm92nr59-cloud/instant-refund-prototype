@@ -110,6 +110,12 @@ export async function subsOf(db, shopperId) {
   return ((await db.prepare("SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE shopper_id = ?").bind(shopperId).all()).results || []);
 }
 const pounds = (m) => "£" + (m / 100).toFixed(2);
+// A price in the shop's own currency: £ for GBP (as before), otherwise e.g. "US$12.00". Never shows another currency as pounds.
+export function priceText(minor, currency) {
+  const c = /^[A-Z]{3}$/.test(String(currency || "")) ? String(currency) : "GBP";
+  if (c === "GBP") return pounds(minor);
+  try { return new Intl.NumberFormat("en-GB", { style: "currency", currency: c }).format(minor / 100); } catch { return c + " " + (minor / 100).toFixed(2); }
+}
 
 // Looks at every watched item. A price lower than the last one Relay saw is a drop; the first look only records the price.
 export async function runPriceAlerts(env, o = {}) {
@@ -122,12 +128,12 @@ export async function runPriceAlerts(env, o = {}) {
   const byShopper = new Map();
   let checked = 0, drops = 0, sent = 0;
   for (const w of rows) {
-    const cur = await db.prepare("SELECT price_minor AS p FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
+    const cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
     if (!cur || !Number.isFinite(cur.p)) continue;
     checked++;
     if (w.last_seen_minor != null && cur.p < w.last_seen_minor) {
       drops++;
-      const l = byShopper.get(w.shopper_id) || []; l.push({ w, was: w.last_seen_minor, now: cur.p }); byShopper.set(w.shopper_id, l);
+      const l = byShopper.get(w.shopper_id) || []; l.push({ w, was: w.last_seen_minor, now: cur.p, currency: cur.c }); byShopper.set(w.shopper_id, l);
       await db.prepare("UPDATE price_watches SET last_seen_minor = ?, last_alert_at = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, now, w.shopper_id, w.sku).run();
     } else if (w.last_seen_minor !== cur.p) {
       await db.prepare("UPDATE price_watches SET last_seen_minor = ? WHERE shopper_id = ? AND sku = ?").bind(cur.p, w.shopper_id, w.sku).run();
@@ -139,7 +145,7 @@ export async function runPriceAlerts(env, o = {}) {
     const subs = await subsOf(db, shopperId);
     const messages = list.slice(0, 10).map(x => ({
       title: "Price drop" + (x.w.store ? " at " + x.w.store : ""),
-      body: x.w.product + (x.w.variant ? " · " + x.w.variant : "") + " is now " + pounds(x.now) + " (was " + pounds(x.was) + ")",
+      body: x.w.product + (x.w.variant ? " · " + x.w.variant : "") + " is now " + priceText(x.now, x.currency) + " (was " + priceText(x.was, x.currency) + ")",
       url: "./"
     }));
     if (list.length > 10) messages.push({ title: (list.length - 10) + " more price drops", body: "Open Relay to see everything you watch.", url: "./" });
