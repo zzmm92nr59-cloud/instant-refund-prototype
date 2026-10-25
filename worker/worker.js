@@ -9,6 +9,39 @@ import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
 import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay } from "./shopify-connect.js";
+import { ensureOnce } from "./once.js";
+// The fictional demo products seeded by migration 0003 had no shop name or picture. They belong to three made-up shops;
+// this names them and adds their pictures (served from the Relay site). Only rows still missing a name are touched.
+const DEMO_PICS = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/pics/products/";
+const DEMO_ROWS = { "urban-kicks": ["Urban Kicks", { "retro-high": "rd-retro-high", "court-low": "rd-court-low", "running-pro": "rd-running-pro", "classic-hoodie": "rd-classic-hoodie" }],
+  "everyday-style": ["Everyday Style", { "essential-tee": "rd-cotton-tshirt", "zip-jacket": "rd-zip-jacket", "linen-shirt": "rd-linen-shirt", "relaxed-jeans": "rd-relaxed-jeans" }],
+  "active-outlet": ["Active Outlet", { "yoga-leggings": "rd-yoga-leggings", "training-shorts": "rd-training-shorts", "sports-tee": "rd-sports-tee", "gym-bag": "rd-gym-bag" }] };
+function labelDemoRows(db) {
+  return ensureOnce(db, "demo-labels-v1", async () => {
+    for (const [shop, [label, pics]] of Object.entries(DEMO_ROWS)) {
+      for (const [item, pic] of Object.entries(pics))
+        await db.prepare("UPDATE retailer_catalog_items SET store_label = COALESCE(store_label, ?), image_url = COALESCE(image_url, ?) WHERE provider = 'relay_demo' AND external_item_id = ?")
+          .bind(label, DEMO_PICS + pic + ".png", shop + ":" + item).run();
+      await db.prepare("UPDATE retailer_catalog_items SET store_label = ? WHERE provider = 'relay_demo' AND store_label IS NULL AND external_item_id LIKE ?").bind(label, shop + ":%").run();
+    }
+  });
+}
+// Shopify can send several change notices in a row; one read per shop runs at a time, plus one more if more changes arrived meanwhile.
+const shopSyncs = new Map();
+function syncShopSoon(env, shop) {
+  const cur = shopSyncs.get(shop);
+  if (cur) { cur.again = true; return cur.done; }
+  const state = { again: false, done: null };
+  state.done = (async () => {
+    try {
+      do { state.again = false; await syncAllShopify(env, { only: shop }); } while (state.again);
+      await runPriceAlerts(env);
+    } catch (e) { console.error("Shopify change sync failed", String(e && e.message || e).slice(0, 120)); }
+    finally { shopSyncs.delete(shop); }
+  })();
+  shopSyncs.set(shop, state);
+  return state.done;
+}
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
@@ -60,7 +93,8 @@ export default {
     });
     if (authResponse) return authResponse;
     if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {
-      return receiveShopifyWebhook(request, env);
+      // A shop changed its products: read just that shop again, then check price alerts.
+      return receiveShopifyWebhook(request, env, { onCatalogueChange: (shop) => { try { ctx.waitUntil(syncShopSoon(env, shop)); } catch {} } });
     }
 
     if (url.pathname === "/relay/webhooks/square" && request.method === "POST") {
@@ -90,7 +124,7 @@ export default {
     // Public demo-only product selector; never exposes production merchant data.
     if (url.pathname === "/relay/live-test/products" && request.method === "GET") {
       if (!env.RELAY_DB) return Response.json({products:[]},{headers:corsHeaders});
-      try { await ensureSquareMerchantSchema(env.RELAY_DB); } catch {}
+      try { await ensureSquareMerchantSchema(env.RELAY_DB); await labelDemoRows(env.RELAY_DB); } catch {}
       const result = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,i.store_label AS storeName,i.image_url AS imageUrl,
         v.sku,v.price_minor AS priceMinor,v.currency,i.provider AS provider,
         i.external_item_id AS externalItemId,
@@ -98,7 +132,7 @@ export default {
         FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id=i.id
         LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
         WHERE i.provider IN ('square_sandbox','relay_demo')
-          AND v.price_minor IS NOT NULL AND v.sku IS NOT NULL
+          AND v.price_minor IS NOT NULL AND v.sku IS NOT NULL AND v.currency='GBP'
         GROUP BY i.id,v.id
         ORDER BY i.provider DESC,i.title,v.title LIMIT 250`).all();
       return Response.json({products:result.results||[]},{headers:{"Cache-Control":"no-store",...corsHeaders}});
@@ -174,6 +208,13 @@ export default {
         if (row) { const m = JSON.parse(row.metadata_json); lastSync = {at:row.created_at, success:!!m.success,
           products:m.products ?? null, variants:m.variants ?? null, images:m.images ?? null, error:m.error || null}; }
       } catch {}
+      // Whether Shopify was asked to send change notices, per connected shop (latest attempt only; no tokens or shop data).
+      let webhooks = [];
+      try {
+        const rows = env.RELAY_DB && ((await env.RELAY_DB.prepare(`SELECT subject_id AS shop, created_at AS at, metadata_json FROM audit_events WHERE event_type='shopify_webhooks_registered'
+          AND created_at = (SELECT MAX(created_at) FROM audit_events a2 WHERE a2.event_type='shopify_webhooks_registered' AND a2.subject_id = audit_events.subject_id) LIMIT 50`).all()).results || []);
+        webhooks = (rows || []).map(r => { const m = JSON.parse(r.metadata_json); return { shop: r.shop, at: r.at, created: m.created || 0, alreadyThere: m.alreadyThere || 0, failed: (m.failed || []).slice(0, 4) }; });
+      } catch {}
       return Response.json({
         success: true, configured: stores.length > 0, connectedStoreCount: stores.length,
         publishedStoreCount: published.length, mode: "read_only_catalogue",
@@ -181,7 +222,7 @@ export default {
         selfConnectedStoreCount: shown.filter(s => s.connected).length, connectWithShopify: Boolean(env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET),
         historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
         publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
-        lastSync,
+        lastSync, webhooks, ukShopsOnly: true,
         note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
       }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }
@@ -207,7 +248,7 @@ export default {
             LEFT JOIN retailer_item_images img ON img.item_id=i.id
             LEFT JOIN retailer_inventory_snapshots s ON s.variant_id=v.id
             WHERE i.provider=? AND v.price_minor IS NOT NULL
-              AND v.currency IS NOT NULL
+              AND v.currency='GBP'
             GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
             .bind("shopify:" + store.domain).all();
           for (const row of rows.results || []) {

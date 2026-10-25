@@ -120,11 +120,15 @@ export async function handleSquareConnect(request, env, url, o = {}) {
       const j = await tokenCall(env, { grant_type: "authorization_code", code }, f);
       const merchantId = String(j.merchant_id || "");
       if (!/^[A-Za-z0-9_-]{5,64}$/.test(merchantId)) throw new Error("Square did not say which shop this is");
-      let label = "Square shop";
+      let label = "Square shop", currency = null;
       try {
         const r = await f(HOST + "/v2/merchants/" + encodeURIComponent(merchantId), { headers: { Authorization: "Bearer " + j.access_token, "Square-Version": "2026-09-16" }, signal: AbortSignal.timeout(15000) });
         const m = (await r.json()).merchant; if (m && m.business_name) label = String(m.business_name).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80) || label;
+        if (m && typeof m.currency === "string" && /^[A-Z]{3}$/.test(m.currency)) currency = m.currency;
       } catch { /* the shop keeps a generic name */ }
+      // Relay is for UK shops that sell in pounds. A shop in another currency is turned away and nothing is stored.
+      if (currency && currency !== "GBP")
+        return page("Relay is for UK shops", esc(label) + " sells in " + esc(currency) + ". Relay only works with UK shops that sell in pounds (£), so nothing was connected.", 400);
       const a = await seal(env, j.access_token), r = j.refresh_token ? await seal(env, j.refresh_token) : { iv: null, data: null };
       await env.RELAY_DB.prepare(`INSERT INTO square_merchants (merchant_id, label, access_iv, access_data, refresh_iv, refresh_data, expires_at, created_at) VALUES (?,?,?,?,?,?,?,?)
         ON CONFLICT(merchant_id) DO UPDATE SET label = excluded.label, access_iv = excluded.access_iv, access_data = excluded.access_data, refresh_iv = excluded.refresh_iv, refresh_data = excluded.refresh_data, expires_at = excluded.expires_at`)

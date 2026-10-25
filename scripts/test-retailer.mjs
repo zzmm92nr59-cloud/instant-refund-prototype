@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleRetailerRoute, issueRetailerKey } from "../worker/retailer.js";
-import { ensurePushTables, b64u } from "../worker/push.js";
+import { ensurePushTables, b64u, handlePushRoute } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -46,6 +46,11 @@ watch("dan-id", "ZAR-SCF-1", "Knit Scarf", "Zara", "store");     // follows the 
 sqlite.prepare("INSERT INTO store_optins (shopper_id, store, created_at) VALUES (?,?,?)").run("dan-id", "Zara", now);
 watch("alice-id", "HBC-CND-250", "Argan Oil Conditioner", "Health & Beauty Company");
 watch("erin-id", "GONE-SKU", "Old thing", "Zara");                 // no longer in Zara's catalogue
+watch("fay-id", "ZAR-SCF-1", "Knit Scarf", "Zara"); watch("gus-id", "ZAR-SCF-1", "Knit Scarf", "Zara");
+// An item priced in dollars never counts: Relay is for UK shops selling in pounds.
+sqlite.prepare("INSERT INTO retailer_catalog_items (id, provider, external_item_id, title, store_label) VALUES (?,?,?,?,?)").run("i:USD", "square_sandbox", "USD", "Dollar Hat", "Zara");
+sqlite.prepare("INSERT INTO retailer_catalog_variants (id, item_id, external_variant_id, title, sku, price_minor, currency) VALUES (?,?,?,?,?,?,?)").run("v:USD1", "i:USD", "USD1", "One size", "ZAR-USD-1", 2000, "USD");
+watch("hal-id", "ZAR-USD-1", "Dollar Hat", "Zara"); watch("ida-id", "ZAR-USD-1", "Dollar Hat", "Zara"); watch("jon-id", "ZAR-USD-1", "Dollar Hat", "Zara");
 
 async function phone() {
   const kp = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
@@ -82,17 +87,22 @@ assert.match(zara, /^rk_[A-Za-z0-9_-]{43}$/);
 assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM retailer_keys").all()).includes(zara), "the key itself is never stored");
 
 // 3. Zara sees counts for its own watched items only, busiest first, and nothing that identifies a shopper.
+//    Any count under 3 is shown only as "fewer than 3", so a shop can't single out one shopper.
 const d = await (await call("/relay/retailer/demand", { key: zara })).json();
 assert.equal(d.store, "Zara");
-assert.deepEqual(d.watchedItems.map(i => [i.sku, i.watchers, i.viaShopFollow, i.newThisWeek]), [["ZAR-SCF-1", 2, 1, 1], ["ZAR-COAT-M", 1, 0, 1]]);
-assert.equal(d.followers, 1); assert.equal(d.shoppersWatchingItems, 3); assert.equal(d.itemsInCatalogue, 3);
+assert.deepEqual(d.watchedItems.map(i => [i.sku, i.watchers, i.watchersText, i.viaShopFollow, i.newThisWeek]), [["ZAR-SCF-1", 4, "4", null, 3], ["ZAR-COAT-M", null, "Fewer than 3", null, null]]);
+assert.equal(d.followers, null); assert.equal(d.followersText, "Fewer than 3");
+assert.equal(d.shoppersWatchingItems, 5); assert.equal(d.itemsInCatalogue, 3, "the dollar-priced item is not counted");
+assert.ok(!JSON.stringify(d).includes("ZAR-USD-1"), "items in another currency never show");
 assert.equal(d.watchedItems[0].imageUrl, "https://images.example/scarf.png");
 const text = JSON.stringify(d);
-for (const secret of ["alice", "bob", "cara", "dan", "erin", "HBC-CND-250", "Argan"]) assert.ok(!text.includes(secret), "Zara's figures never show " + secret);
+for (const secret of ["alice", "bob", "cara", "dan", "erin", "fay", "gus", "HBC-CND-250", "Argan"]) assert.ok(!text.includes(secret), "Zara's figures never show " + secret);
 
+const offer0 = (key, body) => call("/relay/retailer/offers", { method: "POST", key, body });
 // 4. Health & Beauty only sees its own item.
 const h = await (await call("/relay/retailer/demand", { key: hbc })).json();
-assert.deepEqual(h.watchedItems.map(i => [i.sku, i.watchers]), [["HBC-CND-250", 1]]);
+assert.deepEqual(h.watchedItems.map(i => [i.sku, i.watchers, i.watchersText]), [["HBC-CND-250", null, "Fewer than 3"]]);
+assert.equal((await offer0(zara, { sku: "ZAR-USD-1", offerMinor: 1000 })).status, 404, "no offers on items priced in another currency");
 
 // 5. Offers: must be the shop's own item, lower than today's price, sensible length.
 const offer = (key, body) => call("/relay/retailer/offers", { method: "POST", key, body });
@@ -106,12 +116,19 @@ assert.equal(pushes.length, 0, "rejected offers send nothing");
 const ok = await offer(zara, { sku: "ZAR-SCF-1", offerMinor: 1299, hours: 24, note: "In store and online" });
 assert.equal(ok.status, 200);
 const o = (await ok.json()).offer;
-assert.equal(o.shoppers, 3); assert.equal(o.devices, 3);
+assert.equal(o.shoppers, 5); assert.equal(o.devices, undefined, "the shop is never told how many devices");
 assert.deepEqual(pushes.map(p => p.url.split("/").pop()).sort(), ["alice-id", "bob-id", "dan-id"]);
 const msg = await read(phones["alice-id"], pushes.find(p => p.url.endsWith("alice-id")).body);
 assert.equal(msg.title, "Offer from Zara");
 assert.match(msg.body, /^Knit Scarf · One size: £12\.99 for Relay watchers \(usually £17\.99\)\. Ends .+\. In store and online$/);
 
+// 6b. Shoppers see live offers on items they watch inside the app; nobody else sees them.
+const myOffers = async (id) => (await (await handlePushRoute(new Request("https://w.test/relay/my/alerts/offers"), env, new URL("https://w.test/relay/my/alerts/offers"), {}, { id }, { now })).json()).offers;
+const aliceOffers = await myOffers("alice-id");
+assert.deepEqual(aliceOffers.map(x => [x.store, x.product, x.offerMinor, x.wasMinor, x.imageUrl]), [["Zara", "Knit Scarf", 1299, 1799, "https://images.example/scarf.png"]]);
+assert.equal((await myOffers("dan-id")).length, 1, "shop followers see it too");
+assert.equal((await myOffers("cara-id")).length, 0, "someone watching a different item sees nothing");
+assert.ok(!JSON.stringify(aliceOffers).includes("bob"), "no other shopper appears");
 // 7. One running offer per item; the shop can list what it sent.
 assert.equal((await offer(zara, { sku: "ZAR-SCF-1", offerMinor: 1199 })).status, 409);
 const list = await (await call("/relay/retailer/offers", { key: zara })).json();
@@ -121,11 +138,14 @@ assert.equal((await (await call("/relay/retailer/offers", { key: hbc })).json())
 // 8. An offer to an item nobody watches sends nothing but is still recorded honestly.
 pushes = [];
 const quiet = await (await offer(zara, { sku: "ZAR-SKT-S", offerMinor: 1999 })).json();
-assert.equal(quiet.offer.shoppers, 0); assert.equal(pushes.length, 0);
+assert.equal(quiet.offer.shoppers, null); assert.equal(quiet.offer.shoppersText, "0"); assert.equal(pushes.length, 0);
 
 // 9. Only the newest few keys for a shop keep working.
 const keys = [];
 for (let i = 0; i < 6; i++) keys.push(await issueRetailerKey(env, { provider: "square", shopRef: "MZARA1", storeLabel: "Zara" }, now + 1000 + i));
 assert.equal((await call("/relay/retailer/demand", { key: keys[0] })).status, 401);
 assert.equal((await call("/relay/retailer/demand", { key: keys[5] })).status, 200);
+// 10. An offer that has ended disappears from the app.
+now += 8 * 86400000;
+assert.equal((await myOffers("alice-id")).length, 0, "ended offers are not shown");
 console.log("retailer: all checks passed");

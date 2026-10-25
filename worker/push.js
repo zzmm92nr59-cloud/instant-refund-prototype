@@ -117,7 +117,7 @@ export function priceText(minor, currency) {
   try { return new Intl.NumberFormat("en-GB", { style: "currency", currency: c }).format(minor / 100); } catch { return c + " " + (minor / 100).toFixed(2); }
 }
 
-// Looks at every watched item. A price lower than the last one Relay saw is a drop; the first look only records the price.
+// Looks at every watched item (UK shops selling in pounds only). A price lower than the last one Relay saw is a drop; the first look only records the price.
 export async function runPriceAlerts(env, o = {}) {
   const db = env.RELAY_DB; if (!db) return { checked: 0, drops: 0, sent: 0 };
   await ensurePushTables(db);
@@ -128,7 +128,7 @@ export async function runPriceAlerts(env, o = {}) {
   const byShopper = new Map();
   let checked = 0, drops = 0, sent = 0;
   for (const w of rows) {
-    const cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
+    const cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL AND currency = 'GBP' ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
     if (!cur || !Number.isFinite(cur.p)) continue;
     checked++;
     if (w.last_seen_minor != null && cur.p < w.last_seen_minor) {
@@ -236,6 +236,17 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     }
     if (st.length) await db.batch(st);
     return json({ ok: true, watching: items.length }, 200, cors);
+  }
+  if (path === "/relay/my/alerts/offers" && m === "GET") {
+    // Live offers shops have sent for items this shopper watches (on their own or by following the shop). Nothing about other shoppers.
+    let offers = [];
+    try {
+      offers = ((await db.prepare(`SELECT o.id, o.store_label AS store, o.sku, o.product, o.variant, o.offer_minor AS offerMinor, o.was_minor AS wasMinor, o.note, o.ends_at AS endsAt,
+          (SELECT i.image_url FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.sku = o.sku OR v.id = o.sku LIMIT 1) AS imageUrl
+        FROM retailer_offers o WHERE o.ends_at > ? AND EXISTS (SELECT 1 FROM price_watches w WHERE w.shopper_id = ? AND w.sku = o.sku AND w.store = o.store_label)
+        ORDER BY o.ends_at LIMIT 50`).bind(o.now, shopper.id).all()).results || []);
+    } catch { offers = []; /* no shop has sent an offer yet */ }
+    return json({ offers: offers.map(x => ({ ...x, currency: "GBP" })) }, 200, cors);
   }
   if (path === "/relay/my/alerts/check" && m === "POST") {
     const last = (checkedAt.get(shopper.id) || 0);

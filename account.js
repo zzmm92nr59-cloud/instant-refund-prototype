@@ -1205,6 +1205,30 @@
       return sub.unsubscribe().catch(function () {}).then(function () { return api("/relay/my/push/unsubscribe", { method: "POST", body: { endpoint: ep } }); });
     }).then(function () { memoDrop("alerts"); });
   }
+  // ---- Offers: shops can send Relay watchers a lower price on an item. Shown here while they last (also sent as phone alerts). ----
+  function pounds(m) { return "£" + (Number(m) / 100).toFixed(2); }
+  function mountOffers(host) {
+    var wrap = el("div", { style: "margin-top:16px" }); host.appendChild(wrap);
+    api("/relay/my/alerts/offers").then(function (r) {
+      var list = r.ok && r.body && r.body.offers || [];
+      if (!list.length) return;
+      var card = el("div", { className: "card" }); wrap.appendChild(card);
+      card.appendChild(el("h3", { text: "Offers for you", style: "margin:0 0 4px" }));
+      card.appendChild(el("p", { className: "small muted", style: "margin:0 0 10px", text: "Shops sent these to people watching their items. The shop honours the price; Relay doesn't take payment." }));
+      list.forEach(function (o) {
+        var ends = new Date(o.endsAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+        var row = el("div", { style: "display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #eee" });
+        if (o.imageUrl && /^https:\/\//.test(o.imageUrl)) row.appendChild(el("img", { src: o.imageUrl, alt: "", style: "width:56px;height:56px;border-radius:12px;object-fit:cover;flex:none;background:#f3f1ec" }));
+        var txt = el("div", { style: "flex:1;min-width:0" });
+        txt.appendChild(el("div", { className: "eyebrow", text: String(o.store || "").toUpperCase() }));
+        txt.appendChild(el("strong", { text: o.product + (o.variant ? " · " + o.variant : "") }));
+        txt.appendChild(el("div", { className: "small", text: pounds(o.offerMinor) + " (usually " + pounds(o.wasMinor) + ") · ends " + ends }));
+        if (o.note) txt.appendChild(el("div", { className: "small muted", text: o.note }));
+        row.appendChild(txt);
+        card.appendChild(row);
+      });
+    }).catch(function () {});
+  }
   function mountAlerts(host) {
     host.textContent = "";
     var box = el("div", { className: "card" }); host.appendChild(box);
@@ -1215,6 +1239,7 @@
       box.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:240px", onclick: show }));
       return;
     }
+    mountOffers(host);
     if (!pushOk()) {
       box.appendChild(el("p", { className: "sub", text: "This browser can't receive alerts. On an iPhone: open Relay in Safari, tap Share, choose Add to Home Screen, then open Relay from your home screen and come back here." }));
       return;

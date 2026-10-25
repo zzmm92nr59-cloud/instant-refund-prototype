@@ -3,7 +3,8 @@
 // Who can see a shop's figures: only someone holding that shop's retailer key. A key is handed out when the shop signs in
 // with Square ("Connect with Square"), which proves they run that Square account. Relay keeps only a hash of each key.
 // What a shop sees: counts only — how many shoppers watch each item, how many follow the whole shop, how many started this week.
-// Never a shopper's name, email, id or device. The same is true of offers: the shop never learns who received one.
+// Never a shopper's name, email, id or device. A count below 3 is shown as "fewer than 3", so a shop can't single anyone out.
+// Only UK shops selling in pounds take part. The same is true of offers: the shop never learns who received one.
 // What an offer does: sends a phone alert to the shoppers watching that item. It does not change the shop's price in Square
 // or Shopify and Relay does not take payment; the shop honours the offer price itself.
 import { ensureOnce } from "./once.js";
@@ -11,6 +12,10 @@ import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
+export const PRIVACY_MIN = 3;
+// A count a shop may see: the number itself from 3 upwards; below that only "fewer than 3" (0 stays 0 where it's shown at all).
+const shown = (n) => (n >= PRIVACY_MIN ? n : null);
+const shownText = (n) => (n >= PRIVACY_MIN ? String(n) : n > 0 ? "Fewer than " + PRIVACY_MIN : "0");
 const SKU = /^[A-Za-z0-9:_.\-\/]{1,200}$/;
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const clean = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n) : "");
@@ -70,8 +75,16 @@ async function shopVariants(db, shop) {
   const shopify = shop.provider === "shopify";
   const sql = `SELECT ${shopify ? "v.id" : "v.sku"} AS sku, v.sku AS retailerSku, v.title AS variant, v.price_minor AS priceMinor, v.currency AS currency, i.title AS product, i.image_url AS imageUrl
       FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
-     WHERE ${shopify ? "i.provider = ?" : "i.provider = 'square_sandbox' AND i.store_label = ? AND v.sku IS NOT NULL"} LIMIT 2000`;
+     WHERE ${shopify ? "i.provider = ?" : "i.provider = 'square_sandbox' AND i.store_label = ? AND v.sku IS NOT NULL"} AND v.currency = 'GBP' LIMIT 2000`;
   return ((await db.prepare(sql).bind(shopify ? "shopify:" + shop.shop_ref : shop.store_label).all()).results || []);
+}
+// If the shop's catalogue is in another currency, the dashboard says why nothing shows.
+async function otherCurrency(db, shop) {
+  const shopify = shop.provider === "shopify";
+  const row = await db.prepare(`SELECT v.currency AS c FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
+     WHERE ${shopify ? "i.provider = ?" : "i.provider = 'square_sandbox' AND i.store_label = ?"} AND v.currency IS NOT NULL AND v.currency <> 'GBP' LIMIT 1`)
+    .bind(shopify ? "shopify:" + shop.shop_ref : shop.store_label).first();
+  return row ? row.c : null;
 }
 
 // Demand for one shop: counts only, never who.
@@ -92,15 +105,21 @@ export async function shopDemand(env, shop, now = Date.now()) {
     items.set(r.sku, it);
   }
   const followers = (await db.prepare("SELECT COUNT(*) AS n FROM store_optins WHERE store = ?").bind(label).first()).n;
+  // Busiest first; items with fewer than 3 watchers come last in name order, so their order gives nothing away.
+  const big = (i) => i.watchers >= PRIVACY_MIN;
   const list = [...items.values()].filter(i => i.watchers > 0)
-    .sort((a, b) => b.watchers - a.watchers || b.newThisWeek - a.newThisWeek || a.product.localeCompare(b.product));
-  return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", currency: (variants.find(v => v.currency) || {}).currency || "GBP", generatedAt: new Date(now).toISOString(), followers, shoppersWatchingItems: people.size, itemsInCatalogue: variants.length, watchedItems: list };
+    .sort((a, b) => (big(b) - big(a)) || (big(a) ? b.watchers - a.watchers || b.newThisWeek - a.newThisWeek : 0) || a.product.localeCompare(b.product) || String(a.variant || "").localeCompare(String(b.variant || "")))
+    .map(i => ({ ...i, watchers: shown(i.watchers), watchersText: shownText(i.watchers), viaShopFollow: shown(i.viaShopFollow), newThisWeek: shown(i.newThisWeek) }));
+  const notUk = variants.length ? null : await otherCurrency(db, shop);
+  return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", currency: "GBP", generatedAt: new Date(now).toISOString(), privacyMinimum: PRIVACY_MIN,
+    followers: shown(followers), followersText: shownText(followers), shoppersWatchingItems: shown(people.size), shoppersWatchingItemsText: shownText(people.size),
+    itemsInCatalogue: variants.length, watchedItems: list, ...(notUk ? { notUkCurrency: notUk } : {}) };
 }
 
 async function listOffers(db, shop, now) {
   return ((await db.prepare(`SELECT id, sku, product, variant, offer_minor AS offerMinor, was_minor AS wasMinor, note, starts_at AS startsAt, ends_at AS endsAt, shoppers, devices
       FROM retailer_offers WHERE provider = ? AND shop_ref = ? ORDER BY starts_at DESC LIMIT 50`).bind(shop.provider, shop.shop_ref).all()).results || [])
-    .map(o => ({ ...o, active: o.endsAt > now }));
+    .map(o => ({ ...o, shoppers: shown(o.shoppers), shoppersText: shownText(o.shoppers), devices: undefined, active: o.endsAt > now }));
 }
 
 async function sendOffer(env, shop, body, o) {
@@ -130,9 +149,11 @@ async function sendOffer(env, shop, body, o) {
   for (const id of shoppers) {
     for (const s of await subsOf(db, id)) { try { const r = await sendPush(env, s, message, o); if (r.ok) devices++; } catch { /* one device failing never stops the rest */ } }
   }
-  const row = { id: crypto.randomUUID(), sku, product: v.product, variant: v.variant || null, offerMinor: offer, wasMinor: v.priceMinor, note: note || null, startsAt: now, endsAt: ends, shoppers: shoppers.length, devices, active: true };
+  const row = { id: crypto.randomUUID(), sku, product: v.product, variant: v.variant || null, offerMinor: offer, wasMinor: v.priceMinor, note: note || null, startsAt: now, endsAt: ends,
+    shoppers: shown(shoppers.length), shoppersText: shownText(shoppers.length), active: true };
   await db.prepare(`INSERT INTO retailer_offers (id, provider, shop_ref, store_label, sku, product, variant, offer_minor, was_minor, note, starts_at, ends_at, shoppers, devices)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(row.id, shop.provider, shop.shop_ref, shop.store_label, sku, row.product, row.variant, offer, v.priceMinor, row.note, now, ends, shoppers.length, devices).run();
+  // The exact counts stay inside Relay; the shop sees them only from 3 upwards.
   return [200, { offer: row }];
 }
 

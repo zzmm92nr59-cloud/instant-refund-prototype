@@ -347,7 +347,9 @@ function discoverView(){const contextual=exchangeContext;return '<div class="eye
 function reasonLabel(){return ({size:"Wrong size",colour:"Different colour",design:"Don't like the design",mind:"Changed my mind"})[reason]||"Alternative"}
 function sameFamily(p){return String(p.product||"").trim().toLowerCase()===String(selected.item||"").trim().toLowerCase()}
 function storeOf(p){return p.store||p.storeName||(p.provider==="shopify"?"Shopify retailer":p.provider==="relay_demo"?"Relay Studio":"North & Co.")}
-function storeOptions(){const names=[...new Set(["North & Co.",...demoRetailers.map(x=>x.name),...catalog.map(storeOf)])].sort();
+function storeKey(n){return String(n||"").toLowerCase().replace(/[^a-z0-9&]+/g,"")}
+function sameStore(a,b){return storeKey(a)===storeKey(b)}
+function storeOptions(){const seen=new Map();for(const n of [...catalog.filter(p=>!p.fixture).map(storeOf),"North & Co.",...demoRetailers.map(x=>x.name),...catalog.map(storeOf)]){const k=storeKey(n);if(k&&!seen.has(k))seen.set(k,n)}const names=[...seen.values()].sort();
  return '<option value="all">All stores</option>'+names.map(name=>'<option value="'+safe(name)+'">'+safe(name)+'</option>').join("");
 }
 function productCategory(name){return RelayExchangeEngine.category(name)}
@@ -364,7 +366,7 @@ function renderCatalog(){
  const storeQuery=($("storeSearch")?.value||"").trim().toLowerCase();
  let rows=catalog.filter(p=>{
    if(query&&!(p.product+" "+p.variation).toLowerCase().includes(query))return false;
-   if(storeFilter!=="all"&&storeOf(p)!==storeFilter)return false;
+   if(storeFilter!=="all"&&!sameStore(storeOf(p),storeFilter))return false;
    if(storeQuery&&!storeOf(p).toLowerCase().includes(storeQuery))return false;
    if(!exchangeContext)return true;
    return RelayExchangeEngine.matches(selected,{...p,store:storeOf(p)},reason);

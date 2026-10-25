@@ -1,4 +1,5 @@
 // Retailer-authorised Shopify Admin API catalogue importer. Strictly read-only.
+// Only products the shop has set to Active are read (drafts and archived products never reach shoppers).
 // Configure up to five independent shops with SHOPIFY_STORE_{1..5}_DOMAIN,
 // _ADMIN_ACCESS_TOKEN, _CATALOGUE_PUBLIC, optional _LABEL and _WEBHOOK_SECRET.
 // Legacy single-shop secrets are still supported. Never send access tokens to a browser.
@@ -110,7 +111,7 @@ async function syncStore(env, store) {
   let images = 0;
   const gql = `query RelayProducts($cursor: String) {
     shop { currencyCode }
-    products(first: 30, after: $cursor) {
+    products(first: 30, after: $cursor, query: "status:active") {
       pageInfo { hasNextPage endCursor }
       nodes { id title description
         featuredMedia { preview { image { url } } }
@@ -119,6 +120,7 @@ async function syncStore(env, store) {
     }
   }`;
   let cursor = null, pages = 0, products = 0, variants = 0, inventorySnapshots = 0, more = false;
+  const seenItems = new Set(), seenVariants = new Set();
   do {
     const data = await query(store, gql, {cursor});
     for (const item of data.products?.nodes || []) {
@@ -134,7 +136,7 @@ async function syncStore(env, store) {
         title=excluded.title,description=excluded.description,store_label=excluded.store_label,
         image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
         .bind(id, connection, item.id, item.title, item.description || null, store.label || null, safeImage).run();
-      products++;
+      products++; seenItems.add(id);
       if (safeImage) {
         await db.prepare(`INSERT INTO retailer_item_images(item_id,image_url) VALUES (?,?)
           ON CONFLICT(item_id) DO UPDATE SET image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
@@ -151,7 +153,7 @@ async function syncStore(env, store) {
           currency=excluded.currency,updated_at=CURRENT_TIMESTAMP`)
           .bind(vid, id, v.id, v.title, v.sku || null,
             Number.isSafeInteger(price) ? price : null, data.shop?.currencyCode || "GBP").run();
-        variants++;
+        variants++; seenVariants.add(vid);
         const qty = v.inventoryQuantity == null ? null : Number(v.inventoryQuantity);
         await db.prepare(`INSERT INTO retailer_inventory_snapshots
           (variant_id,connection_id,quantity,inventory_state) VALUES (?,?,?,?)
@@ -166,7 +168,25 @@ async function syncStore(env, store) {
     more = Boolean(data.products?.pageInfo?.hasNextPage);
     cursor = data.products?.pageInfo?.endCursor || null;
   } while (more && cursor && pages < 10);
-  return {shop:store.domain, products, variants, images, inventorySnapshots, pages, morePages:more,
+  // Products and sizes the shop has deleted are removed too, but only after a complete read (never on a partial one).
+  let removed = 0;
+  if (!more) try {
+    const items = ((await db.prepare("SELECT id FROM retailer_catalog_items WHERE provider = ?").bind(connection).all()).results || []).map(r => r.id);
+    const vars = ((await db.prepare("SELECT v.id FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE i.provider = ?").bind(connection).all()).results || []).map(r => r.id);
+    for (const vid of vars.filter(v => !seenVariants.has(v))) {
+      await db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id = ?").bind(vid).run();
+      await db.prepare("DELETE FROM retailer_catalog_variants WHERE id = ?").bind(vid).run();
+      removed++;
+    }
+    for (const id of items.filter(i => !seenItems.has(i))) {
+      await db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id IN (SELECT id FROM retailer_catalog_variants WHERE item_id = ?)").bind(id).run();
+      await db.prepare("DELETE FROM retailer_catalog_variants WHERE item_id = ?").bind(id).run();
+      await db.prepare("DELETE FROM retailer_item_images WHERE item_id = ?").bind(id).run();
+      await db.prepare("DELETE FROM retailer_catalog_items WHERE id = ?").bind(id).run();
+      removed++;
+    }
+  } catch (e) { console.error("Could not tidy removed Shopify products for " + store.domain); }
+  return {shop:store.domain, products, variants, images, inventorySnapshots, pages, morePages:more, removed,
     inventoryScope:"shop_aggregate"};
 }
 // extraStores: shops that connected themselves (see shopify-connect.js), each with its own token. They take the place of a

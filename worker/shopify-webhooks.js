@@ -1,7 +1,12 @@
 import { getShopifyStores } from "./shopify.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
-// Shopify retailer-authorised, signature-verified orders/paid ingestion.
-// Private retailer order and line item IDs stay in D1. Nothing here exposes consumer purchases.
+import { forgetShopifyShop, removeShopifyItems } from "./shopify-connect.js";
+// Shopify webhooks, every one checked against Shopify's signature before anything happens.
+// - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
+// - products/create|update|delete: a shop changed its products, so Relay reads that shop again at once (and checks price alerts).
+// - app/uninstalled: the shop removed Relay, so its tokens, dashboard keys and products are deleted.
+// - customers/data_request, customers/redact, shop/redact: Shopify's required privacy requests.
+// Shopify signs webhooks for Relay's app with the app's secret; a shop set up in the server settings may have its own secret.
 const MAX_BYTES = 256 * 1024;
 const DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 function asMoney(value) {
@@ -29,21 +34,74 @@ async function validSignature(raw, encoded, secret) {
     return compare(signed, supplied);
   } catch { return false; }
 }
-export async function receiveShopifyWebhook(request, env) {
+const PRODUCT_TOPICS = new Set(["products/create", "products/update", "products/delete"]);
+const PRIVACY_TOPICS = new Set(["customers/data_request", "customers/redact", "shop/redact"]);
+async function audit(env, type, shop, deliveryId, meta) {
+  try {
+    await env.RELAY_DB.prepare(`INSERT OR IGNORE INTO audit_events (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json) VALUES (?,?,?,?,?,?,?)`)
+      .bind("shopify:webhook:" + shop + ":" + deliveryId, "system", "shopify_webhook", type, "shopify_store", shop, JSON.stringify(meta)).run();
+  } catch { /* the record is a nice-to-have */ }
+}
+async function deleteOrders(db, connection, customerId) {
+  const ids = ((await db.prepare("SELECT id FROM retailer_orders WHERE connection_id = ?" + (customerId ? " AND external_customer_id = ?" : ""))
+    .bind(...(customerId ? [connection, customerId] : [connection])).all()).results || []).map(r => r.id);
+  let n = 0;
+  for (const id of ids) {
+    try { await db.prepare("DELETE FROM retailer_order_emails WHERE order_id = ?").bind(id).run(); } catch { /* table not created yet */ }
+    try {
+      await db.prepare("DELETE FROM order_items WHERE order_id = ?").bind(id).run();
+      await db.prepare("DELETE FROM retailer_orders WHERE id = ?").bind(id).run();
+      n++;
+    } catch { /* an order already matched to a shopper's purchase is kept; its email link above is always removed */ }
+  }
+  return n;
+}
+
+// o.onCatalogueChange(shop): called when a shop's products changed, to read that shop again in the background.
+export async function receiveShopifyWebhook(request, env, o = {}) {
   const shop = String(request.headers.get("x-shopify-shop-domain") || "").toLowerCase().trim();
   if (!env.RELAY_DB)
     return Response.json({ error: "not_configured" }, { status: 503 });
-  const store = DOMAIN.test(shop) ? getShopifyStores(env).find(s => s.domain === shop) : null;
-  if (!store || !store.webhookSecret)
+  if (!DOMAIN.test(shop)) return new Response("Unauthorized store", { status: 403 });
+  const store = getShopifyStores(env).find(s => s.domain === shop) || null;
+  const secrets = [...new Set([store && store.webhookSecret, env.SHOPIFY_CLIENT_SECRET].filter(Boolean))];
+  if (!secrets.length)
     return new Response("Unauthorized store", { status: 403 });
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();
   const deliveryId = String(request.headers.get("x-shopify-webhook-id") || "");
   if (!deliveryId || deliveryId.length > 128) return new Response("Missing delivery ID", { status: 400 });
   const body = await request.arrayBuffer();
   if (body.byteLength > MAX_BYTES) return new Response("Payload too large", { status: 413 });
-  if (!await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), store.webhookSecret))
-    return new Response("Invalid signature", { status: 401 });
-  if (topic !== "orders/paid") return Response.json({ received: true, ignored: true });
+  let signed = false;
+  for (const secret of secrets) if (await validSignature(body, request.headers.get("x-shopify-hmac-sha256"), secret)) { signed = true; break; }
+  if (!signed) return new Response("Invalid signature", { status: 401 });
+  let payload = null;
+  try { payload = JSON.parse(new TextDecoder().decode(body)); } catch { payload = null; }
+  const db = env.RELAY_DB, connection = "shopify:" + shop;
+
+  if (topic === "app/uninstalled") {
+    await forgetShopifyShop(env, shop);
+    await audit(env, "shopify_app_uninstalled", shop, deliveryId, { topic });
+    return Response.json({ received: true });
+  }
+  if (PRODUCT_TOPICS.has(topic)) {
+    if (topic === "products/delete") {
+      const id = payload && (payload.admin_graphql_api_id || (payload.id != null ? "gid://shopify/Product/" + payload.id : null));
+      const removed = id && /^gid:\/\/shopify\/Product\/\d{1,20}$/.test(String(id)) ? await removeShopifyItems(db, connection, String(id)) : 0;
+      return Response.json({ received: true, removed });
+    }
+    if (typeof o.onCatalogueChange === "function") { try { o.onCatalogueChange(shop); } catch { /* the hourly read still catches up */ } }
+    return Response.json({ received: true });
+  }
+  if (PRIVACY_TOPICS.has(topic)) {
+    // Relay never reads Shopify customers for shops that connected themselves; orders exist only for server-configured shops.
+    let deleted = 0;
+    if (topic === "customers/redact" && payload && payload.customer && payload.customer.id != null) deleted = await deleteOrders(db, connection, String(payload.customer.id));
+    if (topic === "shop/redact") { await forgetShopifyShop(env, shop, { everything: true }); deleted = await deleteOrders(db, connection, null); }
+    await audit(env, "shopify_privacy_request", shop, deliveryId, { topic, deleted });
+    return Response.json({ received: true });
+  }
+  if (topic !== "orders/paid" || !store) return Response.json({ received: true, ignored: true });
   let event;
   try { event = JSON.parse(new TextDecoder().decode(body)); }
   catch { return new Response("Invalid JSON", { status: 400 }); }
@@ -52,7 +110,7 @@ export async function receiveShopifyWebhook(request, env) {
   if (String(event.currency || "").toUpperCase() !== "GBP")
     return Response.json({ received: false, error: "GBP_only_MVP" }, { status: 422 });
   if (event.line_items.length > 100) return new Response("Too many lines", { status: 413 });
-  const externalId = String(event.id), connection = "shopify:" + shop;
+  const externalId = String(event.id);
   const orderId = connection + ":order:" + externalId;
   let statements;
   try {
