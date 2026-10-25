@@ -1,13 +1,14 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
-import { getShopifyStores, shopifyConfigured, syncShopifyCatalogues, ensureImageTable } from "./shopify.js";
+import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
 import { sendReturnReminders } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
+import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay } from "./shopify-connect.js";
 export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
@@ -15,7 +16,7 @@ export default {
     const syncs = Promise.allSettled([
       importHistoricalSquareOrders(env),
       syncSquareCatalogue(env),
-      shopifyConfigured(env) ? syncShopifyCatalogues(env) : null
+      syncAllShopify(env)
     ]);
     ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(() => {}));
   },
@@ -44,13 +45,18 @@ export default {
       const connectResponse = await handleSquareConnect(request, env, url, { afterConnect: (merchantId) => { try { ctx.waitUntil(syncSquareCatalogue(env, { only: merchantId }).catch(() => {})); } catch {} } });
       if (connectResponse) return connectResponse;
     }
+    if (url.pathname.startsWith("/relay/shopify/")) {
+      // After a Shopify shop connects, only that shop is read in the background.
+      const shopifyConnect = await handleShopifyConnect(request, env, url, { afterConnect: (shop) => { try { ctx.waitUntil(syncAllShopify(env, { only: shop }).catch(() => {})); } catch {} } });
+      if (shopifyConnect) return shopifyConnect;
+    }
     if (url.pathname.startsWith("/relay/retailer/")) {
       const retailerResponse = await handleRetailerRoute(request, env, url, corsHeaders);
       if (retailerResponse) return retailerResponse;
     }
     const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
       // "Check prices now" refreshes the shops' catalogues first, then compares prices.
-      syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), shopifyConfigured(env) ? syncShopifyCatalogues(env) : null]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
+      syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), syncAllShopify(env)]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
     });
     if (authResponse) return authResponse;
     if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {
@@ -158,7 +164,8 @@ export default {
 
     // Public connectivity metadata only; tokens and unpublished stores stay private.
     if (url.pathname === "/relay/shopify/status" && request.method === "GET") {
-      const stores = getShopifyStores(env), published = stores.filter(s => s.published);
+      const configuredStores = getShopifyStores(env), shown = await shopifyShopsForDisplay(env);
+      const stores = [...new Set([...configuredStores.map(s => s.domain), ...shown.map(s => s.domain)])], published = shown;
       // Latest sync outcome only: counts and a short error code, no shop name, tokens or raw errors.
       let lastSync = null;
       try {
@@ -170,7 +177,8 @@ export default {
       return Response.json({
         success: true, configured: stores.length > 0, connectedStoreCount: stores.length,
         publishedStoreCount: published.length, mode: "read_only_catalogue",
-        paidOrderWebhookConfigured: stores.some(s => Boolean(s.webhookSecret)),
+        paidOrderWebhookConfigured: configuredStores.some(s => Boolean(s.webhookSecret)),
+        selfConnectedStoreCount: shown.filter(s => s.connected).length, connectWithShopify: Boolean(env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET),
         historicalOrdersConnected: false, publicCatalogueEnabled: published.length > 0,
         publishedStores: published.map(s => ({name:s.label, domain:s.domain})),
         lastSync,
@@ -181,7 +189,7 @@ export default {
     // Publish only retailer-opted-in read-only products. Separate Shopify
     // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.
     if (url.pathname === "/relay/shopify/catalogue" && request.method === "GET") {
-      const stores = getShopifyStores(env).filter(s => s.published);
+      const stores = await shopifyShopsForDisplay(env);
       if (!stores.length)
         return Response.json({products:[],published:false,publishedStoreCount:0},
           {headers:{...corsHeaders,"Cache-Control":"no-store"}});
@@ -191,7 +199,7 @@ export default {
         const products = [];
         await ensureImageTable(env.RELAY_DB);
         for (const store of stores) {
-          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,img.image_url AS imageUrl,
+          const rows = await env.RELAY_DB.prepare(`SELECT i.title AS product,v.title AS variation,COALESCE(i.image_url,img.image_url) AS imageUrl,
             v.id AS catalogueId,v.sku AS retailerSku,v.price_minor AS priceMinor,
             v.currency,MAX(s.quantity) AS quantity,MAX(s.observed_at) AS observedAt
             FROM retailer_catalog_items i

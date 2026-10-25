@@ -151,7 +151,8 @@ export async function runPriceAlerts(env, o = {}) {
 }
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
-const SKU = /^[A-Za-z0-9:_.\-]{1,120}$/;
+// Item keys: shop SKUs, or for Shopify the shop-scoped variant id (which contains "/").
+const SKU = /^[A-Za-z0-9:_.\-\/]{1,200}$/;
 const clean = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n) : "");
 const minor = (v) => (Number.isInteger(v) && v >= 0 && v < 100000000 ? v : null);
 

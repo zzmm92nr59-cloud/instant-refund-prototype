@@ -11,7 +11,7 @@ import { ensurePushTables, sendPush, subsOf } from "./push.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
-const SKU = /^[A-Za-z0-9:_.\-]{1,120}$/;
+const SKU = /^[A-Za-z0-9:_.\-\/]{1,200}$/;
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const clean = (v, n) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n) : "");
 const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -58,21 +58,28 @@ async function shopFromRequest(request, env, now) {
     const cur = await env.RELAY_DB.prepare("SELECT label FROM square_merchants WHERE merchant_id = ?").bind(row.shop_ref).first().catch(() => null);
     if (cur && cur.label) row.store_label = cur.label;
   }
+  if (row.provider === "shopify") {
+    const cur = await env.RELAY_DB.prepare("SELECT label FROM shopify_shops WHERE domain = ?").bind(row.shop_ref).first().catch(() => null);
+    if (cur && cur.label) row.store_label = cur.label;
+  }
   return row;
 }
 
-// The shop's own catalogue rows (one per variant with a SKU).
-async function shopVariants(db, label) {
-  return ((await db.prepare(`SELECT v.sku, v.title AS variant, v.price_minor AS priceMinor, i.title AS product, i.image_url AS imageUrl
+// The shop's own catalogue rows, one per variant. "sku" is the key shoppers watch the item by: the shop's SKU for Square,
+// and Relay's shop-scoped variant id for Shopify (Shopify SKUs are optional and can repeat between shops).
+async function shopVariants(db, shop) {
+  const shopify = shop.provider === "shopify";
+  const sql = `SELECT ${shopify ? "v.id" : "v.sku"} AS sku, v.sku AS retailerSku, v.title AS variant, v.price_minor AS priceMinor, i.title AS product, i.image_url AS imageUrl
       FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id
-     WHERE i.store_label = ? AND v.sku IS NOT NULL LIMIT 2000`).bind(label).all()).results || []);
+     WHERE ${shopify ? "i.provider = ?" : "i.provider = 'square_sandbox' AND i.store_label = ? AND v.sku IS NOT NULL"} LIMIT 2000`;
+  return ((await db.prepare(sql).bind(shopify ? "shopify:" + shop.shop_ref : shop.store_label).all()).results || []);
 }
 
 // Demand for one shop: counts only, never who.
-export async function shopDemand(env, label, now = Date.now()) {
-  const db = env.RELAY_DB;
+export async function shopDemand(env, shop, now = Date.now()) {
+  const db = env.RELAY_DB, label = shop.store_label;
   await ensurePushTables(db);
-  const variants = await shopVariants(db, label);
+  const variants = await shopVariants(db, shop);
   const bySku = new Map(variants.map(v => [v.sku, v]));
   const rows = ((await db.prepare(`SELECT shopper_id, sku, via, created_at FROM price_watches WHERE store = ? LIMIT 50000`).bind(label).all()).results || []);
   const week = now - 7 * 86400000;
@@ -80,7 +87,7 @@ export async function shopDemand(env, label, now = Date.now()) {
   for (const r of rows) {
     const v = bySku.get(r.sku);
     if (!v) continue; // only items still in the shop's own catalogue
-    const it = items.get(r.sku) || { sku: r.sku, product: v.product, variant: v.variant, priceMinor: v.priceMinor, imageUrl: v.imageUrl || null, watchers: 0, viaShopFollow: 0, newThisWeek: 0 };
+    const it = items.get(r.sku) || { sku: r.sku, retailerSku: v.retailerSku || null, product: v.product, variant: v.variant, priceMinor: v.priceMinor, imageUrl: v.imageUrl || null, watchers: 0, viaShopFollow: 0, newThisWeek: 0 };
     if (r.via === "item") { it.watchers++; people.add(r.shopper_id); } else it.viaShopFollow++;
     if (r.via === "item" && r.created_at >= week) it.newThisWeek++;
     items.set(r.sku, it);
@@ -88,7 +95,7 @@ export async function shopDemand(env, label, now = Date.now()) {
   const followers = (await db.prepare("SELECT COUNT(*) AS n FROM store_optins WHERE store = ?").bind(label).first()).n;
   const list = [...items.values()].filter(i => i.watchers > 0)
     .sort((a, b) => b.watchers - a.watchers || b.newThisWeek - a.newThisWeek || a.product.localeCompare(b.product));
-  return { store: label, generatedAt: new Date(now).toISOString(), followers, shoppersWatchingItems: people.size, itemsInCatalogue: variants.length, watchedItems: list };
+  return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", generatedAt: new Date(now).toISOString(), followers, shoppersWatchingItems: people.size, itemsInCatalogue: variants.length, watchedItems: list };
 }
 
 async function listOffers(db, shop, now) {
@@ -103,7 +110,7 @@ async function sendOffer(env, shop, body, o) {
   if (typeof sku !== "string" || !SKU.test(sku)) return [400, { error: "bad_item" }];
   if (!Number.isInteger(offer) || offer < 1) return [400, { error: "bad_price" }];
   if (!Number.isInteger(hours) || hours < 1 || hours > MAX_HOURS) return [400, { error: "bad_duration" }];
-  const v = (await shopVariants(db, shop.store_label)).find(x => x.sku === sku);
+  const v = (await shopVariants(db, shop)).find(x => x.sku === sku);
   if (!v) return [404, { error: "not_your_item" }];
   if (!Number.isInteger(v.priceMinor) || offer >= v.priceMinor) return [400, { error: "offer_must_be_lower", priceMinor: v.priceMinor }];
   const live = await db.prepare("SELECT id FROM retailer_offers WHERE provider = ? AND shop_ref = ? AND sku = ? AND ends_at > ?").bind(shop.provider, shop.shop_ref, sku, now).first();
@@ -139,7 +146,7 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
   await ensureRetailerTables(env.RELAY_DB);
   const shop = await shopFromRequest(request, env, now);
   if (!shop) return json({ error: "not_signed_in" }, 401, cors);
-  if (path === "/relay/retailer/demand" && request.method === "GET") return json(await shopDemand(env, shop.store_label, now), 200, cors);
+  if (path === "/relay/retailer/demand" && request.method === "GET") return json(await shopDemand(env, shop, now), 200, cors);
   if (path === "/relay/retailer/offers" && request.method === "GET") return json({ store: shop.store_label, offers: await listOffers(env.RELAY_DB, shop, now) }, 200, cors);
   if (path === "/relay/retailer/offers" && request.method === "POST") {
     const text = await request.text();
