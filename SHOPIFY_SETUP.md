@@ -9,7 +9,23 @@ Relay's single-shop Shopify integration is prepared but **not connected to a rea
 - **Catalogue publishing is opt-in**: `GET /relay/shopify/catalogue` returns items only if `SHOPIFY_CATALOGUE_PUBLIC` is set to the literal string `true` **and** catalogue credentials exist. Otherwise it returns `{products:[],published:false}`. The retailer must explicitly permit Relay to make those products public.
 - **Status check**: `GET /relay/shopify/status` reports whether configuration is present, not whether Shopify has approved scopes or webhooks have been delivered.
 
-## Connect a consenting test store
+## Connect with Shopify (any shop, no server settings)
+
+Shop owners connect themselves: `https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/connect?shop=their-shop.myshopify.com`
+(or the "Sign in with Shopify" box on `retailer.html`, or opening Relay from the Apps section of their Shopify admin).
+They approve Relay inside their own Shopify admin (read-only: `read_products`, `read_inventory`). Relay then:
+
+- stores the shop's name and its access/refresh tokens **encrypted** in D1 (`shopify_shops`), renewing tokens before they expire;
+- reads that shop's products, prices, stock and pictures straight away, then hourly; shoppers see them in Discover and can watch them;
+- gives the shop a private link to its Relay dashboard (watch counts and offers to watchers).
+
+Approving is the shop's consent to show its products and prices to Relay shoppers; the connected page says so.
+The Shopify app ("Relay Test Connector" in the Dev Dashboard) must list
+`https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/oauth/callback` as a redirect URL, and its App URL should be
+`https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/launch`. The Worker needs `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET`.
+Shops outside your Shopify organisation can only install once the app has a distribution method (custom or public) in the Dev Dashboard.
+
+## Connect a consenting test store (older, server-settings method)
 
 1. Create or use a Shopify development/test store you administer. Install an authorised Shopify app and request only the permissions required for this stage: `read_products`, `read_inventory` where needed, and `read_orders` for paid order ingestion. Shopify may require additional protected customer data approval for particular order fields or distribution methods. Do not request access to historical orders outside Shopify's default window without appropriate permission.
 2. In the Cloudflare Worker settings, configure `SHOPIFY_SHOP_DOMAIN` (exact `example.myshopify.com`, not secret) and, as secrets, `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET` from the Shopify Dev Dashboard app. Relay exchanges these for short-lived access tokens itself and reuses the client secret to verify webhook signatures. (Older setups can instead use a static `SHOPIFY_ADMIN_ACCESS_TOKEN` plus `SHOPIFY_WEBHOOK_SECRET`.) **Do not add any credentials to GitHub, browser JavaScript or demo data.**

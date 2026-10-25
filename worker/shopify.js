@@ -124,15 +124,18 @@ async function syncStore(env, store) {
     for (const item of data.products?.nodes || []) {
       // Shopify GIDs are only guaranteed unique within a shop. Namespace by domain.
       const id = connection + ":item:" + item.id;
-      await db.prepare(`INSERT INTO retailer_catalog_items
-        (id,provider,external_item_id,title,description) VALUES (?,?,?,?,?)
-        ON CONFLICT(provider,external_item_id) DO UPDATE SET
-        title=excluded.title,description=excluded.description,updated_at=CURRENT_TIMESTAMP`)
-        .bind(id, connection, item.id, item.title, item.description || null).run();
-      products++;
       // Retailer-hosted image link only (never copied); refreshed on every sync so changes follow the store.
       const imageUrl = item.featuredMedia?.preview?.image?.url;
-      if (typeof imageUrl === "string" && /^https:\/\//.test(imageUrl) && imageUrl.length < 600) {
+      const safeImage = typeof imageUrl === "string" && /^https:\/\//.test(imageUrl) && imageUrl.length < 600 ? imageUrl : null;
+      // The shop's name and picture sit on the item too, so shoppers see which shop it is from and what it looks like.
+      await db.prepare(`INSERT INTO retailer_catalog_items
+        (id,provider,external_item_id,title,description,store_label,image_url) VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(provider,external_item_id) DO UPDATE SET
+        title=excluded.title,description=excluded.description,store_label=excluded.store_label,
+        image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
+        .bind(id, connection, item.id, item.title, item.description || null, store.label || null, safeImage).run();
+      products++;
+      if (safeImage) {
         await db.prepare(`INSERT INTO retailer_item_images(item_id,image_url) VALUES (?,?)
           ON CONFLICT(item_id) DO UPDATE SET image_url=excluded.image_url,updated_at=CURRENT_TIMESTAMP`)
           .bind(id, imageUrl).run();
@@ -166,9 +169,15 @@ async function syncStore(env, store) {
   return {shop:store.domain, products, variants, images, inventorySnapshots, pages, morePages:more,
     inventoryScope:"shop_aggregate"};
 }
-export async function syncShopifyCatalogues(env) {
+// extraStores: shops that connected themselves (see shopify-connect.js), each with its own token. They take the place of a
+// server-configured entry for the same shop. opts.only reads a single shop.
+export async function syncShopifyCatalogues(env, extraStores = [], opts = {}) {
   const results = [];
-  for (const store of getShopifyStores(env).filter(s => s.canAuth)) {
+  const extra = (extraStores || []).filter(s => s && DOMAIN.test(String(s.domain || "")) && (s.token || (s.clientId && s.clientSecret)));
+  const taken = new Set(extra.map(s => s.domain));
+  let stores = [...extra, ...getShopifyStores(env).filter(s => s.canAuth && !taken.has(s.domain))];
+  if (opts && opts.only) stores = stores.filter(s => s.domain === opts.only);
+  for (const store of stores) {
     try {
       const r = await syncStore(env, store);
       results.push({success:true, ...r});
