@@ -188,7 +188,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
   const since = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
   const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
-    nodes { legacyResourceId email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } } customer { legacyResourceId }
+    nodes { legacyResourceId email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } }
       lineItems(first: 100) { nodes { id title quantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
   let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
   try {
@@ -200,7 +200,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
       const page = j.data && j.data.orders || {};
       for (const n of page.nodes || []) {
         const event = { id: n.legacyResourceId, created_at: n.createdAt, processed_at: n.processedAt, currency: n.currencyCode, email: n.email,
-          total_price: n.totalPriceSet && n.totalPriceSet.shopMoney && n.totalPriceSet.shopMoney.amount, customer: n.customer ? { id: n.customer.legacyResourceId } : null,
+          total_price: n.totalPriceSet && n.totalPriceSet.shopMoney && n.totalPriceSet.shopMoney.amount, customer: null, // the customer record itself needs extra access Relay doesn't ask for
           line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity,
             price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
             product_id: l.product ? l.product.legacyResourceId : null, variant_id: l.variant ? l.variant.legacyResourceId : null })) };
