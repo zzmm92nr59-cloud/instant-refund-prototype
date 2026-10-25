@@ -128,4 +128,12 @@ await assert.rejects(() => syncSquareCatalogue(env), /Square HTTP 401/);
 const env2 = { ...env, SQUARE_APPLICATION_SECRET: undefined };
 const noSecret = await handleSquareConnect(new Request("https://w.test/x"), env2, new URL("https://w.test/relay/square/oauth/callback?code=good&state=" + state), { now });
 assert.equal(noSecret.status, 503);
+// Going live is a server setting: production uses Square's live address and Relay's production app, never the Sandbox app.
+{
+  const prodBare = { ...env, SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: undefined };
+  assert.equal((await handleSquareConnect(new Request("https://w.test/x"), prodBare, new URL("https://w.test/relay/square/connect"), { now })).status, 503, "no production app id: nothing connects");
+  const prod = { ...env, SQUARE_ENVIRONMENT: "production", SQUARE_APPLICATION_ID: "sq0idp-live-app" };
+  const live = new URL((await handleSquareConnect(new Request("https://w.test/x"), prod, new URL("https://w.test/relay/square/connect"), { now })).headers.get("location"));
+  assert.equal(live.hostname, "connect.squareup.com"); assert.equal(live.searchParams.get("client_id"), "sq0idp-live-app");
+}
 console.log("square-connect: all checks passed");
