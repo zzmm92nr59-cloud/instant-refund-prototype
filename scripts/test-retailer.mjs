@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleRetailerRoute, issueRetailerKey } from "../worker/retailer.js";
-import { ensurePushTables, b64u, handlePushRoute } from "../worker/push.js";
+import { ensurePushTables, b64u, handlePushRoute, runPriceAlerts } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -148,4 +148,22 @@ assert.equal((await call("/relay/retailer/demand", { key: keys[5] })).status, 20
 // 10. An offer that has ended disappears from the app.
 now += 8 * 86400000;
 assert.equal((await myOffers("alice-id")).length, 0, "ended offers are not shown");
+// 11. Two alert choices: "my watchlist" (default) or "price drops at every shop".
+const my = (id, path, body) => handlePushRoute(new Request("https://w.test" + path, { method: body ? "POST" : "GET", headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }),
+  env, new URL("https://w.test" + path), {}, { id }, { now, fetchImpl });
+assert.equal((await (await my("cara-id", "/relay/my/alerts/status")).json()).allShops, false, "watchlist only by default");
+assert.equal((await (await my("alice-id", "/relay/my/alerts/mode", { mode: "all" })).json()).allShops, true);
+await runPriceAlerts(env, { now, fetchImpl });            // first look only records every price
+pushes = [];
+sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 2499 WHERE sku = 'ZAR-SKT-S'").run();   // nobody watches the skirt
+await runPriceAlerts(env, { now, fetchImpl });
+assert.deepEqual(pushes.map(p => p.url.split("/").pop()), ["alice-id"], "only the shopper who chose every shop hears about an unwatched item");
+const everyMsg = await read(phones["alice-id"], pushes[0].body);
+assert.equal(everyMsg.title, "Price drop at Zara"); assert.match(everyMsg.body, /^Pleated Midi Skirt · S is now £24\.99 \(was £29\.99\)$/);
+pushes = []; await runPriceAlerts(env, { now, fetchImpl });
+assert.equal(pushes.length, 0, "the same drop is never sent twice");
+await my("alice-id", "/relay/my/alerts/mode", { mode: "watchlist" });
+sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 1999 WHERE sku = 'ZAR-SKT-S'").run();
+pushes = []; await runPriceAlerts(env, { now, fetchImpl });
+assert.equal(pushes.length, 0, "back on watchlist-only: unwatched items stay quiet");
 console.log("retailer: all checks passed");
