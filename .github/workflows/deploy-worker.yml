@@ -41,6 +41,7 @@ jobs:
           node scripts/test-square-connect.mjs
           node scripts/test-retailer.mjs
           node scripts/test-shopify-connect.mjs
+          node scripts/test-exchange.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
