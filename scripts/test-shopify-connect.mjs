@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import { handleShopifyConnect, listConnectedShopifyStores, syncAllShopify, shopifyShopsForDisplay, normaliseShop, shopifySigned } from "../worker/shopify-connect.js";
 import { handleRetailerRoute } from "../worker/retailer.js";
-import { ensurePushTables } from "../worker/push.js";
+import { ensurePushTables, priceText } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -54,7 +54,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (!/^(token|fresh)-/.test(token) && token !== "old-static-token") return json({ errors: "unauthorised" }, 401);
   const q = JSON.parse(init.body).query;
   if (/shop \{ name \}/.test(q)) return json({ data: { shop: { name: shops[shop].name } } });
-  return json({ data: { shop: { currencyCode: "GBP" }, products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: shops[shop].products.map(p => ({
+  return json({ data: { shop: { currencyCode: shop.startsWith("volt") ? "USD" : "GBP" }, products: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: shops[shop].products.map(p => ({
     id: p.id, title: p.title, description: "", featuredMedia: p.img ? { preview: { image: { url: p.img } } } : null,
     variants: { nodes: p.variants.map(v => ({ id: v.id, title: v.title, sku: v.sku, price: v.price, inventoryQuantity: v.qty })) } })) } } });
 };
@@ -154,6 +154,13 @@ assert.ok(!JSON.stringify(d).includes("alice"));
 assert.equal((await call("/relay/retailer/offers", "POST", { sku: variantId, offerMinor: 1999, hours: 24 })).status, 200, "offer on its own Shopify item");
 const voltVariant = sqlite.prepare("SELECT v.id FROM retailer_catalog_variants v WHERE v.id LIKE 'shopify:volt-tech%'").get().id;
 assert.equal((await call("/relay/retailer/offers", "POST", { sku: voltVariant, offerMinor: 100 })).status, 404, "never on another shop's item");
+
+// 8b. A US shop's prices stay in dollars everywhere (never shown as pounds).
+assert.equal(priceText(1299, "GBP"), "£12.99");
+assert.equal(priceText(1299, "USD"), "US$12.99");
+assert.equal(priceText(1299, null), "£12.99");
+assert.equal(sqlite.prepare("SELECT currency FROM retailer_catalog_variants WHERE id = ?").get(voltVariant).currency, "USD");
+assert.equal(d.currency, "GBP");
 
 // 9. Without the app's details on the server, nothing can connect, and says so.
 const bare = { ...env, SHOPIFY_CLIENT_SECRET: undefined };
