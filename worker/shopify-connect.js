@@ -3,6 +3,8 @@
 // What is stored per shop: its myshopify address, its name and its access/refresh tokens, encrypted with a key derived from AUTH_SECRET.
 // Tokens never reach the browser. Relay asks only for read-only products and stock.
 // Approving is also the shop's consent for Relay to show its products and prices to Relay shoppers (the page says so).
+// Relay is for UK shops that sell in pounds: a shop whose Shopify currency isn't GBP is turned away (nothing is stored).
+// After approval Relay asks Shopify to tell it straight away when the shop's products change or the app is removed (webhooks).
 import { ensureOnce } from "./once.js";
 import { wrapKey } from "./push.js";
 import { issueRetailerKey } from "./retailer.js";
@@ -99,14 +101,74 @@ async function tokenRequest(shop, fields, f) {
   if (!r.ok || !j.access_token) throw new Error("Shopify token step failed (" + r.status + ")");
   return j;
 }
-async function shopName(shop, token, f) {
+// The shop's name and the currency it sells in. If Shopify can't be asked, the name falls back to the address and the currency is unknown.
+async function shopInfo(shop, token, f) {
+  let name = "", currency = null;
   try {
     const r = await f("https://" + shop + "/admin/api/" + API_VERSION + "/graphql.json", { method: "POST",
-      headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" }, body: JSON.stringify({ query: "{ shop { name } }" }), signal: AbortSignal.timeout(15000) });
-    const n = (await r.json())?.data?.shop?.name;
-    if (typeof n === "string" && n.trim()) return n.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80);
+      headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" }, body: JSON.stringify({ query: "{ shop { name currencyCode } }" }), signal: AbortSignal.timeout(15000) });
+    const s = (await r.json())?.data?.shop || {};
+    if (typeof s.name === "string" && s.name.trim()) name = s.name.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80);
+    if (typeof s.currencyCode === "string" && /^[A-Z]{3}$/.test(s.currencyCode)) currency = s.currencyCode;
   } catch { /* fall back to the address */ }
-  return shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " ");
+  return { name: name || shop.replace(/\.myshopify\.com$/, "").replace(/-/g, " "), currency };
+}
+
+// Webhooks: Shopify tells Relay at once when a product is added, changed or removed, and when the shop removes the app.
+// Each is signed by Shopify with the app's secret and checked in shopify-webhooks.js. Asking twice never makes duplicates.
+export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE"];
+export async function registerShopifyWebhooks(shop, token, origin, f) {
+  const uri = origin.replace(/\/$/, "") + "/relay/webhooks/shopify";
+  const gql = async (query, variables) => {
+    const r = await f("https://" + shop + "/admin/api/" + API_VERSION + "/graphql.json", { method: "POST",
+      headers: { "X-Shopify-Access-Token": token, "content-type": "application/json" }, body: JSON.stringify({ query, variables }), signal: AbortSignal.timeout(15000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || (j.errors && j.errors.length)) throw new Error("Shopify said " + r.status + " " + String((j.errors && j.errors[0] && j.errors[0].message) || "").slice(0, 100));
+    return j.data || {};
+  };
+  const have = await gql("query RelayHooks { webhookSubscriptions(first: 100) { nodes { id topic uri } } }");
+  const already = new Set(((have.webhookSubscriptions && have.webhookSubscriptions.nodes) || []).filter(n => n && n.uri === uri).map(n => n.topic));
+  const out = { created: 0, alreadyThere: 0, failed: [] };
+  for (const topic of WEBHOOK_TOPICS) {
+    if (already.has(topic)) { out.alreadyThere++; continue; }
+    try {
+      const d = await gql(`mutation RelayHook($topic: WebhookSubscriptionTopic!, $sub: WebhookSubscriptionInput!) {
+        webhookSubscriptionCreate(topic: $topic, webhookSubscription: $sub) { webhookSubscription { id } userErrors { field message } } }`, { topic, sub: { uri, format: "JSON" } });
+      const res = d.webhookSubscriptionCreate || {};
+      if (res.webhookSubscription && res.webhookSubscription.id) out.created++;
+      else out.failed.push(topic + ": " + String((res.userErrors && res.userErrors[0] && res.userErrors[0].message) || "no reason given").slice(0, 100));
+    } catch (e) { out.failed.push(topic + ": " + String(e && e.message || e).slice(0, 100)); }
+  }
+  return out;
+}
+async function recordHooks(env, shop, outcome) {
+  try {
+    await env.RELAY_DB.prepare(`INSERT INTO audit_events(id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json) VALUES (?,?,?,?,?,?,?)`)
+      .bind(crypto.randomUUID(), "system", null, "shopify_webhooks_registered", "shopify_store", shop, JSON.stringify(outcome)).run();
+  } catch { /* the record is a nice-to-have */ }
+}
+
+// A shop removed the app (or Shopify asked Relay to erase it): its tokens, dashboard keys and products are deleted, so it
+// disappears from Relay straight away. With everything: true (Shopify's shop/redact, 48 hours later) its offer history goes too.
+export async function forgetShopifyShop(env, domain, o = {}) {
+  const db = env.RELAY_DB, conn = "shopify:" + domain;
+  await ensureShopifyShopSchema(db);
+  await db.prepare("DELETE FROM shopify_shops WHERE domain = ?").bind(domain).run();
+  try { await db.prepare("DELETE FROM retailer_keys WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no keys table yet */ }
+  await removeShopifyItems(db, conn, null);
+  if (o.everything) { try { await db.prepare("DELETE FROM retailer_offers WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no offers yet */ } }
+}
+// Removes a shop's products (all of them, or one product when productGid is given), with their sizes, stock and pictures.
+export async function removeShopifyItems(db, conn, productGid) {
+  const items = ((await db.prepare("SELECT id FROM retailer_catalog_items WHERE provider = ?" + (productGid ? " AND external_item_id = ?" : ""))
+    .bind(...(productGid ? [conn, productGid] : [conn])).all()).results || []).map(r => r.id);
+  for (const id of items) {
+    await db.prepare("DELETE FROM retailer_inventory_snapshots WHERE variant_id IN (SELECT id FROM retailer_catalog_variants WHERE item_id = ?)").bind(id).run();
+    await db.prepare("DELETE FROM retailer_catalog_variants WHERE item_id = ?").bind(id).run();
+    try { await db.prepare("DELETE FROM retailer_item_images WHERE item_id = ?").bind(id).run(); } catch { /* no pictures table */ }
+    await db.prepare("DELETE FROM retailer_catalog_items WHERE id = ?").bind(id).run();
+  }
+  return items.length;
 }
 async function saveTokens(env, shop, label, j, now) {
   const a = await seal(env, j.access_token), r = j.refresh_token ? await seal(env, j.refresh_token) : { iv: null, data: null };
@@ -159,8 +221,14 @@ export async function handleShopifyConnect(request, env, url, o = {}) {
     const j = await tokenRequest(shop, { client_id: env.SHOPIFY_CLIENT_ID, client_secret: env.SHOPIFY_CLIENT_SECRET, code, expiring: "1" }, f);
     if (!String(j.scope || "").split(",").map(s => s.trim()).some(s => s === "read_products" || s === "write_products"))
       return page("Not connected", "<p>Relay needs permission to read your products. Please approve again and keep that permission switched on.</p>", 400);
-    const label = await shopName(shop, j.access_token, f);
+    const info = await shopInfo(shop, j.access_token, f), label = info.name;
+    if (info.currency && info.currency !== "GBP")
+      return page("Relay is for UK shops", `<p>${esc(label)} sells in ${esc(info.currency)}. Relay only works with UK shops that sell in pounds (£), so nothing was connected.</p>
+<p>If this shop should sell in pounds, change its currency in Shopify (Settings → Store details → Store currency), then connect again.</p>`, 400);
     await saveTokens(env, shop, label, j, now);
+    // Ask Shopify to tell Relay about changes straight away. If it can't, hourly reading still keeps the shop up to date.
+    try { await recordHooks(env, shop, await registerShopifyWebhooks(shop, j.access_token, url.origin, f)); }
+    catch (e) { await recordHooks(env, shop, { created: 0, alreadyThere: 0, failed: [String(e && e.message || e).slice(0, 120)] }); }
     if (typeof o.afterConnect === "function") o.afterConnect(shop);
     const key = await issueRetailerKey(env, { provider: "shopify", shopRef: shop, storeLabel: label }, now);
     const dash = (env.RELAY_APP_URL || DASHBOARD_BASE).replace(/\/?$/, "/") + "retailer.html#key=" + encodeURIComponent(key);
