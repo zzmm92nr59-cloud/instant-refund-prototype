@@ -1,6 +1,6 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
-import { syncSquareCatalogue } from "./square-catalogue.js";
+import { syncSqareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
@@ -10,6 +10,7 @@ import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connec
 import { handleRetailerRoute } from "./retailer.js";
 import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConnectedShopifyStores } from "./shopify-connect.js";
 import { ensureOnce } from "./once.js";
+import { syncAwinFeeds } from "./awin-feed.js";
 // The fictional demo products seeded by migration 0003 had no shop name or picture. They belong to three made-up shops;
 // this names them and adds their pictures (served from the Relay site). Only rows still missing a name are touched.
 const DEMO_PICS = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/pics/products/";
@@ -49,7 +50,8 @@ export default {
     const syncs = Promise.allSettled([
       importHistoricalSquareOrders(env),
       syncSquareCatalogue(env),
-      syncAllShopify(env)
+      syncAllShopify(env),
+      syncAwinFeeds(env)
     ]);
     ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(() => {}));
   },
