@@ -11,6 +11,7 @@
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
+import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
@@ -319,7 +320,7 @@ async function listPurchases(env, shopper, orderId) {
   const result = [];
   for (const order of orders.results || []) {
     const items = await env.RELAY_DB.prepare(
-      `SELECT title, quantity, price_minor AS priceMinor, currency FROM order_items WHERE order_id = ?
+      `SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor, currency FROM order_items WHERE order_id = ?
        ORDER BY title LIMIT 100`).bind(order.id).all();
     // The shop's name for orders from Shopify shops that connected themselves (their address otherwise).
     let store = null;
@@ -394,8 +395,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (passkeyResponse) return passkeyResponse;
     const totpResponse = await handleTotpShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
     if (totpResponse) return totpResponse;
+    const exchangeResponse = await handleExchangeRoute(request, env, url, cors, shopper, o);
+    if (exchangeResponse) return exchangeResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
-      return json({ purchases: await listPurchases(env, shopper) }, 200, cors);
+      return json({ purchases: await enrichPurchases(env, await listPurchases(env, shopper)) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {
       // Reads a pasted order-confirmation email. Nothing is stored. The result is
       // shopper-supplied evidence (refundEligible is always false).
