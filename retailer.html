@@ -20,7 +20,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .row{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;display:grid;grid-template-columns:76px 1fr auto;gap:16px;align-items:center}
 .pic{width:76px;height:76px;border-radius:14px;background:#efeae0 center/cover no-repeat;display:grid;place-items:center;font-family:var(--serif);font-size:28px;color:#8a7f69}
 .row h3{margin:0 0 3px;font-size:16px}.row .meta{color:var(--muted);font-size:13px}
-.count{text-align:right}.count strong{font-family:var(--serif);font-size:30px;font-weight:600;display:block;line-height:1}.count span{font-size:12px;color:var(--muted)}
+.count{text-align:right}.count strong{font-family:var(--serif);font-size:30px;font-weight:600;display:block;line-height:1}.count span{font-size:12px;color:var(--muted)}.count strong.few{font-family:inherit;font-size:15px;font-weight:700;line-height:1.3}
 .chip{display:inline-block;margin-top:6px;background:#eef6dc;color:#3f6212;border-radius:99px;padding:3px 9px;font-size:11px;font-weight:800}
 .btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.dark{background:var(--navy);color:#fff}.limebtn{background:var(--lime);color:#1d2911}.ghost{background:#fff;border:1px solid #d9d3c6}
 .offerbox{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
@@ -53,7 +53,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 
 <main id="app" class="hidden">
   <h1 id="shop">Your shop</h1>
-  <p class="sub">How many Relay shoppers are watching each of your items right now. You see totals only — never who they are. Send watchers an offer and Relay alerts their phones.</p>
+  <p class="sub">How many Relay shoppers are watching each of your items right now. You see totals only — never who they are, and counts under 3 show as “fewer than 3”. Send watchers an offer and Relay alerts their phones.</p>
   <div class="stats">
     <div class="stat"><strong id="sWatch">–</strong><span>shoppers watching your items</span></div>
     <div class="stat l"><strong id="sItems">–</strong><span>items being watched</span></div>
@@ -101,18 +101,18 @@ function itemRow(i) {
     <div class="pic" ${pic}>${i.imageUrl ? "" : esc((i.product || "?")[0])}</div>
     <div><h3>${esc(i.product)}</h3><div class="meta">${esc(i.variant || "")}${i.variant ? " · " : ""}${gbp(i.priceMinor, i.currency)}${i.retailerSku ? " · SKU " + esc(i.retailerSku) : ""}</div>
       ${i.newThisWeek ? `<span class="chip">+${i.newThisWeek} this week</span>` : ""}${i.viaShopFollow ? ` <span class="meta">+${i.viaShopFollow} via shop follow</span>` : ""}</div>
-    <div class="count"><strong>${i.watchers}</strong><span>watching</span><div><button class="btn limebtn" data-open style="margin-top:8px">Send offer</button></div></div>
+    <div class="count">${i.watchers != null ? `<strong>${i.watchers}</strong>` : `<strong class="few">Fewer than 3</strong>`}<span>watching</span><div><button class="btn limebtn" data-open style="margin-top:8px">Send offer</button></div></div>
     <form class="offerbox hidden" data-form>
       <label>Offer price (${esc(i.currency && i.currency !== "GBP" ? i.currency : "£")})<input name="price" inputmode="decimal" value="${(suggested / 100).toFixed(2)}" required></label>
       <label>Lasts<select name="hours"><option value="24">24 hours</option><option value="48" selected>2 days</option><option value="72">3 days</option><option value="168">1 week</option></select></label>
       <label class="grow">Message (optional)<input name="note" maxlength="80" placeholder="e.g. In store and online"></label>
-      <button class="btn dark" type="submit">Send to ${i.watchers + i.viaShopFollow} watcher${i.watchers + i.viaShopFollow === 1 ? "" : "s"}</button>
+      <button class="btn dark" type="submit">Send to watchers</button>
     </form><div class="msg hidden" data-msg></div></div>`;
 }
 function offerRow(o) {
   const ends = new Date(o.endsAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   return `<div class="row"><div><h3>${esc(o.product)}${o.variant ? " · " + esc(o.variant) : ""}</h3>
-    <div class="meta">${gbp(o.offerMinor, shopCurrency())} (was ${gbp(o.wasMinor, shopCurrency())}) · sent to ${o.shoppers} shopper${o.shoppers === 1 ? "" : "s"} · ${o.active ? "ends" : "ended"} ${ends}</div>
+    <div class="meta">${gbp(o.offerMinor, shopCurrency())} (was ${gbp(o.wasMinor, shopCurrency())}) · sent to ${o.shoppers != null ? o.shoppers + " shoppers" : esc(o.shoppersText || "fewer than 3").toLowerCase() + " shoppers"} · ${o.active ? "ends" : "ended"} ${ends}</div>
     ${o.note ? `<div class="meta">“${esc(o.note)}”</div>` : ""}</div><span class="state ${o.active ? "live" : "ended"}">${o.active ? "Live" : "Ended"}</span></div>`;
 }
 async function load() {
@@ -123,10 +123,12 @@ async function load() {
     $("shop").textContent = demand.store || "Your shop";
     $("platformTag").textContent = demand.platform === "shopify" ? "Shopify · development shop" : "Square Sandbox · test shop";
     $("platform").textContent = demand.platform === "shopify" ? "Shopify" : "Square";
-    $("sWatch").textContent = demand.shoppersWatchingItems ?? 0;
+    const small = (t) => (t === "Fewer than 3" ? "Under 3" : t);
+    $("sWatch").textContent = demand.shoppersWatchingItems ?? small(demand.shoppersWatchingItemsText) ?? 0;
     $("sItems").textContent = (demand.watchedItems || []).length;
-    $("sFollow").textContent = demand.followers ?? 0;
+    $("sFollow").textContent = demand.followers ?? small(demand.followersText) ?? 0;
     $("items").innerHTML = (demand.watchedItems || []).length ? demand.watchedItems.map(itemRow).join("")
+      : demand.notUkCurrency ? `<div class="empty">Your shop sells in ${esc(demand.notUkCurrency)}. Relay is for UK shops that sell in pounds (£), so your items aren't shown to Relay shoppers. Change your shop's currency to pounds and they'll appear within the hour.</div>`
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
@@ -147,7 +149,7 @@ $("items").addEventListener("submit", async (e) => {
     const r = await api("/relay/retailer/offers", { method: "POST", body: JSON.stringify({ sku: row.dataset.sku, offerMinor: Math.round(pounds * 100), hours: Number(form.hours.value), note: form.note.value }) });
     if (r.status === 200) {
       const o = r.body.offer;
-      say("ok", o.shoppers ? `Sent. ${o.shoppers} shopper${o.shoppers === 1 ? "" : "s"} alerted on ${o.devices} device${o.devices === 1 ? "" : "s"}.` : "Saved, but nobody watching this item has phone alerts turned on, so no alerts went out.");
+      say("ok", o.shoppers != null ? `Sent to ${o.shoppers} shoppers watching this item.` : o.shoppersText && o.shoppersText !== "0" ? "Sent to the shoppers watching this item (fewer than 3)." : "Saved, but nobody is watching this item right now, so no alerts went out.");
       form.classList.add("hidden");
       const offers = (await api("/relay/retailer/offers")).body.offers || [];
       $("offers").innerHTML = offers.map(offerRow).join("");
