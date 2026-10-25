@@ -28,6 +28,7 @@ jobs:
           node --check worker/totp.js
           node --check worker/resale-admin.js
           node --check worker/retailer.js
+          node --check worker/shopify-connect.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
@@ -39,6 +40,7 @@ jobs:
           node scripts/test-push.mjs
           node scripts/test-square-connect.mjs
           node scripts/test-retailer.mjs
+          node scripts/test-shopify-connect.mjs
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
