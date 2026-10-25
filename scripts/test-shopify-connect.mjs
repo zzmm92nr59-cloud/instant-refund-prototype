@@ -215,9 +215,9 @@ assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", { ...paid, i
 assert.equal((await (await hook("unknown-shop.myshopify.com", "orders/paid", { ...paid, id: 7003 })).json()).ignored, true, "orders from a shop that never connected are ignored");
 // Catch-up read on connect: recent paid orders, the same order twice is stored once.
 shopOrders["oak-thread.myshopify.com"] = [
-  { legacyResourceId: "7001", email: "alice@example.com", createdAt: "2026-10-20T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "24.0" } }, customer: { legacyResourceId: "5" },
+  { legacyResourceId: "7001", email: "alice@example.com", createdAt: "2026-10-20T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "24.0" } }, 
     lineItems: { nodes: [{ id: "gid://shopify/LineItem/9001", title: "Linen Cushion", quantity: 1, originalUnitPriceSet: { shopMoney: { amount: "24.0" } }, product: { legacyResourceId: "1" }, variant: { legacyResourceId: "11" } }] } },
-  { legacyResourceId: "7004", email: null, createdAt: "2026-10-21T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "12.5" } }, customer: null,
+  { legacyResourceId: "7004", email: null, createdAt: "2026-10-21T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "12.5" } }, 
     lineItems: { nodes: [{ id: "gid://shopify/LineItem/9004", title: "Stoneware Mug", quantity: 2, originalUnitPriceSet: { shopMoney: { amount: "6.25" } }, product: null, variant: null }] } }];
 const bf = await backfillShopifyOrders(env, "oak-thread.myshopify.com", "token-oak-thread.myshopify.com", { now });
 assert.deepEqual(bf, { orders: 2, emailLinked: 1, skipped: 0, error: null });
