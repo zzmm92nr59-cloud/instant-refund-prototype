@@ -723,7 +723,7 @@
   }
   var openResale = null;
   var CONDITION = { new_with_tags: "New with tags", like_new: "Like new", good: "Good", fair: "Fair" };
-  var resaleErrors = { account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
+  var resaleErrors = { not_resellable: "Only physical items can be listed. Food, travel and digital purchases can't be resold.", account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
     already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
     not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
 
@@ -788,7 +788,7 @@
     });
     // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
     [onBack ? el("h2", { text: "Swap & resell" }) : null,
-     el("p", { text: "Passed your return window? Sell or swap with other Relay members. For now Relay only matches people. Payment and postage aren't built yet, so nothing is bought or sent through Relay." }),
+     onBack ? el("p", { text: "Passed your return window? Sell or swap with other Relay members. For now Relay only matches people. Payment and postage aren't built yet, so nothing is bought or sent through Relay." }) : null,
      tabs, body, msg,
      onBack ? el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
@@ -1216,44 +1216,24 @@
     var step = "reason";
     var selectedReason = null;
 
-    function showQR(result) {
+    // Relay is not connected to Royal Mail yet, so there is no postage label or QR code to show.
+    // Say exactly what happened (a request saved in Relay) and what the shopper should do.
+    function showSaved(result) {
       sheet.textContent = "";
+      var shop = o.store || "the shop";
       var inner = el("div", { className: "sheet-inner" });
-      inner.appendChild(el("div", { className: "eyebrow", text: "RETURN CONFIRMED" }));
-      inner.appendChild(el("h2", { text: "Drop off your parcel" }));
-      inner.appendChild(el("p", { className: "small muted", text: "Show this QR code at any Post Office. Scanning it gives you proof of postage." }));
-
-      // QR code using a data URI via QR.js CDN (loaded lazily)
-      var qrWrap = el("div", { style: "text-align:center;margin:24px 0;background:#fff;padding:16px;border-radius:12px" });
-      var qrLabel = el("div", { style: "font-family:monospace;font-size:14px;letter-spacing:2px;margin-top:8px;color:#111", text: result.returnRef });
-      qrWrap.appendChild(qrLabel);
-
-      // Draw QR using Canvas (works offline, no external dep)
-      var canvas = document.createElement("canvas");
-      qrWrap.insertBefore(canvas, qrLabel);
-      inner.appendChild(qrWrap);
-
-      // Lightweight QR using the browser's built-in TextEncoder + a simple matrix (placeholder visual)
-      // Real QR encoding requires a library — we show a styled placeholder + the reference number
-      canvas.width = 200; canvas.height = 200;
-      var ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 200, 200);
-      ctx.fillStyle = "#111";
-      // Corner squares
-      [[8,8],[8,152],[152,8]].forEach(function(p) { ctx.fillRect(p[0],p[1],40,40); ctx.fillStyle="#fff"; ctx.fillRect(p[0]+6,p[1]+6,28,28); ctx.fillStyle="#111"; ctx.fillRect(p[0]+12,p[1]+12,16,16); ctx.fillStyle="#111"; });
-      ctx.font = "bold 11px monospace"; ctx.textAlign = "center";
-      ctx.fillText("Show at Post Office", 100, 185);
-
-      inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:0 0 16px" }, [
-        el("div", { className: "eyebrow", text: "RETURN REFERENCE" }),
-        el("div", { style: "font-family:monospace;font-size:20px;letter-spacing:3px;margin:4px 0", text: result.returnRef }),
-        el("div", { className: "small muted", text: "Royal Mail · Drop off by " + result.dropOffBy }),
+      inner.appendChild(el("div", { className: "eyebrow", text: "RETURN REQUEST SAVED" }));
+      inner.appendChild(el("h2", { text: "Saved in Relay" }));
+      inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
+      inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:12px 0 16px" }, [
+        el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
+        el("p", { className: "small", style: "margin:6px 0 0", text: "Relay can't create postage labels yet and hasn't contacted " + shop + ". To send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
       ]));
-
-      var instList = el("ul", { style: "padding-left:18px;margin:0 0 16px" });
-      (result.instructions || []).forEach(function(i) { instList.appendChild(el("li", { className: "small", text: i, style: "margin-bottom:6px" })); });
-      inner.appendChild(instList);
-
+      inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
+        el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
+        el("div", { style: "font-family:monospace;font-size:18px;letter-spacing:2px;margin:4px 0", text: result.returnRef }),
+        el("div", { className: "small muted", text: "For your records. This is not a postage label or tracking number." })
+      ]));
       inner.appendChild(el("button", { className: "darkbtn", text: "Done", onclick: function() { close(); if (done) done(); } }));
       sheet.appendChild(inner);
     }
@@ -1273,15 +1253,15 @@
             var inner2 = el("div", { className: "sheet-inner" });
             inner2.appendChild(el("div", { className: "eyebrow", text: "CONFIRM RETURN" }));
             inner2.appendChild(el("h2", { text: it.title }));
-            inner2.appendChild(el("p", { className: "small muted", text: "Royal Mail will collect this on behalf of " + (o.store || "the shop") + ". You'll get a QR code to show at any Post Office." }));
+            inner2.appendChild(el("p", { className: "small muted", text: "Relay will note this return on your account. Relay can't create postage labels yet, so you'll send it back using " + (o.store || "the shop") + "'s own returns process." }));
             inner2.appendChild(el("p", { className: "small", text: "Reason: " + r[1] }));
-            inner2.appendChild(el("p", { className: "small", text: "Refund amount: " + money(it.priceMinor, it.currency) }));
+            inner2.appendChild(el("p", { className: "small", text: "Item price: " + money(it.priceMinor, it.currency) }));
             inner2.appendChild(msg);
-            var confirmBtn = el("button", { className: "darkbtn", text: "Get my return label →", onclick: function() {
+            var confirmBtn = el("button", { className: "darkbtn", text: "Save return request →", onclick: function() {
               confirmBtn.disabled = true; msg.textContent = "";
               api("/relay/my/return", { method: "POST", body: { orderId: o.id, lineId: it.lineId, reason: selectedReason } }).then(function(res) {
                 confirmBtn.disabled = false;
-                if (res.ok) { showQR(res.body); }
+                if (res.ok) { showSaved(res.body); }
                 else { say(msg, RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
               }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
             }});
