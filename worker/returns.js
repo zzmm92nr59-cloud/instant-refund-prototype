@@ -1,12 +1,16 @@
-// Returns through Relay: shopper initiates a return, gets a Royal Mail QR code/reference,
-// drops it at any Post Office. Scan at drop-off = proof of postage. Relay records the return.
+// Returns through Relay.
 //
-// Eligibility: order must be UNFULFILLED (not yet dispatched) OR within 7 days of order date,
+// What this does TODAY: records the shopper's return request against their shop-confirmed order, so the
+// item is marked as being returned (it can't also be exchanged) and the shopper has a Relay reference.
+//
+// What it does NOT do yet: it does not create a postage label, does not contact Royal Mail, and does not
+// tell the shop. Relay is not connected to Royal Mail Click & Drop (that needs a Royal Mail business
+// account and API key). So Relay must never show a QR code, tracking number or "drop off at the Post
+// Office" instruction: there is no real label behind it, and a shopper relying on it could lose their return.
+// The app tells the shopper to use the shop's own returns process for now.
+//
+// Eligibility: order confirmed by the shop for this shopper, within 7 days of the order date,
 // and the item must not already have a return or exchange recorded.
-//
-// This generates a Relay-branded return reference (not a live Royal Mail API call yet — that
-// requires a Click & Drop merchant account). The QR/reference is displayed to the shopper;
-// in production this would call Royal Mail Click & Drop to get a real tracked label.
 
 import { ensureOnce } from "./once.js";
 
@@ -29,8 +33,8 @@ export function ensureReturnsTables(db) {
       price_minor INTEGER NOT NULL,
       reason TEXT,
       return_ref TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'label_issued',
-      carrier TEXT NOT NULL DEFAULT 'royal_mail',
+      status TEXT NOT NULL DEFAULT 'requested',
+      carrier TEXT,
       dropped_off_at INTEGER,
       refund_issued_at INTEGER,
       created_at INTEGER NOT NULL
@@ -42,11 +46,13 @@ export function ensureReturnsTables(db) {
   });
 }
 
-// Generates a Relay return reference in Royal Mail style: RL + 9 digits + GB
-// In production this would be replaced by a real Click & Drop tracking number.
-function generateReturnRef() {
-  const digits = Math.floor(Math.random() * 1_000_000_000).toString().padStart(9, "0");
-  return "RL" + digits + "GB";
+// A Relay reference, deliberately NOT shaped like a Royal Mail tracking number (RL123456789GB),
+// so nobody mistakes it for a postage label. Unambiguous characters only (no 0/O, 1/I).
+const REF_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+export function generateReturnRef() {
+  const b = crypto.getRandomValues(new Uint8Array(8));
+  const c = Array.from(b, x => REF_CHARS[x % REF_CHARS.length]).join("");
+  return "RLY-" + c.slice(0, 4) + "-" + c.slice(4);
 }
 
 // Checks whether an order line is eligible for return
@@ -121,29 +127,19 @@ async function initiateReturn(env, shopper, body) {
   `).bind(
     returnId, shopper.id, check.order.id, check.line.lineId, check.shop,
     check.line.title, check.line.quantity, check.line.priceMinor,
-    reason || null, returnRef, "label_issued", "royal_mail", now
+    reason || null, returnRef, "requested", null, now
   ).run();
-
-  // The QR code encodes a URL the Post Office scanner resolves to the tracking number.
-  // Format matches Royal Mail's label URL pattern (real integration would use Click & Drop API).
-  const qrData = "https://relay.return/" + returnRef;
 
   return [200, {
     returnId,
     returnRef,
-    qrData,            // encode this as a QR code in the UI
-    carrier: "Royal Mail",
-    instructions: [
-      "Print or show this QR code at any Post Office",
-      "Hand over your item in its original or any secure packaging",
-      "The Post Office scans the QR — that's your proof of postage",
-      "Keep your receipt from the Post Office just in case",
-    ],
-    dropOffBy: new Date(now + (RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000)).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
+    status: "requested",
+    // No postage label exists: Relay is not connected to Royal Mail yet and has not told the shop.
+    labelAvailable: false,
+    shopNotified: false,
     item: check.line.title,
     priceMinor: check.line.priceMinor,
     daysSince: check.daysSince,
-    status: "label_issued",
   }];
 }
 
