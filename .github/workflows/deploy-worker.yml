@@ -43,6 +43,12 @@ jobs:
           node scripts/test-shopify-connect.mjs
           node scripts/test-exchange.mjs
           node --check worker/returns.js
+          node scripts/test-returns-offline.mjs
+          node scripts/test-resellable.mjs
+          node --check worker/awin-feed.js
+          node scripts/test-awin-feed.mjs
+          # Load the whole Worker so a misspelt import fails here, not at deploy time.
+          node --input-type=module -e "const m = await import('./worker/worker.js'); if (!m.default || !m.default.fetch || !m.default.scheduled) { console.error('worker.js did not load'); process.exit(1); }"
       - name: Apply catalogue and inventory schema
         uses: cloudflare/wrangler-action@v3
         with:
