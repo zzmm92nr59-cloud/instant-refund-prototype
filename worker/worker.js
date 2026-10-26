@@ -1,6 +1,6 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
-import { syncSqareCatalogue } from "./square-catalogue.js";
+import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";

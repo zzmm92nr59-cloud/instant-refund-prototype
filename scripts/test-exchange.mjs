@@ -35,17 +35,21 @@ const order = (ext, who) => {
     .run(id + ":item:9" + ext, id, "9" + ext, "1", "11", "Logo Cap", 1, 2000, "GBP");
   return id;
 };
-const o500 = order(500, alice), o501 = order(501, alice);
+const o500 = order(500, alice), o501 = order(501, alice), o502 = order(502, alice);
 
-let calls = [], fulfilment = { "500": "UNFULFILLED", "501": "FULFILLED" }, refuseAdd = false;
+let calls = [], fulfilment = { "500": "UNFULFILLED", "501": "FULFILLED", "502": "UNFULFILLED" }, refuseAdd = false, removedLine = null;
 const fetchImpl = async (url, init) => {
   assert.equal(String(url), "https://" + SHOP + "/admin/api/2026-07/graphql.json");
   assert.equal(init.headers["X-Shopify-Access-Token"], "tok");
   const { query, variables } = JSON.parse(init.body); calls.push({ query, variables });
   const ok = (data) => new Response(JSON.stringify({ data }), { status: 200 });
   if (/RelayExchangeCheck/.test(query)) return ok({ order: { cancelledAt: null, displayFulfillmentStatus: fulfilment[variables.o.split("/").pop()] }, productVariant: { inventoryQuantity: variables.v.endsWith("/12") ? 5 : 0, title: "x" } });
+  // Order 502: the shop has since changed the product's variants, so Shopify no longer links the bought line to a variant.
+  if (/orderEditBegin/.test(query) && variables.id.endsWith("/502")) return ok({ orderEditBegin: { calculatedOrder: { id: "gid://shopify/CalculatedOrder/2", lineItems: { nodes: [
+    { id: "gid://shopify/CalculatedLineItem/777", quantity: 1, variant: { id: "gid://shopify/ProductVariant/99" } },
+    { id: "gid://shopify/CalculatedLineItem/9502", quantity: 1, variant: null }] } }, userErrors: [] } });
   if (/orderEditBegin/.test(query)) return ok({ orderEditBegin: { calculatedOrder: { id: "gid://shopify/CalculatedOrder/1", lineItems: { nodes: [{ id: "gid://shopify/CalculatedLineItem/1", quantity: 1, variant: { id: "gid://shopify/ProductVariant/11" } }] } }, userErrors: [] } });
-  if (/orderEditSetQuantity/.test(query)) { assert.match(query, /restock: true/); return ok({ orderEditSetQuantity: { userErrors: [] } }); }
+  if (/orderEditSetQuantity/.test(query)) { assert.match(query, /restock: true/); removedLine = variables.line; return ok({ orderEditSetQuantity: { userErrors: [] } }); }
   if (/orderEditAddVariant/.test(query)) return ok({ orderEditAddVariant: { userErrors: refuseAdd ? [{ message: "Variant is not available" }] : [] } });
   if (/orderEditCommit/.test(query)) { assert.match(variables.note, /Exchanged through Relay/); return ok({ orderEditCommit: { order: { id: "gid://shopify/Order/500" }, userErrors: [] } }); }
   throw Error("unexpected query");
@@ -88,4 +92,10 @@ assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "
 const purchases = await enrichPurchases(env, [{ id: o500, retailer: conn, items: [{ lineId: "9500", productId: "1", variantId: "11", title: "Logo Cap", quantity: 1 }] }]);
 assert.equal(purchases[0].items[0].variant, "Navy"); assert.equal(purchases[0].items[0].imageUrl, "https://cdn.example/cap.png");
 assert.equal(purchases[0].items[0].exchangeable, false); assert.equal(purchases[0].items[0].exchange.fromTitle, "Black");
+// The shop changed the product's variants after the order: Relay finds the shopper's own line by its line id,
+// and removes exactly that line (never the other item on the order).
+const changed = await call(alice, "/relay/my/exchange", { orderId: o502, lineId: "9502", variantKey: conn + ":variant:gid://shopify/ProductVariant/12" });
+assert.equal(changed.status, 200, "exchange works even though the bought variant no longer exists");
+assert.equal(removedLine, "gid://shopify/CalculatedLineItem/9502");
+
 console.log("exchange: all checks passed");

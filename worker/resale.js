@@ -12,6 +12,23 @@
 const DAY = 24 * 60 * 60 * 1000;
 import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
 import { ensureOnce } from "./once.js";
+import { categorise, storeKey } from "./receipt-category.js";
+
+// What can be resold: physical goods only. Food & drink, travel and digital purchases can't be handed to
+// someone else, and receipt lines like "You've saved" or "Delivery" aren't products at all.
+const NOT_A_PRODUCT = /^\s*(you(')?ve saved|you saved|saving|savings|credit\b|credit:|refund|delivery|shipping|postage|p&p|discount|promo|voucher|coupon|gift card|subtotal|sub-total|total|vat|tax|tip|service (fee|charge)|bag charge|carrier bag|deposit|balance|points|order summary)\b/i;
+export function resellable(receipt, item, learnedCategory) {
+  if (!item || typeof item.name !== "string" || !item.name.trim()) return false;
+  if (NOT_A_PRODUCT.test(item.name)) return false;
+  const { category } = categorise(receipt || {}, learnedCategory);
+  return category !== "food" && category !== "travel" && category !== "digital";
+}
+async function learnedCategories(env, shopperId) {
+  try {
+    const r = await env.RELAY_DB.prepare("SELECT store_key AS k, category FROM receipt_learning WHERE shopper_id = ? AND category IS NOT NULL").bind(shopperId).all();
+    return new Map((r.results || []).map(x => [x.k, x.category]));
+  } catch { return new Map(); }
+}
 export const CONDITIONS = ["new_with_tags", "like_new", "good", "fair"];
 const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000;
 
@@ -75,12 +92,13 @@ async function listable(env, shopperId, now) {
   for (const p of parsed) if (p.kind === "return_instructions" && p.orderRef) plans.set(p.orderRef, p);
   const active = await env.RELAY_DB.prepare("SELECT receipt_id, item_index FROM resale_listings WHERE seller_id = ? AND status = 'active'").bind(shopperId).all();
   const taken = new Set((active.results || []).map(a => a.receipt_id + ":" + a.item_index));
+  const learned = await learnedCategories(env, shopperId);
   for (const r of parsed) {
     if (r.kind === "return_instructions" || !Array.isArray(r.items)) continue;
     if (r.orderRef && plans.has(r.orderRef)) r.returnPlan = plans.get(r.orderRef);
     const rw = returnWindow(r, now);
     r.items.forEach((it, i) => {
-      if (!it || typeof it.name !== "string") return;
+      if (!resellable(r, it, learned.get(storeKey(r)))) return;
       out.push({ receiptId: r.id, itemIndex: i, title: it.name, store: (r.retailer && (r.retailer.name || r.retailer.domain)) || null,
         pricePence: it.pricePence ?? null, currency: r.currency || "GBP", hasImage: Boolean(r.hasImage),
         orderDate: r.orderDate || null, returnWindowOpen: rw.open, returnDeadline: rw.deadline, alreadyListed: taken.has(r.id + ":" + i) });
@@ -107,6 +125,7 @@ async function createListing(env, shopper, body, now) {
   const d = JSON.parse(row.details);
   const item = Array.isArray(d.items) ? d.items[index] : null;
   if (!item || typeof item.name !== "string") return { status: 404, body: { error: "not_found" } };
+  if (!resellable(d, item, (await learnedCategories(env, shopper.id)).get(storeKey(d)))) return { status: 400, body: { error: "not_resellable" } };
   const count = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_listings WHERE seller_id = ? AND status = 'active'").bind(shopper.id).first();
   if (count && count.n >= MAX_ACTIVE_LISTINGS) return { status: 429, body: { error: "too_many_listings" } };
   const id = uuid();

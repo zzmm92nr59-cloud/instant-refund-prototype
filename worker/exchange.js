@@ -129,7 +129,11 @@ async function doExchange(env, shopper, body, o) {
       { id: "gid://shopify/Order/" + owned.order.ext }, f);
     const calc = begin.orderEditBegin && begin.orderEditBegin.calculatedOrder;
     if (!calc) throw new Error(firstError(begin.orderEditBegin) || "Shopify wouldn't open the order for editing");
-    const oldLine = ((calc.lineItems && calc.lineItems.nodes) || []).find(n => n.variant && n.variant.id === fromGid && n.quantity > 0);
+    // Find the shopper's line: by its variant, or, if the shop has since changed that product's variants (e.g. added
+    // colours, so the variant bought no longer exists), by the order line itself. Never any other line.
+    const nodes = ((calc.lineItems && calc.lineItems.nodes) || []).filter(n => n.quantity > 0);
+    const oldLine = nodes.find(n => n.variant && n.variant.id === fromGid) ||
+      nodes.find(n => String(n.id).split("/").pop() === String(owned.line.lineId));
     if (!oldLine) throw new Error("The item isn't on the order any more");
     const out = await gql(owned.shop, store.token, `mutation RelayEditRemove($id: ID!, $line: ID!) { orderEditSetQuantity(id: $id, lineItemId: $line, quantity: 0, restock: true) { userErrors { message } } }`,
       { id: calc.id, line: oldLine.id }, f);
