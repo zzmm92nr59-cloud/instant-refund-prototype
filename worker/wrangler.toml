@@ -7,6 +7,7 @@ workers_dev = true
 # are removed on every deploy (secrets are kept).
 [vars]
 SHOPIFY_SHOP_DOMAIN = "relay-ltd.myshopify.com"
+AWIN_PUBLISHER_ID = "3134429"
 
 [[d1_databases]]
 binding = "RELAY_DB"
