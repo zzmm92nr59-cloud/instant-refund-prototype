@@ -74,6 +74,60 @@ assert.equal(r.status, 409); assert.equal(r.body.error, "already_returned");
 assert.equal((await call(alice, "GET", "/relay/my/returns")).body.returns.length, 1);
 assert.equal((await call(bob, "GET", "/relay/my/returns")).body.returns.length, 0);
 
+// Telling the shop. Shopify and the email service are stand-ins; nothing is sent.
+const recent2 = order(102, alice, new Date(Date.now() - 1 * 864e5).toISOString());
+const recent3 = order(103, alice, new Date(Date.now() - 1 * 864e5).toISOString());
+const recent4 = order(104, alice, new Date(Date.now() - 1 * 864e5).toISOString());
+let emails = [], shopifyCalls = [], emailOk = true, contact = "returns@kicklane.example";
+const fakeFetch = async (u, init = {}) => {
+  u = String(u);
+  if (u === "https://kick-lane.myshopify.com/admin/api/2026-07/graphql.json") {
+    shopifyCalls.push(JSON.parse(init.body));
+    assert.equal(init.headers["X-Shopify-Access-Token"], "tok");
+    return Response.json({ data: { shop: { name: "Kick Lane", email: "owner@kicklane.example", contactEmail: contact }, order: { name: "#1102" } } });
+  }
+  if (u === "https://api.resend.com/emails") { emails.push(JSON.parse(init.body)); return new Response("{}", { status: emailOk ? 200 : 500 }); }
+  throw Error("unexpected call " + u);
+};
+const listStores = async () => [{ domain: "kick-lane.myshopify.com", token: "tok", label: "Kick Lane" }];
+const envMail = { RELAY_DB: env.RELAY_DB, RESEND_API_KEY: "test-key" };
+const callWith = async (e, o, body) => {
+  const url = new URL("https://w.example/relay/my/return");
+  const res = await handleReturnRoute(new Request(url, { method: "POST", body: JSON.stringify(body) }), e, url, {}, alice, o);
+  return { status: res.status, body: await res.json() };
+};
+// Email accepted: the shop gets order number, item, reason and reference; the shopper's email is not in it.
+r = await callWith(envMail, { fetchImpl: fakeFetch, listStores }, { orderId: recent2, lineId: "L1", reason: "wrong_size" });
+assert.equal(r.status, 200); assert.equal(r.body.shopNotified, true);
+assert.equal(shopifyCalls.at(-1).variables.id, "gid://shopify/Order/102");
+assert.equal(emails.length, 1);
+const m = emails[0];
+assert.deepEqual(m.to, ["returns@kicklane.example"]);
+assert.match(m.subject, /^Return request RLY-[A-Z2-9]{4}-[A-Z2-9]{4} for order #1102$/);
+assert.match(m.text, /Logo Sports Cap, £20\.00/); assert.match(m.text, /Reason: Wrong size or fit/); assert.match(m.text, new RegExp(r.body.returnRef));
+assert.match(m.text, /not created a postage label and has not issued a refund/);
+assert.doesNotMatch(m.text + m.html, /alice@example\.com/);
+assert.ok(sqlite.prepare("SELECT shop_notified_at FROM relay_returns WHERE order_id = ?").get(recent2).shop_notified_at > 0);
+// No customer-facing contact address: falls back to the shop owner's address.
+contact = "";
+r = await callWith(envMail, { fetchImpl: fakeFetch, listStores }, { orderId: recent3, lineId: "L1" });
+assert.equal(r.body.shopNotified, true); assert.deepEqual(emails.at(-1).to, ["owner@kicklane.example"]);
+assert.match(emails.at(-1).text, /Reason: Not given/);
+// Email service refuses: the request is still saved, but the shopper is told the shop was NOT notified.
+emailOk = false; contact = "returns@kicklane.example";
+r = await callWith(envMail, { fetchImpl: fakeFetch, listStores }, { orderId: recent4, lineId: "L1" });
+assert.equal(r.status, 200); assert.equal(r.body.shopNotified, false);
+assert.equal(sqlite.prepare("SELECT shop_notified_at FROM relay_returns WHERE order_id = ?").get(recent4).shop_notified_at, null);
+// Shop no longer connected, or no email service: nothing is sent and nothing is claimed.
+const { notifyShopOfReturn } = await import("../worker/returns.js");
+emails = []; emailOk = true;
+assert.equal(await notifyShopOfReturn(envMail, { shop: "kick-lane.myshopify.com", externalOrderId: "1", returnRef: "RLY-AAAA-BBBB" }, { fetchImpl: fakeFetch, listStores: async () => [] }), false);
+assert.equal(await notifyShopOfReturn({ RELAY_DB: env.RELAY_DB }, { shop: "kick-lane.myshopify.com", externalOrderId: "1", returnRef: "RLY-AAAA-BBBB" }, { fetchImpl: fakeFetch, listStores }), false);
+assert.equal(emails.length, 0);
+// The app only says the shop was emailed when it was.
+const sheetText = readFileSync("account.js", "utf8");
+assert.match(sheetText, /result\.shopNotified \? "We've emailed "/);
+
 // The app screen no longer shows a fake QR / Post Office instructions.
 const ui = readFileSync("account.js", "utf8");
 assert.doesNotMatch(ui, /Show at Post Office|Show this QR code at any Post Office|Get my return label/);
