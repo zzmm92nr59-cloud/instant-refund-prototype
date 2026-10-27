@@ -3,8 +3,12 @@
 // What this does TODAY: records the shopper's return request against their shop-confirmed order, so the
 // item is marked as being returned (it can't also be exchanged) and the shopper has a Relay reference.
 //
-// What it does NOT do yet: it does not create a postage label, does not contact Royal Mail, and does not
-// tell the shop. Relay is not connected to Royal Mail Click & Drop (that needs a Royal Mail business
+// It also emails the shop (to the contact address set in its Shopify admin) with the order number, item,
+// reason and Relay reference, so the shop knows a return is coming. Only if that email was actually accepted for
+// delivery does the shopper's app say the shop was told; otherwise it says it wasn't. The shopper's own email
+// address is not included: the shop already has it on the order.
+//
+// What it does NOT do yet: it does not create a postage label and does not contact Royal Mail. Relay is not connected to Royal Mail Click & Drop (that needs a Royal Mail business
 // account and API key). So Relay must never show a QR code, tracking number or "drop off at the Post
 // Office" instruction: there is no real label behind it, and a shopper relying on it could lose their return.
 // The app tells the shopper to use the shop's own returns process for now.
@@ -13,6 +17,12 @@
 // and the item must not already have a return or exchange recorded.
 
 import { ensureOnce } from "./once.js";
+import { listConnectedShopifyStores } from "./shopify-connect.js";
+
+const API_VERSION = "2026-07";
+const REASON_TEXT = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
+const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clean = (t, n) => String(t == null ? "" : t).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
 
 const json = (body, status = 200, cors = {}) =>
   Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -43,7 +53,62 @@ export function ensureReturnsTables(db) {
       ON relay_returns(order_id, line_id)`).run();
     await db.prepare(`CREATE INDEX IF NOT EXISTS idx_relay_returns_shopper
       ON relay_returns(shopper_id)`).run();
-  });
+  }).then(() => ensureOnce(db, "returns-shop-notified", async () => {
+    // When the shop's email about this return was accepted for delivery (null = not told). Added later.
+    try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN shop_notified_at INTEGER").run(); } catch { /* already there */ }
+  }));
+}
+
+// Tells the shop about a return by email. Returns true only when the email service accepted the message.
+// Anything missing (no email service set up, shop not connected, no contact address) means false, never a guess.
+export async function notifyShopOfReturn(env, r, o = {}) {
+  const f = o.fetchImpl || ((...a) => fetch(...a));
+  if (!env.RESEND_API_KEY) return false;
+  try {
+    const stores = await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => []);
+    const store = stores.find(x => x.domain === r.shop);
+    if (!store || !store.token) return false;
+    const ext = String(r.externalOrderId || "");
+    const orderGid = /^\d{1,20}$/.test(ext) ? "gid://shopify/Order/" + ext : (/^gid:\/\/shopify\/Order\/\d{1,20}$/.test(ext) ? ext : null);
+    const res = await f("https://" + r.shop + "/admin/api/" + API_VERSION + "/graphql.json", { method: "POST",
+      headers: { "X-Shopify-Access-Token": store.token, "content-type": "application/json" },
+      body: JSON.stringify({ query: "query RelayReturnShop($id: ID!) { shop { name email contactEmail } order(id: $id) { name } }", variables: { id: orderGid || "gid://shopify/Order/0" } }),
+      signal: AbortSignal.timeout(10000) });
+    const d = (await res.json().catch(() => ({}))).data || {};
+    const shopInfo = d.shop || {};
+    const to = [shopInfo.contactEmail, shopInfo.email].map(x => String(x || "").trim()).find(x => /^[^\s@<>]{1,64}@[^\s@<>]{1,190}\.[a-z]{2,}$/i.test(x));
+    if (!to) return false;
+    const shopName = clean(shopInfo.name || store.label || r.shop, 80);
+    const orderName = clean((d.order && d.order.name) || (ext ? "#" + ext : "your order"), 40);
+    const item = clean(r.itemTitle || "an item", 120), qty = Number(r.quantity) || 1;
+    const price = "£" + (Math.round(Number(r.priceMinor) || 0) / 100).toFixed(2);
+    const reason = REASON_TEXT[r.reason] || "Not given";
+    const lines = [
+      "A customer has asked to return an item from order " + orderName + " through Relay.",
+      "",
+      "Item: " + item + (qty > 1 ? " (x" + qty + ")" : "") + ", " + price,
+      "Reason: " + reason,
+      "Relay reference: " + r.returnRef,
+      "",
+      "Relay has not created a postage label and has not issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.",
+      "Please handle this return as you normally would. You can find the customer's details on order " + orderName + " in your Shopify admin.",
+      "",
+      "You're getting this because " + shopName + " is connected to Relay."
+    ];
+    const html = "<p>A customer has asked to return an item from order <b>" + esc(orderName) + "</b> through Relay.</p>" +
+      "<table style=\"border-collapse:collapse\"><tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Item</td><td>" + esc(item) + (qty > 1 ? " (x" + qty + ")" : "") + ", " + esc(price) + "</td></tr>" +
+      "<tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Reason</td><td>" + esc(reason) + "</td></tr>" +
+      "<tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Relay reference</td><td style=\"font-family:monospace\">" + esc(r.returnRef) + "</td></tr></table>" +
+      "<p>Relay has <b>not</b> created a postage label and has <b>not</b> issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.</p>" +
+      "<p>Please handle this return as you normally would. You can find the customer's details on order " + esc(orderName) + " in your Shopify admin.</p>" +
+      "<p style=\"color:#5b6275;font-size:13px\">You're getting this because " + esc(shopName) + " is connected to Relay.</p>";
+    const sent = await f("https://api.resend.com/emails", { method: "POST",
+      headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: env.RELAY_EMAIL_FROM || "Relay <onboarding@resend.dev>", to: [to],
+        subject: "Return request " + r.returnRef + " for order " + orderName, text: lines.join("\n"), html }),
+      signal: AbortSignal.timeout(10000) });
+    return Boolean(sent && sent.ok);
+  } catch { return false; }
 }
 
 // A Relay reference, deliberately NOT shaped like a Royal Mail tracking number (RL123456789GB),
@@ -105,7 +170,7 @@ async function checkEligibility(env, shopper, orderId, lineId) {
 }
 
 // POST /relay/my/return — initiate a return, get back a return reference + QR data
-async function initiateReturn(env, shopper, body) {
+async function initiateReturn(env, shopper, body, o = {}) {
   const db = env.RELAY_DB;
   await ensureReturnsTables(db);
 
@@ -130,13 +195,17 @@ async function initiateReturn(env, shopper, body) {
     reason || null, returnRef, "requested", null, now
   ).run();
 
+  const shopNotified = await notifyShopOfReturn(env, { shop: check.shop, externalOrderId: check.order.ext, itemTitle: check.line.title,
+    quantity: check.line.quantity, priceMinor: check.line.priceMinor, reason: reason || null, returnRef }, o);
+  if (shopNotified) await db.prepare("UPDATE relay_returns SET shop_notified_at = ? WHERE id = ?").bind(Date.now(), returnId).run();
+
   return [200, {
     returnId,
     returnRef,
     status: "requested",
-    // No postage label exists: Relay is not connected to Royal Mail yet and has not told the shop.
+    // No postage label exists: Relay is not connected to Royal Mail yet. shopNotified is true only if the shop's email was sent.
     labelAvailable: false,
-    shopNotified: false,
+    shopNotified,
     item: check.line.title,
     priceMinor: check.line.priceMinor,
     daysSince: check.daysSince,
@@ -152,7 +221,7 @@ async function listReturns(env, shopper) {
            r.item_title AS itemTitle, r.quantity, r.price_minor AS priceMinor,
            r.reason, r.return_ref AS returnRef, r.status, r.carrier,
            r.dropped_off_at AS droppedOffAt, r.refund_issued_at AS refundIssuedAt,
-           r.created_at AS createdAt
+           r.created_at AS createdAt, r.shop_notified_at AS shopNotifiedAt
     FROM relay_returns r WHERE r.shopper_id = ? ORDER BY r.created_at DESC
   `).bind(shopper.id).all()).results || [];
   return [200, { returns: rows }];
@@ -172,7 +241,7 @@ async function checkEligibilityRoute(env, shopper, url) {
   }];
 }
 
-export async function handleReturnRoute(request, env, url, cors, shopper) {
+export async function handleReturnRoute(request, env, url, cors, shopper, o = {}) {
   const path = url.pathname;
   if (!path.startsWith("/relay/my/return")) return null;
   await ensureReturnsTables(env.RELAY_DB);
@@ -183,7 +252,7 @@ export async function handleReturnRoute(request, env, url, cors, shopper) {
   }
   if (path === "/relay/my/return" && request.method === "POST") {
     const body = await request.json().catch(() => null);
-    const [status, out] = await initiateReturn(env, shopper, body);
+    const [status, out] = await initiateReturn(env, shopper, body, o);
     return json(out, status, cors);
   }
   if (path === "/relay/my/returns" && request.method === "GET") {
