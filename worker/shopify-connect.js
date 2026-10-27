@@ -23,6 +23,33 @@ const unb64u = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(
 const esc = (t) => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 
+// Relay can run several Shopify apps at once: the main app (SHOPIFY_CLIENT_ID/_SECRET, later the public one) plus
+// one "custom distribution" app per pilot shop (SHOPIFY_APP_1.._20 _CLIENT_ID, _CLIENT_SECRET and optional _SHOP),
+// because Shopify only lets a custom app be installed on the one shop it was made for.
+// A request is matched to the app whose secret signed it; each connected shop remembers which app it came through.
+export function shopifyApps(env) {
+  const out = [], seen = new Set();
+  const add = (id, secret, shop) => {
+    id = String(id || "").trim(); secret = String(secret || "").trim();
+    if (!id || !secret || seen.has(id)) return;
+    seen.add(id); out.push({ id, secret, shop: normaliseShop(shop) || null });
+  };
+  add(env.SHOPIFY_CLIENT_ID, env.SHOPIFY_CLIENT_SECRET, null);
+  for (let n = 1; n <= 20; n++) add(env["SHOPIFY_APP_" + n + "_CLIENT_ID"], env["SHOPIFY_APP_" + n + "_CLIENT_SECRET"], env["SHOPIFY_APP_" + n + "_SHOP"]);
+  return out;
+}
+// The app to ask a shop's approval through: the pilot app made for that shop if there is one, otherwise the main app.
+function appForShop(env, shop) {
+  const apps = shopifyApps(env);
+  return apps.find(a => a.shop && a.shop === shop) || apps.find(a => !a.shop) || null;
+}
+function appById(env, id) { return shopifyApps(env).find(a => a.id === id) || null; }
+// Which of Relay's apps signed this query string (null if none did).
+async function signingApp(env, params) {
+  for (const a of shopifyApps(env)) if (await shopifySigned(params, a.secret)) return a;
+  return null;
+}
+
 // Accepts what a shop owner is likely to type: "my-shop", "my-shop.myshopify.com", "https://my-shop.myshopify.com/admin"
 // or the newer admin address "admin.shopify.com/store/my-shop". Anything else is refused.
 export function normaliseShop(raw) {
@@ -39,7 +66,10 @@ export function ensureShopifyShopSchema(db) {
   return ensureOnce(db, "shopify-shops", async () => {
     await db.prepare(`CREATE TABLE IF NOT EXISTS shopify_shops (domain TEXT PRIMARY KEY, label TEXT NOT NULL, access_iv TEXT NOT NULL, access_data TEXT NOT NULL,
       refresh_iv TEXT, refresh_data TEXT, expires_at INTEGER, refresh_expires_at INTEGER, scopes TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`).run();
-  });
+  }).then(() => ensureOnce(db, "shopify-shops-app", async () => {
+    // Which Relay app the shop approved (empty = the main app). Added later, so older databases get the column here.
+    try { await db.prepare("ALTER TABLE shopify_shops ADD COLUMN client_id TEXT").run(); } catch { /* already there */ }
+  }));
 }
 
 async function seal(env, text) {
@@ -70,13 +100,13 @@ export async function shopifySigned(params, secret) {
   return sameText(mine, given);
 }
 // Our own "state": which shop the approval is for, where to go afterwards, and when it stops being valid. Signed so it can't be altered.
-async function makeState(env, now, purpose, shop) {
-  const body = b64u(enc.encode(JSON.stringify({ p: purpose === "d" ? "d" : "c", s: shop, e: now + 15 * 60 * 1000, n: b64u(crypto.getRandomValues(new Uint8Array(9))) })));
+async function makeState(env, now, purpose, shop, appId) {
+  const body = b64u(enc.encode(JSON.stringify({ p: purpose === "d" ? "d" : "c", s: shop, a: appId, e: now + 15 * 60 * 1000, n: b64u(crypto.getRandomValues(new Uint8Array(9))) })));
   return body + "." + b64u(new Uint8Array(await crypto.subtle.sign("HMAC", await hmacKey("relay-shopify-state:" + env.AUTH_SECRET), enc.encode(body))));
 }
 async function readState(env, state, now) {
   const [body, sig, extra] = String(state || "").split(".");
-  if (!body || !sig || extra !== undefined || body.length > 400) return null;
+  if (!body || !sig || extra !== undefined || body.length > 500) return null;
   const want = b64u(new Uint8Array(await crypto.subtle.sign("HMAC", await hmacKey("relay-shopify-state:" + env.AUTH_SECRET), enc.encode(body))));
   if (!sameText(want, sig)) return null;
   try { const s = JSON.parse(dec.decode(unb64u(body))); return s && s.e > now && DOMAIN.test(s.s) ? s : null; } catch { return null; }
@@ -90,9 +120,9 @@ const askForShop = (note, purpose) => page("Connect your Shopify shop", `${note 
 <form method="get" action="/relay/shopify/connect"><input name="shop" placeholder="your-shop.myshopify.com" required autocomplete="off" style="font:inherit;padding:12px;border:1px solid #ccc;border-radius:10px;width:100%;box-sizing:border-box">
 ${purpose === "d" ? '<input type="hidden" name="for" value="dashboard">' : ""}<button style="margin-top:10px;font:inherit;font-weight:700;background:#141827;color:#fff;border:0;border-radius:10px;padding:12px 18px">Continue to Shopify</button></form>`, note ? 400 : 200);
 
-async function authorizeRedirect(env, url, shop, purpose, now) {
-  const state = await makeState(env, now, purpose, shop);
-  const to = "https://" + shop + "/admin/oauth/authorize?client_id=" + encodeURIComponent(env.SHOPIFY_CLIENT_ID) + "&scope=" + encodeURIComponent(SCOPES) +
+async function authorizeRedirect(env, url, shop, purpose, now, app) {
+  const state = await makeState(env, now, purpose, shop, app.id);
+  const to = "https://" + shop + "/admin/oauth/authorize?client_id=" + encodeURIComponent(app.id) + "&scope=" + encodeURIComponent(SCOPES) +
     "&redirect_uri=" + encodeURIComponent(url.origin + "/relay/shopify/oauth/callback") + "&state=" + encodeURIComponent(state);
   return new Response(null, { status: 302, headers: { location: to, "cache-control": "no-store" } });
 }
@@ -172,15 +202,15 @@ export async function removeShopifyItems(db, conn, productGid) {
   }
   return items.length;
 }
-async function saveTokens(env, shop, label, j, now) {
+async function saveTokens(env, shop, label, j, now, appId) {
   const a = await seal(env, j.access_token), r = j.refresh_token ? await seal(env, j.refresh_token) : { iv: null, data: null };
   const exp = Number(j.expires_in) > 0 ? now + Number(j.expires_in) * 1000 : null;
   const rexp = Number(j.refresh_token_expires_in) > 0 ? now + Number(j.refresh_token_expires_in) * 1000 : null;
-  await env.RELAY_DB.prepare(`INSERT INTO shopify_shops (domain, label, access_iv, access_data, refresh_iv, refresh_data, expires_at, refresh_expires_at, scopes, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(domain) DO UPDATE SET label = excluded.label, access_iv = excluded.access_iv, access_data = excluded.access_data,
+  await env.RELAY_DB.prepare(`INSERT INTO shopify_shops (domain, label, access_iv, access_data, refresh_iv, refresh_data, expires_at, refresh_expires_at, scopes, created_at, updated_at, client_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(domain) DO UPDATE SET label = excluded.label, access_iv = excluded.access_iv, access_data = excluded.access_data,
     refresh_iv = excluded.refresh_iv, refresh_data = excluded.refresh_data, expires_at = excluded.expires_at, refresh_expires_at = excluded.refresh_expires_at,
-    scopes = excluded.scopes, updated_at = excluded.updated_at`)
-    .bind(shop, label, a.iv, a.data, r.iv, r.data, exp, rexp, String(j.scope || "").slice(0, 300), now, now).run();
+    scopes = excluded.scopes, updated_at = excluded.updated_at, client_id = excluded.client_id`)
+    .bind(shop, label, a.iv, a.data, r.iv, r.data, exp, rexp, String(j.scope || "").slice(0, 300), now, now, appId || null).run();
 }
 
 export async function handleShopifyConnect(request, env, url, o = {}) {
@@ -189,7 +219,7 @@ export async function handleShopifyConnect(request, env, url, o = {}) {
   const now = o.now || Date.now(), f = o.fetchImpl || ((...a) => fetch(...a));
   if (!env.RELAY_DB || !env.AUTH_SECRET || String(env.AUTH_SECRET).length < 16)
     return page("Not available yet", "<p>Relay's server is not fully set up for connecting shops.</p>", 503);
-  if (!env.SHOPIFY_CLIENT_ID || !env.SHOPIFY_CLIENT_SECRET)
+  if (!shopifyApps(env).length)
     return page("Almost there", "<p>Relay is missing its Shopify app details on the server, so it can't connect Shopify shops yet.</p>", 503);
   await ensureShopifyShopSchema(env.RELAY_DB);
   const q = url.searchParams;
@@ -199,35 +229,39 @@ export async function handleShopifyConnect(request, env, url, o = {}) {
     if (!q.has("shop")) return askForShop("", purpose);
     const shop = normaliseShop(q.get("shop"));
     if (!shop) return askForShop("That doesn't look like a Shopify shop address. It ends in .myshopify.com (you can see it in your Shopify admin under Settings → Domains).", purpose);
-    return authorizeRedirect(env, url, shop, purpose, now);
+    const app = appForShop(env, shop);
+    if (!app) return askForShop("Relay isn't set up for this shop yet. Please use the install link Relay sent you.", purpose);
+    return authorizeRedirect(env, url, shop, purpose, now, app);
   }
 
   if (path === "/relay/shopify/launch") {
     // Opened from the shop's own Shopify admin: Shopify signs this link. A link older than ten minutes is refused so it can't be reused.
     const shop = normaliseShop(q.get("shop")), ts = Number(q.get("timestamp"));
-    if (!shop || q.get("shop") !== shop || !Number.isFinite(ts) || Math.abs(now / 1000 - ts) > 600 || !(await shopifySigned(q, env.SHOPIFY_CLIENT_SECRET)))
+    const app = shop && q.get("shop") === shop && Number.isFinite(ts) && Math.abs(now / 1000 - ts) <= 600 ? await signingApp(env, q) : null;
+    if (!app || (app.shop && app.shop !== shop))
       return page("Please open Relay again", "<p>Open Relay from the Apps section of your Shopify admin, or sign in from the Relay shop dashboard.</p>", 400);
-    return authorizeRedirect(env, url, shop, "d", now);
+    return authorizeRedirect(env, url, shop, "d", now, app);
   }
 
   // /relay/shopify/oauth/callback
   if (q.get("error")) return page("Not connected", "<p>The shop did not approve Relay, so nothing was connected.</p>", 400);
   const shop = normaliseShop(q.get("shop"));
-  if (!shop || q.get("shop") !== shop || !(await shopifySigned(q, env.SHOPIFY_CLIENT_SECRET)))
+  const app = shop && q.get("shop") === shop ? await signingApp(env, q) : null;
+  if (!app || (app.shop && app.shop !== shop))
     return page("Not connected", "<p>Relay couldn't confirm this approval came from Shopify, so nothing was connected. Please start again.</p>", 400);
   const state = await readState(env, q.get("state"), now);
-  if (!state || state.s !== shop) return page("That link has expired", "<p>Please start again from Connect with Shopify.</p>", 400);
+  if (!state || state.s !== shop || (state.a && state.a !== app.id)) return page("That link has expired", "<p>Please start again from Connect with Shopify.</p>", 400);
   const code = q.get("code");
   if (!code || code.length > 300) return page("Not connected", "<p>Shopify did not send an approval code.</p>", 400);
   try {
-    const j = await tokenRequest(shop, { client_id: env.SHOPIFY_CLIENT_ID, client_secret: env.SHOPIFY_CLIENT_SECRET, code, expiring: "1" }, f);
+    const j = await tokenRequest(shop, { client_id: app.id, client_secret: app.secret, code, expiring: "1" }, f);
     if (!String(j.scope || "").split(",").map(s => s.trim()).some(s => s === "read_products" || s === "write_products"))
       return page("Not connected", "<p>Relay needs permission to read your products. Please approve again and keep that permission switched on.</p>", 400);
     const info = await shopInfo(shop, j.access_token, f), label = info.name;
     if (info.currency && info.currency !== "GBP")
       return page("Relay is for UK shops", `<p>${esc(label)} sells in ${esc(info.currency)}. Relay only works with UK shops that sell in pounds (£), so nothing was connected.</p>
 <p>If this shop should sell in pounds, change its currency in Shopify (Settings → Store details → Store currency), then connect again.</p>`, 400);
-    await saveTokens(env, shop, label, j, now);
+    await saveTokens(env, shop, label, j, now, app.id);
     // Ask Shopify to tell Relay about changes straight away. If it can't, hourly reading still keeps the shop up to date.
     try { await recordHooks(env, shop, await registerShopifyWebhooks(shop, j.access_token, url.origin, f)); }
     catch (e) { await recordHooks(env, shop, { created: 0, alreadyThere: 0, failed: [String(e && e.message || e).slice(0, 120)] }); }
@@ -254,23 +288,24 @@ export async function listConnectedShopifyStores(env, o = {}) {
     try {
       let token = await open(env, m.access_iv, m.access_data);
       const expiring = m.expires_at && m.expires_at - now < 5 * 60 * 1000;
-      if (expiring && m.refresh_data && (!m.refresh_expires_at || m.refresh_expires_at > now) && env.SHOPIFY_CLIENT_ID && env.SHOPIFY_CLIENT_SECRET) {
+      const app = (m.client_id && appById(env, m.client_id)) || (!m.client_id && appForShop(env, m.domain)) || null;
+      if (expiring && m.refresh_data && (!m.refresh_expires_at || m.refresh_expires_at > now) && app) {
         try {
           const oldRefresh = await open(env, m.refresh_iv, m.refresh_data);
-          const j = await tokenRequest(m.domain, { client_id: env.SHOPIFY_CLIENT_ID, client_secret: env.SHOPIFY_CLIENT_SECRET, grant_type: "refresh_token", refresh_token: oldRefresh }, f);
+          const j = await tokenRequest(m.domain, { client_id: app.id, client_secret: app.secret, grant_type: "refresh_token", refresh_token: oldRefresh }, f);
           // Shopify normally hands back a new refresh token; if it doesn't, the old one stays in use until it runs out.
           if (!j.refresh_token) {
             j.refresh_token = oldRefresh;
             j.refresh_token_expires_in = m.refresh_expires_at ? (m.refresh_expires_at - now) / 1000 : 0;
           }
           if (!j.scope) j.scope = m.scopes;
-          await saveTokens(env, m.domain, m.label, j, now);
+          await saveTokens(env, m.domain, m.label, j, now, m.client_id || null);
           token = j.access_token;
         } catch {
           if (m.expires_at <= now) continue; // expired and couldn't be renewed: skip this shop for now
         }
       } else if (m.expires_at && m.expires_at <= now) continue;
-      out.push({ domain: m.domain, token, label: m.label, canAuth: true, published: true, connected: true, clientId: "", clientSecret: "", webhookSecret: env.SHOPIFY_CLIENT_SECRET || "" });
+      out.push({ domain: m.domain, token, label: m.label, canAuth: true, published: true, connected: true, clientId: "", clientSecret: "", webhookSecret: (app && app.secret) || env.SHOPIFY_CLIENT_SECRET || "" });
     } catch { /* an unreadable row never stops the other shops */ }
   }
   return out;
