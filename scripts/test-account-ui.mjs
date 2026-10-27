@@ -163,8 +163,10 @@ console.log('PASS Continue with Google: starts safely, secret sent once, cancell
   assert.deepEqual((await pk.evaluate(() => window.__pk)).slice(-1)[0], { op: 'create', uv: 'required', rk: 'required', chal: 32, att: 'none' });
   await pk.getByText(/Added \d/).waitFor();
   assert.equal(await pk.evaluate(() => window.__xssK || 0), 0, 'passkey name shown as text only');
-  pk.once('dialog', d => d.accept());
+  pk.once('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await pk.getByRole('button', { name: 'Remove', exact: true }).click();
+  await pk.getByText('Remove this passkey? You can still sign in with an email link.').waitFor();
+  await pk.getByRole('button', { name: 'Remove passkey' }).click();
   await pk.waitForFunction(() => !/Added \d/.test(document.body.innerText));
   // a browser without passkey support shows no passkey buttons at all
   const plain = await context.newPage(); await plain.addInitScript(() => { delete window.PublicKeyCredential; });
@@ -250,8 +252,9 @@ console.log('PASS Authenticator-app 2-step: sign-in waits for the code, setup sh
   await ap.getByText('Sure, text me').waitFor();
   assert.equal(await ap.evaluate(() => (window.__xssR || 0) + (window.__xssM || 0)), 0, 'reason and messages are shown as text only');
   assert.equal(await ap.getByRole('button', { name: 'Take listing down' }).count(), 1);
-  ap.once('dialog', d => d.accept());
+  ap.once('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await ap.getByRole('button', { name: 'Block member' }).click();
+  await ap.getByRole('button', { name: 'Yes, do it' }).click();
   await ap.getByText('No reports waiting').waitFor();
   assert.deepEqual(adminActions, [['88888888-8888-8888-8888-888888888888', 'block']]);
   assert.deepEqual(apErrors, []);
