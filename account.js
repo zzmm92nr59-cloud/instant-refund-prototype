@@ -65,6 +65,22 @@
     (kids || []).forEach(function (c) { n.appendChild(c); });
     return n;
   }
+  function askBox(message, yesLabel, withText, onYes) {
+    var input = withText ? el("textarea", { rows: 3, style: "width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ddd6c6;border-radius:16px;font:inherit;font-size:15px;margin-bottom:6px" }) : null;
+    var card = el("div", { className: "rl-sheet", role: "alertdialog", ariaModal: "true" }, [el("p", { text: message, style: "color:#0f1b33;font-size:16px" })]);
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function done() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") done(); }
+    if (input) card.appendChild(input);
+    card.appendChild(el("button", { className: "rl-btn", text: yesLabel || "Yes, continue", onclick: function () { var v = input ? input.value : true; done(); onYes(v); } }));
+    card.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: done }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) done(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    (input || card.querySelector("button")).focus();
+  }
+  function ask(message, yesLabel, onYes) { askBox(message, yesLabel, false, onYes); }
+  function askText(message, yesLabel, onText) { askBox(message, yesLabel, true, onText); }
   var back = null;
   function close() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
   var pageLaunchers = null;
@@ -182,8 +198,9 @@
         ((r.body && r.body.passkeys) || []).forEach(function (k) {
           var rm = el("button", { className: "rl-btn ghost", text: "Remove", style: "width:auto;display:inline-block;margin:6px 0 0;padding:8px 14px;font-size:14px" });
           rm.onclick = function () {
-            if (!confirm("Remove this passkey? You can still sign in with an email link.")) return;
-            api("/relay/my/passkeys/remove", { method: "POST", body: { id: k.id } }).then(function (x) { if (x.ok) refresh(); else say(note, "Couldn't remove it. Try again.", true); });
+            ask("Remove this passkey? You can still sign in with an email link.", "Remove passkey", function () {
+              api("/relay/my/passkeys/remove", { method: "POST", body: { id: k.id } }).then(function (x) { if (x.ok) refresh(); else say(note, "Couldn't remove it. Try again.", true); });
+            });
           };
           list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: k.name || "Passkey" }),
             el("span", { text: "Added " + new Date(k.createdAt).toLocaleDateString("en-GB") + (k.lastUsedAt ? " · last used " + new Date(k.lastUsedAt).toLocaleDateString("en-GB") : "") }), rm]));
@@ -428,8 +445,9 @@
     return card;
   }
   function disconnectGmail(done, msg) {
-    if (!confirm("Disconnect Gmail and delete every receipt Relay captured from it?")) return;
-    api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
+    ask("Disconnect Gmail and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
+      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
+    });
   }
   function gmailSection(box, c, msg, onPage) {
     box.textContent = "";
@@ -687,8 +705,8 @@
     [el("h2", { text: "Reports to review" }),
      el("p", { text: "You see the conversation only, never who the members are. Dismiss, take the listing down, or block the member." }),
      list, msg, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
-    function act(id, outcome, ask) {
-      if (ask && !confirm(ask)) return;
+    function act(id, outcome, question) {
+      if (question) return ask(question, "Yes, do it", function () { act(id, outcome, null); });
       api("/relay/my/admin/reports/" + id + "/review", { method: "POST", body: { outcome: outcome } }).then(function (r) {
         if (r.ok) { say(msg, "Done."); load(); }
         else say(msg, r.body.error === "conflict_of_interest" ? "You're part of this conversation, so another admin has to review it." : "That didn't work. Try again.", true);
@@ -757,12 +775,11 @@
         tools.textContent = "";
         if (isOpen) {
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "End conversation", style: "padding:9px 14px;font-size:14px", onclick: function () {
-            if (!confirm("End this conversation? The item goes back on sale.")) return;
-            api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); } }));
+            ask("End this conversation? The item goes back on sale.", "End conversation", function () {
+              api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); }); } }));
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", style: "padding:9px 14px;font-size:14px", onclick: function () {
-            var why = prompt("What went wrong? (for example: asked me to pay outside Relay)\n\nReporting lets the Relay team read this conversation to review it. They won't see who either of you is.");
-            if (why === null) return;
-            api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); } }));
+            askText("What went wrong? (for example: asked me to pay outside Relay). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
+              api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); }); } }));
         }
       });
     }
@@ -973,11 +990,11 @@
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
       api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Delete my Relay account", onclick: function () {
-      if (!confirm("Delete your Relay sign-in and everything linked to it? This can't be undone.")) return;
-      api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); } }));
+      ask("Delete your Relay sign-in and everything linked to it? This can't be undone.", "Delete my account", function () {
+        api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Withdraw my permission for Relay to read my receipts", onclick: function () {
-      if (!confirm("Withdraw permission? Relay will disconnect Gmail and delete everything it captured. You'll be asked again next time you open your account.")) return;
-      api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else say(msg, "Couldn't withdraw. Try again.", true); }); } }));
+      ask("Withdraw permission? Relay will disconnect Gmail and delete everything it captured. You'll be asked again next time you open your account.", "Withdraw permission", function () {
+        api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else say(msg, "Couldn't withdraw. Try again.", true); }); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
   }
   function show() {
@@ -1295,13 +1312,14 @@
           var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available, style: "margin:6px 0;text-align:left",
             text: x.title + (x.available ? (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
           b.onclick = function () {
-            if (!confirm("Swap " + (it.variant || it.title) + " for " + x.title + "? " + (o.store || "The shop") + " will update your order.")) return;
-            list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
-            say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
-            api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key } }).then(function (res) {
-              if (res.ok) { say(msg, res.body.message); list.textContent = ""; list.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } })); return; }
-              say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
-              list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
+            ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + (o.store || "The shop") + " will update your order. Same price, nothing to pay or refund.", "Yes, swap it", function () {
+              list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
+              say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
+              api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key } }).then(function (res) {
+                if (res.ok) { say(msg, res.body.message); list.textContent = ""; list.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } })); return; }
+                say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
+                list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
+              });
             });
           };
           list.appendChild(b);
