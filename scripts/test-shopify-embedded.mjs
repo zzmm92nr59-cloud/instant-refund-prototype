@@ -8,6 +8,7 @@ import { handleShopifyEmbedded, verifyIdToken } from "../worker/shopify-embedded
 import { handleRetailerRoute } from "../worker/retailer.js";
 import { ensurePushTables } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
+import { hasAllScopes } from "../worker/shopify-connect.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -45,7 +46,7 @@ for (const [why, tok] of [
   ["garbage", "a.b.c"]]) assert.equal(await verifyIdToken(env, tok, now), null, why);
 
 // 2. Signing in from inside Shopify admin.
-let calls = [], currency = {}, exchangeFails = false;
+let calls = [], currency = {}, exchangeFails = false, granted = "read_products,read_inventory,write_orders,write_order_edits";
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
   if (url === "https://dash.test/retailer.html") return new Response(readFileSync("retailer.html", "utf8"));
@@ -56,7 +57,7 @@ const fetchImpl = async (url, init = {}) => {
     const b = Object.fromEntries(new URLSearchParams(init.body)); calls.push({ shop, ...b });
     if (b.grant_type === "refresh_token") return Response.json({ access_token: "fresh-" + shop, expires_in: 86400, refresh_token: "r2", refresh_token_expires_in: 7776000, scope: "read_products" });
     if (exchangeFails) return Response.json({ error: "invalid_subject_token" }, { status: 400 });
-    return Response.json({ access_token: "tok-" + shop, scope: "read_products,read_inventory,read_orders,write_order_edits", expires_in: 86400, refresh_token: "r-" + shop, refresh_token_expires_in: 7776000 });
+    return Response.json({ access_token: "tok-" + shop, scope: granted, expires_in: 86400, refresh_token: "r-" + shop, refresh_token_expires_in: 7776000 });
   }
   const q = JSON.parse(init.body).query;
   calls.push({ shop, graphql: q });
@@ -94,6 +95,30 @@ calls = []; connected = [];
 r = await session(idToken("kick-lane.myshopify.com", PILOT));
 assert.equal(r.status, 200); assert.equal(r.body.connectedNow, false);
 assert.equal(calls.filter(c => c.grant_type).length, 0); assert.deepEqual(connected, []);
+
+// Relay asks for a new permission (as when refunds were added): keys saved before that don't cover it, so the next open
+// fetches them again and sets up the notifications Relay doesn't have yet. Then it's back to no exchange.
+sqlite.prepare("UPDATE shopify_shops SET scopes = ? WHERE domain = 'kick-lane.myshopify.com'").run("read_products,read_inventory,read_orders,write_order_edits");
+calls = []; connected = [];
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(r.status, 200); assert.equal(r.body.store, "Kick Lane");
+assert.equal(calls.filter(c => c.grant_type).length, 1, "keys fetched again");
+assert.ok(calls.some(c => c.graphql && /webhookSubscriptionCreate/.test(c.graphql)), "missing notifications set up");
+assert.equal(sqlite.prepare("SELECT scopes FROM shopify_shops WHERE domain = 'kick-lane.myshopify.com'").get().scopes, granted);
+calls = [];
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(r.body.connectedNow, false); assert.equal(calls.filter(c => c.grant_type).length, 0);
+// The shop hasn't approved the new permission yet: Relay still opens with what it has (and asks Shopify again next time).
+granted = "read_products,read_inventory,read_orders,write_order_edits";
+sqlite.prepare("UPDATE shopify_shops SET scopes = ? WHERE domain = 'kick-lane.myshopify.com'").run(granted);
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(r.status, 200); assert.equal(r.body.store, "Kick Lane");
+granted = "read_products,read_inventory,write_orders,write_order_edits";
+// "write_" covers "read_"; anything less doesn't.
+assert.equal(hasAllScopes("read_products,read_inventory,write_orders,write_order_edits"), true);
+assert.equal(hasAllScopes("read_products,read_inventory,read_orders,write_orders,write_order_edits"), true);
+assert.equal(hasAllScopes("read_products,read_inventory,read_orders,write_order_edits"), false);
+assert.equal(hasAllScopes(""), false); assert.equal(hasAllScopes(null), false);
 
 // A shop that sells in dollars is turned away and nothing is stored.
 currency["us-shop.myshopify.com"] = "USD";
