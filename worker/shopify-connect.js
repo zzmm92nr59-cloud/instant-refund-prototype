@@ -16,6 +16,12 @@ import { getShopifyStores, syncShopifyCatalogues } from "./shopify.js";
 // write_orders: lets Relay refund the difference when a customer swaps to something cheaper. Without it the swap still
 // works and the shop is asked to refund by hand.
 const SCOPES = "read_products,read_inventory,read_orders,write_order_edits,write_orders";
+// True when a shop's saved keys cover everything Relay now asks for (a "write_" permission includes its "read_" one).
+// When Relay asks for something new (as when refunds were added), the saved keys don't, so they are fetched again.
+export function hasAllScopes(granted) {
+  const have = new Set(String(granted || "").split(",").map(s => s.trim()).filter(Boolean));
+  return SCOPES.split(",").every(s => have.has(s) || (s.startsWith("read_") && have.has("write_" + s.slice(5))));
+}
 const API_VERSION = "2026-07";
 const DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 const DASHBOARD_BASE = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
