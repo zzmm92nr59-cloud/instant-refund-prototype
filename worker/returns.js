@@ -62,6 +62,9 @@ export function ensureReturnsTables(db) {
   })).then(() => ensureOnce(db, "returns-tracking", async () => {
     // Royal Mail tracking number, only when Royal Mail actually made a label. Added later.
     try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN tracking_number TEXT").run(); } catch { /* already there */ }
+  })).then(() => ensureOnce(db, "returns-refund-amount", async () => {
+    // How much the shop refunded in Shopify for this return (from Shopify's refund notification). Added later.
+    try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN refund_minor INTEGER").run(); } catch { /* already there */ }
   }));
 }
 
@@ -245,7 +248,7 @@ async function listReturns(env, shopper) {
            r.item_title AS itemTitle, r.quantity, r.price_minor AS priceMinor,
            r.reason, r.return_ref AS returnRef, r.status, r.carrier,
            r.dropped_off_at AS droppedOffAt, r.refund_issued_at AS refundIssuedAt,
-           r.created_at AS createdAt, r.shop_notified_at AS shopNotifiedAt, r.tracking_number AS trackingNumber
+           r.created_at AS createdAt, r.shop_notified_at AS shopNotifiedAt, r.tracking_number AS trackingNumber, r.refund_minor AS refundMinor
     FROM relay_returns r WHERE r.shopper_id = ? ORDER BY r.created_at DESC
   `).bind(shopper.id).all()).results || [];
   return [200, { returns: rows }];

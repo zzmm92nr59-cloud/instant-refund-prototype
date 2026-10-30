@@ -87,7 +87,7 @@ assert.equal(r1.status, 302);
 const to = new URL(r1.headers.get("location"));
 assert.equal(to.origin + to.pathname, "https://oak-thread.myshopify.com/admin/oauth/authorize");
 assert.equal(to.searchParams.get("client_id"), "client-id-1");
-assert.equal(to.searchParams.get("scope"), "read_products,read_inventory,read_orders,write_order_edits");
+assert.equal(to.searchParams.get("scope"), "read_products,read_inventory,read_orders,write_order_edits,write_orders");
 assert.equal(to.searchParams.get("redirect_uri"), "https://w.test/relay/shopify/oauth/callback");
 const state = to.searchParams.get("state");
 const cb = (params) => go("/relay/shopify/oauth/callback?" + params.toString());
@@ -113,7 +113,7 @@ const okPage = await ok.text();
 assert.match(okPage, /Oak &amp; Thread is connected to Relay/);
 const key = /retailer\.html#key=(rk_[A-Za-z0-9_-]{43})/.exec(okPage)[1];
 // Shopify is asked to send change notices (products added, changed, removed; app removed) to Relay, once each.
-assert.deepEqual(hooks["oak-thread.myshopify.com"].map(h => h.topic).sort(), ["APP_UNINSTALLED", "INVENTORY_LEVELS_UPDATE", "ORDERS_PAID", "PRODUCTS_CREATE", "PRODUCTS_DELETE", "PRODUCTS_UPDATE"]);
+assert.deepEqual(hooks["oak-thread.myshopify.com"].map(h => h.topic).sort(), ["APP_UNINSTALLED", "INVENTORY_LEVELS_UPDATE", "ORDERS_PAID", "PRODUCTS_CREATE", "PRODUCTS_DELETE", "PRODUCTS_UPDATE", "REFUNDS_CREATE"]);
 assert.ok(hooks["oak-thread.myshopify.com"].every(h => h.uri === "https://w.test/relay/webhooks/shopify"));
 const row = sqlite.prepare("SELECT * FROM shopify_shops").get();
 assert.equal(row.domain, "oak-thread.myshopify.com"); assert.equal(row.label, "Oak & Thread");

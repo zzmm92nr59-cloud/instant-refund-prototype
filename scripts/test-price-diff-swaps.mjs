@@ -46,10 +46,10 @@ const order = (ext, qty = 1) => {
     .run(id + ":item:9" + ext, id, "9" + ext, "1", "11", "Logo Cap", qty, 2000, "GBP");
   return id;
 };
-const oDear = order(600), oFail = order(601), oDecline = order(602), oCheap = order(603), oTwo = order(604, 2);
+const oDear = order(600), oFail = order(601), oDecline = order(602), oCheap = order(603), oTwo = order(604, 2), oCheap2 = order(605);
 
 // Stand-ins for Stripe and Shopify.
-let stripeCalls = [], shopifyCalls = [], piStatus = "requires_capture", refuseAdd = false, siCustomer = null;
+let stripeCalls = [], shopifyCalls = [], piStatus = "requires_capture", refuseAdd = false, siCustomer = null, refundAllowed = true;
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
   if (url.startsWith("https://api.stripe.com/v1/")) {
@@ -67,6 +67,7 @@ const fetchImpl = async (url, init = {}) => {
       return ok({ id: "pi_" + stripeCalls.length.toString().padStart(8, "0"), status: piStatus });
     }
     if (/^payment_intents\/.+\/(capture|cancel)$/.test(path)) return ok({});
+    if (path === "accounts/acct_kicklane0001") return ok({ id: "acct_kicklane0001", charges_enabled: true, details_submitted: true });
     throw Error("unexpected Stripe call " + path);
   }
   assert.equal(url, "https://" + SHOP + "/admin/api/2026-07/graphql.json");
@@ -78,6 +79,9 @@ const fetchImpl = async (url, init = {}) => {
   if (/orderEditAddVariant/.test(query)) return ok({ orderEditAddVariant: { calculatedLineItem: { id: "gid://shopify/CalculatedLineItem/NEW" }, userErrors: refuseAdd ? [{ message: "Variant is not available" }] : [] } });
   if (/orderEditAddLineItemDiscount/.test(query)) return ok({ orderEditAddLineItemDiscount: { userErrors: [] } });
   if (/orderEditCommit/.test(query)) return ok({ orderEditCommit: { order: { id: "gid://shopify/Order/1" }, userErrors: [] } });
+  if (/RelayTx/.test(query)) return ok({ order: { transactions: [{ id: "gid://shopify/OrderTransaction/77", kind: "SALE", status: "SUCCESS", gateway: "shopify_payments", amountSet: { shopMoney: { amount: "20.00" } } }] } });
+  if (/refundCreate/.test(query)) return refundAllowed ? ok({ refundCreate: { refund: { id: "gid://shopify/Refund/9" }, userErrors: [] } })
+    : Response.json({ errors: [{ message: "Access denied for refundCreate field. Required access: `write_orders` access scope." }] });
   throw Error("unexpected Shopify query");
 };
 const o = { now: 1_800_000_000_000, fetchImpl, listStores: async () => [{ domain: SHOP, token: "tok", label: "Kick Lane" }] };
@@ -87,17 +91,21 @@ const cardCall = async (e, path, body) => { const r = await handleCardRoute(req(
 const opts = async (e, orderId) => (await swapCall(e, "/relay/my/exchange/options?orderId=" + encodeURIComponent(orderId) + "&lineId=9" + orderId.split(":").pop())).body;
 const V = (n) => conn + ":variant:gid://shopify/ProductVariant/" + n;
 
-// 1. Payments off: dearer options say so, card routes refuse, nothing reaches Stripe.
+// 1. Card payments off: the dearer option is paid through the shop's Shopify checkout instead; card routes refuse; nothing reaches Stripe.
 let x = await opts(envOff, oDear);
-assert.deepEqual(x.options.map(v => [v.title, v.available, v.reason]), [["Kids", true, null], ["Large", false, "Costs £5.00 more (not available yet)"], ["Navy", true, null]]);
+assert.deepEqual(x.options.map(v => [v.title, v.available, v.reason, v.payBy]), [["Kids", true, null, null], ["Large", true, null, "shopify"], ["Navy", true, null, null]]);
+assert.equal(x.payBy, "shopify");
 assert.equal((await cardCall(envOff, "/relay/my/card")).body.enabled, false);
 assert.equal((await cardCall(envOff, "/relay/my/card/setup", {})).status, 503);
 assert.equal(stripeCalls.length, 0);
 
+// The shop chose instant card payments and connected its own Stripe account (shop-payments.js; tested in test-shop-payments.mjs).
+sqlite.prepare("INSERT INTO relay_shop_pay (shop, method, stripe_account, stripe_ready, updated_at) VALUES (?,?,?,?,?)").run(SHOP, "card", "acct_kicklane0001", 1, 1);
+
 // 2. Test mode on, no card yet: the dearer option asks for a card.
 x = await opts(env, oDear);
 assert.deepEqual(x.options.find(v => v.title === "Large"), { key: V(14), title: "Large", priceMinor: 2500, quantity: 4, priceDiffMinor: 500, available: false,
-  reason: "Costs £5.00 more: add a card to pay the difference", needsCard: true });
+  reason: "Costs £5.00 more: add a card to pay the difference", needsCard: true, payBy: "card" });
 assert.equal((await swapCall(env, "/relay/my/exchange", { orderId: oDear, lineId: "9600", variantKey: V(14), agreedDiffMinor: 500 })).body.error, "card_needed");
 
 // 3. Saving a card with the £0.00 check.
@@ -117,7 +125,7 @@ assert.equal(c.status, 200);
 assert.deepEqual(c.body.card, { brand: "visa", last4: "4242", wallet: "apple_pay", expMonth: 12, expYear: 2030, testMode: true });
 assert.doesNotMatch(JSON.stringify(sqlite.prepare("SELECT * FROM relay_cards").all()), /4242 4242|cvc|number/i, "no card number stored");
 
-// 4. Dearer swap: hold → edit order with a £5 discount on the new item → take. Relay owes the shop £5.
+// 4. Dearer swap: hold → edit order with a £5 discount on the new item → take. Stripe pays it into the shop's own account.
 x = await opts(env, oDear);
 assert.equal(x.options.find(v => v.title === "Large").available, true);
 assert.deepEqual(x.card, { brand: "visa", last4: "4242", wallet: "apple_pay" });
@@ -132,14 +140,17 @@ const pi = stripeCalls.find(s => s.path === "payment_intents");
 assert.deepEqual([pi.body.amount, pi.body.currency, pi.body.capture_method, pi.body.off_session, pi.body.confirm, pi.body.customer, pi.body.payment_method],
   ["500", "gbp", "manual", "true", "true", "cus_alice0001", "pm_card0000001"]);
 assert.ok(pi.idem && pi.idem.startsWith("relay-swap-"));
+assert.deepEqual([pi.body["transfer_data[destination]"], pi.body.on_behalf_of], ["acct_kicklane0001", "acct_kicklane0001"], "paid straight to the shop's Stripe account");
 const order_ = stripeCalls.map(s => s.path.replace(/pi_\d+/, "pi"));
 assert.deepEqual(order_, ["payment_intents", "payment_intents/pi/capture"], "hold first, take after the order changed");
 const disc = shopifyCalls.find(s => /orderEditAddLineItemDiscount/.test(s.query));
 assert.deepEqual([disc.variables.line, disc.variables.d.fixedValue], ["gid://shopify/CalculatedLineItem/NEW", { amount: "5.00", currencyCode: "GBP" }]);
 const note = shopifyCalls.find(s => /orderEditCommit/.test(s.query)).variables.note;
-assert.match(note, /paid the £5\.00 difference through Relay \(Stripe TEST MODE, no real money; ref pi_/); assert.match(note, /Relay owes the shop £5\.00/);
-let pay = sqlite.prepare("SELECT status, amount_minor, owed_to_shop, test_mode, shop FROM relay_swap_payments WHERE order_id = ?").get(oDear);
-assert.deepEqual({ ...pay }, { status: "taken", amount_minor: 500, owed_to_shop: 500, test_mode: 1, shop: SHOP });
+assert.match(note, /paid the £5\.00 difference by card through Relay \(Stripe TEST MODE, no real money; ref pi_/); assert.match(note, /paid into your Stripe account/);
+assert.equal(shopifyCalls.find(s => /orderEditCommit/.test(s.query)).variables.notify, false, "nothing for Shopify to collect");
+let pay = sqlite.prepare("SELECT status, amount_minor, owed_to_shop, test_mode, shop, destination FROM relay_swap_payments WHERE order_id = ?").get(oDear);
+assert.deepEqual({ ...pay }, { status: "taken", amount_minor: 500, owed_to_shop: 0, test_mode: 1, shop: SHOP, destination: "acct_kicklane0001" });
+assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(oDear).detail, "paid to shop 500");
 
 // 5. Shopify refuses the edit after the hold: the hold is cancelled and nothing is owed.
 refuseAdd = true; stripeCalls = [];
@@ -157,14 +168,25 @@ assert.equal(r.status, 402); assert.equal(r.body.error, "card_declined");
 assert.equal(shopifyCalls.filter(s => /orderEdit/.test(s.query)).length, 0);
 piStatus = "requires_capture";
 
-// 7. Cheaper swap: no card needed, nothing charged, the shop is asked (in the order note) to refund £5.
+// 7. Cheaper swap: no card needed, nothing charged; Relay refunds £5 in Shopify to the customer's original payment.
 stripeCalls = []; shopifyCalls = [];
 r = await swapCall(env, "/relay/my/exchange", { orderId: oCheap, lineId: "9603", variantKey: V(15), agreedDiffMinor: -500 });
 assert.equal(r.status, 200, JSON.stringify(r.body));
-assert.equal(stripeCalls.length, 0); assert.equal(r.body.paid, null);
-assert.match(r.body.message, /Kick Lane will refund the £5\.00 difference to how you paid/);
-assert.match(shopifyCalls.find(s => /orderEditCommit/.test(s.query)).variables.note, /Please refund the customer £5\.00/);
+assert.equal(stripeCalls.length, 0); assert.equal(r.body.paid, null); assert.equal(r.body.refunded, true);
+assert.match(r.body.message, /Kick Lane has refunded the £5\.00 difference to how you paid/);
 assert.equal(shopifyCalls.filter(s => /orderEditAddLineItemDiscount/.test(s.query)).length, 0);
+const ref = shopifyCalls.find(s => /refundCreate/.test(s.query));
+assert.match(ref.query, /@idempotent\(key: "relay-refund-[0-9a-f-]{36}"\)/);
+assert.deepEqual(ref.variables.input.transactions, [{ orderId: "gid://shopify/Order/603", parentId: "gid://shopify/OrderTransaction/77", kind: "REFUND", gateway: "shopify_payments", amount: "5.00" }]);
+assert.equal(ref.variables.input.notify, true);
+assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(oCheap).detail, "refunded 500");
+// The shop hasn't given Relay permission to refund: the swap still happens, and the shop is asked to refund by hand.
+refundAllowed = false; shopifyCalls = [];
+r = await swapCall(env, "/relay/my/exchange", { orderId: oCheap2, lineId: "9605", variantKey: V(15), agreedDiffMinor: -500 });
+assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(r.body.refunded, false);
+assert.match(r.body.message, /Kick Lane will refund the £5\.00 difference to how you paid/);
+assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(oCheap2).detail, "shop to refund 500");
+refundAllowed = true;
 
 // 8. Two of the same item: a different price isn't offered (only for a single item).
 x = await opts(env, oTwo);
@@ -178,13 +200,13 @@ assert.equal(c.body.card, null);
 assert.deepEqual(stripeCalls.map(s => s.path), ["payment_methods/pm_card0000001/detach"]);
 assert.equal((await cardCall(env, "/relay/my/card")).body.card, null);
 
-// 10. Deleting the Relay account forgets the card (and detaches it at Stripe); swap payment records stay as money owed.
+// 10. Deleting the Relay account forgets the card (and detaches it at Stripe); swap payment records are kept (no card details in them).
 await cardCall(env, "/relay/my/card/setup", {}); await cardCall(env, "/relay/my/card/confirm", { setupIntentId: "seti_new000001" });
 stripeCalls = [];
 const { forgetCard } = await import("../worker/payments.js");
 await forgetCard(env, "alice-id", o);
 assert.deepEqual(stripeCalls.map(s => s.path), ["payment_methods/pm_card0000001/detach"]);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM relay_cards WHERE shopper_id = 'alice-id'").get().n, 0);
-assert.equal(sqlite.prepare("SELECT owed_to_shop FROM relay_swap_payments WHERE order_id = ?").get(oDear).owed_to_shop, 500);
+assert.deepEqual({ ...sqlite.prepare("SELECT status, amount_minor, destination FROM relay_swap_payments WHERE order_id = ?").get(oDear) }, { status: "taken", amount_minor: 500, destination: "acct_kicklane0001" });
 
 console.log("price-difference swaps: all checks passed");

@@ -1424,7 +1424,7 @@
 
   var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
-    already_exchanged: "This item has already been exchanged.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
+    already_exchanged: "This item has already been exchanged.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
     card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
     price_changed: "The price has just changed. Close this and look again." };
   function absPounds(m) { return "£" + (Math.abs(m) / 100).toFixed(2); }
@@ -1450,14 +1450,23 @@
               addCard(list, function () { setTimeout(function () { close(); openExchange(o, it, done); }, 900); });
               return;
             }
+            var viaShop = d > 0 && x.payBy === "shopify";
             var what = d === 0 ? "Same price, nothing to pay or refund."
+              : viaShop ? "It costs " + absPounds(d) + " more. " + shop + " will update your order and send you a link to pay the " + absPounds(d) + ", using any way of paying " + shop + " accepts. Your new " + (x.title || "item") + " is kept for you."
               : d > 0 ? "It costs " + absPounds(d) + " more. We'll take " + absPounds(d) + " from your " + (card ? cardText(card) : "card") + " only once the shop has updated your order. (Test mode: no real money.)"
               : "It costs " + absPounds(d) + " less. " + shop + " will refund the " + absPounds(d) + " to how you paid.";
-            ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + what, d > 0 ? "Swap and pay " + absPounds(d) : "Yes, swap it", function () {
+            ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + what, viaShop ? "Swap, then pay " + absPounds(d) : d > 0 ? "Swap and pay " + absPounds(d) : "Yes, swap it", function () {
               list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
               say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
               api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key, agreedDiffMinor: d } }).then(function (res) {
-                if (res.ok) { say(msg, res.body.message); list.textContent = ""; list.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } })); return; }
+                if (res.ok) {
+                  say(msg, res.body.message); list.textContent = "";
+                  // Shopify's own payment page for the extra, on the shop's checkout (opens in a new tab).
+                  if (res.body.payUrl && /^https:\/\//.test(res.body.payUrl))
+                    list.appendChild(el("a", { className: "rl-btn", href: res.body.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + absPounds(d) + " to " + shop + " →", style: "text-align:center;text-decoration:none;margin-bottom:8px" }));
+                  list.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } }));
+                  return;
+                }
                 say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
                 list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
               });
@@ -1491,6 +1500,12 @@
           d.appendChild(el("div", { className: "small muted", text: (it.variant ? it.variant + " · " : "") + "Qty " + it.quantity + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") }));
           d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
           if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
+          if (it.returnInfo) {
+            var ri = it.returnInfo, refunded = ri.status === "refunded";
+            d.appendChild(el("p", { className: "small " + (refunded ? "watch" : "muted"), text: refunded
+              ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + (o.store || "the shop") + (ri.refundedAt ? " on " + new Date(ri.refundedAt).toLocaleDateString("en-GB") : "")
+              : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + " · waiting for " + (o.store || "the shop") + " to refund" }));
+          }
           if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { mountConfirmed(host); }); } }));
           if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { mountConfirmed(host); }); } }));
           card.appendChild(d); grid.appendChild(card);

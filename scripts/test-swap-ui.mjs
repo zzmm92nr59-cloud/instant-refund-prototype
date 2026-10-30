@@ -22,7 +22,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   elements: function () { return { create: function () { return { mount: function (n) { n.textContent = '[card field]'; } }; } }; },
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
-async function run({ card }) {
+async function run({ card, mode = "card", returnInfo = null }) {
   const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
   const posts = [];
   let saved = card;
@@ -35,7 +35,11 @@ async function run({ card }) {
     if (!p.startsWith('/relay/')) return route.abort();
     if (req.method() === 'POST') posts.push({ p, body: JSON.parse(req.postData() || '{}') });
     if (p === '/relay/my/purchases') return j(200, { purchases: [{ id: 'o1', store: 'Kick Lane', retailer: 'shopify:kick-lane.myshopify.com', orderedAt: '2026-10-29T10:00:00Z',
-      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: true, returnable: false }] }] });
+      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: !returnInfo, returnable: false, returnInfo }] }] });
+    if (p === '/relay/my/exchange/options' && mode === 'shopify') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: false, payBy: 'shopify', card: null, options: [
+      { key: 'k14', title: 'Large', priceMinor: 2500, quantity: 4, priceDiffMinor: 500, available: true, reason: null, needsCard: false, payBy: 'shopify' }] });
+    if (p === '/relay/my/exchange' && mode === 'shopify') return j(200, { exchanged: true, payBy: 'shopify', payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc',
+      message: "Done. Your order now has Large instead. Pay the £5.00 difference to Kick Lane to finish. Use the button below, or the link in Kick Lane's email. You can pay however Kick Lane accepts." });
     if (p === '/relay/my/exchange/options') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: true, card: saved, options: [
       { key: 'k15', title: 'Kids', priceMinor: 1500, quantity: 4, priceDiffMinor: -500, available: true, reason: null, needsCard: false },
       { key: 'k14', title: 'Large', priceMinor: 2500, quantity: 4, priceDiffMinor: 500, available: Boolean(saved), reason: saved ? null : 'Costs £5.00 more: add a card to pay the difference', needsCard: !saved },
@@ -50,7 +54,7 @@ async function run({ card }) {
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
+  if (!returnInfo) await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
   return { context, page, posts, errors };
 }
 
@@ -97,5 +101,36 @@ async function run({ card }) {
   assert.deepEqual(errors, []);
   await context.close();
   console.log('PASS adding a card from the swap screen (stand-in Stripe), then the dearer swap becomes available');
+}
+// 3. The shop takes the difference through its own Shopify checkout: no card asked for, and a link to pay the shop afterwards.
+{
+  const { context, page, posts, errors } = await run({ card: null, mode: 'shopify' });
+  await page.getByRole('button', { name: /Large · £5\.00 more/ }).click();
+  const box = await page.locator('.rl-sheet').last().innerText();
+  assert.match(box, /costs £5\.00 more\. Kick Lane will update your order and send you a link to pay the £5\.00, using any way of paying Kick Lane accepts\./);
+  assert.doesNotMatch(box, /card/i);
+  await page.getByRole('button', { name: 'Swap, then pay £5.00' }).click();
+  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane →' });
+  await pay.waitFor();
+  assert.equal(await pay.getAttribute('href'), 'https://kick-lane.myshopify.com/1/invoices/abc');
+  assert.equal(await pay.getAttribute('target'), '_blank');
+  if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-shopify-pay.png' });
+  assert.equal(posts.filter(x => x.p.startsWith('/relay/my/card')).length, 0, 'no card involved');
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log('PASS dearer swap paid through the shop\'s Shopify checkout');
+}
+
+// 4. A return the shop has refunded shows as refunded; one still waiting says so. No swap offered for either.
+{
+  const { context, page, errors } = await run({ card: null, returnInfo: { status: 'refunded', ref: 'RLY-AAAA-BBBB', trackingNumber: null, refundMinor: 2000, refundedAt: Date.UTC(2026, 9, 31) } });
+  await page.getByText('✓ Refunded £20.00 by Kick Lane on 31/10/2026').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Exchange size or colour →' }).count(), 0);
+  assert.deepEqual(errors, []);
+  await context.close();
+  const w = await run({ card: null, returnInfo: { status: 'requested', ref: 'RLY-CCCC-DDDD', trackingNumber: 'TT123456789GB', refundMinor: null, refundedAt: null } });
+  await w.page.getByText('Return started · ref RLY-CCCC-DDDD · Royal Mail TT123456789GB · waiting for Kick Lane to refund').waitFor();
+  await w.context.close();
+  console.log('PASS return status: refunded, or waiting for the shop');
 }
 await browser.close(); server.close();

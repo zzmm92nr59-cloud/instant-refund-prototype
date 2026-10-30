@@ -8,6 +8,7 @@ import { sendReturnReminders } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
+import { stripeReturnPage } from "./shop-payments.js";
 import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConnectedShopifyStores } from "./shopify-connect.js";
 import { handleShopifyEmbedded } from "./shopify-embedded.js";
 import { ensureOnce } from "./once.js";
@@ -98,6 +99,7 @@ export default {
       })()); } catch {} } });
       if (embedded) return embedded;
     }
+    if (url.pathname === "/relay/stripe/return" && request.method === "GET") return stripeReturnPage(url);
     if (url.pathname.startsWith("/relay/retailer/")) {
       const retailerResponse = await handleRetailerRoute(request, env, url, corsHeaders);
       if (retailerResponse) return retailerResponse;

@@ -13,7 +13,9 @@ import { issueRetailerKey } from "./retailer.js";
 import { ensureSquareMerchantSchema } from "./square-connect.js";
 import { getShopifyStores, syncShopifyCatalogues } from "./shopify.js";
 
-const SCOPES = "read_products,read_inventory,read_orders,write_order_edits";
+// write_orders: lets Relay refund the difference when a customer swaps to something cheaper. Without it the swap still
+// works and the shop is asked to refund by hand.
+const SCOPES = "read_products,read_inventory,read_orders,write_order_edits,write_orders";
 const API_VERSION = "2026-07";
 const DOMAIN = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/;
 const DASHBOARD_BASE = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
@@ -148,7 +150,8 @@ async function shopInfo(shop, token, f) {
 
 // Webhooks: Shopify tells Relay at once when a product is added, changed or removed, and when the shop removes the app.
 // Each is signed by Shopify with the app's secret and checked in shopify-webhooks.js. Asking twice never makes duplicates.
-export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE", "ORDERS_PAID", "INVENTORY_LEVELS_UPDATE"];
+// REFUNDS_CREATE: the shop refunded something, so a return started in Relay can show as refunded.
+export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE", "ORDERS_PAID", "INVENTORY_LEVELS_UPDATE", "REFUNDS_CREATE"];
 export async function registerShopifyWebhooks(shop, token, origin, f) {
   const uri = origin.replace(/\/$/, "") + "/relay/webhooks/shopify";
   const gql = async (query, variables) => {

@@ -1,10 +1,13 @@
 import { getShopifyStores } from "./shopify.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
+import { ensureReturnsTables } from "./returns.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
 // - app/uninstalled: the shop removed Relay, so its tokens, dashboard keys and products are deleted.
+// - refunds/create: the shop refunded items; any return started in Relay for those order lines is marked refunded (with the
+//   amount Shopify says), and a "please refund" left by a cheaper swap is marked done when the same amount is refunded.
 // - customers/data_request, customers/redact, shop/redact: Shopify's required privacy requests.
 // Shopify signs webhooks for Relay's app with the app's secret; a shop set up in the server settings may have its own secret.
 const MAX_BYTES = 256 * 1024;
@@ -102,6 +105,12 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     await audit(env, "shopify_privacy_request", shop, deliveryId, { topic, deleted });
     return Response.json({ received: true });
   }
+  if (topic === "refunds/create") {
+    if (!payload) return new Response("Invalid JSON", { status: 400 });
+    const r = await recordShopRefund(env, shop, payload);
+    await audit(env, "shopify_refund_seen", shop, deliveryId, { topic, ...r });
+    return Response.json({ received: true, ...r });
+  }
   if (topic !== "orders/paid") return Response.json({ received: true, ignored: true });
   // Orders are taken from shops set up in the server settings, and from shops that connected themselves to Relay.
   let connected = false;
@@ -110,6 +119,46 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
   if (!payload) return new Response("Invalid JSON", { status: 400 });
   const r = await ingestShopifyOrder(env, shop, payload, "webhook:" + deliveryId, topic);
   return Response.json(r.body, { status: r.status });
+}
+
+// A refund the shop made in Shopify. Marks Relay returns on the refunded order lines as refunded, and a cheaper swap's
+// "shop to refund N" as refunded when a refund of exactly that amount (with no items) is made. Never creates anything.
+export async function recordShopRefund(env, shop, refund, now = Date.now()) {
+  const db = env.RELAY_DB, orderId = "shopify:" + shop + ":order:" + String(refund && refund.order_id || "");
+  if (!/:order:\d{1,20}$/.test(orderId)) return { returns: 0, swaps: 0 };
+  let returns = 0, swaps = 0;
+  try { await ensureReturnsTables(db); } catch { /* marking returns is skipped below if the table can't be made */ }
+  const byLine = new Map();
+  for (const li of Array.isArray(refund.refund_line_items) ? refund.refund_line_items : []) {
+    const line = String(li && li.line_item_id || "");
+    if (!/^\d{1,20}$/.test(line)) continue;
+    let amount = 0;
+    try { amount = asMoney((li.subtotal_set && li.subtotal_set.shop_money && li.subtotal_set.shop_money.amount) ?? li.subtotal ?? 0); } catch { amount = 0; }
+    byLine.set(line, (byLine.get(line) || 0) + amount);
+  }
+  for (const [line, amount] of byLine) {
+    try {
+      const res = await db.prepare(`UPDATE relay_returns SET status = 'refunded', refund_issued_at = ?, refund_minor = COALESCE(refund_minor, 0) + ?
+        WHERE order_id = ? AND line_id = ? AND status NOT IN ('cancelled')`).bind(now, amount, orderId, line).run();
+      returns += Number(res && res.meta && res.meta.changes) || (res && res.changes) || 0;
+    } catch { /* returns table (or refund_minor column) not there yet: nothing to mark */ }
+  }
+  if (!byLine.size) {
+    let total = 0;
+    for (const t of Array.isArray(refund.transactions) ? refund.transactions : []) {
+      if (t && String(t.kind || "").toLowerCase() === "refund" && String(t.status || "success").toLowerCase() === "success") {
+        try { total += asMoney(t.amount); } catch { /* skip */ }
+      }
+    }
+    if (total > 0) {
+      try {
+        const res = await db.prepare("UPDATE relay_exchanges SET detail = ? WHERE order_id = ? AND status = 'done' AND detail = ?")
+          .bind("refunded " + total, orderId, "shop to refund " + total).run();
+        swaps += Number(res && res.meta && res.meta.changes) || (res && res.changes) || 0;
+      } catch { /* no swaps table yet */ }
+    }
+  }
+  return { returns, swaps };
 }
 
 // Stores one paid Shopify order (webhook or catch-up read). Shape: Shopify's REST order (id, created_at, currency, total_price,

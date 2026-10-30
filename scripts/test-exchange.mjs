@@ -63,9 +63,10 @@ assert.equal((await call(bob, "/relay/my/exchange/options?orderId=" + encodeURIC
 assert.equal((await call(bob, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: conn + ":variant:gid://shopify/ProductVariant/12" })).status, 404);
 assert.equal(calls.length, 0, "nothing reaches the shop for someone else's order");
 
-// 2. Options: other colours of the same product; out of stock and different price are shown but not allowed.
+// 2. Options: other colours of the same product; out of stock is shown but not allowed.
 const opts = (await (await call(alice, "/relay/my/exchange/options?orderId=" + encodeURIComponent(o500) + "&lineId=9500")).json()).options;
-assert.deepEqual(opts.map(x => [x.title, x.available, x.reason]), [["Large", false, "Costs £5.00 more (not available yet)"], ["Navy", true, null], ["Red", false, "Out of stock"]]);
+// A dearer one is offered too: by default the customer pays the difference through the shop's own Shopify checkout.
+assert.deepEqual(opts.map(x => [x.title, x.available, x.reason, x.payBy]), [["Large", true, null, "shopify"], ["Navy", true, null, null], ["Red", false, "Out of stock", null]]);
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: conn + ":variant:gid://shopify/ProductVariant/13" })).status, 409, "out of stock is refused");
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: "made-up" })).status, 400);
 assert.equal(calls.length, 0);

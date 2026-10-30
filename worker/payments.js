@@ -5,7 +5,9 @@
 //     charged. Stripe keeps the card; Relay keeps only Stripe's reference, the brand, the last 4 digits and the expiry.
 //   - When a shopper swaps to a dearer size or colour, Relay first PUTS A HOLD on the difference (not a charge), then
 //     edits the order in Shopify, then takes the held amount. If Shopify refuses the edit, the hold is cancelled.
-//   - Every amount taken is recorded as owed to that shop (relay_swap_payments.owed_to_shop).
+//   - If the shop has connected its own Stripe account (shop-payments.js), the charge is a Stripe Connect destination
+//     charge: Stripe pays it straight to the shop's account. Otherwise (older test swaps) it is recorded as owed to that
+//     shop (relay_swap_payments.owed_to_shop).
 //
 // What this does NOT do:
 //   - Real money. It only switches on with Stripe test keys (sk_test_… and pk_test_…); with a live key it stays off.
@@ -30,7 +32,10 @@ export function ensurePaymentTables(db) {
       shop TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, payment_intent TEXT, status TEXT NOT NULL, owed_to_shop INTEGER NOT NULL DEFAULT 0,
       test_mode INTEGER NOT NULL DEFAULT 1, detail TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)`).run();
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_swap_payments_shop ON relay_swap_payments(shop, status)").run();
-  });
+  }).then(() => ensureOnce(db, "payments-destination", async () => {
+    // The shop's own Stripe account the money was paid into (Stripe Connect). Added later.
+    try { await db.prepare("ALTER TABLE relay_swap_payments ADD COLUMN destination TEXT").run(); } catch { /* already there */ }
+  }));
 }
 
 // Stripe's API takes form fields; nested ones as a[b]=c.
@@ -107,27 +112,30 @@ async function removeCard(env, shopper, o) {
 }
 
 // Holds the difference on the shopper's saved card (nothing taken yet). Returns { id } or throws with a reason.
-export async function holdDifference(env, shopper, card, { amountMinor, orderId, lineId, shop, label }, o = {}) {
+// destination: the shop's own Stripe account (acct_…) to pay the money into; without it Relay records it as owed to the shop.
+export async function holdDifference(env, shopper, card, { amountMinor, orderId, lineId, shop, label, destination }, o = {}) {
   const now = o.now || Date.now(), id = crypto.randomUUID();
   await ensurePaymentTables(env.RELAY_DB);
   const pi = await stripe(env, "POST", "payment_intents", {
     amount: amountMinor, currency: "gbp", customer: card.customer_id, payment_method: card.payment_method_id, off_session: "true", confirm: "true",
     capture_method: "manual", description: ("Relay swap difference: " + label).slice(0, 200),
-    metadata: { relay_shopper: shopper.id, relay_order: orderId, relay_line: lineId, shop }
+    metadata: { relay_shopper: shopper.id, relay_order: orderId, relay_line: lineId, shop },
+    ...(destination ? { transfer_data: { destination }, on_behalf_of: destination } : {})
   }, { ...o, idempotencyKey: "relay-swap-" + id });
   if (pi.status !== "requires_capture") {
     try { await stripe(env, "POST", "payment_intents/" + pi.id + "/cancel", {}, o); } catch { /* nothing held */ }
     const e = new Error("Card not accepted"); e.code = "card_declined"; throw e;
   }
-  await env.RELAY_DB.prepare(`INSERT INTO relay_swap_payments (id, shopper_id, order_id, line_id, shop, amount_minor, currency, payment_intent, status, owed_to_shop, test_mode, created_at, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, shopper.id, orderId, lineId, shop, amountMinor, "GBP", pi.id, "held", 0, 1, now, now).run();
-  return { id, paymentIntent: pi.id };
+  await env.RELAY_DB.prepare(`INSERT INTO relay_swap_payments (id, shopper_id, order_id, line_id, shop, amount_minor, currency, payment_intent, status, owed_to_shop, test_mode, destination, created_at, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id, shopper.id, orderId, lineId, shop, amountMinor, "GBP", pi.id, "held", 0, 1, destination || null, now, now).run();
+  return { id, paymentIntent: pi.id, destination: destination || null };
 }
 export async function takeHeld(env, hold, o = {}) {
   const now = o.now || Date.now();
   try {
     await stripe(env, "POST", "payment_intents/" + hold.paymentIntent + "/capture", {}, o);
-    await env.RELAY_DB.prepare("UPDATE relay_swap_payments SET status = 'taken', owed_to_shop = amount_minor, updated_at = ? WHERE id = ?").bind(now, hold.id).run();
+    // Paid straight to the shop's Stripe account: nothing owed. Otherwise Relay owes the shop the amount.
+    await env.RELAY_DB.prepare("UPDATE relay_swap_payments SET status = 'taken', owed_to_shop = " + (hold.destination ? "0" : "amount_minor") + ", updated_at = ? WHERE id = ?").bind(now, hold.id).run();
     return true;
   } catch (e) {
     await env.RELAY_DB.prepare("UPDATE relay_swap_payments SET status = 'take_failed', detail = ?, updated_at = ? WHERE id = ?").bind(String(e && e.message || e).slice(0, 200), now, hold.id).run();

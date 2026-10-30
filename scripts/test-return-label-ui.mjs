@@ -91,6 +91,7 @@ async function shopperPage(returnBody) {
 {
   const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
   let settings = { connected: false }, saves = [];
+  let paySettings = { method: 'shopify', cardPossible: true, testMode: true, stripe: { connected: false, ready: false, detailsSubmitted: false } };
   await context.route('https://**/*', route => {
     const req = route.request(), p = new URL(req.url()).pathname;
     const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: H, body: JSON.stringify(body) });
@@ -111,6 +112,9 @@ async function shopperPage(returnBody) {
       return j(200, settings);
     }
     if (p === '/relay/retailer/royal-mail/remove') { settings = { connected: false }; return j(200, settings); }
+    if (p === '/relay/retailer/payments' && req.method() === 'GET') return j(200, paySettings);
+    if (p === '/relay/retailer/payments') { const b = JSON.parse(req.postData()); if (b.method === 'card' && !paySettings.stripe.ready) return j(409, { error: 'stripe_not_ready' }); paySettings = { ...paySettings, method: b.method }; return j(200, paySettings); }
+    if (p === '/relay/retailer/payments/stripe') return j(200, { url: 'https://connect.stripe.com/setup/s/abc123' });
     return j(404, {});
   });
   const page = await context.newPage();
@@ -118,6 +122,24 @@ async function shopperPage(returnBody) {
   await page.goto(origin + '/retailer.html#key=rk_' + 'k'.repeat(40));
   await page.getByRole('heading', { name: 'Royal Mail return labels' }).waitFor();
   await page.getByText('Relay ref RLY-ABCD-EFGH · Royal Mail TT123456789GB').waitFor();
+  // Price differences: Shopify checkout by default; instant card can't be picked until the shop's own Stripe is ready.
+  await page.getByRole('heading', { name: 'Price differences on swaps' }).waitFor();
+  assert.equal(await page.locator('#payState').innerText(), 'Shopify checkout');
+  assert.equal(await page.locator('input[name=payMethod][value=shopify]').isChecked(), true);
+  assert.equal(await page.locator('input[name=payMethod][value=card]').isDisabled(), true);
+  assert.equal(await page.locator('#stripeGo').innerText(), 'Connect Stripe');
+  const [popup] = await Promise.all([context.waitForEvent('page'), page.locator('#stripeGo').click()]);
+  await popup.waitForURL(/connect\.stripe\.com/).catch(() => {});
+  assert.match(popup.url(), /^https:\/\/connect\.stripe\.com\/setup\/s\/abc123|about:blank/);
+  await popup.close();
+  await page.getByText('Stripe opened in a new tab.', { exact: false }).waitFor();
+  paySettings = { ...paySettings, stripe: { connected: true, ready: true, detailsSubmitted: true } };
+  await page.reload(); await page.getByRole('heading', { name: 'Price differences on swaps' }).waitFor();
+  await page.locator('#stripeText').getByText('Stripe connected · your account can take payments (test mode).').waitFor();
+  await page.locator('input[name=payMethod][value=card]').check();
+  await page.getByText('Saved. Price differences are now taken instantly by card and paid into your Stripe account.').waitFor();
+  assert.equal(await page.locator('#payState').innerText(), 'Instant card');
+  if (process.env.SHOTS) await page.locator('#pay').screenshot({ path: process.env.SHOTS + '/retailer-pay.png' });
   // Swaps at a different price say what happened to the difference, never "Same price".
   await page.getByText('Customer paid £15.00 more by card (test mode) · Relay owes you £15.00', { exact: false }).waitFor();
   await page.getByText('New item is £5.00 cheaper · please refund the customer £5.00 in Shopify', { exact: false }).waitFor();

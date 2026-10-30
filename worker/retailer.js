@@ -10,6 +10,7 @@
 import { ensureOnce } from "./once.js";
 import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
+import { handleShopPayRoute } from "./shop-payments.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -164,7 +165,9 @@ async function sendOffer(env, shop, body, o) {
 // "Value kept" is the price of the items swapped instead of returned: it assumes each swap would otherwise have been a
 // return, which the dashboard says in plain words. For a swap to a dearer or cheaper item it is the new item's price
 // (what the shop keeps once the difference is paid or refunded). The difference comes from what Relay recorded on the
-// swap: "paid N" (taken from the shopper's card, owed to the shop), "payment not taken N", or "shop to refund N".
+// swap: "paid N" (taken by card, owed to the shop), "paid to shop N" (by card, paid into the shop's Stripe account),
+// "payment not taken N", "shopify balance N" (the customer was asked by Shopify to pay it), "refunded N" (Relay refunded it
+// in Shopify) or "shop to refund N".
 export async function shopResults(env, shop) {
   const db = env.RELAY_DB, out = { store: shop.store_label, supported: shop.provider === "shopify", swaps: [], returns: [],
     totals: { swaps: 0, swapValueMinor: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" };
@@ -178,12 +181,14 @@ export async function shopResults(env, shop) {
       LEFT JOIN order_items i ON i.order_id = x.order_id AND i.external_line_item_id = x.line_id
       WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
     out.swaps = rows.map(r => {
-      const m = /^(paid|payment not taken|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
-      const diff = !m ? 0 : m[1] === "shop to refund" ? -Number(m[2]) : Number(m[2]);
+      const m = /^(paid|paid to shop|payment not taken|shopify balance|refunded|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
+      const diff = !m ? 0 : (m[1] === "shop to refund" || m[1] === "refunded") ? -Number(m[2]) : Number(m[2]);
       const price = Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null;
       return { at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
         valueMinor: price == null ? null : price + (m && m[1] === "payment not taken" ? 0 : diff),
-        priceDiffMinor: diff, differencePaid: !m ? null : m[1] === "paid" ? true : m[1] === "payment not taken" ? false : null,
+        priceDiffMinor: diff, differencePaid: !m ? null : (m[1] === "paid" || m[1] === "paid to shop") ? true : m[1] === "payment not taken" ? false : null,
+        differenceHow: !m ? null : { "paid": "card_owed", "paid to shop": "card_to_shop", "payment not taken": "card_failed", "shopify balance": "shopify",
+          "refunded": "refunded", "shop to refund": "shop_to_refund" }[m[1]],
         currency: r.currency || "GBP", orderUrl: orderUrl(r.ext) };
     });
   } catch { /* no swaps yet on this database */ }
@@ -233,6 +238,13 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
     let body = null; try { body = text.length < 2000 ? JSON.parse(text) : null; } catch { body = null; }
     const [status, out] = await sendOffer(env, shop, body, { ...o, now });
     return json(out, status, cors);
+  }
+  // How customers pay a price difference on a swap: through the shop's Shopify checkout, or instantly by card into the shop's
+  // own Stripe account (Shopify shops only).
+  if (path === "/relay/retailer/payments" || path.startsWith("/relay/retailer/payments/")) {
+    if (shop.provider !== "shopify") return json({ error: "shopify_only" }, 400, cors);
+    const res = await handleShopPayRoute(request, env, url, cors, shop.shop_ref, { ...o, now });
+    if (res) return res;
   }
   // Royal Mail return labels on the shop's own Click & Drop account (Shopify shops only). The key is never sent back.
   if (path === "/relay/retailer/royal-mail" || path === "/relay/retailer/royal-mail/remove") {
