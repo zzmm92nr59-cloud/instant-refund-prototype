@@ -94,16 +94,32 @@ function store(get, v) { try { if (get) return localStorage.getItem(KEY_STORE); 
 // The key arrives after "#" (never sent to any server), is kept on this device, and is removed from the address bar.
 const fromLink = /(?:^|[#&])key=(rk_[A-Za-z0-9_-]{20,80})/.exec(location.hash);
 if (fromLink) { store(false, fromLink[1]); history.replaceState(null, "", location.pathname); }
-let key = fromLink ? fromLink[1] : store(true);
+// Inside Shopify admin (Relay's server adds window.RELAY_EMBEDDED and Shopify's App Bridge), the shop is proved by
+// Shopify itself: no sign-in screen, no key kept on the device.
+const EMBEDDED = Boolean(window.RELAY_EMBEDDED && window.shopify && typeof window.shopify.idToken === "function");
+let key = EMBEDDED ? null : (fromLink ? fromLink[1] : store(true));
+const EMBED_ERR = { not_gbp: "Relay is for UK shops that sell in pounds (£). Change your store currency in Shopify settings, then open Relay again.",
+  missing_permission: "Relay needs permission to read your products. Reinstall Relay from your Shopify admin and keep that permission on." };
+async function embeddedKey() {
+  const t = await window.shopify.idToken();
+  const r = await fetch(API + "/relay/shopify/embedded/session", { method: "POST", headers: { Authorization: "Bearer " + t } });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j.key) return j.key;
+  throw Error(j.error || "embedded_failed");
+}
 let demand = null;
 
-async function api(path, opts = {}) {
+async function api(path, opts = {}, retried = false) {
   const r = await fetch(API + path, { ...opts, headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" } });
   const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && EMBEDDED && !retried) { key = await embeddedKey(); return api(path, opts, true); }
   if (r.status === 401) { store(false, null); key = null; show(); throw Error("signed_out"); }
   return { status: r.status, body: j };
 }
-function show() { $("signin").classList.toggle("hidden", !!key); $("app").classList.toggle("hidden", !key); }
+function show() {
+  $("signin").classList.toggle("hidden", !!key || EMBEDDED); $("app").classList.toggle("hidden", !key && !EMBEDDED);
+  if (EMBEDDED) { $("signout").classList.add("hidden"); document.querySelector(".top").classList.add("hidden"); }
+}
 
 const ERR = { offer_must_be_lower: "An offer has to be lower than today's price.", offer_already_running: "There's already an offer running on this item.",
   too_many_offers_today: "You've sent 10 offers today — try again tomorrow.", bad_price: "Enter a price like 12.99.", not_your_item: "This item isn't in your shop's catalogue any more.", bad_duration: "Choose how long the offer lasts." };
@@ -156,6 +172,11 @@ function showResults(r) {
     "“Value of items swapped” counts each swap as a sale that would otherwise have been returned. Returns are handled through your usual process; Relay doesn't refund anyone.";
 }
 async function load() {
+  if (EMBEDDED && !key) {
+    show(); $("items").innerHTML = `<div class="empty">Connecting to your shop…</div>`;
+    try { key = await embeddedKey(); }
+    catch (e) { $("items").innerHTML = `<div class="empty">${esc(EMBED_ERR[e.message] || "Relay couldn't connect to your shop just now. Close and reopen Relay from your Apps.")}</div>`; return; }
+  }
   show(); if (!key) return;
   try {
     const [d, o, res] = await Promise.all([api("/relay/retailer/demand"), api("/relay/retailer/offers"), api("/relay/retailer/results").catch(() => null)]);
