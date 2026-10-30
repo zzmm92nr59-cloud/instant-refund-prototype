@@ -40,9 +40,9 @@ const order = (shop, ext, lines) => {
       .run(id + ":item:" + lineId, id, lineId, "P", "V", title, qty, price, "GBP");
   return id;
 };
-const swap = (shop, orderId, lineId, from, to, qty, status, at) =>
+const swap = (shop, orderId, lineId, from, to, qty, status, at, detail = null) =>
   sqlite.prepare("INSERT INTO relay_exchanges (id, shopper_id, order_id, line_id, shop, from_variant, from_title, to_variant, to_title, quantity, status, detail, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
-    .run(crypto.randomUUID(), "alice", orderId, lineId, shop, "gid://a", from, "gid://b", to, qty, status, null, at);
+    .run(crypto.randomUUID(), "alice", orderId, lineId, shop, "gid://a", from, "gid://b", to, qty, status, detail, at);
 const ret = (shop, orderId, lineId, item, qty, price, reason, ref, at, notified, status = "requested") =>
   sqlite.prepare("INSERT INTO relay_returns (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason, return_ref, status, created_at, shop_notified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
     .run(crypto.randomUUID(), "alice", orderId, lineId, shop, item, qty, price, reason, ref, status, at, notified);
@@ -57,6 +57,19 @@ swap("oak-thread.myshopify.com", other, "L1", "Sage", "Rust", 1, "done", now - 1
 ret("kick-lane.myshopify.com", o2, "L1", "Court Trainer", 1, 6500, "faulty", "RLY-AAAA-BBBB", now - 2000, now - 2000);
 ret("kick-lane.myshopify.com", o2, "L1", "Court Trainer", 1, 6500, "faulty", "RLY-CCCC-DDDD", now - 1500, null, "cancelled"); // cancelled: not counted
 ret("oak-thread.myshopify.com", other, "L1", "Linen Cushion", 1, 2400, "changed_mind", "RLY-EEEE-FFFF", now - 50, null);
+
+// Swaps at a different price: valued at the new item's price, with the difference and whether it was paid.
+const o3 = order("kick-lane.myshopify.com", "6100000000003", [["L1", "Cloud Runner Trainers", 1, 9500], ["L2", "Rain Jacket", 1, 6000], ["L3", "Beanie", 1, 1500]]);
+swap("kick-lane.myshopify.com", o3, "L1", "UK 8", "UK 7", 1, "done", now - 4000, "paid 1500");
+swap("kick-lane.myshopify.com", o3, "L2", "M", "L", 1, "done", now - 4100, "shop to refund 500");
+swap("kick-lane.myshopify.com", o3, "L3", "Red", "Blue", 1, "done", now - 4200, "payment not taken 300");
+const dr = (await call(kick)).body.swaps.filter(s => ["Cloud Runner Trainers", "Rain Jacket", "Beanie"].includes(s.item));
+assert.deepEqual(dr.map(s => [s.item, s.valueMinor, s.priceDiffMinor, s.differencePaid]),
+  [["Cloud Runner Trainers", 11000, 1500, true], ["Rain Jacket", 5500, -500, null], ["Beanie", 1500, 300, false]]);
+sqlite.prepare("DELETE FROM relay_exchanges WHERE order_id = ?").run(o3);
+const dashPage = readFileSync("retailer.html", "utf8");
+assert.match(dashPage, /Customer paid \$\{gbp\(diff, results\.currency\)\} more by card \(test mode\)/);
+assert.match(dashPage, /please refund the customer/);
 
 r = await call(kick);
 assert.equal(r.status, 200);
