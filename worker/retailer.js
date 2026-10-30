@@ -162,7 +162,9 @@ async function sendOffer(env, shop, body, o) {
 // Only for Shopify shops (swaps and returns run through Shopify orders). The shop already has these orders and their
 // customers in its own admin, so this shows order links and items but never the shopper's email or Relay account.
 // "Value kept" is the price of the items swapped instead of returned: it assumes each swap would otherwise have been a
-// return, which the dashboard says in plain words.
+// return, which the dashboard says in plain words. For a swap to a dearer or cheaper item it is the new item's price
+// (what the shop keeps once the difference is paid or refunded). The difference comes from what Relay recorded on the
+// swap: "paid N" (taken from the shopper's card, owed to the shop), "payment not taken N", or "shop to refund N".
 export async function shopResults(env, shop) {
   const db = env.RELAY_DB, out = { store: shop.store_label, supported: shop.provider === "shopify", swaps: [], returns: [],
     totals: { swaps: 0, swapValueMinor: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" };
@@ -170,13 +172,20 @@ export async function shopResults(env, shop) {
   const domain = shop.shop_ref, handle = String(domain).replace(/\.myshopify\.com$/, "");
   const orderUrl = (ext) => (/^\d{1,20}$/.test(String(ext || "")) ? "https://admin.shopify.com/store/" + handle + "/orders/" + ext : null);
   try {
-    const rows = (await db.prepare(`SELECT x.created_at AS at, x.from_title AS fromTitle, x.to_title AS toTitle, x.quantity AS qty,
+    const rows = (await db.prepare(`SELECT x.created_at AS at, x.from_title AS fromTitle, x.to_title AS toTitle, x.quantity AS qty, x.detail AS detail,
         o.external_order_id AS ext, i.title AS title, i.price_minor AS price, i.currency AS currency
       FROM relay_exchanges x LEFT JOIN retailer_orders o ON o.id = x.order_id
       LEFT JOIN order_items i ON i.order_id = x.order_id AND i.external_line_item_id = x.line_id
       WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
-    out.swaps = rows.map(r => ({ at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
-      valueMinor: Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null, currency: r.currency || "GBP", orderUrl: orderUrl(r.ext) }));
+    out.swaps = rows.map(r => {
+      const m = /^(paid|payment not taken|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
+      const diff = !m ? 0 : m[1] === "shop to refund" ? -Number(m[2]) : Number(m[2]);
+      const price = Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null;
+      return { at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
+        valueMinor: price == null ? null : price + (m && m[1] === "payment not taken" ? 0 : diff),
+        priceDiffMinor: diff, differencePaid: !m ? null : m[1] === "paid" ? true : m[1] === "payment not taken" ? false : null,
+        currency: r.currency || "GBP", orderUrl: orderUrl(r.ext) };
+    });
   } catch { /* no swaps yet on this database */ }
   try {
     let rows;
