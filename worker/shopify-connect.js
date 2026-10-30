@@ -332,3 +332,6 @@ export async function shopifyShopsForDisplay(env) {
   }
   return [...byDomain.values()];
 }
+
+// Used by shopify-embedded.js (Relay inside Shopify admin).
+export { appForShop, shopInfo, saveTokens, tokenRequest, recordHooks };
