@@ -32,6 +32,9 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .offers .row{grid-template-columns:1fr auto}.state{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px}.live{background:#eef6dc;color:#3f6212}.ended{background:#efeae0;color:#6b6252}
 .fine{font-size:12px;color:var(--muted);line-height:1.6;margin-top:30px}
 .hidden{display:none!important}
+.act{grid-template-columns:auto 1fr auto!important}.kind{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px;white-space:nowrap}.kind.swap{background:var(--lime);color:#1d2911}.kind.ret{background:#efeae0;color:#6b6252}
+.act a{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}.act .val{font-family:var(--serif);font-size:20px;font-weight:600;text-align:right}
+@media(max-width:640px){.act{grid-template-columns:auto 1fr!important}.act .end{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}}
 .shopify{margin:22px auto 0;max-width:420px;text-align:left;border-top:1px solid var(--line);padding-top:18px}.shopify label{font-size:12px;font-weight:700;color:var(--muted)}
 .shopify-row{display:flex;gap:8px;margin-top:6px}.shopify-row input{flex:1;min-width:0;border:1px solid #d9d3c6;border-radius:12px;padding:11px 12px;background:#fff}
 @media(max-width:480px){.shopify-row{flex-direction:column}}
@@ -54,6 +57,17 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 <main id="app" class="hidden">
   <h1 id="shop">Your shop</h1>
   <p class="sub">How many Relay shoppers are watching each of your items right now. You see totals only — never who they are, and counts under 3 show as “fewer than 3”. Send watchers an offer and Relay alerts their phones.</p>
+  <section id="results" class="hidden">
+    <div class="head"><h2>Pilot results</h2></div>
+    <div class="stats">
+      <div class="stat l"><strong id="rSwaps">–</strong><span>swaps instead of returns</span></div>
+      <div class="stat"><strong id="rKept">–</strong><span>value of items swapped</span></div>
+      <div class="stat w"><strong id="rReturns">–</strong><span>returns started in Relay</span></div>
+    </div>
+    <div class="list offers" id="activity"></div>
+    <p class="fine" style="margin-top:10px" id="resultsNote"></p>
+    <div class="head"><h2>Demand</h2></div>
+  </section>
   <div class="stats">
     <div class="stat"><strong id="sWatch">–</strong><span>shoppers watching your items</span></div>
     <div class="stat l"><strong id="sItems">–</strong><span>items being watched</span></div>
@@ -115,10 +129,37 @@ function offerRow(o) {
     <div class="meta">${gbp(o.offerMinor, shopCurrency())} (was ${gbp(o.wasMinor, shopCurrency())}) · sent to ${o.shoppers != null ? o.shoppers + " shoppers" : esc(o.shoppersText || "fewer than 3").toLowerCase() + " shoppers"} · ${o.active ? "ends" : "ended"} ${ends}</div>
     ${o.note ? `<div class="meta">“${esc(o.note)}”</div>` : ""}</div><span class="state ${o.active ? "live" : "ended"}">${o.active ? "Live" : "Ended"}</span></div>`;
 }
+const REASONS = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
+function activityRow(a) {
+  const when = new Date(a.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  const what = a.kind === "swap"
+    ? `${esc(a.item || "Item")}${a.from && a.to ? ` · ${esc(a.from)} → ${esc(a.to)}` : ""}`
+    : `${esc(a.item || "Item")} · ${esc(REASONS[a.reason] || "No reason given")}`;
+  const extra = a.kind === "swap" ? "Same price, order updated in Shopify" : `Relay ref ${esc(a.ref)} · ${a.emailed ? "you were emailed" : "email not sent"}`;
+  return `<div class="row act"><span class="kind ${a.kind === "swap" ? "swap" : "ret"}">${a.kind === "swap" ? "Swap" : "Return"}</span>
+    <div><h3>${what}</h3><div class="meta">${when}${a.quantity > 1 ? " · ×" + a.quantity : ""} · ${extra}</div></div>
+    <div class="end"><div class="val">${a.valueMinor != null ? gbp(a.valueMinor, results.currency) : ""}</div>${a.orderUrl ? `<a href="${esc(a.orderUrl)}" target="_blank" rel="noopener noreferrer">View order ↗</a>` : ""}</div></div>`;
+}
+let results = null;
+function showResults(r) {
+  results = r;
+  $("results").classList.toggle("hidden", !r || !r.supported);
+  if (!r || !r.supported) return;
+  const t = r.totals;
+  $("rSwaps").textContent = t.swaps;
+  $("rKept").textContent = gbp(t.swapValueMinor, r.currency);
+  $("rReturns").textContent = t.returns;
+  const all = r.swaps.map(x => ({ ...x, kind: "swap" })).concat(r.returns.map(x => ({ ...x, kind: "return" }))).sort((a, b) => b.at - a.at);
+  $("activity").innerHTML = all.length ? all.map(activityRow).join("")
+    : `<div class="empty">No swaps or returns yet. When a customer swaps a size or colour, or starts a return in Relay, it shows up here.</div>`;
+  $("resultsNote").textContent = (t.swapShare != null ? `${t.swapShare}% of the customers who came to Relay with an unwanted item swapped it rather than returning it. ` : "") +
+    "“Value of items swapped” counts each swap as a sale that would otherwise have been returned. Returns are handled through your usual process; Relay doesn't refund anyone.";
+}
 async function load() {
   show(); if (!key) return;
   try {
-    const [d, o] = await Promise.all([api("/relay/retailer/demand"), api("/relay/retailer/offers")]);
+    const [d, o, res] = await Promise.all([api("/relay/retailer/demand"), api("/relay/retailer/offers"), api("/relay/retailer/results").catch(() => null)]);
+    showResults(res && res.status === 200 ? res.body : null);
     demand = d.body;
     $("shop").textContent = demand.store || "Your shop";
     $("platformTag").textContent = demand.platform === "shopify" ? "Shopify · development shop" : "Square Sandbox · test shop";
