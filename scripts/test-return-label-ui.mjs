@@ -98,7 +98,9 @@ async function shopperPage(returnBody) {
     if (!p.startsWith('/relay/')) return route.abort();
     if (p === '/relay/retailer/demand') return j(200, { store: 'Kick Lane', platform: 'shopify', currency: 'GBP', watchedItems: [], shoppersWatchingItems: 0, followers: 0 });
     if (p === '/relay/retailer/offers') return j(200, { offers: [] });
-    if (p === '/relay/retailer/results') return j(200, { supported: true, currency: 'GBP', swaps: [], totals: { swaps: 0, returns: 1, swapValueMinor: 0, swapShare: 0 },
+    if (p === '/relay/retailer/results') return j(200, { supported: true, currency: 'GBP', swaps: [{ at: Date.now(), item: 'Cloud Runner Trainers', from: 'UK 8', to: 'UK 7', quantity: 1, valueMinor: 11000, priceDiffMinor: 1500, differencePaid: true, orderUrl: null },
+      { at: Date.now(), item: 'Rain Jacket', from: 'M', to: 'L', quantity: 1, valueMinor: 5500, priceDiffMinor: -500, differencePaid: null, orderUrl: null }],
+      totals: { swaps: 2, returns: 1, swapValueMinor: 16500, swapShare: 67 },
       returns: [{ at: Date.now(), item: 'Logo Cap', quantity: 1, valueMinor: 2000, reason: 'wrong_size', ref: 'RLY-ABCD-EFGH', emailed: true, trackingNumber: 'TT123456789GB', orderUrl: null }] });
     if (p === '/relay/retailer/royal-mail' && req.method() === 'GET') return j(200, settings);
     if (p === '/relay/retailer/royal-mail') {
@@ -116,6 +118,10 @@ async function shopperPage(returnBody) {
   await page.goto(origin + '/retailer.html#key=rk_' + 'k'.repeat(40));
   await page.getByRole('heading', { name: 'Royal Mail return labels' }).waitFor();
   await page.getByText('Relay ref RLY-ABCD-EFGH · Royal Mail TT123456789GB').waitFor();
+  // Swaps at a different price say what happened to the difference, never "Same price".
+  await page.getByText('Customer paid £15.00 more by card (test mode) · Relay owes you £15.00', { exact: false }).waitFor();
+  await page.getByText('New item is £5.00 cheaper · please refund the customer £5.00 in Shopify', { exact: false }).waitFor();
+  assert.equal(await page.getByText('Same price', { exact: false }).count(), 0);
   assert.equal(await page.locator('#rmState').innerText(), 'Off');
   const f = page.locator('#rmForm');
   await f.locator('[name=apiKey]').fill('wrong-key-wrong-key-wrong');
