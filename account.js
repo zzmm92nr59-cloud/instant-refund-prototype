@@ -183,6 +183,94 @@
     };
     return b;
   }
+  // ---- Card for swaps that cost more (Stripe TEST MODE only: no real money moves). ----
+  // Saved with a £0.00 check through Apple Pay / Google Pay where the device offers it, or a typed card.
+  // Stripe keeps the card; Relay only ever sees the brand and last 4 digits.
+  var stripeLoading = null;
+  function loadStripe(pk) {
+    if (window.Stripe) return Promise.resolve(window.Stripe(pk));
+    if (!stripeLoading) stripeLoading = new Promise(function (ok, bad) {
+      var sc = document.createElement("script"); sc.src = "https://js.stripe.com/v3/"; sc.onload = ok; sc.onerror = bad; document.head.appendChild(sc);
+    });
+    return stripeLoading.then(function () { return window.Stripe(pk); });
+  }
+  function cardText(c) {
+    var w = c.wallet === "apple_pay" ? "Apple Pay · " : c.wallet === "google_pay" ? "Google Pay · " : "";
+    return w + (c.brand ? c.brand.charAt(0).toUpperCase() + c.brand.slice(1) : "Card") + " ending " + c.last4;
+  }
+  function addCard(box, onSaved) {
+    var note = el("div", { className: "rl-msg" });
+    var holder = el("div", { style: "margin:10px 0" });
+    box.appendChild(holder); box.appendChild(note);
+    say(note, "Loading…");
+    api("/relay/my/card/setup", { method: "POST", body: {} }).then(function (r) {
+      if (!r.ok) return say(note, "Couldn't start. Please try again.", true);
+      var secret = r.body.clientSecret;
+      return loadStripe(r.body.publishableKey).then(function (stripe) {
+        note.textContent = ""; note.className = "rl-msg";
+        var finish = function (setupIntent) {
+          api("/relay/my/card/confirm", { method: "POST", body: { setupIntentId: setupIntent.id } }).then(function (x) {
+            if (x.ok) { say(note, "Card saved. Nothing was charged."); if (onSaved) onSaved(x.body.card); }
+            else say(note, "Couldn't save the card. Please try again.", true);
+          });
+        };
+        // Apple Pay / Google Pay sheet showing £0.00.
+        var pr = stripe.paymentRequest({ country: "GB", currency: "gbp", total: { label: "Relay card check (nothing charged)", amount: 0 } });
+        var elements = stripe.elements();
+        var typeNote = el("p", { className: "small muted", text: "Type a card. Test mode: use 4242 4242 4242 4242, any future date, any 3 digits." });
+        pr.canMakePayment().then(function (can) {
+          if (can) {
+            typeNote.textContent = "Or type a card. Test mode: use 4242 4242 4242 4242, any future date, any 3 digits.";
+            var btnBox = el("div", { style: "margin-bottom:10px" }); holder.insertBefore(btnBox, holder.firstChild);
+            elements.create("paymentRequestButton", { paymentRequest: pr }).mount(btnBox);
+          }
+        });
+        pr.on("paymentmethod", function (ev) {
+          stripe.confirmCardSetup(secret, { payment_method: ev.paymentMethod.id }, { handleActions: false }).then(function (res) {
+            if (res.error || !res.setupIntent) { ev.complete("fail"); return say(note, (res.error && res.error.message) || "That didn't work.", true); }
+            ev.complete("success"); finish(res.setupIntent);
+          });
+        });
+        // Typed card (test mode: 4242 4242 4242 4242, any future date, any CVC).
+        var cardBox = el("div", { style: "padding:12px 14px;border:1px solid #ddd6c6;border-radius:14px;background:#fff" });
+        holder.appendChild(typeNote);
+        holder.appendChild(cardBox);
+        var cardEl = elements.create("card", { hidePostalCode: true }); cardEl.mount(cardBox);
+        var save = el("button", { className: "rl-btn", text: "Save card (£0.00)", style: "margin-top:10px" });
+        save.onclick = function () {
+          save.disabled = true; say(note, "Checking the card…");
+          stripe.confirmCardSetup(secret, { payment_method: { card: cardEl } }).then(function (res) {
+            save.disabled = false;
+            if (res.error || !res.setupIntent) return say(note, (res.error && res.error.message) || "That didn't work.", true);
+            finish(res.setupIntent);
+          });
+        };
+        holder.appendChild(save);
+      });
+    }).catch(function () { say(note, "Couldn't load the card form. Check your connection and try again.", true); });
+  }
+  function cardSection(box) {
+    api("/relay/my/card").then(function (r) {
+      if (!r.ok || !r.body || !r.body.enabled) return;
+      box.textContent = "";
+      box.appendChild(el("h2", { text: "Card for swaps", style: "font-size:18px;margin-top:8px" }));
+      box.appendChild(el("span", { text: "TEST MODE · no real money", style: "display:inline-block;margin-bottom:6px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;background:#fff3d7;color:#7a540c" }));
+      box.appendChild(el("p", { text: "Used only when you swap to a size or colour that costs more: you pay the difference, after you've agreed it. Saving it charges nothing." }));
+      var note = el("div", { className: "rl-msg" });
+      if (r.body.card) {
+        box.appendChild(el("p", { text: cardText(r.body.card) }));
+        box.appendChild(el("button", { className: "rl-btn ghost", text: "Remove card", onclick: function () {
+          ask("Remove " + cardText(r.body.card) + " from Relay?", "Remove card", function () {
+            api("/relay/my/card/remove", { method: "POST", body: {} }).then(function (x) { if (x.ok) cardSection(box); else say(note, "Couldn't remove it. Try again.", true); });
+          }); } }));
+        box.appendChild(note);
+      } else {
+        var add = el("button", { className: "rl-btn ghost", text: "Add a card (£0.00 check)" });
+        add.onclick = function () { add.remove(); addCard(box, function () { setTimeout(function () { cardSection(box); }, 900); }); };
+        box.appendChild(add);
+      }
+    });
+  }
   function passkeySection(box, msg) {
     if (!passkeysSupported()) return;
     var list = el("div"), note = el("div", { className: "rl-msg" });
@@ -970,6 +1058,7 @@
       });
     } else gmailSection(gbox, c || {}, msg);
     var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
+    var cbox = el("div"); sheet.insertBefore(cbox, list.previousSibling); cardSection(cbox);
     var tbox = el("div"); sheet.insertBefore(tbox, list.previousSibling); twoStepSection(tbox);
     list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
@@ -1297,25 +1386,39 @@
 
   var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
-    already_exchanged: "This item has already been exchanged.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled." };
+    already_exchanged: "This item has already been exchanged.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
+    card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
+    price_changed: "The price has just changed. Close this and look again." };
+  function absPounds(m) { return "£" + (Math.abs(m) / 100).toFixed(2); }
   function openExchange(o, it, done) {
     open(function (sheet) {
       sheet.appendChild(el("h2", { text: "Exchange " + it.title, style: "margin:0 0 4px" }));
-      sheet.appendChild(el("p", { className: "small muted", text: (o.store || "The shop") + " · you have " + (it.variant || "this item") + ". Choose what you'd like instead. Same price, so there's nothing to pay or refund." }));
+      sheet.appendChild(el("p", { className: "small muted", text: (o.store || "The shop") + " · you have " + (it.variant || "this item") + ". Choose what you'd like instead." }));
       var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
       var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
       api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
         list.textContent = "";
         var opts = (r.ok && r.body && r.body.options) || [];
         if (!opts.length) { list.appendChild(el("p", { text: r.ok ? "This product has no other sizes or colours." : "Couldn't load the options." })); return; }
+        var shop = o.store || "The shop", card = r.body.card;
         opts.forEach(function (x) {
-          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available, style: "margin:6px 0;text-align:left",
-            text: x.title + (x.available ? (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
+          var d = x.priceDiffMinor || 0;
+          var price = d > 0 ? " · " + absPounds(d) + " more" : d < 0 ? " · " + absPounds(d) + " less" : "";
+          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available && !x.needsCard, style: "margin:6px 0;text-align:left",
+            text: x.title + (x.available ? price + (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
           b.onclick = function () {
-            ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + (o.store || "The shop") + " will update your order. Same price, nothing to pay or refund.", "Yes, swap it", function () {
+            if (x.needsCard) {
+              list.textContent = ""; list.appendChild(el("p", { text: "Add a card to pay the " + absPounds(d) + " difference. Saving it charges nothing." }));
+              addCard(list, function () { setTimeout(function () { close(); openExchange(o, it, done); }, 900); });
+              return;
+            }
+            var what = d === 0 ? "Same price, nothing to pay or refund."
+              : d > 0 ? "It costs " + absPounds(d) + " more. We'll take " + absPounds(d) + " from your " + (card ? cardText(card) : "card") + " only once the shop has updated your order. (Test mode: no real money.)"
+              : "It costs " + absPounds(d) + " less. " + shop + " will refund the " + absPounds(d) + " to how you paid.";
+            ask("Swap " + (it.variant || it.title) + " for " + x.title + "? " + what, d > 0 ? "Swap and pay " + absPounds(d) : "Yes, swap it", function () {
               list.querySelectorAll("button").forEach(function (n) { n.disabled = true; });
               say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
-              api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key } }).then(function (res) {
+              api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key, agreedDiffMinor: d } }).then(function (res) {
                 if (res.ok) { say(msg, res.body.message); list.textContent = ""; list.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } })); return; }
                 say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
                 list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
