@@ -63,12 +63,19 @@ const o3 = order("kick-lane.myshopify.com", "6100000000003", [["L1", "Cloud Runn
 swap("kick-lane.myshopify.com", o3, "L1", "UK 8", "UK 7", 1, "done", now - 4000, "paid 1500");
 swap("kick-lane.myshopify.com", o3, "L2", "M", "L", 1, "done", now - 4100, "shop to refund 500");
 swap("kick-lane.myshopify.com", o3, "L3", "Red", "Blue", 1, "done", now - 4200, "payment not taken 300");
-const dr = (await call(kick)).body.swaps.filter(s => ["Cloud Runner Trainers", "Rain Jacket", "Beanie"].includes(s.item));
-assert.deepEqual(dr.map(s => [s.item, s.valueMinor, s.priceDiffMinor, s.differencePaid]),
-  [["Cloud Runner Trainers", 11000, 1500, true], ["Rain Jacket", 5500, -500, null], ["Beanie", 1500, 300, false]]);
+const o4 = order("kick-lane.myshopify.com", "6100000000004", [["L1", "Gilet", 1, 4000], ["L2", "Scarf", 1, 2000], ["L3", "Gloves", 1, 1800]]);
+swap("kick-lane.myshopify.com", o4, "L1", "S", "M", 1, "done", now - 4300, "shopify balance 1000");
+swap("kick-lane.myshopify.com", o4, "L2", "Red", "Blue", 1, "done", now - 4400, "paid to shop 250");
+swap("kick-lane.myshopify.com", o4, "L3", "S", "XS", 1, "done", now - 4500, "refunded 300");
+const dr = (await call(kick)).body.swaps.filter(s => ["Cloud Runner Trainers", "Rain Jacket", "Beanie", "Gilet", "Scarf", "Gloves"].includes(s.item));
+assert.deepEqual(dr.map(s => [s.item, s.valueMinor, s.priceDiffMinor, s.differencePaid, s.differenceHow]),
+  [["Cloud Runner Trainers", 11000, 1500, true, "card_owed"], ["Rain Jacket", 5500, -500, null, "shop_to_refund"], ["Beanie", 1500, 300, false, "card_failed"],
+   ["Gilet", 5000, 1000, null, "shopify"], ["Scarf", 2250, 250, true, "card_to_shop"], ["Gloves", 1500, -300, null, "refunded"]]);
+sqlite.prepare("DELETE FROM relay_exchanges WHERE order_id = ?").run(o4);
 sqlite.prepare("DELETE FROM relay_exchanges WHERE order_id = ?").run(o3);
 const dashPage = readFileSync("retailer.html", "utf8");
-assert.match(dashPage, /Customer paid \$\{gbp\(diff, results\.currency\)\} more by card \(test mode\)/);
+assert.match(dashPage, /Customer paid \$\{m\(diff\)\} more by card \(test mode\) · paid into your Stripe account/);
+assert.match(dashPage, /Shopify asked the customer to pay \$\{m\(diff\)\} more/);
 assert.match(dashPage, /please refund the customer/);
 
 r = await call(kick);
