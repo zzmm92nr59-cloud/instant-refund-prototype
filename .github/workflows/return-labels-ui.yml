@@ -1,0 +1,29 @@
+name: Return labels UI
+on:
+  push:
+    branches: [main]
+    paths:
+      - account.js
+      - retailer.html
+      - index.html
+      - scripts/test-return-label-ui.mjs
+      - .github/workflows/return-labels-ui.yml
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  return-labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install test browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Royal Mail return labels in the shopper app and the shop dashboard (mocked API)
+        run: node scripts/test-return-label-ui.mjs

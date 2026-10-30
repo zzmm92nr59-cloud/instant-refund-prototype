@@ -48,6 +48,8 @@ jobs:
           node scripts/test-exchange.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
+          node --check worker/royal-mail.js
+          node scripts/test-royal-mail.mjs
           node scripts/test-resellable.mjs
           node --check worker/awin-feed.js
           node scripts/test-awin-feed.mjs

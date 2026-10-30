@@ -8,16 +8,19 @@
 // delivery does the shopper's app say the shop was told; otherwise it says it wasn't. The shopper's own email
 // address is not included: the shop already has it on the order.
 //
-// What it does NOT do yet: it does not create a postage label and does not contact Royal Mail. Relay is not connected to Royal Mail Click & Drop (that needs a Royal Mail business
-// account and API key). So Relay must never show a QR code, tracking number or "drop off at the Post
-// Office" instruction: there is no real label behind it, and a shopper relying on it could lose their return.
-// The app tells the shopper to use the shop's own returns process for now.
+// Postage labels: only when the shop has connected its own Royal Mail Click & Drop account in Relay for shops
+// (see royal-mail.js). Then Relay asks Royal Mail for a return label and shows the shopper the QR code / label and
+// tracking number exactly as Royal Mail sent them. If the shop hasn't connected Royal Mail, or Royal Mail doesn't
+// return a tracking number, there is no label: Relay must never show a QR code, tracking number or "drop off at the
+// Post Office" instruction without a real label behind it, and the app tells the shopper to use the shop's own
+// returns process.
 //
 // Eligibility: order confirmed by the shop for this shopper, within 7 days of the order date,
 // and the item must not already have a return or exchange recorded.
 
 import { ensureOnce } from "./once.js";
 import { listConnectedShopifyStores } from "./shopify-connect.js";
+import { shopMakesLabels, orderAddress, createReturnLabel, saveLabel, labelResponse } from "./royal-mail.js";
 
 const API_VERSION = "2026-07";
 const REASON_TEXT = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
@@ -56,6 +59,9 @@ export function ensureReturnsTables(db) {
   }).then(() => ensureOnce(db, "returns-shop-notified", async () => {
     // When the shop's email about this return was accepted for delivery (null = not told). Added later.
     try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN shop_notified_at INTEGER").run(); } catch { /* already there */ }
+  })).then(() => ensureOnce(db, "returns-tracking", async () => {
+    // Royal Mail tracking number, only when Royal Mail actually made a label. Added later.
+    try { await db.prepare("ALTER TABLE relay_returns ADD COLUMN tracking_number TEXT").run(); } catch { /* already there */ }
   }));
 }
 
@@ -65,8 +71,7 @@ export async function notifyShopOfReturn(env, r, o = {}) {
   const f = o.fetchImpl || ((...a) => fetch(...a));
   if (!env.RESEND_API_KEY) return false;
   try {
-    const stores = await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => []);
-    const store = stores.find(x => x.domain === r.shop);
+    const store = r.store || ((await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => [])).find(x => x.domain === r.shop));
     if (!store || !store.token) return false;
     const ext = String(r.externalOrderId || "");
     const orderGid = /^\d{1,20}$/.test(ext) ? "gid://shopify/Order/" + ext : (/^gid:\/\/shopify\/Order\/\d{1,20}$/.test(ext) ? ext : null);
@@ -83,6 +88,10 @@ export async function notifyShopOfReturn(env, r, o = {}) {
     const item = clean(r.itemTitle || "an item", 120), qty = Number(r.quantity) || 1;
     const price = "£" + (Math.round(Number(r.priceMinor) || 0) / 100).toFixed(2);
     const reason = REASON_TEXT[r.reason] || "Not given";
+    const label = r.trackingNumber ? "Relay has created a Royal Mail return label (" + (r.serviceName || "Royal Mail returns") + ") on your Click & Drop account. Tracking number: " + r.trackingNumber + ". Royal Mail charges the postage to your account as usual. Relay has not issued a refund; any refund comes from you."
+      : "Relay has not created a postage label and has not issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.";
+    const labelHtml = r.trackingNumber ? "<p>Relay has created a <b>Royal Mail return label</b> (" + esc(r.serviceName || "Royal Mail returns") + ") on your Click &amp; Drop account. Tracking number: <b style=\"font-family:monospace\">" + esc(r.trackingNumber) + "</b>. Royal Mail charges the postage to your account as usual. Relay has <b>not</b> issued a refund; any refund comes from you.</p>"
+      : "<p>Relay has <b>not</b> created a postage label and has <b>not</b> issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.</p>";
     const lines = [
       "A customer has asked to return an item from order " + orderName + " through Relay.",
       "",
@@ -90,7 +99,7 @@ export async function notifyShopOfReturn(env, r, o = {}) {
       "Reason: " + reason,
       "Relay reference: " + r.returnRef,
       "",
-      "Relay has not created a postage label and has not issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.",
+      label,
       "Please handle this return as you normally would. You can find the customer's details on order " + orderName + " in your Shopify admin.",
       "",
       "You're getting this because " + shopName + " is connected to Relay."
@@ -99,7 +108,7 @@ export async function notifyShopOfReturn(env, r, o = {}) {
       "<table style=\"border-collapse:collapse\"><tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Item</td><td>" + esc(item) + (qty > 1 ? " (x" + qty + ")" : "") + ", " + esc(price) + "</td></tr>" +
       "<tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Reason</td><td>" + esc(reason) + "</td></tr>" +
       "<tr><td style=\"padding:2px 12px 2px 0;color:#5b6275\">Relay reference</td><td style=\"font-family:monospace\">" + esc(r.returnRef) + "</td></tr></table>" +
-      "<p>Relay has <b>not</b> created a postage label and has <b>not</b> issued a refund. The customer has been told to send the item back using your usual returns process, and that any refund comes from you.</p>" +
+      labelHtml +
       "<p>Please handle this return as you normally would. You can find the customer's details on order " + esc(orderName) + " in your Shopify admin.</p>" +
       "<p style=\"color:#5b6275;font-size:13px\">You're getting this because " + esc(shopName) + " is connected to Relay.</p>";
     const sent = await f("https://api.resend.com/emails", { method: "POST",
@@ -169,7 +178,7 @@ async function checkEligibility(env, shopper, orderId, lineId) {
   return { eligible: true, order, shop: m[1], line, daysSince: Math.floor(daysSince) };
 }
 
-// POST /relay/my/return — initiate a return, get back a return reference + QR data
+// POST /relay/my/return — start a return; get back a Relay reference, plus a Royal Mail label when the shop has set that up
 async function initiateReturn(env, shopper, body, o = {}) {
   const db = env.RELAY_DB;
   await ensureReturnsTables(db);
@@ -195,16 +204,31 @@ async function initiateReturn(env, shopper, body, o = {}) {
     reason || null, returnRef, "requested", null, now
   ).run();
 
-  const shopNotified = await notifyShopOfReturn(env, { shop: check.shop, externalOrderId: check.order.ext, itemTitle: check.line.title,
-    quantity: check.line.quantity, priceMinor: check.line.priceMinor, reason: reason || null, returnRef }, o);
+  // A Royal Mail label, only if the shop connected its own Click & Drop account and Royal Mail returned a tracking number.
+  let store = null, made = null;
+  if (await shopMakesLabels(env, check.shop)) {
+    store = ((await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => [])).find(x => x.domain === check.shop)) || null;
+    const from = store ? await orderAddress(store, check.order.ext, o) : null;
+    made = from ? await createReturnLabel(env, check.shop, from, returnRef, o) : null;
+    if (made) {
+      await saveLabel(env, returnId, shopper.id, made, now);
+      await db.prepare("UPDATE relay_returns SET carrier = 'royal_mail', tracking_number = ? WHERE id = ?").bind(made.trackingNumber, returnId).run();
+    }
+  }
+
+  const shopNotified = await notifyShopOfReturn(env, { shop: check.shop, store, externalOrderId: check.order.ext, itemTitle: check.line.title,
+    quantity: check.line.quantity, priceMinor: check.line.priceMinor, reason: reason || null, returnRef,
+    trackingNumber: made && made.trackingNumber, serviceName: made && made.serviceName }, o);
   if (shopNotified) await db.prepare("UPDATE relay_returns SET shop_notified_at = ? WHERE id = ?").bind(Date.now(), returnId).run();
 
   return [200, {
     returnId,
     returnRef,
     status: "requested",
-    // No postage label exists: Relay is not connected to Royal Mail yet. shopNotified is true only if the shop's email was sent.
-    labelAvailable: false,
+    // labelAvailable is true only when Royal Mail made a real label. shopNotified is true only if the shop's email was sent.
+    labelAvailable: Boolean(made),
+    ...(made ? { carrier: "Royal Mail", trackingNumber: made.trackingNumber, serviceName: made.serviceName, hasPdf: Boolean(made.label),
+      qrImage: made.qr ? "data:" + made.qr.type + ";base64," + made.qr.data : null } : {}),
     shopNotified,
     item: check.line.title,
     priceMinor: check.line.priceMinor,
@@ -221,7 +245,7 @@ async function listReturns(env, shopper) {
            r.item_title AS itemTitle, r.quantity, r.price_minor AS priceMinor,
            r.reason, r.return_ref AS returnRef, r.status, r.carrier,
            r.dropped_off_at AS droppedOffAt, r.refund_issued_at AS refundIssuedAt,
-           r.created_at AS createdAt, r.shop_notified_at AS shopNotifiedAt
+           r.created_at AS createdAt, r.shop_notified_at AS shopNotifiedAt, r.tracking_number AS trackingNumber
     FROM relay_returns r WHERE r.shopper_id = ? ORDER BY r.created_at DESC
   `).bind(shopper.id).all()).results || [];
   return [200, { returns: rows }];
@@ -255,6 +279,7 @@ export async function handleReturnRoute(request, env, url, cors, shopper, o = {}
     const [status, out] = await initiateReturn(env, shopper, body, o);
     return json(out, status, cors);
   }
+  if (path === "/relay/my/return/label" && request.method === "GET") return labelResponse(env, shopper, url, cors);
   if (path === "/relay/my/returns" && request.method === "GET") {
     const [status, body] = await listReturns(env, shopper);
     return json(body, status, cors);

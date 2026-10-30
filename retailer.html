@@ -77,6 +77,25 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
   <div class="list" id="items"><div class="empty">Loading…</div></div>
   <div class="head"><h2>Offers you've sent</h2></div>
   <div class="list offers" id="offers"></div>
+  <section id="rm" class="hidden">
+    <div class="head"><h2>Royal Mail return labels</h2><span class="state ended" id="rmState">Off</span></div>
+    <div class="row" style="grid-template-columns:1fr">
+      <p class="meta" style="margin:0;line-height:1.55">Turn this on and customers who start a return in Relay get a Royal Mail return label — a QR code for the Post Office counter, or a label to print — made on <b>your own Click &amp; Drop account</b>. Royal Mail charges the postage to your account, just like labels you make in Click &amp; Drop. Leave it off and customers use your usual returns process.</p>
+      <form id="rmForm" class="offerbox" style="border:0;padding:0" autocomplete="off">
+        <label class="grow">Click &amp; Drop API key<input name="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Click & Drop › Settings › Integrations"></label>
+        <label>Returns service<select name="serviceCode"><option value="">Checked with Royal Mail</option></select></label>
+        <label class="grow">Send returns to (name)<input name="name" maxlength="150" required></label>
+        <label class="grow">Company (optional)<input name="company" maxlength="250"></label>
+        <label class="grow">Address line 1<input name="line1" maxlength="250" required></label>
+        <label class="grow">Address line 2 (optional)<input name="line2" maxlength="250"></label>
+        <label>Town or city<input name="city" maxlength="100" required></label>
+        <label>Postcode<input name="postcode" maxlength="10" required autocapitalize="characters"></label>
+        <button class="btn dark" type="submit" id="rmSave">Check key and turn on</button>
+        <button class="btn ghost hidden" type="button" id="rmOff">Turn off</button>
+      </form>
+      <div class="msg hidden" id="rmMsg"></div>
+    </div>
+  </section>
   <p class="fine">An offer sends a phone alert to everyone watching that item (and people following your whole shop). It doesn't change your price in <span id="platform">your shop system</span> and Relay doesn't take payment — you honour the offer price at your till or checkout. One offer per item at a time, up to 10 a day. Figures update when Relay next reads your catalogue (at least hourly).<br>
   <button class="btn ghost" id="signout" style="margin-top:10px">Sign out on this device</button></p>
 </main>
@@ -151,7 +170,7 @@ function activityRow(a) {
   const what = a.kind === "swap"
     ? `${esc(a.item || "Item")}${a.from && a.to ? ` · ${esc(a.from)} → ${esc(a.to)}` : ""}`
     : `${esc(a.item || "Item")} · ${esc(REASONS[a.reason] || "No reason given")}`;
-  const extra = a.kind === "swap" ? "Same price, order updated in Shopify" : `Relay ref ${esc(a.ref)} · ${a.emailed ? "you were emailed" : "email not sent"}`;
+  const extra = a.kind === "swap" ? "Same price, order updated in Shopify" : `Relay ref ${esc(a.ref)}${a.trackingNumber ? ` · Royal Mail ${esc(a.trackingNumber)}` : ""} · ${a.emailed ? "you were emailed" : "email not sent"}`;
   return `<div class="row act"><span class="kind ${a.kind === "swap" ? "swap" : "ret"}">${a.kind === "swap" ? "Swap" : "Return"}</span>
     <div><h3>${what}</h3><div class="meta">${when}${a.quantity > 1 ? " · ×" + a.quantity : ""} · ${extra}</div></div>
     <div class="end"><div class="val">${a.valueMinor != null ? gbp(a.valueMinor, results.currency) : ""}</div>${a.orderUrl ? `<a href="${esc(a.orderUrl)}" target="_blank" rel="noopener noreferrer">View order ↗</a>` : ""}</div></div>`;
@@ -169,7 +188,7 @@ function showResults(r) {
   $("activity").innerHTML = all.length ? all.map(activityRow).join("")
     : `<div class="empty">No swaps or returns yet. When a customer swaps a size or colour, or starts a return in Relay, it shows up here.</div>`;
   $("resultsNote").textContent = (t.swapShare != null ? `${t.swapShare}% of the customers who came to Relay with an unwanted item swapped it rather than returning it. ` : "") +
-    "“Value of items swapped” counts each swap as a sale that would otherwise have been returned. Returns are handled through your usual process; Relay doesn't refund anyone.";
+    "“Value of items swapped” counts each swap as a sale that would otherwise have been returned. Returns go back through your usual process (or on your Royal Mail label, if you've turned that on); Relay doesn't refund anyone.";
 }
 async function load() {
   if (EMBEDDED && !key) {
@@ -194,6 +213,7 @@ async function load() {
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
+    loadRm();
   } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
 }
 $("items").addEventListener("click", (e) => {
@@ -219,6 +239,49 @@ $("items").addEventListener("submit", async (e) => {
   } catch { say("bad", "Couldn't reach Relay just now."); }
   btn.disabled = false; btn.textContent = "Send";
 });
+const RM_ERR = { bad_key: "Royal Mail didn't accept that API key. Copy it again from Click & Drop › Settings › Integrations.",
+  key_needed: "Add your Click & Drop API key.", bad_postcode: "Enter a UK postcode, like SW1A 1AA.", address_incomplete: "Fill in the name, first address line and town.",
+  no_return_services: "Your Royal Mail account has no returns services yet. Ask Royal Mail to add Tracked Returns, then try again.",
+  bad_service: "Pick one of the returns services on your account.", royal_mail_unavailable: "Couldn't reach Royal Mail just now. Please try again in a minute." };
+function rmSay(cls, text) { const m = $("rmMsg"); m.className = "msg " + cls; m.textContent = text; }
+function rmShow(st) {
+  const f = $("rmForm"), on = Boolean(st && st.connected);
+  $("rmState").textContent = on ? "On" : "Off"; $("rmState").className = "state " + (on ? "live" : "ended");
+  f.apiKey.value = ""; f.apiKey.required = !on;
+  f.apiKey.placeholder = on ? "Saved — leave blank to keep it" : "Click & Drop › Settings › Integrations";
+  const svcs = (st && st.services) || [];
+  f.serviceCode.innerHTML = svcs.length ? svcs.map(x => `<option value="${esc(x.code)}"${st.serviceCode === x.code ? " selected" : ""}>${esc(x.name || x.code)}</option>`).join("")
+    : `<option value="">Checked with Royal Mail</option>`;
+  const a = (st && st.address) || {};
+  for (const k of ["name", "company", "line1", "line2", "city", "postcode"]) if (on || !f[k].value) f[k].value = a[k] || "";
+  $("rmSave").textContent = on ? "Save changes" : "Check key and turn on";
+  $("rmOff").classList.toggle("hidden", !on);
+}
+async function loadRm() {
+  const shopify = demand && demand.platform === "shopify";
+  $("rm").classList.toggle("hidden", !shopify);
+  if (!shopify) return;
+  try { const r = await api("/relay/retailer/royal-mail"); if (r.status === 200) rmShow(r.body); } catch { /* shown as Off */ }
+}
+$("rmForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = $("rmSave"), was = btn.textContent;
+  const body = { serviceCode: f.serviceCode.value, address: { name: f.name.value, company: f.company.value, line1: f.line1.value, line2: f.line2.value, city: f.city.value, postcode: f.postcode.value } };
+  if (f.apiKey.value.trim()) body.apiKey = f.apiKey.value.trim();
+  btn.disabled = true; btn.textContent = "Checking with Royal Mail…";
+  try {
+    const r = await api("/relay/retailer/royal-mail", { method: "POST", body: JSON.stringify(body) });
+    if (r.status === 200) { rmShow(r.body); rmSay("ok", `On. Customers' returns now get a ${r.body.serviceName} label from your Royal Mail account.`); }
+    else { if (r.body.services) rmShow({ connected: false, services: r.body.services }); rmSay("bad", RM_ERR[r.body.error] || "That didn't save. Please try again."); }
+  } catch { rmSay("bad", "Couldn't reach Relay just now."); }
+  btn.disabled = false; if (btn.textContent === "Checking with Royal Mail…") btn.textContent = was;
+});
+$("rmOff").onclick = async () => {
+  try {
+    const r = await api("/relay/retailer/royal-mail/remove", { method: "POST", body: "{}" });
+    if (r.status === 200) { rmShow({ connected: false }); rmSay("ok", "Off. Relay deleted your Click & Drop key. Customers will use your usual returns process."); }
+  } catch { rmSay("bad", "Couldn't reach Relay just now."); }
+};
 $("refresh").onclick = load;
 $("signout").onclick = () => { store(false, null); key = null; show(); };
 load();
