@@ -191,7 +191,8 @@ function activityRow(a) {
     card_to_shop: `Customer paid ${m(diff)} more by card (test mode) · paid into your Stripe account`,
     card_owed: `Customer paid ${m(diff)} more by card (test mode) · Relay owes you ${m(diff)}`,
     card_failed: `Customer's card wasn't charged the ${m(diff)} difference · Relay will sort this`,
-    shopify: `Shopify asked the customer to pay ${m(diff)} more · check the order is paid before sending`,
+    shopify: `Shopify asked the customer to pay ${m(diff)} more · not paid yet, so don't send the new item until it is`,
+    shopify_paid: `Customer paid ${m(diff)} more through your Shopify checkout`,
     refunded: `New item is ${m(diff)} cheaper · Relay refunded the customer ${m(diff)} in Shopify`,
     shop_to_refund: `New item is ${m(diff)} cheaper · please refund the customer ${m(diff)} in Shopify` };
   const extra = a.kind === "swap" ? (diff === 0 ? "Same price, order updated in Shopify"
