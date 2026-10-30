@@ -1,6 +1,6 @@
 import { getShopifyStores } from "./shopify.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
-import { forgetShopifyShop, removeShopifyItems } from "./shopify-connect.js";
+import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
@@ -64,7 +64,8 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     return Response.json({ error: "not_configured" }, { status: 503 });
   if (!DOMAIN.test(shop)) return new Response("Unauthorized store", { status: 403 });
   const store = getShopifyStores(env).find(s => s.domain === shop) || null;
-  const secrets = [...new Set([store && store.webhookSecret, env.SHOPIFY_CLIENT_SECRET].filter(Boolean))];
+  // Shopify signs with the secret of whichever Relay app the shop installed (main app or that shop's pilot app).
+  const secrets = [...new Set([store && store.webhookSecret, ...shopifyApps(env).map(x => x.secret)].filter(Boolean))];
   if (!secrets.length)
     return new Response("Unauthorized store", { status: 403 });
   const topic = String(request.headers.get("x-shopify-topic") || "").toLowerCase();

@@ -41,6 +41,7 @@ jobs:
           node scripts/test-square-connect.mjs
           node scripts/test-retailer.mjs
           node scripts/test-shopify-connect.mjs
+          node scripts/test-shopify-pilot-apps.mjs
           node scripts/test-exchange.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
