@@ -128,9 +128,10 @@ async function shopperPage(returnBody) {
   assert.equal(await page.locator('input[name=payMethod][value=shopify]').isChecked(), true);
   assert.equal(await page.locator('input[name=payMethod][value=card]').isDisabled(), true);
   assert.equal(await page.locator('#stripeGo').innerText(), 'Connect Stripe');
+  // A stand-in for Stripe's set-up page, so the test never depends on reaching Stripe.
+  await context.route('https://connect.stripe.com/**', r => r.fulfill({ status: 200, contentType: 'text/html', body: '<title>Stripe</title>' }));
   const [popup] = await Promise.all([context.waitForEvent('page'), page.locator('#stripeGo').click()]);
-  await popup.waitForURL(/connect\.stripe\.com/).catch(() => {});
-  assert.match(popup.url(), /^https:\/\/connect\.stripe\.com\/setup\/s\/abc123|about:blank/);
+  await popup.waitForURL(/^https:\/\/connect\.stripe\.com\/setup\/s\/abc123$/);
   await popup.close();
   await page.getByText('Stripe opened in a new tab.', { exact: false }).waitFor();
   paySettings = { ...paySettings, stripe: { connected: true, ready: true, detailsSubmitted: true } };
