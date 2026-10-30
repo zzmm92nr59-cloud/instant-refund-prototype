@@ -29,6 +29,7 @@ jobs:
           node --check worker/resale-admin.js
           node --check worker/retailer.js
           node --check worker/shopify-connect.js
+          node --check worker/shopify-embedded.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
@@ -43,6 +44,7 @@ jobs:
           node scripts/test-pilot-results.mjs
           node scripts/test-shopify-connect.mjs
           node scripts/test-shopify-pilot-apps.mjs
+          node scripts/test-shopify-embedded.mjs
           node scripts/test-exchange.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
