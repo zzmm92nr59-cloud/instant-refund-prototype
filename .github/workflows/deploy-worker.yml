@@ -40,6 +40,7 @@ jobs:
           node scripts/test-push.mjs
           node scripts/test-square-connect.mjs
           node scripts/test-retailer.mjs
+          node scripts/test-pilot-results.mjs
           node scripts/test-shopify-connect.mjs
           node scripts/test-shopify-pilot-apps.mjs
           node scripts/test-exchange.mjs
