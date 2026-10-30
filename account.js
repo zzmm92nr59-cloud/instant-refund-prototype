@@ -1244,7 +1244,7 @@
       inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
       inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:12px 0 16px" }, [
         el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
-        el("p", { className: "small", style: "margin:6px 0 0", text: "Relay can't create postage labels yet and hasn't contacted " + shop + ". To send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
+        el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") + "Relay can't create postage labels yet, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
       ]));
       inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
         el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
