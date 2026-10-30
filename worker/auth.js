@@ -8,6 +8,7 @@
 //  * No endpoint accepts a shopper ID from the client. Every "my" query is keyed by the
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
+import { labelDeleteStatements } from "./royal-mail.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
@@ -377,6 +378,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
+        ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
         ...totpDeleteStatements(env.RELAY_DB, shopper.id),
         ...pushDeleteStatements(env.RELAY_DB, shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
