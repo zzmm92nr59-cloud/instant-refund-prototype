@@ -170,7 +170,11 @@ function activityRow(a) {
   const what = a.kind === "swap"
     ? `${esc(a.item || "Item")}${a.from && a.to ? ` · ${esc(a.from)} → ${esc(a.to)}` : ""}`
     : `${esc(a.item || "Item")} · ${esc(REASONS[a.reason] || "No reason given")}`;
-  const extra = a.kind === "swap" ? "Same price, order updated in Shopify" : `Relay ref ${esc(a.ref)}${a.trackingNumber ? ` · Royal Mail ${esc(a.trackingNumber)}` : ""} · ${a.emailed ? "you were emailed" : "email not sent"}`;
+  const diff = a.priceDiffMinor || 0;
+  const extra = a.kind === "swap" ? (diff === 0 ? "Same price, order updated in Shopify"
+      : diff > 0 ? (a.differencePaid ? `Customer paid ${gbp(diff, results.currency)} more by card (test mode) · Relay owes you ${gbp(diff, results.currency)}`
+        : `Customer's card wasn't charged the ${gbp(diff, results.currency)} difference · Relay will sort this`)
+      : `New item is ${gbp(-diff, results.currency)} cheaper · please refund the customer ${gbp(-diff, results.currency)} in Shopify`) : `Relay ref ${esc(a.ref)}${a.trackingNumber ? ` · Royal Mail ${esc(a.trackingNumber)}` : ""} · ${a.emailed ? "you were emailed" : "email not sent"}`;
   return `<div class="row act"><span class="kind ${a.kind === "swap" ? "swap" : "ret"}">${a.kind === "swap" ? "Swap" : "Return"}</span>
     <div><h3>${what}</h3><div class="meta">${when}${a.quantity > 1 ? " · ×" + a.quantity : ""} · ${extra}</div></div>
     <div class="end"><div class="val">${a.valueMinor != null ? gbp(a.valueMinor, results.currency) : ""}</div>${a.orderUrl ? `<a href="${esc(a.orderUrl)}" target="_blank" rel="noopener noreferrer">View order ↗</a>` : ""}</div></div>`;
