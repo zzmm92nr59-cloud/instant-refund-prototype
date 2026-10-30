@@ -43,6 +43,8 @@ jobs:
           node scripts/test-shopify-connect.mjs
           node scripts/test-shopify-pilot-apps.mjs
           node scripts/test-exchange.mjs
+          node --check worker/payments.js
+          node scripts/test-price-diff-swaps.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
           node scripts/test-resellable.mjs
