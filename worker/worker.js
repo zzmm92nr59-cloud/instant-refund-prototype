@@ -9,6 +9,7 @@ import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
 import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConnectedShopifyStores } from "./shopify-connect.js";
+import { handleShopifyEmbedded } from "./shopify-embedded.js";
 import { ensureOnce } from "./once.js";
 import { syncAwinFeeds } from "./awin-feed.js";
 // The fictional demo products seeded by migration 0003 had no shop name or picture. They belong to three made-up shops;
@@ -89,6 +90,13 @@ export default {
         if (st) await backfillShopifyOrders(env, shop, st.token).catch(() => {});
       })()); } catch {} } });
       if (shopifyConnect) return shopifyConnect;
+      // Relay inside Shopify admin: the framed dashboard page and its sign-in with Shopify's ID token.
+      const embedded = await handleShopifyEmbedded(request, env, url, { afterConnect: (shop) => { try { ctx.waitUntil((async () => {
+        await syncAllShopify(env, { only: shop }).catch(() => {});
+        const st = (await listConnectedShopifyStores(env).catch(() => [])).find(x => x.domain === shop);
+        if (st) await backfillShopifyOrders(env, shop, st.token).catch(() => {});
+      })()); } catch {} } });
+      if (embedded) return embedded;
     }
     if (url.pathname.startsWith("/relay/retailer/")) {
       const retailerResponse = await handleRetailerRoute(request, env, url, corsHeaders);

@@ -9,6 +9,7 @@
 // or Shopify and Relay does not take payment; the shop honours the offer price itself.
 import { ensureOnce } from "./once.js";
 import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
+import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -157,6 +158,55 @@ async function sendOffer(env, shop, body, o) {
   return [200, { offer: row }];
 }
 
+// Pilot results: every swap and return Relay handled for this shop, newest first, with simple totals.
+// Only for Shopify shops (swaps and returns run through Shopify orders). The shop already has these orders and their
+// customers in its own admin, so this shows order links and items but never the shopper's email or Relay account.
+// "Value kept" is the price of the items swapped instead of returned: it assumes each swap would otherwise have been a
+// return, which the dashboard says in plain words.
+export async function shopResults(env, shop) {
+  const db = env.RELAY_DB, out = { store: shop.store_label, supported: shop.provider === "shopify", swaps: [], returns: [],
+    totals: { swaps: 0, swapValueMinor: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" };
+  if (!out.supported) return out;
+  const domain = shop.shop_ref, handle = String(domain).replace(/\.myshopify\.com$/, "");
+  const orderUrl = (ext) => (/^\d{1,20}$/.test(String(ext || "")) ? "https://admin.shopify.com/store/" + handle + "/orders/" + ext : null);
+  try {
+    const rows = (await db.prepare(`SELECT x.created_at AS at, x.from_title AS fromTitle, x.to_title AS toTitle, x.quantity AS qty,
+        o.external_order_id AS ext, i.title AS title, i.price_minor AS price, i.currency AS currency
+      FROM relay_exchanges x LEFT JOIN retailer_orders o ON o.id = x.order_id
+      LEFT JOIN order_items i ON i.order_id = x.order_id AND i.external_line_item_id = x.line_id
+      WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
+    out.swaps = rows.map(r => ({ at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
+      valueMinor: Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null, currency: r.currency || "GBP", orderUrl: orderUrl(r.ext) }));
+  } catch { /* no swaps yet on this database */ }
+  try {
+    let rows;
+    try {
+      rows = (await db.prepare(`SELECT r.created_at AS at, r.item_title AS item, r.quantity AS qty, r.price_minor AS price, r.reason, r.return_ref AS ref,
+          r.shop_notified_at AS notifiedAt, o.external_order_id AS ext
+        FROM relay_returns r LEFT JOIN retailer_orders o ON o.id = r.order_id WHERE r.shop = ? AND r.status != 'cancelled' ORDER BY r.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
+    } catch {
+      rows = (await db.prepare(`SELECT r.created_at AS at, r.item_title AS item, r.quantity AS qty, r.price_minor AS price, r.reason, r.return_ref AS ref,
+          NULL AS notifiedAt, o.external_order_id AS ext
+        FROM relay_returns r LEFT JOIN retailer_orders o ON o.id = r.order_id WHERE r.shop = ? AND r.status != 'cancelled' ORDER BY r.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
+    }
+    // Royal Mail tracking numbers, where Royal Mail made a label (the column only exists once returns have been used since labels arrived).
+    const tracking = new Map();
+    try {
+      for (const t of (await db.prepare("SELECT return_ref AS ref, tracking_number AS tn FROM relay_returns WHERE shop = ? AND tracking_number IS NOT NULL").bind(domain).all()).results || [])
+        tracking.set(t.ref, t.tn);
+    } catch { /* no labels yet */ }
+    out.returns = rows.map(r => ({ at: r.at, item: r.item || null, quantity: Number(r.qty) || 1, valueMinor: Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null,
+      reason: r.reason || null, ref: r.ref, emailed: Boolean(r.notifiedAt), trackingNumber: tracking.get(r.ref) || null, orderUrl: orderUrl(r.ext) }));
+  } catch { /* no returns yet on this database */ }
+  const t = out.totals;
+  t.swaps = out.swaps.length; t.returns = out.returns.length;
+  t.swapValueMinor = out.swaps.reduce((n, x) => n + (x.valueMinor || 0), 0);
+  t.returnValueMinor = out.returns.reduce((n, x) => n + (x.valueMinor || 0), 0);
+  t.swapShare = t.swaps + t.returns ? Math.round((100 * t.swaps) / (t.swaps + t.returns)) : null;
+  out.currency = (out.swaps.find(x => x.currency) || {}).currency || "GBP";
+  return out;
+}
+
 // Routes under /relay/retailer/ — every one needs the shop's key.
 export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) {
   const path = url.pathname;
@@ -167,12 +217,25 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
   const shop = await shopFromRequest(request, env, now);
   if (!shop) return json({ error: "not_signed_in" }, 401, cors);
   if (path === "/relay/retailer/demand" && request.method === "GET") return json(await shopDemand(env, shop, now), 200, cors);
+  if (path === "/relay/retailer/results" && request.method === "GET") return json(await shopResults(env, shop), 200, cors);
   if (path === "/relay/retailer/offers" && request.method === "GET") return json({ store: shop.store_label, offers: await listOffers(env.RELAY_DB, shop, now) }, 200, cors);
   if (path === "/relay/retailer/offers" && request.method === "POST") {
     const text = await request.text();
     let body = null; try { body = text.length < 2000 ? JSON.parse(text) : null; } catch { body = null; }
     const [status, out] = await sendOffer(env, shop, body, { ...o, now });
     return json(out, status, cors);
+  }
+  // Royal Mail return labels on the shop's own Click & Drop account (Shopify shops only). The key is never sent back.
+  if (path === "/relay/retailer/royal-mail" || path === "/relay/retailer/royal-mail/remove") {
+    if (shop.provider !== "shopify") return json({ error: "shopify_only" }, 400, cors);
+    if (request.method === "GET" && path === "/relay/retailer/royal-mail") return json(await royalMailSettings(env, shop.shop_ref), 200, cors);
+    if (request.method === "POST" && path === "/relay/retailer/royal-mail/remove") { const [st, out] = await removeRoyalMail(env, shop.shop_ref); return json(out, st, cors); }
+    if (request.method === "POST") {
+      const text = await request.text();
+      let body = null; try { body = text.length < 4000 ? JSON.parse(text) : null; } catch { body = null; }
+      const [st, out] = await saveRoyalMail(env, shop.shop_ref, body, { ...o, now });
+      return json(out, st, cors);
+    }
   }
   return json({ error: "not_found" }, 404, cors);
 }

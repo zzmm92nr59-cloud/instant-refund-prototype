@@ -29,6 +29,7 @@ jobs:
           node --check worker/resale-admin.js
           node --check worker/retailer.js
           node --check worker/shopify-connect.js
+          node --check worker/shopify-embedded.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
@@ -40,13 +41,17 @@ jobs:
           node scripts/test-push.mjs
           node scripts/test-square-connect.mjs
           node scripts/test-retailer.mjs
+          node scripts/test-pilot-results.mjs
           node scripts/test-shopify-connect.mjs
           node scripts/test-shopify-pilot-apps.mjs
+          node scripts/test-shopify-embedded.mjs
           node scripts/test-exchange.mjs
           node --check worker/payments.js
           node scripts/test-price-diff-swaps.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
+          node --check worker/royal-mail.js
+          node scripts/test-royal-mail.mjs
           node scripts/test-resellable.mjs
           node --check worker/awin-feed.js
           node scripts/test-awin-feed.mjs

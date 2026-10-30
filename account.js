@@ -1316,15 +1316,53 @@
   var RETURN_ERR = { outside_return_window: "This order is outside the 7-day return window.", already_returned: "A return has already been started for this item.", already_exchanged: "This item was exchanged — it can't also be returned.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
 
   function openReturn(o, it, done) {
-    var sheet = document.createElement("div"); sheet.className = "sheet"; document.body.appendChild(sheet);
-    function close() { if (sheet.parentNode) sheet.parentNode.removeChild(sheet); }
-    var msg = el("div", { className: "msg" });
+    // Shown as a proper sheet over the page (same look as the other Relay sheets), above the bottom bar on phones.
+    var sheet = el("div", { className: "rl-sheet", role: "dialog" });
+    var layer = el("div", { className: "rl-back" }, [sheet]);
+    layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
+    document.body.appendChild(layer);
+    function close() { if (layer.parentNode) layer.parentNode.removeChild(layer); }
+    var msg = el("div", { className: "rl-msg" });
     var step = "reason";
     var selectedReason = null;
 
-    // Relay is not connected to Royal Mail yet, so there is no postage label or QR code to show.
+    // A Royal Mail label is shown only when Royal Mail actually made one (the shop connected its own Click & Drop account).
+    function showLabel(result) {
+      sheet.textContent = "";
+      var shop = o.store || "the shop";
+      var inner = el("div", { className: "sheet-inner" });
+      var msg2 = el("div", { className: "rl-msg" });
+      inner.appendChild(el("div", { className: "eyebrow", text: "ROYAL MAIL RETURN LABEL" }));
+      inner.appendChild(el("h2", { text: "Your return label is ready" }));
+      inner.appendChild(el("p", { className: "small", text: shop + " has sent you a Royal Mail " + (result.serviceName || "returns") + " label for " + (result.item || it.title) + "." }));
+      if (result.qrImage) inner.appendChild(el("div", { className: "card", style: "text-align:center;margin:12px 0" }, [
+        el("img", { src: result.qrImage, alt: "Royal Mail QR code for your return", style: "width:200px;height:200px;image-rendering:pixelated" }),
+        el("p", { className: "small", style: "margin:8px 0 0", text: "Pack the item, then show this QR code at a Post Office counter. They'll print the label for you." })
+      ]));
+      inner.appendChild(el("div", { className: "card", style: "margin:0 0 12px" }, [
+        el("div", { className: "eyebrow", text: "TRACKING NUMBER" }),
+        el("div", { style: "font-family:monospace;font-size:18px;letter-spacing:1px;margin:4px 0", text: result.trackingNumber }),
+        el("div", { className: "small muted", text: "Relay reference " + result.returnRef + ". Your refund comes from " + shop + " once they receive the item." })
+      ]));
+      if (result.hasPdf) inner.appendChild(el("button", { className: "rl-btn ghost", text: "Download label to print (PDF)", style: "margin-bottom:8px", onclick: function() {
+        var s0 = load(), h = {}; if (s0 && s0.token) h.Authorization = "Bearer " + s0.token;
+        fetch(API + "/relay/my/return/label?kind=pdf&id=" + encodeURIComponent(result.returnId), { headers: h })
+          .then(function(r) { return r.ok ? r.blob() : null; })
+          .then(function(b) {
+            if (!b || b.type !== "application/pdf") return say(msg2, "Couldn't download the label just now. The QR code still works.", true);
+            var a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = "royal-mail-return-label.pdf"; document.body.appendChild(a); a.click(); a.remove();
+          }).catch(function() { say(msg2, "Connection error. Please try again.", true); });
+      } }));
+      inner.appendChild(msg2);
+      inner.appendChild(el("p", { className: "small muted", text: result.shopNotified ? "We've emailed " + shop + " to say this return is coming." : "Relay hasn't been able to email " + shop + ", but the label is on their Royal Mail account." }));
+      inner.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function() { close(); if (done) done(); } }));
+      sheet.appendChild(inner);
+    }
+
+    // No Royal Mail label (the shop hasn't set that up, or Royal Mail didn't make one): there is no QR code to show.
     // Say exactly what happened (a request saved in Relay) and what the shopper should do.
     function showSaved(result) {
+      if (result.labelAvailable && result.trackingNumber) return showLabel(result);
       sheet.textContent = "";
       var shop = o.store || "the shop";
       var inner = el("div", { className: "sheet-inner" });
@@ -1333,14 +1371,14 @@
       inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
       inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:12px 0 16px" }, [
         el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
-        el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") + "Relay can't create postage labels yet, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
+        el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") + shop + " hasn't set up Royal Mail labels in Relay, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
       ]));
       inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
         el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
         el("div", { style: "font-family:monospace;font-size:18px;letter-spacing:2px;margin:4px 0", text: result.returnRef }),
         el("div", { className: "small muted", text: "For your records. This is not a postage label or tracking number." })
       ]));
-      inner.appendChild(el("button", { className: "darkbtn", text: "Done", onclick: function() { close(); if (done) done(); } }));
+      inner.appendChild(el("button", { className: "rl-btn", text: "Done", onclick: function() { close(); if (done) done(); } }));
       sheet.appendChild(inner);
     }
 
@@ -1351,7 +1389,7 @@
       inner.appendChild(el("h2", { text: "Return: " + it.title }));
       inner.appendChild(el("p", { className: "small muted", text: "What's the reason for the return?" }));
       RETURN_REASONS.forEach(function(r) {
-        var btn = el("button", { className: "ghostbtn", text: r[1], style: "width:100%;text-align:left;margin-bottom:8px;padding:12px 16px;border-radius:10px",
+        var btn = el("button", { className: "rl-btn ghost", text: r[1], style: "width:100%;text-align:left;margin-bottom:8px;padding:12px 16px;border-radius:10px",
           onclick: function() {
             selectedReason = r[0];
             // Confirm step
@@ -1359,11 +1397,11 @@
             var inner2 = el("div", { className: "sheet-inner" });
             inner2.appendChild(el("div", { className: "eyebrow", text: "CONFIRM RETURN" }));
             inner2.appendChild(el("h2", { text: it.title }));
-            inner2.appendChild(el("p", { className: "small muted", text: "Relay will note this return on your account. Relay can't create postage labels yet, so you'll send it back using " + (o.store || "the shop") + "'s own returns process." }));
+            inner2.appendChild(el("p", { className: "small muted", text: "Relay will note this return on your account. If " + (o.store || "the shop") + " has set up Royal Mail returns in Relay, you'll get a return label straight away; if not, you'll send it back using their own returns process." }));
             inner2.appendChild(el("p", { className: "small", text: "Reason: " + r[1] }));
             inner2.appendChild(el("p", { className: "small", text: "Item price: " + money(it.priceMinor, it.currency) }));
             inner2.appendChild(msg);
-            var confirmBtn = el("button", { className: "darkbtn", text: "Save return request →", onclick: function() {
+            var confirmBtn = el("button", { className: "rl-btn", text: "Start return →", onclick: function() {
               confirmBtn.disabled = true; msg.textContent = "";
               api("/relay/my/return", { method: "POST", body: { orderId: o.id, lineId: it.lineId, reason: selectedReason } }).then(function(res) {
                 confirmBtn.disabled = false;
@@ -1372,13 +1410,13 @@
               }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
             }});
             inner2.appendChild(confirmBtn);
-            inner2.appendChild(el("button", { className: "ghostbtn", text: "← Back", style: "margin-top:8px", onclick: showReasonPicker }));
+            inner2.appendChild(el("button", { className: "rl-btn ghost", text: "← Back", style: "margin-top:8px", onclick: showReasonPicker }));
             sheet.appendChild(inner2);
           }
         });
         inner.appendChild(btn);
       });
-      inner.appendChild(el("button", { className: "ghostbtn", text: "Cancel", onclick: close }));
+      inner.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: close }));
       sheet.appendChild(inner);
     }
     showReasonPicker();
