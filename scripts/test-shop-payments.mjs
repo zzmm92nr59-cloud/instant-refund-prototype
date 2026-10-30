@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { handleExchangeRoute, enrichPurchases } from "../worker/exchange.js";
 import { handleRetailerRoute, issueRetailerKey } from "../worker/retailer.js";
 import { stripeReturnPage, shopPay } from "../worker/shop-payments.js";
-import { recordShopRefund } from "../worker/shopify-webhooks.js";
+import { recordShopRefund, recordBalancePaid } from "../worker/shopify-webhooks.js";
 import { ensureReturnsTables } from "../worker/returns.js";
 import { emailHash } from "../worker/auth.js";
 
@@ -46,7 +46,7 @@ const order = (ext) => {
 };
 const V = (n) => conn + ":variant:gid://shopify/ProductVariant/" + n;
 
-let stripeCalls = [], shopifyCalls = [], payLink = "https://kick-lane.myshopify.com/1234/invoices/abc", acctReady = false;
+let stripeCalls = [], shopifyCalls = [], payLink = "https://kick-lane.myshopify.com/1234/invoices/abc", acctReady = false, balanceLeft = "5.00", finStatus = "PARTIALLY_PAID";
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
   if (url.startsWith("https://api.stripe.com/v1/")) {
@@ -64,7 +64,7 @@ const fetchImpl = async (url, init = {}) => {
   if (/orderEditSetQuantity/.test(query)) return ok({ orderEditSetQuantity: { userErrors: [] } });
   if (/orderEditAddVariant/.test(query)) return ok({ orderEditAddVariant: { calculatedLineItem: { id: "gid://shopify/CalculatedLineItem/NEW" }, userErrors: [] } });
   if (/orderEditCommit/.test(query)) return ok({ orderEditCommit: { order: { id: "gid://shopify/Order/1" }, userErrors: [] } });
-  if (/RelayBalance/.test(query)) return ok({ order: { totalOutstandingSet: { shopMoney: { amount: "5.00" } }, paymentCollectionDetails: { additionalPaymentCollectionUrl: payLink } } });
+  if (/RelayBalance/.test(query)) return ok({ order: { displayFinancialStatus: finStatus, totalOutstandingSet: { shopMoney: { amount: balanceLeft } }, paymentCollectionDetails: { additionalPaymentCollectionUrl: balanceLeft === "0.00" ? null : payLink } } });
   throw Error("unexpected Shopify query " + query.slice(0, 40));
 };
 const o = { now: 1_800_000_000_000, fetchImpl, listStores: async () => [{ domain: SHOP, token: "tok", label: "Kick Lane" }] };
@@ -181,11 +181,44 @@ assert.deepEqual(await recordShopRefund(env, SHOP, { order_id: 703, refund_line_
 assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE id = 'ex-1'").get().detail, "refunded 500");
 console.log("PASS refunds made in Shopify show on Relay returns and cheaper swaps");
 
-// 5. The app and dashboard words.
+// 5. After a swap paid through Shopify: the app shows what's still to pay (with Shopify's link) until Shopify says it's paid.
+const line = (oid, lid) => [{ id: oid, retailer: conn, store: "Kick Lane", orderedAt: new Date().toISOString(), items: [{ lineId: lid, productId: "1", variantId: "11", title: "Logo Cap" }] }];
+shopifyCalls = [];
+let ex = (await enrichPurchases(env, line(o1, "9700"), o))[0].items[0].exchange;
+assert.deepEqual(ex.balance, { owedMinor: 500, paid: false, payUrl: payLink });
+assert.equal(ex.detail, undefined, "nothing internal sent to the app"); assert.equal(ex.id, undefined);
+assert.equal(shopifyCalls.filter(c => /RelayBalance/.test(c.query))[0].variables.id, "gid://shopify/Order/700");
+// Shopify can't be reached: still owed, no link, nothing changed.
+ex = (await enrichPurchases(env, line(o1, "9700"), { ...o, fetchImpl: async () => new Response("down", { status: 503 }) }))[0].items[0].exchange;
+assert.deepEqual(ex.balance, { owedMinor: 500, paid: false, payUrl: null });
+// Cancelled or voided order: nothing outstanding but not paid either, so not marked paid.
+balanceLeft = "0.00"; finStatus = "VOIDED";
+assert.equal((await enrichPurchases(env, line(o1, "9700"), o))[0].items[0].exchange.balance.paid, false);
+// Paid: marked once, then no more Shopify calls for it.
+finStatus = "PAID";
+assert.equal((await enrichPurchases(env, line(o1, "9700"), o))[0].items[0].exchange.balance.paid, true);
+assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(o1).detail, "shopify paid 500");
+shopifyCalls = [];
+assert.deepEqual((await enrichPurchases(env, line(o1, "9700"), o))[0].items[0].exchange.balance, { owedMinor: 500, paid: true, payUrl: null });
+assert.equal(shopifyCalls.length, 0);
+// Shopify's "order paid" notification marks it too (only when fully paid; never another order's swap).
+assert.equal(await recordBalancePaid(env, SHOP, { id: 701, financial_status: "partially_paid" }), 0);
+assert.equal(await recordBalancePaid(env, SHOP, { id: 701, financial_status: "paid", total_outstanding: "5.00" }), 0);
+assert.equal(await recordBalancePaid(env, SHOP, { id: "701; DROP TABLE relay_exchanges", financial_status: "paid" }), 0);
+assert.equal(await recordBalancePaid(env, "other-shop.myshopify.com", { id: 701, financial_status: "paid" }), 0);
+assert.equal(await recordBalancePaid(env, SHOP, { id: 701, financial_status: "paid", total_outstanding: "0.00" }), 1);
+assert.equal(sqlite.prepare("SELECT detail FROM relay_exchanges WHERE order_id = ? AND status = 'done'").get(o2).detail, "shopify paid 500");
+assert.equal(await recordBalancePaid(env, SHOP, { id: 701, financial_status: "paid" }), 0, "already marked");
+balanceLeft = "5.00"; finStatus = "PARTIALLY_PAID";
+console.log("PASS balance paid through Shopify: shown until paid, then marked paid (by Shopify's notification or a check)");
+
+// 6. The app and dashboard words.
 const app = readFileSync("account.js", "utf8"), dash = readFileSync("retailer.html", "utf8");
 assert.match(app, /will update your order and send you a link to pay the/);
 assert.match(app, /"Pay " \+ absPounds\(d\) \+ " to " \+ shop \+ " →"/);
 assert.match(app, /✓ Refunded/);
+assert.match(app, /" still to pay " \+ shopName \+ " for the swap"/);
+assert.match(app, /" difference paid to " \+ shopName/);
 assert.match(dash, /Through your Shopify checkout<\/b> \(recommended\)/);
 assert.match(dash, /Works with every payment method you accept/);
 console.log("shop payments: all checks passed");
