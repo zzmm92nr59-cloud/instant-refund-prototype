@@ -1500,6 +1500,15 @@
           d.appendChild(el("div", { className: "small muted", text: (it.variant ? it.variant + " · " : "") + "Qty " + it.quantity + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") }));
           d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
           if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
+          // Swapped to a dearer item, paid through the shop's own checkout: what's left to pay, until it's paid.
+          if (it.exchange && it.exchange.balance) {
+            var bal = it.exchange.balance, shopName = o.store || "the shop";
+            if (bal.paid) d.appendChild(el("p", { className: "small watch", text: "✓ " + money(bal.owedMinor, it.currency) + " difference paid to " + shopName }));
+            else {
+              d.appendChild(el("p", { className: "small muted", text: money(bal.owedMinor, it.currency) + " still to pay " + shopName + " for the swap" + (bal.payUrl ? "." : ". Use the link in " + shopName + "'s email.") }));
+              if (bal.payUrl && /^https:\/\//.test(bal.payUrl)) d.appendChild(el("a", { className: "darkbtn", href: bal.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + money(bal.owedMinor, it.currency) + " to " + shopName + " →", style: "display:block;text-align:center;text-decoration:none" }));
+            }
+          }
           if (it.returnInfo) {
             var ri = it.returnInfo, refunded = ri.status === "refunded";
             d.appendChild(el("p", { className: "small " + (refunded ? "watch" : "muted"), text: refunded
