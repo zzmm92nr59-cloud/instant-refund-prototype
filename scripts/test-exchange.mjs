@@ -65,7 +65,7 @@ assert.equal(calls.length, 0, "nothing reaches the shop for someone else's order
 
 // 2. Options: other colours of the same product; out of stock and different price are shown but not allowed.
 const opts = (await (await call(alice, "/relay/my/exchange/options?orderId=" + encodeURIComponent(o500) + "&lineId=9500")).json()).options;
-assert.deepEqual(opts.map(x => [x.title, x.available, x.reason]), [["Large", false, "Different price (not supported yet)"], ["Navy", true, null], ["Red", false, "Out of stock"]]);
+assert.deepEqual(opts.map(x => [x.title, x.available, x.reason]), [["Large", false, "Costs £5.00 more (not available yet)"], ["Navy", true, null], ["Red", false, "Out of stock"]]);
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: conn + ":variant:gid://shopify/ProductVariant/13" })).status, 409, "out of stock is refused");
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: "made-up" })).status, 400);
 assert.equal(calls.length, 0);

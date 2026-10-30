@@ -7,6 +7,7 @@
 // those need the shop's returns process (not built yet), and Relay says so.
 import { ensureOnce } from "./once.js";
 import { listConnectedShopifyStores } from "./shopify-connect.js";
+import { paymentsEnabled, cardOf, holdDifference, takeHeld, releaseHold, moneyText } from "./payments.js";
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const SHOP = /^shopify:([a-z0-9-]+\.myshopify\.com)$/;
@@ -72,7 +73,9 @@ async function ownedLine(env, shopper, orderId, lineId) {
   return { order, shop: m[1], line };
 }
 
-async function options(env, owned) {
+// What the shopper can swap to. Same price: always (if in stock). Dearer: with a saved card in Stripe test mode, which pays
+// the difference. Cheaper: the shop refunds the difference through Shopify. A different price only works for a single item.
+async function options(env, owned, card) {
   const db = env.RELAY_DB;
   const rows = ((await db.prepare(`SELECT v.id AS key, v.external_variant_id AS gid, v.title, v.price_minor AS priceMinor, v.currency,
       (SELECT MAX(s.quantity) FROM retailer_inventory_snapshots s WHERE s.variant_id = v.id) AS quantity
@@ -80,11 +83,17 @@ async function options(env, owned) {
   const done = await db.prepare("SELECT to_variant AS v FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
     .bind(owned.order.id, owned.line.lineId).first();
   const current = done ? done.v : "gid://shopify/ProductVariant/" + owned.line.variantId;
+  const payments = paymentsEnabled(env);
   return rows.filter(r => r.gid !== current).map(r => {
     const inStock = Number(r.quantity) > 0;
-    const samePrice = r.priceMinor === owned.line.priceMinor && r.currency === "GBP";
-    return { key: r.key, title: r.title, priceMinor: r.priceMinor, quantity: r.quantity, available: inStock && samePrice,
-      reason: !inStock ? "Out of stock" : !samePrice ? "Different price (not supported yet)" : null };
+    const diff = r.currency === "GBP" && Number.isFinite(r.priceMinor) && Number.isFinite(owned.line.priceMinor) ? r.priceMinor - owned.line.priceMinor : null;
+    let reason = !inStock ? "Out of stock" : null;
+    if (!reason && diff === null) reason = "Different price (not supported yet)";
+    else if (!reason && diff !== 0 && Number(owned.line.quantity) !== 1) reason = "Different price (only for a single item)";
+    else if (!reason && diff > 0 && !payments) reason = "Costs " + moneyText(diff) + " more (not available yet)";
+    else if (!reason && diff > 0 && !card) reason = "Costs " + moneyText(diff) + " more: add a card to pay the difference";
+    return { key: r.key, title: r.title, priceMinor: r.priceMinor, quantity: r.quantity, priceDiffMinor: diff, available: !reason, reason,
+      needsCard: Boolean(inStock && diff > 0 && payments && !card) };
   });
 }
 
@@ -103,9 +112,13 @@ async function doExchange(env, shopper, body, o) {
   if (!owned) return [404, { error: "not_your_order" }];
   const already = await db.prepare("SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done'").bind(owned.order.id, owned.line.lineId).first();
   if (already) return [409, { error: "already_exchanged" }];
-  const choice = (await options(env, owned)).find(x => x.key === String(body && body.variantKey || ""));
+  const card = paymentsEnabled(env) ? await cardOf(env, shopper.id).catch(() => null) : null;
+  const choice = (await options(env, owned, card)).find(x => x.key === String(body && body.variantKey || ""));
   if (!choice) return [400, { error: "not_an_option" }];
-  if (!choice.available) return [409, { error: choice.reason === "Out of stock" ? "out_of_stock" : "different_price" }];
+  if (!choice.available) return [409, { error: choice.reason === "Out of stock" ? "out_of_stock" : choice.needsCard ? "card_needed" : "different_price" }];
+  const diff = choice.priceDiffMinor || 0;
+  // The shopper must have seen and agreed the same difference the server works out now (prices can change meanwhile).
+  if (diff !== 0 && Number(body && body.agreedDiffMinor) !== diff) return [409, { error: "price_changed", priceDiffMinor: diff }];
   const stores = await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => []);
   const store = stores.find(s => s.domain === owned.shop);
   if (!store) return [409, { error: "shop_not_connected" }];
@@ -117,6 +130,7 @@ async function doExchange(env, shopper, body, o) {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(), shopper.id, owned.order.id, owned.line.lineId, owned.shop, fromGid, fromTitle, toGid, choice.title,
       owned.line.quantity, status, detail ? String(detail).slice(0, 300) : null, o.now).run();
   };
+  let hold = null;
   try {
     // Live checks at the shop: the order hasn't been sent, and the new item really is in stock right now.
     const live = await gql(owned.shop, store.token, `query RelayExchangeCheck($o: ID!, $v: ID!) { order(id: $o) { cancelledAt displayFulfillmentStatus }
@@ -124,6 +138,12 @@ async function doExchange(env, shopper, body, o) {
     if (!live.order || live.order.cancelledAt) return [409, { error: "order_cancelled" }];
     if (live.order.displayFulfillmentStatus !== "UNFULFILLED") return [409, { error: "already_sent" }];
     if (!live.productVariant || !(Number(live.productVariant.inventoryQuantity) >= owned.line.quantity)) return [409, { error: "out_of_stock" }];
+    // Dearer: hold the difference on the saved card before touching the order. Nothing is taken until the order is changed.
+    if (diff > 0) {
+      try { hold = await holdDifference(env, shopper, card, { amountMinor: diff, orderId: owned.order.id, lineId: owned.line.lineId, shop: owned.shop,
+        label: owned.line.title + " → " + choice.title }, o); }
+      catch (e) { return [402, { error: "card_declined", detail: String(e && e.message || e).slice(0, 120) }]; }
+    }
     // Shopify order edit: begin, take the old item out (back into stock), add the new one, commit.
     const begin = await gql(owned.shop, store.token, `mutation RelayEditBegin($id: ID!) { orderEditBegin(id: $id) { calculatedOrder { id lineItems(first: 100) { nodes { id quantity variant { id } } } } userErrors { message } } }`,
       { id: "gid://shopify/Order/" + owned.order.ext }, f);
@@ -138,15 +158,34 @@ async function doExchange(env, shopper, body, o) {
     const out = await gql(owned.shop, store.token, `mutation RelayEditRemove($id: ID!, $line: ID!) { orderEditSetQuantity(id: $id, lineItemId: $line, quantity: 0, restock: true) { userErrors { message } } }`,
       { id: calc.id, line: oldLine.id }, f);
     if (firstError(out.orderEditSetQuantity)) throw new Error(firstError(out.orderEditSetQuantity));
-    const add = await gql(owned.shop, store.token, `mutation RelayEditAdd($id: ID!, $v: ID!, $q: Int!) { orderEditAddVariant(id: $id, variantId: $v, quantity: $q, allowDuplicates: false) { userErrors { message } } }`,
+    const add = await gql(owned.shop, store.token, `mutation RelayEditAdd($id: ID!, $v: ID!, $q: Int!) { orderEditAddVariant(id: $id, variantId: $v, quantity: $q, allowDuplicates: false) { calculatedLineItem { id } userErrors { message } } }`,
       { id: calc.id, v: toGid, q: owned.line.quantity }, f);
     if (firstError(add.orderEditAddVariant)) throw new Error(firstError(add.orderEditAddVariant));
+    // Dearer: the shopper pays the difference through Relay, so the new item is discounted by that much in Shopify and the
+    // order total stays what the shopper already paid the shop. Relay records the difference as owed to the shop.
+    if (diff > 0) {
+      const newLine = add.orderEditAddVariant && add.orderEditAddVariant.calculatedLineItem && add.orderEditAddVariant.calculatedLineItem.id;
+      if (!newLine) throw new Error("Shopify didn't return the new item");
+      const disc = await gql(owned.shop, store.token, `mutation RelayEditDiscount($id: ID!, $line: ID!, $d: OrderEditAppliedDiscountInput!) { orderEditAddLineItemDiscount(id: $id, lineItemId: $line, discount: $d) { userErrors { message } } }`,
+        { id: calc.id, line: newLine, d: { description: "Difference paid through Relay", fixedValue: { amount: (diff / 100).toFixed(2), currencyCode: "GBP" } } }, f);
+      if (firstError(disc.orderEditAddLineItemDiscount)) throw new Error(firstError(disc.orderEditAddLineItemDiscount));
+    }
+    const note = "Exchanged through Relay: " + owned.line.title + " → " + choice.title + ". " + (diff === 0 ? "Same price, nothing to pay or refund."
+      : diff > 0 ? "Customer paid the " + moneyText(diff) + " difference through Relay (Stripe TEST MODE, no real money; ref " + hold.paymentIntent + "). Relay owes the shop " + moneyText(diff) + "."
+      : "The new item costs " + moneyText(-diff) + " less. Please refund the customer " + moneyText(-diff) + " from this order.");
     const commit = await gql(owned.shop, store.token, `mutation RelayEditCommit($id: ID!, $note: String) { orderEditCommit(id: $id, notifyCustomer: false, staffNote: $note) { order { id } userErrors { message } } }`,
-      { id: calc.id, note: "Exchanged through Relay: " + owned.line.title + " → " + choice.title + ". Same price, nothing to pay or refund." }, f);
+      { id: calc.id, note }, f);
     if (!(commit.orderEditCommit && commit.orderEditCommit.order)) throw new Error(firstError(commit.orderEditCommit) || "Shopify didn't save the change");
-    await record("done", null);
-    return [200, { exchanged: true, to: choice.title, message: "Done. Your order now has " + choice.title + " instead. Nothing to pay or refund." }];
+    let paid = null;
+    if (hold) paid = await takeHeld(env, hold, o);
+    await record("done", diff > 0 ? (paid ? "paid " + diff : "payment not taken " + diff) : diff < 0 ? "shop to refund " + (-diff) : null);
+    const store_ = owned.shop && (store.label || "the shop");
+    const message = "Done. Your order now has " + choice.title + " instead. " + (diff === 0 ? "Nothing to pay or refund."
+      : diff > 0 ? (paid ? moneyText(diff) + " was taken from your card (test mode, no real money)." : "We couldn't take the " + moneyText(diff) + " from your card, so Relay will be in touch.")
+      : store_ + " will refund the " + moneyText(-diff) + " difference to how you paid.");
+    return [200, { exchanged: true, to: choice.title, priceDiffMinor: diff, paid: diff > 0 ? paid : null, message }];
   } catch (e) {
+    if (hold) await releaseHold(env, hold, e && e.message, o);
     await record("failed", e && e.message);
     return [502, { error: "shop_refused", detail: String(e && e.message || e).slice(0, 160) }];
   }
@@ -160,7 +199,9 @@ export async function handleExchangeRoute(request, env, url, cors, shopper, o) {
   if (path === "/relay/my/exchange/options" && request.method === "GET") {
     const owned = await ownedLine(env, shopper, url.searchParams.get("orderId"), url.searchParams.get("lineId"));
     if (!owned) return json({ error: "not_your_order" }, 404, cors);
-    return json({ product: owned.line.title, priceMinor: owned.line.priceMinor, options: await options(env, owned) }, 200, cors);
+    const card = paymentsEnabled(env) ? await cardOf(env, shopper.id).catch(() => null) : null;
+    return json({ product: owned.line.title, priceMinor: owned.line.priceMinor, options: await options(env, owned, card),
+      card: card ? { brand: card.brand, last4: card.last4, wallet: card.wallet } : null, payments: paymentsEnabled(env) }, 200, cors);
   }
   if (path === "/relay/my/exchange" && request.method === "POST") {
     const body = await request.json().catch(() => null);

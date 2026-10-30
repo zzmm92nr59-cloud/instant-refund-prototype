@@ -10,6 +10,8 @@ on:
       - testing.html
       - relay-exchange-engine.js
       - scripts/ui-smoke-test.mjs
+      - account.js
+      - scripts/test-swap-ui.mjs
       - .github/workflows/ui-smoke-test.yml
   pull_request:
   workflow_dispatch:
@@ -30,3 +32,5 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Test purchase flows on desktop and mobile
         run: node scripts/ui-smoke-test.mjs
+      - name: Test swaps with a price difference and saving a card (stand-in Stripe)
+        run: node scripts/test-swap-ui.mjs
