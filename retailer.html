@@ -32,6 +32,8 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .offers .row{grid-template-columns:1fr auto}.state{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px}.live{background:#eef6dc;color:#3f6212}.ended{background:#efeae0;color:#6b6252}
 .fine{font-size:12px;color:var(--muted);line-height:1.6;margin-top:30px}
 .hidden{display:none!important}
+.choice{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:14px;cursor:pointer}
+.choice input{margin-top:4px;accent-color:var(--navy)}.choice.dim{opacity:.55;cursor:not-allowed}
 .act{grid-template-columns:auto 1fr auto!important}.kind{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px;white-space:nowrap}.kind.swap{background:var(--lime);color:#1d2911}.kind.ret{background:#efeae0;color:#6b6252}
 .act a{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}.act .val{font-family:var(--serif);font-size:20px;font-weight:600;text-align:right}
 @media(max-width:640px){.act{grid-template-columns:auto 1fr!important}.act .end{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}}
@@ -77,6 +79,20 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
   <div class="list" id="items"><div class="empty">Loading…</div></div>
   <div class="head"><h2>Offers you've sent</h2></div>
   <div class="list offers" id="offers"></div>
+  <section id="pay" class="hidden">
+    <div class="head"><h2>Price differences on swaps</h2><span class="state live" id="payState">Shopify checkout</span></div>
+    <div class="row" style="grid-template-columns:1fr">
+      <p class="meta" style="margin:0;line-height:1.55">When a customer swaps to something dearer, how should they pay the difference? Cheaper swaps are refunded in Shopify to how the customer paid.</p>
+      <label class="choice"><input type="radio" name="payMethod" value="shopify"> <span><b>Through your Shopify checkout</b> (recommended) — Shopify emails the customer a link to pay. Works with every payment method you accept: Shopify Payments, Stripe, PayPal, Klarna, Apple Pay and more. The money comes straight to you; Relay never touches it. Don't send the new item until it's paid.</span></label>
+      <label class="choice"><input type="radio" name="payMethod" value="card"> <span><b>Instantly from the customer's saved card</b> — taken the moment the order is updated and paid straight into <b>your own Stripe account</b>. Needs a Stripe account connected below.</span></label>
+      <div id="stripeBox" class="offerbox" style="border:0;padding:0">
+        <span class="meta" id="stripeText">Stripe isn't connected.</span>
+        <button class="btn ghost" type="button" id="stripeGo">Connect Stripe</button>
+        <button class="btn ghost hidden" type="button" id="stripeOff">Disconnect</button>
+      </div>
+      <div class="msg hidden" id="payMsg"></div>
+    </div>
+  </section>
   <section id="rm" class="hidden">
     <div class="head"><h2>Royal Mail return labels</h2><span class="state ended" id="rmState">Off</span></div>
     <div class="row" style="grid-template-columns:1fr">
@@ -170,11 +186,16 @@ function activityRow(a) {
   const what = a.kind === "swap"
     ? `${esc(a.item || "Item")}${a.from && a.to ? ` · ${esc(a.from)} → ${esc(a.to)}` : ""}`
     : `${esc(a.item || "Item")} · ${esc(REASONS[a.reason] || "No reason given")}`;
-  const diff = a.priceDiffMinor || 0;
+  const diff = a.priceDiffMinor || 0, m = (x) => gbp(Math.abs(x), results.currency);
+  const DIFF_TEXT = {
+    card_to_shop: `Customer paid ${m(diff)} more by card (test mode) · paid into your Stripe account`,
+    card_owed: `Customer paid ${m(diff)} more by card (test mode) · Relay owes you ${m(diff)}`,
+    card_failed: `Customer's card wasn't charged the ${m(diff)} difference · Relay will sort this`,
+    shopify: `Shopify asked the customer to pay ${m(diff)} more · check the order is paid before sending`,
+    refunded: `New item is ${m(diff)} cheaper · Relay refunded the customer ${m(diff)} in Shopify`,
+    shop_to_refund: `New item is ${m(diff)} cheaper · please refund the customer ${m(diff)} in Shopify` };
   const extra = a.kind === "swap" ? (diff === 0 ? "Same price, order updated in Shopify"
-      : diff > 0 ? (a.differencePaid ? `Customer paid ${gbp(diff, results.currency)} more by card (test mode) · Relay owes you ${gbp(diff, results.currency)}`
-        : `Customer's card wasn't charged the ${gbp(diff, results.currency)} difference · Relay will sort this`)
-      : `New item is ${gbp(-diff, results.currency)} cheaper · please refund the customer ${gbp(-diff, results.currency)} in Shopify`) : `Relay ref ${esc(a.ref)}${a.trackingNumber ? ` · Royal Mail ${esc(a.trackingNumber)}` : ""} · ${a.emailed ? "you were emailed" : "email not sent"}`;
+      : DIFF_TEXT[a.differenceHow] || (diff > 0 ? (a.differencePaid ? DIFF_TEXT.card_owed : DIFF_TEXT.card_failed) : DIFF_TEXT.shop_to_refund)) : `Relay ref ${esc(a.ref)}${a.trackingNumber ? ` · Royal Mail ${esc(a.trackingNumber)}` : ""} · ${a.emailed ? "you were emailed" : "email not sent"}`;
   return `<div class="row act"><span class="kind ${a.kind === "swap" ? "swap" : "ret"}">${a.kind === "swap" ? "Swap" : "Return"}</span>
     <div><h3>${what}</h3><div class="meta">${when}${a.quantity > 1 ? " · ×" + a.quantity : ""} · ${extra}</div></div>
     <div class="end"><div class="val">${a.valueMinor != null ? gbp(a.valueMinor, results.currency) : ""}</div>${a.orderUrl ? `<a href="${esc(a.orderUrl)}" target="_blank" rel="noopener noreferrer">View order ↗</a>` : ""}</div></div>`;
@@ -217,7 +238,7 @@ async function load() {
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
-    loadRm();
+    loadRm(); loadPay();
   } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
 }
 $("items").addEventListener("click", (e) => {
@@ -280,6 +301,52 @@ $("rmForm").addEventListener("submit", async (e) => {
   } catch { rmSay("bad", "Couldn't reach Relay just now."); }
   btn.disabled = false; if (btn.textContent === "Checking with Royal Mail…") btn.textContent = was;
 });
+// ---- How customers pay a price difference ----
+const PAY_ERR = { stripe_not_ready: "Finish setting up Stripe first. Once Stripe says your account can take payments, you can switch this on.",
+  cards_not_available: "Instant card payments aren't switched on in Relay yet.", stripe_unavailable: "Couldn't reach Stripe just now. Please try again." };
+function paySay(cls, text) { const m = $("payMsg"); m.className = "msg " + cls; m.textContent = text; }
+function payShow(p) {
+  const card = p.method === "card";
+  $("payState").textContent = card ? "Instant card" : "Shopify checkout";
+  for (const r of document.querySelectorAll('input[name=payMethod]')) {
+    r.checked = r.value === p.method;
+    const off = r.value === "card" && !p.stripe.ready;
+    r.disabled = off; r.closest(".choice").classList.toggle("dim", off);
+  }
+  $("stripeBox").classList.toggle("hidden", !p.cardPossible);
+  $("stripeText").textContent = !p.stripe.connected ? "Stripe isn't connected." + (p.testMode ? " (Test mode: no real money.)" : "")
+    : p.stripe.ready ? "Stripe connected · your account can take payments" + (p.testMode ? " (test mode)." : ".")
+    : "Stripe set-up not finished. Stripe will ask for your business and bank details.";
+  $("stripeGo").textContent = !p.stripe.connected ? "Connect Stripe" : p.stripe.ready ? "Open Stripe set-up" : "Finish Stripe set-up";
+  $("stripeOff").classList.toggle("hidden", !p.stripe.connected);
+}
+async function loadPay() {
+  const shopify = demand && demand.platform === "shopify";
+  $("pay").classList.toggle("hidden", !shopify);
+  if (!shopify) return;
+  try { const r = await api("/relay/retailer/payments"); if (r.status === 200) payShow(r.body); } catch { /* stays on the default */ }
+}
+$("pay").addEventListener("change", async (e) => {
+  if (e.target.name !== "payMethod") return;
+  try {
+    const r = await api("/relay/retailer/payments", { method: "POST", body: JSON.stringify({ method: e.target.value }) });
+    if (r.status === 200) { payShow(r.body); paySay("ok", r.body.method === "card" ? "Saved. Price differences are now taken instantly by card and paid into your Stripe account." : "Saved. Customers now pay price differences through your Shopify checkout."); }
+    else { paySay("bad", PAY_ERR[r.body.error] || "That didn't save."); loadPay(); }
+  } catch { paySay("bad", "Couldn't reach Relay just now."); }
+});
+$("stripeGo").onclick = async () => {
+  // Stripe's own set-up pages open in a new tab (they can't run inside Shopify admin). Relay never sees the details you enter there.
+  const w = window.open("", "_blank");
+  try {
+    const r = await api("/relay/retailer/payments/stripe", { method: "POST", body: "{}" });
+    if (r.status === 200 && r.body.url) { if (w) w.location = r.body.url; else location.href = r.body.url; paySay("ok", "Stripe opened in a new tab. When you've finished there, come back and press Refresh."); }
+    else { if (w) w.close(); paySay("bad", PAY_ERR[r.body.error] || "Couldn't start Stripe set-up."); }
+  } catch { if (w) w.close(); paySay("bad", "Couldn't reach Relay just now."); }
+};
+$("stripeOff").onclick = async () => {
+  try { const r = await api("/relay/retailer/payments/stripe/remove", { method: "POST", body: "{}" }); if (r.status === 200) { payShow(r.body); paySay("ok", "Stripe disconnected from Relay. Customers pay price differences through your Shopify checkout."); } }
+  catch { paySay("bad", "Couldn't reach Relay just now."); }
+};
 $("rmOff").onclick = async () => {
   try {
     const r = await api("/relay/retailer/royal-mail/remove", { method: "POST", body: "{}" });
