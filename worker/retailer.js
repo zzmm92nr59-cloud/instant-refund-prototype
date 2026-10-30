@@ -9,6 +9,7 @@
 // or Shopify and Relay does not take payment; the shop honours the offer price itself.
 import { ensureOnce } from "./once.js";
 import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
+import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -188,8 +189,14 @@ export async function shopResults(env, shop) {
           NULL AS notifiedAt, o.external_order_id AS ext
         FROM relay_returns r LEFT JOIN retailer_orders o ON o.id = r.order_id WHERE r.shop = ? AND r.status != 'cancelled' ORDER BY r.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
     }
+    // Royal Mail tracking numbers, where Royal Mail made a label (the column only exists once returns have been used since labels arrived).
+    const tracking = new Map();
+    try {
+      for (const t of (await db.prepare("SELECT return_ref AS ref, tracking_number AS tn FROM relay_returns WHERE shop = ? AND tracking_number IS NOT NULL").bind(domain).all()).results || [])
+        tracking.set(t.ref, t.tn);
+    } catch { /* no labels yet */ }
     out.returns = rows.map(r => ({ at: r.at, item: r.item || null, quantity: Number(r.qty) || 1, valueMinor: Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null,
-      reason: r.reason || null, ref: r.ref, emailed: Boolean(r.notifiedAt), orderUrl: orderUrl(r.ext) }));
+      reason: r.reason || null, ref: r.ref, emailed: Boolean(r.notifiedAt), trackingNumber: tracking.get(r.ref) || null, orderUrl: orderUrl(r.ext) }));
   } catch { /* no returns yet on this database */ }
   const t = out.totals;
   t.swaps = out.swaps.length; t.returns = out.returns.length;
@@ -217,6 +224,18 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
     let body = null; try { body = text.length < 2000 ? JSON.parse(text) : null; } catch { body = null; }
     const [status, out] = await sendOffer(env, shop, body, { ...o, now });
     return json(out, status, cors);
+  }
+  // Royal Mail return labels on the shop's own Click & Drop account (Shopify shops only). The key is never sent back.
+  if (path === "/relay/retailer/royal-mail" || path === "/relay/retailer/royal-mail/remove") {
+    if (shop.provider !== "shopify") return json({ error: "shopify_only" }, 400, cors);
+    if (request.method === "GET" && path === "/relay/retailer/royal-mail") return json(await royalMailSettings(env, shop.shop_ref), 200, cors);
+    if (request.method === "POST" && path === "/relay/retailer/royal-mail/remove") { const [st, out] = await removeRoyalMail(env, shop.shop_ref); return json(out, st, cors); }
+    if (request.method === "POST") {
+      const text = await request.text();
+      let body = null; try { body = text.length < 4000 ? JSON.parse(text) : null; } catch { body = null; }
+      const [st, out] = await saveRoyalMail(env, shop.shop_ref, body, { ...o, now });
+      return json(out, st, cors);
+    }
   }
   return json({ error: "not_found" }, 404, cors);
 }
