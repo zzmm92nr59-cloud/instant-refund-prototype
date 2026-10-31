@@ -8,7 +8,7 @@ import { handleShopifyEmbedded, verifyIdToken } from "../worker/shopify-embedded
 import { handleRetailerRoute } from "../worker/retailer.js";
 import { ensurePushTables } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
-import { hasAllScopes } from "../worker/shopify-connect.js";
+import { hasAllScopes, HOOKS_SET } from "../worker/shopify-connect.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -46,7 +46,7 @@ for (const [why, tok] of [
   ["garbage", "a.b.c"]]) assert.equal(await verifyIdToken(env, tok, now), null, why);
 
 // 2. Signing in from inside Shopify admin.
-let calls = [], currency = {}, exchangeFails = false, granted = "read_products,read_inventory,write_orders,write_order_edits";
+let calls = [], currency = {}, exchangeFails = false, hooksFail = false, granted = "read_products,read_inventory,write_orders,write_order_edits";
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
   if (url === "https://dash.test/retailer.html") return new Response(readFileSync("retailer.html", "utf8"));
@@ -63,7 +63,7 @@ const fetchImpl = async (url, init = {}) => {
   calls.push({ shop, graphql: q });
   if (/shop \{ name currencyCode \}/.test(q)) return Response.json({ data: { shop: { name: shop.split(".")[0] === "kick-lane" ? "Kick Lane" : "Oak & Thread", currencyCode: currency[shop] || "GBP" } } });
   if (/webhookSubscriptions\(/.test(q)) return Response.json({ data: { webhookSubscriptions: { nodes: [] } } });
-  if (/webhookSubscriptionCreate/.test(q)) return Response.json({ data: { webhookSubscriptionCreate: { webhookSubscription: { id: "x" }, userErrors: [] } } });
+  if (/webhookSubscriptionCreate/.test(q)) return hooksFail ? Response.json({ errors: [{ message: "Throttled" }] }) : Response.json({ data: { webhookSubscriptionCreate: { webhookSubscription: { id: "x" }, userErrors: [] } } });
   return Response.json({ data: {} });
 };
 let connected = [];
@@ -108,6 +108,27 @@ assert.equal(sqlite.prepare("SELECT scopes FROM shopify_shops WHERE domain = 'ki
 calls = [];
 r = await session(idToken("kick-lane.myshopify.com", PILOT));
 assert.equal(r.body.connectedNow, false); assert.equal(calls.filter(c => c.grant_type).length, 0);
+// Keys already cover everything, but Relay has added a notification since this shop's were set up: the missing ones are
+// added with the saved keys (no new keys), once. A failure is tried again next time.
+sqlite.prepare("UPDATE shopify_shops SET hooks = ? WHERE domain = 'kick-lane.myshopify.com'").run("APP_UNINSTALLED,ORDERS_PAID");
+calls = [];
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(r.status, 200); assert.equal(r.body.connectedNow, false);
+assert.equal(calls.filter(c => c.grant_type).length, 0, "no new keys needed");
+assert.ok(calls.some(c => c.graphql && /webhookSubscriptionCreate/.test(c.graphql)), "missing notifications added");
+assert.equal(sqlite.prepare("SELECT hooks FROM shopify_shops WHERE domain = 'kick-lane.myshopify.com'").get().hooks, HOOKS_SET);
+assert.match(HOOKS_SET, /REFUNDS_CREATE/);
+calls = [];
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(calls.filter(c => c.graphql && /webhook/.test(c.graphql)).length, 0, "nothing more to add");
+sqlite.prepare("UPDATE shopify_shops SET hooks = NULL WHERE domain = 'kick-lane.myshopify.com'").run();
+hooksFail = true; calls = [];
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(r.status, 200, "Relay still opens if Shopify won't add them");
+assert.equal(sqlite.prepare("SELECT hooks FROM shopify_shops WHERE domain = 'kick-lane.myshopify.com'").get().hooks, null, "tried again next time");
+hooksFail = false;
+r = await session(idToken("kick-lane.myshopify.com", PILOT));
+assert.equal(sqlite.prepare("SELECT hooks FROM shopify_shops WHERE domain = 'kick-lane.myshopify.com'").get().hooks, HOOKS_SET);
 // The shop hasn't approved the new permission yet: Relay still opens with what it has (and asks Shopify again next time).
 granted = "read_products,read_inventory,read_orders,write_order_edits";
 sqlite.prepare("UPDATE shopify_shops SET scopes = ? WHERE domain = 'kick-lane.myshopify.com'").run(granted);

@@ -13,7 +13,7 @@
 //
 // The page is only allowed to be framed by the shop's own admin (Content-Security-Policy frame-ancestors).
 import { shopifyApps, normaliseShop, ensureShopifyShopSchema, appForShop, shopInfo, saveTokens, tokenRequest,
-  registerShopifyWebhooks, recordHooks, listConnectedShopifyStores, hasAllScopes } from "./shopify-connect.js";
+  registerShopifyWebhooks, recordHooks, listConnectedShopifyStores, hasAllScopes, HOOKS_SET } from "./shopify-connect.js";
 import { issueRetailerKey } from "./retailer.js";
 
 const enc = new TextEncoder(), dec = new TextDecoder();
@@ -59,14 +59,20 @@ async function startSession(request, env, url, o) {
   if (!who) return json({ error: "invalid_session" }, 401, RETRY);
   const { shop, app } = who, db = env.RELAY_DB;
   await ensureShopifyShopSchema(db);
-  const row = await db.prepare("SELECT label, client_id, scopes FROM shopify_shops WHERE domain = ?").bind(shop).first();
+  const row = await db.prepare("SELECT label, client_id, scopes, hooks FROM shopify_shops WHERE domain = ?").bind(shop).first();
   // Already connected through this app, with keys Relay can still use and that cover every permission Relay now needs:
   // nothing to exchange. Otherwise (first visit, or the shop has just approved a new permission) the keys are fetched again
   // and any Shopify notifications Relay doesn't have yet are set up. A shop connected before Relay recorded the app
   // (client_id empty) came through the main app.
   const sameApp = Boolean(row) && (row.client_id ? row.client_id === app.id : !app.shop);
-  const usable = sameApp && hasAllScopes(row.scopes) && (await listConnectedShopifyStores(env, { now, fetchImpl: f }).catch(() => [])).some(s => s.domain === shop);
+  const saved = sameApp && hasAllScopes(row.scopes) ? (await listConnectedShopifyStores(env, { now, fetchImpl: f }).catch(() => [])).find(s => s.domain === shop) : null;
+  const usable = Boolean(saved);
   let label = row && row.label;
+  // Keys are fine but Relay has added a Shopify notification since this shop's were set up: add the missing ones.
+  if (usable && row.hooks !== HOOKS_SET) {
+    try { await recordHooks(env, shop, await registerShopifyWebhooks(shop, saved.token, url.origin, f)); }
+    catch (e) { await recordHooks(env, shop, { created: 0, alreadyThere: 0, failed: [String(e && e.message || e).slice(0, 120)] }); }
+  }
   if (!usable) {
     let j;
     try { j = await exchange(shop, app, m[1], f); }
