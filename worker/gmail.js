@@ -34,7 +34,9 @@ const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 const STATE_TTL_MS = 10 * 60 * 1000;
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
-const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 24, FETCH_PARALLEL = 6;
+// Cloudflare's free plan allows 50 outside calls and 50 database calls per request, so a round reads at most 10 emails,
+// writes them in one database batch, and stops early (saying there is more) if it gets near either limit.
+const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 5, CALL_BUDGET = 36;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 13;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
@@ -137,6 +139,51 @@ export function gmailDeleteStatements(db, shopperId) {
   ];
 }
 
+// Automatic checking: each run looks at new mail for the shopper checked longest ago, then carries on reading older
+// mail if their first full read isn't finished. Runs on its own schedule, so it has the request's limits to itself.
+// Only shoppers who agreed to Gmail reading (and haven't withdrawn) are included.
+const AUTO_PASSES_PER_RUN = 2, AUTO_RECENT_DAYS = 3, AUTO_MAX_BACK_DAYS = 30;
+function ensureAutoColumns(db) {
+  return ensureOnce(db, "gmail-auto", async () => {
+    for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN auto_at INTEGER", "ALTER TABLE gmail_connections ADD COLUMN auto_cursor TEXT"]) {
+      try { await db.prepare(sql).run(); } catch { /* already there */ }
+    }
+  });
+}
+export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
+  if (!env.RELAY_DB) return { checked: 0 };
+  await ensureGmailTables(env.RELAY_DB);
+  await ensureAutoColumns(env.RELAY_DB);
+  const rows = ((await env.RELAY_DB.prepare(
+    `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor FROM gmail_connections g
+     WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION).all()).results || []);
+  let passes = 0, calls = 0;
+  const out = [];
+  for (const r of rows) {
+    if (passes >= AUTO_PASSES_PER_RUN || calls > CALL_BUDGET - 12) break;
+    // 1. New mail since this shopper was last checked (a couple of days' overlap; never more than a month).
+    const since = Math.max(now - AUTO_MAX_BACK_DAYS * DAY_MS, (r.autoAt || r.lastScanAt || now - AUTO_RECENT_DAYS * DAY_MS) - 2 * DAY_MS);
+    let recent;
+    try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls }); }
+    catch (e) { recent = { status: 500, body: { error: String(e && e.message || e).slice(0, 80) } }; }
+    passes++; calls += recent.calls || 3;
+    let cursor = r.cursor || null;
+    // 2. The first full read, a little more each run, until it reaches the start of the look-back period.
+    if (!r.lastScanAt && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
+      let back;
+      try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls }); }
+      catch (e) { back = { status: 500, body: {} }; }
+      passes++; calls += back.calls || 3;
+      if (back.status === 200) cursor = back.body.more ? back.body.cursor : null;
+    }
+    // Moved to the back of the queue whatever happened, so one shopper's problem never blocks the rest.
+    await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_at = ?, auto_cursor = ? WHERE shopper_id = ?").bind(now, cursor, r.id).run();
+    out.push({ status: recent.status, added: recent.body && recent.body.added || 0, updated: recent.body && recent.body.updated || 0, more: Boolean(recent.body && recent.body.more) });
+  }
+  return { checked: out.length, results: out };
+}
+
 async function hasConsent(db, shopperId) {
   const row = await db.prepare(
     "SELECT 1 AS ok FROM shopper_consents WHERE shopper_id = ? AND version = ? AND withdrawn_at IS NULL")
@@ -188,7 +235,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
   return { deleted: true, revokedAtGoogle: revoked };
 }
 
-const MAX_IMAGES_PER_SCAN = 4;
+const MAX_IMAGES_PER_SCAN = 1;
 const IMAGE_MAX_BYTES = 400000, IMAGE_MIN_BYTES = 2000;
 function b64Chunked(bytes) {
   let out = "";
@@ -293,7 +340,11 @@ function classify(rawText, id, lenient = false) {
   return { details, status };
 }
 
-async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
+async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
+  // Every outside call is counted so a round never runs past the plan's per-request limit.
+  let calls = 0;
+  const fetchImpl = (...a) => { calls++; return fetchImplIn(...a); };
+  const budget = o.budget || CALL_BUDGET, maxFetch = o.maxFetch || MAX_FETCH_PER_SCAN;
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data, last_scan_at FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
@@ -304,17 +355,19 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
-  const sinceLast = !full && row.last_scan_at ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
+  const sinceLast = o.sinceMs ? Math.max(fullLimit, o.sinceMs) : !full && row.last_scan_at ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
   const limitDay = ymd(sinceLast);
   let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= ymd(now + DAY_MS) ? cursorIn : ymd(now + DAY_MS);
-  let incomplete = false, windows = 0;
+  let incomplete = false, windows = 0, outOfBudget = false;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
+    if (calls + 4 > budget) { outOfBudget = true; break; }
     const afterD = ymd(fromYmd(before) - WINDOW_DAYS * DAY_MS);
     incomplete = false;
     // Gmail lists newest first, a page at a time. Read several pages so older receipts are reachable.
     const ids = [];
     let pageToken = "";
     for (let page = 0; page < MAX_PAGES; page++) {
+      if (page > 0 && calls + 4 > budget) { incomplete = true; break; }
       const list = await fetchImpl(
         "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(windowQuery(afterD, before)) +
         (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
@@ -336,11 +389,11 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
     }
     // Read the emails that need reading several at a time instead of one by one (this is most of the scan's waiting time).
     const toRead = [];
-    for (let i = 0; i < ids.length && fetched + toRead.length < MAX_FETCH_PER_SCAN; i++) {
+    for (let i = 0; i < ids.length && fetched + toRead.length < maxFetch && calls + toRead.length + 2 < budget; i++) {
       const sn = known.get(refs[i]);
       if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
     }
-    const rawById = new Map();
+    const rawById = new Map(), writes = [];
     for (let i = 0; i < toRead.length; i += FETCH_PARALLEL) {
       await Promise.all(toRead.slice(i, i + FETCH_PARALLEL).map(async (mid) => {
         try {
@@ -355,7 +408,7 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
       // Anything read by an older version of the reader is read once more.
       const stale = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
       if (seen && !stale) { skipped++; continue; }
-      if (fetched >= MAX_FETCH_PER_SCAN) { incomplete = true; continue; }
+      if (!rawById.has(id)) { incomplete = true; continue; }   // left for the next round
       fetched++;
       const raw = rawById.get(id);
       if (typeof raw !== "string") continue;
@@ -370,7 +423,7 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
       if (details.kind === "receipt") {
         // A photo that failed once is tried again whenever the reader version changes (a transient failure should not be permanent).
         details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && (prev.hasImage || !stale);
-        if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN) {
+        if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN && calls + 2 < budget) {
           imagesTried++;
           const urls = extractProductImageUrls(rawText);
           const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
@@ -384,26 +437,28 @@ async function scan(env, shopperId, fetchImpl, now, cursorIn, full) {
       if (seen) {
         // The shopper's confirm/dismiss choice lives in the status column and is kept.
         const keep = seen.status !== "not_receipt" && status !== "not_receipt" ? seen.status : status;
-        await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
-          .bind(JSON.stringify(details), keep, shopperId, ref).run();
-        if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
+        writes.push(env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
+          .bind(JSON.stringify(details), keep, shopperId, ref));
+        if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
         if (status !== "not_receipt") updated++;
         continue;
       }
-      await env.RELAY_DB.prepare(
+      writes.push(env.RELAY_DB.prepare(
         "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
-        .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now).run();
-      if (imageToStore) await saveImage(env, shopperId, imageToStore, now);
+        .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now));
+      if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
       if (status !== "not_receipt") added++;
     }
+    // Everything read in this window is saved in one database call.
+    if (writes.length) await env.RELAY_DB.batch(writes.splice(0));
     windows++;
     if (incomplete) break;       // stay on this window until every email in it is read
     before = afterD;
-    if (fetched >= MAX_FETCH_PER_SCAN) break;
+    if (fetched >= maxFetch) break;
   }
-  const more = incomplete || before > limitDay;
-  if (!more) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
-  return { status: 200, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
+  const more = incomplete || outOfBudget || before > limitDay;
+  if (!more && !o.recent) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
 
 
@@ -489,6 +544,10 @@ async function addEmail(env, shopperId, fetchImpl, now, messageId) {
   return { status: 200, body: { ok: true, kind: details.kind, store: (details.retailer && (details.retailer.name || details.retailer.domain)) || null, orderRef: details.orderRef || null } };
 }
 
+function imageStatement(env, shopperId, img, now) {
+  return env.RELAY_DB.prepare("INSERT OR REPLACE INTO receipt_images (receipt_id,shopper_id,type,data,created_at) VALUES (?,?,?,?,?)")
+    .bind(img.receiptId, shopperId, img.type, img.data, now);
+}
 async function saveImage(env, shopperId, img, now) {
   await env.RELAY_DB.prepare(
     "INSERT OR REPLACE INTO receipt_images (receipt_id,shopper_id,type,data,created_at) VALUES (?,?,?,?,?)")
@@ -708,15 +767,21 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/gmail" && m === "GET") {
     const c = await env.RELAY_DB.prepare(
-      "SELECT google_email AS googleEmail, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id = ?")
-      .bind(shopper.id).first();
+      "SELECT * FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first()
+      .then(x => x && { googleEmail: x.google_email, connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
     return json({ connected: Boolean(c), ...(c || {}) }, 200, cors);
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const sb = await request.json().catch(() => ({}));
-    const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true));
-    return json(r.body, r.status, cors);
+    try {
+      const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true));
+      return json(r.body, r.status, cors);
+    } catch (e) {
+      // A round that hits a limit still answers, so the app can wait a moment and carry on from where it was.
+      console.error("gmail scan round failed", String(e && e.message || e).slice(0, 160));
+      return json({ error: "scan_busy", retryAfterMs: 3000 }, 503, cors);
+    }
   }
   if (path === "/relay/my/gmail/find" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
