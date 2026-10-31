@@ -1,10 +1,10 @@
 // Multi-location Square Sandbox adapter. Retailer records are not consumer-owned.
-// Uses the merchant-authorised Square token only; no customer order endpoints.
+// Uses the merchant-authorised Square token only. Customer emails are read only to link orders to their owners (hashed).
 import { squareHost } from "./square-env.js";
+import { sq, squareOrderStatements, squareItemsOfVariations, linkSquareOrderEmails } from "./square-orders.js";
 const DAYS = 60;
 const MAX_PAGES_PER_LOCATION = 10;
 const connectionId = location => "square:sandbox:" + location;
-const minor = money => Number.isSafeInteger(money?.amount) ? money.amount : 0;
 export async function squareRequest(env, path, init = {}) {
   const { token, ...rest } = init;
   const key = token || env.SQUARE_ACCESS_TOKEN;
@@ -24,51 +24,36 @@ export async function listSquareLocations(env, token) {
   return (data.locations || []).filter(l => l.id && l.status === "ACTIVE")
     .map(l => ({ id: l.id, name: l.name || "Square location", currency: l.currency || "GBP" }));
 }
-async function importLocation(env, location, since) {
+// Reads one location's recent orders, saves them in one batch per page, then finds whose orders they are
+// (by the customer's email at Square) so they show up in that shopper's wallet.
+export async function importLocation(env, location, since, f) {
   const db = env.RELAY_DB, connection = connectionId(location.id);
-  await db.prepare("INSERT OR IGNORE INTO retailer_connections (id,provider,merchant_external_id) VALUES (?,?,?)")
-    .bind(connection, "square_sandbox", location.id).run();
+  const itemOfVariation = await squareItemsOfVariations(db);
   let cursor, pages = 0, orders = 0, items = 0, skipped = 0;
+  const imported = [];
   do {
     const body = { location_ids: [location.id], limit: 100,
       query: { filter: { date_time_filter: { created_at: { start_at: since } } },
         sort: { sort_field: "CREATED_AT", sort_order: "DESC" } },
       ...(cursor ? { cursor } : {}) };
-    const data = await squareRequest(env, "/v2/orders/search",
-      { method: "POST", body: JSON.stringify(body) });
+    const data = await sq(env, "/v2/orders/search", { method: "POST", body: JSON.stringify(body) }, f);
+    const statements = [];
     for (const order of data.orders || []) {
       if (!order.id || !order.created_at || Number.isNaN(Date.parse(order.created_at))) { skipped++; continue; }
-      const id = "square:sandbox:order:" + order.id;
-      const currency = order.total_money?.currency || location.currency;
-      await db.prepare(`INSERT INTO retailer_orders
-        (id,connection_id,external_order_id,external_customer_id,ordered_at,amount_minor,currency,status)
-        VALUES (?,?,?,?,?,?,?,?)
-        ON CONFLICT(connection_id,external_order_id) DO UPDATE SET
-        external_customer_id=excluded.external_customer_id,
-        amount_minor=excluded.amount_minor,currency=excluded.currency,status=excluded.status`)
-        .bind(id, connection, order.id, order.customer_id || null, order.created_at,
-          minor(order.total_money), currency, order.state || "UNKNOWN").run();
+      const saved = squareOrderStatements(db, order, location, itemOfVariation);
+      statements.push(...saved.statements);
+      imported.push({ id: saved.id, order });
       orders++;
-      for (let index = 0; index < (order.line_items || []).length; index++) {
-        const line = order.line_items[index], quantity = Number(line.quantity);
-        if (!Number.isSafeInteger(quantity) || quantity <= 0) { skipped++; continue; }
-        const lineId = line.uid || String(index);
-        await db.prepare(`INSERT INTO order_items
-          (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency)
-          VALUES (?,?,?,?,?,?,?,?,?)
-          ON CONFLICT(order_id,external_line_item_id) DO UPDATE SET
-          title=excluded.title,quantity=excluded.quantity,price_minor=excluded.price_minor,
-          currency=excluded.currency,product_id=excluded.product_id,variant_id=excluded.variant_id`)
-          .bind(id + ":item:" + lineId, id, lineId, line.catalog_object_id || null,
-            null, line.name || "Unnamed item", quantity, minor(line.base_price_money),
-            line.base_price_money?.currency || currency).run();
-        items++;
-      }
+      for (const line of order.line_items || []) { const q = Number(line.quantity); if (Number.isSafeInteger(q) && q > 0) items++; else skipped++; }
     }
+    if (statements.length) await db.batch(statements);
     cursor = data.cursor || null;
     pages++;
   } while (cursor && pages < MAX_PAGES_PER_LOCATION);
-  const result = { locationId: location.id, pages, orders, items, skipped, morePages: !!cursor };
+  let emails = { linked: 0, calls: 0 };
+  try { emails = await linkSquareOrderEmails(env, imported, f); }
+  catch (e) { console.error("Square order emails failed", String(e && e.message || e).slice(0, 120)); }
+  const result = { locationId: location.id, pages, orders, items, skipped, morePages: !!cursor, linked: emails.linked };
   await db.prepare(`INSERT INTO audit_events
     (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
     VALUES (?,?,?,?,?,?,?)`)
