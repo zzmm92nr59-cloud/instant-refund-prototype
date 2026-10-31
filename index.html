@@ -579,17 +579,21 @@ const stores=demoRetailers.map(st=>{const rows=catalog.filter(p=>storeOf(p)===st
 return '<button class="link" onclick="retailer=false;render()">← Back to Relay</button><h1 class="title">Retailer inventory lab</h1><p class="sub">Edit three independent fictional retailer inventories, including Shopify-style demo shops. Changes persist in this browser and appear in Discover, Radar and exchange checks.</p><div class="notice">The Shopify demo retailers are fictional. Actual Shopify order ingestion is private and requires retailer authorisation. Square Sandbox inventory is read-only here. No changes are sent to any real merchant, and demo stock is not shared across devices.</div><div class="card"><h3>North & Co. · Square Sandbox</h3><p class="small muted">'+catalog.filter(p=>p.provider==='square_sandbox').length+' catalogue variants from Square Sandbox. Not editable through this lab.</p></div>'+stores+'<button class="outline" id="resetInventory">Reset all demo retailer prices and stock</button>';
 }
 function bindRetailerControls(){document.querySelectorAll("[data-save-sku]").forEach(b=>b.onclick=()=>{const sku=b.dataset.saveSku;const price=Number($("price-"+sku)?.value),qty=Number($("qty-"+sku)?.value);if(!Number.isFinite(price)||price<1||!Number.isInteger(qty)||qty<0){alert("Enter a valid price and non-negative whole-number stock quantity.");return}inventoryChanges[sku]={...(inventoryChanges[sku]||{}),priceMinor:Math.round(price*100),quantity:qty,updatedAt:new Date().toISOString()};saveInventory()});document.querySelectorAll("[data-discount-sku]").forEach(b=>b.onclick=()=>applyDemoDiscount(b.dataset.discountSku));const reset=$("resetInventory");if(reset)reset.onclick=()=>{if(confirm("Reset all demo retailer prices and stock?"))resetDemoInventory()}}
+// Each catalogue is asked for at the same time and given 10 seconds, so one slow source never hides the others.
+function fetchWithin(url,ms){const c=typeof AbortController==="function"?new AbortController():null;const t=c?setTimeout(()=>c.abort(),ms):null;return fetch(url,{cache:"no-store",...(c?{signal:c.signal}:{})}).finally(()=>{if(t)clearTimeout(t)})}
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;
+ const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue",10000);
+ squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});
  try{
-  const response=await fetch(API+"/relay/live-test/products",{cache:"no-store"});
+  const response=await squareAsk;
   if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
   const data=await response.json();
   next=[...(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))).map(p=>({...p,provider:"square_sandbox",store:p.storeName||"Relay Demo Store",fixture:false})),...next];
  }catch(e){squareError=e.message}
  // Independent retailer feed: a Square outage must not suppress a connected Shopify catalogue.
  try{
-  const response=await fetch(API+"/relay/shopify/catalogue",{cache:"no-store"});
+  const response=await shopifyAsk;
   if(response.ok){
    const data=await response.json();
    if(data.published&&Array.isArray(data.products)){
