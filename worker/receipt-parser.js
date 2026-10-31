@@ -598,6 +598,41 @@ export function parseReturnEmail(rawEmail) {
     estimatedRefundPence: refund ? money(refund[1]) : null,
     currency: /£|GBP/.test(text) ? "GBP" : null,
     trackUrl,
+    // The return parcel's own tracking number, so carrier emails about it can show where it is.
+    trackingNumber: (trackingIn(text) || {}).trackingNumber || null,
+  };
+}
+
+// ---- Return progress emails ("We've received your return", "Your refund has been processed") -------------------
+// Only emails whose subject is about a received return or a refund count, so a receipt or return-request email that
+// merely says "once we've received your return we'll refund you" is never mistaken for one. The refund amount is
+// what the shop's email says; Relay cannot confirm it.
+export function parseReturnUpdateEmail(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const subject = headers.subject || "";
+  if (!/\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject) ||
+      /\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const both = subject + "\n" + text.slice(0, 6000);
+  let stage = null;
+  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b/i.test(both)) stage = "refunded";
+  else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
+  if (!stage) return { ok: false, reason: "not_a_return_update" };
+  const sender = retailerFromFrom(headers.from);
+  const refDate = headers.date ? new Date(headers.date) : null;
+  const amt = stage === "refunded" ? (both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
+  const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
+  const rid = text.match(/return (?:id|number|reference)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
+  return {
+    ok: true, kind: "return_update", stage,
+    at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
+    amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
+    orderRef: ref ? ref[1] : null, returnId: rid ? rid[1] : null,
+    retailer: { name: sender?.name || null, domain: sender?.domain || null },
   };
 }
 
