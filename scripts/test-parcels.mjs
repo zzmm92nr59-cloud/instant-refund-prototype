@@ -114,3 +114,33 @@ const u = parseReceiptEmail(undated);
 assert.equal(u.ok, true); assert.equal(u.orderDate, "2026-10-31"); assert.equal(u.orderDateFrom, "email");
 assert.equal(order.orderDate, "2026-10-30", "a date in the text still wins");
 console.log("ok - undated order emails use the day they were sent");
+
+// 7. Return tracking: the return parcel and the shop's own "received" and "refund" emails show where a return has got to.
+import { parseReturnUpdateEmail } from "../worker/receipt-parser.js";
+import { attachReturnProgress } from "../worker/gmail.js";
+const returnReq = mime({ from: LULU, subject: "Thanks for your return request for your lululemon order", date: "Sun, 1 Nov 2026 09:00:00 +0000",
+  plain: "Return ID: nuk0400000001\r\nOrder Id: #UK05000001\r\nSend it back no later than November 28.\r\nTracking number: JK000000777GB\r\nOnce we've received your return we'll refund you.",
+  htmlLines: ["Return ID: nuk0400000001", "Order Id: #UK05000001", "Send it back no later than November 28.", "Tracking number: JK000000777GB", "Once we've received your return we'll refund you."] });
+const r1 = parseReturnEmail(returnReq);
+assert.equal(r1.ok, true); assert.equal(r1.trackingNumber, "JK000000777GB");
+assert.equal(parseReturnUpdateEmail(returnReq).ok, false, "a return request that mentions refunds later is not a refund");
+const rmReturnDelivered = mime({ from: RM, subject: "Your item has been delivered", date: "Tue, 3 Nov 2026 11:00:00 +0000",
+  plain: "We delivered your item to LULULEMON RETURNS on Tuesday, 3 November 2026.\r\nJK000000777GB", htmlLines: ["We delivered your item to LULULEMON RETURNS on Tuesday, 3 November 2026.", "JK000000777GB"] });
+const received = mime({ from: LULU, subject: "We've received your return", date: "Wed, 4 Nov 2026 08:00:00 +0000",
+  plain: "Good news, Alex. We've received your return for order #UK05000001.", htmlLines: ["Good news, Alex. We've received your return for order #UK05000001."] });
+const refunded = mime({ from: LULU, subject: "Your refund has been processed", date: "Thu, 5 Nov 2026 08:00:00 +0000",
+  plain: "Order Id: #UK05000001\r\nWe've processed your refund of £69.00 to your original payment method.", htmlLines: ["Order Id: #UK05000001", "We've processed your refund of £69.00 to your original payment method."] });
+const u1 = parseReturnUpdateEmail(received), u2 = parseReturnUpdateEmail(refunded);
+assert.deepEqual([u1.ok, u1.stage, u1.orderRef], [true, "received", "UK05000001"]);
+assert.deepEqual([u2.ok, u2.stage, u2.amountPence, u2.orderRef], [true, "refunded", 6900, "UK05000001"]);
+assert.equal(parseReturnUpdateEmail(luluOrder).ok, false, "an order email is never a return update");
+const rd = parseDeliveryEmail(rmReturnDelivered);
+assert.equal(rd.trackingNumber, "JK000000777GB"); assert.equal(rd.status, "delivered");
+const card = mergeOrderEmails([asCard(luluOrder, "a", 1), asCard(luluShipped, "b", 2)]);
+card[0].returnPlan = { kind: "return_instructions", ...r1 };
+attachDeliveries(card, [asCard(rmDelivered, "e", 5), { ...rd }]);
+assert.equal(card[0].delivery.trackingNumber, "JK000000001GB", "the return parcel never replaces the delivery of the order");
+attachReturnProgress(card, [{ ...rd }], [{ kind: "return_update", ...u1 }, { kind: "return_update", ...u2 }]);
+assert.deepEqual(card[0].returnProgress, { trackingNumber: "JK000000777GB", carrier: "Royal Mail", trackUrl: "https://www.royalmail.com/track-your-item#/tracking-results/JK000000777GB",
+  parcel: { status: "delivered", at: "2026-11-03", carrier: "Royal Mail" }, receivedAt: "2026-11-04", refundedAt: "2026-11-05", refundPence: 6900, currency: "GBP" });
+console.log("ok - return tracking: parcel delivered to the shop, return received, refund of £69.00 processed (from the shop's emails)");
