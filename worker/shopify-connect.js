@@ -77,6 +77,9 @@ export function ensureShopifyShopSchema(db) {
   }).then(() => ensureOnce(db, "shopify-shops-app", async () => {
     // Which Relay app the shop approved (empty = the main app). Added later, so older databases get the column here.
     try { await db.prepare("ALTER TABLE shopify_shops ADD COLUMN client_id TEXT").run(); } catch { /* already there */ }
+  })).then(() => ensureOnce(db, "shopify-shops-hooks", async () => {
+    // Which Shopify notifications Relay last set up for the shop in full (see HOOKS_SET). Empty = set up before this was kept.
+    try { await db.prepare("ALTER TABLE shopify_shops ADD COLUMN hooks TEXT").run(); } catch { /* already there */ }
   }));
 }
 
@@ -158,6 +161,9 @@ async function shopInfo(shop, token, f) {
 // Each is signed by Shopify with the app's secret and checked in shopify-webhooks.js. Asking twice never makes duplicates.
 // REFUNDS_CREATE: the shop refunded something, so a return started in Relay can show as refunded.
 export const WEBHOOK_TOPICS = ["APP_UNINSTALLED", "PRODUCTS_CREATE", "PRODUCTS_UPDATE", "PRODUCTS_DELETE", "ORDERS_PAID", "INVENTORY_LEVELS_UPDATE", "REFUNDS_CREATE"];
+// The full set, as kept against each shop once every one of them was set up. When Relay adds a notification (as it did for
+// refunds), shops set up before that no longer match, and the next time the shop opens Relay the missing ones are added.
+export const HOOKS_SET = [...WEBHOOK_TOPICS].sort().join(",");
 export async function registerShopifyWebhooks(shop, token, origin, f) {
   const uri = origin.replace(/\/$/, "") + "/relay/webhooks/shopify";
   const gql = async (query, variables) => {
@@ -183,6 +189,10 @@ export async function registerShopifyWebhooks(shop, token, origin, f) {
   return out;
 }
 async function recordHooks(env, shop, outcome) {
+  if (outcome && Array.isArray(outcome.failed) && !outcome.failed.length) {
+    try { await ensureShopifyShopSchema(env.RELAY_DB); await env.RELAY_DB.prepare("UPDATE shopify_shops SET hooks = ? WHERE domain = ?").bind(HOOKS_SET, shop).run(); }
+    catch { /* tried again next time the shop opens Relay */ }
+  }
   try {
     await env.RELAY_DB.prepare(`INSERT INTO audit_events(id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json) VALUES (?,?,?,?,?,?,?)`)
       .bind(crypto.randomUUID(), "system", null, "shopify_webhooks_registered", "shopify_store", shop, JSON.stringify(outcome)).run();
