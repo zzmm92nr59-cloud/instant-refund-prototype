@@ -31,44 +31,82 @@ export function ensureExchangeTables(db) {
 const itemKey = (shop, productId) => "shopify:" + shop + ":item:gid://shopify/Product/" + productId;
 const variantKey = (shop, variantId) => "shopify:" + shop + ":variant:gid://shopify/ProductVariant/" + variantId;
 
+// Rows for many keys at once (the database takes at most 100 values per question, so long lists go in chunks).
+async function rowsIn(db, sqlWith, keys) {
+  const out = [], list = [...new Set(keys.filter(k => k != null).map(String))];
+  for (let i = 0; i < list.length; i += 90) {
+    const part = list.slice(i, i + 90);
+    out.push(...(((await db.prepare(sqlWith("(" + part.map(() => "?").join(",") + ")")).bind(...part).all()).results) || []));
+  }
+  return out;
+}
+
 // Adds what the app needs to each purchased line: picture, size/colour, and any exchange already made.
+// Everything is looked up in a handful of questions to the database for all orders together (one per line was slow).
 export async function enrichPurchases(env, purchases, opt = {}) {
   const db = env.RELAY_DB;
   await ensureExchangeTables(db);
   let stores = null; // the shop's Shopify access, fetched only if a swap still has a balance to check
   const RETURN_WINDOW_DAYS = 7;
   const now = Date.now();
+  const shopOrders = purchases.filter(o => SHOP.test(String(o.retailer || "")));
+  const orderIds = shopOrders.map(o => o.id);
+  // Swaps done on these orders, newest first.
+  const swaps = orderIds.length ? await rowsIn(db, (q) => `SELECT id, order_id AS orderId, line_id AS lineId, to_title AS toTitle, from_title AS fromTitle,
+      to_variant AS toVariant, status, detail, created_at AS at FROM relay_exchanges WHERE status = 'done' AND order_id IN ${q} ORDER BY created_at DESC`, orderIds).catch(() => []) : [];
+  const swapOf = new Map(); // "order|line" -> newest swap
+  for (const r of swaps) { const k = r.orderId + "|" + r.lineId; if (!swapOf.has(k)) swapOf.set(k, r); }
+  // Returns started in Relay on these orders, newest first (the table and some columns only exist once returns have been used).
+  let rets = [];
+  if (orderIds.length) {
+    try {
+      rets = await rowsIn(db, (q) => `SELECT order_id AS orderId, line_id AS lineId, status, return_ref AS ref, tracking_number AS trackingNumber, refund_minor AS refundMinor,
+        refund_issued_at AS refundedAt FROM relay_returns WHERE status != 'cancelled' AND order_id IN ${q} ORDER BY created_at DESC`, orderIds);
+    } catch {
+      try { rets = await rowsIn(db, (q) => `SELECT order_id AS orderId, line_id AS lineId, status, return_ref AS ref FROM relay_returns WHERE status != 'cancelled' AND order_id IN ${q}`, orderIds); }
+      catch { rets = []; }
+    }
+  }
+  const retOf = new Map();
+  for (const r of rets) { const k = r.orderId + "|" + r.lineId; if (!retOf.has(k)) retOf.set(k, r); }
+  // Sizes/colours, pictures and prices of the items bought and of the items swapped to.
+  const vkeys = [];
+  for (const o of shopOrders) {
+    const shop = SHOP.exec(o.retailer)[1];
+    for (const it of o.items || []) if (it.variantId) vkeys.push(variantKey(shop, it.variantId));
+  }
+  for (const r of swaps) {
+    const o = shopOrders.find(x => x.id === r.orderId);
+    if (o && /^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/.test(String(r.toVariant || ""))) vkeys.push("shopify:" + SHOP.exec(o.retailer)[1] + ":variant:" + r.toVariant);
+  }
+  const variants = new Map((vkeys.length ? await rowsIn(db, (q) => `SELECT v.id AS id, v.title AS variant, v.price_minor AS price, i.image_url AS imageUrl
+    FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id IN ${q}`, vkeys).catch(() => []) : []).map(r => [r.id, r]));
+
   for (const o of purchases) {
     const m = SHOP.exec(String(o.retailer || ""));
     const daysSinceOrder = o.orderedAt ? (now - new Date(o.orderedAt).getTime()) / (1000 * 60 * 60 * 24) : 999;
     // When Relay swaps an item, Shopify adds the new item to the order as a line of its own, which arrives with the order's next
     // update. That line is the swapped item already shown on the original line ("swapped to …"), so it isn't shown twice
     // (and can't be swapped or returned a second time). One hidden line per swap, only a line with no swap of its own.
-    let swappedTo = new Map();
-    if (m) {
-      try {
-        for (const r of ((await db.prepare("SELECT line_id AS line, to_variant AS v FROM relay_exchanges WHERE order_id = ? AND status = 'done'").bind(o.id).all()).results || []))
-          swappedTo.set(String(r.v), { from: String(r.line), left: (swappedTo.get(String(r.v))?.left || 0) + 1 });
-      } catch { swappedTo = new Map(); }
-    }
+    const swappedTo = new Map();
+    if (m) for (const r of swaps.filter(x => x.orderId === o.id))
+      swappedTo.set(String(r.toVariant), { from: String(r.lineId), left: (swappedTo.get(String(r.toVariant))?.left || 0) + 1 });
     const hide = new Set();
     for (const it of o.items || []) {
       it.exchangeable = false;
       it.returnable = false;
       if (!m || !it.variantId) continue;
+      const k = o.id + "|" + it.lineId;
       const sw = swappedTo.get("gid://shopify/ProductVariant/" + it.variantId);
-      if (sw && sw.left > 0 && sw.from !== String(it.lineId)) {
-        const own = await db.prepare("SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done'").bind(o.id, it.lineId).first();
-        if (!own) { sw.left--; hide.add(it); continue; }
-      }
-      const v = await db.prepare(`SELECT v.title AS variant, i.image_url AS imageUrl, i.title AS product FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id = ?`)
-        .bind(variantKey(m[1], it.variantId)).first();
+      if (sw && sw.left > 0 && sw.from !== String(it.lineId) && !swapOf.has(k)) { sw.left--; hide.add(it); continue; }
+      const v = variants.get(variantKey(m[1], it.variantId));
       if (v) { it.variant = v.variant && v.variant !== "Default Title" ? v.variant : null; it.imageUrl = v.imageUrl || null; }
-      const ex = await db.prepare("SELECT id, to_title AS toTitle, from_title AS fromTitle, to_variant AS toVariant, status, detail, created_at AS at FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
-        .bind(o.id, it.lineId).first();
-      if (ex) {
+      const row = swapOf.get(k);
+      let ex = null;
+      if (row) {
+        ex = { toTitle: row.toTitle, fromTitle: row.fromTitle, status: row.status, at: row.at };
         // A swap to a dearer item paid through the shop's Shopify checkout: has the customer paid the extra yet?
-        const owed = /^shopify (balance|paid) (\d{1,9})$/.exec(String(ex.detail || ""));
+        const owed = /^shopify (balance|paid) (\d{1,9})$/.exec(String(row.detail || ""));
         if (owed) {
           ex.balance = { owedMinor: Number(owed[2]), paid: owed[1] === "paid", payUrl: null };
           const ext = /:order:(\d{1,20})$/.exec(String(o.id || ""));
@@ -78,28 +116,18 @@ export async function enrichPurchases(env, purchases, opt = {}) {
             const bal = store ? await balanceOf(m[1], store.token, "gid://shopify/Order/" + ext[1], opt.fetchImpl || ((...a) => fetch(...a))) : null;
             if (bal && bal.paid) {
               ex.balance.paid = true;
-              await db.prepare("UPDATE relay_exchanges SET detail = ? WHERE id = ? AND detail = ?").bind("shopify paid " + owed[2], ex.id, ex.detail).run().catch(() => {});
+              await db.prepare("UPDATE relay_exchanges SET detail = ? WHERE id = ? AND detail = ?").bind("shopify paid " + owed[2], row.id, row.detail).run().catch(() => {});
             } else if (bal) ex.balance.payUrl = bal.payUrl;
           }
         }
         // The card shows what the shopper has now: the new item's price (the difference was paid or refunded).
-        if (/^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/.test(String(ex.toVariant || ""))) {
-          const nv = await db.prepare("SELECT price_minor AS p FROM retailer_catalog_variants WHERE id = ?").bind("shopify:" + m[1] + ":variant:" + ex.toVariant).first().catch(() => null);
-          if (nv && Number.isFinite(nv.p) && nv.p > 0) { ex.fromPriceMinor = it.priceMinor ?? null; it.priceMinor = nv.p; }
-        }
-        delete ex.id; delete ex.detail; delete ex.toVariant;
+        const nv = variants.get("shopify:" + m[1] + ":variant:" + row.toVariant);
+        if (nv && Number.isFinite(nv.price) && nv.price > 0) { ex.fromPriceMinor = it.priceMinor ?? null; it.priceMinor = nv.price; }
         it.exchange = ex; it.variant = ex.toTitle || it.variant;
       }
       it.exchangeable = !ex && Boolean(it.productId);
       // A return started in Relay for this item: its reference, Royal Mail tracking and whether the shop has refunded it.
-      let ret = null;
-      try {
-        ret = await db.prepare(`SELECT status, return_ref AS ref, tracking_number AS trackingNumber, refund_minor AS refundMinor, refund_issued_at AS refundedAt
-          FROM relay_returns WHERE order_id = ? AND line_id = ? AND status != 'cancelled' ORDER BY created_at DESC LIMIT 1`).bind(o.id, it.lineId).first();
-      } catch {
-        try { ret = await db.prepare("SELECT status, return_ref AS ref FROM relay_returns WHERE order_id = ? AND line_id = ? AND status != 'cancelled' LIMIT 1").bind(o.id, it.lineId).first(); }
-        catch { ret = null; /* relay_returns table may not exist yet */ }
-      }
+      const ret = retOf.get(k) || null;
       if (ret) it.returnInfo = { status: ret.status, ref: ret.ref, trackingNumber: ret.trackingNumber || null,
         refundMinor: Number.isFinite(ret.refundMinor) ? ret.refundMinor : null, refundedAt: ret.refundedAt || null };
       // returnable: within window, no completed return, no completed exchange
