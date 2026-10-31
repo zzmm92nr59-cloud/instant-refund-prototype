@@ -48,7 +48,7 @@ export async function enrichPurchases(env, purchases, opt = {}) {
       const v = await db.prepare(`SELECT v.title AS variant, i.image_url AS imageUrl, i.title AS product FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id = ?`)
         .bind(variantKey(m[1], it.variantId)).first();
       if (v) { it.variant = v.variant && v.variant !== "Default Title" ? v.variant : null; it.imageUrl = v.imageUrl || null; }
-      const ex = await db.prepare("SELECT id, to_title AS toTitle, from_title AS fromTitle, status, detail, created_at AS at FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
+      const ex = await db.prepare("SELECT id, to_title AS toTitle, from_title AS fromTitle, to_variant AS toVariant, status, detail, created_at AS at FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
         .bind(o.id, it.lineId).first();
       if (ex) {
         // A swap to a dearer item paid through the shop's Shopify checkout: has the customer paid the extra yet?
@@ -66,7 +66,12 @@ export async function enrichPurchases(env, purchases, opt = {}) {
             } else if (bal) ex.balance.payUrl = bal.payUrl;
           }
         }
-        delete ex.id; delete ex.detail;
+        // The card shows what the shopper has now: the new item's price (the difference was paid or refunded).
+        if (/^gid:\/\/shopify\/ProductVariant\/\d{1,20}$/.test(String(ex.toVariant || ""))) {
+          const nv = await db.prepare("SELECT price_minor AS p FROM retailer_catalog_variants WHERE id = ?").bind("shopify:" + m[1] + ":variant:" + ex.toVariant).first().catch(() => null);
+          if (nv && Number.isFinite(nv.p) && nv.p > 0) { ex.fromPriceMinor = it.priceMinor ?? null; it.priceMinor = nv.p; }
+        }
+        delete ex.id; delete ex.detail; delete ex.toVariant;
         it.exchange = ex; it.variant = ex.toTitle || it.variant;
       }
       it.exchangeable = !ex && Boolean(it.productId);
