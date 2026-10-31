@@ -20,3 +20,13 @@ export function ensureOnce(db, key, run, o = {}) {
   if (!m.has(key)) m.set(key, run().catch(e => { m.delete(key); throw e; }));
   return m.get(key);
 }
+
+// Runs a list of set-up statements ("create if missing") in one trip to the database where it can (Cloudflare's batch),
+// instead of one trip each. That made the first request after each deploy take several seconds.
+export async function runAll(db, statements) {
+  if (db && typeof db.batch === "function") {
+    try { await db.batch(statements.map(sql => db.prepare(sql))); return; }
+    catch { /* if the database won't take them as one batch, do them one at a time below */ }
+  }
+  for (const sql of statements) await db.prepare(sql).run();
+}

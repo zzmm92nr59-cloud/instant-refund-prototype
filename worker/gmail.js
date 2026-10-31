@@ -12,7 +12,7 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
 import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
-import { ensureOnce } from "./once.js";
+import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
 import { categorise, storeKey, CATEGORIES } from "./receipt-category.js";
@@ -115,7 +115,7 @@ async function ensureGmailTablesRun(db) {
        domain TEXT PRIMARY KEY, type TEXT, data TEXT, found INTEGER NOT NULL, fetched_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_receipt_learning_store ON receipt_learning(store_key, category)`
   ];
-  for (const sql of statements) await db.prepare(sql).run();
+  await runAll(db, statements);
   await ensureResaleTables(db);
 }
 

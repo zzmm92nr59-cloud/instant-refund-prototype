@@ -20,3 +20,17 @@ await ensureOnce(db, "flaky", async () => { n++; }, W);
 assert.equal(n, 2);
 void stuck;
 console.log("once: all checks passed");
+// Set-up statements go to the database in one batch where the database offers it.
+import { runAll } from "../worker/once.js";
+{
+  const ran = [];
+  await runAll({ prepare: (sql) => ({ sql }), batch: async (list) => { ran.push(list.map(x => x.sql)); } }, ["A", "B", "C"]);
+  assert.deepEqual(ran, [["A", "B", "C"]]);
+  const one = [];
+  await runAll({ prepare: (sql) => ({ run: async () => one.push(sql) }) }, ["A", "B"]);
+  assert.deepEqual(one, ["A", "B"]);
+  const fell = [];
+  await runAll({ prepare: (sql) => ({ run: async () => fell.push(sql) }), batch: async () => { throw new Error("not allowed in a batch"); } }, ["A", "B"]);
+  assert.deepEqual(fell, ["A", "B"], "falls back to one at a time");
+  console.log("once: batched set-up checks passed");
+}
