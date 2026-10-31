@@ -210,6 +210,8 @@ export function parseDate(text, refDate) {
 }
 
 function fromText(text, refDate) {
+  // Some plain-text parts write the pound sign as "L" ("L69.00" on its own line). Only whole lines that are just an amount are changed.
+  text = text.replace(/^([ \t|]*)L\s?([0-9][0-9,]*\.[0-9]{2})[ \t|]*$/gm, "$1£$2");
   const ref =
     text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
@@ -248,13 +250,14 @@ function fromText(text, refDate) {
     for (let i = 2; i < rows.length - 1; i++) {
       const v = rows[i].match(/^(\d{1,2})\s*[x×]\s*\S+\s*\/\s*.{2,60}$/);
       if (!v) continue;
-      const nameLines = [rows[i - 2], rows[i - 1]].filter((r) => r.length < 80 && !/^£|items|purchased|order|subtotal|total/i.test(r));
+      const nameLines = [rows[i - 2], rows[i - 1]].filter((r) => r.length < 80 && !/^£|items|purchased|order|subtotal|total|^(?:shipping|shipped|dispatched|delivered|on its way|in this (?:shipment|parcel)|track)/i.test(r));
       let price = null;
       for (let j = i + 1; j < Math.min(rows.length, i + 4) && price == null; j++) {
         const pm = rows[j].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
         if (pm) price = money(pm[1]);
       }
-      if (nameLines.length) items.push({ name: nameLines.join(" ").trim(), qty: Number(v[1]), pricePence: price, lineTotal: true });
+      const vm = rows[i].match(/\/\s*(.{2,60})$/);
+      if (nameLines.length) items.push({ name: nameLines.join(" ").trim(), qty: Number(v[1]), pricePence: price, lineTotal: true, ...(vm ? { variant: vm[1].trim() } : {}) });
     }
   }
   const sub = text.match(/\bsubtotal\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
@@ -399,7 +402,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Many senders include a skimpy plain-text part next to the full HTML one: use whichever reads richer.
   if (plain && fromHtml) {
     const alt = fromText(fromHtml, refDate);
-    const richness = (r) => (r.items.length ? 2 : 0) + (r.orderDate ? 1 : 0) + (r.totalPence != null ? 1 : 0) + (r.orderRef ? 1 : 0);
+    const richness = (r) => (r.items.length ? 2 : 0) + (r.items.some((i) => i.pricePence != null) ? 1 : 0) + (r.items.some((i) => i.variant) ? 1 : 0) + (r.orderDate ? 1 : 0) + (r.totalPence != null ? 1 : 0) + (r.orderRef ? 1 : 0);
     if (richness(alt) > richness(txt)) { txt = alt; text = fromHtml; }
   }
   const chosen = ld || txt;
@@ -426,6 +429,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length, nothingFound: true } };
   }
   result.returns = extractReturns(text, html, result.orderDate);
+  result.shipment = shipmentOf(subject, text);
 
   const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.lineTotal ? 1 : i.qty || 1), 0);
   const checks = [
@@ -443,6 +447,70 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   result.confidence = score >= 5 && consistent ? "high" : score >= 3 && consistent ? "medium" : "low";
   result.needsShopperConfirmation = result.confidence !== "high";
   return result;
+}
+
+// ---- Parcels -------------------------------------------------------------------------
+// A tracking number in an order or shipping email, and which carrier it belongs to.
+const ROYAL_MAIL_REF = /\b([A-Z]{2}\d{9}GB)\b/;
+const CARRIER_NAMES = [["Royal Mail", /royal ?mail|parcelforce/i], ["Evri", /\bevri\b|\bhermes\b/i], ["DPD", /\bdpd\b/i], ["InPost", /\binpost\b/i],
+  ["Yodel", /\byodel\b/i], ["DHL", /\bdhl\b/i], ["UPS", /\bups\b/i], ["FedEx", /\bfedex\b/i]];
+function carrierIn(text) { for (const [n, re] of CARRIER_NAMES) if (re.test(text)) return n; return null; }
+function trackingIn(text) {
+  const rm = text.match(ROYAL_MAIL_REF);
+  if (rm) return { trackingNumber: rm[1], carrier: "Royal Mail" };
+  const m = text.match(/\btracking\s*(?:number|no\.?|#|id|code)?\s*[:#]\s*([A-Z0-9]{8,30})\b/i) || text.match(/\btracking\s+(?:number|no\.?|id|code)\s+(?:is\s+)?([A-Z0-9]{8,30})\b/i);
+  return m && /\d/.test(m[1]) ? { trackingNumber: m[1].toUpperCase(), carrier: null } : null;
+}
+function shipmentOf(subject, text) {
+  const t = trackingIn(text);
+  const shipped = /\b(shipped|shipping|dispatched|on its way|on the way|sent)\b/i.test(subject || "");
+  if (!t && !shipped) return null;
+  return { trackingNumber: t ? t.trackingNumber : null, carrier: (t && t.carrier) || carrierIn(text), status: shipped ? "shipped" : null };
+}
+const UK_TRACK = { "Royal Mail": (n) => "https://www.royalmail.com/track-your-item#/tracking-results/" + n, "Evri": (n) => "https://www.evri.com/track/parcel/" + n,
+  "DPD": (n) => "https://track.dpd.co.uk/parcels/" + n, "InPost": (n) => "https://inpost.co.uk/tracking/?number=" + n };
+export function trackingLink(carrier, number) {
+  return carrier && UK_TRACK[carrier] && /^[A-Z0-9]{8,30}$/.test(String(number || "")) ? UK_TRACK[carrier](number) : null;
+}
+
+// Delivery updates: emails from a carrier ("Your parcel from Lululemon EMEA has been delivered") or from the shop
+// ("Your order is out for delivery"). They never make a purchase card; they add "where's my parcel" to one.
+const CARRIER_SENDERS = [["Royal Mail", /royalmail\.com|parcelforce\.com/i], ["Evri", /evri\.com|myhermes/i], ["DPD", /dpd\.co\.uk|dpdlocal/i], ["InPost", /inpost\.co\.uk/i], ["Yodel", /yodel\.co\.uk/i]];
+export function parseDeliveryEmail(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const subject = headers.subject || "";
+  const from = String(headers.from || "");
+  const fromCarrier = (CARRIER_SENDERS.find(([, re]) => re.test(from)) || [])[0] || null;
+  const both = subject + "\n" + text.slice(0, 4000);
+  let status = null;
+  // "Due to be delivered today" is checked first so it is never read as "delivered today".
+  if (/\bdue to be delivered\b|\barriving today\b|\bexpected (?:today|on)\b/i.test(subject)) status = "due";
+  else if (/\b(has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bwe delivered\b/i.test(both)) status = "delivered";
+  else if (/\bout for delivery\b/i.test(both)) status = "out_for_delivery";
+  else if (/\bdue to be delivered\b|\barriving today\b/i.test(both)) status = "due";
+  else if (fromCarrier && /\b(on its way|dispatched|in transit|we(?:'|’)?ve got your parcel)\b/i.test(both)) status = "in_transit";
+  // A shop's own email only counts when the subject says so, so receipts that merely mention delivery are left alone.
+  if (!status || (!fromCarrier && !/\bdelivered\b|\bout for delivery\b/i.test(subject))) return { ok: false, reason: "not_a_delivery_email" };
+  const sender = retailerFromFrom(from);
+  const t = trackingIn(text);
+  const merchant = (both.match(/\bparcel from ([A-Z][\w&'’ .-]{1,60}?)(?:\s+(?:is|has|was)\b|[.,:\n])/) || [])[1] || null;
+  const refDate = headers.date ? new Date(headers.date) : null;
+  const dated = (text.match(/\b(?:today|on),?\s+(?:[A-Za-z]{3,9},?\s+)?(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\s+\d{4})/i) || [])[1];
+  const at = (dated && parseDate(dated, refDate)) || (refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null);
+  const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
+  return {
+    ok: true, kind: "delivery_update", status, at,
+    carrier: fromCarrier || (t && t.carrier) || carrierIn(text) || null,
+    trackingNumber: t ? t.trackingNumber : null,
+    merchant: merchant ? merchant.trim() : null,
+    retailer: fromCarrier ? null : { name: sender?.name || null, domain: sender?.domain || null },
+    orderRef: ref ? ref[1] : null,
+  };
 }
 
 // ---- Return-instructions emails ("Thanks for your return request ...") -------------
