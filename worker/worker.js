@@ -49,7 +49,7 @@ const GMAIL_CRON = "7,22,37,52 * * * *";
 export default {
   async scheduled(event, env, ctx) {
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
-    if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
+    if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
     // Catalogues are refreshed first so price alerts compare against the newest prices.
     const syncs = Promise.allSettled([
