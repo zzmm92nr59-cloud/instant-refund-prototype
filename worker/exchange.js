@@ -32,9 +32,10 @@ const itemKey = (shop, productId) => "shopify:" + shop + ":item:gid://shopify/Pr
 const variantKey = (shop, variantId) => "shopify:" + shop + ":variant:gid://shopify/ProductVariant/" + variantId;
 
 // Adds what the app needs to each purchased line: picture, size/colour, and any exchange already made.
-export async function enrichPurchases(env, purchases) {
+export async function enrichPurchases(env, purchases, opt = {}) {
   const db = env.RELAY_DB;
   await ensureExchangeTables(db);
+  let stores = null; // the shop's Shopify access, fetched only if a swap still has a balance to check
   const RETURN_WINDOW_DAYS = 7;
   const now = Date.now();
   for (const o of purchases) {
@@ -47,9 +48,27 @@ export async function enrichPurchases(env, purchases) {
       const v = await db.prepare(`SELECT v.title AS variant, i.image_url AS imageUrl, i.title AS product FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id = ?`)
         .bind(variantKey(m[1], it.variantId)).first();
       if (v) { it.variant = v.variant && v.variant !== "Default Title" ? v.variant : null; it.imageUrl = v.imageUrl || null; }
-      const ex = await db.prepare("SELECT to_title AS toTitle, from_title AS fromTitle, status, created_at AS at FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
+      const ex = await db.prepare("SELECT id, to_title AS toTitle, from_title AS fromTitle, status, detail, created_at AS at FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done' ORDER BY created_at DESC LIMIT 1")
         .bind(o.id, it.lineId).first();
-      if (ex) { it.exchange = ex; it.variant = ex.toTitle || it.variant; }
+      if (ex) {
+        // A swap to a dearer item paid through the shop's Shopify checkout: has the customer paid the extra yet?
+        const owed = /^shopify (balance|paid) (\d{1,9})$/.exec(String(ex.detail || ""));
+        if (owed) {
+          ex.balance = { owedMinor: Number(owed[2]), paid: owed[1] === "paid", payUrl: null };
+          const ext = /:order:(\d{1,20})$/.exec(String(o.id || ""));
+          if (!ex.balance.paid && ext) {
+            if (!stores) stores = await (opt.listStores ? opt.listStores() : listConnectedShopifyStores(env, opt)).catch(() => []);
+            const store = (stores || []).find(s => s.domain === m[1]);
+            const bal = store ? await balanceOf(m[1], store.token, "gid://shopify/Order/" + ext[1], opt.fetchImpl || ((...a) => fetch(...a))) : null;
+            if (bal && bal.paid) {
+              ex.balance.paid = true;
+              await db.prepare("UPDATE relay_exchanges SET detail = ? WHERE id = ? AND detail = ?").bind("shopify paid " + owed[2], ex.id, ex.detail).run().catch(() => {});
+            } else if (bal) ex.balance.payUrl = bal.payUrl;
+          }
+        }
+        delete ex.id; delete ex.detail;
+        it.exchange = ex; it.variant = ex.toTitle || it.variant;
+      }
       it.exchangeable = !ex && Boolean(it.productId);
       // A return started in Relay for this item: its reference, Royal Mail tracking and whether the shop has refunded it.
       let ret = null;
@@ -117,14 +136,23 @@ async function gql(shop, token, query, variables, f) {
 }
 const firstError = (x) => (x && x.userErrors && x.userErrors[0] && x.userErrors[0].message) || null;
 
-// The link Shopify gives for paying an order's outstanding balance (only an https link on Shopify's own domains).
-async function balanceLink(shop, token, orderGid, f) {
+// What's left to pay on an order, and the link Shopify gives for paying it (only a plain https link). paid is true only when
+// Shopify says nothing is outstanding and the order is paid (not when it was cancelled or voided). null if Shopify can't be asked.
+async function balanceOf(shop, token, orderGid, f) {
   try {
-    const d = await gql(shop, token, `query RelayBalance($id: ID!) { order(id: $id) { totalOutstandingSet { shopMoney { amount } } paymentCollectionDetails { additionalPaymentCollectionUrl } } }`, { id: orderGid }, f);
-    const u = d.order && d.order.paymentCollectionDetails && d.order.paymentCollectionDetails.additionalPaymentCollectionUrl;
-    // From Shopify itself; it may be on the shop's own domain, so any plain https address is accepted.
-    return typeof u === "string" && /^https:\/\/[^\s"'<>]{8,500}$/.test(u) ? u : null;
+    const d = await gql(shop, token, `query RelayBalance($id: ID!) { order(id: $id) { displayFinancialStatus totalOutstandingSet { shopMoney { amount } } paymentCollectionDetails { additionalPaymentCollectionUrl } } }`, { id: orderGid }, f);
+    if (!d.order) return null;
+    const u = d.order.paymentCollectionDetails && d.order.paymentCollectionDetails.additionalPaymentCollectionUrl;
+    const left = Number(d.order.totalOutstandingSet && d.order.totalOutstandingSet.shopMoney && d.order.totalOutstandingSet.shopMoney.amount);
+    const status = String(d.order.displayFinancialStatus || "");
+    return { paid: left === 0 && /^(PAID|PARTIALLY_REFUNDED)$/.test(status),
+      // From Shopify itself; it may be on the shop's own domain, so any plain https address is accepted.
+      payUrl: typeof u === "string" && /^https:\/\/[^\s"'<>]{8,500}$/.test(u) ? u : null };
   } catch { return null; }
+}
+async function balanceLink(shop, token, orderGid, f) {
+  const b = await balanceOf(shop, token, orderGid, f);
+  return b ? b.payUrl : null;
 }
 
 // Refunds an amount to the payment the customer made on this order. True only if Shopify created the refund.

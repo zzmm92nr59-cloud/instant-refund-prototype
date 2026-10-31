@@ -22,7 +22,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   elements: function () { return { create: function () { return { mount: function (n) { n.textContent = '[card field]'; } }; } }; },
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
-async function run({ card, mode = "card", returnInfo = null }) {
+async function run({ card, mode = "card", returnInfo = null, exchange = null }) {
   const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
   const posts = [];
   let saved = card;
@@ -35,7 +35,7 @@ async function run({ card, mode = "card", returnInfo = null }) {
     if (!p.startsWith('/relay/')) return route.abort();
     if (req.method() === 'POST') posts.push({ p, body: JSON.parse(req.postData() || '{}') });
     if (p === '/relay/my/purchases') return j(200, { purchases: [{ id: 'o1', store: 'Kick Lane', retailer: 'shopify:kick-lane.myshopify.com', orderedAt: '2026-10-29T10:00:00Z',
-      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: !returnInfo, returnable: false, returnInfo }] }] });
+      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: !returnInfo && !exchange, returnable: false, returnInfo, exchange }] }] });
     if (p === '/relay/my/exchange/options' && mode === 'shopify') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: false, payBy: 'shopify', card: null, options: [
       { key: 'k14', title: 'Large', priceMinor: 2500, quantity: 4, priceDiffMinor: 500, available: true, reason: null, needsCard: false, payBy: 'shopify' }] });
     if (p === '/relay/my/exchange' && mode === 'shopify') return j(200, { exchanged: true, payBy: 'shopify', payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc',
@@ -54,7 +54,7 @@ async function run({ card, mode = "card", returnInfo = null }) {
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  if (!returnInfo) await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
+  if (!returnInfo && !exchange) await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
   return { context, page, posts, errors };
 }
 
@@ -133,4 +133,25 @@ async function run({ card, mode = "card", returnInfo = null }) {
   await w.context.close();
   console.log('PASS return status: refunded, or waiting for the shop');
 }
+
+// 5. After the swap: the extra still to pay the shop, with Shopify's link, until it's paid; then a paid line instead.
+{
+  const { context, page, errors } = await run({ card: null, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc' } } });
+  await page.getByText('£5.00 still to pay Kick Lane for the swap.').waitFor();
+  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane →' });
+  assert.equal(await pay.getAttribute('href'), 'https://kick-lane.myshopify.com/1/invoices/abc');
+  if (process.env.SHOTS) await page.locator('.card.product').first().screenshot({ path: process.env.SHOTS + '/swap-balance-owed.png' });
+  assert.deepEqual(errors, []);
+  await context.close();
+  const n = await run({ card: null, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: null } } });
+  await n.page.getByText("£5.00 still to pay Kick Lane for the swap. Use the link in Kick Lane's email.").waitFor();
+  assert.equal(await n.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
+  await n.context.close();
+  const p = await run({ card: null, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: true, payUrl: null } } });
+  await p.page.getByText('✓ £5.00 difference paid to Kick Lane').waitFor();
+  assert.equal(await p.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
+  await p.context.close();
+  console.log('PASS swap balance: still to pay (with or without link), then paid');
+}
+
 await browser.close(); server.close();

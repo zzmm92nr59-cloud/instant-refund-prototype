@@ -112,6 +112,8 @@ export async function receiveShopifyWebhook(request, env, o = {}) {
     return Response.json({ received: true, ...r });
   }
   if (topic !== "orders/paid") return Response.json({ received: true, ignored: true });
+  // A customer who swapped to a dearer item has paid the balance through the shop's checkout.
+  if (payload) await recordBalancePaid(env, shop, payload).catch(() => 0);
   // Orders are taken from shops set up in the server settings, and from shops that connected themselves to Relay.
   let connected = false;
   try { connected = !!(await db.prepare("SELECT 1 AS x FROM shopify_shops WHERE domain = ?").bind(shop).first()); } catch { connected = false; }
@@ -159,6 +161,19 @@ export async function recordShopRefund(env, shop, refund, now = Date.now()) {
     }
   }
   return { returns, swaps };
+}
+
+// An order the shop's Shopify now says is fully paid: any Relay swap on it waiting for the customer to pay the extra through
+// Shopify ("shopify balance N") is marked paid ("shopify paid N"). Changes nothing else. Returns how many swaps were marked.
+export async function recordBalancePaid(env, shop, order) {
+  const id = String(order && order.id || "");
+  if (!/^\d{1,20}$/.test(id) || String(order.financial_status || "").toLowerCase() !== "paid") return 0;
+  if (order.total_outstanding != null && Number(order.total_outstanding) !== 0) return 0;
+  try {
+    const res = await env.RELAY_DB.prepare("UPDATE relay_exchanges SET detail = 'shopify paid ' || substr(detail, 17) WHERE order_id = ? AND status = 'done' AND detail LIKE 'shopify balance %'")
+      .bind("shopify:" + shop + ":order:" + id).run();
+    return Number(res && res.meta && res.meta.changes) || 0;
+  } catch { return 0; /* no swaps table yet */ }
 }
 
 // Stores one paid Shopify order (webhook or catch-up read). Shape: Shopify's REST order (id, created_at, currency, total_price,

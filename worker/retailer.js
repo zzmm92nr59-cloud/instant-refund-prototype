@@ -166,7 +166,7 @@ async function sendOffer(env, shop, body, o) {
 // return, which the dashboard says in plain words. For a swap to a dearer or cheaper item it is the new item's price
 // (what the shop keeps once the difference is paid or refunded). The difference comes from what Relay recorded on the
 // swap: "paid N" (taken by card, owed to the shop), "paid to shop N" (by card, paid into the shop's Stripe account),
-// "payment not taken N", "shopify balance N" (the customer was asked by Shopify to pay it), "refunded N" (Relay refunded it
+// "payment not taken N", "shopify balance N" (the customer was asked by Shopify to pay it), "shopify paid N" (and has paid it), "refunded N" (Relay refunded it
 // in Shopify) or "shop to refund N".
 export async function shopResults(env, shop) {
   const db = env.RELAY_DB, out = { store: shop.store_label, supported: shop.provider === "shopify", swaps: [], returns: [],
@@ -181,13 +181,13 @@ export async function shopResults(env, shop) {
       LEFT JOIN order_items i ON i.order_id = x.order_id AND i.external_line_item_id = x.line_id
       WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
     out.swaps = rows.map(r => {
-      const m = /^(paid|paid to shop|payment not taken|shopify balance|refunded|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
+      const m = /^(paid|paid to shop|payment not taken|shopify balance|shopify paid|refunded|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
       const diff = !m ? 0 : (m[1] === "shop to refund" || m[1] === "refunded") ? -Number(m[2]) : Number(m[2]);
       const price = Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null;
       return { at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
         valueMinor: price == null ? null : price + (m && m[1] === "payment not taken" ? 0 : diff),
-        priceDiffMinor: diff, differencePaid: !m ? null : (m[1] === "paid" || m[1] === "paid to shop") ? true : m[1] === "payment not taken" ? false : null,
-        differenceHow: !m ? null : { "paid": "card_owed", "paid to shop": "card_to_shop", "payment not taken": "card_failed", "shopify balance": "shopify",
+        priceDiffMinor: diff, differencePaid: !m ? null : (m[1] === "paid" || m[1] === "paid to shop" || m[1] === "shopify paid") ? true : (m[1] === "payment not taken" || m[1] === "shopify balance") ? false : null,
+        differenceHow: !m ? null : { "paid": "card_owed", "paid to shop": "card_to_shop", "payment not taken": "card_failed", "shopify balance": "shopify", "shopify paid": "shopify_paid",
           "refunded": "refunded", "shop to refund": "shop_to_refund" }[m[1]],
         currency: r.currency || "GBP", orderUrl: orderUrl(r.ext) };
     });
