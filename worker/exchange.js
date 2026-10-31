@@ -41,10 +41,26 @@ export async function enrichPurchases(env, purchases, opt = {}) {
   for (const o of purchases) {
     const m = SHOP.exec(String(o.retailer || ""));
     const daysSinceOrder = o.orderedAt ? (now - new Date(o.orderedAt).getTime()) / (1000 * 60 * 60 * 24) : 999;
+    // When Relay swaps an item, Shopify adds the new item to the order as a line of its own, which arrives with the order's next
+    // update. That line is the swapped item already shown on the original line ("swapped to …"), so it isn't shown twice
+    // (and can't be swapped or returned a second time). One hidden line per swap, only a line with no swap of its own.
+    let swappedTo = new Map();
+    if (m) {
+      try {
+        for (const r of ((await db.prepare("SELECT line_id AS line, to_variant AS v FROM relay_exchanges WHERE order_id = ? AND status = 'done'").bind(o.id).all()).results || []))
+          swappedTo.set(String(r.v), { from: String(r.line), left: (swappedTo.get(String(r.v))?.left || 0) + 1 });
+      } catch { swappedTo = new Map(); }
+    }
+    const hide = new Set();
     for (const it of o.items || []) {
       it.exchangeable = false;
       it.returnable = false;
       if (!m || !it.variantId) continue;
+      const sw = swappedTo.get("gid://shopify/ProductVariant/" + it.variantId);
+      if (sw && sw.left > 0 && sw.from !== String(it.lineId)) {
+        const own = await db.prepare("SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done'").bind(o.id, it.lineId).first();
+        if (!own) { sw.left--; hide.add(it); continue; }
+      }
       const v = await db.prepare(`SELECT v.title AS variant, i.image_url AS imageUrl, i.title AS product FROM retailer_catalog_variants v JOIN retailer_catalog_items i ON i.id = v.item_id WHERE v.id = ?`)
         .bind(variantKey(m[1], it.variantId)).first();
       if (v) { it.variant = v.variant && v.variant !== "Default Title" ? v.variant : null; it.imageUrl = v.imageUrl || null; }
@@ -90,6 +106,7 @@ export async function enrichPurchases(env, purchases, opt = {}) {
       if (daysSinceOrder <= RETURN_WINDOW_DAYS && !ex) it.returnable = !ret;
       if (ret) it.exchangeable = false;
     }
+    if (hide.size) o.items = o.items.filter(it => !hide.has(it));
   }
   return purchases;
 }
