@@ -1482,7 +1482,9 @@
     if (!host) return;
     host.textContent = "";
     var s = load(); if (!s || !s.token) return;
-    api("/relay/my/purchases").then(function (r) {
+    // The wallet can be drawn twice as the page settles: both share one request rather than asking the server twice.
+    if (!memo.purchases) memo.purchases = api("/relay/my/purchases").then(function (r) { setTimeout(function () { memo.purchases = null; }, 1500); return r; }, function (e) { memo.purchases = null; throw e; });
+    memo.purchases.then(function (r) {
       var rows = (r.ok && r.body && r.body.purchases) || [];
       if (!rows.length) return;
       host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
@@ -1515,8 +1517,8 @@
               ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + (o.store || "the shop") + (ri.refundedAt ? " on " + new Date(ri.refundedAt).toLocaleDateString("en-GB") : "")
               : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + " · waiting for " + (o.store || "the shop") + " to refund" }));
           }
-          if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { mountConfirmed(host); }); } }));
-          if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { mountConfirmed(host); }); } }));
+          if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
+          if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
           card.appendChild(d); grid.appendChild(card);
         });
       });
