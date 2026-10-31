@@ -212,6 +212,11 @@ assert.equal(await recordBalancePaid(env, SHOP, { id: 701, financial_status: "pa
 balanceLeft = "5.00"; finStatus = "PARTIALLY_PAID";
 console.log("PASS balance paid through Shopify: shown until paid, then marked paid (by Shopify's notification or a check)");
 
+// After a swap the card shows the new item's price (Large £25 instead of Black £20); nothing internal is sent.
+const after = (await enrichPurchases(env, [{ id: o1, retailer: conn, store: "Kick Lane", orderedAt: new Date().toISOString(), items: [{ lineId: "9700", productId: "1", variantId: "11", title: "Logo Cap", priceMinor: 2000 }] }], o))[0].items[0];
+assert.equal(after.priceMinor, 2500); assert.equal(after.exchange.fromPriceMinor, 2000); assert.equal(after.exchange.toVariant, undefined);
+console.log("PASS swapped item shows its new price");
+
 // 6. The app and dashboard words.
 const app = readFileSync("account.js", "utf8"), dash = readFileSync("retailer.html", "utf8");
 assert.match(app, /will update your order and send you a link to pay the/);
