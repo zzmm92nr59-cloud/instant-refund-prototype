@@ -10,7 +10,7 @@
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { labelDeleteStatements } from "./royal-mail.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
-import { ensureOnce } from "./once.js";
+import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
@@ -82,7 +82,7 @@ async function ensureAuthTablesRun(db) {
     ...PASSKEY_TABLE_SQL,
     ...TOTP_TABLE_SQL
   ];
-  for (const sql of statements) await db.prepare(sql).run();
+  await runAll(db, statements);
   await ensureGmailTables(db);
 }
 
