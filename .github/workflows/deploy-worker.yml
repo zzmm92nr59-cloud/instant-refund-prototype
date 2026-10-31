@@ -50,6 +50,7 @@ jobs:
           node scripts/test-price-diff-swaps.mjs
           node --check worker/shop-payments.js
           node scripts/test-shop-payments.mjs
+          node scripts/test-once.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs
           node --check worker/royal-mail.js
