@@ -11,7 +11,7 @@
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
-import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
@@ -36,12 +36,14 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 24, FETCH_PARALLEL = 6;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 11;
+const PARSER_VERSION = 12;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
-  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR "QR code"))';
+  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR "QR code"))' +
+  // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
+  ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped)';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
 const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;
@@ -259,8 +261,14 @@ function classify(rawText, id, lenient = false) {
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
   // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
   const ret = parseReturnEmail(rawText);
-  const receipt = ret.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
-  if (ret.ok) {
+  const del = ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
+  const receipt = ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  if (del.ok) {
+    details = {
+      kind: "delivery_update", gmailId: id, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
+      merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+    };
+  } else if (ret.ok) {
     details = {
       kind: "return_instructions", gmailId: id,
       retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
@@ -274,7 +282,7 @@ function classify(rawText, id, lenient = false) {
       kind: "receipt", gmailId: id,
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, currency: receipt.currency,
       totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
-      needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns,
+      needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else {
@@ -487,8 +495,83 @@ async function saveImage(env, shopperId, img, now) {
     .bind(img.receiptId, shopperId, img.type, img.data, now).run();
 }
 
+// Newest purchase first by the date on the order, not by when Relay happened to read the email
+// (reading older mail later must never push this week's orders out of the list).
+const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().slice(0, 10);
+
+// One order often arrives as several emails (confirmation, "we're shipping it", ...). They become one card:
+// the most complete email leads and the others fill in what it lacks (price, size, tracking, returns link).
+export function mergeOrderEmails(orders) {
+  const out = [], groups = new Map();
+  for (const o of orders) {
+    const k = o.orderRef ? storeKey(o) + "|" + String(o.orderRef).toUpperCase() : null;
+    if (!k) { out.push(o); continue; }
+    if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }
+    groups.get(k).push(o);
+  }
+  const score = (o) => (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
+  return out.map(g => {
+    if (!Array.isArray(g)) return g;
+    if (g.length === 1) return g[0];
+    const [lead, ...rest] = g.slice().sort((a, b) => score(b) - score(a) || a.createdAt - b.createdAt);
+    const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
+    for (const o of rest) {
+      if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = c.currency || o.currency; }
+      if (!c.orderDate && o.orderDate) c.orderDate = o.orderDate;
+      if (!c.items.length && (o.items || []).length) c.items = o.items.map(i => ({ ...i }));
+      for (const it of c.items) {
+        const twin = (o.items || []).find(x => x.name === it.name);
+        if (!twin) continue;
+        if (it.pricePence == null && twin.pricePence != null) it.pricePence = twin.pricePence;
+        if (!it.variant && twin.variant) it.variant = twin.variant;
+      }
+      if (o.shipment && o.shipment.trackingNumber && !(c.shipment && c.shipment.trackingNumber)) c.shipment = o.shipment;
+      if (o.returns) {
+        const r = c.returns || (c.returns = {});
+        for (const f of ["windowDays", "windowFrom", "deadline", "address", "portalUrl"]) if (r[f] == null && o.returns[f] != null) r[f] = o.returns[f];
+        if (!(r.instructions || []).length && (o.returns.instructions || []).length) r.instructions = o.returns.instructions;
+        r.qrMentioned = Boolean(r.qrMentioned || o.returns.qrMentioned); r.labelMentioned = Boolean(r.labelMentioned || o.returns.labelMentioned);
+      }
+    }
+    return c;
+  });
+}
+
+// Parcel updates join the purchase they belong to: by tracking number, then order number, then (for a carrier's
+// "your parcel from <shop>") the most recent order from that shop placed in the month before. The furthest-along update wins.
+const STAGE = { shipped: 1, in_transit: 2, due: 3, out_for_delivery: 4, delivered: 5 };
+const letters = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+export function attachDeliveries(orders, deliveries) {
+  for (const o of orders) {
+    const t = o.shipment && o.shipment.trackingNumber;
+    let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
+    for (const d of deliveries) {
+      let hit = (t && d.trackingNumber && d.trackingNumber === t) || (d.orderRef && o.orderRef && String(d.orderRef).toUpperCase() === String(o.orderRef).toUpperCase() && (!d.retailer || storeKey(d) === storeKey(o)));
+      if (!hit && !d.trackingNumber && d.merchant && o.orderDate && d.at) {
+        const word = letters(d.merchant.split(/\s+/)[0]);
+        const days = (Date.parse(d.at) - Date.parse(o.orderDate)) / 86400000;
+        hit = word.length >= 3 && (letters(o.retailer && o.retailer.name).includes(word) || storeKey(o).includes(word)) && days >= 0 && days <= 31 &&
+          !orders.some(p => p !== o && storeKey(p) === storeKey(o) && p.orderDate > o.orderDate && p.orderDate <= d.at);
+      }
+      if (!hit) continue;
+      if (!best || (STAGE[d.status] || 0) > (STAGE[best.status] || 0) || ((STAGE[d.status] || 0) === (STAGE[best.status] || 0) && (d.at || "") > (best.at || ""))) {
+        best = { status: d.status, at: d.at || null, carrier: d.carrier || (best && best.carrier) || null, trackingNumber: d.trackingNumber || (best && best.trackingNumber) || null };
+      } else if (best && !best.carrier && d.carrier) best.carrier = d.carrier;
+    }
+    if (!best) continue;
+    best.trackUrl = trackingLink(best.carrier, best.trackingNumber);
+    o.delivery = best;
+    // When the email gives no return deadline, show the least UK law allows for online orders: 14 days after delivery to tell the shop.
+    const r = o.returns || {};
+    if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays) {
+      const d = new Date(Date.parse(best.at) + 14 * 86400000);
+      if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "uk_law" };
+    }
+  }
+}
+
 async function listReceipts(env, shopperId, timing, opts = {}) {
-  const maxRows = opts.rows || 300, maxCards = opts.cards || 100;
+  const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
   const rows = await env.RELAY_DB.prepare(
     "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT " + maxRows)
@@ -496,8 +579,9 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   lap("rowsMs"); if (timing) timing.rowCount = (rows.results || []).length;
   const all = (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
   lap("parseMs");
-  const orders = all.filter(x => x.kind !== "return_instructions");
   const plans = all.filter(x => x.kind === "return_instructions");
+  const deliveries = all.filter(x => x.kind === "delivery_update");
+  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update"));
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.map(storeKey).filter(Boolean))];
@@ -514,6 +598,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
+  attachDeliveries(orders, deliveries);
   for (const p of plans) {
     if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
     const o = p.orderRef && byOrder.get(p.orderRef);
@@ -521,7 +606,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     if (o) o.returnPlan = p;
   }
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
-  const cards = [...orders];
+  // An order the shopper dismissed stays hidden even when the shop sent other emails about it.
+  const cards = orders.filter(o => !(o.orderRef && dismissedRefs.has(o.orderRef)));
   for (const c of cards) { const r = remById.get(c.id); c.reminder = r ? (r.sentAt ? "sent" : "on") : "off"; }
   // What the app has been taught. A shopper's own choice always wins. Otherwise a category is used only when at least two
   // different shoppers chose it for the same store and it clearly leads, so one person's mistake never changes anyone else's list.
@@ -539,7 +625,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
     const l = mine.get(storeKey(c));
     return !(l && l.promo && !c.orderRef && c.kind !== "return_instructions");
-  }).sort((a, b) => b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
+  }).sort((a, b) => whenOf(b).localeCompare(whenOf(a)) || b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
     const k = storeKey(c), l = mine.get(k);
     const learned = (l && l.category) || crowdPick(k) || null;
     return { ...c, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
