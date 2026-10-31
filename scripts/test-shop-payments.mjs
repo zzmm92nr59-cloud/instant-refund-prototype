@@ -217,6 +217,17 @@ const after = (await enrichPurchases(env, [{ id: o1, retailer: conn, store: "Kic
 assert.equal(after.priceMinor, 2500); assert.equal(after.exchange.fromPriceMinor, 2000); assert.equal(after.exchange.toVariant, undefined);
 console.log("PASS swapped item shows its new price");
 
+// Shopify adds the swapped-to item as a new line on the order (it arrives with the order's next update). It isn't shown again.
+const both = (await enrichPurchases(env, [{ id: o1, retailer: conn, store: "Kick Lane", orderedAt: new Date().toISOString(), items: [
+  { lineId: "9700", productId: "1", variantId: "11", title: "Logo Cap", priceMinor: 2000 },
+  { lineId: "9799", productId: "1", variantId: "14", title: "Logo Cap", priceMinor: 2500 }] }], o))[0].items;
+assert.deepEqual(both.map(i => [i.lineId, i.variant, i.priceMinor]), [["9700", "Large", 2500]]);
+// A second Large bought on its own on another order is still shown.
+const other = order(704);
+const otherItems = (await enrichPurchases(env, [{ id: other, retailer: conn, orderedAt: new Date().toISOString(), items: [{ lineId: "9704", productId: "1", variantId: "14", title: "Logo Cap", priceMinor: 2500 }] }], o))[0].items;
+assert.equal(otherItems.length, 1);
+console.log("PASS the swapped-to line Shopify adds isn't shown twice");
+
 // 6. The app and dashboard words.
 const app = readFileSync("account.js", "utf8"), dash = readFileSync("retailer.html", "utf8");
 assert.match(app, /will update your order and send you a link to pay the/);
