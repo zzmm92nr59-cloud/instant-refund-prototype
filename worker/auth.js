@@ -320,19 +320,28 @@ async function listPurchases(env, shopper, orderId) {
             o.amount_minor AS amountMinor, o.currency AS currency, o.status AS status
      FROM retailer_orders o JOIN retailer_order_emails e ON e.order_id = o.id
      WHERE e.email_hash = ? ${where} ORDER BY o.ordered_at DESC LIMIT 100`).bind(...params).all();
+  // Order lines and shop names for all the orders at once (asking once per order was slow).
+  const list = orders.results || [];
+  const lines = new Map(), labels = new Map();
+  for (let i = 0; i < list.length; i += 90) {
+    const ids = list.slice(i, i + 90).map(o => o.id);
+    const rows = (await env.RELAY_DB.prepare(`SELECT order_id AS orderId, external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity,
+        price_minor AS priceMinor, currency FROM order_items WHERE order_id IN (${ids.map(() => "?").join(",")}) ORDER BY title`).bind(...ids).all()).results || [];
+    for (const r of rows) { const { orderId, ...line } = r; if (!lines.has(orderId)) lines.set(orderId, []); if (lines.get(orderId).length < 100) lines.get(orderId).push(line); }
+  }
+  const domains = [...new Set(list.map(o => (/^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(o.retailer || "")) || [])[1]).filter(Boolean))];
+  if (domains.length) {
+    try {
+      for (const r of (await env.RELAY_DB.prepare(`SELECT domain, label FROM shopify_shops WHERE domain IN (${domains.map(() => "?").join(",")})`).bind(...domains).all()).results || [])
+        labels.set(r.domain, r.label);
+    } catch { /* no connected shops table yet: shop addresses are used */ }
+  }
   const result = [];
-  for (const order of orders.results || []) {
-    const items = await env.RELAY_DB.prepare(
-      `SELECT external_line_item_id AS lineId, product_id AS productId, variant_id AS variantId, title, quantity, price_minor AS priceMinor, currency FROM order_items WHERE order_id = ?
-       ORDER BY title LIMIT 100`).bind(order.id).all();
+  for (const order of list) {
     // The shop's name for orders from Shopify shops that connected themselves (their address otherwise).
-    let store = null;
     const m = /^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(order.retailer || ""));
-    if (m) {
-      try { store = (await env.RELAY_DB.prepare("SELECT label FROM shopify_shops WHERE domain = ?").bind(m[1]).first())?.label || null; } catch { store = null; }
-      store = store || m[1].replace(/\.myshopify\.com$/, "");
-    }
-    result.push({ ...order, store, ownership: "retailer_email_matched", items: items.results || [] });
+    const store = m ? (labels.get(m[1]) || m[1].replace(/\.myshopify\.com$/, "")) : null;
+    result.push({ ...order, store, ownership: "retailer_email_matched", items: lines.get(order.id) || [] });
   }
   return result;
 }
