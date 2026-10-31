@@ -11,7 +11,7 @@
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
-import { parseReceiptEmail, parseReturnEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
@@ -38,12 +38,12 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // writes them in one database batch, and stops early (saying there is more) if it gets near either limit.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 5, CALL_BUDGET = 36;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 13;
+const PARSER_VERSION = 14;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
-  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR "QR code"))' +
+  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped)';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
@@ -307,10 +307,16 @@ function classify(rawText, id, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
   // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
-  const ret = parseReturnEmail(rawText);
-  const del = ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
-  const receipt = ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
-  if (del.ok) {
+  const upd = parseReturnUpdateEmail(rawText);
+  const ret = upd.ok ? { ok: false } : parseReturnEmail(rawText);
+  const del = upd.ok || ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
+  const receipt = upd.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  if (upd.ok) {
+    details = {
+      kind: "return_update", gmailId: id, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
+      orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+    };
+  } else if (del.ok) {
     details = {
       kind: "delivery_update", gmailId: id, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
       merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
@@ -320,7 +326,7 @@ function classify(rawText, id, lenient = false) {
       kind: "return_instructions", gmailId: id,
       retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
       deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
-      estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl,
+      estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl, trackingNumber: ret.trackingNumber || null,
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (receipt.ok) {
@@ -629,6 +635,31 @@ export function attachDeliveries(orders, deliveries) {
   }
 }
 
+// Where a return has got to: the return parcel (carrier emails about its tracking number) and the shop's own
+// "we've received your return" / "your refund has been processed" emails, matched by order number.
+export function attachReturnProgress(orders, deliveries, updates) {
+  for (const o of orders) {
+    const plan = o.returnPlan || null;
+    const t = plan && plan.trackingNumber;
+    const ref = o.orderRef ? String(o.orderRef).toUpperCase() : null;
+    let parcel = null;
+    if (t) for (const d of deliveries) {
+      if (d.trackingNumber !== t) continue;
+      if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
+    }
+    const mine = ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [];
+    const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
+    const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
+    if (!parcel && !received && !refunded && !t) continue;
+    o.returnProgress = {
+      trackingNumber: t || null, carrier: (parcel && parcel.carrier) || (plan && plan.carrier) || null,
+      trackUrl: t ? trackingLink((parcel && parcel.carrier) || (plan && plan.carrier) || null, t) : null,
+      parcel, receivedAt: received ? received.at : null,
+      refundedAt: refunded ? refunded.at : null, refundPence: refunded ? refunded.amountPence : null, currency: refunded ? refunded.currency : null
+    };
+  }
+}
+
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
@@ -640,7 +671,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   lap("parseMs");
   const plans = all.filter(x => x.kind === "return_instructions");
   const deliveries = all.filter(x => x.kind === "delivery_update");
-  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update"));
+  const updates = all.filter(x => x.kind === "return_update");
+  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update"));
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.map(storeKey).filter(Boolean))];
@@ -664,6 +696,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
     if (o) o.returnPlan = p;
   }
+  attachReturnProgress(orders, deliveries, updates);
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
   // An order the shopper dismissed stays hidden even when the shop sent other emails about it.
   const cards = orders.filter(o => !(o.orderRef && dismissedRefs.has(o.orderRef)));
