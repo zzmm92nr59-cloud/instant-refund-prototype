@@ -520,6 +520,8 @@
       card.appendChild(rb);
     }
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);
+    var prog = x.returnProgress || null;
+    if (!rp && prog) rp = {};
     if (rp) {
       var pb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
       pb.appendChild(el("b", { text: "Your return", style: "display:block;margin-bottom:4px" }));
@@ -527,6 +529,23 @@
       if (rp.deadline) {
         var past = rp.deadline < new Date().toISOString().slice(0, 10);
         pl((past ? "Deadline passed: " : "Return by ") + new Date(rp.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }), past ? "opacity:.7" : "font-weight:600");
+      }
+      if (prog) {
+        // Where the return has got to, step by step. Each step comes from an email; Relay can't confirm the refund itself.
+        var shortDay = function (d) { return d ? " · " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; };
+        var pc = prog.parcel, arrived = Boolean(prog.receivedAt || prog.refundedAt || (pc && pc.status === "delivered"));
+        var steps = [
+          ["Sent back", Boolean(pc || arrived), pc && pc.status !== "delivered" ? shortDay(pc.at) : ""],
+          ["Arrived at " + who, arrived, shortDay(prog.receivedAt || (pc && pc.status === "delivered" ? pc.at : null))],
+          [prog.refundPence != null ? "Refund of " + money(prog.refundPence, prog.currency || "GBP") + " processed" : "Refund processed", Boolean(prog.refundedAt), shortDay(prog.refundedAt)]
+        ];
+        var track = el("div", { style: "margin:6px 0 4px" });
+        steps.forEach(function (st) {
+          track.appendChild(el("span", { text: (st[1] ? "✓ " : "○ ") + st[0] + (st[1] ? st[2] : ""), style: "display:block;margin-top:2px;" + (st[1] ? "font-weight:600;color:#46601b" : "opacity:.65") }));
+        });
+        pb.appendChild(track);
+        if (prog.trackUrl && !rp.trackUrl && /^https:\/\//.test(prog.trackUrl)) pb.appendChild(el("a", { href: prog.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track your return parcel →", style: "display:block;margin:2px 0 4px;font-weight:600" }));
+        if (prog.refundedAt) pl("The refund comes from " + who + "'s email. Allow a few days for it to show on your statement.", "font-size:13px;opacity:.8");
       }
       if (rp.carrier) pl("Drop off with " + rp.carrier);
       if (rp.returnId) pl("Return ID: " + rp.returnId);
