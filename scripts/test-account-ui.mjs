@@ -57,7 +57,10 @@ await context.route('https://**/*', route => {
   if (p === '/relay/my/consent/withdraw') { consentAccepted = false; gmailConnected = false; return j(200, { ok: true }); }
   if (p === '/relay/my/gmail') return j(200, gmailConnected ? { connected: true, googleEmail: 'alice@gmail.com' } : { connected: false });
   if (p === '/relay/my/gmail/connect') return j(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=mock' });
-  if (p === '/relay/my/gmail/scan') { const b = JSON.parse(req.postData() || '{}'); scanBodies.push(b); return b.cursor ? j(200, { ok: true, added: 0, more: false, cursor: null }) : j(200, { ok: true, added: 1, more: true, cursor: '2026/05/01', scannedBack: '2026/05/01' }); }
+  if (p === '/relay/my/gmail/scan') { const b = JSON.parse(req.postData() || '{}'); scanBodies.push(b);
+    // The round after the first is "busy" once (as Cloudflare's limits can make it); the app must wait and carry on from the same place.
+    if (b.cursor && scanBodies.filter(x => x.cursor).length === 1) return j(503, { error: 'scan_busy', retryAfterMs: 3000 });
+    return b.cursor ? j(200, { ok: true, added: 0, more: false, cursor: null }) : j(200, { ok: true, added: 1, more: true, cursor: '2026/05/01', scannedBack: '2026/05/01' }); }
   if (p === '/relay/my/gmail/disconnect') { gmailConnected = false; return j(200, { ok: true }); }
   if (p === '/relay/my/gmail/find') { findBodies.push(JSON.parse(req.postData())); return j(200, { results: [{ id: 'm77abcdef', subject: '<img src=x onerror=window.__xss9=1>Thanks for your lululemon order', from: 'lululemon', date: '2025-11-19', added: false }, { id: 'm78abcdef', subject: 'New arrivals', from: 'lululemon', date: '2025-11-20', added: false }] }); }
   if (p === '/relay/my/gmail/add') { const b = JSON.parse(req.postData()); addBodies.push(b); return b.messageId === 'm77abcdef' ? j(200, { ok: true, kind: 'receipt', store: 'lululemon', orderRef: 'UK04002516' }) : j(200, { ok: false, reason: 'not_recognised', signals: { subject: false, body: false } }); }
@@ -281,7 +284,8 @@ await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found or updated 1 receipt').waitFor();
 assert.ok(await page.evaluate(() => { const m = [...document.querySelectorAll('.rl-msg')].find(e => /Found or updated/.test(e.textContent)); const b = [...document.querySelectorAll('button')].find(e => /Check for new receipts|Scan my Gmail/.test(e.textContent)); return m && b && (b.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'scan status sits next to the Scan button');
 assert.equal(await page.evaluate(() => localStorage.getItem('relay_scan_cursor')), null, 'saved scan position cleared once finished');
-assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }], 'the app follows the cursor back through the mailbox');
+assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }, { cursor: '2026/05/01' }], 'the app follows the cursor back through the mailbox, retrying a busy round from the same place');
+console.log('PASS a busy scan round is retried from the same place, not reported as "Couldn\'t reach Relay"');
 await page.getByPlaceholder('Search your receipts').fill('wool');
 assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1, 'search finds the item');
 await page.getByPlaceholder('Search your receipts').fill('lululemon');

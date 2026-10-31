@@ -577,7 +577,10 @@
       var lastScan = r.body.lastScanAt ? new Date(r.body.lastScanAt) : null;
       var scanBtn = el("button", { className: "rl-btn", text: lastScan ? "Check for new receipts" : "Scan my Gmail for receipts" });
       var status = el("div", { className: "rl-msg" });
-      if (lastScan) status.textContent = "Your receipts are saved. Last checked " + lastScan.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + ".";
+      var autoAt = r.body.autoAt ? new Date(r.body.autoAt) : null;
+      var checked = autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
+      var when = function (d) { return d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
+      status.textContent = "Relay checks your Gmail for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
       search.addEventListener("input", function () { var was = Boolean(query); query = search.value.trim().toLowerCase(); if (was !== Boolean(query)) drawList(); else applyFilter(); });
@@ -698,10 +701,23 @@
       var doScan = function (full) {
         scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
         var added = 0, rounds = 0, saved = ""; try { saved = localStorage.getItem("relay_scan_cursor") || ""; } catch (e) {}
+        var tries = 0;
+        // A round that fails (Gmail or Relay busy for a moment) is tried again a few seconds later from the same place.
+        function retry(cursor) {
+          tries++;
+          if (tries > 3) {
+            scanBtn.disabled = false;
+            try { if (cursor) localStorage.setItem("relay_scan_cursor", cursor); } catch (e) {}
+            return say(status, (added ? "Found or updated " + added + " so far. " : "") + "Gmail is busy right now. Your place is saved: tap the button again in a minute to carry on.", true);
+          }
+          say(status, "Gmail is busy, trying again…" + (added ? " " + added + " found so far" : ""));
+          return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(cursor); });
+        }
         function step(cursor) {
           return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}) }).then(function (x) {
             if (x.status === 401) { scanBtn.disabled = false; return say(status, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
-            if (!x.ok) { scanBtn.disabled = false; return say(status, "Couldn't scan Gmail right now. Please try again.", true); }
+            if (!x.ok) return retry(cursor);
+            tries = 0;
             added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
             loadList();
             try { if (x.body.more && x.body.cursor) localStorage.setItem("relay_scan_cursor", x.body.cursor); else localStorage.removeItem("relay_scan_cursor"); } catch (e) {}
@@ -713,9 +729,10 @@
             }
             scanBtn.disabled = false; memo.gmail = null;
             say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
-          });
+          // A dropped connection is treated like a busy round: wait, then carry on from the same place.
+          }, function () { return retry(cursor); });
         }
-        step(full ? "" : saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay.", true); });
+        step(full ? "" : saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
       scanBtn.onclick = function () { doScan(false); };
       box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); loadList();
@@ -1630,7 +1647,9 @@
     }
     draw();
   }
-  window.RelayAccount = { mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); } };
+  window.RelayAccount = { mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+    // Orders the shop confirmed (shares the wallet's request when one is already on its way).
+    purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

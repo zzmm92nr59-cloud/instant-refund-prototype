@@ -281,10 +281,13 @@ function wallet(){
 // In-store and email-receipt purchases: read from the shopper's own scanned receipts (shopper-supplied evidence, never a verified refund).
 function loadReceiptPurchases(){
  const box=$("receiptPurchases");if(!box||!window.RelayAccount)return;if(!RelayAccount.signedIn()){box.appendChild(Object.assign(document.createElement("div"),{className:"card",innerHTML:'<h3>Bring in your email receipts</h3><p class="sub">Sign in to add purchases from your email, including in-store ones.</p>'}));const b=Object.assign(document.createElement("button"),{className:"darkbtn",textContent:"Sign in or connect Gmail →",onclick:()=>RelayAccount.open()});box.firstChild.appendChild(b);return}
- RelayAccount.receipts().then(r=>{
+ Promise.all([RelayAccount.receipts(),RelayAccount.purchases?RelayAccount.purchases():Promise.resolve([])]).then(([r,shopOrders])=>{
   const host=$("receiptPurchases");if(!host||!r.ok)return;
   const known=new Set((real||[]).map(p=>String(p.orderId||"").replace(/^#/,"").toLowerCase()).filter(Boolean));
-  const rows=((r.body&&r.body.receipts)||[]).filter(x=>x.kind!=="return_instructions"&&x.totalPence!=null&&!(x.orderRef&&known.has(String(x.orderRef).replace(/^#/,"").toLowerCase())));
+  // An email receipt for an order the shop already confirmed (same shop, same amount) is shown once, under "Confirmed by the shop".
+  const label=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g,"");
+  const confirmed=new Set((shopOrders||[]).map(o=>label(o.store)+"|"+o.amountMinor));
+  const rows=((r.body&&r.body.receipts)||[]).filter(x=>x.kind!=="return_instructions"&&x.totalPence!=null&&!(x.orderRef&&known.has(String(x.orderRef).replace(/^#/,"").toLowerCase()))&&!confirmed.has(label(x.retailer&&x.retailer.name)+"|"+x.totalPence));
   host.textContent="";if(!rows.length)return;
   const mk=(t,props,kids)=>{const n=document.createElement(t);Object.assign(n,props||{});(kids||[]).forEach(k=>n.appendChild(k));return n};
   host.appendChild(mk("div",{className:"sectionhead"},[mk("h2",{textContent:"From your receipts"}),mk("span",{className:"pill",textContent:rows.length+" found"})]));
@@ -301,7 +304,7 @@ function loadReceiptPurchases(){
    return mk("div",{className:"card product purchase-tile",role:"button",tabIndex:0,onclick:()=>go("receipts")},[mk("div",{className:"details"},[
     mk("div",{className:"eyebrow",textContent:who.toUpperCase()}),
     mk("h3",{textContent:names}),
-    mk("div",{className:"small muted",textContent:(x.orderDate||"Date not found")+(dl?" · return by "+(dl===legal?"at least ":"")+fmt(dl):"")}),
+    mk("div",{className:"small muted",textContent:(x.orderDate?fmt(x.orderDate):"Date not found")+(dl?" · return by "+(dl===legal?"at least ":"")+fmt(dl):"")}),
     mk("div",{className:"price",textContent:"£"+(x.totalPence/100).toFixed(2)}),
     mk("span",{className:"relay-status ordered",textContent:note}),
     mk("div",{className:"tile-arrow",textContent:"See in Receipts →"})])]);

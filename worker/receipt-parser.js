@@ -446,6 +446,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const consistent = result.totalPence == null || !result.items.length || itemSum <= ceiling + 1;
   result.confidence = score >= 5 && consistent ? "high" : score >= 3 && consistent ? "medium" : "low";
   result.needsShopperConfirmation = result.confidence !== "high";
+  // No date in the text: the day the shop sent the email is the best guess (used for sorting and display, never for confidence).
+  if (!result.orderDate && refDate && !Number.isNaN(refDate.getTime())) { result.orderDate = isoDate(refDate); result.orderDateFrom = "email"; }
   return result;
 }
 

@@ -106,3 +106,11 @@ console.log("ok - a parcel without a tracking number goes to the newest matching
 assert.equal(trackingLink("Royal Mail", "JK000000001GB"), "https://www.royalmail.com/track-your-item#/tracking-results/JK000000001GB");
 assert.equal(trackingLink("Royal Mail", "bad number!"), null); assert.equal(trackingLink(null, "JK000000001GB"), null);
 console.log("ok - tracking links");
+
+// 6. An order email with no date in its text takes the day it was sent (marked as such), without raising confidence.
+const undated = mime({ from: '"Kick Lane" <store+1@g.shopifyemail.com>', subject: "Order #1003 confirmed", date: "Sat, 31 Oct 2026 10:15:00 +0000",
+  plain: "Thank you for your purchase!\r\nOrder #1003\r\nCloud Runner Trainers × 1 £110.00\r\nTotal £110.00", htmlLines: ["Thank you for your purchase!", "Order #1003", "Cloud Runner Trainers × 1", "£110.00", "Total", "£110.00"] });
+const u = parseReceiptEmail(undated);
+assert.equal(u.ok, true); assert.equal(u.orderDate, "2026-10-31"); assert.equal(u.orderDateFrom, "email");
+assert.equal(order.orderDate, "2026-10-30", "a date in the text still wins");
+console.log("ok - undated order emails use the day they were sent");
