@@ -11,7 +11,7 @@
 
 const DAY = 24 * 60 * 60 * 1000;
 import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
-import { ensureOnce } from "./once.js";
+import { ensureOnce, runAll } from "./once.js";
 import { categorise, storeKey } from "./receipt-category.js";
 
 // What can be resold: physical goods only. Food & drink, travel and digital purchases can't be handed to
@@ -55,7 +55,7 @@ async function ensureResaleTablesRun(db) {
        id TEXT PRIMARY KEY, request_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL)`,
     ...ADMIN_TABLE_SQL
   ];
-  for (const sql of statements) await db.prepare(sql).run();
+  await runAll(db, statements);
 }
 
 const MY_REQUESTS = "(SELECT q.id FROM resale_requests q WHERE q.asker_id = ? UNION SELECT q.id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE l.seller_id = ?)";
