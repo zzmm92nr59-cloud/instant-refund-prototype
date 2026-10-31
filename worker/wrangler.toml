@@ -17,3 +17,9 @@ migrations_dir = "migrations"
 
 [triggers]
 crons = ["0 * * * *", "7,22,37,52 * * * *"]
+
+# Server logs (Workers Logs), so errors and slow requests can be looked into. Logs hold request paths and
+# Relay's own console lines, which never include tokens or email text.
+[observability]
+enabled = true
+head_sampling_rate = 1
