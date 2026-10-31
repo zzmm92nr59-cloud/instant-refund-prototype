@@ -39,7 +39,8 @@
       .then(function (b) { return b && /^image\//.test(b.type) ? URL.createObjectURL(b) : null; }).catch(function () { return null; });
   }
   function deadlineOf(x) {
-    return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) || null;
+    return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) ||
+      (x.returnBy && x.returnable !== false && x.returnBy.date) || null;
   }
   function daysLeft(dl) {
     if (!dl || !/^\d{4}-\d{2}-\d{2}$/.test(dl)) return null;
@@ -451,7 +452,7 @@
   }
   function receiptCard(x, refresh, slim) {
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
-    var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name; }).join(", ");
+    var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
       el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (x.orderDate ? " · " + x.orderDate : "") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
@@ -460,6 +461,18 @@
       card.insertBefore(ph, card.firstChild);
       apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
     }
+    var dv = x.delivery;
+    if (!slim && dv && dv.status) {
+      var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
+      var today = new Date().toISOString().slice(0, 10);
+      var said = dv.status === "delivered" ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "") :
+        dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? (dv.at && dv.at !== today ? "Due " + day(dv.at) : "Due today") : "On its way";
+      var dl = el("div", { style: "clear:both;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px" }, [
+        el("span", { text: (dv.status === "delivered" ? "✓ " : "📦 ") + said + (dv.carrier ? " · " + dv.carrier : ""),
+          style: "font-weight:700;padding:4px 10px;border-radius:999px;background:" + (dv.status === "delivered" ? "#e3f4c8;color:#46601b" : "#e7eefc;color:#1d3f8a") })]);
+      if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel →", style: "font-weight:600" }));
+      card.appendChild(dl);
+    }
     if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:#ece8dd;color:#5b6475" }));
     var left = daysLeft(deadlineOf(x));
     if (left !== null) {
@@ -467,7 +480,7 @@
         left <= 2 ? [left + " day" + (left === 1 ? "" : "s") + " left", "#fde0dd", "#b3261e"] :
         left <= 7 ? [left + " days left", "#ffefc9", "#77520a"] : [left + " days left", "#e3f4c8", "#46601b"];
       card.appendChild(el("span", { text: pill[0], style: "display:inline-block;margin-top:6px;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:" + pill[1] + ";color:" + pill[2] }));
-      if (left >= 0 && x.id && x.reminder) {
+      if (left >= 0 && x.id && x.reminder && !(x.returnBy && deadlineOf(x) === x.returnBy.date)) {
         var rem = el("button", { className: "rl-btn ghost", style: "margin-top:8px;padding:9px 14px;font-size:14px", disabled: x.reminder === "sent",
           text: x.reminder === "on" ? "Reminder set · turn off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before",
           onclick: function () { rem.disabled = true;
@@ -482,19 +495,26 @@
     if (x.id && /^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") && openOriginal) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "View original receipt", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openOriginal(x.id); } }));
     }
-    var rt = x.returns;
+    var legal = x.returnBy && x.returnable !== false && x.returnBy.basis === "uk_law" ? x.returnBy.date : null;
+    var rt = x.returns || (legal ? {} : null);
     if (rt) {
       var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
       rb.appendChild(el("b", { text: "Returns", style: "display:block;margin-bottom:4px" }));
       var line = function (t) { rb.appendChild(el("span", { text: t, style: "display:block;margin-top:2px" })); };
       if (rt.deadline) line("Return by " + new Date(rt.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }));
       else if (rt.windowDays) line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery (check your delivery date)" : ""));
+      else if (legal) {
+        rb.appendChild(el("span", { text: "Tell " + who + " by " + new Date(legal + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }) + " if you want to send it back",
+          style: "display:block;margin-top:2px;font-weight:600" }));
+        rb.appendChild(el("span", { text: "The email doesn't give a return window, so this is the least UK law allows for online orders: 14 days from delivery. " + who + " may allow longer.",
+          style: "display:block;margin-top:2px;font-size:13px;opacity:.8" }));
+      }
       if (rt.address) line("Send to: " + rt.address);
       (rt.instructions || []).forEach(function (t) { line("“" + t + "”"); });
       if (rt.qrMentioned) line("This email mentions a QR code. Tap “View original receipt” to see it.");
       else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Tap “View original receipt” to see it.");
       if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
-        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return on the store's site", style: "display:block;margin-top:6px;font-weight:600" }));
+        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return with " + who + " →", style: "display:block;margin-top:6px;font-weight:600" }));
       }
       rb.appendChild(el("span", { text: "Read from the email. Check it matches the store's own policy.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
       card.appendChild(rb);
