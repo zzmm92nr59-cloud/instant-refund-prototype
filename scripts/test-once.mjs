@@ -34,3 +34,12 @@ import { runAll } from "../worker/once.js";
   assert.deepEqual(fell, ["A", "B"], "falls back to one at a time");
   console.log("once: batched set-up checks passed");
 }
+
+// On Cloudflare (recognised by its own name, even when its runtime also says "node") the safe mode is on by default.
+Object.defineProperty(globalThis, "navigator", { value: { userAgent: "Cloudflare-Workers" }, configurable: true });
+const cf = await import("../worker/once.js?cloudflare");
+const stuckDb = {};
+cf.ensureOnce(stuckDb, "cf-key", () => new Promise(() => {}));   // an abandoned request's set-up that never finishes
+const next = await Promise.race([cf.ensureOnce(stuckDb, "cf-key", async () => "ran"), new Promise(r => setTimeout(() => r("hung"), 500))]);
+assert.equal(next, "ran", "on Cloudflare a later request never waits on another request's unfinished set-up");
+console.log("ok - Cloudflare is recognised by name, so a stuck set-up never blocks the next request");

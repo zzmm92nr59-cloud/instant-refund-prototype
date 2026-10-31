@@ -117,6 +117,12 @@ sqlite.prepare("UPDATE shopper_consents SET withdrawn_at = NULL").run();
 sqlite.prepare("DELETE FROM captured_receipts").run();
 sqlite.prepare("UPDATE gmail_connections SET last_scan_at = NULL, auto_at = NULL, auto_cursor = NULL").run();
 let runs = 0;
-while (count() < 122 && runs < 40) { clock += 15 * 60 * 1000; await autoScanGmail(env, clock, fetchImpl); runs++; }
+while (count() < 122 && runs < 80) { clock += 15 * 60 * 1000; await autoScanGmail(env, clock, fetchImpl); runs++; }
 assert.equal(count(), 122, "the whole mailbox is read by the automatic checks alone");
 console.log(`ok - automatic checks alone read the whole mailbox (${runs} runs)`);
+
+// 6. A retry after a round ran out of time asks for a small round: at most 2 emails are read.
+sqlite.prepare("DELETE FROM captured_receipts").run();
+const small = await (await post("/relay/my/gmail/scan", alice, { small: true })).json();
+assert.ok(small.added <= 2 && small.more === true, "small round reads at most 2 emails: " + small.added);
+console.log("ok - a retry asks for a small round (at most 2 emails)");

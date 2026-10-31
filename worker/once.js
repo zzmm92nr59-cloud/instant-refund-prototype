@@ -8,10 +8,12 @@
 // Under Node (our tests, which make many throw-away databases) it is remembered per database object, as before.
 const done = new WeakMap();
 const finished = new Set();
-const underNode = typeof process !== "undefined" && !!(process.release && process.release.name === "node");
+// Cloudflare is recognised by its own name. (Checking for Node was not enough: Cloudflare's newer runtime also says "node",
+// which quietly switched the protection above off and let one abandoned request leave every later one waiting forever.)
+const onCloudflare = typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
 export function ensureOnce(db, key, run, o = {}) {
   if (!db || typeof db !== "object") return run();
-  if (o.workers ?? !underNode) {
+  if (o.workers ?? onCloudflare) {
     if (finished.has(key)) return Promise.resolve();
     return Promise.resolve().then(run).then(v => { finished.add(key); return v; });
   }

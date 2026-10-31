@@ -142,7 +142,8 @@ export function gmailDeleteStatements(db, shopperId) {
 // Automatic checking: each run looks at new mail for the shopper checked longest ago, then carries on reading older
 // mail if their first full read isn't finished. Runs on its own schedule, so it has the request's limits to itself.
 // Only shoppers who agreed to Gmail reading (and haven't withdrawn) are included.
-const AUTO_PASSES_PER_RUN = 2, AUTO_RECENT_DAYS = 3, AUTO_MAX_BACK_DAYS = 30;
+// Small rounds: the free plan also allows only 10 ms of processing per run.
+const AUTO_PASSES_PER_RUN = 2, AUTO_RECENT_DAYS = 3, AUTO_MAX_BACK_DAYS = 30, AUTO_MAX_FETCH = 4;
 function ensureAutoColumns(db) {
   return ensureOnce(db, "gmail-auto", async () => {
     for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN auto_at INTEGER", "ALTER TABLE gmail_connections ADD COLUMN auto_cursor TEXT"]) {
@@ -165,14 +166,14 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
     // 1. New mail since this shopper was last checked (a couple of days' overlap; never more than a month).
     const since = Math.max(now - AUTO_MAX_BACK_DAYS * DAY_MS, (r.autoAt || r.lastScanAt || now - AUTO_RECENT_DAYS * DAY_MS) - 2 * DAY_MS);
     let recent;
-    try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls }); }
+    try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
     catch (e) { recent = { status: 500, body: { error: String(e && e.message || e).slice(0, 80) } }; }
     passes++; calls += recent.calls || 3;
     let cursor = r.cursor || null;
     // 2. The first full read, a little more each run, until it reaches the start of the look-back period.
     if (!r.lastScanAt && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
       let back;
-      try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls }); }
+      try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
       catch (e) { back = { status: 500, body: {} }; }
       passes++; calls += back.calls || 3;
       if (back.status === 200) cursor = back.body.more ? back.body.cursor : null;
@@ -808,7 +809,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const sb = await request.json().catch(() => ({}));
     try {
-      const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true));
+      // A retry after a round that ran out of time asks for a small round (2 emails), so the same heavy emails get through.
+      const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true),
+        sb && sb.small === true ? { maxFetch: 2 } : {});
       return json(r.body, r.status, cors);
     } catch (e) {
       // A round that hits a limit still answers, so the app can wait a moment and carry on from where it was.

@@ -284,7 +284,7 @@ await page.getByText('Gmail connected: alice@gmail.com').waitFor();
 await page.getByText('Found or updated 1 receipt').waitFor();
 assert.ok(await page.evaluate(() => { const m = [...document.querySelectorAll('.rl-msg')].find(e => /Found or updated/.test(e.textContent)); const b = [...document.querySelectorAll('button')].find(e => /Check for new receipts|Scan my Gmail/.test(e.textContent)); return m && b && (b.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING); }), 'scan status sits next to the Scan button');
 assert.equal(await page.evaluate(() => localStorage.getItem('relay_scan_cursor')), null, 'saved scan position cleared once finished');
-assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }, { cursor: '2026/05/01' }], 'the app follows the cursor back through the mailbox, retrying a busy round from the same place');
+assert.deepEqual(scanBodies, [{}, { cursor: '2026/05/01' }, { cursor: '2026/05/01', small: true }], 'the app follows the cursor back through the mailbox, retrying a busy round from the same place as a small round');
 console.log('PASS a busy scan round is retried from the same place, not reported as "Couldn\'t reach Relay"');
 await page.getByPlaceholder('Search your receipts').fill('wool');
 assert.equal(await page.locator('.rl-order[data-find]:visible').count(), 1, 'search finds the item');

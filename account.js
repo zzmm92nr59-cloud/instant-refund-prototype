@@ -730,10 +730,10 @@
             return say(status, (added ? "Found or updated " + added + " so far. " : "") + "Gmail is busy right now. Your place is saved: tap the button again in a minute to carry on.", true);
           }
           say(status, "Gmail is busy, trying again…" + (added ? " " + added + " found so far" : ""));
-          return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(cursor); });
+          return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(cursor, true); });
         }
-        function step(cursor) {
-          return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}) }).then(function (x) {
+        function step(cursor, small) {
+          return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
             if (x.status === 401) { scanBtn.disabled = false; return say(status, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
             if (!x.ok) return retry(cursor);
             tries = 0;
