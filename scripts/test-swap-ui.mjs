@@ -54,6 +54,8 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
+  // Returns and swaps already started live on the Returns & swaps page; the wallet shows what can still be returned or swapped.
+  if (returnInfo || exchange) await page.evaluate(() => window.go('returns'));
   if (!returnInfo && !exchange) await page.getByRole('button', { name: 'Swap', exact: true }).click();
   return { context, page, posts, errors };
 }
