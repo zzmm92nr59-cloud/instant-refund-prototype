@@ -253,6 +253,22 @@ paging = true;
 await scanAll(alice, 60, true);
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
+// 7e. Marking which items of an email order are going back: owner-only, checked against the receipt, and shown on it.
+{
+  const card = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1");
+  const url = `/relay/my/receipts/${card.id}/items`;
+  assert.equal((await post(url, bob, { items: [{ index: 0, status: "returning" }] })).status, 404, "someone else's receipt");
+  assert.equal((await post(url, alice, { items: [{ index: 9, status: "returning" }] })).status, 400, "no such item");
+  assert.equal((await post(url, alice, { items: [{ index: 0, status: "lost" }] })).status, 400, "unknown status");
+  assert.equal((await post(url, alice, { items: "x" })).status, 400);
+  assert.equal((await post(url, alice, { items: [{ index: 0, status: "returning" }] })).status, 200);
+  let again = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === card.id);
+  assert.deepEqual(again.itemReturns, { 0: "returning" });
+  assert.equal((await post(url, alice, { items: [{ index: 0, status: null }] })).status, 200, "undo");
+  again = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === card.id);
+  assert.deepEqual(again.itemReturns, { 0: "kept" }, "undoing is remembered as the shopper's choice");
+  sqlite.prepare("DELETE FROM receipt_item_marks").run();
+}
 // 7d. Past years for Wrapped: only read when the shopper asks, one year at a time, and remembered once finished.
 {
   const thisYear = new Date(clock).getUTCFullYear(), old = thisYear - 4;
