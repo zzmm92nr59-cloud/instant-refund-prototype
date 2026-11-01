@@ -10,7 +10,9 @@ const shopName = (c) => (c.retailer && (c.retailer.name || c.retailer.domain)) |
 // Kinds of purchase that are physical things you could photograph. A photo from a food, travel or digital receipt is
 // almost always a restaurant banner, an advert or an app icon, so those are never used.
 const THINGS = new Set(["fashion", "electronics", "home", "beauty", "other"]);
-const itemName = (it) => it && typeof it.name === "string" && it.name.trim().length > 1 && it.name.trim().length <= 80 ? it.name.trim() : null;
+// Lines some shops print among the items that aren't things bought: savings, credits, charges and labels.
+const NOT_A_THING = /^(you('ve| have)?\s+saved?|you\s+save|saved?|savings?|was|now|rrp|credit|credits|discount|voucher|promo(tion)?( code)?|offer|multi-?buy|delivery|service( fee| charge)?|bag charge|carrier bag|tip|total|sub-?total|vat|balance|deposit|nectar|clubcard|points?)\b|:\s*$/i;
+const itemName = (it) => { const n = it && typeof it.name === "string" ? it.name.trim() : ""; return n.length > 1 && n.length <= 80 && !NOT_A_THING.test(n) ? n : null; };
 
 function whenOf(card) {
   if (card.orderDate && /^\d{4}-\d{2}-\d{2}$/.test(card.orderDate)) return card.orderDate;
@@ -126,8 +128,8 @@ export function buildWrapped(cards, year, now = Date.now()) {
   const yearList = [...itemStats.values()].sort((a, b) => b.times - a.times || b.spentPence - a.spentPence).slice(0, 100);
   const topItems = yearList.slice(0, 5);
   // Your biggest buys (like "Top Albums"): the five largest receipts.
-  const topBuys = gbp.slice().sort((a, b) => b.totalPence - a.totalPence).slice(0, 5).map(c => ({ shop: shopName(c), item: (c.items || []).length === 1 ? itemName(c.items[0]) : null,
-    items: (c.items || []).length, totalPence: c.totalPence, date: whenOf(c), photoId: c.hasImage && c.id && THINGS.has(c.category || "other") ? c.id : null }));
+  const topBuys = gbp.filter(c => !forwarded(c)).sort((a, b) => b.totalPence - a.totalPence).slice(0, 5).map(c => ({ shop: shopName(c), item: (c.items || []).filter(itemName).length === 1 ? itemName((c.items || []).filter(itemName)[0]) : null,
+    items: (c.items || []).filter(itemName).length, totalPence: c.totalPence, date: whenOf(c), photoId: c.hasImage && c.id && THINGS.has(c.category || "other") ? c.id : null }));
   // Shopping time (like "Minutes listened"): the days you bought something, and your favourite day of the week.
   const shopDays = new Set(mine.map(whenOf));
   const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], byDay = DAY.map(() => 0);
