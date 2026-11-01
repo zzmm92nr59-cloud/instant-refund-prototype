@@ -14,6 +14,7 @@ import { ensureOnce } from "./once.js";
 import { listConnectedShopifyStores } from "./shopify-connect.js";
 import { paymentsEnabled, cardOf, holdDifference, takeHeld, releaseHold, moneyText } from "./payments.js";
 import { shopPay } from "./shop-payments.js";
+import { handleSquareExchange } from "./square-orders.js";
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const SHOP = /^shopify:([a-z0-9-]+\.myshopify\.com)$/;
@@ -328,6 +329,9 @@ export async function handleExchangeRoute(request, env, url, cors, shopper, o) {
   const path = url.pathname;
   if (!path.startsWith("/relay/my/exchange")) return null;
   await ensureExchangeTables(env.RELAY_DB);
+  // Square orders have their own swap flow (square-orders.js).
+  const sq = await handleSquareExchange(request, env, url, cors, shopper, o);
+  if (sq) return sq;
   if (path === "/relay/my/exchange/options" && request.method === "GET") {
     const owned = await ownedLine(env, shopper, url.searchParams.get("orderId"), url.searchParams.get("lineId"));
     if (!owned) return json({ error: "not_your_order" }, 404, cors);
