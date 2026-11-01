@@ -54,7 +54,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  if (!returnInfo && !exchange) await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
+  if (!returnInfo && !exchange) await page.getByRole('button', { name: 'Swap', exact: true }).click();
   return { context, page, posts, errors };
 }
 
@@ -73,7 +73,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   await page.getByText(/£5\.00 was taken from your card \(test mode, no real money\)/).waitFor();
   assert.deepEqual(posts.find(x => x.p === '/relay/my/exchange').body, { orderId: 'o1', lineId: 'L1', variantKey: 'k14', agreedDiffMinor: 500 });
   // The cheaper one says the shop refunds, and nothing is taken.
-  await page.reload(); await page.getByRole('button', { name: 'Exchange size or colour →' }).click();
+  await page.reload(); await page.getByRole('button', { name: 'Swap', exact: true }).click();
   await page.getByRole('button', { name: /Kids · £5\.00 less/ }).click();
   assert.match(await page.locator('.rl-sheet').last().innerText(), /costs £5\.00 less\. Kick Lane will refund the £5\.00 to how you paid\./);
   assert.deepEqual(errors, []);
@@ -110,7 +110,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   assert.match(box, /costs £5\.00 more\. Kick Lane will update your order and send you a link to pay the £5\.00, using any way of paying Kick Lane accepts\./);
   assert.doesNotMatch(box, /card/i);
   await page.getByRole('button', { name: 'Swap, then pay £5.00' }).click();
-  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane →' });
+  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane' });
   await pay.waitFor();
   assert.equal(await pay.getAttribute('href'), 'https://kick-lane.myshopify.com/1/invoices/abc');
   assert.equal(await pay.getAttribute('target'), '_blank');
@@ -124,12 +124,12 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
 // 4. A return the shop has refunded shows as refunded; one still waiting says so. No swap offered for either.
 {
   const { context, page, errors } = await run({ card: null, returnInfo: { status: 'refunded', ref: 'RLY-AAAA-BBBB', trackingNumber: null, refundMinor: 2000, refundedAt: Date.UTC(2026, 9, 31) } });
-  await page.getByText('✓ Refunded £20.00 by Kick Lane on 31/10/2026').waitFor();
-  assert.equal(await page.getByRole('button', { name: 'Exchange size or colour →' }).count(), 0);
+  await page.getByText('✓ Refunded £20.00 by Kick Lane on 31 Oct').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Swap', exact: true }).count(), 0);
   assert.deepEqual(errors, []);
   await context.close();
   const w = await run({ card: null, returnInfo: { status: 'requested', ref: 'RLY-CCCC-DDDD', trackingNumber: 'TT123456789GB', refundMinor: null, refundedAt: null } });
-  await w.page.getByText('Return started · ref RLY-CCCC-DDDD · Royal Mail TT123456789GB · waiting for Kick Lane to refund').waitFor();
+  await w.page.getByText('Return started · ref RLY-CCCC-DDDD · Royal Mail TT123456789GB. Waiting for Kick Lane to refund.').waitFor();
   await w.context.close();
   console.log('PASS return status: refunded, or waiting for the shop');
 }
@@ -138,7 +138,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
 {
   const { context, page, errors } = await run({ card: null, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc' } } });
   await page.getByText('£5.00 still to pay Kick Lane for the swap.').waitFor();
-  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane →' });
+  const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane' });
   assert.equal(await pay.getAttribute('href'), 'https://kick-lane.myshopify.com/1/invoices/abc');
   if (process.env.SHOTS) await page.locator('.card.product').first().screenshot({ path: process.env.SHOTS + '/swap-balance-owed.png' });
   assert.deepEqual(errors, []);
