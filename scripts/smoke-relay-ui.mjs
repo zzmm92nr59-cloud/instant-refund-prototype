@@ -11,7 +11,7 @@ for(const file of files){
  sandbox.window=sandbox;const context=vm.createContext(sandbox);
  for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){const src=match[1].match(/src="\.\/([^"?]+)/);vm.runInContext(src?readFileSync(src[1],'utf8'):match[2],context,{timeout:2000})}
  assert.deepEqual(errors,[]);
- assert.match(el('view').innerHTML,/Your purchases/);
+ assert.match(el('view').innerHTML,/What you can still return or swap/);
  for(const tab of ['wallet','discover','radar','wrapped','profile']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp(tab));assert.ok(el('view').innerHTML.length>100)}
  sandbox.startSample();sandbox.openPurchase('relay-sample-Ava-unit-0');assert.match(el('view').innerHTML,/INSTANT REFUND/);assert.match(el('view').innerHTML,/Swap item/);
  sandbox.page='refund';sandbox.render();assert.match(el('view').innerHTML,/refundReason/);
