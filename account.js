@@ -1379,7 +1379,9 @@
     var cover = el("div", { className: "rl-wr-cover" }, [el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }), el("h2", { text: "Adding up your " + year + "…" })]);
     var extra = el("div");
     host.appendChild(yrs); host.appendChild(cover); host.appendChild(extra);
-    cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
+    // Building Wrapped is heavy work for the server, so one failed try is retried once before showing an error.
+    var getW = function () { return cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year); };
+    getW().catch(function () { return { ok: false }; }).then(function (r) { return r.ok || r.status === 401 ? r : new Promise(function (ok) { setTimeout(ok, 1200); }).then(getW); }).then(function (r) {
       if (r.status === 401) { save(null); mountWrapped(host, year); return; }
       if (!r.ok) { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't build Wrapped just now. Please try again." })); return; }
       var w = r.body;
