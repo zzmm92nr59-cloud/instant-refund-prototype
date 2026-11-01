@@ -39,4 +39,12 @@ const once = buildWrapped([{ kind: "order", retailer: R("A", "a.com"), orderDate
 assert.equal(once.topItem, null, "something bought once is not 'on repeat'");
 const refunds = buildWrapped([{ kind: "order", retailer: R("A", "a.com"), orderDate: "2026-02-01", totalPence: 5000, currency: "GBP", items: [], returnProgress: { refundPence: 2500 } }], 2026);
 assert.equal(refunds.refundedPence, 2500); assert.equal(refunds.refundsMatched, 1);
+// A receipt forwarded from a personal mailbox is the same purchase as the shop's email: counted once, never shown as a shop.
+const fw = buildWrapped([
+  { kind: "order", retailer: R("Beds Ltd", "beds.test"), orderDate: "2026-07-06", totalPence: 187000, currency: "GBP", items: [] },
+  { kind: "order", retailer: R("Sam Smith", "gmail.com"), orderDate: "2026-07-07", totalPence: 187000, currency: "GBP", items: [] },
+  { kind: "order", retailer: R("Sam Smith", "gmail.com"), orderDate: "2026-08-01", totalPence: 2500, currency: "GBP", items: [] }], 2026);
+assert.equal(fw.spentPence, 187000 + 2500, "the forwarded copy isn't added twice");
+assert.equal(fw.receipts, 2);
+assert.ok(!fw.topShops.some(s => /Sam Smith|Forwarded/.test(s.name)), "a person's name is never a top shop");
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly");
