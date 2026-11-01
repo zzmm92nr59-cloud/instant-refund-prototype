@@ -70,6 +70,19 @@
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:#fff;color:#101828}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
+    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}" +
+    ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:radial-gradient(120% 140% at 100% 0%,#5b21b6 0%,#30255d 35%,#101828 75%);color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}" +
+    ".rl-wr-play{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:14px 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
+    ".rl-wr-glance{background:#fff;border:1px solid #ebe6da;border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:#101828}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:#f7f5ef;border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:12px;color:#667085;font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:#101828;margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:12px;color:#667085}.rl-wr-note{font-size:12px;color:#667085;margin:12px 0 0}" +
+    ".rl-story{position:fixed;inset:0;z-index:10050;background:rgba(5,8,18,.92);display:flex;align-items:center;justify-content:center}.rl-story-frame{position:relative;width:min(440px,100vw);height:min(820px,100dvh);border-radius:26px;overflow:hidden;transition:background .5s,color .5s;cursor:pointer;user-select:none;-webkit-user-select:none}@media(max-width:500px){.rl-story-frame{border-radius:0}}" +
+    ".rl-story-bars{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:2}.rl-story-bars div{flex:1;height:3px;border-radius:3px;background:rgba(127,127,127,.35);overflow:hidden}.rl-story-bars i{display:block;height:100%;width:0;background:currentColor}.rl-story-bars .done i{width:100%}.rl-story-bars .now i{animation:rlbar linear forwards}.rl-story-frame.paused .rl-story-bars .now i{animation-play-state:paused}@keyframes rlbar{to{width:100%}}" +
+    ".rl-story-x{all:unset;position:absolute;top:22px;right:16px;z-index:3;font-size:30px;line-height:1;cursor:pointer;opacity:.8;padding:4px 8px}.rl-story-body{position:absolute;inset:0;display:flex;align-items:center;padding:56px 30px 40px}" +
+    ".rl-story-slide{width:100%}.rl-story-slide>*{opacity:0;animation:rlup .6s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide>*:nth-child(2){animation-delay:.15s}.rl-story-slide>*:nth-child(3){animation-delay:.35s}.rl-story-slide>*:nth-child(4){animation-delay:.55s}.rl-story-slide>*:nth-child(5){animation-delay:.75s}@keyframes rlup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}" +
+    ".rl-story-slide .k{font-size:12px;font-weight:900;letter-spacing:2px;color:var(--accent)}.rl-story-slide h1{font-size:42px;line-height:1.02;letter-spacing:-1.5px;margin:14px 0}.rl-story-slide p{font-size:18px;line-height:1.4;margin:10px 0;opacity:.9}.rl-story-slide .lead{font-size:20px;font-weight:800;opacity:1}.rl-story-slide .big{font-size:64px;font-weight:900;letter-spacing:-2.5px;line-height:1;margin:12px 0;color:var(--accent);word-break:break-word}.rl-story-slide .big.name{font-size:46px;letter-spacing:-1.5px}.rl-story-slide .fine{font-size:13px;opacity:.75}.rl-story-slide .pill{display:inline-block;border:2px solid currentColor;border-radius:999px;padding:6px 14px;font-weight:800;font-size:15px}" +
+    ".rl-story-slide .rank{list-style:none;padding:0;margin:16px 0 0}.rl-story-slide .rank li{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.15);opacity:0;animation:rlup .5s forwards;font-size:19px;font-weight:800}.rl-story-slide .rank b{font-size:28px;color:var(--accent);width:28px}.rl-story-slide .rank span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rl-story-slide .rank em{font-style:normal;font-size:14px;opacity:.75;font-weight:600}" +
+    ".rl-story-slide .bars{margin-top:18px}.rl-story-slide .bar{display:grid;grid-template-columns:1fr 2fr auto;gap:10px;align-items:center;margin:8px 0;font-weight:700;font-size:14px}.rl-story-slide .bar i{display:block;height:14px;border-radius:7px;background:currentColor;width:0;animation:rlw .9s cubic-bezier(.2,.8,.2,1) forwards}@keyframes rlw{to{width:var(--w)}}.rl-story-slide .bar em{font-style:normal}" +
+    ".rl-story-slide .months{display:flex;align-items:flex-end;gap:5px;height:150px;margin:20px 0 6px}.rl-story-slide .months div{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}.rl-story-slide .months i{display:block;width:100%;border-radius:6px 6px 2px 2px;background:currentColor;opacity:.35;height:0;animation:rlh .8s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide .months i.hot{opacity:1;background:var(--accent)}.rl-story-slide .months span{font-size:11px;opacity:.7}@keyframes rlh{to{height:var(--h)}}" +
+    ".rl-story-slide .sum{background:linear-gradient(160deg,#5b21b6,#30255d 60%,#172554);border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,#f4f2ec,#fbfaf6,#f4f2ec);background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
     ".rl-empty{background:#fff;border:1px dashed #d9d3c4;border-radius:22px;padding:22px}.rl-empty h3{margin:0 0 6px;font-size:18px;color:#101828}.rl-empty p{margin:0 0 12px;color:#475467;font-size:14px}" +
     ".rl-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:1fr;gap:12px;margin-top:8px}" +
@@ -1323,76 +1336,228 @@
   function memoDrop(prefix) { Object.keys(memo).forEach(function (k) { if (k.indexOf(prefix) === 0) delete memo[k]; }); }
   function mountWrapped(host, year) {
     host.textContent = "";
-    year = year || new Date().getFullYear();
     var s = load();
-    var dark = "background:#101828;color:#fff;border-radius:24px;padding:22px;max-width:520px;margin:0 auto";
-    var box = el("div", { style: dark }, []);
-    host.appendChild(box);
-    box.appendChild(el("div", { text: "✦ RELAY WRAPPED " + year, style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:2px" }));
-    box.appendChild(el("h2", { text: "Your " + year + ", in purchases.", style: "font-size:34px;letter-spacing:-1.5px;line-height:1.08;margin:12px 0" }));
     if (!s || !s.token) {
-      box.appendChild(el("p", { text: "Sign in and connect Gmail, and Relay builds this from your real receipts.", style: "color:#d4d4e5;line-height:1.5" }));
-      box.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:240px", onclick: show }));
-      box.appendChild(el("p", { style: "font-size:12px;margin-top:16px" }, [el("a", { href: "wrapped.html", text: "See a sample with made-up numbers", style: "color:#d6f9a8" })]));
+      host.appendChild(el("div", { className: "rl-wr-cover" }, [
+        el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED" }),
+        el("h2", { text: "Your year in purchases, as a story." }),
+        el("p", { text: "Sign in and connect Gmail, and Relay builds your Wrapped from your real receipts." }),
+        el("button", { className: "rl-wr-play", text: "Sign in", onclick: show })]));
       return;
     }
-    var yrs = el("div", { style: "display:flex;gap:8px;margin:0 0 14px" });
-    [year === new Date().getFullYear() ? year : new Date().getFullYear(), new Date().getFullYear() - 1].forEach(function (y) {
-      yrs.appendChild(el("button", { type: "button", text: String(y), "aria-pressed": y === year ? "true" : "false", style: "border:1px solid #5a5276;border-radius:20px;padding:6px 14px;font-weight:800;color:" + (y === year ? "#243113" : "#fff") + ";background:" + (y === year ? "#c7f567" : "transparent"), onclick: function () { mountWrapped(host, y); } }));
-    });
-    box.appendChild(yrs);
-    var body = el("div", {}, [el("p", { text: "Adding it up…", style: "color:#d4d4e5" })]);
-    box.appendChild(body);
-    function draw(w) {
-      body.textContent = "";
-      if (!w.receipts) {
-        body.appendChild(el("p", { text: "No receipts found for " + year + " yet. Connect Gmail on the Receipts tab and Relay will find your order emails.", style: "color:#d4d4e5;line-height:1.5" }));
-        body.appendChild(el("button", { className: "rl-btn", text: "Go to Receipts", style: "max-width:240px", onclick: function () { if (window.go) window.go("receipts"); } }));
-        return;
-      }
-      function tile(label, big, small, bg, fg) {
-        return el("div", { style: "border-radius:20px;padding:16px;min-height:130px;display:flex;flex-direction:column;justify-content:space-between;background:" + bg + ";color:" + fg }, [
-          el("span", { text: label, style: "font-size:12px;font-weight:700" }), el("strong", { text: big, style: "font-size:28px;letter-spacing:-1px;line-height:1.05;word-break:break-word" }), el("small", { text: small, style: "font-size:11px" })]);
-      }
-      var cat = w.categories[0];
-      var grid = el("div", { style: "display:grid;grid-template-columns:1fr 1fr;gap:10px" }, [
-        tile("Total spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", w.coverage.withTotal ? "Across " + w.shops + (w.shops === 1 ? " shop" : " shops") : "No readable amounts yet", "#30255d", "#e4d8ff"),
-        tile("Items bought", String(w.items), w.receipts + (w.receipts === 1 ? " receipt" : " receipts"), "#c7f567", "#243113"),
-        tile("Favourite group", cat ? cat.label : "—", cat ? cat.receipts + (cat.receipts === 1 ? " receipt" : " receipts") : "", "#f6c7e2", "#57233f"),
-        tile("Returns started", String(w.returnsStarted), "Return emails matched to a purchase", "#263f8c", "#d7e4ff")
-      ]);
-      body.appendChild(grid);
-      var gaps = [];
-      if (w.coverage.noTotal) gaps.push(w.coverage.noTotal + " with no readable amount");
-      if (w.coverage.otherCurrency) gaps.push(w.coverage.otherCurrency + " not in pounds");
-      body.appendChild(el("p", { text: "Spending is added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts" + (gaps.length ? " (" + gaps.join(", ") + " left out)." : "."), style: "font-size:12px;color:#cfc9e4;margin:10px 0" }));
-      if (w.personality) body.appendChild(el("div", { style: "background:#241c46;border-radius:20px;padding:18px;margin-top:6px" }, [
-        el("div", { text: "WHAT YOUR RECEIPTS SAY", style: "color:#d9cbff;font-size:12px;font-weight:800;letter-spacing:1px" }),
-        el("h3", { text: w.personality.label, style: "font-size:26px;margin:8px 0;color:#fff" }),
-        el("p", { text: w.personality.why, style: "color:#e3dff0;font-size:14px;margin:0" })]));
-      var facts = [];
-      if (w.biggest) facts.push("Biggest single purchase: " + money(w.biggest.totalPence, "GBP") + " at " + w.biggest.shop + (w.biggest.date ? " on " + w.biggest.date : "") + ".");
-      if (w.busiestMonth) facts.push("Busiest month: " + w.busiestMonth + ".");
-      facts.forEach(function (f) { body.appendChild(el("p", { text: f, style: "color:#e3dff0;font-size:14px;margin:10px 0 0" })); });
-      var tops = el("div", { style: "background:#171d37;border-radius:20px;padding:16px;margin-top:12px" }, [el("div", { text: "YOUR TOP SHOPS", style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:1.3px;margin-bottom:8px" })]);
-      w.topShops.forEach(function (sh, i) {
-        tops.appendChild(el("div", { style: "display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid #2a3150;font-size:14px" }, [
-          el("span", { text: (i + 1) + ". " + sh.name }), el("span", { text: (sh.spentPence ? money(sh.spentPence, "GBP") + " · " : "") + sh.receipts + (sh.receipts === 1 ? " receipt" : " receipts"), style: "color:#cfc9e4;white-space:nowrap" })]));
-      });
-      body.appendChild(tops);
-      var max = Math.max.apply(null, w.byMonth.map(function (m) { return m.receipts; })) || 1;
-      var bars = el("div", { style: "display:flex;align-items:flex-end;gap:5px;height:90px;margin-top:12px" });
-      w.byMonth.forEach(function (m) { bars.appendChild(el("div", { title: m.month + ": " + m.receipts + (m.receipts === 1 ? " receipt" : " receipts"), style: "flex:1;background:#9d87ee;border-radius:6px 6px 0 0;min-height:4px;height:" + Math.max(4, Math.round(m.receipts / max * 100)) + "%" })); });
-      var labels = el("div", { style: "display:flex;gap:5px;color:#c7c5d7;font-size:9px;margin-top:6px" });
-      w.byMonth.forEach(function (m) { labels.appendChild(el("span", { text: m.month.slice(0, 1), style: "flex:1;text-align:center" })); });
-      body.appendChild(el("div", { style: "background:#171d37;border-radius:20px;padding:16px;margin-top:12px" }, [el("div", { text: "RECEIPTS PER MONTH", style: "color:#d6f9a8;font-size:12px;font-weight:900;letter-spacing:1.3px" }), bars, labels]));
-      body.appendChild(el("p", { text: w.note, style: "font-size:12px;color:#cfc9e4;margin-top:14px;border:1px solid #5a5276;border-radius:14px;padding:12px" }));
-    }
+    var thisYear = new Date().getFullYear();
+    year = year || thisYear;
+    var yrs = el("div", { className: "rl-wr-years" });
+    var cover = el("div", { className: "rl-wr-cover" }, [el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }), el("h2", { text: "Adding up your " + year + "…" })]);
+    var extra = el("div");
+    host.appendChild(yrs); host.appendChild(cover); host.appendChild(extra);
     cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
       if (r.status === 401) { save(null); mountWrapped(host, year); return; }
-      if (!r.ok) { body.textContent = ""; body.appendChild(el("p", { text: "Couldn't build Wrapped just now. Please try again.", style: "color:#d4d4e5" })); return; }
-      draw(r.body);
-    }).catch(function () { body.textContent = ""; body.appendChild(el("p", { text: "Couldn't reach Relay.", style: "color:#d4d4e5" })); });
+      if (!r.ok) { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't build Wrapped just now. Please try again." })); return; }
+      var w = r.body;
+      var list = (w.years || []).map(function (y) { return y.year; });
+      if (list.indexOf(year) < 0) list.push(year);
+      if (list.indexOf(thisYear) < 0) list.push(thisYear);
+      list.sort(function (a, b) { return b - a; }).forEach(function (y) {
+        yrs.appendChild(el("button", { type: "button", text: String(y), ariaPressed: y === year ? "true" : "false", className: y === year ? "on" : "", onclick: function () { mountWrapped(host, y); } }));
+      });
+      cover.textContent = "";
+      cover.appendChild(el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }));
+      if (!w.receipts) {
+        cover.appendChild(el("h2", { text: "Nothing to wrap for " + year + " yet." }));
+        cover.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below and Relay will look for that year's receipts." : "Connect Gmail on the Receipts tab and Relay will find your order emails." }));
+      } else {
+        cover.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
+        cover.appendChild(el("p", { text: w.receipts + " receipts · " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.coverage.withTotal ? " · " + money(w.spentPence, "GBP") : "") }));
+        cover.appendChild(el("button", { className: "rl-wr-play", text: "▶  Play your story", onclick: function () { playStory(w); } }));
+      }
+      if (w.receipts) extra.appendChild(wrappedGlance(w));
+      var hb = el("div"); extra.appendChild(hb);
+      mountHistory(hb, w, function (firstYear) { Object.keys(memo).forEach(function (k) { if (/^wrapped/.test(k)) memoDrop(k); }); mountWrapped(host, firstYear || year); });
+    }).catch(function () { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't reach Relay." })); });
+  }
+  // Opt-in: read past years of order emails so Wrapped works for them too. Same Gmail permission, same rules: only receipts and order emails.
+  function mountHistory(host, w, done) {
+    host.textContent = "";
+    var thisYear = new Date().getFullYear();
+    var card = el("div", { className: "rl-wr-glance" });
+    host.appendChild(card);
+    card.appendChild(el("h3", { text: "Add earlier years" }));
+    card.appendChild(el("p", { text: "Relay normally reads the last 16 months of your email. Pick earlier years and Relay will look through those years' order confirmations and receipts too, so you can play Wrapped for them. It only reads purchase emails, the same as now, and you can delete everything from Account & security.", style: "color:#475467;font-size:14px;margin:0 0 12px;line-height:1.5" }));
+    var chips = el("div", { className: "rl-wr-years" }), picked = {}, status = el("p", { className: "rl-wr-note", style: "font-size:13px" });
+    var go = el("button", { className: "rl-po-primary", text: "Read these years", style: "max-width:260px", disabled: true });
+    card.appendChild(chips); card.appendChild(go); card.appendChild(status);
+    var have = {}; (w.years || []).forEach(function (y) { have[y.year] = y.receipts; });
+    api("/relay/my/gmail/history").then(function (r) {
+      var doneYears = {}; ((r.ok && r.body.years) || []).forEach(function (y) { doneYears[y.year] = true; });
+      var earliest = (r.ok && r.body.earliest) || thisYear - 10;
+      for (var y = thisYear - 1; y >= Math.max(earliest, thisYear - 8); y--) (function (y) {
+        var b = el("button", { type: "button", text: doneYears[y] ? y + " ✓" : String(y), title: doneYears[y] ? "Already read" + (have[y] ? " · " + have[y] + " receipts" : "") : "", ariaPressed: "false",
+          onclick: function () { picked[y] = !picked[y]; b.className = picked[y] ? "on" : ""; b.ariaPressed = picked[y] ? "true" : "false"; go.disabled = !Object.keys(picked).some(function (k) { return picked[k]; }); } });
+        chips.appendChild(b);
+      })(y);
+    });
+    go.onclick = function () {
+      var years = Object.keys(picked).filter(function (k) { return picked[k]; }).map(Number).sort(function (a, b) { return b - a; });
+      if (!years.length) return;
+      go.disabled = true; Array.prototype.forEach.call(chips.children, function (b) { b.disabled = true; });
+      var found = 0, errors = 0;
+      function oneYear(k) {
+        if (k >= years.length) { status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "."; setTimeout(function () { done(years[0]); }, 900); return; }
+        var y = years[k];
+        function round(cursor) {
+          status.textContent = "Reading " + y + (cursor ? " · back to " + cursor.replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2") : "") + "… " + found + " receipts found so far. Keep this page open.";
+          api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
+            if (!x.ok) {
+              if (x.status === 401) { status.textContent = "Google needs you to reconnect Gmail on the Receipts tab."; return; }
+              if (++errors > 8) { status.textContent = "Gmail is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
+              return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
+            }
+            errors = 0; found += (x.body.added || 0);
+            if (x.body.more && x.body.cursor) setTimeout(function () { round(x.body.cursor); }, 800); else oneYear(k + 1);
+          }, function () { if (++errors > 8) { status.textContent = "Couldn't reach Relay. Try again in a moment."; go.disabled = false; return; } setTimeout(function () { round(cursor); }, 4000); });
+        }
+        round("");
+      }
+      oneYear(0);
+    };
+  }
+  // The same numbers as the story, on one card, for a quick look.
+  function wrappedGlance(w) {
+    var box = el("div", { className: "rl-wr-glance" });
+    function stat(label, big, small) { return el("div", {}, [el("span", { text: label }), el("strong", { text: big }), el("small", { text: small || "" })]); }
+    var cat = w.categories[0], top = w.topShops[0];
+    box.appendChild(el("h3", { text: "At a glance" }));
+    box.appendChild(el("div", { className: "rl-wr-stats" }, [
+      stat("Spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", "from " + w.coverage.withTotal + " of " + w.receipts + " receipts"),
+      stat("Top shop", top ? top.name : "—", top ? top.receipts + (top.receipts === 1 ? " order" : " orders") : ""),
+      stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + " receipts" : ""),
+      stat("Busiest month", w.busiestMonth || "—", "")]));
+    box.appendChild(el("p", { className: "rl-wr-note", text: w.note }));
+    return box;
+  }
+  var MONTH_FULL = { Jan: "January", Feb: "February", Mar: "March", Apr: "April", May: "May", Jun: "June", Jul: "July", Aug: "August", Sep: "September", Oct: "October", Nov: "November", Dec: "December" };
+  // Counts a number up from zero, so the big figure on a slide lands with a bit of drama.
+  function countUp(node, to, fmt, ms) {
+    var t0 = null; ms = ms || 1200;
+    function step(t) { if (!t0) t0 = t; var k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); node.textContent = fmt(Math.round(to * e)); if (k < 1 && node.isConnected) requestAnimationFrame(step); }
+    node.textContent = fmt(0); requestAnimationFrame(step);
+  }
+  function storySlides(w) {
+    var S = [], cat = w.categories[0], top = w.topShops[0], gbp = function (p) { return money(p, "GBP"); };
+    S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
+      b.appendChild(el("div", { className: "k", text: "✦ RELAY WRAPPED" }));
+      b.appendChild(el("h1", { text: w.year + " was a year of shopping." }));
+      b.appendChild(el("p", { text: "Relay found " + w.receipts + " receipts from " + w.shops + (w.shops === 1 ? " shop" : " shops") + ". Let's look back." }));
+    } });
+    if (w.coverage.withTotal) S.push({ bg: "#30255d", fg: "#fff", accent: "#e4d8ff", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
+      var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
+      b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
+      if (w.coverage.noTotal) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts. " + w.coverage.noTotal + " had no amount Relay could read." }));
+    } });
+    if (top) S.push({ bg: "#c7f567", fg: "#16210a", accent: "#16210a", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your number one shop" }));
+      b.appendChild(el("div", { className: "big name", text: top.name }));
+      b.appendChild(el("p", { text: top.receipts + (top.receipts === 1 ? " order" : " orders") + (top.spentPence ? " · " + gbp(top.spentPence) : "") }));
+      if (w.topShopShare) b.appendChild(el("p", { className: "pill", text: "That's " + w.topShopShare + "% of everything you spent" }));
+    } });
+    if (w.topShops.length > 1) S.push({ bg: "#172554", fg: "#fff", accent: "#93c5fd", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your top shops" }));
+      var ol = el("ol", { className: "rank" });
+      w.topShops.forEach(function (sh, i) {
+        ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: sh.name }), el("em", { text: sh.spentPence ? gbp(sh.spentPence) : sh.receipts + " orders" })]));
+      });
+      b.appendChild(ol);
+    } });
+    if (cat) S.push({ bg: "#f6c7e2", fg: "#3f1430", accent: "#3f1430", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your favourite kind of shopping" }));
+      b.appendChild(el("div", { className: "big name", text: cat.label }));
+      b.appendChild(el("p", { text: cat.receipts + " of your " + w.receipts + " receipts." }));
+      var bars = el("div", { className: "bars" });
+      w.categories.slice(0, 4).forEach(function (c, i) {
+        var pct = Math.max(4, Math.round(c.receipts / w.receipts * 100));
+        bars.appendChild(el("div", { className: "bar" }, [el("span", { text: c.label }), el("i", { style: "--w:" + pct + "%;animation-delay:" + (0.2 + i * 0.15) + "s" }), el("em", { text: Math.round(c.receipts / w.receipts * 100) + "%" })]));
+      });
+      b.appendChild(bars);
+    } });
+    if (w.topItem) S.push({ bg: "#ff8a5b", fg: "#2b0d00", accent: "#2b0d00", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "On repeat" }));
+      b.appendChild(el("div", { className: "big name", text: w.topItem.name }));
+      var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.topItem.times, function (v) { return v + "×"; }, 900);
+      b.appendChild(el("p", { text: "You kept coming back for it" + (w.topItem.shop ? " at " + w.topItem.shop : "") + "." }));
+    } });
+    if (w.busiestMonth) S.push({ bg: "#263f8c", fg: "#fff", accent: "#d7e4ff", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your busiest month" }));
+      b.appendChild(el("div", { className: "big name", text: MONTH_FULL[w.busiestMonth] || w.busiestMonth }));
+      var max = Math.max.apply(null, w.byMonth.map(function (m) { return m.receipts; })) || 1;
+      var chart = el("div", { className: "months" });
+      w.byMonth.forEach(function (m, i) { chart.appendChild(el("div", {}, [el("i", { className: m.month === w.busiestMonth ? "hot" : "", style: "--h:" + Math.max(4, Math.round(m.receipts / max * 100)) + "%;animation-delay:" + (0.1 + i * 0.05) + "s" }), el("span", { text: m.month.slice(0, 1) })])); });
+      b.appendChild(chart);
+      var bm = w.byMonth.filter(function (m) { return m.month === w.busiestMonth; })[0];
+      if (bm) b.appendChild(el("p", { text: bm.receipts + " receipts" + (bm.spentPence ? " · " + gbp(bm.spentPence) : "") + "." }));
+    } });
+    if (w.biggest) S.push({ bg: "#0f5132", fg: "#fff", accent: "#b7f0cf", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your biggest treat" }));
+      var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.biggest.totalPence, gbp, 1100);
+      b.appendChild(el("p", { text: "at " + w.biggest.shop + (w.biggest.date ? " on " + new Date(w.biggest.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "") + "." }));
+    } });
+    if (w.returnsStarted || w.refundedPence) S.push({ bg: "#fde68a", fg: "#3a2a00", accent: "#3a2a00", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Changed your mind?" }));
+      if (w.refundedPence) { var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.refundedPence, gbp, 1000); b.appendChild(el("p", { text: "came back to you in refunds Relay tracked." })); }
+      else b.appendChild(el("div", { className: "big", text: String(w.returnsStarted) }));
+      if (w.returnsStarted) b.appendChild(el("p", { text: w.returnsStarted + (w.returnsStarted === 1 ? " return" : " returns") + " started from your orders." }));
+    } });
+    if (w.personality) S.push({ bg: "#5b21b6", fg: "#fff", accent: "#e9d5ff", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your shopping style" }));
+      b.appendChild(el("div", { className: "big name", text: w.personality.label }));
+      b.appendChild(el("p", { text: w.personality.why }));
+    } });
+    S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", summary: true, build: function (b, again, close) {
+      var card = el("div", { className: "sum" }, [el("div", { className: "k", text: "✦ MY " + w.year + " ON RELAY" })]);
+      var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], ["Shops", String(w.shops)]];
+      var g = el("div", { className: "sumgrid" }); rows.forEach(function (r) { g.appendChild(el("div", {}, [el("span", { text: r[0] }), el("strong", { text: r[1] })])); }); card.appendChild(g);
+      b.appendChild(card);
+      var text = "My " + w.year + " on Relay: " + rows.map(function (r) { return r[0] + " " + r[1]; }).join(" · ");
+      var msg = el("p", { className: "fine" });
+      b.appendChild(el("div", { className: "acts" }, [
+        el("button", { type: "button", text: "Share", onclick: function (e) { e.stopPropagation();
+          if (navigator.share) navigator.share({ title: "My " + w.year + " on Relay", text: text }).catch(function () {});
+          else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it anywhere."; }, function () {}); } }),
+        el("button", { type: "button", className: "ghost", text: "Watch again", onclick: function (e) { e.stopPropagation(); again(); } }),
+        el("button", { type: "button", className: "ghost", text: "Done", onclick: function (e) { e.stopPropagation(); close(); } })]));
+      b.appendChild(msg);
+    } });
+    return S;
+  }
+  function playStory(w) {
+    var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
+    var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });
+    var frame = el("div", { className: "rl-story-frame" });
+    var bars = el("div", { className: "rl-story-bars" });
+    slides.forEach(function () { bars.appendChild(el("div", {}, [el("i")])); });
+    var closeBtn = el("button", { type: "button", className: "rl-story-x", ariaLabel: "Close", text: "×" });
+    var body = el("div", { className: "rl-story-body" });
+    frame.appendChild(bars); frame.appendChild(closeBtn); frame.appendChild(body); root.appendChild(frame);
+    document.body.appendChild(root); document.body.style.overflow = "hidden";
+    function close() { clearTimeout(timer); document.removeEventListener("keydown", key); root.remove(); document.body.style.overflow = ""; }
+    function show(n) {
+      i = Math.max(0, Math.min(slides.length - 1, n)); clearTimeout(timer);
+      var sl = slides[i];
+      frame.style.background = sl.bg; frame.style.color = sl.fg; frame.style.setProperty("--accent", sl.accent);
+      Array.prototype.forEach.call(bars.children, function (b, k) { b.className = k < i ? "done" : k === i ? "now" : ""; b.firstChild.style.animationDuration = DUR + "ms"; });
+      body.textContent = ""; var inner = el("div", { className: "rl-story-slide" }); body.appendChild(inner);
+      sl.build(inner, function () { show(0); }, close);
+      if (!sl.summary) timer = setTimeout(function () { if (!paused) show(i + 1); }, DUR);
+    }
+    function key(e) { if (e.key === "Escape") close(); else if (e.key === "ArrowRight") show(i + 1); else if (e.key === "ArrowLeft") show(i - 1); }
+    document.addEventListener("keydown", key);
+    closeBtn.onclick = function (e) { e.stopPropagation(); close(); };
+    // Tap the right side to go on, the left side to go back; press and hold to pause.
+    frame.addEventListener("click", function (e) { if (e.target.closest("button")) return; var r = frame.getBoundingClientRect(); if (e.clientX - r.left < r.width * 0.33) show(i - 1); else if (!slides[i].summary) show(i + 1); });
+    frame.addEventListener("pointerdown", function () { paused = true; frame.classList.add("paused"); });
+    frame.addEventListener("pointerup", function () { if (!paused) return; paused = false; frame.classList.remove("paused"); });
+    show(0);
   }
 
   // ---- Phone alerts: price drops sent to this device. Nothing is sent unless the shopper turns it on here. ----
@@ -1702,7 +1867,7 @@
     var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
     if (opts.actions !== false && portal && /^https:\/\//.test(portal))
-      actions.appendChild(el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", text: "Return or exchange ↗" }));
+      actions.appendChild(el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", text: "Return on " + (who.length <= 16 ? who + "'s site" : "the shop's site") + " ↗" }));
     actions.appendChild(el("button", { className: "rl-po-secondary", text: "Details", style: portal && opts.actions !== false ? "flex:0 0 96px" : "", onclick: function () {
       open(function (sheet) {
         sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
@@ -1712,6 +1877,9 @@
       });
     } }));
     card.appendChild(actions);
+    // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
+    if (opts.actions !== false && portal && /^https:\/\//.test(portal))
+      card.appendChild(el("div", { text: "Opens the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run this page.", style: "font-size:12px;color:#667085;margin-top:8px;line-height:1.4" }));
     return card;
   }
   function loadBoth() {
