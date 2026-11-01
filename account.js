@@ -3,6 +3,8 @@
 (function () {
   var API = "https://relay-square-api2.9pts72cy5j.workers.dev";
   var KEY = "relay.session.v1";
+  // The shopper's name and photo, kept on this device so the avatar shows straight away (the server copy is the real one).
+  var PROFILE_KEY = "relay.profile";
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
   // Ask the browser not to clear Relay's saved sign-in when it tidies up storage.
   function keepStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
@@ -27,7 +29,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
+  function save(v) { if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars(); }
   function api(path, opts) {
     opts = opts || {};
     var s = load(), headers = { "Content-Type": "application/json" };
@@ -101,6 +103,8 @@
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,#f4f2ec,#fbfaf6,#f4f2ec);background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
     ".rl-empty{background:#fff;border:1px dashed #d9d3c4;border-radius:22px;padding:22px}.rl-empty h3{margin:0 0 6px;font-size:18px;color:#101828}.rl-empty p{margin:0 0 12px;color:#475467;font-size:14px}" +
     ".rl-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:1fr;gap:12px;margin-top:8px}" +
+    ".rl-face{display:inline-grid;place-items:center;border-radius:50%;overflow:hidden;background:#e9efd6;color:#2b3d12;font-weight:900;line-height:1;flex:none;box-shadow:0 0 0 1px rgba(16,24,40,.06)}.rl-face img{width:100%;height:100%;object-fit:cover;display:block}" +
+    ".avatar.rl-has-photo{width:38px;height:38px;padding:0;box-sizing:border-box;background-size:cover;background-position:center;background-repeat:no-repeat}" +
     ".rl-po-more{margin:6px 0 4px;padding:10px 16px;border-radius:999px;border:1.5px solid #101828;background:#fff;font-weight:700;cursor:pointer}" +
     ".rl-order b{display:block}.rl-order span{color:#5b6475;font-size:14px}";
   document.head.appendChild(css);
@@ -129,6 +133,144 @@
     var g = Math.round(px * 0.55);
     tile.innerHTML = '<svg viewBox="0 0 24 24" width="' + g + '" height="' + g + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + c[2] + "</svg>";
     return tile;
+  }
+
+  // ---- Your name and photo. Only you see them: Relay never shows them to shops or other members. ----
+  var PHOTO_SHAPE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/]+={0,2}$/;
+  function profileNow() {
+    var s = load(); if (!s || !s.token) return null;
+    var p = null; try { p = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null"); } catch (e) {}
+    if (!p || p.email !== s.email) p = {};
+    return { email: s.email || "", name: typeof p.name === "string" ? p.name : null, photo: PHOTO_SHAPE.test(p.photo || "") ? p.photo : null };
+  }
+  function keepProfile(p) {
+    var s = load();
+    try { if (s && p) localStorage.setItem(PROFILE_KEY, JSON.stringify({ email: s.email, name: p.name || null, photo: p.photo || null })); } catch (e) {}
+  }
+  var profileWatchers = [];
+  function profileChanged() {
+    paintAvatars();
+    // Each screen showing the name or photo redraws itself; one that has been closed drops out.
+    profileWatchers = profileWatchers.filter(function (f) { try { return f() !== false; } catch (e) { return false; } });
+  }
+  function firstLetter(p) { var t = String((p && (p.name || p.email)) || "").trim(); return t ? Array.from(t)[0].toUpperCase() : "R"; }
+  // A round picture of the shopper: their photo, or the first letter of their name (or email).
+  function face(p, px) {
+    var n = el("span", { className: "rl-face", style: "width:" + px + "px;height:" + px + "px;font-size:" + Math.round(px * 0.42) + "px" });
+    n.setAttribute("aria-hidden", "true");
+    if (p && p.photo) n.appendChild(el("img", { src: p.photo, alt: "" })); else n.textContent = firstLetter(p);
+    return n;
+  }
+  // The round button at the top of every page.
+  function paintAvatars() {
+    var p = profileNow();
+    Array.prototype.forEach.call(document.querySelectorAll(".avatar"), function (a) {
+      var photo = Boolean(p && p.photo);
+      a.classList.toggle("rl-has-photo", photo);
+      a.style.backgroundImage = photo ? 'url("' + p.photo + '")' : "";
+      a.textContent = photo ? "" : p ? firstLetter(p) : "R";
+    });
+  }
+  var profileLoading = null;
+  function loadProfile() {
+    var s = load(); if (!s || !s.token) return Promise.resolve(null);
+    if (!profileLoading) profileLoading = api("/relay/my/profile").then(function (r) {
+      profileLoading = null;
+      if (r.ok && r.body && r.body.email === (load() || {}).email) { keepProfile(r.body); profileChanged(); }
+      return profileNow();
+    }, function () { profileLoading = null; return profileNow(); });
+    return profileLoading;
+  }
+  // Cuts the chosen photo to a centred square and shrinks it to 256 × 256 on this device. Re-drawing it also leaves the
+  // camera's details (like where it was taken) behind. Only this small copy is sent to Relay.
+  function squarePhoto(file) {
+    return new Promise(function (resolve, reject) {
+      if (file.type && !/^image\//.test(file.type)) return reject(new Error("not a picture"));
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        try {
+          var w = img.naturalWidth, h = img.naturalHeight, side = Math.min(w, h);
+          if (!side) throw new Error("empty");
+          var c = document.createElement("canvas"); c.width = c.height = 256;
+          var g = c.getContext("2d"); g.fillStyle = "#ffffff"; g.fillRect(0, 0, 256, 256); g.imageSmoothingQuality = "high";
+          g.drawImage(img, (w - side) / 2, (h - side) / 2, side, side, 0, 0, 256, 256);
+          var out = c.toDataURL("image/jpeg", 0.86);
+          if (out.length > 180000) out = c.toDataURL("image/jpeg", 0.7);
+          URL.revokeObjectURL(url);
+          if (!PHOTO_SHAPE.test(out)) throw new Error("couldn't make a picture");
+          resolve(out);
+        } catch (e) { URL.revokeObjectURL(url); reject(e); }
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error("unreadable")); };
+      img.src = url;
+    });
+  }
+  function profileView(sheet, onBack, backLabel) {
+    var p = profileNow() || { email: "" };
+    var photo = p.photo, photoChanged = false;
+    var msg = el("div", { className: "rl-msg" });
+    var nameIn = el("input", { type: "text", id: "rl-name", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: p.name || "" });
+    nameIn.setAttribute("aria-label", "Your name");
+    var holder = el("div", { style: "display:flex;justify-content:center;margin:4px 0 12px" });
+    var file = el("input", { type: "file", accept: "image/*", style: "display:none" });
+    file.setAttribute("aria-label", "Choose a profile photo");
+    var pick = el("button", { type: "button", className: "rl-btn ghost", style: "margin-top:0", onclick: function () { file.click(); } });
+    var drop = el("button", { type: "button", className: "rl-btn ghost", text: "Remove photo", onclick: function () { photo = null; photoChanged = true; draw(); } });
+    function draw() {
+      holder.textContent = "";
+      holder.appendChild(el("button", { type: "button", ariaLabel: photo ? "Change your photo" : "Add a photo", style: "all:unset;cursor:pointer;border-radius:50%", onclick: function () { file.click(); } },
+        [face({ email: p.email, name: nameIn.value.trim() || p.name, photo: photo }, 96)]));
+      pick.textContent = photo ? "Choose a different photo" : "Add a photo";
+      drop.style.display = photo ? "" : "none";
+    }
+    file.onchange = function () {
+      var f = file.files && file.files[0]; file.value = "";
+      if (!f) return;
+      say(msg, "Getting your photo ready…");
+      squarePhoto(f).then(function (d) { photo = d; photoChanged = true; draw(); say(msg, ""); },
+        function () { say(msg, "That photo couldn't be opened. Try a JPEG or PNG photo.", true); });
+    };
+    nameIn.addEventListener("input", function () { if (!photo) draw(); });
+    var saveBtn = el("button", { type: "button", className: "rl-btn", text: "Save" });
+    saveBtn.onclick = function () {
+      var body = { name: nameIn.value.trim() || null };
+      if (photoChanged) body.photo = photo;
+      saveBtn.disabled = true; say(msg, "Saving…");
+      api("/relay/my/profile", { method: "POST", body: body }).then(function (r) {
+        saveBtn.disabled = false;
+        if (r.ok) { keepProfile(r.body); profileChanged(); say(msg, "Saved."); if (onBack) onBack(); return; }
+        say(msg, r.body && r.body.error === "bad_name" ? "Use letters, spaces, hyphens or apostrophes, up to 40 characters." :
+          r.body && (r.body.error === "bad_photo" || r.body.error === "photo_too_big") ? "That photo couldn't be used. Try a different one." : "Couldn't save. Try again.", true);
+      }).catch(function () { saveBtn.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    sheet.appendChild(el("h2", { text: "Your profile" }));
+    sheet.appendChild(el("p", { text: "Add your name and a photo. Only you can see them." }));
+    sheet.appendChild(holder); sheet.appendChild(file); sheet.appendChild(pick); sheet.appendChild(drop);
+    sheet.appendChild(el("label", { htmlFor: "rl-name", text: "Your name", style: "display:block;font-weight:700;font-size:14px;margin:16px 0 6px" }));
+    sheet.appendChild(nameIn); sheet.appendChild(saveBtn); sheet.appendChild(msg);
+    sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: backLabel || "Back", onclick: function () { if (onBack) onBack(); else close(); } }));
+    draw();
+  }
+  function editProfile() { open(function (sheet) { profileView(sheet, close, "Cancel"); }); }
+  // The top of the Profile page: photo, name and email, and a way to change them.
+  function mountProfile(host) {
+    if (!host) return;
+    function draw() {
+      if (!document.body.contains(host)) return false;
+      host.textContent = "";
+      var p = profileNow();
+      if (!p) return;
+      host.appendChild(el("div", { style: "display:flex;gap:16px;align-items:center;margin:0 0 12px" }, [
+        el("button", { type: "button", ariaLabel: p.photo ? "Change your photo" : "Add a photo", style: "all:unset;cursor:pointer;border-radius:50%;flex:none", onclick: editProfile }, [face(p, 64)]),
+        el("div", { style: "min-width:0" }, [
+          el("div", { className: "eyebrow", text: "SIGNED IN" }),
+          el("h2", { text: p.name || p.email, style: "margin:2px 0 2px;word-break:break-word" }),
+          el("div", { className: "small muted", text: p.name ? p.email : "Add your name and a photo so Relay feels like yours.", style: "word-break:break-all" })])]));
+      host.appendChild(el("button", { type: "button", className: "outline", text: p.name || p.photo ? "Edit profile" : "Add name and photo", onclick: editProfile }));
+    }
+    profileWatchers.push(draw);
+    draw();
+    loadProfile();
   }
   function askBox(message, yesLabel, withText, onYes) {
     var input = withText ? el("textarea", { rows: 3, style: "width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ddd6c6;border-radius:16px;font:inherit;font-size:15px;margin-bottom:6px" }) : null;
@@ -188,7 +330,7 @@
         if (r.body.needsSecondStep) return secondStepView(sheet, r.body.pendingToken);
         save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
         keepStorage();
-        var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
+        paintAvatars(); loadProfile();
         show();
       }).catch(function () { codeGo.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
@@ -282,7 +424,7 @@
           if (!v.ok) return say(msg, "That passkey wasn't accepted. If you haven't added one yet, sign in another way first and add it from your account.", true);
           save({ token: v.body.sessionToken, email: v.body.email, expiresAt: v.body.expiresAt });
           keepStorage();
-          var a = document.querySelector(".avatar"); if (a) a.textContent = v.body.email.charAt(0).toUpperCase();
+          paintAvatars(); loadProfile();
           show();
         });
       }).catch(function (e) { b.disabled = false; say(msg, passkeyProblem(e), true); });
@@ -435,7 +577,7 @@
         if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
         save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
         keepStorage();
-        var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
+        paintAvatars(); loadProfile();
         show();
       }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
@@ -929,6 +1071,10 @@
         status.style.cssText = "margin:0;font-size:13px;color:#667085";
         box.appendChild(el("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px" }, [status, scanBtn]));
         box.appendChild(list);
+        // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
+        box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Missing a receipt? Search " + MB + " for it",
+          style: "all:unset;cursor:pointer;display:block;margin:20px auto 6px;font-size:14px;font-weight:700;color:#3f5a17;text-decoration:underline;text-underline-offset:3px",
+          onclick: function () { open(function (sheet) { findView(sheet, close); }); } }));
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
@@ -1292,7 +1438,19 @@
   function signedInView(sheet, email, notice, c) {
     var list = el("div"), msg = el("div", { className: "rl-msg" });
     var gbox = el("div");
-    [el("h2", { text: "Your account" }), el("p", { text: email }), gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
+    var head = el("div", { style: "display:flex;gap:14px;align-items:center;margin:0 0 16px" });
+    function editHere() { back.firstChild.textContent = ""; profileView(back.firstChild, function () { gate(back.firstChild, email); }); }
+    function drawHead() {
+      if (!document.body.contains(head)) return false;
+      var p = profileNow() || { email: email };
+      head.textContent = "";
+      head.appendChild(el("button", { type: "button", ariaLabel: "Change your name and photo", style: "all:unset;cursor:pointer;border-radius:50%;flex:none", onclick: editHere }, [face(p, 52)]));
+      head.appendChild(el("div", { style: "min-width:0;flex:1" }, [el("b", { text: p.name || "Add your name", style: "display:block;font-size:17px;color:" + (p.name ? "#0f1b33" : "#5b6475") }),
+        el("span", { text: email, style: "display:block;font-size:14px;color:#5b6475;word-break:break-all" })]));
+      head.appendChild(el("button", { type: "button", text: "Edit", onclick: editHere, style: "all:unset;cursor:pointer;font-weight:700;font-size:14px;padding:8px 14px;border:1px solid #ddd6c6;border-radius:999px" }));
+    }
+    [el("h2", { text: "Your account" }), head, gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
+    drawHead(); profileWatchers.push(drawHead); loadProfile();
     if (notice) say(msg, notice.text, notice.bad);
     var abox = el("div"); sheet.insertBefore(abox, gbox.nextSibling);
     api("/relay/my/admin/me").then(function (r) {
@@ -1356,7 +1514,7 @@
     a.setAttribute("aria-label", "Account and sign in");
     a.addEventListener("click", show);
     a.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); show(); } });
-    var s = load(); if (s && s.email) a.textContent = s.email.charAt(0).toUpperCase();
+    paintAvatars(); loadProfile();
   }
   function completeLinkSignIn() {
     var m = /(?:^|[#&])signin=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash || "");
@@ -1372,7 +1530,7 @@
       if (r.body.needsSecondStep) return open(function (sheet) { secondStepView(sheet, r.body.pendingToken); });
       save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
       keepStorage();
-      var a = document.querySelector(".avatar"); if (a) a.textContent = r.body.email.charAt(0).toUpperCase();
+      paintAvatars(); loadProfile();
       // Signed in and Outlook connected together: straight to Receipts, where the first scan starts by itself.
       if (r.body.outlookConnected && window.go) { close(); window.__relayAutoScan = true; window.__relayReceiptsNote = mailNote("connected", "Outlook"); window.go("receipts"); return; }
       show();
@@ -2543,7 +2701,7 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
