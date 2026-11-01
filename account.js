@@ -712,7 +712,7 @@
         if (memo.openCat === "shop" && shopRows.length) {
           list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All groups", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); } }));
           list.appendChild(el("h3", { text: "🛍 Shop orders (" + shopRows.length + ")", style: "font-size:20px;margin:14px 0 8px;color:#0f1b33" }));
-          var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px" });
+          var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid #e7e1d2;border-radius:14px;font-size:15px;background:#fff;font-family:inherit" });
           var sh = el("div", { className: "rl-po-grid" });
           shopRows.forEach(function (x) { var c = confirmedCard(x[0], x[1], function () { memo.purchases = null; loadList(); }); c.setAttribute("data-find", [x[0].store, x[1].title, x[1].variant].join(" ").toLowerCase()); sh.appendChild(c); });
           sq.addEventListener("input", function () { var q = sq.value.trim().toLowerCase(); Array.prototype.forEach.call(sh.children, function (c) { c.style.display = !q || c.getAttribute("data-find").indexOf(q) !== -1 ? "" : "none"; }); });
@@ -723,7 +723,7 @@
           list.appendChild(el("button", { className: "rl-btn ghost", text: "‹ All groups", style: "width:auto;padding:8px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }));
           list.appendChild(el("h3", { text: (glyphs[memo.openCat] || "") + " " + groupNames[memo.openCat] + " (" + by[memo.openCat].length + ")", style: "font-size:20px;margin:14px 0 4px;color:#0f1b33" }));
           if (by[memo.openCat][0].returnable === false && by[memo.openCat][0].notReturnableReason) list.appendChild(el("p", { text: by[memo.openCat][0].notReturnableReason, style: "font-size:13px;margin:0 0 8px" }));
-          var cq = el("input", { type: "search", placeholder: "Search " + groupNames[memo.openCat].toLowerCase() + " (shop, item, order number)", style: "margin:0 0 12px" });
+          var cq = el("input", { type: "search", placeholder: "Search " + groupNames[memo.openCat].toLowerCase() + " (shop, item, order number)", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid #e7e1d2;border-radius:14px;font-size:15px;background:#fff;font-family:inherit" });
           var ch = el("div");
           by[memo.openCat].forEach(function (r) { ch.appendChild(receiptRow(r)); });
           var none = el("p", { text: "No receipts match that search.", style: "display:none;color:#667085" });
