@@ -1,6 +1,7 @@
-// "View original receipt": fetches ONE email live from the shopper's Gmail, cleans it and returns
+// "View original receipt": fetches ONE email live from the shopper's Gmail or Outlook, cleans it and returns
 // display-ready HTML. Nothing is stored. The app shows the result in a sandboxed frame with no scripts,
 // so cleaning here is defence in depth, not the only barrier.
+import { mimeParts } from "./receipt-parser.js";
 const MAX_HTML = 400_000;
 const MAX_INLINE_IMAGE = 600_000; // bytes per embedded picture
 const MAX_INLINE_TOTAL = 2_500_000;
@@ -124,11 +125,9 @@ export async function buildOriginal(fetchImpl, token, messageId) {
   const out = { html: [], text: [], images: [] };
   walk(msg.payload, out);
   // Pictures embedded in the email (QR codes are usually these): fetched live and inlined as data.
-  const cidMap = new Map();
-  const gallery = [];
-  let total = 0, count = 0;
+  const pictures = [];
   for (const img of out.images) {
-    if (count >= MAX_INLINE_COUNT) break;
+    if (pictures.length >= MAX_INLINE_COUNT) break;
     let b64 = null;
     try {
       if (img.data) b64 = bytesToB64(unb64url(img.data));
@@ -137,7 +136,29 @@ export async function buildOriginal(fetchImpl, token, messageId) {
         if (a.ok) { const j = await a.json().catch(() => ({})); if (typeof j.data === "string") b64 = bytesToB64(unb64url(j.data)); }
       }
     } catch { b64 = null; }
-    if (!b64) continue;
+    if (b64) pictures.push({ type: img.type, cid: img.cid, b64 });
+  }
+  return { status: 200, body: shown(out.html, out.text, pictures) };
+}
+
+// The same, for Outlook: the email is fetched once as it was sent (with its pictures inside) and taken apart here.
+export async function buildOriginalOutlook(fetchImpl, token, messageId) {
+  const res = await fetchImpl("https://graph.microsoft.com/v1.0/me/messages/" + encodeURIComponent(messageId) + "/$value", { headers: { Authorization: "Bearer " + token } });
+  if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
+  if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
+  const out = mimeParts(await res.text());
+  return { status: 200, body: shown(out.html, out.text, out.images.slice(0, MAX_INLINE_COUNT * 2)) };
+}
+
+// Cleans the email's HTML (or text) and puts its own pictures back in place, within size limits.
+function shown(htmlParts, textParts, pictures) {
+  const cidMap = new Map();
+  const gallery = [];
+  let total = 0, count = 0;
+  for (const img of pictures) {
+    if (count >= MAX_INLINE_COUNT) break;
+    const b64 = img.b64;
+    if (!b64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || !/^image\/(png|jpeg|jpg|gif|webp)$/.test(img.type)) continue;
     const bytes = Math.floor(b64.length * 0.75);
     if (bytes > MAX_INLINE_IMAGE || total + bytes > MAX_INLINE_TOTAL) continue;
     total += bytes; count++;
@@ -145,13 +166,14 @@ export async function buildOriginal(fetchImpl, token, messageId) {
     if (img.cid) cidMap.set(img.cid, uri);
     gallery.push({ uri, cid: img.cid });
   }
+  const out = { html: htmlParts, text: textParts };
   const rawHtml = out.html.join("\n");
   const html = rawHtml ? cleanHtml(rawHtml, cidMap) : plainToHtml(out.text.join("\n"));
   const used = new Set();
   for (const [cid, uri] of cidMap) if (html.includes(uri)) used.add(cid);
   // Attachments that the email body does not show (some stores attach the QR code) are listed separately.
   const extra = gallery.filter(g => !g.cid || !used.has(g.cid)).map(g => g.uri);
-  return { status: 200, body: { html, extraImages: extra, links: usefulLinks(rawHtml) } };
+  return { html, extraImages: extra, links: usefulLinks(rawHtml) };
 }
 
 // Wraps cleaned HTML for the sandboxed frame: no scripts, nothing but https/data pictures.

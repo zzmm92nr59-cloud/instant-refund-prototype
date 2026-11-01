@@ -1,5 +1,6 @@
-// Gmail connection for Relay: consent record, Google sign-in (OAuth), encrypted token,
-// and a scan that reads ONLY order-confirmation / receipt emails.
+// Email connection for Relay (Gmail, or Outlook for Microsoft personal accounts): consent record, sign-in to the
+// mailbox (OAuth), encrypted token, and a scan that reads ONLY order-confirmation / receipt emails.
+// The tables keep their first names (gmail_connections and so on) and hold either kind of mailbox: a "provider" column says which.
 //
 // Rules (do not weaken):
 //  * No Gmail access without a recorded consent to the CURRENT wording. The wording
@@ -10,27 +11,36 @@
 //  * The OAuth "state" is single-use, expires in 10 minutes and is bound to the shopper
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
-//  * Disconnect revokes the token at Google and deletes the token and captured receipts.
+//  * Disconnect revokes the token at Google and deletes the token and captured receipts. (Microsoft has no
+//    revoke call for personal accounts: the token is deleted, and the shopper can remove Relay at account.live.com.)
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
-import { buildOriginal } from "./original.js";
+import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { categorise, storeKey, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 
-export const CONSENT_VERSION = "2026-10-v4";
+// v5: the same permission, worded for Outlook as well as Gmail.
+export const CONSENT_VERSION = "2026-11-v5";
 export const CONSENT_TEXT = [
   "To work, Relay needs to see your online and in-store receipts.",
-  "With your permission, Relay reads your Gmail in read-only mode and looks only for order confirmations, receipts and return emails from the past year or so.",
+  "With your permission, Relay reads your email (Gmail or Outlook) in read-only mode and looks only for order confirmations, receipts and return emails from the past year or so.",
   "From each one it keeps the store, order number, date, total and items, plus return details (deadline, how to return, return ID, any return link), one small product photo from the email if there is one, and a link back to the original email so you can open it yourself. It does not keep the email itself.",
   "If you ask for a return reminder on an item, Relay emails you once, at your sign-in address, a few days before its deadline. It sends nothing otherwise.",
-  "Relay never sends email from your Gmail, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
-  "You can disconnect Gmail and delete everything Relay has captured at any time, in one tap.",
+  "Relay never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds.",
+  "You can disconnect your email and delete everything Relay has captured at any time, in one tap.",
   "What Relay finds comes from your email, not from the store, so it can track your purchases but cannot start an automatic refund on its own."
 ];
 
 const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+// Outlook: Microsoft personal accounts (Outlook.com, Hotmail, Live). Read-only mail access, plus the address of the mailbox.
+export const MS_AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
+const GRAPH = "https://graph.microsoft.com/v1.0";
+export const OUTLOOK_SCOPE = "offline_access https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read";
+// Outlook message ids are long and may change if an email is moved, so emails are remembered by their own Message-ID instead.
+const OUTLOOK_ID = /^[A-Za-z0-9_=+\/-]{16,512}$/;
+const GMAIL_ID = /^[A-Za-z0-9]{6,40}$/;
 const STATE_TTL_MS = 10 * 60 * 1000;
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
@@ -83,6 +93,13 @@ async function decrypt(env, iv, data) {
 export function gmailConfigured(env) {
   return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
 }
+export function outlookConfigured(env) {
+  return Boolean(env.MICROSOFT_CLIENT_ID && env.MICROSOFT_CLIENT_SECRET);
+}
+// One address at Microsoft for both "Continue with Microsoft" and "Connect Outlook" (registered once with Microsoft).
+export function microsoftRedirect(env, url) {
+  return env.MICROSOFT_REDIRECT_URI || `${url.origin}/relay/microsoft/callback`;
+}
 function redirectUri(env, url) {
   return env.GOOGLE_REDIRECT_URI || `${url.origin}/relay/gmail/callback`;
 }
@@ -128,6 +145,10 @@ async function ensureGmailTablesRun(db) {
        updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id, item_index))`
   ];
   await runAll(db, statements);
+  // Which kind of mailbox a connection (or a connection being started) is: NULL for Gmail, 'microsoft' for Outlook.
+  for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN provider TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN provider TEXT"]) {
+    try { await db.prepare(sql).run(); } catch { /* already there */ }
+  }
   await ensureResaleTables(db);
 }
 
@@ -216,11 +237,39 @@ async function accessToken(env, refreshToken, fetchImpl) {
   return body && body.access_token ? body.access_token : null;
 }
 
+// Microsoft may hand back a new refresh token each time; the newest is kept so the connection doesn't lapse.
+async function msAccessToken(env, refreshToken, fetchImpl) {
+  const res = await fetchImpl(MS_AUTH + "/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.MICROSOFT_CLIENT_ID, client_secret: env.MICROSOFT_CLIENT_SECRET,
+      refresh_token: refreshToken, grant_type: "refresh_token", scope: OUTLOOK_SCOPE
+    })
+  });
+  if (!res.ok) return null;
+  const body = await res.json().catch(() => null);
+  return body && body.access_token ? { access: body.access_token, refresh: typeof body.refresh_token === "string" ? body.refresh_token : null } : null;
+}
+// An access token for whichever mailbox the shopper connected (row from gmail_connections), or null if it must be reconnected.
+async function mailToken(env, shopperId, row, fetchImpl) {
+  const refresh = await decrypt(env, row.token_iv, row.token_data);
+  if (row.provider !== "microsoft") return accessToken(env, refresh, fetchImpl);
+  if (!outlookConfigured(env)) return null;
+  const t = await msAccessToken(env, refresh, fetchImpl);
+  if (!t) return null;
+  if (t.refresh && t.refresh !== refresh) {
+    const enc = await encrypt(env, t.refresh);
+    await env.RELAY_DB.prepare("UPDATE gmail_connections SET token_iv = ?, token_data = ? WHERE shopper_id = ?").bind(enc.iv, enc.data, shopperId).run();
+  }
+  return t.access;
+}
+
 async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   let revoked = false;
-  if (row) {
+  if (row && row.provider !== "microsoft") {
     try {
       const refresh = await decrypt(env, row.token_iv, row.token_data);
       const res = await fetchImpl("https://oauth2.googleapis.com/revoke", {
@@ -245,7 +294,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
   if (withdraw) statements.push(env.RELAY_DB.prepare(
     "UPDATE shopper_consents SET withdrawn_at = ? WHERE shopper_id = ? AND withdrawn_at IS NULL").bind(Date.now(), shopperId));
   await env.RELAY_DB.batch(statements);
-  return { deleted: true, revokedAtGoogle: revoked };
+  return { deleted: true, revokedAtGoogle: revoked, provider: row && row.provider === "microsoft" ? "microsoft" : "google" };
 }
 
 const MAX_IMAGES_PER_SCAN = 1;
@@ -316,7 +365,8 @@ async function logoFor(env, fetchImpl, domain, now) {
 }
 
 // Reads one email and decides what it is. Only extracted fields are kept; the email text is dropped.
-function classify(rawText, id, lenient = false) {
+// "ref" says where the email lives so it can be opened again: { gmailId } or { outlookId }.
+function classify(rawText, ref, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
   // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
@@ -326,17 +376,17 @@ function classify(rawText, id, lenient = false) {
   const receipt = upd.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
   if (upd.ok) {
     details = {
-      kind: "return_update", gmailId: id, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
+      kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
       orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (del.ok) {
     details = {
-      kind: "delivery_update", gmailId: id, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
+      kind: "delivery_update", ...ref, status: del.status, at: del.at, carrier: del.carrier, trackingNumber: del.trackingNumber,
       merchant: del.merchant, retailer: del.retailer, orderRef: del.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (ret.ok) {
     details = {
-      kind: "return_instructions", gmailId: id,
+      kind: "return_instructions", ...ref,
       retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
       deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
       estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl, trackingNumber: ret.trackingNumber || null,
@@ -345,7 +395,7 @@ function classify(rawText, id, lenient = false) {
   } else if (receipt.ok) {
     // Keep only extracted fields. The email text is dropped here.
     details = {
-      kind: "receipt", gmailId: id,
+      kind: "receipt", ...ref,
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, orderDateFrom: receipt.orderDateFrom || null, currency: receipt.currency,
       totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
@@ -359,18 +409,97 @@ function classify(rawText, id, lenient = false) {
   return { details, status };
 }
 
+// ---- The two kinds of mailbox. Each lists one date window of likely emails and reads one email as it was sent. ----
+function gmailMailbox(fetchImpl, token) {
+  const auth = { Authorization: "Bearer " + token };
+  return {
+    prefix: "gmail:",
+    // Gmail lists newest first, a page at a time. Several pages are read so older receipts are reachable.
+    async list(afterD, before, canPage) {
+      const entries = [];
+      let pageToken = "", incomplete = false;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        if (page > 0 && !canPage()) { incomplete = true; break; }
+        const list = await fetchImpl(
+          "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(windowQuery(afterD, before)) +
+          (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
+        if (!list.ok) { if (page === 0) return { failed: true }; break; }
+        const data = await list.json().catch(() => ({}));
+        for (const m of data.messages || []) if (m && typeof m.id === "string" && GMAIL_ID.test(m.id)) entries.push({ id: m.id, key: m.id });
+        pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
+        if (!pageToken) break;
+      }
+      return { entries, incomplete };
+    },
+    async read(id) {
+      const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
+      const raw = r.ok ? (await r.json().catch(() => ({}))).raw : null;
+      return typeof raw === "string" ? new TextDecoder().decode(unb64url(raw)) : null;
+    },
+    ref: e => ({ gmailId: e.id })
+  };
+}
+
+// Outlook can't be searched the way Gmail is (there is no "purchases" category), so each date window is listed by
+// subject and sender only, and just the emails that look like orders, receipts, returns or parcel updates are read in full.
+const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|shipped|shipping|on (its|it's|the) way|invoice|booking|confirmation|confirmed|your (items?|parcel|package))\b/i;
+const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|receipts?|returns?|shipping|ship-confirm|auto-confirm|order-update|confirm|confirmation)@/i;
+export function looksLikeShopping(subject, from) {
+  return SHOPPING_SUBJECT.test(String(subject || "")) || SHOPPING_SENDER.test(String(from || "").trim());
+}
+const OUTLOOK_PAGE = 200;
+function outlookMailbox(fetchImpl, token) {
+  const auth = { Authorization: "Bearer " + token };
+  const at = d => d.replace(/\//g, "-") + "T00:00:00Z";
+  return {
+    prefix: "outlook:",
+    async list(afterD, before, canPage) {
+      const entries = [];
+      let next = GRAPH + "/me/messages?$filter=" + encodeURIComponent("receivedDateTime ge " + at(afterD) + " and receivedDateTime lt " + at(before)) +
+        "&$orderby=" + encodeURIComponent("receivedDateTime desc") + "&$select=id,internetMessageId,subject,from,receivedDateTime&$top=" + OUTLOOK_PAGE;
+      let incomplete = false, oldest = null;
+      for (let page = 0; page < MAX_PAGES && next; page++) {
+        if (page > 0 && !canPage()) { incomplete = true; break; }
+        const res = await fetchImpl(next, { headers: auth });
+        if (!res.ok) { if (page === 0) return { failed: true }; incomplete = true; break; }
+        const data = await res.json().catch(() => ({}));
+        for (const m of Array.isArray(data.value) ? data.value : []) {
+          if (!m || typeof m.id !== "string" || !OUTLOOK_ID.test(m.id)) continue;
+          if (typeof m.receivedDateTime === "string" && /^\d{4}-\d{2}-\d{2}T/.test(m.receivedDateTime)) oldest = m.receivedDateTime;
+          if (!looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address)) continue;
+          const mid = typeof m.internetMessageId === "string" ? m.internetMessageId.trim() : "";
+          entries.push({ id: m.id, key: mid && mid.length <= 400 ? mid : m.id });
+        }
+        const link = data["@odata.nextLink"];
+        next = typeof link === "string" && link.startsWith(GRAPH + "/me/messages?") ? link : "";
+      }
+      // A very busy inbox has more in one window than a round can list: the next round starts from the oldest email listed.
+      return { entries, incomplete, moreBefore: next && oldest ? oldest.slice(0, 10).replace(/-/g, "/") : null };
+    },
+    async read(id) {
+      const r = await fetchImpl(GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", { headers: auth });
+      return r.ok ? r.text() : null;
+    },
+    ref: e => ({ outlookId: e.id })
+  };
+}
+// The Message-ID an email carries, which stays the same wherever it is filed (Outlook's own ids do not).
+function messageIdOf(rawText) {
+  const m = /^message-id:[ \t]*(<[^>\r\n]{1,398}>)/im.exec(String(rawText).slice(0, 60000));
+  return m ? m[1].trim() : null;
+}
+
 async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   // Every outside call is counted so a round never runs past the plan's per-request limit.
   let calls = 0;
   const fetchImpl = (...a) => { calls++; return fetchImplIn(...a); };
   const budget = o.budget || CALL_BUDGET, maxFetch = o.maxFetch || MAX_FETCH_PER_SCAN;
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data, last_scan_at FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, last_scan_at, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
-  const refresh = await decrypt(env, row.token_iv, row.token_data);
-  const token = await accessToken(env, refresh, fetchImpl);
+  const token = await mailToken(env, shopperId, row, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
-  const auth = { Authorization: "Bearer " + token };
+  const box = row.provider === "microsoft" ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token);
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
@@ -385,22 +514,12 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     if (calls + 4 > budget) { outOfBudget = true; break; }
     const afterD = ymd(fromYmd(before) - WINDOW_DAYS * DAY_MS);
     incomplete = false;
-    // Gmail lists newest first, a page at a time. Read several pages so older receipts are reachable.
-    const ids = [];
-    let pageToken = "";
-    for (let page = 0; page < MAX_PAGES; page++) {
-      if (page > 0 && calls + 4 > budget) { incomplete = true; break; }
-      const list = await fetchImpl(
-        "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(windowQuery(afterD, before)) +
-        (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
-      if (!list.ok) { if (page === 0) return { status: 502, body: { error: "gmail_unavailable" } }; break; }
-      const data = await list.json().catch(() => ({}));
-      for (const m of data.messages || []) if (m && typeof m.id === "string" && /^[A-Za-z0-9]{6,40}$/.test(m.id)) ids.push(m.id);
-      pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
-      if (!pageToken) break;
-    }
+    const listed = await box.list(afterD, before, () => calls + 4 <= budget);
+    if (listed.failed) { if (windows === 0) return { status: 502, body: { error: "gmail_unavailable" } }; incomplete = true; break; }
+    if (listed.incomplete) incomplete = true;
+    const ids = listed.entries.map(e => e.id);
     // Lookups are done in groups to stay under the database's per-query limit.
-    const refs = await Promise.all(ids.map(id => sha256Hex("gmail:" + id)));
+    const refs = await Promise.all(listed.entries.map(e => sha256Hex(box.prefix + e.key)));
     const known = new Map();
     for (let i = 0; i < refs.length; i += 90) {
       const chunk = refs.slice(i, i + 90);
@@ -418,10 +537,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     const rawById = new Map(), writes = [];
     for (let i = 0; i < toRead.length; i += FETCH_PARALLEL) {
       await Promise.all(toRead.slice(i, i + FETCH_PARALLEL).map(async (mid) => {
-        try {
-          const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${mid}?format=raw`, { headers: auth });
-          rawById.set(mid, r.ok ? ((await r.json().catch(() => ({}))).raw) : null);
-        } catch (e) { rawById.set(mid, null); }
+        try { rawById.set(mid, await box.read(mid)); } catch (e) { rawById.set(mid, null); }
       }));
     }
     for (let i = 0; i < ids.length; i++) {
@@ -432,10 +548,9 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (seen && !stale) { skipped++; continue; }
       if (!rawById.has(id)) { incomplete = true; continue; }   // left for the next round
       fetched++;
-      const raw = rawById.get(id);
-      if (typeof raw !== "string") continue;
-      const rawText = new TextDecoder().decode(unb64url(raw));
-      const cls = classify(rawText, id);
+      const rawText = rawById.get(id);
+      if (typeof rawText !== "string") continue;
+      const cls = classify(rawText, box.ref(listed.entries[i]));
       const details = cls.details, status = cls.status;
       let imageToStore = null;
       if (status === "not_receipt") ignored++;
@@ -477,7 +592,12 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     if (writes.length) await env.RELAY_DB.batch(writes.splice(0));
     windows++;
     if (incomplete) break;       // stay on this window until every email in it is read
-    before = afterD;
+    // An Outlook window with more emails than one round lists carries on from the day of the oldest one listed
+    // (that day is listed again, and what was already read is skipped). Otherwise the next window is the 30 days before.
+    if (listed.moreBefore) {
+      const next = ymd(fromYmd(listed.moreBefore) + DAY_MS);
+      before = next < before ? next : listed.moreBefore < before ? listed.moreBefore : afterD;
+    } else before = afterD;
     if (fetched >= maxFetch) break;
   }
   const more = incomplete || outOfBudget || before > limitDay;
@@ -488,13 +608,13 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
 }
 
 
-// ---- Find a missing receipt: search Gmail live by store name, then add one chosen email ----
+// ---- Find a missing receipt: search the mailbox live by store name, then add one chosen email ----
 async function tokenFor(env, shopperId, fetchImpl) {
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
-  const token = await accessToken(env, await decrypt(env, row.token_iv, row.token_data), fetchImpl);
-  return token ? { token } : { status: 401, body: { error: "gmail_reconnect_needed" } };
+  const token = await mailToken(env, shopperId, row, fetchImpl);
+  return token ? { token, provider: row.provider === "microsoft" ? "microsoft" : "google" } : { status: 401, body: { error: "gmail_reconnect_needed" } };
 }
 
 // Nothing here is stored: the list is for the shopper to choose from.
@@ -504,11 +624,12 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
   const t = await tokenFor(env, shopperId, fetchImpl);
   if (!t.token) return t;
   const auth = { Authorization: "Bearer " + t.token };
+  if (t.provider === "microsoft") return findOutlook(env, shopperId, fetchImpl, auth, q);
   // Order, shipping and return emails first (a shop's marketing and payment-plan emails otherwise bury them), then anything else.
   const listIds = async query => {
     const l = await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=" + encodeURIComponent(query), { headers: auth });
     if (!l.ok) return null;
-    return ((await l.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && /^[A-Za-z0-9]{6,40}$/.test(id));
+    return ((await l.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && GMAIL_ID.test(id));
   };
   const first = await listIds(q + ' subject:(order OR receipt OR confirmation OR "thanks for your" OR return OR "QR code" OR shipping OR delivered OR invoice) -category:promotions');
   const rest = await listIds(q);
@@ -530,23 +651,52 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
   return { status: 200, body: { results } };
 }
 
+// Outlook's own search, newest first; order-type emails are put at the top of the list.
+async function findOutlook(env, shopperId, fetchImpl, auth, q) {
+  const l = await fetchImpl(GRAPH + "/me/messages?$search=" + encodeURIComponent('"' + q + '"') + "&$top=25&$select=id,internetMessageId,subject,from,receivedDateTime", { headers: auth });
+  if (!l.ok) return { status: 502, body: { error: "gmail_unavailable" } };
+  const found = ((await l.json().catch(() => ({}))).value || []).filter(m => m && typeof m.id === "string" && OUTLOOK_ID.test(m.id));
+  const looks = m => looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address);
+  const ordered = [...found.filter(looks), ...found.filter(m => !looks(m))].slice(0, 15);
+  const results = [];
+  for (const m of ordered) {
+    const mid = typeof m.internetMessageId === "string" ? m.internetMessageId.trim() : "";
+    const ref = await sha256Hex("outlook:" + (mid && mid.length <= 400 ? mid : m.id));
+    const have = await env.RELAY_DB.prepare("SELECT status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
+    const who = m.from && m.from.emailAddress || {};
+    results.push({ id: m.id, subject: String(m.subject || "").slice(0, 120), from: String(who.name || who.address || "").replace(/["']/g, "").trim().slice(0, 60),
+      date: typeof m.receivedDateTime === "string" ? m.receivedDateTime.slice(0, 10) : null,
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) });
+  }
+  return { status: 200, body: { results } };
+}
+
 async function addEmail(env, shopperId, fetchImpl, now, messageId) {
-  if (typeof messageId !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(messageId)) return { status: 400, body: { error: "invalid_message" } };
+  if (typeof messageId !== "string" || !(GMAIL_ID.test(messageId) || OUTLOOK_ID.test(messageId))) return { status: 400, body: { error: "invalid_message" } };
   const t = await tokenFor(env, shopperId, fetchImpl);
   if (!t.token) return t;
-  const res = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=raw`, { headers: { Authorization: "Bearer " + t.token } });
+  const outlook = t.provider === "microsoft";
+  if (outlook ? !OUTLOOK_ID.test(messageId) : !GMAIL_ID.test(messageId)) return { status: 400, body: { error: "invalid_message" } };
+  const res = outlook
+    ? await fetchImpl(GRAPH + "/me/messages/" + encodeURIComponent(messageId) + "/$value", { headers: { Authorization: "Bearer " + t.token } })
+    : await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=raw`, { headers: { Authorization: "Bearer " + t.token } });
   if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
   if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const raw = (await res.json().catch(() => ({}))).raw;
-  if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
-  const rawText = new TextDecoder().decode(unb64url(raw));
-  const { details, status } = classify(rawText, messageId, true);
+  let rawText;
+  if (outlook) rawText = await res.text();
+  else {
+    const raw = (await res.json().catch(() => ({}))).raw;
+    if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
+    rawText = new TextDecoder().decode(unb64url(raw));
+  }
+  const { details, status } = classify(rawText, outlook ? { outlookId: messageId } : { gmailId: messageId }, true);
   if (status === "not_receipt") {
     // Say which checks failed (no email content), so a missed layout can be fixed.
     const why = parseReceiptEmail(rawText, { lenient: true }).signals || null;
     return { status: 200, body: { ok: false, reason: "not_recognised", signals: why } };
   }
-  const ref = await sha256Hex("gmail:" + messageId);
+  // The same key the scan uses, so an email added by hand is never added a second time by a scan.
+  const ref = await sha256Hex(outlook ? "outlook:" + (messageIdOf(rawText) || messageId) : "gmail:" + messageId);
   const seen = await env.RELAY_DB.prepare("SELECT id, details FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
   const prev = seen ? JSON.parse(seen.details) : {};
   const receiptId = seen ? seen.id : crypto.randomUUID();
@@ -814,7 +964,7 @@ export async function handleGmailCallback(request, env, url, opts) {
   const state = url.searchParams.get("state") || "";
   if (!code || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
   const claimed = await env.RELAY_DB.prepare(
-    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
+    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider IS NULL AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
     .bind(opts.now, await sha256Hex(state), opts.now).first();
   if (!claimed) return back("failed");
   if (!(await hasConsent(env.RELAY_DB, claimed.shopper_id))) return back("consent_needed");
@@ -834,12 +984,57 @@ export async function handleGmailCallback(request, env, url, opts) {
       { headers: { Authorization: "Bearer " + tokens.access_token } });
     if (p.ok) googleEmail = (await p.json()).emailAddress || null;
   } catch { googleEmail = null; }
-  const enc = await encrypt(env, tokens.refresh_token);
+  await saveConnection(env, claimed.shopper_id, null, googleEmail, tokens.refresh_token, opts.now);
+  return back("connected");
+}
+
+// One mailbox per shopper: connecting one replaces the other (receipts already captured stay until the shopper disconnects).
+async function saveConnection(env, shopperId, provider, address, refreshToken, now) {
+  const enc = await encrypt(env, refreshToken);
+  await ensureAutoColumns(env.RELAY_DB);
+  // A newly connected mailbox is read from the start (the automatic checker's place in the old one is dropped).
   await env.RELAY_DB.prepare(
-    `INSERT INTO gmail_connections (shopper_id,google_email,token_iv,token_data,connected_at) VALUES (?,?,?,?,?)
+    `INSERT INTO gmail_connections (shopper_id,google_email,token_iv,token_data,connected_at,provider) VALUES (?,?,?,?,?,?)
      ON CONFLICT(shopper_id) DO UPDATE SET google_email=excluded.google_email, token_iv=excluded.token_iv,
-       token_data=excluded.token_data, connected_at=excluded.connected_at, last_scan_at=NULL`)
-    .bind(claimed.shopper_id, googleEmail, enc.iv, enc.data, opts.now).run();
+       token_data=excluded.token_data, connected_at=excluded.connected_at, provider=excluded.provider, last_scan_at=NULL, auto_cursor=NULL`)
+    .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
+}
+
+// Microsoft sends the browser back here after "Connect Outlook" (sign-in states are handled first, in auth.js).
+// As with Gmail, the single-use state bound to the shopper who started is the only thing that identifies them.
+export async function handleOutlookCallback(request, env, url, opts) {
+  const appUrl = String(env.RELAY_APP_URL || opts.appUrl).split("#")[0];
+  const back = result => Response.redirect(appUrl + "#outlook=" + result, 302);
+  if (!outlookConfigured(env)) return back("not_configured");
+  if (url.searchParams.get("error")) return back("denied");
+  const code = url.searchParams.get("code") || "";
+  const state = url.searchParams.get("state") || "";
+  if (!code || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
+  const claimed = await env.RELAY_DB.prepare(
+    `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider = 'microsoft' AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
+    .bind(opts.now, await sha256Hex(state), opts.now).first();
+  if (!claimed) return back("failed");
+  if (!(await hasConsent(env.RELAY_DB, claimed.shopper_id))) return back("consent_needed");
+  let tokens = null;
+  try {
+    const res = await opts.fetchImpl(MS_AUTH + "/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code, client_id: env.MICROSOFT_CLIENT_ID, client_secret: env.MICROSOFT_CLIENT_SECRET,
+        redirect_uri: microsoftRedirect(env, url), grant_type: "authorization_code", scope: OUTLOOK_SCOPE
+      })
+    });
+    tokens = res.ok ? await res.json().catch(() => null) : null;
+  } catch { tokens = null; }
+  if (!tokens || !tokens.refresh_token || !tokens.access_token) return back("failed");
+  // Read access to mail must actually have been granted (not just sign-in).
+  if (!/(^|[\s/])Mail\.Read(\s|$)/i.test(String(tokens.scope || ""))) return back("failed");
+  let address = null;
+  try {
+    const p = await opts.fetchImpl(GRAPH + "/me?$select=mail,userPrincipalName", { headers: { Authorization: "Bearer " + tokens.access_token } });
+    if (p.ok) { const me = await p.json(); address = (typeof me.mail === "string" && me.mail) || (typeof me.userPrincipalName === "string" && me.userPrincipalName) || null; }
+  } catch { address = null; }
+  await saveConnection(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null, tokens.refresh_token, opts.now);
   return back("connected");
 }
 
@@ -848,8 +1043,12 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   const path = url.pathname;
   const m = request.method;
   if (path === "/relay/my/consent" && m === "GET") {
-    return json({ version: CONSENT_VERSION, text: CONSENT_TEXT, accepted: await hasConsent(env.RELAY_DB, shopper.id),
-      gmailAvailable: gmailConfigured(env) }, 200, cors);
+    const accepted = await hasConsent(env.RELAY_DB, shopper.id);
+    // Someone who agreed to an earlier wording is told what changed, rather than being shown it as if for the first time.
+    const earlier = accepted ? null : await env.RELAY_DB.prepare(
+      "SELECT 1 AS ok FROM shopper_consents WHERE shopper_id = ? AND version <> ? AND withdrawn_at IS NULL").bind(shopper.id, CONSENT_VERSION).first();
+    return json({ version: CONSENT_VERSION, text: CONSENT_TEXT, accepted, acceptedEarlier: Boolean(earlier),
+      gmailAvailable: gmailConfigured(env), outlookAvailable: outlookConfigured(env) }, 200, cors);
   }
   if (path === "/relay/my/consent" && m === "POST") {
     const body = await request.json().catch(() => null);
@@ -864,13 +1063,22 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: true })) }, 200, cors);
   }
   if (path === "/relay/my/gmail/connect" && m === "POST") {
-    if (!gmailConfigured(env)) return json({ error: "gmail_not_configured" }, 503, cors);
+    const cb = await request.json().catch(() => ({}));
+    const outlook = Boolean(cb && cb.provider === "microsoft");
+    if (outlook ? !outlookConfigured(env) : !gmailConfigured(env)) return json({ error: "gmail_not_configured" }, 503, cors);
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const state = randomToken();
     await env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE expires_at <= ?").bind(opts.now).run();
     await env.RELAY_DB.prepare(
-      "INSERT INTO gmail_oauth_states (state_hash,shopper_id,created_at,expires_at) VALUES (?,?,?,?)")
-      .bind(await sha256Hex(state), shopper.id, opts.now, opts.now + STATE_TTL_MS).run();
+      "INSERT INTO gmail_oauth_states (state_hash,shopper_id,created_at,expires_at,provider) VALUES (?,?,?,?,?)")
+      .bind(await sha256Hex(state), shopper.id, opts.now, opts.now + STATE_TTL_MS, outlook ? "microsoft" : null).run();
+    if (outlook) {
+      const ms = new URLSearchParams({
+        client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
+        scope: OUTLOOK_SCOPE, state, prompt: "select_account", login_hint: shopper.email
+      });
+      return json({ url: MS_AUTH + "/authorize?" + ms }, 200, cors);
+    }
     const params = new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri(env, url), response_type: "code", scope: SCOPE,
       access_type: "offline", prompt: "consent", include_granted_scopes: "false", state, login_hint: shopper.email
@@ -880,7 +1088,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/gmail" && m === "GET") {
     const c = await env.RELAY_DB.prepare(
       "SELECT * FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first()
-      .then(x => x && { googleEmail: x.google_email, connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
+      .then(x => x && { provider: x.provider === "microsoft" ? "microsoft" : "google", googleEmail: x.google_email, email: x.google_email,
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
     return json({ connected: Boolean(c), ...(c || {}) }, 200, cors);
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
@@ -951,14 +1160,17 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const rec = await env.RELAY_DB.prepare(
       "SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(orig[1], shopper.id).first();
     if (!rec) return json({ error: "not_found" }, 404, cors);
-    const gid = JSON.parse(rec.details).gmailId;
-    if (typeof gid !== "string" || !/^[A-Za-z0-9]{6,40}$/.test(gid)) return json({ error: "email_not_found" }, 404, cors);
+    const d = JSON.parse(rec.details);
     const conn = await env.RELAY_DB.prepare(
-      "SELECT token_iv, token_data FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first();
+      "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first();
     if (!conn) return json({ error: "gmail_not_connected" }, 409, cors);
-    const token = await accessToken(env, await decrypt(env, conn.token_iv, conn.token_data), opts.fetchImpl);
+    // An email can only be opened from the mailbox it came from.
+    const outlook = conn.provider === "microsoft";
+    const mid = outlook ? d.outlookId : d.gmailId;
+    if (typeof mid !== "string" || !(outlook ? OUTLOOK_ID : GMAIL_ID).test(mid)) return json({ error: "email_not_found" }, 404, cors);
+    const token = await mailToken(env, shopper.id, conn, opts.fetchImpl);
     if (!token) return json({ error: "gmail_reconnect_needed" }, 401, cors);
-    const r = await buildOriginal(opts.fetchImpl, token, gid);
+    const r = outlook ? await buildOriginalOutlook(opts.fetchImpl, token, mid) : await buildOriginal(opts.fetchImpl, token, mid);
     return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
   }
   const act = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/(confirm|dismiss)$/.exec(path);

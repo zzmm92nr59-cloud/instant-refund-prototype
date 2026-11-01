@@ -102,6 +102,37 @@ function collectParts(headers, body, out, depth = 0) {
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
 }
 
+// A raw email split up for showing it as it was sent: its text, its HTML and the pictures inside it (with their
+// Content-ID, so the HTML's "cid:" pictures can be put back). Only those parts are decoded; attachments are skipped.
+const SHOWN_IMAGE = /^image\/(png|jpe?g|gif|webp)\b/i;
+export function mimeParts(raw) {
+  const out = { html: [], text: [], images: [] };
+  const top = splitMessage(String(raw || "").slice(0, 8_000_000));
+  walkShownParts(top.headers, top.body, out, 0);
+  return out;
+}
+function walkShownParts(headers, body, out, depth) {
+  if (depth > 8) return;
+  const type = headers["content-type"] || "text/plain";
+  const boundary = type.match(/boundary="?([^";]+)"?/i);
+  if (/multipart\//i.test(type) && boundary) {
+    for (const chunk of body.split("--" + boundary[1]).slice(1)) {
+      if (chunk.startsWith("--")) break;
+      const part = splitMessage(chunk.replace(/^\r?\n/, ""));
+      walkShownParts(part.headers, part.body, out, depth + 1);
+    }
+    return;
+  }
+  const img = SHOWN_IMAGE.exec(type);
+  if (img) {
+    const b64 = /base64/i.test(headers["content-transfer-encoding"] || "") ? body.replace(/\s+/g, "") : "";
+    if (/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) out.images.push({ type: "image/" + img[1].toLowerCase().replace("jpg", "jpeg"), cid: (headers["content-id"] || "").trim().replace(/^<|>$/g, ""), b64 });
+    return;
+  }
+  if (/text\/html/i.test(type)) out.html.push(decodeBody(headers, body));
+  else if (/text\/plain/i.test(type) && !/attachment/i.test(headers["content-disposition"] || "")) out.text.push(decodeBody(headers, body));
+}
+
 function htmlToText(html) {
   return html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
