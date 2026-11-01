@@ -58,6 +58,19 @@
     ".rl-btn.ghost{background:transparent;border:1px solid #ddd6c6;color:#0f1b33;margin-top:10px}" +
     ".rl-btn:disabled{opacity:.6}.rl-msg{min-height:20px;font-size:14px;margin:8px 0 0;color:#46601b}.rl-msg.err{color:#b3261e}" +
     ".rl-order{border:1px solid #ece4d3;border-radius:18px;padding:12px 14px;margin:10px 0;background:#fff}" +
+    ".rl-po-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin:12px 0 8px}" +
+    ".rl-po{background:#fff;border:1px solid #ebe6da;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)}" +
+    ".rl-po-top{display:flex;gap:14px;align-items:flex-start}.rl-po-info{flex:1;min-width:0}" +
+    ".rl-po-img{width:68px;height:68px;border-radius:16px;background:#f3efe6;flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:#526549}" +
+    ".rl-po-img img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-po-shop{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#526549}" +
+    ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:#101828}.rl-po-meta{font-size:13px;color:#667085}" +
+    ".rl-po-price{font-weight:800;font-size:17px;white-space:nowrap;color:#101828}" +
+    ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:#eef6df;color:#3f5a17}.rl-po-status.wait{background:#f4f2ec;color:#475467}" +
+    ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
+    ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
+    ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:#fff;color:#101828}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
+    ".rl-po-more{margin:6px 0 4px;padding:10px 16px;border-radius:999px;border:1.5px solid #101828;background:#fff;font-weight:700;cursor:pointer}" +
     ".rl-order b{display:block}.rl-order span{color:#5b6475;font-size:14px}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
@@ -949,7 +962,7 @@
     });
     // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
     [onBack ? el("h2", { text: "Swap & resell" }) : null,
-     onBack ? el("p", { text: "Passed your return window? Sell or swap with other Relay members. For now Relay only matches people. Payment and postage aren't built yet, so nothing is bought or sent through Relay." }) : null,
+     onBack ? el("p", { text: "Passed your return window? Sell or swap with other Relay members. Relay puts you in touch, and you agree payment and postage between you." }) : null,
      tabs, body, msg,
      onBack ? el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
@@ -1538,70 +1551,89 @@
       sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
     });
   }
-  function mountConfirmed(host) {
+  // Test shop tools (Square sandbox test orders, test refunds, card-only test payments) only for people testing Relay:
+  // switched on from Profile → Testing, or with ?testing=1. Shoppers never see them.
+  function testingOn() {
+    try { return /[?&]testing=1(&|$)/.test(location.search) || localStorage.getItem("relay-testing-tools") === "1"; } catch (e) { return false; }
+  }
+  function shortDate(d) {
+    var t = new Date(d); if (isNaN(t)) return "";
+    var o = { day: "numeric", month: "short" }; if (t.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
+    return t.toLocaleDateString("en-GB", o);
+  }
+  function initials(name) { return String(name || "Shop").split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
+  // One shop-confirmed item: picture, shop, what it is, price, where it's up to, and what you can do.
+  function confirmedCard(o, it, redraw) {
+    var card = el("div", { className: "rl-po" });
+    var img = el("div", { className: "rl-po-img" });
+    if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) img.appendChild(el("img", { src: it.imageUrl, alt: "" })); else img.textContent = initials(o.store);
+    var info = el("div", { className: "rl-po-info" }, [
+      el("div", { className: "rl-po-shop", text: o.store || "Shop" }),
+      el("h3", { text: it.title }),
+      el("div", { className: "rl-po-meta", text: [it.variant, it.quantity > 1 ? "×" + it.quantity : null, shortDate(o.orderedAt)].filter(Boolean).join(" · ") })]);
+    card.appendChild(el("div", { className: "rl-po-top" }, [img, info, el("div", { className: "rl-po-price", text: money(it.priceMinor, it.currency) })]));
+    var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
+    var shopName = o.store || "the shop";
+    if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
+    else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
+    var actions = el("div", { className: "rl-po-actions" });
+    if (it.exchange && it.exchange.balance) {
+      var bal = it.exchange.balance;
+      if (bal.paid) status("✓ " + money(bal.owedMinor, it.currency) + " difference paid to " + shopName, true);
+      else {
+        status(money(bal.owedMinor, it.currency) + " still to pay " + shopName + " for the swap" + (bal.payUrl ? "." : ". Use the link in " + shopName + "'s email."), false);
+        if (bal.payUrl && /^https:\/\//.test(bal.payUrl)) actions.appendChild(el("a", { className: "rl-po-primary", href: bal.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + money(bal.owedMinor, it.currency) + " to " + shopName }));
+      }
+    }
+    if (it.returnInfo) {
+      var ri = it.returnInfo, refunded = ri.status === "refunded";
+      status(refunded ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + shopName + (ri.refundedAt ? " on " + shortDate(ri.refundedAt) : "")
+        : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + ". Waiting for " + shopName + " to refund.", refunded);
+      if (!refunded && o.testOrder && testingOn()) {
+        var tm = el("div", { className: "rl-msg" });
+        var tb = el("button", { className: "rl-po-secondary", text: "Test shop: refund it", onclick: function () {
+          tb.disabled = true; say(tm, "Asking the test shop to refund it…");
+          api("/relay/my/testing/square-refund", { method: "POST", body: { orderId: o.id, lineId: it.lineId } }).then(function (r) {
+            tb.disabled = false;
+            if (r.ok && r.body && r.body.refunded) { say(tm, "✓ Refunded by the test shop"); setTimeout(redraw, 1000); }
+            else if (r.ok) say(tm, "The test shop has started the refund. Press again in a minute, or it'll show within the hour.");
+            else say(tm, "The test shop couldn't refund it just now. Please try again in a minute.", true);
+          }, function () { tb.disabled = false; say(tm, "Couldn't reach Relay. Please try again.", true); });
+        } });
+        actions.appendChild(tb); card.appendChild(tm);
+      }
+    }
+    if (it.exchangeable) actions.appendChild(el("button", { className: "rl-po-primary", text: "Swap", title: "Swap for another size or colour", onclick: function () { openExchange(o, it, redraw); } }));
+    if (it.returnable) actions.appendChild(el("button", { className: "rl-po-secondary", text: "Return", onclick: function () { openReturn(o, it, redraw); } }));
+    if (actions.childNodes.length) card.appendChild(actions);
+    return card;
+  }
+  // Orders the shop confirmed. opts.limit: show only the newest few (the wallet), with a link to the rest.
+  function mountConfirmed(host, opts) {
     if (!host) return;
+    opts = opts || {};
     host.textContent = "";
     var s = load(); if (!s || !s.token) return;
     // The wallet can be drawn twice as the page settles: both share one request rather than asking the server twice.
     if (!memo.purchases) memo.purchases = api("/relay/my/purchases").then(function (r) { setTimeout(function () { memo.purchases = null; }, 1500); return r; }, function (e) { memo.purchases = null; throw e; });
     memo.purchases.then(function (r) {
       var rows = (r.ok && r.body && r.body.purchases) || [];
-      var testHost = el("div", { style: "margin-top:14px" });
-      var refresh = function () { memo.purchases = null; mountConfirmed(host); };
+      var refresh = function () { memo.purchases = null; mountConfirmed(host, opts); };
       var inHost = el("div"); mountInstore(inHost, refresh);
-      mountSquareTest(testHost, refresh);
-      if (!rows.length) { host.appendChild(inHost); host.appendChild(testHost); return; }
+      var testHost = el("div", { style: "margin-top:14px" });
+      if (testingOn()) mountSquareTest(testHost, refresh);
       host.appendChild(inHost);
-      host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
-      host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can return or exchange items here." }));
-      var grid = el("div", { className: "purchase-grid" }); host.appendChild(grid);
-      rows.forEach(function (o) {
-        (o.items || []).forEach(function (it) {
-          var card = el("div", { className: "card product" });
-          var art = el("div", { className: "art" });
-          if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) art.appendChild(el("img", { src: it.imageUrl, alt: "", style: "width:100%;height:100%;object-fit:cover;border-radius:16px" })); else art.textContent = "🛍";
-          card.appendChild(art);
-          var d = el("div", { className: "details" });
-          d.appendChild(el("div", { className: "eyebrow", text: String(o.store || "Shop").toUpperCase() + " · ✓ CONFIRMED BY THE SHOP" }));
-          d.appendChild(el("h3", { text: it.title }));
-          d.appendChild(el("div", { className: "small muted", text: (it.variant ? it.variant + " · " : "") + "Qty " + it.quantity + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") }));
-          d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
-          if (it.exchange && it.exchange.status === "awaiting_payment") d.appendChild(el("p", { className: "small muted", text: "Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + ": waiting for your payment" }));
-          else if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
-          // Swapped to a dearer item, paid through the shop's own checkout: what's left to pay, until it's paid.
-          if (it.exchange && it.exchange.balance) {
-            var bal = it.exchange.balance, shopName = o.store || "the shop";
-            if (bal.paid) d.appendChild(el("p", { className: "small watch", text: "✓ " + money(bal.owedMinor, it.currency) + " difference paid to " + shopName }));
-            else {
-              d.appendChild(el("p", { className: "small muted", text: money(bal.owedMinor, it.currency) + " still to pay " + shopName + " for the swap" + (bal.payUrl ? "." : ". Use the link in " + shopName + "'s email.") }));
-              if (bal.payUrl && /^https:\/\//.test(bal.payUrl)) d.appendChild(el("a", { className: "darkbtn", href: bal.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + money(bal.owedMinor, it.currency) + " to " + shopName + " →", style: "display:block;text-align:center;text-decoration:none" }));
-            }
-          }
-          if (it.returnInfo) {
-            var ri = it.returnInfo, refunded = ri.status === "refunded";
-            d.appendChild(el("p", { className: "small " + (refunded ? "watch" : "muted"), text: refunded
-              ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + (o.store || "the shop") + (ri.refundedAt ? " on " + new Date(ri.refundedAt).toLocaleDateString("en-GB") : "")
-              : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + " · waiting for " + (o.store || "the shop") + " to refund" }));
-            // Test shop only: play the shop's part and refund it in Square's test system, to see the whole return through.
-            if (!refunded && o.testOrder) (function (o, it) {
-              var tm = el("div", { className: "rl-msg" });
-              var tb = el("button", { className: "ghostbtn", text: "Test shop: refund this return", style: "margin-top:6px", onclick: function () {
-                tb.disabled = true; say(tm, "Asking the test shop to refund it…");
-                api("/relay/my/testing/square-refund", { method: "POST", body: { orderId: o.id, lineId: it.lineId } }).then(function (r) {
-                  tb.disabled = false;
-                  if (r.ok && r.body && r.body.refunded) { say(tm, "✓ Refunded by the test shop"); setTimeout(function () { memo.purchases = null; mountConfirmed(host); }, 1000); }
-                  else if (r.ok) say(tm, "The test shop has started the refund. Square usually finishes it within the hour, and it'll show here then.");
-                  else say(tm, "The test shop couldn't refund it just now. Please try again in a minute.", true);
-                }, function () { tb.disabled = false; say(tm, "Couldn't reach Relay. Please try again.", true); });
-              } });
-              d.appendChild(tb); d.appendChild(tm);
-            })(o, it);
-          }
-          if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
-          if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
-          card.appendChild(d); grid.appendChild(card);
-        });
-      });
+      if (rows.length) {
+        var items = [];
+        rows.forEach(function (o) { (o.items || []).forEach(function (it) { items.push([o, it]); }); });
+        host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: items.length + " item" + (items.length === 1 ? "" : "s") })]));
+        host.appendChild(el("p", { className: "small muted", text: "Bought with your Relay email at shops on Relay, so you can swap or return them here." }));
+        var grid = el("div", { className: "rl-po-grid" }); host.appendChild(grid);
+        var shown = opts.limit ? items.slice(0, opts.limit) : items;
+        shown.forEach(function (x) { grid.appendChild(confirmedCard(x[0], x[1], refresh)); });
+        if (opts.limit && items.length > opts.limit && window.go)
+          host.appendChild(el("button", { className: "rl-po-more", text: "See all " + items.length + " in Receipts →", onclick: function () { window.go("receipts"); } }));
+      }
       host.appendChild(testHost);
     }).catch(function () {});
   }
@@ -1626,9 +1658,9 @@
             else { yes.disabled = no.disabled = false; say(msg, a.body && a.body.error === "already_claimed" ? "Someone else has already added this purchase." : "Couldn't save that. Please try again.", true); }
           }, function () { yes.disabled = no.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
         };
-        var yes = el("button", { className: "darkbtn", text: "Yes, it's mine", onclick: function () { send("mine"); } });
-        var no = el("button", { className: "ghostbtn", text: "Not mine", style: "margin-left:8px", onclick: function () { send("not_mine"); } });
-        card.appendChild(el("div", {}, [yes, no])); card.appendChild(msg);
+        var yes = el("button", { className: "rl-po-primary", text: "Yes, it's mine", onclick: function () { send("mine"); } });
+        var no = el("button", { className: "rl-po-secondary", text: "Not mine", onclick: function () { send("not_mine"); } });
+        card.appendChild(el("div", { className: "rl-po-actions", style: "max-width:440px" }, [yes, no])); card.appendChild(msg);
         host.appendChild(card);
       });
       // Add a purchase from a shop receipt.
@@ -1666,7 +1698,7 @@
       var items = (r.ok && r.body && r.body.items) || [];
       if (!items.length) return;
       var card = el("details", { className: "card", style: "padding:14px 16px" });
-      card.appendChild(el("summary", { text: "Try it with a test order", style: "font-weight:700;cursor:pointer" }));
+      card.appendChild(el("summary", { text: "Testing: place a test order", style: "font-weight:700;cursor:pointer" }));
       card.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "Places an order at " + (r.body.store || "Relay's test shop") +
         " (a Square test shop) under your Relay email, paid with Square's test payment. No card is needed and no real money moves. Up to 5 a day." }));
       var pick = el("select", { style: "width:100%;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" });
@@ -1783,7 +1815,7 @@
     }
     draw();
   }
-  window.RelayAccount = { mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }

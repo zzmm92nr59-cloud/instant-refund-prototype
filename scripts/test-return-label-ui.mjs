@@ -45,7 +45,7 @@ async function shopperPage(returnBody) {
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  const ret = page.getByRole('button', { name: 'Return →' });
+  const ret = page.getByRole('button', { name: 'Return', exact: true });
   await ret.waitFor(); await ret.evaluate(e => e.scrollIntoView({ block: 'center' }));
   await ret.click();
   await page.getByRole('button', { name: 'Wrong size or fit' }).click();
