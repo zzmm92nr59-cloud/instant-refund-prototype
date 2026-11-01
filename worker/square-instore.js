@@ -15,7 +15,7 @@
 //     links that one purchase; it doesn't make Relay remember the card. 10 tries a day.
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { ensureOnce } from "./once.js";
-import { squareIsProduction } from "./square-env.js";
+import { squareIsProduction, squareShopName } from "./square-env.js";
 import { sq, squareOrderStatements, squareItemsOfVariations, ensureSquareOrderTables, SQUARE_ORDER } from "./square-orders.js";
 
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -81,7 +81,7 @@ async function listSuggestions(env, shopper) {
   const rows = ((await env.RELAY_DB.prepare(`SELECT s.id, s.order_id AS orderId, s.brand, s.last4, s.amount_minor AS amountMinor, s.currency, s.paid_at AS paidAt, s.store
     FROM square_instore_suggestions s WHERE s.email_hash = ? AND s.status = 'pending'
     AND NOT EXISTS (SELECT 1 FROM retailer_order_emails e WHERE e.order_id = s.order_id) ORDER BY s.paid_at DESC LIMIT 20`).bind(shopper.emailHash).all()).results || []);
-  return rows.map(r => ({ ...r, store: r.store || label(env) }));
+  return rows.map(r => ({ ...r, store: squareShopName(env, r.store) }));
 }
 
 async function answer(env, shopper, id, mine, now) {
@@ -107,7 +107,7 @@ async function answer(env, shopper, id, mine, now) {
 // The Square shops a receipt can be claimed at (Relay's own Square account's active locations).
 async function shops(env, f) {
   const locs = ((await sq(env, "/v2/locations", {}, f)).locations || []).filter(l => l.status === "ACTIVE");
-  return locs.map(l => ({ id: l.id, name: l.business_name || l.name || label(env), merchantId: l.merchant_id || null, currency: l.currency || "GBP" }));
+  return locs.map(l => ({ id: l.id, name: squareShopName(env, l.business_name || l.name), merchantId: l.merchant_id || null, currency: l.currency || "GBP" }));
 }
 
 async function claim(env, shopper, body, f, now) {
@@ -162,7 +162,7 @@ async function testTap(env, shopper, body, f, now, linkOne) {
   statements.push(db.prepare("INSERT INTO square_test_orders (id,shopper_id,order_id,created_at) VALUES (?,?,?,?)").bind(crypto.randomUUID(), shopper.id, id, now));
   await db.batch(statements);
   // What Relay's hourly check would do with it, straight away.
-  const r = await linkOne(env, [{ id, order }], f, { scope: "square:" + (location.merchant_id || location.id), store: location.business_name || location.name, now });
+  const r = await linkOne(env, [{ id, order }], f, { scope: "square:" + (location.merchant_id || location.id), store: squareShopName(env, location.business_name || location.name), now });
   const facts = paymentFacts(payment);
   return [200, { ok: true, orderId: id, suggested: r.suggested > 0, card: facts.brand && facts.last4 ? facts.brand + " •• " + facts.last4 : null, receiptNumber: facts.receipt,
     message: r.suggested > 0 ? "Test card payment made at the till. Relay recognised the card and is asking if it's yours."
