@@ -82,6 +82,10 @@
     ".rl-story-slide .rank{list-style:none;padding:0;margin:16px 0 0}.rl-story-slide .rank li{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.15);opacity:0;animation:rlup .5s forwards;font-size:19px;font-weight:800}.rl-story-slide .rank b{font-size:28px;color:var(--accent);width:28px}.rl-story-slide .rank span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rl-story-slide .rank em{font-style:normal;font-size:14px;opacity:.75;font-weight:600}" +
     ".rl-story-slide .bars{margin-top:18px}.rl-story-slide .bar{display:grid;grid-template-columns:1fr 2fr auto;gap:10px;align-items:center;margin:8px 0;font-weight:700;font-size:14px}.rl-story-slide .bar i{display:block;height:14px;border-radius:7px;background:currentColor;width:0;animation:rlw .9s cubic-bezier(.2,.8,.2,1) forwards}@keyframes rlw{to{width:var(--w)}}.rl-story-slide .bar em{font-style:normal}" +
     ".rl-story-slide .months{display:flex;align-items:flex-end;gap:5px;height:150px;margin:20px 0 6px}.rl-story-slide .months div{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}.rl-story-slide .months i{display:block;width:100%;border-radius:6px 6px 2px 2px;background:currentColor;opacity:.35;height:0;animation:rlh .8s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide .months i.hot{opacity:1;background:var(--accent)}.rl-story-slide .months span{font-size:11px;opacity:.7}@keyframes rlh{to{height:var(--h)}}" +
+    ".rl-story-slide .ph{display:grid;gap:8px;margin:16px 0 8px}.rl-story-slide .ph.n1{grid-template-columns:1fr}.rl-story-slide .ph.n2,.rl-story-slide .ph.n4{grid-template-columns:1fr 1fr}.rl-story-slide .ph.n3,.rl-story-slide .ph.n5,.rl-story-slide .ph.n6,.rl-story-slide .ph.n7,.rl-story-slide .ph.n8,.rl-story-slide .ph.n9{grid-template-columns:1fr 1fr 1fr}" +
+    ".rl-story-slide .ph figure{margin:0;background:#fff;border-radius:16px;overflow:hidden;aspect-ratio:1;position:relative;opacity:0;animation:rlpop .5s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide .ph.n1 figure{aspect-ratio:4/5;max-height:46vh}.rl-story-slide .ph img{width:100%;height:100%;object-fit:contain;display:block}.rl-story-slide .ph figcaption{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:11px;font-weight:700;padding:14px 8px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@keyframes rlpop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}" +
+    ".rl-story-slide .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.rl-story-slide .chips span{border:2px solid currentColor;border-radius:999px;padding:6px 12px;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:6px}.rl-story-slide .chips i{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}" +
+    ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:#f4f1ea;overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:11px;color:#475467;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-story-slide .sum{background:linear-gradient(160deg,#5b21b6,#30255d 60%,#172554);border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,#f4f2ec,#fbfaf6,#f4f2ec);background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
     ".rl-empty{background:#fff;border:1px dashed #d9d3c4;border-radius:22px;padding:22px}.rl-empty h3{margin:0 0 6px;font-size:18px;color:#101828}.rl-empty p{margin:0 0 12px;color:#475467;font-size:14px}" +
@@ -1455,6 +1459,7 @@
       stat("Top shop", top ? top.name : "—", top ? top.receipts + (top.receipts === 1 ? " order" : " orders") : ""),
       stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + " receipts" : ""),
       stat("Busiest month", w.busiestMonth || "—", "")]));
+    if ((w.photos || []).length) { box.appendChild(el("h3", { text: "Things you bought", style: "margin:16px 0 8px;font-size:15px" })); box.appendChild(photoGrid(w.photos, "rl-wr-strip")); }
     box.appendChild(el("p", { className: "rl-wr-note", text: w.note }));
     return box;
   }
@@ -1465,12 +1470,37 @@
     function step(t) { if (!t0) t0 = t; var k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); node.textContent = fmt(Math.round(to * e)); if (k < 1 && node.isConnected) requestAnimationFrame(step); }
     node.textContent = fmt(0); requestAnimationFrame(step);
   }
+  // Real photos from the shopper's own receipts (only ones Relay checked are of the item). Never a stand-in picture.
+  function photoGrid(list, cls) {
+    var g = el("div", { className: cls + " n" + list.length });
+    var gone = function (f) { f.remove(); g.className = cls + " n" + g.children.length; };
+    list.forEach(function (p, i) {
+      var f = el("figure", { style: "animation-delay:" + (0.2 + i * 0.12) + "s" }), cap = p.item ? p.item + (p.more ? " +" + p.more : "") : p.shop;
+      if (cls === "rl-wr-strip") { var box = el("div", { className: "im" }); f.appendChild(box); f.appendChild(el("figcaption", { text: cap })); apiBlob("/relay/my/receipts/" + p.id + "/image").then(function (u) { if (u) box.appendChild(el("img", { src: u, alt: cap })); else gone(f); }); }
+      else { f.appendChild(el("figcaption", { text: cap })); apiBlob("/relay/my/receipts/" + p.id + "/image").then(function (u) { if (u) f.insertBefore(el("img", { src: u, alt: cap }), f.firstChild); else gone(f); }); }
+      g.appendChild(f);
+    });
+    return g;
+  }
+  // The style slide is worked out from the year's things (clothes, shoes, homeware) with the same rules as Discover.
+  function wrappedStyle(w) {
+    var E = window.RelayRecommendationEngine;
+    if (!E || !(w.things || []).length) return null;
+    var pr = E.profile(w.things.map(function (t) { return { item: t.name, detail: t.variant || t.name, merchant: t.shop, price: t.pricePence ? t.pricePence / 100 : 0, verified: true }; }), []);
+    if (!pr.headline || (!pr.styles.length && !pr.sizes.clothing && !pr.sizes.footwear && !pr.sizes.bed)) return null;
+    return pr;
+  }
+  var SW = { white: "#fff", black: "#111", grey: "#9aa0a6", gray: "#9aa0a6", cream: "#f3ead6", navy: "#1d2b55", blue: "#3b6fd8", green: "#3f9b4f", pink: "#f2a7c3", red: "#d33a2f", brown: "#7a4e2d", beige: "#e6d5b8", oat: "#e2d6bf", olive: "#6b7034", purple: "#7c4dbd", lilac: "#c8a2c8", lavender: "#b9a7e0", sage: "#a3b18a", charcoal: "#36393f", stone: "#c9c1b1", khaki: "#b3a26b" };
+  function longDate(d) { return new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long" }); }
   function storySlides(w) {
     var S = [], cat = w.categories[0], top = w.topShops[0], gbp = function (p) { return money(p, "GBP"); };
+    var photos = (w.photos || []).slice(0, 9), style = wrappedStyle(w);
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
       b.appendChild(el("div", { className: "k", text: "✦ RELAY WRAPPED" }));
-      b.appendChild(el("h1", { text: w.year + " was a year of shopping." }));
-      b.appendChild(el("p", { text: "Relay found " + w.receipts + " receipts from " + w.shops + (w.shops === 1 ? " shop" : " shops") + ". Let's look back." }));
+      b.appendChild(el("h1", { text: "Your " + w.year + ", one receipt at a time." }));
+      var fb = w.firstBuy;
+      if (fb && fb.date) b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + (fb.item ? " with " + fb.item : "") + (fb.shop ? (fb.item ? " from " : " at ") + fb.shop : "") + "." }));
+      b.appendChild(el("p", { text: w.receipts + " receipts and " + w.shops + (w.shops === 1 ? " shop" : " shops") + " later, here's what Relay saw." }));
     } });
     if (w.coverage.withTotal) S.push({ bg: "#30255d", fg: "#fff", accent: "#e4d8ff", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
@@ -1495,7 +1525,7 @@
     if (cat) S.push({ bg: "#f6c7e2", fg: "#3f1430", accent: "#3f1430", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your favourite kind of shopping" }));
       b.appendChild(el("div", { className: "big name", text: cat.label }));
-      b.appendChild(el("p", { text: cat.receipts + " of your " + w.receipts + " receipts." }));
+      b.appendChild(el("p", { text: cat.receipts + " of your " + w.receipts + " receipts" + (cat.topShop && cat.topShop.receipts > 1 ? ", and your go-to was " + cat.topShop.name + " (" + cat.topShop.receipts + ")" : "") + "." }));
       var bars = el("div", { className: "bars" });
       w.categories.slice(0, 4).forEach(function (c, i) {
         var pct = Math.max(4, Math.round(c.receipts / w.receipts * 100));
@@ -1503,11 +1533,26 @@
       });
       b.appendChild(bars);
     } });
+    if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#30255d", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: photos.length === 1 ? "One thing you brought home" : "Some things you brought home" }));
+      b.appendChild(photoGrid(photos.length > 6 ? photos.slice(0, 6) : photos, "ph"));
+      b.appendChild(el("p", { className: "fine", text: "Photos from your own order emails." }));
+    } });
+    if (style) S.push({ bg: "#1f3d2b", fg: "#fff", accent: "#c7f567", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your style in " + w.year }));
+      b.appendChild(el("p", { text: style.headline, style: "font-size:24px;line-height:1.3;font-weight:800;opacity:1" }));
+      var ch = el("div", { className: "chips" });
+      style.styles.forEach(function (x) { ch.appendChild(el("span", { text: x.name })); });
+      style.colours.slice(0, 3).forEach(function (x) { ch.appendChild(el("span", {}, [el("i", { style: "background:" + (SW[x.name] || "#ccc") }), document.createTextNode(x.name.charAt(0).toUpperCase() + x.name.slice(1))])); });
+      b.appendChild(ch);
+      b.appendChild(el("p", { className: "fine", text: "Read from the sizes, colours and names on " + style.bought + (style.bought === 1 ? " item" : " items") + " you bought." }));
+    } });
     if (w.topItem) S.push({ bg: "#ff8a5b", fg: "#2b0d00", accent: "#2b0d00", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "On repeat" }));
       b.appendChild(el("div", { className: "big name", text: w.topItem.name }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.topItem.times, function (v) { return v + "×"; }, 900);
-      b.appendChild(el("p", { text: "You kept coming back for it" + (w.topItem.shop ? " at " + w.topItem.shop : "") + "." }));
+      var t = w.topItem.times, weeks = w.activeMonths ? w.activeMonths * 4.3 : 52;
+      b.appendChild(el("p", { text: "You kept coming back for it" + (w.topItem.shop ? " at " + w.topItem.shop : "") + "." + (t >= weeks ? " That's more than once a week." : t >= 12 ? " That's about " + Math.round(t / Math.max(1, w.activeMonths || 12)) + " a month." : "") }));
     } });
     if (w.busiestMonth) S.push({ bg: "#263f8c", fg: "#fff", accent: "#d7e4ff", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your busiest month" }));
@@ -1522,7 +1567,8 @@
     if (w.biggest) S.push({ bg: "#0f5132", fg: "#fff", accent: "#b7f0cf", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your biggest treat" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.biggest.totalPence, gbp, 1100);
-      b.appendChild(el("p", { text: "at " + w.biggest.shop + (w.biggest.date ? " on " + new Date(w.biggest.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "") + "." }));
+      b.appendChild(el("p", { text: (w.biggest.item ? w.biggest.item + ", " : "") + "at " + w.biggest.shop + (w.biggest.date ? " on " + longDate(w.biggest.date) : "") + "." }));
+      if (w.biggest.photoId) b.appendChild(photoGrid([{ id: w.biggest.photoId, item: w.biggest.item, shop: w.biggest.shop }], "ph"));
     } });
     if (w.returnsStarted || w.refundedPence) S.push({ bg: "#fde68a", fg: "#3a2a00", accent: "#3a2a00", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Changed your mind?" }));
@@ -1537,7 +1583,7 @@
     } });
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", summary: true, build: function (b, again, close) {
       var card = el("div", { className: "sum" }, [el("div", { className: "k", text: "✦ MY " + w.year + " ON RELAY" })]);
-      var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], ["Shops", String(w.shops)]];
+      var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], [style && style.styles[0] ? "Style" : "Shops", style && style.styles[0] ? style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & ") : String(w.shops)]];
       var g = el("div", { className: "sumgrid" }); rows.forEach(function (r) { g.appendChild(el("div", {}, [el("span", { text: r[0] }), el("strong", { text: r[1] })])); }); card.appendChild(g);
       b.appendChild(card);
       var text = "My " + w.year + " on Relay: " + rows.map(function (r) { return r[0] + " " + r[1]; }).join(" · ");
@@ -2334,7 +2380,7 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
