@@ -11,7 +11,7 @@ const shopName = (c) => (c.retailer && (c.retailer.name || c.retailer.domain)) |
 // almost always a restaurant banner, an advert or an app icon, so those are never used.
 const THINGS = new Set(["fashion", "electronics", "home", "beauty", "other"]);
 // Lines some shops print among the items that aren't things bought: savings, credits, charges and labels.
-const NOT_A_THING = /^(you('ve| have)?\s+saved?|you\s+save|saved?|savings?|was|now|rrp|credit|credits|discount|voucher|promo(tion)?( code)?|offer|multi-?buy|delivery|service( fee| charge)?|bag charge|carrier bag|tip|total|sub-?total|vat|balance|deposit|nectar|clubcard|points?)\b|:\s*$/i;
+const NOT_A_THING = /^(you('ve| have)?\s+saved?|you\s+save|saved?|savings?|was|now|rrp|credit|credits|discount|voucher|promo(tion)?( code)?|offer|multi-?buy|delivery|service( fee| charge)?|bag charge|carrier bag|tip|total|sub-?total|vat|balance|deposit|nectar|clubcard|points?|apple\s?pay|google\s?pay|paypal|visa|mastercard|amex|card payment|gift card balance)\b|:\s*$/i;
 const itemName = (it) => { const n = it && typeof it.name === "string" ? it.name.trim() : ""; return n.length > 1 && n.length <= 80 && !NOT_A_THING.test(n) ? n : null; };
 
 function whenOf(card) {
