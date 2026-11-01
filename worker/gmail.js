@@ -11,11 +11,11 @@
 //    who started the connection, so a callback can never attach Gmail to someone else.
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts.
-import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
-import { categorise, storeKey, CATEGORIES, shopDisplayName } from "./receipt-category.js";
+import { categorise, storeKey, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 
@@ -38,7 +38,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // writes them in one database batch, and stops early (saying there is more) if it gets near either limit.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 5, CALL_BUDGET = 36;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 16;
+const PARSER_VERSION = 17;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -445,6 +445,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (details.kind === "receipt") {
         // A photo that failed once is tried again whenever the reader version changes (a transient failure should not be permanent).
         details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && (prev.hasImage || !stale);
+        details.photoIsItem = photoShowsItem(rawText);
         if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN && calls + 2 < budget) {
           imagesTried++;
           const urls = extractProductImageUrls(rawText);
@@ -551,6 +552,7 @@ async function addEmail(env, shopperId, fetchImpl, now, messageId) {
   let image = null;
   if (details.kind === "receipt") {
     details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && Boolean(prev.hasImage);
+    details.photoIsItem = photoShowsItem(rawText);
     if (!details.imageTried) {
       const urls = extractProductImageUrls(rawText);
       image = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
@@ -584,15 +586,33 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 
 // One order often arrives as several emails (confirmation, "we're shipping it", ...). They become one card:
 // the most complete email leads and the others fill in what it lacks (price, size, tracking, returns link).
+// A receipt the shopper forwarded from their own mailbox (gmail.com...) has the shop's order number but not the shop's
+// address, so it joins the shop's own emails for that order when the order number matches and the amounts agree.
+const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
 export function mergeOrderEmails(orders) {
   const out = [], groups = new Map();
+  const shopFor = new Map(); // order number -> the shop it belongs to, when exactly one shop used it
   for (const o of orders) {
-    const k = o.orderRef ? storeKey(o) + "|" + String(o.orderRef).toUpperCase() : null;
+    if (!o.orderRef || isForwarded(o)) continue;
+    const ref = String(o.orderRef).toUpperCase(), e = shopFor.get(ref) || { keys: new Set(), totals: new Set() };
+    e.keys.add(storeKey(o)); if (o.totalPence != null) e.totals.add(o.totalPence); shopFor.set(ref, e);
+  }
+  const keyOf = (o) => {
+    if (!o.orderRef) return null;
+    const ref = String(o.orderRef).toUpperCase();
+    if (isForwarded(o)) {
+      const e = shopFor.get(ref);
+      if (e && e.keys.size === 1 && (o.totalPence == null || !e.totals.size || e.totals.has(o.totalPence))) return [...e.keys][0] + "|" + ref;
+    }
+    return storeKey(o) + "|" + ref;
+  };
+  for (const o of orders) {
+    const k = keyOf(o);
     if (!k) { out.push(o); continue; }
     if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }
     groups.get(k).push(o);
   }
-  const score = (o) => (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
+  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
   return out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
@@ -777,7 +797,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
       c = { ...c, totalPence: c.items.reduce((n, i) => n + i.pricePence, 0), totalFrom: "items" };
     const shown = shopDisplayName(c.retailer);
     const retailer = c.retailer && shown && shown !== c.retailer.name ? { ...c.retailer, name: shown, legalName: c.retailer.name || null } : c.retailer;
-    return { ...c, retailer, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
+    // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
+    return { ...c, retailer, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
   });
 }
 
@@ -901,6 +922,22 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/wrapped" && m === "GET") {
     const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
     return json(buildWrapped(cards, url.searchParams.get("year"), opts.now), 200, cors);
+  }
+  // Everything the shopper bought that their style can be learned from: physical things only (no food, travel or apps),
+  // across all their receipts rather than just the newest. The app works the style out on the device from this list.
+  if (path === "/relay/my/style" && m === "GET") {
+    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    const things = [];
+    for (const c of cards) {
+      if (c.kind === "return_instructions" || ["food", "travel", "digital"].includes(c.category)) continue;
+      if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
+      const items = (c.items || []).filter(i => i && typeof i.name === "string" && i.name.trim()).slice(0, 20)
+        .map(i => ({ name: i.name.slice(0, 120), variant: typeof i.variant === "string" ? i.variant.slice(0, 80) : null, pricePence: Number.isInteger(i.pricePence) ? i.pricePence : null, qty: i.qty || 1 }));
+      if (!items.length) continue;
+      things.push({ id: c.id, retailer: { name: (c.retailer && (c.retailer.name || c.retailer.domain)) || null }, orderDate: c.orderDate || null, category: c.category, hasImage: Boolean(c.hasImage), items });
+      if (things.length >= 400) break;
+    }
+    return json({ receipts: things }, 200, cors);
   }
   if (path === "/relay/my/receipts" && m === "GET") {
     const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing);

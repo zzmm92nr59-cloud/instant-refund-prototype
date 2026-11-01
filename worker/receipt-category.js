@@ -66,5 +66,43 @@ export function shopDisplayName(retailer) {
   while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store)$/.test(parts[parts.length - 1])) parts.pop();
   const base = parts.filter(p => !MAIL_SUBDOMAIN.test(p)).pop() || parts.pop();
   if (Object.prototype.hasOwnProperty.call(KNOWN_NAMES, base)) return KNOWN_NAMES[base];
-  return base ? base.charAt(0).toUpperCase() + base.slice(1) : null;
+  if (!base) return null;
+  // "just-eat" → "Just Eat"; "tvbedsnorthwest" → "TV Beds North West" (only when every piece is a known word).
+  return base.split("-").filter(Boolean).map(w => splitWords(w) || cap(w)).join(" ");
+}
+const cap = (w) => SHORT_CAPS.has(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1);
+// Short pieces written in capitals in a shop name.
+const SHORT_CAPS = new Set(["tv", "uk", "hd", "pc", "diy", "hp", "jd", "bq", "ao", "gb", "eu", "usa", "nyc", "bbq", "led", "dvd"]);
+// Common words in UK shop web addresses. A name is only split when every piece is one of these, so unknown brand
+// names ("Lululemon", "Gymshark") are left whole rather than chopped up.
+const WORDS = new Set(("tv beds bed bedding sofa sofas north south east west northwest northeast southwest southeast " +
+  "the and of my our your shop store stores direct online outlet world house home homes garden gardens furniture " +
+  "kitchen kitchens bath bathroom bathrooms tile tiles carpet carpets floor floors flooring light lights lighting " +
+  "pet pets vet vets dog dogs cat cats food foods fresh farm farms deli bakery wine wines beer beers coffee tea " +
+  "fashion style clothing clothes wear shoe shoes boot boots sport sports outdoor outdoors bike bikes cycle cycles " +
+  "golf run running fit fitness gym health beauty hair skin care pharmacy chemist eye eyes glasses lens lenses " +
+  "baby kids toy toys game games gift gifts card cards party book books music phone phones mobile mobiles tech " +
+  "electric electrical electricals electronics computer computers camera cameras sound audio parts car cars auto " +
+  "motor motors tyre tyres wheel wheels travel trip hotel hotels flight flights holiday holidays cottage cottages " +
+  "london manchester leeds liverpool bristol glasgow edinburgh cardiff birmingham scotland wales england irish " +
+  "british great big little mini super best good top new old blue red green black white gold silver box boxes " +
+  "trade depot warehouse factory mill market place hub co company group brand brands club studio lab design " +
+  "made hand craft crafts paper print prints art arts frame frames plant plants flower flowers tree trees").split(" "));
+function splitWords(w) {
+  if (w.length < 6 || WORDS.has(w) || SHORT_CAPS.has(w)) return null;
+  // Fewest pieces wins, so "northwest" stays one word when it can.
+  const best = new Array(w.length + 1).fill(null); best[0] = [];
+  for (let i = 0; i < w.length; i++) {
+    if (!best[i]) continue;
+    for (let j = i + 2; j <= w.length; j++) {
+      const piece = w.slice(i, j);
+      if (!WORDS.has(piece) && !SHORT_CAPS.has(piece)) continue;
+      const next = best[i].concat(piece);
+      if (!best[j] || next.length < best[j].length) best[j] = next;
+    }
+  }
+  const parts = best[w.length];
+  if (!parts || parts.length < 2) return null;
+  // "northwest"/"southeast" read better as two words in a name.
+  return parts.flatMap(p => /^(north|south)(east|west)$/.test(p) ? [p.slice(0, 5), p.slice(5)] : [p]).map(cap).join(" ");
 }

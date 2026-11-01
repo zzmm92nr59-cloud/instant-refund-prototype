@@ -381,6 +381,23 @@ assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alic
 const photoCalls = imageCalls.length;
 await scanAll();
 assert.equal(imageCalls.length, photoCalls, "photos are fetched only once per receipt");
+// A photo is only shown as the item when it's named after the item; an advert in the same kind of email is stored but never shown.
+assert.equal(JSON.parse(withPhoto.details).photoIsItem, true, "the photo's alt text names the item");
+gmailBox.m9 = gmailBox.m5.replace(/EO-5/g, "EO-9").replace('alt="Wool jumper"', 'alt="New arrivals"').replace("products/wool-jumper.png", "promo/new-season/wool-jumper.png").replace("Wool jumper - Qty", "Cardigan - Qty");
+await scanAll();
+const advert = sqlite.prepare("SELECT id, details FROM captured_receipts WHERE details LIKE '%EO-9%'").get();
+assert.equal(JSON.parse(advert.details).hasImage, true, "the picture was fetched");
+assert.equal(JSON.parse(advert.details).photoIsItem, false, "but it isn't of the item");
+const listed = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
+assert.equal(listed.find(x => x.orderRef === "EO-5").hasImage, true, "a real item photo is shown");
+assert.equal(listed.find(x => x.orderRef === "EO-9").hasImage, false, "an advert is never shown as the item");
+// The style list: physical things from every receipt, only the shopper's own.
+const style = await (await call("/relay/my/style", { token: alice })).json();
+assert.ok(style.receipts.some(x => x.items.some(i => i.name === "Wool jumper")), "things bought are listed for the style");
+assert.ok(style.receipts.every(x => !["food", "travel", "digital"].includes(x.category)), "food, travel and apps are left out");
+assert.equal((await (await call("/relay/my/style", { token: bob })).json()).receipts.some(x => x.items.some(i => i.name === "Wool jumper")), false, "never another shopper's");
+assert.equal((await call("/relay/my/style")).status, 401);
+sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-9%'").run(); delete gmailBox.m9;
 
 // 7e. Return reminders: opt-in per item, sent once, only before the deadline, only if still wanted.
 const keepClock = clock;
