@@ -1427,7 +1427,9 @@
       inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
       inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,#f7f7f7);margin:12px 0 16px" }, [
         el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
-        el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") + shop + " hasn't set up Royal Mail labels in Relay, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + "." })
+        el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") +
+          (result.inStore ? "Take the item back to " + shop + " and show them your Relay reference, or send it using their own returns process. Your refund comes from " + shop + ", and Relay will show it here once they've refunded it."
+            : shop + " hasn't set up Royal Mail labels in Relay, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + ".") })
       ]));
       inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
         el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
@@ -1482,7 +1484,8 @@
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
     already_exchanged: "This item has already been exchanged.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
     card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
-    price_changed: "The price has just changed. Close this and look again." };
+    price_changed: "The price has just changed. Close this and look again.", outside_window: "It's more than 7 days since you bought this, so it can't be swapped through Relay.",
+    order_not_complete: "This order isn't finished at the shop yet, so it can't be swapped." };
   function absPounds(m) { return "£" + (Math.abs(m) / 100).toFixed(2); }
   function openExchange(o, it, done) {
     open(function (sheet) {
@@ -1506,8 +1509,9 @@
               addCard(list, function () { setTimeout(function () { close(); openExchange(o, it, done); }, 900); });
               return;
             }
-            var viaShop = d > 0 && x.payBy === "shopify";
+            var viaShop = d > 0 && (x.payBy === "shopify" || x.payBy === "square");
             var what = d === 0 ? "Same price, nothing to pay or refund."
+              : d > 0 && x.payBy === "square" ? "It costs " + absPounds(d) + " more. You'll pay the " + absPounds(d) + " to " + shop + " on Square's secure payment page, and the swap is confirmed once it's paid."
               : viaShop ? "It costs " + absPounds(d) + " more. " + shop + " will update your order and send you a link to pay the " + absPounds(d) + ", using any way of paying " + shop + " accepts. Your new " + (x.title || "item") + " is kept for you."
               : d > 0 ? "It costs " + absPounds(d) + " more. We'll take " + absPounds(d) + " from your " + (card ? cardText(card) : "card") + " only once the shop has updated your order. (Test mode: no real money.)"
               : "It costs " + absPounds(d) + " less. " + shop + " will refund the " + absPounds(d) + " to how you paid.";
@@ -1546,7 +1550,7 @@
       mountSquareTest(testHost, function () { memo.purchases = null; mountConfirmed(host); });
       if (!rows.length) { host.appendChild(testHost); return; }
       host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
-      host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can exchange items here." }));
+      host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can return or exchange items here." }));
       var grid = el("div", { className: "purchase-grid" }); host.appendChild(grid);
       rows.forEach(function (o) {
         (o.items || []).forEach(function (it) {
@@ -1559,7 +1563,8 @@
           d.appendChild(el("h3", { text: it.title }));
           d.appendChild(el("div", { className: "small muted", text: (it.variant ? it.variant + " · " : "") + "Qty " + it.quantity + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") }));
           d.appendChild(el("div", { className: "price", text: money(it.priceMinor, it.currency) }));
-          if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
+          if (it.exchange && it.exchange.status === "awaiting_payment") d.appendChild(el("p", { className: "small muted", text: "Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + ": waiting for your payment" }));
+          else if (it.exchange) d.appendChild(el("p", { className: "small watch", text: "✓ Exchanged" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " through Relay" }));
           // Swapped to a dearer item, paid through the shop's own checkout: what's left to pay, until it's paid.
           if (it.exchange && it.exchange.balance) {
             var bal = it.exchange.balance, shopName = o.store || "the shop";
@@ -1574,6 +1579,20 @@
             d.appendChild(el("p", { className: "small " + (refunded ? "watch" : "muted"), text: refunded
               ? "✓ Refunded" + (ri.refundMinor ? " " + money(ri.refundMinor, it.currency) : "") + " by " + (o.store || "the shop") + (ri.refundedAt ? " on " + new Date(ri.refundedAt).toLocaleDateString("en-GB") : "")
               : "Return started · ref " + ri.ref + (ri.trackingNumber ? " · Royal Mail " + ri.trackingNumber : "") + " · waiting for " + (o.store || "the shop") + " to refund" }));
+            // Test shop only: play the shop's part and refund it in Square's test system, to see the whole return through.
+            if (!refunded && o.testOrder) (function (o, it) {
+              var tm = el("div", { className: "rl-msg" });
+              var tb = el("button", { className: "ghostbtn", text: "Test shop: refund this return", style: "margin-top:6px", onclick: function () {
+                tb.disabled = true; say(tm, "Asking the test shop to refund it…");
+                api("/relay/my/testing/square-refund", { method: "POST", body: { orderId: o.id, lineId: it.lineId } }).then(function (r) {
+                  tb.disabled = false;
+                  if (r.ok && r.body && r.body.refunded) { say(tm, "✓ Refunded by the test shop"); setTimeout(function () { memo.purchases = null; mountConfirmed(host); }, 1000); }
+                  else if (r.ok) say(tm, "The test shop has started the refund. Square usually finishes it within the hour, and it'll show here then.");
+                  else say(tm, "The test shop couldn't refund it just now. Please try again in a minute.", true);
+                }, function () { tb.disabled = false; say(tm, "Couldn't reach Relay. Please try again.", true); });
+              } });
+              d.appendChild(tb); d.appendChild(tm);
+            })(o, it);
           }
           if (it.exchangeable) d.appendChild(el("button", { className: "darkbtn", text: "Exchange size or colour →", onclick: function () { openExchange(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
           if (it.returnable) d.appendChild(el("button", { className: "ghostbtn", text: "Return →", style: "margin-top:6px", onclick: function () { openReturn(o, it, function () { memo.purchases = null; mountConfirmed(host); }); } }));
