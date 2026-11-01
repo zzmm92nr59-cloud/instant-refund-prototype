@@ -92,3 +92,27 @@ const ranked = E.rank([{ product: "Silk Dress", variation: "Red / 10", priceMino
 assert.equal(ranked[0].product, "Align Jogger");
 assert.match(ranked[0]._relayReason, /usual size \(M\)/);
 console.log("PASS style profile: sizes, colours, styles and a plain sentence, all from receipts; your size goes first at any shop");
+
+// 7. The Spotify-style parts: top 5 things, biggest buys, shopping time, shop sprint, regulars, badges, and a year's list.
+{
+  const c = (id, d, shop, cat, items, t) => ({ id, kind: "receipt", retailer: { name: shop, domain: shop.toLowerCase().replace(/\W/g, "") + ".test" }, orderDate: d, totalPence: t, currency: "GBP", category: cat, items });
+  const cards = [];
+  for (let m = 1; m <= 8; m++) cards.push(c("a" + m, `2026-${String(m).padStart(2, "0")}-0${m % 2 ? 3 : 4}`, "Apple", "digital", [{ name: "Match Masters", pricePence: 499 }], 499));
+  cards.push(c("k1", "2026-03-07", "Kick Lane", "fashion", ["Court Trainers", "Socks", "Cap", "Tee", "Bag"].map((n, i) => ({ name: n, pricePence: 1000 * (i + 1) })), 15000));
+  cards.push(c("k2", "2026-04-05", "Kick Lane", "fashion", [{ name: "Socks", pricePence: 1000 }], 1000));
+  const w = buildWrapped(cards, 2026);
+  assert.deepEqual(w.topItems.slice(0, 2).map(x => [x.name, x.times]), [["Match Masters", 8], ["Socks", 2]], "ranked by how many orders, then spend");
+  assert.equal(w.yearList.length, 6);
+  assert.deepEqual(w.topBuys.map(x => x.totalPence).slice(0, 2), [15000, 1000]);
+  assert.equal(w.topBuys[0].items, 5);
+  assert.equal(w.shoppingTime.days, 10); assert.equal(w.shoppingTime.longestMonthStreak, 8);
+  assert.equal(w.shoppingTime.weekendShare, 50, "5 of the 10 shopping days were a Saturday or Sunday");
+  const kl = w.sprint.find(x => x.name === "Kick Lane");
+  assert.deepEqual(kl.months.slice(0, 5), [0, 0, 1, 1, 0]);
+  assert.deepEqual(w.subscriptions, [{ name: "Apple", months: 8, spentPence: 3992, item: "Match Masters" }], "paid for in 3+ different months");
+  const labels = w.badges.map(b => b.label);
+  assert.ok(labels.includes("Loyal to Kick Lane") && labels.includes("Never Missed a Month") && labels.includes("Big Basket") && labels.includes("Weekend Shopper"));
+  assert.ok(!labels.includes("Returns Pro") && !labels.includes("Subscriber"), "no badge without the receipts to back it");
+  assert.equal(buildWrapped([], 2026).badges.length, 0);
+  console.log("PASS Spotify-style Wrapped: top 5 things, biggest buys, shopping time, shop sprint, regulars, earned badges, year's list");
+}
