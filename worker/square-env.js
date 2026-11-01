@@ -8,3 +8,10 @@ export function squareAppId(env) {
   if (squareIsProduction(env)) return env.SQUARE_APPLICATION_ID || null; // never fall back to the Sandbox app in production
   return env.SQUARE_APPLICATION_ID || SANDBOX_APP_ID;
 }
+// The name to show for a Square shop. Square's test accounts are called things like "Default Test Account",
+// which means nothing to a shopper, so those use Relay's label for its demo shop instead.
+const PLACEHOLDER = /^(default test account|sandbox seller|test account|my business)\b/i;
+export function squareShopName(env, raw) {
+  const name = String(raw || "").trim();
+  return name && !PLACEHOLDER.test(name) ? name : (env && env.SQUARE_DEFAULT_LABEL) || "Relay Demo Store";
+}
