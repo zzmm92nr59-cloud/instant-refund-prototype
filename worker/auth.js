@@ -14,6 +14,7 @@ import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
+import { handleSquareTestRoute, enrichSquarePurchases } from "./square-orders.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
@@ -415,8 +416,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (cardResponse) return cardResponse;
     const returnResponse = await handleReturnRoute(request, env, url, cors, shopper);
     if (returnResponse) return returnResponse;
+    const squareTestResponse = await handleSquareTestRoute(request, env, url, cors, shopper, o);
+    if (squareTestResponse) return squareTestResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
-      return json({ purchases: await enrichPurchases(env, await listPurchases(env, shopper)) }, 200, cors);
+      return json({ purchases: await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper))) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {
       // Reads a pasted order-confirmation email. Nothing is stored. The result is
       // shopper-supplied evidence (refundEligible is always false).
