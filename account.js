@@ -668,7 +668,9 @@
         var canOpen = row.id && /^[A-Za-z0-9]{6,40}$/.test(row.gmailId || "") && openOriginal;
         var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
           : el("b", { text: who, style: "display:block;font-size:16px" });
-        var meta = [names ? (names.length > 60 ? names.slice(0, 57) + "…" : names) : null, row.totalPence == null ? null : money(row.totalPence, row.currency), row.orderDate].filter(Boolean).join(" · ");
+        // No item names in the email: a short order number is the next most useful thing to show.
+        var ref = !names && row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
+        var meta = [names ? (names.length > 60 ? names.slice(0, 57) + "…" : names) : ref, row.totalPence == null ? null : money(row.totalPence, row.currency), row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ");
         var mid = el("div", { style: "flex:1;min-width:0" }, [shop, el("span", { text: meta || "Details not found", style: "display:block;font-size:13px;opacity:.75;margin-top:2px" })]);
         var left = daysLeft(deadlineOf(row));
         if (left !== null) mid.appendChild(left < 0 ? pill("Deadline passed", "#ece8dd", "#5b6475") : left <= 2 ? pill(left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left", "#fde0dd", "#b3261e") : left <= 7 ? pill(left + " days left", "#ffefc9", "#77520a") : pill(left + " days left", "#e3f4c8", "#46601b"));
@@ -697,6 +699,9 @@
       function drawList() {
         list.textContent = "";
         var rows = allRows;
+        // An email from a shop on Relay is the same purchase as its shop order, which is already under "Shop orders".
+        if (onPage && shopRows.length) { var dup = {}; shopRows.forEach(function (x) { dup[label(x[0].store) + "|" + x[0].amountMinor] = true; });
+          rows = rows.filter(function (r) { return !dup[label(r.retailer && r.retailer.name) + "|" + r.totalPence]; }); }
         if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." })); return; }
         // Soonest deadline first, then no deadline, then expired.
         var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
