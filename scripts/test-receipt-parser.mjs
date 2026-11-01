@@ -399,6 +399,10 @@ t("Apple service with only a section name (iCloud+) still gets a name", () => {
   const r = parseReceiptEmail(appleHtml(["Order ID", "MQZZ99YY88", "Apple Services", "iCloud+ with 200 GB storage", "Monthly", "£2.99", "Total", "£2.99"]));
   assert.deepEqual(r.items.map(i => i.name), ["iCloud+ with 200 GB storage"]);
 });
+t("Apple receipt with the device on its own line and an 'Inclusive of VAT' line", () => {
+  const r = parseReceiptEmail(appleHtml(["Order ID", "MQKY4QNLQ6", "App Store", "Puzzle Kingdom", "Stack of Coins", "iPhone", "£1.59", "Inclusive of VAT at 20%", "£0.26", "Total", "£1.59"]));
+  assert.deepEqual(r.items.map(i => [i.name, i.variant || null, i.pricePence]), [["Puzzle Kingdom", "Stack of Coins", 159]]);
+});
 t("the Apple reader never runs for other shops", () => {
   const r = parseReceiptEmail(appleHtml(["Order ID", "AB12345", "Some Shop", "Thing", "£5.00", "Total", "£5.00"]).replace("no_reply@email.apple.com", "orders@someshop.test"));
   assert.deepEqual(r.items, []);

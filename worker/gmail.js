@@ -38,7 +38,7 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // writes them in one database batch, and stops early (saying there is more) if it gets near either limit.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 5, CALL_BUDGET = 36;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 15;
+const PARSER_VERSION = 16;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
