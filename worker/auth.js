@@ -15,6 +15,7 @@ import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
 import { handleSquareTestRoute, enrichSquarePurchases } from "./square-orders.js";
+import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
@@ -393,6 +394,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
         ...totpDeleteStatements(env.RELAY_DB, shopper.id),
         ...pushDeleteStatements(env.RELAY_DB, shopper.id),
+        ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash)),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
         env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
@@ -416,6 +418,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (cardResponse) return cardResponse;
     const returnResponse = await handleReturnRoute(request, env, url, cors, shopper, o);
     if (returnResponse) return returnResponse;
+    const instoreResponse = await handleInstoreRoute(request, env, url, cors, shopper, o);
+    if (instoreResponse) return instoreResponse;
     const squareTestResponse = await handleSquareTestRoute(request, env, url, cors, shopper, o);
     if (squareTestResponse) return squareTestResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
