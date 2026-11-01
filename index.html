@@ -201,12 +201,30 @@ function loadReceiptTaste(){
   receiptBuys=out;if(page==="discover")renderCatalog();
  }).catch(()=>{});
 }
+const SWATCH={white:"#fff",black:"#111",grey:"#9aa0a6",gray:"#9aa0a6",cream:"#f3ead6",sand:"#d8c39b",slate:"#5f6b7a",forest:"#2f5d3a",green:"#3f9b4f",blue:"#3b6fd8",navy:"#1d2b55",olive:"#6b7034",pink:"#f2a7c3",ecru:"#ece3cf",brown:"#7a4e2d",stone:"#c9c1b1",chalk:"#f4f1ea",oat:"#e2d6bf",rust:"#b5532a",charcoal:"#36393f",moss:"#69784a",clay:"#b97a5b",red:"#d33a2f",beige:"#e6d5b8",camel:"#c19a6b",khaki:"#b3a26b",taupe:"#8b7d6b",ivory:"#fffaee",burgundy:"#6d1f2c",lilac:"#c8a2c8",lavender:"#b9a7e0",purple:"#7c4dbd",yellow:"#f5cf3b",orange:"#f08a2c",mauve:"#b48ba5",teal:"#2a8c8c",mint:"#9fe2bf",sage:"#a3b18a"};
+function styleChip(text,swatch){return'<span style="display:inline-flex;align-items:center;gap:6px;background:#f2f4ec;border-radius:999px;padding:6px 11px;font-size:13px;font-weight:750;color:#263513;margin:0 6px 6px 0">'+(swatch?'<i style="width:12px;height:12px;border-radius:50%;background:'+swatch+';box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)"></i>':'')+safe(text)+'</span>'}
 function tasteCardHtml(){
- if(!personalise||typeof RelayRecommendationEngine==="undefined")return"";
+ if(typeof RelayRecommendationEngine==="undefined")return"";
+ const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();
+ if(!personalise)return signed?'<div class="card" style="background:#101828;color:#fff;border:0"><div class="eyebrow" style="color:#c7f567">✦ YOUR STYLE</div><h3 style="font-size:21px;margin:8px 0 6px;letter-spacing:-.4px">Let Relay learn what you like</h3><p class="small" style="color:#c9d0df;line-height:1.5;margin:0 0 14px">Relay can read the sizes, colours and kinds of things on your receipts and put what suits you first, at any shop you search. It is worked out on this device and you can switch it off any time.</p><button class="limebtn" onclick="togglePersonalise()">Show me my style</button></div>':"";
  const pr=RelayRecommendationEngine.profile(personalisationHistory(),getTaps());
- if(!pr.bought&&!pr.looked)return'<div class="card"><strong>✦ What Relay has noticed</strong><p class="small muted">Nothing yet. As you open or watch products'+(receiptBuys.length?'':', and once your receipts are connected')+', suggestions get more like you.</p></div>';
- const list=a=>a.map(x=>safe(x.name)).join(", ");
- return'<div class="card"><strong>✦ What Relay has noticed</strong><p class="small" style="margin:8px 0">'+(pr.categories.length?'You tend to look at <b>'+list(pr.categories)+'</b>. ':'')+(pr.colours.length?'Colours: <b>'+list(pr.colours)+'</b>. ':'')+(pr.shops.length?'Shops you buy from: <b>'+list(pr.shops)+'</b>. ':'')+(pr.typicalPriceMinor?'A typical purchase is about <b>'+money(pr.typicalPriceMinor/100)+'</b>.':'')+'</p><p class="small muted">Based on '+pr.bought+' purchased item'+(pr.bought===1?'':'s')+' and '+pr.looked+' product'+(pr.looked===1?'':'s')+' you looked at. It is counted, not guessed, and stays on this device.</p><button class="link" onclick="forgetTaste()">Forget what Relay has learned →</button></div>'}
+ if(!pr.bought&&!pr.looked)return'<div class="card"><div class="eyebrow">✦ YOUR STYLE</div><p class="small muted" style="margin:8px 0 0">Nothing to go on yet. '+(signed?'Relay looks for clothes, shoes and homeware on your receipts. Food, travel and app purchases aren\'t used.':'Sign in and connect your receipts, and Relay will learn your sizes and colours.')+'</p></div>';
+ const chips=[];
+ pr.styles.forEach(x=>chips.push(styleChip(x.name+" · "+x.count)));
+ pr.colours.forEach(x=>chips.push(styleChip(x.name.charAt(0).toUpperCase()+x.name.slice(1),SWATCH[x.name]||"#ccc")));
+ if(pr.sizes.clothing)chips.push(styleChip("Size "+pr.sizes.clothing.value));
+ if(pr.sizes.footwear)chips.push(styleChip(pr.sizes.footwear.value+" shoes"));
+ if(pr.sizes.waist)chips.push(styleChip(pr.sizes.waist.value+" waist"));
+ if(pr.sizes.bed)chips.push(styleChip(pr.sizes.bed.value+" bed"));
+ if(pr.typicalPriceMinor)chips.push(styleChip("About "+money(pr.typicalPriceMinor/100)+" a buy"));
+ const storeNow=storeFilter&&storeFilter!=="all"?storeFilter:(($("storeSearch")?.value||"").trim());
+ const fit=[pr.sizes.clothing&&("size "+pr.sizes.clothing.value),pr.sizes.footwear&&pr.sizes.footwear.value,pr.colours[0]&&pr.colours[0].name,pr.styles[0]&&pr.styles[0].name.toLowerCase()+" pieces"].filter(Boolean);
+ return'<div class="card" style="background:linear-gradient(135deg,#fbfdf6,#f1f6e6);border-color:#dfe9c9"><div class="split" style="align-items:flex-start"><div class="eyebrow" style="color:#46731a">✦ YOUR STYLE, FROM YOUR RECEIPTS</div><button class="link small" onclick="forgetTaste()">Forget</button></div>'
+  +(pr.headline?'<p style="font-family:Fraunces,Georgia,serif;font-size:21px;line-height:1.35;letter-spacing:-.3px;margin:10px 0 14px;color:#141827">'+safe(pr.headline)+'</p>':'')
+  +'<div>'+chips.join("")+'</div>'
+  +(pr.shops.length?'<p class="small" style="margin:6px 0 0;color:#475467">Shops you buy from: <b>'+pr.shops.map(x=>safe(x.name)).join(", ")+'</b></p>':'')
+  +(storeNow&&fit.length?'<p class="small" style="margin:10px 0 0;background:#fff;border-radius:12px;padding:10px 12px;color:#263513"><b>At '+safe(storeNow)+':</b> things in your '+safe(fit.join(", "))+' are shown first.</p>':'')
+  +'<p class="small muted" style="margin:10px 0 0">From '+pr.bought+' item'+(pr.bought===1?'':'s')+' on your receipts'+(pr.looked?' and '+pr.looked+' you looked at':'')+'. Counted from what you bought, never guessed, and worked out on this device.</p></div>'}
 
 
 let planPreview="free";try{if(localStorage.getItem("relay-plan-preview")==="plus")planPreview="plus"}catch{}
