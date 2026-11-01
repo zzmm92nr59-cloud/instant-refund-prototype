@@ -1491,7 +1491,8 @@
     var E = window.RelayRecommendationEngine;
     if (!E || !(w.things || []).length) return null;
     var pr = E.profile(w.things.map(function (t) { return { item: t.name, detail: t.variant || t.name, merchant: t.shop, price: t.pricePence ? t.pricePence / 100 : 0, verified: true }; }), []);
-    if (!pr.headline || (!pr.styles.length && !pr.sizes.clothing && !pr.sizes.footwear && !pr.sizes.bed)) return null;
+    // One or two items aren't enough to call it a style.
+    if (pr.bought < 3 || !pr.headline || (!pr.styles.length && !pr.sizes.clothing && !pr.sizes.footwear && !pr.sizes.bed)) return null;
     return pr;
   }
   var SW = { white: "#fff", black: "#111", grey: "#9aa0a6", gray: "#9aa0a6", cream: "#f3ead6", navy: "#1d2b55", blue: "#3b6fd8", green: "#3f9b4f", pink: "#f2a7c3", red: "#d33a2f", brown: "#7a4e2d", beige: "#e6d5b8", oat: "#e2d6bf", olive: "#6b7034", purple: "#7c4dbd", lilac: "#c8a2c8", lavender: "#b9a7e0", sage: "#a3b18a", charcoal: "#36393f", stone: "#c9c1b1", khaki: "#b3a26b" };
