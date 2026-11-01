@@ -20,7 +20,8 @@ import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
-import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH } from "./gmail.js";
+import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
+  CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
@@ -84,10 +85,16 @@ async function ensureAuthTablesRun(db) {
     `CREATE TABLE IF NOT EXISTS retailer_order_emails (
        order_id TEXT PRIMARY KEY, email_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
     `CREATE INDEX IF NOT EXISTS idx_order_emails_hash ON retailer_order_emails(email_hash)`,
+    // An Outlook connection waiting for the browser that started a "sign in and connect" to finish signing in.
+    `CREATE TABLE IF NOT EXISTS auth_pending_mailbox (
+       token_hash TEXT PRIMARY KEY, address TEXT, token_iv TEXT NOT NULL, token_data TEXT NOT NULL,
+       created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
     ...PASSKEY_TABLE_SQL,
     ...TOTP_TABLE_SQL
   ];
   await runAll(db, statements);
+  // Whether a Microsoft sign-in also asked to connect Outlook (the wording version the shopper agreed to on the sign-in screen).
+  try { await db.prepare("ALTER TABLE auth_microsoft_states ADD COLUMN mail_consent TEXT").run(); } catch { /* already there */ }
   await ensureGmailTables(db);
 }
 
@@ -193,28 +200,43 @@ async function verifyLink(request, env, cors, opts) {
   if (String(claimed.client_hash).startsWith("gnonce:")) {
     const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
     if (!nonce || claimed.client_hash !== "gnonce:" + (await sha256Hex("gnonce:" + nonce))) return json({ error: "invalid_or_expired_link" }, 400, cors);
+    // "Sign in and connect Outlook": the shopper agreed to the wording on the sign-in screen of this same browser,
+    // so the agreement is recorded and Outlook connected now, in one step.
+    const pending = await env.RELAY_DB.prepare(
+      "DELETE FROM auth_pending_mailbox WHERE token_hash = ? AND expires_at > ? RETURNING address, token_iv, token_data").bind(await sha256Hex(token), now).first();
+    if (pending) {
+      const shopperId = await ensureShopper(env, claimed.email, now);
+      await recordConsent(env, shopperId, now);
+      await saveConnection(env, shopperId, "microsoft", pending.address, await openToken(env, pending.token_iv, pending.token_data), now);
+      return startSession(env, claimed.email, now, cors, { extra: { outlookConnected: true } });
+    }
   }
   return startSession(env, claimed.email, now, cors);
 }
 
-async function startSession(env, email, now, cors, opts = {}) {
+async function ensureShopper(env, email, now) {
   const hash = await emailHash(env.AUTH_SECRET, email);
   await env.RELAY_DB.prepare(
     "INSERT OR IGNORE INTO shoppers (id,email,email_hash,created_at) VALUES (?,?,?,?)")
     .bind(crypto.randomUUID(), email, hash, now).run();
-  const shopper = await env.RELAY_DB.prepare("SELECT id FROM shoppers WHERE email_hash = ?").bind(hash).first();
+  return (await env.RELAY_DB.prepare("SELECT id FROM shoppers WHERE email_hash = ?").bind(hash).first()).id;
+}
+
+async function startSession(env, email, now, cors, opts = {}) {
+  const shopper = { id: await ensureShopper(env, email, now) };
+  const extra = opts.extra || {};
   // Authenticator-app 2-step: a first factor (email link, code, Google) is not enough when the shopper switched it on.
   if (!opts.skipSecondStep) {
     const second = await secondStepFor(env, shopper.id, now);
     if (second && second.tooMany) return json({ error: "too_many_requests" }, 429, cors);
-    if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, email }, 200, cors);
+    if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, email, ...extra }, 200, cors);
   }
   const sessionToken = randomToken();
   await env.RELAY_DB.prepare(
     "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at) VALUES (?,?,?,?)")
     .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS).run();
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
-  return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email }, 200, cors);
+  return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email, ...extra }, 200, cors);
 }
 
 async function verifyCode(request, env, cors, opts) {
@@ -338,16 +360,21 @@ async function microsoftStart(request, env, url, cors, opts) {
   const body = await readJson(request);
   const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
   if (!TOKEN_SHAPE.test(nonce)) return json({ error: "invalid_request" }, 400, cors);
+  // "Agree and continue with Microsoft": the shopper read Relay's wording (shown on the sign-in screen, from /relay/auth/providers)
+  // and agreed, so Microsoft is also asked for read-only Outlook access and sign-in and Connect Outlook happen in one go.
+  if (body.consentVersion !== undefined && body.consentVersion !== CONSENT_VERSION) return json({ error: "consent_version_mismatch" }, 400, cors);
+  const withMail = body.consentVersion === CONSENT_VERSION;
   const client = await sha256Hex("client:" + (request.headers.get("cf-connecting-ip") || "unknown"));
   await env.RELAY_DB.prepare("DELETE FROM auth_microsoft_states WHERE expires_at <= ?").bind(now).run();
+  await env.RELAY_DB.prepare("DELETE FROM auth_pending_mailbox WHERE expires_at <= ?").bind(now).run();
   const n = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_microsoft_states WHERE client_hash = ? AND created_at > ?").bind(client, now - HOUR_MS).first();
   if ((n?.n || 0) >= MAX_GOOGLE_STARTS_PER_CLIENT_PER_HOUR) return json({ error: "too_many_requests" }, 429, cors);
   const state = randomToken();
-  await env.RELAY_DB.prepare("INSERT INTO auth_microsoft_states (state_hash,client_hash,nonce_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS).run();
+  await env.RELAY_DB.prepare("INSERT INTO auth_microsoft_states (state_hash,client_hash,nonce_hash,created_at,expires_at,mail_consent) VALUES (?,?,?,?,?,?)")
+    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS, withMail ? CONSENT_VERSION : null).run();
   const params = new URLSearchParams({
     client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
-    scope: MS_SIGNIN_SCOPE, state, prompt: "select_account"
+    scope: withMail ? MS_SIGNIN_SCOPE + " " + OUTLOOK_SCOPE : MS_SIGNIN_SCOPE, state, prompt: "select_account"
   });
   return json({ url: MS_AUTH + "/authorize?" + params }, 200, cors);
 }
@@ -364,20 +391,23 @@ async function microsoftCallback(request, env, url, opts) {
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const back = result => Response.redirect(appUrl + "#msignin=" + result, 302);
   const claimed = await env.RELAY_DB.prepare(
-    "UPDATE auth_microsoft_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash")
+    "UPDATE auth_microsoft_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash, mail_consent")
     .bind(now, stateHash, now).first();
   if (!claimed) return back("failed");
   if (url.searchParams.get("error")) return back("denied");
   const code = url.searchParams.get("code") || "";
   if (!code || !outlookConfigured(env)) return back("failed");
-  let email = null, otherAddress = false;
+  const withMail = claimed.mail_consent === CONSENT_VERSION;
+  let email = null, otherAddress = false, mailbox = null;
   try {
     const res = await opts.fetchImpl(MS_AUTH + "/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ code, client_id: env.MICROSOFT_CLIENT_ID, client_secret: env.MICROSOFT_CLIENT_SECRET,
-        redirect_uri: microsoftRedirect(env, url), grant_type: "authorization_code", scope: MS_SIGNIN_SCOPE })
+        redirect_uri: microsoftRedirect(env, url), grant_type: "authorization_code", scope: withMail ? MS_SIGNIN_SCOPE + " " + OUTLOOK_SCOPE : MS_SIGNIN_SCOPE })
     });
     const tokens = res.ok ? await res.json().catch(() => null) : null;
+    // Read-only mail access granted as well: kept (encrypted) until this browser finishes signing in.
+    if (withMail && tokens && typeof tokens.refresh_token === "string" && /(^|[\s/])Mail\.Read(\s|$)/i.test(String(tokens.scope || ""))) mailbox = tokens.refresh_token;
     // The ID token comes straight from Microsoft's token endpoint over TLS, so its claims are read and checked here.
     const claims = tokens ? decodeClaims(tokens.id_token) : null;
     if (claims && claims.iss === "https://login.microsoftonline.com/" + MS_CONSUMER_TENANT + "/v2.0" && claims.tid === MS_CONSUMER_TENANT &&
@@ -388,9 +418,14 @@ async function microsoftCallback(request, env, url, opts) {
     }
   } catch { email = null; }
   if (!email) return back(otherAddress ? "other_address" : "failed");
-  const token = randomToken();
+  const token = randomToken(), tokenHash = await sha256Hex(token);
   await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(await sha256Hex(token), email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+  if (mailbox) {
+    const sealed = await sealToken(env, mailbox);
+    await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at) VALUES (?,?,?,?,?,?)")
+      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS).run();
+  }
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
 
@@ -441,8 +476,12 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
     if (path === "/relay/auth/microsoft/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await microsoftStart(request, env, url, cors, o); }
     // Which sign-in buttons the app should show. Says nothing about any shopper.
-    if (path === "/relay/auth/providers" && request.method === "GET")
-      return json({ email: configured(env), google: configured(env) && googleConfigured(env), microsoft: configured(env) && outlookConfigured(env) }, 200, cors);
+    if (path === "/relay/auth/providers" && request.method === "GET") {
+      const microsoft = configured(env) && outlookConfigured(env);
+      // The wording a Microsoft sign-in agrees to (it also connects Outlook), shown on the sign-in screen before going to Microsoft.
+      return json({ email: configured(env), google: configured(env) && googleConfigured(env), microsoft,
+        ...(microsoft ? { consent: { version: CONSENT_VERSION, text: CONSENT_TEXT } } : {}) }, 200, cors);
+    }
     if (path.startsWith("/relay/auth/passkey/") && configured(env)) {
       await ensureAuthTables(env.RELAY_DB);
       const pk = await handlePasskeyAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
