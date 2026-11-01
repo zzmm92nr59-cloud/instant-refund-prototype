@@ -5,11 +5,11 @@ export const CATEGORIES = {
   beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other",
 };
 const RULES = [
-  ["digital", /\b(app store|itunes|icloud|apple music|apple tv|google play|spotify|netflix|disney\+?|prime video|subscription|membership|gift card|e-?gift|steam|playstation store|xbox|nintendo eshop|audible|kindle|youtube premium|microsoft 365|adobe|dropbox|openai|chatgpt)\b/i],
+  ["digital", /\b(app store|itunes|icloud|apple music|apple tv|google play|spotify|netflix|disney\+?|prime video|subscription|membership|gift card|e-?gift|steam|playstation store|xbox|nintendo eshop|audible|kindle|youtube premium|microsoft 365|adobe|dropbox|openai|chatgpt|anthropic|claude\.ai|appcharge|xsolla|in-app purchase|game credits?|top-?up|lycamobile|lyca|giffgaff|voxi|smarty|lebara|tesco mobile|sim only|patreon|substack|onlyfans|twitch|discord nitro|duolingo|notion|canva|github|cloudflare|google one|google workspace)\b/i],
   ["travel", /\b(uber|bolt|trainline|tfl|ryanair|easyjet|british airways|jet2|booking\.com|airbnb|expedia|hotels?|eurostar|national rail|lner|avanti|flights?|taxi|parking)\b/i],
   ["food", /\b(deliveroo|just eat|uber eats|tesco|sainsbury|asda|morrisons|waitrose|lidl|aldi|ocado|co-?op|greggs|pret|costa|starbucks|nando|mcdonald|kfc|domino|pizza|restaurant|cafe|coffee|pub|tavern|bistro|brasserie|diner|burger|sushi|ramen|curry|wetherspoon|leon|itsu|wagamama|five guys|subway|tortilla|wasabi|honest burgers|dishoom|bubble tea|grocer|groceries|bakery|takeaway|wine|beer)\b/i],
   ["electronics", /\b(apple|iphone|ipad|macbook|airpods|samsung|currys|argos|ao\.com|very|dell|lenovo|hp\b|sony|bose|dyson|gopro|nintendo|playstation|laptop|phone|tablet|headphones|charger|cable|monitor|keyboard|camera|television|tv\b|console|smart ?watch)\b/i],
-  ["beauty", /\b(boots|superdrug|lookfantastic|space nk|sephora|cult beauty|the body shop|holland & barrett|beauty|skincare|perfume|fragrance|makeup|cosmetic|shampoo|vitamin|pharmacy|optician|specsavers)\b/i],
+  ["beauty", /\b(boots|superdrug|lookfantastic|space nk|sephora|cult beauty|the body shop|holland & barrett|beauty|skincare|perfume|fragrance|makeup|cosmetic|shampoo|vitamin|pharmacy|optician|specsavers|gr(ü|u)um|grooming|razors?|shaving|dental|toothbrush)\b/i],
   ["home", /\b(ikea|b&q|wickes|screwfix|dunelm|john lewis|wayfair|made\.com|homebase|garden|furniture|sofa|mattress|bedding|lamp|kitchen|candle|rug|curtain|plant)\b/i],
   ["fashion", /\b(lululemon|zara|h&m|asos|next|uniqlo|nike|adidas|puma|new balance|primark|m&s|marks (&|and) spencer|boohoo|shein|gap|levi|ralph lauren|north face|patagonia|jd sports|sports direct|schuh|office shoes|river island|topshop|mango|cos\b|arket|& other stories|jumper|hoodie|jacket|jeans|trousers|dress|shirt|t-?shirt|leggings|shorts|trainers|shoes?|boots?|coat|socks|bra\b|swimwear|bag|handbag)\b/i],
 ];
@@ -42,4 +42,25 @@ function finish(category) {
     category === "digital" ? "Digital purchases and subscriptions usually can't be returned. Cancel or ask the provider instead." :
     category === "food" ? "Food and drink usually can't be returned." : "Travel and rides usually can't be returned.";
   return { category, categoryLabel: CATEGORIES[category], returnable, notReturnableReason: reason };
+}
+
+// A shop name a person would say. Receipts often carry a company's legal name ("Anthropic Ireland, Limited")
+// or no name at all, only the sending domain ("appcharge.com"), so this tidies the first and builds one from the second.
+const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifyemail: null, stripe: null, paypal: null, squareup: null };
+const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
+export function shopDisplayName(retailer) {
+  const r = retailer || {};
+  let name = String(r.name || "").trim();
+  if (name) {
+    // "Anthropic Ireland, Limited" → "Anthropic"; "Acme UK Ltd." → "Acme"
+    const short = name.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim();
+    return short || name;
+  }
+  const parts = String(r.domain || "").toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
+  if (!parts.length) return null;
+  // Drop the country/generic ending (".com", ".co.uk") and any mail-sending subdomain ("e.", "email.").
+  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store)$/.test(parts[parts.length - 1])) parts.pop();
+  const base = parts.filter(p => !MAIL_SUBDOMAIN.test(p)).pop() || parts.pop();
+  if (Object.prototype.hasOwnProperty.call(KNOWN_NAMES, base)) return KNOWN_NAMES[base];
+  return base ? base.charAt(0).toUpperCase() + base.slice(1) : null;
 }

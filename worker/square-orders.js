@@ -7,7 +7,7 @@
 // Test orders (sandbox only, never on live Square): a signed-in shopper can place an order in Relay's own Square test shop
 // under their sign-in email, paid with Square's sandbox test payment (no card, no real money). Up to 5 a day.
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
-import { squareHost, squareIsProduction } from "./square-env.js";
+import { squareHost, squareIsProduction, squareShopName } from "./square-env.js";
 import { ensureOnce } from "./once.js";
 import { ensureReturnsTables, REASON_TEXT, esc, clean } from "./returns.js";
 
@@ -257,7 +257,7 @@ export async function notifySquareShopOfReturn(env, r, o = {}) {
     const location = (await sq(env, "/v2/locations/" + encodeURIComponent(loc), {}, f)).location || {};
     const to = String(location.business_email || "").trim();
     if (!EMAIL.test(to)) return false;
-    const shopName = clean(location.business_name || location.name || TEST_LABEL(env), 80);
+    const shopName = clean(squareShopName(env, location.business_name || location.name), 80);
     const item = clean(r.itemTitle || "an item", 120), qty = Number(r.quantity) || 1;
     const price = "£" + (Math.round(Number(r.priceMinor) || 0) / 100).toFixed(2);
     const reason = REASON_TEXT[r.reason] || "Not given";
