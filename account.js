@@ -597,8 +597,15 @@
     if (!onPage) box.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
     var list = el("div");
     var shopRows = [];
+    // Placeholder squares while the first load is on its way, so the page is never blank.
+    if (onPage && !memo.receipts) {
+      var sk = el("div", { className: "rl-cats", style: "margin-top:52px" });
+      for (var si = 0; si < 6; si++) sk.appendChild(el("div", { className: "rl-po rl-skel", style: "min-height:150px;margin:0" }));
+      list.appendChild(sk); box.appendChild(list);
+    }
     cachedGet("gmail", "/relay/my/gmail").then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
+      if (!r.ok || !r.body.connected) list.textContent = "";
       if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your Gmail status." })); return; }
       if (!r.body.connected) {
         box.appendChild(el("p", { text: c.gmailAvailable ? "Connect Gmail so Relay can find your order confirmations and receipts for you." : "Gmail connection isn't switched on yet. You can still add a receipt by pasting it below." }));
@@ -755,6 +762,7 @@
         // Show what was loaded last time straight away, then quietly update if anything changed.
         if (onPage && !shopRows.length && memo.shopRows) shopRows = memo.shopRows;
         if (drawnSig === null && memo.receipts) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); }
+        var sk = list.firstChild; if (sk && sk.className === "rl-cats" && sk.style.marginTop) sk.style.marginTop = "8px";
         // Shop orders and email receipts are drawn together, so the page never redraws itself a moment later.
         var shopsLoaded = !onPage ? Promise.resolve() : (memo.purchases || api("/relay/my/purchases")).then(function (pr) {
           var rows = []; ((pr.ok && pr.body && pr.body.purchases) || []).forEach(function (o) { (o.items || []).forEach(function (it) { rows.push([o, it]); }); });
