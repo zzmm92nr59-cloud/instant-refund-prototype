@@ -41,6 +41,7 @@ const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 
 const PARSER_VERSION = 16;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
+const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
   '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"))' +
@@ -117,7 +118,14 @@ async function ensureGmailTablesRun(db) {
     // Public store logos, fetched from the store's own website and shared by everyone. Holds no personal data.
     `CREATE TABLE IF NOT EXISTS retailer_logos (
        domain TEXT PRIMARY KEY, type TEXT, data TEXT, found INTEGER NOT NULL, fetched_at INTEGER NOT NULL)`,
-    `CREATE INDEX IF NOT EXISTS idx_receipt_learning_store ON receipt_learning(store_key, category)`
+    `CREATE INDEX IF NOT EXISTS idx_receipt_learning_store ON receipt_learning(store_key, category)`,
+    // Past years the shopper asked Relay to read (for Wrapped), and when each was finished.
+    `CREATE TABLE IF NOT EXISTS gmail_history_years (
+       shopper_id TEXT NOT NULL, year INTEGER NOT NULL, done_at INTEGER, PRIMARY KEY (shopper_id, year))`,
+    // Which items of an email order the shopper is sending back (an email receipt covers the whole order).
+    `CREATE TABLE IF NOT EXISTS receipt_item_marks (
+       shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, item_index INTEGER NOT NULL, status TEXT NOT NULL,
+       updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id, item_index))`
   ];
   await runAll(db, statements);
   await ensureResaleTables(db);
@@ -133,6 +141,8 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").bind(shopperId)
@@ -228,6 +238,8 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId)
   ];
   if (withdraw) statements.push(env.RELAY_DB.prepare(
@@ -363,8 +375,11 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
   const sinceLast = o.sinceMs ? Math.max(fullLimit, o.sinceMs) : !full && row.last_scan_at ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
-  const limitDay = ymd(sinceLast);
-  let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= ymd(now + DAY_MS) ? cursorIn : ymd(now + DAY_MS);
+  // A past year the shopper asked for (Wrapped history) is read on its own, from 31 Dec back to 1 Jan, whatever the usual look-back.
+  const yr = o.year;
+  const limitDay = yr ? yr + "/01/01" : ymd(sinceLast);
+  const top = yr ? (yr + 1) + "/01/01" : ymd(now + DAY_MS);
+  let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= top && cursorIn > limitDay ? cursorIn : top;
   let incomplete = false, windows = 0, outOfBudget = false;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
     if (calls + 4 > budget) { outOfBudget = true; break; }
@@ -464,7 +479,9 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     if (fetched >= maxFetch) break;
   }
   const more = incomplete || outOfBudget || before > limitDay;
-  if (!more && !o.recent) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  if (yr) {
+    if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at) VALUES (?,?,?) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at").bind(shopperId, yr, now).run();
+  } else if (!more && !o.recent) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
 
@@ -823,14 +840,22 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const sb = await request.json().catch(() => ({}));
     try {
       // A retry after a round that ran out of time asks for a small round (2 emails), so the same heavy emails get through.
+      const thisYear = new Date(opts.now).getUTCFullYear(), want = Number(sb && sb.year);
+      if (sb && sb.year !== undefined && !(Number.isInteger(want) && want >= thisYear - HISTORY_YEARS && want < thisYear))
+        return json({ error: "bad_year", earliest: thisYear - HISTORY_YEARS }, 400, cors);
       const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true),
-        sb && sb.small === true ? { maxFetch: 2 } : {});
+        { ...(sb && sb.small === true ? { maxFetch: 2 } : {}), ...(want ? { year: want } : {}) });
       return json(r.body, r.status, cors);
     } catch (e) {
       // A round that hits a limit still answers, so the app can wait a moment and carry on from where it was.
       console.error("gmail scan round failed", String(e && e.message || e).slice(0, 160));
       return json({ error: "scan_busy", retryAfterMs: 3000 }, 503, cors);
     }
+  }
+  if (path === "/relay/my/gmail/history" && m === "GET") {
+    const r = await env.RELAY_DB.prepare("SELECT year, done_at AS doneAt FROM gmail_history_years WHERE shopper_id = ? ORDER BY year DESC").bind(shopper.id).all();
+    const thisYear = new Date(opts.now).getUTCFullYear();
+    return json({ years: (r.results || []).filter(x => x.doneAt), earliest: thisYear - HISTORY_YEARS, recentFrom: ymd(opts.now - LOOKBACK_DAYS * DAY_MS).replace(/\//g, "-") }, 200, cors);
   }
   if (path === "/relay/my/gmail/find" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);

@@ -253,6 +253,27 @@ paging = true;
 await scanAll(alice, 60, true);
 paging = false;
 assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-99"), "receipt from page two captured");
+// 7d. Past years for Wrapped: only read when the shopper asks, one year at a time, and remembered once finished.
+{
+  const thisYear = new Date(clock).getUTCFullYear(), old = thisYear - 4;
+  gmailBox.m95 = receiptMail(95).replace("14 Oct 2026", "15 Jun " + old);
+  boxDates.m95 = old + "/06/15";
+  await scanAll(alice, 60, true);
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-95"), "an ordinary scan doesn't go back years");
+  assert.equal((await post("/relay/my/gmail/scan", alice, { year: thisYear })).status, 400, "this year isn't a 'past year'");
+  assert.equal((await post("/relay/my/gmail/scan", alice, { year: thisYear - 11 })).status, 400, "no more than 10 years back");
+  assert.equal((await post("/relay/my/gmail/scan", alice, { year: "2020; DROP" })).status, 400);
+  let cursor = "", rounds = 0, j; const q0 = listQueries.length;
+  do { const r = await post("/relay/my/gmail/scan", alice, { year: old, ...(cursor ? { cursor } : {}) }); assert.equal(r.status, 200); j = await r.json(); cursor = j.cursor; rounds++; assert.ok(rounds < 30); } while (j.more);
+  assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("EO-95"), "the old year's receipt is found");
+  assert.ok(listQueries.slice(q0).every(q => q.split("..")[1] <= (old + 1) + "/01/01") && listQueries.length > q0, "a year scan never reads beyond that year");
+  const h = await (await call("/relay/my/gmail/history", { token: alice })).json();
+  assert.deepEqual(h.years.map(y => y.year), [old], "the finished year is remembered");
+  assert.deepEqual((await (await call("/relay/my/gmail/history", { token: bob })).json()).years, [], "only for that shopper");
+  const wr = await (await call("/relay/my/wrapped?year=" + old, { token: alice })).json();
+  assert.equal(wr.receipts, 1); assert.ok(wr.years.some(y => y.year === old), "Wrapped offers the year");
+  sqlite.prepare("DELETE FROM captured_receipts WHERE details LIKE '%EO-95%'").run(); delete gmailBox.m95; delete boxDates.m95;
+}
 // 11c. "Find a missing receipt": search by store name, pick one email, add it. Owner-only, consent-gated.
 {
   const find = (q, token = alice) => post("/relay/my/gmail/find", token, { query: q });

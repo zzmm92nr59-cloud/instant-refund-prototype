@@ -414,12 +414,27 @@ await page.locator('#marketPage').getByRole('button', { name: 'Sell', exact: tru
 assert.equal(await page.locator('#marketPage').getByRole('button', { name: 'Back', exact: true }).count(), 0, 'the Market page has nothing to go back to');
 console.log('PASS Market tab shows swap and resell on its own page');
 await page.getByRole('button', { name: /^.*Wrapped$/ }).first().click();
-await page.getByRole('heading', { name: 'Your 2026, in purchases.' }).waitFor();
-await page.getByText('£122.00').waitFor();
-await page.getByText('Spending is added up from 3 of 5 receipts (1 with no readable amount, 1 not in pounds left out).').waitFor();
-await page.getByText('Fashion regular').waitFor();
-await page.getByText('Busiest month: Mar.').waitFor();
+await page.getByRole('heading', { name: 'Your 2026 in purchases.' }).waitFor();
+await page.locator('.rl-wr-glance').getByText('£122.00').waitFor();
+await page.getByText('from 3 of 5 receipts').waitFor();
 await page.getByText("In-store card purchases without an email receipt aren't included.", { exact: false }).waitFor();
+// The story: tap through every slide and check what it says.
+await page.getByRole('button', { name: /Play your story/ }).click();
+const storyText = [];
+for (let k = 0; k < 15; k++) {
+  await page.waitForTimeout(250);
+  storyText.push(await page.locator('.rl-story-body').innerText());
+  if (await page.getByRole('button', { name: 'Watch again' }).count()) break;
+  await page.keyboard.press('ArrowRight');
+}
+const story = storyText.join('\n');
+assert.match(story, /In 2026 you spent/);
+assert.match(story, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./);
+assert.match(story, /Fashion regular/);
+assert.match(story, /Your busiest month\s+March/);
+assert.match(story, /MY 2026 ON RELAY/);
+await page.getByRole('button', { name: 'Done' }).click();
+assert.equal(await page.locator('.rl-story').count(), 0, 'Done closes the story');
 assert.equal(await page.evaluate(() => window.__xss9), undefined, 'shop names in Wrapped never run as HTML');
 console.log('PASS Wrapped shows real totals, says what was left out, and keeps shop names safe');
 await page.getByRole('button', { name: /^.*Discover$/ }).first().click();
