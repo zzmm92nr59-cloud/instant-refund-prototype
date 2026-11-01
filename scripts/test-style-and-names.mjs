@@ -116,3 +116,15 @@ console.log("PASS style profile: sizes, colours, styles and a plain sentence, al
   assert.equal(buildWrapped([], 2026).badges.length, 0);
   console.log("PASS Spotify-style Wrapped: top 5 things, biggest buys, shopping time, shop sprint, regulars, earned badges, year's list");
 }
+
+// 8. Savings lines, credits and labels are never "things you bought", and forwarded copies aren't "biggest buys".
+{
+  const c = (id, shop, dom, items, t) => ({ id, kind: "receipt", retailer: { name: shop, domain: dom }, orderDate: "2026-05-0" + id.length, totalPence: t, currency: "GBP", category: "food", items });
+  const w = buildWrapped([c("a", "Sainsbury's", "sainsburys.test", [{ name: "You've saved", pricePence: 120 }, { name: "Bananas", pricePence: 90 }], 5000),
+    c("bb", "Sainsbury's", "sainsburys.test", [{ name: "You've saved", pricePence: 80 }, { name: "Credit:", pricePence: 100 }, { name: "Bananas", pricePence: 90 }], 4000),
+    c("ccc", "Forwarded receipt", "gmail.com", [{ name: "Sofa" }], 90000)], 2026);
+  assert.deepEqual(w.yearList.map(x => x.name), ["Bananas", "Sofa"], "a forwarded receipt with no shop copy still counts as something bought");
+  assert.ok(!w.topBuys.some(b => b.shop === "Forwarded receipt"), "a forwarded copy isn't a biggest buy");
+  assert.equal(w.topBuys[0].item, "Bananas", "the one real item names the order");
+  console.log("PASS Wrapped lists only real things: no savings lines, credits or forwarded copies");
+}
