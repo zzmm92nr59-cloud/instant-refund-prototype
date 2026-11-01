@@ -382,6 +382,28 @@ t("lenient mode (shopper picked the email) accepts one signal but still needs re
   assert.equal(strict.ok, false); assert.equal(len.ok, false); assert.equal(len.signals.nothingFound, true);
 });
 
+// Apple receipts (synthetic, built to Apple's published receipt layout): the app and what was bought sit on lines above the price.
+const appleHtml = (rows) => `From: Apple <no_reply@email.apple.com>\nSubject: Your receipt from Apple.\nDate: Sat, 31 Oct 2026 10:00:00 +0000\nContent-Type: text/html; charset=utf-8\n\n<html><body>${rows.map(r => `<p>${r}</p>`).join("")}</body></html>`;
+t("Apple in-app purchase: app and item are read, not the account or order lines", () => {
+  const r = parseReceiptEmail(appleHtml(["Receipt", "Apple Account", "someone@example.test", "Invoice Date", "31 Oct 2026", "Order ID", "MQKY4QNLQ6", "Document", "123456789012", "App Store", "Puzzle Kingdom", "5,000 Coins", "Report a Problem", "£1.59", "Subtotal", "£1.33", "VAT charged at 20%", "£0.26", "Total", "£1.59"]));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.orderRef, "MQKY4QNLQ6");
+  assert.equal(r.totalPence, 159);
+  assert.deepEqual(r.items.map(i => [i.name, i.variant, i.pricePence]), [["Puzzle Kingdom", "5,000 Coins", 159]]);
+});
+t("Apple receipt with two purchases and a subscription", () => {
+  const r = parseReceiptEmail(appleHtml(["Order ID", "MQAB12CD34", "App Store", "Puzzle Kingdom", "Gem Pack", "In-App Purchase", "Report a Problem", "£3.19", "Cloud Notes Pro", "Cloud Notes Pro (Monthly)", "Renews 30 Nov 2026", "Report a Problem", "£4.99", "Subtotal", "£6.82", "Total", "£8.18"]));
+  assert.deepEqual(r.items.map(i => [i.name, i.variant || null, i.pricePence]), [["Puzzle Kingdom", "Gem Pack", 319], ["Cloud Notes Pro", "Cloud Notes Pro (Monthly)", 499]]);
+});
+t("Apple service with only a section name (iCloud+) still gets a name", () => {
+  const r = parseReceiptEmail(appleHtml(["Order ID", "MQZZ99YY88", "Apple Services", "iCloud+ with 200 GB storage", "Monthly", "£2.99", "Total", "£2.99"]));
+  assert.deepEqual(r.items.map(i => i.name), ["iCloud+ with 200 GB storage"]);
+});
+t("the Apple reader never runs for other shops", () => {
+  const r = parseReceiptEmail(appleHtml(["Order ID", "AB12345", "Some Shop", "Thing", "£5.00", "Total", "£5.00"]).replace("no_reply@email.apple.com", "orders@someshop.test"));
+  assert.deepEqual(r.items, []);
+});
+
 console.log(`\n${passed} receipt-parser tests passed (synthetic emails only)`);
 
 // Real-world lesson (lululemon, 2025): a message that says "Return ID: https://..." must not yield the ID "https",
