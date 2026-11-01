@@ -678,6 +678,30 @@ export function attachReturnProgress(orders, deliveries, updates) {
   }
 }
 
+// Which items of an email order are being sent back. The shopper's own choice wins; otherwise, when a refund email
+// gives an amount that matches exactly one set of the order's item prices, those items are shown as returned.
+export function itemsForRefund(items, refundPence) {
+  const priced = (items || []).map((it, i) => ({ i, p: it && Number.isInteger(it.pricePence) ? it.pricePence * (Number(it.qty) > 0 && !it.lineTotal ? Number(it.qty) : 1) : null }));
+  if (!Number.isInteger(refundPence) || refundPence <= 0 || priced.length < 2 || priced.length > 12 || priced.some(x => x.p == null)) return null;
+  let found = null;
+  for (let mask = 1; mask < (1 << priced.length); mask++) {
+    let sum = 0; const pick = [];
+    for (let k = 0; k < priced.length; k++) if (mask & (1 << k)) { sum += priced[k].p; pick.push(priced[k].i); }
+    if (sum === refundPence) { if (found) return null; found = pick; }   // two different sets fit: don't guess
+  }
+  return found && found.length < priced.length ? found : null;           // the whole order isn't a per-item answer
+}
+export function attachItemReturns(orders, marks) {
+  const byId = new Map();
+  for (const m of marks) { const e = byId.get(m.id) || {}; e[m.i] = m.status; byId.set(m.id, e); }
+  for (const o of orders) {
+    const mine = byId.get(o.id);
+    if (mine) { o.itemReturns = mine; continue; }
+    const rp = o.returnProgress, guess = rp && rp.refundPence != null ? itemsForRefund(o.items, rp.refundPence) : null;
+    if (guess) { o.itemReturns = Object.fromEntries(guess.map(i => [i, "returning"])); o.itemReturnsFrom = "refund"; }
+  }
+}
+
 // An email Relay itself sent (from its own sending address), which the receipt reader can mistake for a purchase.
 function isRelayEmail(c, env) {
   const r = c.retailer || {}, domain = String(r.domain || "").toLowerCase();
@@ -706,9 +730,10 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, ...learned] = await Promise.all([
+  const [gone, rem, marks, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
+    env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
@@ -721,6 +746,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     if (o) o.returnPlan = p;
   }
   attachReturnProgress(orders, deliveries, updates);
+  attachItemReturns(orders, (marks && marks.results) || []);
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
   // An order the shopper dismissed stays hidden even when the shop sent other emails about it.
   const cards = orders.filter(o => !(o.orderRef && dismissedRefs.has(o.orderRef)));
@@ -932,6 +958,23 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     await env.RELAY_DB.prepare(
       "INSERT INTO receipt_learning (shopper_id, store_key, category, promo, updated_at) VALUES (?,?,?,0,?) ON CONFLICT (shopper_id, store_key) DO UPDATE SET category = excluded.category, updated_at = excluded.updated_at")
       .bind(shopper.id, k, b.category, Date.now()).run();
+    return json({ ok: true }, 200, cors);
+  }
+  // The shopper says which items of an email order they're sending back (or not any more).
+  const itm = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/items$/.exec(path);
+  if (itm && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const list = b && Array.isArray(b.items) ? b.items.slice(0, 50) : null;
+    if (!list || !list.every(x => x && Number.isInteger(x.index) && x.index >= 0 && (x.status === "returning" || x.status === null)))
+      return json({ error: "bad_items" }, 400, cors);
+    const row = await env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(itm[1], shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    const count = Math.max(1, (JSON.parse(row.details).items || []).length); // an order with no item names is one thing
+    if (list.some(x => x.index >= count)) return json({ error: "bad_items" }, 400, cors);
+    const now = Date.now();
+    await env.RELAY_DB.batch(list.map(x => x.status
+      ? env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,?,?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, x.status, now)
+      : env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,'kept',?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = 'kept', updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, now)));
     return json({ ok: true }, 200, cors);
   }
   const img = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(path);

@@ -30,6 +30,12 @@ async function learnedCategories(env, shopperId) {
   } catch { return new Map(); }
 }
 export const CONDITIONS = ["new_with_tags", "like_new", "good", "fair"];
+export const HANDOVER = ["collect", "post", "either"];
+// "SW11 1AA", "sw11", "M1" → the outward code ("SW11", "M1"). Only this part is ever stored or shown.
+export function postcodeArea(v) {
+  const m = String(v || "").toUpperCase().replace(/\s+/g, " ").trim().match(/^([A-Z]{1,2}[0-9][A-Z0-9]?)(?: ?[0-9][A-Z]{2})?$/);
+  return m ? m[1] : null;
+}
 const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000;
 
 export function ensureResaleTables(db) { return ensureOnce(db, "resale", () => ensureResaleTablesRun(db)); }
@@ -56,6 +62,10 @@ async function ensureResaleTablesRun(db) {
     ...ADMIN_TABLE_SQL
   ];
   await runAll(db, statements);
+  // Added later: how the item changes hands, and the area for collection (only the first half of a postcode, never an address).
+  for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT"]) {
+    try { await db.prepare(sql).run(); } catch { /* already there */ }
+  }
 }
 
 const MY_REQUESTS = "(SELECT q.id FROM resale_requests q WHERE q.asker_id = ? UNION SELECT q.id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE l.seller_id = ?)";
@@ -113,6 +123,11 @@ async function createListing(env, shopper, body, now) {
   const index = Number.isInteger(body.itemIndex) && body.itemIndex >= 0 && body.itemIndex < 100 ? body.itemIndex : -1;
   if (!receiptId || index < 0) return { status: 400, body: { error: "invalid_item" } };
   if (!CONDITIONS.includes(body.condition)) return { status: 400, body: { error: "invalid_condition" } };
+  const handover = body.handover == null ? "post" : body.handover;
+  if (!HANDOVER.includes(handover)) return { status: 400, body: { error: "invalid_handover" } };
+  const area = body.area ? postcodeArea(body.area) : null;
+  if (body.area && !area) return { status: 400, body: { error: "invalid_area" } };
+  if (handover !== "post" && !area) return { status: 400, body: { error: "area_needed" } };
   let ask = null;
   if (body.askPence != null) {
     if (!Number.isInteger(body.askPence) || body.askPence < 0 || body.askPence > MAX_ASK_PENCE) return { status: 400, body: { error: "invalid_price" } };
@@ -131,11 +146,11 @@ async function createListing(env, shopper, body, now) {
   const id = uuid();
   try {
     await env.RELAY_DB.prepare(
-      `INSERT INTO resale_listings (id, seller_id, receipt_id, item_index, title, store, currency, size, condition, ask_pence, swap_ok, note, has_image, status, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?)`)
+      `INSERT INTO resale_listings (id, seller_id, receipt_id, item_index, title, store, currency, size, condition, ask_pence, swap_ok, note, has_image, status, created_at, handover, area)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?)`)
       .bind(id, shopper.id, receiptId, index, clean(item.name, 120), clean((d.retailer && (d.retailer.name || d.retailer.domain)) || "", 60) || null,
         d.currency === "GBP" || !d.currency ? "GBP" : clean(d.currency, 3), clean(body.size, 20) || null, body.condition, ask,
-        body.swapOk === true ? 1 : 0, clean(body.note, 200) || null, d.hasImage && d.items.length === 1 ? 1 : 0, now).run(); // a receipt photo is only trusted as the item's photo when the order has one item
+        body.swapOk === true ? 1 : 0, clean(body.note, 200) || null, d.hasImage && d.items.length === 1 ? 1 : 0, now, handover, area).run(); // a receipt photo is only trusted as the item's photo when the order has one item
   } catch (e) {
     return { status: 409, body: { error: "already_listed" } };
   }
@@ -144,7 +159,8 @@ async function createListing(env, shopper, body, now) {
 
 const publicListing = (r, mine) => ({
   id: r.id, title: r.title, store: r.store, size: r.size, condition: r.condition, askPence: r.ask_pence, currency: r.currency || "GBP",
-  swapOk: Boolean(r.swap_ok), note: r.note, hasImage: Boolean(r.has_image), createdAt: r.created_at, status: r.status, mine: Boolean(mine)
+  swapOk: Boolean(r.swap_ok), note: r.note, hasImage: Boolean(r.has_image), createdAt: r.created_at, status: r.status, mine: Boolean(mine),
+  handover: r.handover || "post", area: r.area || null
 });
 
 async function feed(env, shopper) {

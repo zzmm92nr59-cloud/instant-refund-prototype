@@ -967,7 +967,7 @@
   }
   var openResale = null;
   var CONDITION = { new_with_tags: "New with tags", like_new: "Like new", good: "Good", fair: "Fair" };
-  var resaleErrors = { not_resellable: "Only physical items can be listed. Food, travel and digital purchases can't be resold.", account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
+  var resaleErrors = { area_needed: "Add your postcode area (like SW11) so buyers know where to collect, or choose Post only.", invalid_area: "That doesn't look like a postcode area. Use the first part, like SW11 or M1.", invalid_handover: "Choose how the item changes hands.", not_resellable: "Only physical items can be listed. Food, travel and digital purchases can't be resold.", account_restricted: "Your account can't use the swap and resell board right now.", agreement_required: "Please tick the box to agree.", already_listed: "That item is already listed.", too_many_listings: "You have the maximum number of listings.",
     already_asked: "You've already asked about this one.", offer_one_of_your_listings: "Choose one of your own listings to offer.", swap_not_offered: "The seller isn't open to swaps.",
     not_found: "That's no longer available.", invalid_price: "Enter a price between £0 and £5,000.", too_many_requests: "Too many requests today. Try again tomorrow." };
 
@@ -980,7 +980,13 @@
     var input = el("input", { placeholder: "Write a message", maxLength: 500 });
     var send = el("button", { className: "rl-btn", text: "Send" });
     var tools = el("div");
-    [head, sub, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
+    // How to do the deal safely. Relay doesn't take payments yet, so this is what keeps both sides safe.
+    var tips = el("details", { style: "background:#f7f5ef;border-radius:14px;padding:10px 14px;margin:6px 0;font-size:14px;color:#344054" }, [
+      el("summary", { text: "Doing the deal safely", style: "font-weight:800;cursor:pointer" }),
+      el("p", { text: "Collecting: meet somewhere public in daylight, check the item, then pay on the spot (cash, or a bank transfer you can see arrive).", style: "margin:8px 0 4px" }),
+      el("p", { text: "Posting: Relay doesn't handle payments yet, so never pay a stranger in advance by bank transfer. Collection is the safe option for now.", style: "margin:4px 0" }),
+      el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
+    [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
     var timer = null, isOpen = false;
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     function load() {
@@ -1044,7 +1050,8 @@
     }
     function facts(l) {
       return [l.store, l.size ? "Size " + l.size : null, CONDITION[l.condition] || null,
-        l.askPence == null ? "Price: open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null].filter(Boolean).join(" · ");
+        l.askPence == null ? "Price: open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null,
+        l.handover === "collect" ? "Collection in " + l.area : l.handover === "either" ? "Collect in " + l.area + " or post" : l.handover === "post" ? "Posted" : null].filter(Boolean).join(" · ");
     }
     function draw() {
       Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "#c7f567" : "transparent"; });
@@ -1060,9 +1067,18 @@
         if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load listings." }));
         var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
         var rows = rs[0].body.listings || [];
+        // Like a local marketplace: put things you could collect near you first. Only the postcode area is used.
+        var near = ""; try { near = localStorage.getItem("relay-market-area") || ""; } catch (e) {}
+        var nearBox = el("input", { placeholder: "Your postcode area, e.g. SW11", value: near, maxLength: 8, style: "flex:1;min-width:0;padding:10px 14px;border:1px solid #e7e1d2;border-radius:12px;font-size:15px;background:#fff" });
+        nearBox.addEventListener("change", function () { try { localStorage.setItem("relay-market-area", nearBox.value.trim().toUpperCase().split(" ")[0]); } catch (e) {} drawBrowse(); });
+        if (rows.length) body.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:12px 0" }, [el("span", { text: "📍", ariaHidden: "true" }), nearBox]));
+        var mineArea = near.toUpperCase().split(" ")[0], letters = mineArea.replace(/[0-9].*$/, "");
+        var score = function (l) { if (!mineArea || !l.area || l.handover === "post") return 0; return l.area === mineArea ? 2 : l.area.replace(/[0-9].*$/, "") === letters ? 1 : 0; };
+        rows = rows.slice().sort(function (a, b) { return score(b) - score(a); });
         if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return window? List it from the Sell tab." })]));
         rows.forEach(function (l) {
           var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
+          if (score(l)) card.appendChild(el("span", { text: score(l) === 2 ? "📍 Near you" : "📍 In your area", style: "display:inline-block;margin-top:6px;background:#e3f4c8;color:#2f4a10;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800" }));
           photo(card, l.id, l.hasImage);
           if (l.note) card.appendChild(el("span", { text: "“" + l.note + "”", style: "display:block;margin-top:4px" }));
           if (l.myRequest) {
@@ -1153,15 +1169,21 @@
         var price = el("input", { placeholder: "Asking price in £ (leave empty for open to offers)", inputMode: "decimal" });
         var note = el("input", { placeholder: "Note for buyers (optional, no contact details)", maxLength: 200 });
         var swap = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
+        var hand = el("select", { style: "width:100%;margin:8px 0;padding:10px;border-radius:12px;border:1px solid #ddd6c6;font-size:15px" });
+        [["either", "Collection or post"], ["collect", "Collection only"], ["post", "Post only"]].forEach(function (o) { hand.appendChild(el("option", { value: o[0], text: o[1] })); });
+        var savedArea = ""; try { savedArea = localStorage.getItem("relay-market-area") || ""; } catch (e) {}
+        var area = el("input", { placeholder: "Postcode area for collection, e.g. SW11", maxLength: 8, value: savedArea });
+        var areaNote = el("span", { text: "Only the first part of your postcode is shown, never your address.", style: "display:block;font-size:12px;color:#667085;margin:-4px 0 6px" });
+        hand.onchange = function () { var c = hand.value !== "post"; area.style.display = areaNote.style.display = c ? "" : "none"; };
         var agree = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
         var go = el("button", { className: "rl-btn", text: "Put it on Relay", style: "margin-top:10px", onclick: function () {
           var p = price.value.trim(), pence = null;
           if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return tell(resaleErrors.invalid_price, true); pence = Math.round(n * 100); }
           go.disabled = true;
-          api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, agree: agree.checked } })
+          api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, agree: agree.checked, handover: hand.value, area: hand.value === "post" ? null : area.value.trim() || null } })
             .then(function (r) { go.disabled = false; if (r.ok) { cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); });
         } });
-        [cond, size, price, note,
+        [cond, size, price, note, hand, area, areaNote,
          el("label", { style: "display:block;font-size:14px;margin:4px 0" }, [swap, document.createTextNode("I'm open to swaps")]),
          el("label", { style: "display:block;font-size:13px;margin:8px 0;color:#5b6475" }, [agree, document.createTextNode("I agree Relay shows this item's name, store, size, condition, price, note and photo to other Relay members. My name, email, order number and address are never shown.")]),
          go].forEach(function (n) { card.appendChild(n); });
@@ -1560,6 +1582,101 @@
     show(0);
   }
 
+  // ---- Investor/shop demo of the Market (only with ?demo=1). Everything here is made up and stays in this browser:
+  // nothing is sent to Relay, and real members never see it. It shows how buying and selling works end to end. ----
+  function mountDemoMarket(host) {
+    host.textContent = "";
+    var D = [
+      { id: "d1", title: "Waterproof Rain Shell", store: "Fieldhouse", size: "M", cond: "Like new", price: 4500, paid: 12000, ago: "5 weeks ago", area: "SW11", how: "either", who: "Priya", img: "ltd-rain-shell.png" },
+      { id: "d2", title: "Court Classic Trainers", store: "Kick Lane", size: "UK 8", cond: "Good", price: 3500, paid: 8500, ago: "2 months ago", area: "SW4", how: "collect", who: "Tom", img: "court-classic-sneakers.png", swap: true },
+      { id: "d3", title: "Oversized Hoodie", store: "Studio North", size: "L", cond: "New with tags", price: 3000, paid: 5500, ago: "3 weeks ago", area: "SW11", how: "either", who: "Maya", img: "studio-oversized-hoodie.png" },
+      { id: "d4", title: "Wool Coat", store: "Harlow & Co", size: "UK 10", cond: "Like new", price: 9000, paid: 22000, ago: "6 weeks ago", area: "N1", how: "post", who: "Ellie", img: "wool-coat.png" },
+      { id: "d5", title: "Yoga Leggings", store: "Relay Demo Store", size: "S", cond: "Like new", price: 1800, paid: 4800, ago: "1 month ago", area: "SE15", how: "collect", who: "Aisha", img: "rd-yoga-leggings.png", swap: true },
+      { id: "d6", title: "Leather Crossbody Bag", store: "Harlow & Co", size: null, cond: "Good", price: 4000, paid: 9500, ago: "4 months ago", area: "SW11", how: "collect", who: "Sam", img: "leather-crossbody.png" },
+      { id: "d7", title: "Trail Grip Boots", store: "Fieldhouse", size: "UK 9", cond: "Good", price: 5500, paid: 14000, ago: "2 months ago", area: "M1", how: "post", who: "Josh", img: "trail-grip-boots.png" },
+      { id: "d8", title: "Wireless Earbuds", store: "Voltline", size: null, cond: "Like new", price: 3500, paid: 7900, ago: "3 weeks ago", area: "SW12", how: "either", who: "Leo", img: "wireless-earbuds.png" }];
+    var MINE = [{ id: "s1", title: "Linen Shirt", store: "Studio North", paid: 4500, ago: "Bought 7 weeks ago", img: "linen-shirt.png" },
+      { id: "s2", title: "Retro High Trainers", store: "Kick Lane", paid: 9500, ago: "Bought 3 months ago", img: "ltd-retro-high.png" },
+      { id: "s3", title: "Steel Water Bottle", store: "Fieldhouse", paid: 2200, ago: "Bought 5 weeks ago", img: "steel-water-bottle.png" }];
+    var listed = [], cur = "browse", near = "SW11";
+    var pic = function (f) { return el("img", { src: "pics/products/" + f, alt: "", style: "width:100%;aspect-ratio:1;object-fit:contain;background:#f4f1ea;border-radius:16px" }); };
+    var howText = function (l) { return l.how === "collect" ? "Collection in " + l.area : l.how === "post" ? "Posted" : "Collect in " + l.area + " or post"; };
+    host.appendChild(el("div", { style: "background:#fff4d6;border:1px solid #f2d27b;color:#5c4400;border-radius:14px;padding:10px 14px;font-size:13px;margin:0 0 12px" }, [
+      el("b", { text: "Demo: " }), document.createTextNode("made-up members and listings to show how the Market works. Nothing here is real or sent anywhere.")]));
+    var tabs = el("div", { style: "display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px" }), body = el("div");
+    host.appendChild(tabs); host.appendChild(body);
+    [["browse", "Browse"], ["mine", "Mine"], ["sell", "Sell"]].forEach(function (t) {
+      var b = el("button", { className: "rl-btn ghost", text: t[1], style: "margin:0;padding:9px 6px;font-size:14px", onclick: function () { cur = t[0]; draw(); } });
+      b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
+    });
+    function draw() {
+      Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "#c7f567" : "transparent"; });
+      body.textContent = "";
+      if (cur === "browse") browse(); else if (cur === "mine") mine(); else sell();
+    }
+    function browse() {
+      var box = el("input", { value: near, maxLength: 8, placeholder: "Your postcode area", style: "flex:1;padding:10px 14px;border:1px solid #e7e1d2;border-radius:12px;font-size:15px" });
+      box.onchange = function () { near = box.value.trim().toUpperCase(); draw(); };
+      body.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:0 0 12px" }, [el("span", { text: "📍" }), box]));
+      var letters = near.replace(/[0-9].*$/, "");
+      var score = function (l) { return l.how === "post" ? 0 : l.area === near ? 2 : l.area.replace(/[0-9].*$/, "") === letters ? 1 : 0; };
+      var grid = el("div", { style: "display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px" });
+      D.slice().sort(function (a, b) { return score(b) - score(a); }).forEach(function (l) {
+        var c = el("div", { className: "rl-po", style: "padding:12px" }, [pic(l.img),
+          el("div", { style: "display:flex;justify-content:space-between;gap:8px;margin-top:10px" }, [el("b", { text: l.title, style: "font-size:15px;color:#101828" }), el("b", { text: money(l.price, "GBP"), style: "color:#101828" })]),
+          el("div", { text: [l.size ? "Size " + l.size : null, l.cond, howText(l)].filter(Boolean).join(" · "), style: "font-size:13px;color:#475467;margin-top:4px" }),
+          el("div", { text: "✓ Bought at " + l.store + " " + l.ago + " for " + money(l.paid, "GBP") + ". Receipt checked by Relay.", style: "font-size:12px;color:#2f4a10;background:#eef7df;border-radius:10px;padding:6px 8px;margin-top:8px" })]);
+        if (score(l)) c.appendChild(el("span", { text: score(l) === 2 ? "📍 Near you" : "📍 In your area", style: "display:inline-block;margin-top:8px;background:#e3f4c8;color:#2f4a10;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800" }));
+        c.appendChild(el("div", { style: "display:flex;gap:6px;margin-top:10px" }, [
+          el("button", { className: "rl-po-primary", text: "I'd like this", onclick: function () { chat(l, "Hi! Is the " + l.title.toLowerCase() + " still available?", [
+            "Yes, it is! " + (l.how === "post" ? "I can post it this week." : "I'm in " + l.area + ". Could you collect on Saturday morning?"),
+            l.how === "post" ? "Great. Once Relay payments are live you'll pay through the app; for now we'd arrange it safely here." : "Perfect, see you then. I'll message the exact spot here."]); } }),
+          l.swap ? el("button", { className: "rl-po-secondary", text: "Offer a swap", onclick: function () { chat(l, "Hi! Would you swap for my Linen Shirt (M)?", ["Ooh, maybe! What colour is it?", "Sounds good, let's swap when we meet."]); } }) : null].filter(Boolean)));
+        grid.appendChild(c);
+      });
+      body.appendChild(grid);
+    }
+    function chat(l, opener, replies) {
+      var back = el("div", { className: "rl-back", style: "z-index:10000" });
+      var sheet = el("div", { className: "rl-sheet", role: "dialog" });
+      back.appendChild(sheet); document.body.appendChild(back);
+      var log = el("div", { style: "display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:40vh;overflow:auto" });
+      var bubble = function (t, me) { log.appendChild(el("div", { text: t, style: "max-width:80%;padding:10px 14px;border-radius:16px;font-size:15px;" + (me ? "align-self:flex-end;background:#101828;color:#fff" : "align-self:flex-start;background:#f1ecdf;color:#101828") })); log.scrollTop = 1e6; };
+      var n = 0, reply = function () { if (n < replies.length) { var t = replies[n++]; setTimeout(function () { bubble(t, false); }, 1100); } };
+      var input = el("input", { placeholder: "Write a message", maxLength: 300 });
+      var send = el("button", { className: "rl-btn", text: "Send", onclick: function () { var t = input.value.trim(); if (!t) return; if (/@|(?:\d[\s-]*){9,}/.test(t)) { note.textContent = "Relay keeps phone numbers and emails out of chats, to protect you both."; return; } note.textContent = ""; bubble(t, true); input.value = ""; reply(); } });
+      var note = el("div", { className: "rl-msg" });
+      [el("h2", { text: l.title }), el("p", { text: "Chatting with " + l.who + " (made-up demo member) · " + money(l.price, "GBP") + " · " + howText(l), style: "color:#475467;margin:0" }),
+       el("details", { style: "background:#f7f5ef;border-radius:14px;padding:10px 14px;margin:10px 0 0;font-size:14px" }, [el("summary", { text: "Doing the deal safely", style: "font-weight:800;cursor:pointer" }),
+         el("p", { text: "Meet somewhere public, check the item, pay on the spot. Don't pay a stranger in advance by bank transfer.", style: "margin:8px 0 0" })]),
+       log, input, send, note, el("button", { className: "rl-btn ghost", text: "Close", onclick: function () { back.remove(); } })].forEach(function (x) { sheet.appendChild(x); });
+      bubble(opener, true); reply();
+    }
+    function sell() {
+      body.appendChild(el("p", { text: "Things Relay found in this demo shopper's receipts. Pick one to list it: the name, shop and price paid come from the receipt, so buyers know it's genuine.", style: "color:#475467;margin:0 0 12px;font-size:14px" }));
+      MINE.filter(function (m) { return !listed.some(function (x) { return x.id === m.id; }); }).forEach(function (m) {
+        var c = el("div", { className: "rl-po", style: "display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:10px" }, [el("div", { style: "width:72px;flex:none" }, [pic(m.img)]),
+          el("div", { style: "flex:1" }, [el("b", { text: m.title }), el("div", { text: m.store + " · " + m.ago + " · paid " + money(m.paid, "GBP"), style: "font-size:13px;color:#475467" })]),
+          el("button", { className: "rl-po-primary", text: "List it", style: "flex:none;width:auto;padding:10px 16px", onclick: function () {
+            listed.push({ id: m.id, title: m.title, img: m.img, price: Math.round(m.paid * 0.45 / 100) * 100, state: "listed" }); cur = "mine"; draw();
+            setTimeout(function () { var x = listed.filter(function (q) { return q.id === m.id; })[0]; if (x) { x.state = "asked"; if (cur === "mine") draw(); } }, 2500);
+          } })]);
+        body.appendChild(c);
+      });
+    }
+    function mine() {
+      if (!listed.length) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "Use the Sell tab to list something from your receipts." })])); return; }
+      listed.forEach(function (x) {
+        var c = el("div", { className: "rl-po", style: "display:flex;gap:12px;align-items:center;padding:12px;margin-bottom:10px" }, [el("div", { style: "width:72px;flex:none" }, [pic(x.img)]),
+          el("div", { style: "flex:1" }, [el("b", { text: x.title + " · " + money(x.price, "GBP") }),
+            el("div", { text: x.state === "listed" ? "Listed · waiting for interest…" : x.state === "asked" ? "🔔 Jordan (demo member, SW11) would like this" : "✓ Deal agreed with Jordan", style: "font-size:13px;color:" + (x.state === "asked" ? "#2f4a10;font-weight:800" : "#475467") })])]);
+        if (x.state === "asked") c.appendChild(el("button", { className: "rl-po-primary", text: "Accept", style: "flex:none;width:auto;padding:10px 16px", onclick: function () { x.state = "agreed"; draw();
+          chat({ title: x.title, who: "Jordan", price: x.price, how: "collect", area: "SW11" }, "Hi Jordan, it's yours! I'm in SW11. Does Sunday work?", ["Sunday's great! Outside the station at 11?", "See you then 👍"]); } }));
+        body.appendChild(c);
+      });
+    }
+    draw();
+  }
   // ---- Phone alerts: price drops sent to this device. Nothing is sent unless the shopper turns it on here. ----
   function pushOk() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
   function keyBytes(t) { var s = t.replace(/-/g, "+").replace(/_/g, "/"); s += "=".repeat((4 - s.length % 4) % 4); return Uint8Array.from(atob(s), function (c) { return c.charCodeAt(0); }); }
@@ -1849,12 +1966,15 @@
     var card = el("div", { className: "rl-po" });
     var img = el("div", { className: "rl-po-img", text: initials(who) });
     if ((x.items || []).length <= 1 && x.hasImage && x.id) apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) { img.textContent = ""; img.appendChild(el("img", { src: u, alt: "" })); } });
-    var first = (x.items || [])[0] || {};
+    // One item of a multi-item order gets its own card (opts.item is its position on the receipt).
+    var one = opts.item != null ? (x.items || [])[opts.item] : null;
+    var first = one || (x.items || [])[0] || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
+    var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
     card.appendChild(el("div", { className: "rl-po-top" }, [img, el("div", { className: "rl-po-info" }, [
-      el("div", { className: "rl-po-shop", text: who }), el("h3", { text: receiptTitle(x) }),
-      el("div", { className: "rl-po-meta", text: [first.variant, date].filter(Boolean).join(" · ") })]),
-      el("div", { className: "rl-po-price", text: x.totalPence == null ? "" : money(x.totalPence, x.currency) })]));
+      el("div", { className: "rl-po-shop", text: who }), el("h3", { text: one ? one.name : receiptTitle(x) }),
+      el("div", { className: "rl-po-meta", text: [first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]),
+      el("div", { className: "rl-po-price", text: price })]));
     var dv = x.delivery;
     if (dv && dv.status) {
       var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
@@ -1880,7 +2000,25 @@
     // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
     if (opts.actions !== false && portal && /^https:\/\//.test(portal))
       card.appendChild(el("div", { text: "Opens the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run this page.", style: "font-size:12px;color:#667085;margin-top:8px;line-height:1.4" }));
+    // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
+    if (opts.markable && x.id) {
+      var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
+      if (!idxs.length) idxs = [0];
+      card.appendChild(el("button", { type: "button", className: "rl-link", text: opts.markable === "undo" ? "Not sending this back" : "I'm sending this back", style: "all:unset;cursor:pointer;color:#46601b;font-weight:800;font-size:14px;margin-top:10px;display:inline-block;text-decoration:underline;text-underline-offset:3px",
+        onclick: function (e) { var b = e.currentTarget; b.disabled = true; b.textContent = "Saving…";
+          markItems(x, idxs, opts.markable === "undo" ? null : "returning").then(function (ok) { if (ok && opts.changed) opts.changed(); else { b.disabled = false; b.textContent = "Couldn't save. Try again"; } }); } }));
+    }
     return card;
+  }
+  function markItems(x, idxs, status) {
+    return api("/relay/my/receipts/" + x.id + "/items", { method: "POST", body: { items: idxs.map(function (i) { return { index: i, status: status }; }) } })
+      .then(function (r) { memo.receipts = null; return r.ok; }, function () { return false; });
+  }
+  // The items of an email order, each with whether it's being sent back. Orders with one (or no) named item stay whole.
+  function emailItems(x) {
+    var named = (x.items || []).map(function (it, i) { return { it: it, i: i }; }).filter(function (e) { return e.it && e.it.name; });
+    var marks = x.itemReturns || {};
+    return named.map(function (e) { return { index: e.i, returning: marks[e.i] === "returning" }; });
   }
   function loadBoth() {
     var p = memo.purchases || api("/relay/my/purchases");
@@ -1918,10 +2056,14 @@
         items.push({ deadline: new Date(Date.parse(o.orderedAt) + 7 * 864e5).toISOString().slice(0, 10), node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
       }); });
       orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
-        if (x.returnable === false || x.returnProgress) return;
+        if (x.returnable === false) return;
         var dl = deadlineOf(x), onWay = x.delivery && x.delivery.status && x.delivery.status !== "delivered";
         if (!((dl && dl >= today) || (onWay && !dl))) return;
-        items.push({ deadline: dl, node: function () { return emailCard(x); } });
+        var parts = emailItems(x), anyMarked = parts.some(function (p) { return p.returning; });
+        // A return is under way but Relay doesn't know which items: the Returns page asks, and nothing shows here meanwhile.
+        if (x.returnProgress && !anyMarked) return;
+        if (parts.length > 1) parts.forEach(function (p) { if (!p.returning) items.push({ deadline: dl, node: function () { return emailCard(x, { item: p.index, markable: true, changed: refresh }); } }); });
+        else if (!anyMarked) items.push({ deadline: dl, node: function () { return emailCard(x, { markable: true, changed: refresh }); } });
       });
       items.sort(function (a, b) { return (a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1; });
       grid.textContent = "";
@@ -1936,6 +2078,25 @@
       if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); foot.appendChild(t); mountSquareTest(t, refresh); }
     });
   }
+  function whichItems(x, parts, done) {
+    var who = (x.retailer && x.retailer.name) || "this shop";
+    var card = el("div", { className: "rl-po" }, [el("div", { className: "rl-po-shop", text: who }), el("h3", { text: "Which items did you send back?", style: "margin:4px 0 6px" }),
+      el("p", { text: "Relay can see a return for this order but not which items were in it. Tick what you sent back and Relay will keep the rest in your wallet.", style: "font-size:14px;color:#475467;margin:0 0 10px" })]);
+    var picks = {};
+    parts.forEach(function (q) {
+      var it = x.items[q.index];
+      var box = el("input", { type: "checkbox", style: "width:20px;height:20px;accent-color:#101828" });
+      box.onchange = function () { picks[q.index] = box.checked; save.disabled = !Object.keys(picks).some(function (k) { return picks[k]; }); };
+      card.appendChild(el("label", { style: "display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #eee;cursor:pointer;font-size:15px" }, [box,
+        el("span", { text: it.name + (it.variant ? " · " + it.variant : ""), style: "flex:1" }), el("span", { text: Number.isInteger(it.pricePence) ? money(it.pricePence, x.currency) : "", style: "color:#667085" })]));
+    });
+    var save = el("button", { className: "rl-po-primary", text: "Save", disabled: true, style: "margin-top:10px", onclick: function () {
+      save.disabled = true; save.textContent = "Saving…";
+      markItems(x, Object.keys(picks).filter(function (k) { return picks[k]; }).map(Number), "returning").then(function (ok) { if (ok) done(); else { save.disabled = false; save.textContent = "Couldn't save. Try again"; } });
+    } });
+    card.appendChild(save);
+    return card;
+  }
   // Returns and swaps you've started, and where each one has got to.
   function mountReturns(host) {
     if (!host) return;
@@ -1947,12 +2108,17 @@
       var items = [];
       both[0].forEach(function (o) { (o.items || []).forEach(function (it) { if (it.returnInfo || it.exchange) items.push({ at: o.orderedAt, node: function () { return confirmedCard(o, it, refresh); } }); }); });
       orderRows(both[1]).forEach(function (x) {
-        var p = x.returnProgress; if (!p) return;
-        items.push({ at: x.orderDate, node: function () { return emailCard(x, { deadline: false, actions: false, extra: function (card) {
-          var step = p.refundedAt ? "✓ Refund processed" + (p.refundPence != null ? " · " + money(p.refundPence, p.currency || "GBP") : "")
-            : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Arrived back at the shop · waiting for the refund" : "Sent back · on its way to the shop";
-          card.appendChild(el("div", { className: "rl-po-status" + (p.refundedAt ? "" : " wait"), text: step }));
-        } }); } });
+        var p = x.returnProgress, parts = emailItems(x), marked = parts.filter(function (q) { return q.returning; });
+        if (!p && !marked.length) return;
+        var step = !p ? "You're sending this back · Relay will update this when the shop's emails arrive"
+          : p.refundedAt ? "✓ Refund processed" + (p.refundPence != null ? " · " + money(p.refundPence, p.currency || "GBP") : "")
+          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Arrived back at the shop · waiting for the refund" : "Sent back · on its way to the shop";
+        var progress = function (card) { card.appendChild(el("div", { className: "rl-po-status" + (p && p.refundedAt ? "" : " wait"), text: step }));
+          if (x.itemReturnsFrom === "refund") card.appendChild(el("div", { text: "Relay matched the refund amount to this item.", style: "font-size:12px;color:#667085;margin-top:6px" })); };
+        // A return for an order with several items, and Relay can't tell which: ask once.
+        if (p && parts.length > 1 && !marked.length) { items.push({ at: x.orderDate, node: function () { return whichItems(x, parts, refresh); } }); return; }
+        if (parts.length > 1) marked.forEach(function (q) { items.push({ at: x.orderDate, node: function () { return emailCard(x, { item: q.index, deadline: false, actions: false, extra: progress, markable: p && p.refundedAt ? false : "undo", changed: refresh }); } }); });
+        else items.push({ at: x.orderDate, node: function () { return emailCard(x, { deadline: false, actions: false, extra: progress, markable: p ? false : "undo", changed: refresh }); } });
       });
       items.sort(function (a, b) { return String(b.at || "").localeCompare(String(a.at || "")); });
       grid.textContent = "";
@@ -2168,7 +2334,7 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/receipts").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }

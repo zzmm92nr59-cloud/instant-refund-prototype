@@ -69,16 +69,25 @@ assert.ok(!JSON.stringify(items).includes("Trail shell"), "never lists another m
 
 // Listing rules.
 const list = (token, extra = {}) => post("/relay/my/resale/listings", token, { receiptId: A1, itemIndex: 0, condition: "like_new", size: "US 8 (UK 12)", askPence: 6500, swapOk: true, note: "Worn twice", agree: true, ...extra });
+// Collection or post: an area (first half of a postcode only) is needed for collection, and nothing more of the address is kept.
+{
+  const { postcodeArea } = await import("../worker/resale.js");
+  assert.equal(postcodeArea("sw11 1aa"), "SW11"); assert.equal(postcodeArea("M1"), "M1"); assert.equal(postcodeArea("EC1A 1BB"), "EC1A"); assert.equal(postcodeArea("12 High St"), null);
+}
 assert.equal((await list(alice, { agree: false })).status, 400, "sharing must be agreed to");
 assert.equal((await list(alice, { condition: "mint" })).status, 400);
 assert.equal((await list(alice, { askPence: -1 })).status, 400);
 assert.equal((await list(alice, { askPence: 99999999 })).status, 400);
 assert.equal((await list(alice, { itemIndex: 9 })).status, 404);
 assert.equal((await list(bob)).status, 404, "bob cannot list alice's receipt item");
-let r = await list(alice, { title: "FAKE TITLE", store: "Gucci" });
+assert.equal((await list(alice, { handover: "collect" })).status, 400, "collection needs an area");
+assert.equal((await list(alice, { handover: "teleport", area: "SW11" })).status, 400);
+assert.equal((await list(alice, { handover: "collect", area: "my house" })).status, 400, "only a postcode area");
+let r = await list(alice, { title: "FAKE TITLE", store: "Gucci", handover: "either", area: "sw11 1aa" });
 assert.equal(r.status, 200);
 const L1 = (await r.json()).id;
 const row = sqlite.prepare("SELECT * FROM resale_listings WHERE id = ?").get(L1);
+assert.equal(row.area, "SW11", "only the first half of the postcode is kept"); assert.equal(row.handover, "either");
 assert.equal(row.title, "Define Jacket Nulu"); assert.equal(row.store, "lululemon", "title and store come from the receipt, not the request");
 assert.equal((await list(alice)).status, 409, "the same item cannot be listed twice");
 await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 0, condition: "good", agree: true });
@@ -91,6 +100,8 @@ const L2 = sqlite.prepare("SELECT id FROM resale_listings WHERE receipt_id = ? A
 const feedBob = (await (await get("/relay/my/resale/feed", bob)).json()).listings;
 assert.equal(feedBob.length, 3);
 const seen = JSON.stringify(feedBob);
+assert.ok(feedBob.some(l => l.area === "SW11" && l.handover === "either"), "buyers see the collection area");
+assert.ok(feedBob.some(l => l.handover === "post" && l.area === null), "listings that didn't choose are posted");
 for (const secret of ["alice", "UK04002516", "EO-1", A1, idOf("alice@example.com"), "seller", "receipt"]) assert.ok(!seen.toLowerCase().includes(secret.toLowerCase()), "feed leaks nothing: " + secret);
 assert.equal((await (await get("/relay/my/resale/feed", alice)).json()).listings.length, 0, "own listings are not in your own feed");
 

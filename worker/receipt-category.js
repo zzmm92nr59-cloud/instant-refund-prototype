@@ -48,8 +48,12 @@ function finish(category) {
 // or no name at all, only the sending domain ("appcharge.com"), so this tidies the first and builds one from the second.
 const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifyemail: null, stripe: null, paypal: null, squareup: null };
 const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
+// Personal email services: a receipt "from" one of these is one the shopper (or a friend) forwarded, not a shop.
+export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.com|hotmail\.(com|co\.uk)|live\.(com|co\.uk)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk)|ymail\.com|aol\.com|proton\.me|protonmail\.com|pm\.me|btinternet\.com|sky\.com|virginmedia\.com)$/i;
 export function shopDisplayName(retailer) {
   const r = retailer || {};
+  // Never show a person's name as a shop.
+  if (PERSONAL_MAIL.test(String(r.domain || ""))) return "Forwarded receipt";
   let name = String(r.name || "").trim();
   if (name) {
     // "Anthropic Ireland, Limited" → "Anthropic"; "Acme UK Ltd." → "Acme"
