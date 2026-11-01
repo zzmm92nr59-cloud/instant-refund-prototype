@@ -673,30 +673,32 @@ export function parseReturnUpdateEmail(rawEmail) {
 // Picks up to two likely product-photo URLs from an order email's HTML. Only https links to
 // real hostnames are returned. Logos, social icons, tracking pixels and payment badges are skipped.
 const NOT_A_PHOTO = /(pixel|tracking|track\b|beacon|spacer|logo|facebook|instagram|twitter|tiktok|pinterest|youtube|linkedin|social|icon|badge|footer|header|banner|payment|visa|mastercard|paypal|klarna|apple-?pay|google-?play|app-?store|qr|barcode|\.gif(\?|$)|1x1|\/open\b|click\.)/i;
-export function extractProductImageUrls(rawEmail) {
+export function extractProductImageUrls(rawEmail, parsed) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   if (!html) return [];
-  return scoredPhotos(html, rawEmail).slice(0, 2).map(f => f.url);
+  return scoredPhotos(html, rawEmail, parsed).slice(0, 2).map(f => f.url);
 }
 // True when the best photo in the email is named after (or linked as) one of the items bought, so it really shows
 // the item. Shop logos, banners and adverts don't match an item name and are never treated as the item's photo.
-export function photoShowsItem(rawEmail) {
+export function photoShowsItem(rawEmail, parsed) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   if (!html) return false;
-  const best = scoredPhotos(html, rawEmail)[0];
+  const best = scoredPhotos(html, rawEmail, parsed)[0];
   return Boolean(best && best.matched);
 }
 const COMMON = new Set(["with", "your", "from", "this", "that", "order", "item", "size", "colour", "color", "black", "white", "pack", "high", "rise"]);
-function scoredPhotos(html, rawEmail) {
-  const parsed = parseReceiptEmail(rawEmail), r = parsed.retailer || {};
+// `parsed` is the receipt already read from this email, when the caller has it, so the email isn't read twice.
+function scoredPhotos(html, rawEmail, parsed) {
+  parsed = parsed && Array.isArray(parsed.items) ? parsed : parseReceiptEmail(rawEmail);
+  const r = parsed.retailer || {};
   // The shop's own name is in its logo's alt text, so it can't show that a photo is of the item.
   const shop = String((r.name || "") + " " + (r.domain || "")).toLowerCase();
   const words = (parsed.items || []).flatMap(i => String(i.name || "").toLowerCase().split(/\W+/)).filter(w => w.length > 3 && !COMMON.has(w) && !shop.includes(w));
