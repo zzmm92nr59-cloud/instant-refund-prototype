@@ -729,6 +729,9 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   }).sort((a, b) => whenOf(b).localeCompare(whenOf(a)) || b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
     const k = storeKey(c), l = mine.get(k);
     const learned = (l && l.category) || crowdPick(k) || null;
+    // Apple receipts list every charge as an item, so when the total line wasn't found the items add up to it.
+    if (c.totalPence == null && /(^|\.)apple\.com$/i.test((c.retailer && c.retailer.domain) || "") && (c.items || []).length && c.items.every(i => Number.isInteger(i.pricePence)))
+      c = { ...c, totalPence: c.items.reduce((n, i) => n + i.pricePence, 0), totalFrom: "items" };
     const shown = shopDisplayName(c.retailer);
     const retailer = c.retailer && shown && shown !== c.retailer.name ? { ...c.retailer, name: shown, legalName: c.retailer.name || null } : c.retailer;
     return { ...c, retailer, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
