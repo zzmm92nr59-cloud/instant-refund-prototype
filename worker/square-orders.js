@@ -69,38 +69,52 @@ export function squareOrderStatements(db, order, location, itemOfVariation) {
   return { id, statements };
 }
 
-// Finds the customer's email for Square orders not yet linked to anyone, a few per run (each costs a call to Square).
+// Finds whose Square orders are not yet linked to anyone, a few per run (each costs a call or two to Square):
+//  - the receipt email on the order's payment, else the email on the order's customer profile: linked to that email, and
+//    the card used is remembered (hashed) as proven for that shopper at this shop (square-instore.js);
+//  - no email but a card already proven by one shopper at this shop: suggested to that shopper ("Is this yours?").
 // An order with no email anywhere is remembered so it isn't asked about again.
 export async function linkSquareOrderEmails(env, list, f, o = {}) {
   const db = env.RELAY_DB;
-  if (!env.AUTH_SECRET || String(env.AUTH_SECRET).length < 16 || !list.length) return { linked: 0, calls: 0 };
+  if (!env.AUTH_SECRET || String(env.AUTH_SECRET).length < 16 || !list.length) return { linked: 0, calls: 0, suggested: 0 };
   await ensureAuthTables(db); await ensureSquareOrderTables(db);
+  const { paymentFacts, anchorStatement, suggestionStatement } = await import("./square-instore.js");
   const ids = list.map(x => x.id), done = new Set();
   for (let i = 0; i < ids.length; i += 90) {
     const part = ids.slice(i, i + 90), q = part.map(() => "?").join(",");
     for (const r of ((await db.prepare(`SELECT order_id AS id FROM retailer_order_emails WHERE order_id IN (${q}) UNION SELECT order_id AS id FROM square_email_checks WHERE order_id IN (${q})`)
       .bind(...part, ...part).all()).results || [])) done.add(r.id);
   }
-  let calls = 0, linked = 0;
-  const budget = o.budget ?? LOOKUP_CALLS_PER_RUN, now = o.now || Date.now(), statements = [];
+  let calls = 0, linked = 0, suggested = 0;
+  const budget = o.budget ?? LOOKUP_CALLS_PER_RUN, now = o.now || Date.now(), scope = o.scope || "square:default";
+  const statements = [], cardOnly = [];
   for (const { id, order } of list) {
     if (done.has(id) || calls >= budget) continue;
-    let email = null;
+    let facts = { email: null, fingerprint: null }, email = null;
     try {
-      if (order.customer_id) { calls++; email = normaliseEmail(((await sq(env, "/v2/customers/" + encodeURIComponent(order.customer_id), { token: o.token }, f)).customer || {}).email_address); }
-      for (const t of order.tenders || []) {
-        if (email || !t.payment_id || calls >= budget) break;
-        calls++; email = normaliseEmail(((await sq(env, "/v2/payments/" + encodeURIComponent(t.payment_id), { token: o.token }, f)).payment || {}).buyer_email_address);
-      }
+      const t = (order.tenders || []).find(x => x.payment_id || x.id);
+      if (t) { calls++; facts = paymentFacts((await sq(env, "/v2/payments/" + encodeURIComponent(t.payment_id || t.id), { token: o.token }, f)).payment || {}); email = facts.email; }
+      if (!email && order.customer_id && calls < budget) { calls++; email = normaliseEmail(((await sq(env, "/v2/customers/" + encodeURIComponent(order.customer_id), { token: o.token }, f)).customer || {}).email_address); }
+      else if (!email && order.customer_id) continue; // out of calls: asked next run
     } catch { continue; /* asked again next run */ }
     if (email) {
       linked++;
+      const eHash = await emailHash(env.AUTH_SECRET, email);
       statements.push(db.prepare("INSERT INTO retailer_order_emails (order_id,email_hash,created_at) VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET email_hash=excluded.email_hash")
-        .bind(id, await emailHash(env.AUTH_SECRET, email), now));
-    } else statements.push(db.prepare("INSERT OR REPLACE INTO square_email_checks (order_id,checked_at,found) VALUES (?,?,0)").bind(id, now));
+        .bind(id, eHash, now));
+      const anchor = await anchorStatement(env, scope, facts, eHash, now);
+      if (anchor) statements.push(anchor);
+    } else {
+      statements.push(db.prepare("INSERT OR REPLACE INTO square_email_checks (order_id,checked_at,found) VALUES (?,?,0)").bind(id, now));
+      if (facts.fingerprint) cardOnly.push({ id, facts });
+    }
   }
   if (statements.length) await db.batch(statements);
-  return { linked, calls };
+  // Card-only purchases, after this run's proven cards are saved.
+  const suggestions = [];
+  for (const c of cardOnly) { const st = await suggestionStatement(env, scope, c.id, c.facts, o.store || null, now); if (st) { suggestions.push(st); suggested++; } }
+  if (suggestions.length) await db.batch(suggestions);
+  return { linked, calls, suggested };
 }
 
 // ---- Test orders (sandbox only) ---------------------------------------------------------------------------------
@@ -135,7 +149,7 @@ async function placeTestOrder(env, shopper, body, f, now) {
   const created = (await sq(env, "/v2/orders", { method: "POST", body: JSON.stringify({ idempotency_key: crypto.randomUUID(),
     order: { location_id: location.id, customer_id: customer.id, reference_id: "relay-test", line_items: [{ catalog_object_id: variationId, quantity: "1" }] } }) }, f)).order;
   // Square's sandbox test payment: no card details, no real money.
-  await sq(env, "/v2/payments", { method: "POST", body: JSON.stringify({ idempotency_key: crypto.randomUUID(), source_id: "cnon:card-nonce-ok",
+  const paid = await sq(env, "/v2/payments", { method: "POST", body: JSON.stringify({ idempotency_key: crypto.randomUUID(), source_id: "cnon:card-nonce-ok",
     amount_money: created.total_money, order_id: created.id, customer_id: customer.id, location_id: location.id, buyer_email_address: email, autocomplete: true,
     note: "Relay sandbox test order" }) }, f);
   const order = (await sq(env, "/v2/orders/" + encodeURIComponent(created.id), {}, f)).order || created;
@@ -143,6 +157,10 @@ async function placeTestOrder(env, shopper, body, f, now) {
   statements.push(db.prepare("INSERT INTO retailer_order_emails (order_id,email_hash,created_at) VALUES (?,?,?) ON CONFLICT(order_id) DO UPDATE SET email_hash=excluded.email_hash")
     .bind(id, shopper.emailHash, now));
   statements.push(db.prepare("INSERT INTO square_test_orders (id,shopper_id,order_id,created_at) VALUES (?,?,?,?)").bind(crypto.randomUUID(), shopper.id, id, now));
+  // The order is linked by the shopper's verified email, so the card used is proven for them at this shop.
+  const { paymentFacts, anchorStatement } = await import("./square-instore.js");
+  const anchor = await anchorStatement(env, "square:" + (location.merchant_id || location.id), paymentFacts((paid && paid.payment) || {}), shopper.emailHash, now);
+  if (anchor) statements.push(anchor);
   await db.batch(statements);
   return [200, { ok: true, orderId: id, product: item.product, variant: item.variant, totalMinor: (order.total_money && order.total_money.amount) || item.priceMinor,
     store: TEST_LABEL(env), message: "Test order placed at " + TEST_LABEL(env) + " (Square sandbox, no real money). It's now in your wallet." }];

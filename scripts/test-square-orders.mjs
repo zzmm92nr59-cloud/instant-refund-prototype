@@ -39,7 +39,7 @@ for (const v of ["TEE-M", "TEE-L", "MUG-1", "TEE-XL", "TEE-S"])
   sqlite.prepare("INSERT INTO retailer_inventory_snapshots (variant_id,connection_id,quantity,inventory_state) VALUES (?,?,?,?)").run("square:sandbox:variant:" + v, "square:sandbox:LOC1", 5, "IN_STOCK");
 
 // ---- Fake Square --------------------------------------------------------------------------------------------------
-const LOC = { id: "LOC1", name: "Relay Demo Store", status: "ACTIVE", currency: "GBP" };
+const LOC = { id: "LOC1", name: "Relay Demo Store", status: "ACTIVE", currency: "GBP", merchant_id: "MERCH1" };
 const customers = { C_ALICE: { id: "C_ALICE", email_address: "Alice@Example.com" } };
 const payments = { P_BOB: { id: "P_BOB", buyer_email_address: "bob@example.com" } };
 const order = (id, extra) => ({ id, location_id: "LOC1", created_at: new Date(Date.now() - 86400000).toISOString(), state: "COMPLETED", total_money: { amount: 2500, currency: "GBP" },
@@ -50,6 +50,7 @@ const orders = {
   O_NOBODY: order("O_NOBODY", { tenders: [{ payment_id: "P_NONE" }] })      // no email anywhere
 };
 payments.P_NONE = { id: "P_NONE" };
+let card = { fp: "sq-1-SHARED-TEST-CARD", last4: "1111" }, tick = 0;
 let squareCalls = [], fail = null, payCalls = [], refundSeq = 0, refundStatus = "COMPLETED", refundKeys = {};
 const PRICES = { "TEE-M": 2500, "TEE-L": 2500, "MUG-1": 900, "TEE-XL": 3000, "TEE-S": 2000 };
 const stock = { "TEE-M": 5, "TEE-L": 5, "MUG-1": 5, "TEE-XL": 5, "TEE-S": 5 };
@@ -76,8 +77,13 @@ const fetchImpl = async (url, init = {}) => {
   if (path === "/v2/orders/search") return json({ orders: Object.values(orders) });
   let m;
   if ((m = /^\/v2\/customers\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") return customers[m[1]] ? json({ customer: customers[m[1]] }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
+  if (path.startsWith("/v2/payments?") && method === "GET") {
+    const q = new URL("https://x" + path).searchParams;
+    return json({ payments: Object.values(payments).filter(p => p.location_id === q.get("location_id") && p.card_details && p.card_details.card.last_4 === q.get("last_4") &&
+      p.created_at >= q.get("begin_time") && p.created_at <= q.get("end_time")) });
+  }
   if ((m = /^\/v2\/payments\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") {
-    if (payments[m[1]]) return json({ payment: payments[m[1]] });
+    if (payments[m[1]]) { const o = orders[m[1].slice(2)]; return json({ payment: { ...payments[m[1]], refund_ids: ((o && o.refunds) || []).map(r => r.id) } }); }
     const o = orders[m[1].slice(2)];
     return o ? json({ payment: { id: m[1], refund_ids: (o.refunds || []).map(r => r.id) } }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
   }
@@ -105,7 +111,10 @@ const fetchImpl = async (url, init = {}) => {
   if (path === "/v2/payments" && method === "POST") {
     assert.equal(body.source_id, "cnon:card-nonce-ok", "only Square's sandbox test payment is used");
     orders[body.order_id].state = "COMPLETED"; orders[body.order_id].tenders = [{ id: "P_" + body.order_id, payment_id: "P_" + body.order_id }];
-    return json({ payment: { id: "P_" + body.order_id, status: "COMPLETED" } });
+    const pay = payments["P_" + body.order_id] = { id: "P_" + body.order_id, status: "COMPLETED", order_id: body.order_id, location_id: body.location_id, created_at: new Date(Date.now() + (++tick)).toISOString(),
+      amount_money: body.amount_money, receipt_number: "Rc" + (++tick), ...(body.buyer_email_address ? { buyer_email_address: body.buyer_email_address } : {}),
+      card_details: { card: { fingerprint: card.fp, last_4: card.last4, card_brand: "VISA" } } };
+    return json({ payment: pay });
   }
   if (path === "/v2/refunds" && method === "POST") {
     const o = orders[body.payment_id.slice(2)];
@@ -324,4 +333,76 @@ stock["TEE-L"] = 0;
 assert.equal((await swap(gil, gOrder, gl, "TEE-L", 0)).status, 409);
 stock["TEE-L"] = 5;
 console.log("16 ok: sold-out sizes refused");
+
+// ---- In-store (card-only) purchases ------------------------------------------------------------------------------------
+const pend = async (t) => (await (await call("/relay/my/instore/suggestions", { token: t })).json()).suggestions;
+const tap = async (t, v = "MUG-1") => (await call("/relay/my/testing/square-tap", { method: "POST", token: t, body: { variationId: v } })).json();
+const hal = await signIn("hal@example.com", "12.12.12.12"), ivy = await signIn("ivy@example.com", "13.13.13.13");
+// 17. A card Relay doesn't know: nothing suggested to anyone.
+card = { fp: "sq-1-HAL-CARD-0001", last4: "4242" };
+let tp = await tap(hal);
+assert.equal(tp.ok, true, JSON.stringify(tp)); assert.equal(tp.suggested, false);
+assert.equal((await pend(hal)).length, 0);
+const halEarlyTap = tp.orderId;
+// Hal buys something linked by his email: the card is now proven for him at this shop.
+assert.equal((await (await call("/relay/my/testing/square-order", { method: "POST", token: hal, body: { variationId: "TEE-M" } })).json()).ok, true);
+assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM square_card_anchors").all()).includes("HAL-CARD"), "the card isn't stored readably");
+// 18. His next card-only purchase is suggested to him, and only him; the earlier one (before the card was proven) isn't.
+tp = await tap(hal);
+assert.equal(tp.suggested, true, JSON.stringify(tp));
+let hs = await pend(hal);
+assert.equal(hs.length, 1); assert.equal(hs[0].last4, "4242"); assert.equal(hs[0].amountMinor, 900); assert.equal(hs[0].store, "Relay Demo Store");
+assert.ok(!("items" in hs[0]), "no items until he says it's his");
+assert.ok(!hs.some(x => x.orderId === halEarlyTap));
+assert.equal((await pend(ivy)).length, 0); assert.equal((await pend(alice)).length, 0);
+assert.ok(!(await purchases(hal)).some(p => p.id === tp.orderId), "not in the wallet until confirmed");
+// Someone else can't answer it.
+assert.equal((await call("/relay/my/instore/suggestions/" + hs[0].id, { method: "POST", token: ivy, body: { answer: "mine" } })).status, 404);
+assert.equal((await (await call("/relay/my/instore/suggestions/" + hs[0].id, { method: "POST", token: hal, body: { answer: "mine" } })).json()).added, true);
+const halTap = (await purchases(hal)).find(p => p.id === tp.orderId);
+assert.ok(halTap, "confirmed purchase is in the wallet"); assert.equal(halTap.items[0].title, "Item"); assert.equal(halTap.items[0].returnable, true);
+assert.equal((await pend(hal)).length, 0);
+console.log("17-18 ok: proven card's card-only purchase suggested to its owner only; added on yes");
+
+// 19. "Not mine" leaves it out.
+tp = await tap(hal); hs = await pend(hal);
+assert.equal((await (await call("/relay/my/instore/suggestions/" + hs[0].id, { method: "POST", token: hal, body: { answer: "not_mine" } })).json()).added, false);
+assert.equal((await pend(hal)).length, 0); assert.ok(!(await purchases(hal)).some(p => p.id === tp.orderId));
+console.log("19 ok: not mine");
+
+// 20. A shared card (proven by two shoppers): nothing suggested to either.
+await call("/relay/my/testing/square-order", { method: "POST", token: ivy, body: { variationId: "TEE-M" } });
+tp = await tap(ivy);
+assert.equal(tp.suggested, false); assert.equal((await pend(hal)).length, 0); assert.equal((await pend(ivy)).length, 0);
+console.log("20 ok: shared card not suggested");
+
+// 21. Add a receipt: all four details must match exactly one payment.
+const kim = await signIn("kim@example.com", "14.14.14.14"), lee = await signIn("lee@example.com", "15.15.15.15");
+card = { fp: "sq-1-KIM-CARD-0002", last4: "5555" };
+const kt = await tap(kim, "TEE-L");
+const kp = payments["P_" + kt.orderId.split(":").pop()];
+const day = kp.created_at.slice(0, 10);
+const claimIt = (t, b) => call("/relay/my/instore/claim", { method: "POST", token: t, body: { date: day, amountMinor: 2500, last4: "5555", receiptNumber: kp.receipt_number, ...b } });
+assert.equal((await claimIt(kim, { receiptNumber: "WRONG1" })).status, 404);
+assert.equal((await claimIt(kim, { last4: "1234" })).status, 404);
+assert.equal((await claimIt(kim, { amountMinor: 2400 })).status, 404);
+assert.equal((await claimIt(kim, { last4: "55" })).status, 400);
+let cr = await claimIt(kim, {});
+assert.equal(cr.status, 200, JSON.stringify(await cr.clone().json()));
+assert.ok((await purchases(kim)).some(p => p.id === kt.orderId));
+assert.equal((await claimIt(lee, {})).status, 409, "someone else's purchase can't be claimed");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_card_anchors WHERE scope = 'square:MERCH1'").get().n >= 1, true);
+// A receipt claim doesn't make Relay remember the card: Kim's next tap isn't suggested.
+assert.equal((await tap(kim)).suggested, false);
+for (let i = 0; i < 10; i++) await claimIt(lee, { receiptNumber: "X" + i + "ZZ" });
+assert.equal((await claimIt(lee, {})).status, 429, "10 tries a day");
+console.log("21 ok: receipt claims");
+
+// 22. Deleting an account removes remembered cards and suggestions.
+const halHash = sqlite.prepare("SELECT email_hash AS h FROM shoppers WHERE email = 'hal@example.com'").get().h;
+assert.ok(sqlite.prepare("SELECT COUNT(*) AS n FROM square_card_anchors WHERE email_hash = ?").get(halHash).n > 0);
+assert.equal((await call("/relay/my/delete", { method: "POST", token: hal })).status, 200);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_card_anchors WHERE email_hash = ?").get(halHash).n, 0);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_instore_suggestions WHERE email_hash = ?").get(halHash).n, 0);
+console.log("22 ok: account deletion removes card memory");
 console.log("All Square order tests passed");

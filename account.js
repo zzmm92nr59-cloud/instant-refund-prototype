@@ -1547,8 +1547,11 @@
     memo.purchases.then(function (r) {
       var rows = (r.ok && r.body && r.body.purchases) || [];
       var testHost = el("div", { style: "margin-top:14px" });
-      mountSquareTest(testHost, function () { memo.purchases = null; mountConfirmed(host); });
-      if (!rows.length) { host.appendChild(testHost); return; }
+      var refresh = function () { memo.purchases = null; mountConfirmed(host); };
+      var inHost = el("div"); mountInstore(inHost, refresh);
+      mountSquareTest(testHost, refresh);
+      if (!rows.length) { host.appendChild(inHost); host.appendChild(testHost); return; }
+      host.appendChild(inHost);
       host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
       host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can return or exchange items here." }));
       var grid = el("div", { className: "purchase-grid" }); host.appendChild(grid);
@@ -1603,6 +1606,60 @@
     }).catch(function () {});
   }
 
+  // ---- Bought in a shop: card-only purchases Relay thinks are yours ("Is this yours?"), and adding one from its receipt. ----
+  function mountInstore(host, done) {
+    api("/relay/my/instore/suggestions").then(function (r) {
+      if (!r.ok) return;
+      var list = (r.body && r.body.suggestions) || [];
+      list.forEach(function (x) {
+        var when = x.paidAt ? new Date(x.paidAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+        var card = el("div", { className: "card", style: "margin:0 0 12px;border:2px solid #d9e7b8" });
+        card.appendChild(el("div", { className: "eyebrow", text: "IS THIS YOURS?" }));
+        card.appendChild(el("h3", { text: money(x.amountMinor, x.currency) + " at " + x.store, style: "margin:4px 0" }));
+        card.appendChild(el("p", { className: "small muted", style: "margin:0 0 10px", text: when + (x.last4 ? " · " + (x.brand ? x.brand.charAt(0) + x.brand.slice(1).toLowerCase().replace(/_/g, " ") : "Card") + " ending " + x.last4 : "") +
+          ". Paid in the shop with a card you've used there before. Say if it's yours and Relay adds it, with what you bought." }));
+        var msg = el("div", { className: "rl-msg" });
+        var send = function (ans) {
+          yes.disabled = no.disabled = true;
+          api("/relay/my/instore/suggestions/" + encodeURIComponent(x.id), { method: "POST", body: { answer: ans } }).then(function (a) {
+            if (a.ok) { if (ans === "mine") { say(msg, "✓ Added to your purchases"); setTimeout(done, 900); } else card.remove(); }
+            else { yes.disabled = no.disabled = false; say(msg, a.body && a.body.error === "already_claimed" ? "Someone else has already added this purchase." : "Couldn't save that. Please try again.", true); }
+          }, function () { yes.disabled = no.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
+        };
+        var yes = el("button", { className: "darkbtn", text: "Yes, it's mine", onclick: function () { send("mine"); } });
+        var no = el("button", { className: "ghostbtn", text: "Not mine", style: "margin-left:8px", onclick: function () { send("not_mine"); } });
+        card.appendChild(el("div", {}, [yes, no])); card.appendChild(msg);
+        host.appendChild(card);
+      });
+      // Add a purchase from a shop receipt.
+      var box = el("details", { className: "card", style: "padding:14px 16px;margin:0 0 12px" });
+      box.appendChild(el("summary", { text: "Bought something in a shop? Add it from your receipt", style: "font-weight:700;cursor:pointer" }));
+      box.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "For shops on Relay that use Square. Enter what's on your receipt; all four must match one purchase." }));
+      var inp = function (ph, type, mode) { return el("input", { placeholder: ph, type: type || "text", inputMode: mode || "text", style: "width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" }); };
+      var shopSel = el("select", { style: "width:100%;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" });
+      var rn = inp("Receipt number (e.g. #A1b2)"), amt = inp("Amount paid, e.g. 29.99", "text", "decimal"), dt = inp("Date", "date"), l4 = inp("Last 4 digits of your card", "text", "numeric");
+      var cmsg = el("div", { className: "rl-msg" });
+      var go = el("button", { className: "darkbtn", text: "Find my purchase", onclick: function () {
+        var pounds = Number(String(amt.value).replace(/[£,\s]/g, ""));
+        if (!(pounds > 0) || !/^\d{4}$/.test(l4.value.trim()) || !dt.value || !rn.value.trim()) return say(cmsg, "Please fill in all four from your receipt.", true);
+        go.disabled = true; say(cmsg, "Looking for it…");
+        api("/relay/my/instore/claim", { method: "POST", body: { locationId: shopSel.value, receiptNumber: rn.value.trim(), amountMinor: Math.round(pounds * 100), date: dt.value, last4: l4.value.trim() } }).then(function (c) {
+          go.disabled = false;
+          if (c.ok) { say(cmsg, "✓ Found it and added it to your purchases"); setTimeout(done, 900); return; }
+          var e = c.body && c.body.error;
+          say(cmsg, e === "no_match" ? "No purchase matches all of those. Check the receipt number, amount, date and card." : e === "already_claimed" ? "That purchase is already in someone else's Relay."
+            : e === "too_many_tries" ? "That's 10 tries today. Please try again tomorrow." : "Couldn't look just now. Please try again.", true);
+        }, function () { go.disabled = false; say(cmsg, "Couldn't reach Relay. Please try again.", true); });
+      } });
+      box.addEventListener("toggle", function () {
+        if (!box.open || shopSel.options.length) return;
+        api("/relay/my/instore/shops").then(function (sh) { ((sh.body && sh.body.shops) || []).forEach(function (o) { shopSel.appendChild(el("option", { value: o.id, text: o.name })); }); });
+      });
+      [shopSel, rn, amt, dt, l4, go, cmsg].forEach(function (n) { box.appendChild(n); });
+      host.appendChild(box);
+    }).catch(function () {});
+  }
+
   // ---- Test orders at Relay's Square test shop (only while Relay uses Square's sandbox; no card, no real money). ----
   function mountSquareTest(host, done) {
     api("/relay/my/testing/square-items").then(function (r) {
@@ -1627,7 +1684,16 @@
           say(msg, e === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
         }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
       } });
-      card.appendChild(pick); card.appendChild(go); card.appendChild(msg);
+      var tapBtn = el("button", { className: "ghostbtn", text: "Pay in the shop with a card (test)", style: "margin-left:8px", onclick: function () {
+        tapBtn.disabled = true; say(msg, "Paying at the test shop's till…");
+        api("/relay/my/testing/square-tap", { method: "POST", body: { variationId: pick.value } }).then(function (p) {
+          tapBtn.disabled = false;
+          if (p.ok && p.body && p.body.ok) { say(msg, p.body.message + (p.body.receiptNumber ? " Receipt number: " + p.body.receiptNumber + "." : "")); if (p.body.suggested) setTimeout(done, 1500); return; }
+          say(msg, p.body && p.body.error === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the payment. Please try again in a minute.", true);
+        }, function () { tapBtn.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
+      } });
+      card.appendChild(el("p", { className: "small muted", style: "margin:0 0 8px", text: "Or pay at the till with just a card (no email), like most shop purchases. Relay suggests it to you if it knows the card from an earlier order." }));
+      card.appendChild(pick); card.appendChild(go); card.appendChild(tapBtn); card.appendChild(msg);
       host.appendChild(card);
     }).catch(function () {});
   }
