@@ -37,7 +37,7 @@ for (let k = 0; k < 20; k++) {
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-for (const re of [/2026 was a year of shopping/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./, /Your number one shop\s+Zara/, /65% of everything you spent/,
+for (const re of [/Your 2026, one receipt at a time/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./, /Your number one shop\s+Zara/, /65% of everything you spent/,
   /Your top shops/, /Your favourite kind of shopping\s+Fashion/, /On repeat/, /Your busiest month\s+March/, /Your biggest treat/, /£20\.00/, /Fashion regular/, /MY 2026 ON RELAY/])
   assert.match(story, re);
 assert.equal(texts.length, 11, "11 slides for a full year");
@@ -45,7 +45,7 @@ assert.equal(texts.length, 11, "11 slides for a full year");
 await page.getByRole("button", { name: "Watch again" }).click();
 await page.keyboard.press("ArrowRight");
 await page.locator(".rl-story-frame").click({ position: { x: 20, y: 400 } });
-assert.match(await page.locator(".rl-story-body").innerText(), /2026 was a year of shopping/, "tap on the left goes back");
+assert.match(await page.locator(".rl-story-body").innerText(), /Your 2026, one receipt at a time/, "tap on the left goes back");
 await page.keyboard.press("Escape");
 assert.equal(await page.locator(".rl-story").count(), 0, "Escape closes the story");
 assert.equal(await page.evaluate(() => window.__xss), undefined, "item and shop names never run as HTML");
