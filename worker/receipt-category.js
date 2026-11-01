@@ -1,19 +1,108 @@
 // Sorts a captured receipt into a shopping group and says whether it can normally be returned.
-// This is a best guess from the store and item names, not a fact: the app shows it as a label the shopper can see.
+// This is a best guess from the store and item names, not a fact: the app shows it as a label the shopper can see,
+// and the shopper can move a receipt to another group (which then wins for that shop).
 export const CATEGORIES = {
   fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden",
   beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other",
 };
-const RULES = [
-  ["digital", /\b(app store|itunes|icloud|apple music|apple tv|google play|spotify|netflix|disney\+?|prime video|subscription|membership|gift card|e-?gift|steam|playstation store|xbox|nintendo eshop|audible|kindle|youtube premium|microsoft 365|adobe|dropbox|openai|chatgpt|anthropic|claude\.ai|appcharge|xsolla|in-app purchase|game credits?|top-?up|lycamobile|lyca|giffgaff|voxi|smarty|lebara|tesco mobile|sim only|patreon|substack|onlyfans|twitch|discord nitro|duolingo|notion|canva|github|cloudflare|google one|google workspace)\b/i],
-  ["travel", /\b(uber|bolt|trainline|tfl|ryanair|easyjet|british airways|jet2|booking\.com|airbnb|expedia|hotels?|eurostar|national rail|lner|avanti|flights?|taxi|parking)\b/i],
-  ["food", /\b(deliveroo|just eat|uber eats|tesco|sainsbury|asda|morrisons|waitrose|lidl|aldi|ocado|co-?op|greggs|pret|costa|starbucks|nando|mcdonald|kfc|domino|pizza|restaurant|cafe|coffee|pub|tavern|bistro|brasserie|diner|burger|sushi|ramen|curry|wetherspoon|leon|itsu|wagamama|five guys|subway|tortilla|wasabi|honest burgers|dishoom|bubble tea|grocer|groceries|bakery|takeaway|wine|beer)\b/i],
-  ["electronics", /\b(apple|iphone|ipad|macbook|airpods|samsung|currys|argos|ao\.com|very|dell|lenovo|hp\b|sony|bose|dyson|gopro|nintendo|playstation|laptop|phone|tablet|headphones|charger|cable|monitor|keyboard|camera|television|tv\b|console|smart ?watch)\b/i],
-  ["beauty", /\b(boots|superdrug|lookfantastic|space nk|sephora|cult beauty|the body shop|holland & barrett|beauty|skincare|perfume|fragrance|makeup|cosmetic|shampoo|vitamin|pharmacy|optician|specsavers|gr(ü|u)um|grooming|razors?|shaving|dental|toothbrush)\b/i],
-  ["home", /\b(ikea|b&q|wickes|screwfix|dunelm|john lewis|wayfair|made\.com|homebase|garden|furniture|sofa|mattress|bedding|lamp|kitchen|candle|rug|curtain|plant)\b/i],
-  ["fashion", /\b(lululemon|zara|h&m|asos|next|uniqlo|nike|adidas|puma|new balance|primark|m&s|marks (&|and) spencer|boohoo|shein|gap|levi|ralph lauren|north face|patagonia|jd sports|sports direct|schuh|office shoes|river island|topshop|mango|cos\b|arket|& other stories|jumper|hoodie|jacket|jeans|trousers|dress|shirt|t-?shirt|leggings|shorts|trainers|shoes?|boots?|coat|socks|bra\b|swimwear|bag|handbag)\b/i],
+
+// 1. Shops Relay knows, by name or web address (letters and digits only: "H&M" is "hm", "Sainsbury's" is "sainsburys").
+// A shop's group is used before its item names, so a Zara "phone case" stays Fashion and a Currys kettle stays Electronics.
+const SHOP_LIST = {
+  food: "nespresso lavazza illy pactcoffee pact taylorsofharrogate bettys yorkshiretea twinings whittard teapigs clipperteas " +
+    "starbucks costa costacoffee caffenero nero pret pretamanger greggs gails joeandthejuice blankstreet " +
+    "tesco sainsburys asda morrisons waitrose ocado lidl aldi iceland coop cooperative spar budgens londis nisa costco amazonfresh " +
+    "deliveroo justeat ubereats boltfood wolt gousto hellofresh mindfulchef simplycook abelandcole riverford oddbox milkandmore getir gorillas zapp toogoodtogo " +
+    "beer52 virginwines majestic majesticwine laithwaites nakedwines thewhiskyexchange whiskyexchange masterofmalt " +
+    "honestburgers dishoom nandos wagamama fiveguys mcdonalds kfc burgerking dominos papajohns pizzahut pizzaexpress francomanca " +
+    "wetherspoon jdwetherspoon wetherspoons leon itsu wasabi yosushi tortilla chipotle krispykreme hotelchocolat thorntons lindt cadbury graze huel myprotein bulk grenade",
+  travel: "uber bolt freenow addisonlee gett trainline tfl nationalrail lner avanti avantiwestcoast gwr southeastern southernrailway thameslink " +
+    "northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar " +
+    "megabus nationalexpress flixbus stagecoach firstbus arriva lime voi tier santandercycles zipcar hertz avis europcar sixt getaround " +
+    "ringgo justpark paybyphone ncp heathrowexpress gatwickexpress stanstedexpress poferries dfds stenaline brittanyferries calmac redfunnel wightlink " +
+    "ryanair easyjet britishairways ba jet2 jet2holidays wizzair virginatlantic emirates qatarairways klm airfrance lufthansa tui loganair aerlingus " +
+    "vueling iberia norwegian turkishairlines bookingcom booking airbnb expedia hotelscom hotels trivago premierinn travelodge hilton marriott ihg " +
+    "holidayinn accor ibis novotel citizenm skyscanner kayak lastminute onthebeach loveholidays haystravel trailfinders sykescottages hoseasons " +
+    "centerparcs haven butlins omio holidayextras opodo edreams hostelworld agoda vrbo",
+  digital: "itunes icloud applemusic appletv googleplay spotify netflix disney disneyplus primevideo audible kindle youtube youtubepremium " +
+    "microsoft365 adobe dropbox openai chatgpt anthropic claude appcharge xsolla steam steampowered playstationstore xbox nintendoeshop epicgames " +
+    "roblox ubisoft patreon substack onlyfans twitch discord discordnitro duolingo notion canva github cloudflare googleone googleworkspace " +
+    "lycamobile lyca giffgaff voxi smarty lebara tescomobile ee o2 vodafone three virginmedia bt sky nowtv plusnet talktalk hyperoptic " +
+    "communityfibre idmobile deezer tidal nytimes thetimes theguardian economist ft medium strava headspace calm tinder hinge bumble linkedin " +
+    "grammarly 1password nordvpn expressvpn surfshark proton protonmail zoom slack figma paramountplus britbox discoveryplus dazn crunchyroll " +
+    "wix squarespace godaddy namecheap",
+  electronics: "samsung currys ao aocom dell lenovo hp sony bose dyson gopro nintendo playstation oneplus xiaomi huawei anker belkin logitech " +
+    "razer corsair scan overclockers ebuyer cex webuy backmarket musicmagpie sonos jbl bangolufsen garmin fitbit ring panasonic lg tcl hisense " +
+    "canon nikon fujifilm wexphoto jessops richersounds raspberrypi pimoroni thepihut game googlestore laptopsdirect appliancesdirect novatech cclonline " +
+    "argos very",
+  beauty: "boots superdrug lookfantastic spacenk sephora cultbeauty thebodyshop bodyshop hollandbarrett hollandandbarrett beautybay feelunique " +
+    "charlottetilbury glossier theordinary deciem cerave larocheposay clinique esteelauder maccosmetics benefitcosmetics nyxcosmetics rituals lush " +
+    "loccitane jomalone moltonbrown aesop nealsyardremedies elemis kiehls fentybeauty rarebeauty hudabeauty glossybox birchbox beautypie notino " +
+    "escentual theperfumeshop perfumeshop fragrancedirect thefragranceshop fragranceshop specsavers visionexpress myvitamins vitabiotics hims numan " +
+    "lloydspharmacy wellpharmacy chemist4u pharmacy2u simpleonlinepharmacy oralb gillette harrys kingofshaves ghd cloudnine babyliss gruum nivea " +
+    "olaplex kerastase aveda bareminerals nars urbandecay toofaced drunkelephant paulaschoice theinkeylist inkeylist revolutionbeauty makeuprevolution " +
+    "elfcosmetics healthspan",
+  home: "ikea bq bandq diy wickes screwfix toolstation dunelm johnlewis wayfair made madecom homebase habitat therange bm bmstores homebargains wilko " +
+    "robertdyas lakeland lecreuset josephjoseph oliverbonas hmhome zarahome laredoute loaf sofa sofacom dfs sofology furniturevillage oakfurnitureland " +
+    "cotswoldco swoon thewhitecompany whitecompany sohohome heals conranshop coxandcox rockettstgeorge grahamandgreen emmasleep simbasleep evesleep otty " +
+    "silentnight dreams bensonsforbeds mattressonline bedkingdom crocus thompsonmorgan suttons vanmeuwen primrose gardeningexpress patch " +
+    "beardsanddaisies hortology bloomandwild interflora yankeecandle neom petsathome zooplus jollyes tails butternutbox lilyskitchen",
+  fashion: "rains lululemon zara hm handm asos next uniqlo nike adidas puma newbalance primark boohoo boohooman prettylittlething missguided shein gap " +
+    "levi levis ralphlauren thenorthface northface patagonia jdsports sportsdirect schuh office officeshoes riverisland topshop topman mango cos " +
+    "cosstores arket otherstories andotherstories weekday monki massimodutti pullandbear pullbear bershka stradivarius reiss allsaints tedbaker " +
+    "whistles jigsaw hobbs phaseeight monsoon whitestuff fatface joules seasalt seasaltcornwall boden superdry hollister abercrombie " +
+    "abercrombieandfitch urbanoutfitters freepeople anthropologie selfridges harveynichols liberty libertylondon endclothing mrporter netaporter " +
+    "matchesfashion farfetch ssense mytheresa drmartens clarks kurtgeiger russellandbromley vans converse birkenstock ugg timberland skechers crocs " +
+    "gymshark sweatybetty aloyoga oysho carhartt carharttwip stussy dickies barbour hunter hunterboots mulberry coach michaelkors katespade pandora " +
+    "swarovski monicavinader missoma astridandmiyu danielwellington hsamuel ernestjones goldsmiths beaverbrooks rayban matalan newlook quiz " +
+    "quizclothing inthestyle nastygal karenmillen coast oasis warehouse sezane ganni acnestudios jacquemus axelarigato veja onrunning hoka asics " +
+    "salomon arcteryx rab montane mountainwarehouse cotswoldoutdoor blacks gooutdoors regatta craghoppers berghaus jackwolfskin columbia decathlon " +
+    "underarmour reebok fila ellesse lacoste tommyhilfiger calvinklein hugoboss armani gucci prada burberry louisvuitton balenciaga moncler " +
+    "canadagoose stoneisland fredperry jackandjones veromoda nobodyschild marksspencer marksandspencer ms",
+};
+// Names that are also ordinary words ("Next", "Very", "Office", "Boots"): these only count when they are the shop's whole
+// name or web address, never one word in a longer name ("Post Office" is not the shoe shop).
+const WHOLE_ONLY = new Set(("next very office gap cos mango arket weekday whistles jigsaw hobbs monsoon joules seasalt boden liberty vans ugg " +
+  "coach pandora quiz coast oasis warehouse rab blacks columbia hunter boots game scan ring ao hp lg bolt lime tier ba ee o2 three bt sky calm " +
+  "ft made sofa dreams patch tails bm bq diy booking hotels hm ms costa nero bulk leon iceland spar tortilla wasabi haven ibis avis steam " +
+  "claude kindle notion medium proton discord zoom slack tidal hinge strava office").split(" "));
+// Shops that sell a bit of everything: what was bought decides, and the shop's usual group is only used when the items don't say.
+const MIXED = new Set(("amazon amazonfresh ebay argos very johnlewis tesco asda sainsburys marksspencer marksandspencer ms selfridges harrods tkmaxx " +
+  "temu aliexpress etsy notonthehighstreet costco bm bmstores wilko homebargains therange next debenhams houseoffraser qvc groupon wowcher " +
+  "vinted depop lidl aldi").split(" "));
+const SHOPS = new Map();
+for (const [cat, list] of Object.entries(SHOP_LIST)) for (const k of list.split(/\s+/)) if (k && !SHOPS.has(k)) SHOPS.set(k, cat);
+for (const k of MIXED) if (!SHOPS.has(k)) SHOPS.set(k, null);
+
+// 2. What the items are. Each item takes the first group whose words it matches, in this order; the group with the most
+// items wins. Kitchen things named after food come first ("tea towel" is Home, not Food), and words that are also
+// colours or flavours ("chocolate", "coffee", "wine") only count when nothing else fits ("Long Jacket Chocolate" is Fashion).
+const ITEM_RULES = [
+  ["home", /\b(tea ?towels?|wine ?glass(es)?|champagne flutes?|coffee tables?|coffee machines?|espresso machines?|bean to cup|milk frothers?|aeroccino|frothers?|coffee grinders?|grinders?|kettles?|toasters?|blenders?|cheese ?boards?|bread ?bins?|bread makers?|cake tins?|ice cream makers?|cafeti[eè]res?|french press|travel mugs?|mugs?|espresso cups?|tumblers?|flasks?|water filters?|lunch ?box(es)?|pasta makers?|dishwasher (tablets?|capsules?|pods?)|laundry (capsules?|pods?)|washing (capsules?|pods?))\b/i],
+  ["food", /\b(espresso|ristretto|lungo|decaf(feinated)?|cappuccino|latte macchiato|(coffee|espresso|nespresso|vertuo|tassimo|dolce gusto) (capsules?|pods?)|coffee beans|ground coffee|instant coffee|tea ?bags|loose leaf|matcha|groceries|grocery|bananas|avocados?|vegetables|veg box|fruit box|meal kit|recipe box|pizzas?|burgers?|fries|chips and|nuggets|chicken wings|onion rings|kebab|sushi|ramen|noodles|curry|biryani|dumplings|burrito|tacos?|sandwich(es)?|salads?|soup|pasta|risotto|bagels?|croissants?|pastr(y|ies)|doughnuts?|donuts?|muffins?|brownies|cookies|biscuits|crisps|snacks?|cereal|granola|porridge|protein (powder|bars?|shake)|whey|beers?|lagers?|ales|ciders?|gin|vodka|rum|whisk(e)?y|tequila|prosecco|champagne|red wine|white wine|ros[eé] wine|wines|spirits|cocktails|soft drinks?|cola|lemonade|smoothies?|juices?|milkshakes?|bubble tea|kombucha|takeaway|delivery fee|meal deal|breakfast|lunch|dinner)\b/i],
+  ["digital", /\b(subscriptions?|membership|premium plan|monthly plan|annual plan|gift ?cards?|e-?gift|e-?vouchers?|in-app purchase|game credits?|v-?bucks|robux|top-?up|sim only|airtime|data (plan|bundle|add-?on)|e-?books?|kindle edition|audiobooks?|digital (download|edition|copy)|downloads?|licen[cs]e key|software licen[cs]e|cloud storage|icloud\+?)\b/i],
+  ["travel", /\b(flights?|airfare|boarding pass|baggage|hotel|hostel|room night|nights? stay|accommodation|train tickets?|rail(card| tickets?)|railcard|off-?peak|anytime return|single ticket|season ticket|oyster|bus (ticket|pass)|coach ticket|ferry|taxi|trip fare|car hire|car rental|parking|congestion charge|toll|e-?scooter|bike hire)\b/i],
+  ["beauty", /\b(skin ?care|moisturi[sz]er|serum|cleanser|sunscreen|spf ?\d*|sun cream|lipstick|lip (balm|gloss|liner)|mascara|eyeliner|eyeshadow|foundation|concealer|bronzer|nail (polish|varnish)|perfume|fragrance|eau de (toilette|parfum)|aftershave|cologne|body (wash|lotion|butter|spray)|shower gel|shampoo|conditioner|hair (oil|mask|dryer|dye|colour|color)|straighteners?|curling wand|deodorant|antiperspirant|razors?|shaving|beard oil|toothbrush|toothpaste|electric toothbrush|floss|mouthwash|vitamins?|supplements?|multivitamin|probiotics?|collagen|paracetamol|ibuprofen|plasters|prescription|contact lenses|makeup|make-up|cosmetics?|grooming)\b/i],
+  ["electronics", /\b(laptops?|macbook|chromebook|iphone|ipad|smartphones?|mobile phones?|phones?|tablets?|headphones|earphones|earbuds|airpods|chargers?|charging (cable|case|pad)|(usb|usb-c|hdmi|lightning|charging|power|ethernet|audio|aux|phone) cables?|usb|hdmi|monitors?|keyboards?|(computer|wireless|gaming|magic|bluetooth) mouse|webcam|cameras?|tripod|televisions?|tvs?|soundbar|speakers?|routers?|printers?|ink cartridges?|ssd|hard drive|memory card|sd card|power banks?|adapters?|batter(y|ies)|smart ?watch|apple watch|fitness tracker|consoles?|controllers?|nintendo switch|ps5|playstation 5|xbox series|e-?reader|kindle paperwhite|drones?|projectors?|graphics card|processor|motherboard)\b/i],
+  ["home", /\b(sofas?|armchairs?|chairs?|tables?|desks?|beds?|bed frames?|mattress(es)?|bedding|duvets?|pillows?|cushions?|throws?|blankets?|sheets|duvet covers?|towels?|bath mats?|curtains?|blinds|rugs?|lamps?|light bulbs?|lighting|candles?|diffusers?|vases?|mirrors?|frames?|wall art|shelv(es|ing)|storage|baskets?|wardrobes?|drawers|cookware|frying pans?|saucepans?|pans|pots|knives|cutlery|crockery|plates|bowls|kitchen|bakeware|utensils?|plants?|seeds|compost|soil|planters?|garden|hose|lawn|mower|bbq|barbecue|paint|primer paint|drill|screws|tools?|toolbox|wallpaper|tiles|vacuum|hoover|steam iron|clothes iron|ironing board|dehumidifier|heater|(desk|ceiling|electric|tower|pedestal) fan|air fryer|microwave|fridge|freezer|washing machine|dishwasher|bin bags|pedal bin|kitchen bin|cleaning|detergent|washing up|dog (food|bed|lead|toy|treats)|cat (food|litter|bed|toy|tree)|pet (food|bed|toy|carrier)|cat litter)\b/i],
+  ["fashion", /\b(jumpers?|sweaters?|hoodies?|sweatshirts?|cardigans?|jackets?|coats?|raincoats?|rain ?wear|parkas?|puffer|anorak|gilets?|blazers?|suits?|jeans|trousers|chinos|joggers|leggings|shorts|skirts?|dress(es)?|shirts?|t-?shirts?|tees?|blouses?|vests?|bodysuits?|jumpsuits?|playsuits?|knitwear|denim|trainers|sneakers|shoes|boots|sandals|heels|loafers|slippers|socks|tights|underwear|bras?|briefs|boxers|lingerie|swimwear|swimsuits?|swim shorts|bikinis?|pyjamas|nightwear|robe|handbags?|bags?|backpacks?|rucksacks?|totes?|tote bag|wallets?|purses?|belts?|scarf|scarves|hats?|bucket hat|caps?|beanies?|gloves|mittens|sunglasses|watch|jewell?ery|necklaces?|bracelets?|earrings|rings|pendant|waterproof)\b/i],
+  ["food", /\b(coffee|tea|chocolate|wine|honey|caramel|vanilla|mocha|cocoa|cheese|bread|milk|eggs|butter|yoghurt|yogurt|chicken|beef|pork|salmon|fish|rice|sauce|spices?|olive oil|jam|nuts|sweets|candy|ice cream|cake|food|drinks?)\b/i],
 ];
-const HARDWARE = /\b(iphone|ipad|macbook|imac|mac mini|airpods|apple watch|airtag|charger|cable|case|keyboard|mouse|monitor|laptop|phone|tablet|headphones)\b/i;
+// Generic words in a shop's own name, for shops Relay doesn't know ("The Red Lion Pub", "Northwest Beds").
+const NAME_WORDS = [
+  ["food", /\b(pub|tavern|inn|restaurant|cafe|café|coffee|roasters?|espresso|bakery|patisserie|takeaway|pizza|pizzeria|burger|sushi|ramen|curry|grill|kitchen|deli|butchers?|grocer|groceries|wine|wines|beer|brewery|brewing|distillery|tea|tearoom|bistro|brasserie|diner|eatery|noodle|dumplings?|bubble tea|juice|food|foods|chocolate|chocolatier|cakes?|sweets)\b/i],
+  ["travel", /\b(taxi|taxis|cabs?|cars|airport|airways|airlines?|rail|railway|trains?|hotels?|hostel|inn hotel|parking|car hire|travel|holidays?|cottages?|ferries|coaches|tours?)\b/i],
+  ["beauty", /\b(pharmacy|chemist|beauty|cosmetics|skin|skincare|salon|spa|barbers?|opticians?|eyewear|dental|dentist|health|wellness|fragrances?|perfumes?)\b/i],
+  ["electronics", /\b(electronics|electricals?|electrical|tech|technology|computers?|phones|mobiles|gadgets|cameras?|audio|hifi|hi-fi|gaming)\b/i],
+  ["home", /\b(furniture|beds|bedding|sofas?|mattress(es)?|garden|gardens|plants?|flowers|florist|interiors?|homewares?|home|kitchens|bathrooms?|lighting|diy|hardware|carpets?|flooring|tiles|paint|pets?)\b/i],
+  ["fashion", /\b(fashion|clothing|clothes|apparel|boutique|shoes|footwear|wear|jewell?ery|jewellers?|denim|knitwear|sportswear|outdoor clothing|tailoring|tailors?)\b/i],
+  ["digital", /\b(software|apps?|subscriptions?|streaming|games store)\b/i],
+];
+const HARDWARE = /\b(iphone|ipad|macbook|imac|mac mini|mac studio|airpods|apple watch|airtag|apple tv 4k|homepod|apple pencil|magic (mouse|keyboard|trackpad)|charger|cable|case|keyboard|mouse|monitor|laptop|phone|tablet|headphones)\b/i;
+// Kitchen things a coffee or food shop also sells: they can usually be returned even though the group is Food & drink.
+const APPLIANCE = /\b(machines?|frothers?|aeroccino|grinders?|kettles?|toasters?|blenders?|cafeti[eè]res?|french press|mugs?|cups|glass(es)?|tumblers?|flasks?|carafes?)\b/i;
+// The order ties are settled in: groups that can usually be returned first, so a return window is never hidden.
+const TIE_ORDER = ["electronics", "fashion", "home", "beauty", "food", "digital", "travel"];
 
 // A stable key for a store, so what the app learns about "Zara" applies to every Zara email.
 export function storeKey(card) {
@@ -22,22 +111,80 @@ export function storeKey(card) {
   return raw.replace(/[^a-z0-9]+/g, "").slice(0, 60);
 }
 
+// Lower case, accents off, apostrophes and dots dropped ("Sainsbury's" → "sainsburys", "Booking.com" → "bookingcom"), then words.
+const words = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/['’.]/g, "")
+  .split(/[^a-z0-9]+/).filter(Boolean);
+const FILLER = new Set(["uk", "gb", "ltd", "limited", "plc", "inc", "llc", "gmbh", "official", "store", "stores", "shop", "online", "london", "europe", "eu", "international", "group", "co", "com", "the"]);
+// The shop's web address without its country ending or mail-sending part: "e.rains.com" → "rains", "email.hm.com" → "hm".
+function domainBase(domain) {
+  const parts = String(domain || "").toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
+  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store|dk|se|nl)$/.test(parts[parts.length - 1])) parts.pop();
+  const kept = parts.filter(p => !MAIL_SUBDOMAIN.test(p));
+  return (kept.length ? kept[kept.length - 1] : parts[parts.length - 1] || "").replace(/[^a-z0-9]/g, "");
+}
+// The shop Relay recognises in a receipt, if any: { key, cat } (cat is null for a shop that sells everything).
+export function knownShop(card) {
+  const r = card && card.retailer || {};
+  const w = words(r.name);
+  let core = w.slice();
+  while (core.length > 1 && FILLER.has(core[core.length - 1])) core.pop();
+  while (core.length > 1 && FILLER.has(core[0])) core.shift();
+  const whole = core.join("");
+  // The whole name first, then the longest run of words in it, then the web address.
+  if (SHOPS.has(whole) || SHOPS.has(w.join(""))) { const k = SHOPS.has(whole) ? whole : w.join(""); return { key: k, cat: SHOPS.get(k) }; }
+  for (let n = Math.min(4, w.length); n >= 1; n--) {
+    for (let i = 0; i + n <= w.length; i++) {
+      const k = w.slice(i, i + n).join("");
+      if (SHOPS.has(k) && !WHOLE_ONLY.has(k) && k.length >= 3) return { key: k, cat: SHOPS.get(k) };
+    }
+  }
+  const d = domainBase(r.domain);
+  if (d && SHOPS.has(d)) return { key: d, cat: SHOPS.get(d) };
+  return null;
+}
+// The group the item names point to (the one with most items), or null.
+function itemsGroup(items) {
+  const count = {};
+  for (const it of items || []) {
+    const name = it && typeof it.name === "string" ? it.name : "";
+    if (!name) continue;
+    let cat = null;
+    for (const [c, re] of ITEM_RULES) if (re.test(name)) { cat = c; break; }
+    // A brand named in the item ("Nespresso Vertuo Pods" bought on Amazon).
+    if (!cat) {
+      const w = words(name);
+      for (let n = Math.min(3, w.length); n >= 1 && !cat; n--) for (let i = 0; i + n <= w.length && !cat; i++) {
+        const k = w.slice(i, i + n).join("");
+        if (SHOPS.get(k) && !WHOLE_ONLY.has(k) && !MIXED.has(k) && k.length >= 4) cat = SHOPS.get(k);
+      }
+    }
+    if (cat) count[cat] = (count[cat] || 0) + 1;
+  }
+  let best = null;
+  for (const c of TIE_ORDER) if (count[c] && (!best || count[c] > count[best])) best = c;
+  return best;
+}
+
 // `learned` is what the app has been taught about this store (a category the shopper chose, or one many shoppers agree on).
 export function categorise(card, learned) {
-  if (learned && CATEGORIES[learned]) return finish(learned);
-  const store = [card.retailer && card.retailer.name, card.retailer && card.retailer.domain].filter(Boolean).join(" ");
+  card = card || {};
   const items = (card.items || []).map(i => i && i.name).filter(Boolean).join(" ");
-  const all = store + " " + items;
-  let category = "other";
+  if (learned && CATEGORIES[learned]) return finish(learned, items);
+  const r = card.retailer || {};
+  const store = [r.name, r.domain].filter(Boolean).join(" ");
   // Apple sells both phones and App Store credit: the items decide.
-  if (/apple/i.test(store) && !HARDWARE.test(items)) category = "digital";
-  else {
-    for (const [cat, re] of RULES) { if (re.test(items) || re.test(store)) { category = cat; break; } }
-  }
-  return finish(category);
+  if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items);
+  const shop = knownShop(card);
+  let category = null;
+  if (shop && shop.cat && !MIXED.has(shop.key)) category = shop.cat;
+  if (!category) category = itemsGroup(card.items);
+  if (!category && shop && shop.cat) category = shop.cat;
+  if (!category) for (const [c, re] of NAME_WORDS) if (re.test(r.name || "") || re.test(domainBase(r.domain))) { category = c; break; }
+  return finish(category || "other", items);
 }
-function finish(category) {
-  const returnable = category !== "digital" && category !== "food" && category !== "travel";
+function finish(category, items) {
+  // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned.
+  const returnable = category === "food" ? APPLIANCE.test(items || "") : category !== "digital" && category !== "travel";
   const reason = returnable ? null :
     category === "digital" ? "Digital purchases and subscriptions usually can't be returned. Cancel or ask the provider instead." :
     category === "food" ? "Food and drink usually can't be returned." : "Travel and rides usually can't be returned.";
