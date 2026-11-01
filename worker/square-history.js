@@ -22,7 +22,7 @@ export async function squareRequest(env, path, init = {}) {
 export async function listSquareLocations(env, token) {
   const data = await squareRequest(env, "/v2/locations", { token });
   return (data.locations || []).filter(l => l.id && l.status === "ACTIVE")
-    .map(l => ({ id: l.id, name: l.name || "Square location", currency: l.currency || "GBP" }));
+    .map(l => ({ id: l.id, name: l.business_name || l.name || "Square location", currency: l.currency || "GBP", merchantId: l.merchant_id || null }));
 }
 // Reads one location's recent orders, saves them in one batch per page, then finds whose orders they are
 // (by the customer's email at Square) so they show up in that shopper's wallet.
@@ -51,9 +51,9 @@ export async function importLocation(env, location, since, f) {
     pages++;
   } while (cursor && pages < MAX_PAGES_PER_LOCATION);
   let emails = { linked: 0, calls: 0 };
-  try { emails = await linkSquareOrderEmails(env, imported, f); }
+  try { emails = await linkSquareOrderEmails(env, imported, f, { scope: "square:" + (location.merchantId || location.id), store: location.name }); }
   catch (e) { console.error("Square order emails failed", String(e && e.message || e).slice(0, 120)); }
-  const result = { locationId: location.id, pages, orders, items, skipped, morePages: !!cursor, linked: emails.linked };
+  const result = { locationId: location.id, pages, orders, items, skipped, morePages: !!cursor, linked: emails.linked, suggested: emails.suggested || 0 };
   await db.prepare(`INSERT INTO audit_events
     (id,actor_type,actor_id,event_type,subject_type,subject_id,metadata_json)
     VALUES (?,?,?,?,?,?,?)`)
