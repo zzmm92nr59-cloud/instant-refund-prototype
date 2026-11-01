@@ -85,6 +85,8 @@
     ".rl-story-slide .ph{display:grid;gap:8px;margin:16px 0 8px}.rl-story-slide .ph.n1{grid-template-columns:1fr}.rl-story-slide .ph.n2,.rl-story-slide .ph.n4{grid-template-columns:1fr 1fr}.rl-story-slide .ph.n3,.rl-story-slide .ph.n5,.rl-story-slide .ph.n6,.rl-story-slide .ph.n7,.rl-story-slide .ph.n8,.rl-story-slide .ph.n9{grid-template-columns:1fr 1fr 1fr}" +
     ".rl-story-slide .ph figure{margin:0;background:#fff;border-radius:16px;overflow:hidden;aspect-ratio:1;position:relative;opacity:0;animation:rlpop .5s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide .ph.n1 figure{aspect-ratio:4/5;max-height:46vh}.rl-story-slide .ph img{width:100%;height:100%;object-fit:contain;display:block}.rl-story-slide .ph figcaption{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:11px;font-weight:700;padding:14px 8px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@keyframes rlpop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}" +
     ".rl-story-slide .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.rl-story-slide .chips span{border:2px solid currentColor;border-radius:999px;padding:6px 12px;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:6px}.rl-story-slide .chips i{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}" +
+    ".rl-story-slide .sprint{margin-top:18px;display:grid;gap:10px}.rl-story-slide .sprint .row{display:grid;grid-template-columns:96px repeat(12,1fr);gap:3px;align-items:center;font-size:12px;font-weight:800}.rl-story-slide .sprint .row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}.rl-story-slide .sprint i{display:block;aspect-ratio:1;border-radius:4px;background:var(--accent);opacity:0;animation:rlfade .4s forwards}.rl-story-slide .sprint .head i{background:none;opacity:1;animation:none;font-style:normal;text-align:center;font-size:10px;opacity:.7}@keyframes rlfade{to{opacity:var(--o)}}" +
+    ".rl-story-slide .badges{display:grid;gap:10px;margin-top:16px}.rl-story-slide .badges div{border:2px solid currentColor;border-radius:18px;padding:12px 14px;opacity:0;animation:rlup .5s forwards}.rl-story-slide .badges b{display:block;font-size:19px;color:var(--accent)}.rl-story-slide .badges small{font-size:13px;opacity:.85}" +
     ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:#f4f1ea;overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:11px;color:#475467;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-story-slide .sum{background:linear-gradient(160deg,#5b21b6,#30255d 60%,#172554);border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,#f4f2ec,#fbfaf6,#f4f2ec);background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
@@ -1502,6 +1504,13 @@
       if (fb && fb.date) b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + (fb.item ? " with " + fb.item : "") + (fb.shop ? (fb.item ? " from " : " at ") + fb.shop : "") + "." }));
       b.appendChild(el("p", { text: w.receipts + " receipts and " + w.shops + (w.shops === 1 ? " shop" : " shops") + " later, here's what Relay saw." }));
     } });
+    var st = w.shoppingTime;
+    if (st && st.days) S.push({ bg: "#0b3b5c", fg: "#fff", accent: "#7dd3fc", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your shopping time" }));
+      var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, st.days, function (v) { return v + (v === 1 ? " day" : " days"); }, 1100);
+      b.appendChild(el("p", { text: "You bought something on " + st.days + " days of " + w.year + "." + (st.favouriteDay && st.favouriteDayCount > 1 ? " " + st.favouriteDay + " was your day (" + st.favouriteDayCount + " of them)." : "") }));
+      if (st.longestMonthStreak >= 3) b.appendChild(el("p", { className: "pill", text: st.longestMonthStreak + " months in a row with a purchase" }));
+    } });
     if (w.coverage.withTotal) S.push({ bg: "#30255d", fg: "#fff", accent: "#e4d8ff", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
@@ -1520,6 +1529,33 @@
       w.topShops.forEach(function (sh, i) {
         ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: sh.name }), el("em", { text: sh.spentPence ? gbp(sh.spentPence) : sh.receipts + " orders" })]));
       });
+      b.appendChild(ol);
+    } });
+    var spr = (w.sprint || []).filter(function (x) { return x.months.some(Boolean); }).slice(0, 5);
+    if (spr.length > 1) S.push({ bg: "#111827", fg: "#fff", accent: "#c7f567", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your shop sprint" }));
+      b.appendChild(el("p", { text: "When you shopped at your top shops, month by month." }));
+      var g = el("div", { className: "sprint" }), max = Math.max.apply(null, spr.map(function (x) { return Math.max.apply(null, x.months); })) || 1;
+      var head = el("div", { className: "row head" }, [el("span", { text: "" })]); "JFMAMJJASOND".split("").forEach(function (m) { head.appendChild(el("i", { text: m })); }); g.appendChild(head);
+      spr.forEach(function (x, r) { var row = el("div", { className: "row" }, [el("span", { text: x.name })]);
+        x.months.forEach(function (n, i) { row.appendChild(el("i", { title: n + " in " + Object.keys(MONTH_FULL)[i], style: "--o:" + (n ? 0.25 + 0.75 * n / max : 0.06) + ";animation-delay:" + (0.2 + r * 0.12 + i * 0.03) + "s" })); });
+        g.appendChild(row); });
+      b.appendChild(g);
+    } });
+    var ti = (w.topItems || []).filter(function (x) { return x.name; });
+    if (ti.length >= 3) S.push({ bg: "#7c2d12", fg: "#fff", accent: "#fdba74", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your top 5 things" }));
+      var ol = el("ol", { className: "rank" });
+      ti.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: x.name }), el("em", { text: x.times > 1 ? x.times + "×" : x.spentPence ? gbp(x.spentPence) : (x.shop || "") })])); });
+      b.appendChild(ol);
+      b.appendChild(el("p", { className: "fine", text: "Ranked by how many orders each was in, then by what you spent." }));
+    } });
+    var subs = w.subscriptions || [];
+    if (subs.length) S.push({ bg: "#1e1b4b", fg: "#fff", accent: "#a5b4fc", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: subs.length === 1 ? "Your regular" : "Your regulars" }));
+      b.appendChild(el("p", { text: "Things you paid for month after month." }));
+      var ol = el("ol", { className: "rank" });
+      subs.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: x.item && x.item !== x.name ? x.name + " · " + x.item : x.name }), el("em", { text: x.months + " months" + (x.spentPence ? " · " + gbp(x.spentPence) : "") })])); });
       b.appendChild(ol);
     } });
     if (cat) S.push({ bg: "#f6c7e2", fg: "#3f1430", accent: "#3f1430", build: function (b) {
@@ -1570,6 +1606,20 @@
       b.appendChild(el("p", { text: (w.biggest.item ? w.biggest.item + ", " : "") + "at " + w.biggest.shop + (w.biggest.date ? " on " + longDate(w.biggest.date) : "") + "." }));
       if (w.biggest.photoId) b.appendChild(photoGrid([{ id: w.biggest.photoId, item: w.biggest.item, shop: w.biggest.shop }], "ph"));
     } });
+    var tb = w.topBuys || [];
+    if (tb.length >= 3) S.push({ bg: "#064e3b", fg: "#fff", accent: "#6ee7b7", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Your biggest buys" }));
+      var ol = el("ol", { className: "rank" });
+      tb.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: (x.item || (x.items > 1 ? x.items + " things" : "Order")) + " · " + x.shop }), el("em", { text: gbp(x.totalPence) })])); });
+      b.appendChild(ol);
+    } });
+    var bd = w.badges || [];
+    if (bd.length) S.push({ bg: "#c7f567", fg: "#16210a", accent: "#16210a", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: bd.length === 1 ? "Your badge" : "Your badges" }));
+      var g = el("div", { className: "badges" });
+      bd.slice(0, 4).forEach(function (x, i) { g.appendChild(el("div", { style: "animation-delay:" + (0.2 + i * 0.2) + "s" }, [el("b", { text: x.label }), el("small", { text: x.why })])); });
+      b.appendChild(g);
+    } });
     if (w.returnsStarted || w.refundedPence) S.push({ bg: "#fde68a", fg: "#3a2a00", accent: "#3a2a00", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Changed your mind?" }));
       if (w.refundedPence) { var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.refundedPence, gbp, 1000); b.appendChild(el("p", { text: "came back to you in refunds Relay tracked." })); }
@@ -1592,8 +1642,13 @@
         el("button", { type: "button", text: "Share", onclick: function (e) { e.stopPropagation();
           if (navigator.share) navigator.share({ title: "My " + w.year + " on Relay", text: text }).catch(function () {});
           else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it anywhere."; }, function () {}); } }),
+        (w.yearList || []).length ? el("button", { type: "button", className: "ghost", text: "Save my list", onclick: function (e) { e.stopPropagation();
+          var q = function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+          var csv = "Rank,Item,Shop,Orders,Spent\n" + w.yearList.map(function (x, i) { return [i + 1, x.name, x.shop || "", x.times, x.spentPence ? (x.spentPence / 100).toFixed(2) : ""].map(q).join(","); }).join("\n");
+          var a = el("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })) }); a.download = "relay-" + w.year + "-top-things.csv"; document.body.appendChild(a); a.click(); a.remove();
+          msg.textContent = "Saved your top " + w.yearList.length + " things."; } }) : null,
         el("button", { type: "button", className: "ghost", text: "Watch again", onclick: function (e) { e.stopPropagation(); again(); } }),
-        el("button", { type: "button", className: "ghost", text: "Done", onclick: function (e) { e.stopPropagation(); close(); } })]));
+        el("button", { type: "button", className: "ghost", text: "Done", onclick: function (e) { e.stopPropagation(); close(); } })].filter(Boolean)));
       b.appendChild(msg);
     } });
     return S;
