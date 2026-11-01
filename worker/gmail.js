@@ -47,8 +47,31 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 // Cloudflare's Workers Paid plan allows 1,000 outside calls and 1,000 database calls per request, so a round reads up to
 // 40 emails, saves each date window in one database batch, and stops early (saying there is more) long before either limit.
 // (On the free plan it was 10 emails a round, to fit 50 calls and 10 ms of processing.) A Worker keeps at most 6 connections
-// open at once, so emails are fetched 6 at a time.
+// open at once, so Gmail emails are fetched 6 at a time.
 const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 40, FETCH_PARALLEL = 6, CALL_BUDGET = 120;
+// Outlook lets an app have only 4 requests open at once on one mailbox and refuses the rest ("429 Too Many Requests").
+// Reading 6 at a time made Outlook refuse some emails, and those were skipped for good. So Outlook emails are read 3 at a
+// time (leaving room for anything else open, like an original receipt), and a refused one is waited for and asked again.
+const OUTLOOK_PARALLEL = 3;
+// An email that couldn't be read is tried again in later rounds; after this many tries it is left out so a scan never gets stuck.
+const MAX_READ_TRIES = 3;
+// Bump to have every Outlook mailbox's whole look-back period listed again once (only emails never read are read).
+// 1: emails Outlook refused during earlier scans were never captured.
+const OUTLOOK_FULL_REV = 1;
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+// A request Outlook refused for being too busy is asked once more after the wait it asks for (at most 2 seconds here;
+// anything longer is left for the next round).
+async function graphGet(fetchImpl, url, headers) {
+  let r = await fetchImpl(url, { headers });
+  if (r.status === 429 || r.status === 503 || r.status === 504) {
+    const secs = Number(r.headers && typeof r.headers.get === "function" ? r.headers.get("retry-after") : NaN);
+    await sleep(Number.isFinite(secs) && secs >= 0 ? Math.min(2000, secs * 1000) : 1000);
+    r = await fetchImpl(url, { headers });
+  }
+  return r;
+}
+// What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
+const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 17;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
@@ -148,7 +171,9 @@ async function ensureGmailTablesRun(db) {
   ];
   await runAll(db, statements);
   // Which kind of mailbox a connection (or a connection being started) is: NULL for Gmail, 'microsoft' for Outlook.
-  for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN provider TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN provider TEXT"]) {
+  // full_rev: which complete read of the look-back period the mailbox has had (see OUTLOOK_FULL_REV).
+  for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN provider TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN provider TEXT",
+    "ALTER TABLE gmail_connections ADD COLUMN full_rev INTEGER"]) {
     try { await db.prepare(sql).run(); } catch { /* already there */ }
   }
   await ensureResaleTables(db);
@@ -189,7 +214,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
   const rows = ((await env.RELAY_DB.prepare(
-    `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor FROM gmail_connections g
+    `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
      WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
      ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION).all()).results || []);
   let passes = 0, calls = 0;
@@ -203,8 +228,8 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
     catch (e) { recent = { status: 500, body: { error: String(e && e.message || e).slice(0, 80) } }; }
     passes++; calls += recent.calls || 3;
     let cursor = r.cursor || null;
-    // 2. The first full read, a little more each run, until it reaches the start of the look-back period.
-    if (!r.lastScanAt && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
+    // 2. The first full read (or a full read again, see OUTLOOK_FULL_REV), a little more each run, until it reaches the start of the look-back period.
+    if (needsFullRead(r.lastScanAt, r.provider, r.fullRev) && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
       let back;
       try { back = await scan(env, r.id, fetchImpl, now, cursor || ymd(since), false, { budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
       catch (e) { back = { status: 500, body: {} }; }
@@ -216,6 +241,12 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
     out.push({ status: recent.status, added: recent.body && recent.body.added || 0, updated: recent.body && recent.body.updated || 0, more: Boolean(recent.body && recent.body.more) });
   }
   return { checked: out.length, results: out };
+}
+
+// Whether the mailbox still needs its whole look-back period read: never finished, or an Outlook mailbox read before
+// the fix in OUTLOOK_FULL_REV.
+function needsFullRead(lastScanAt, provider, fullRev) {
+  return !lastScanAt || (provider === "microsoft" && (fullRev || 0) < OUTLOOK_FULL_REV);
 }
 
 async function hasConsent(db, shopperId) {
@@ -433,19 +464,24 @@ function gmailMailbox(fetchImpl, token) {
       }
       return { entries, incomplete };
     },
+    // The email as text; GONE if it no longer exists; null if Gmail couldn't give it just now (tried again later).
     async read(id) {
       const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
+      if (r.status === 404) return GONE;
       const raw = r.ok ? (await r.json().catch(() => ({}))).raw : null;
       return typeof raw === "string" ? new TextDecoder().decode(unb64url(raw)) : null;
     },
+    parallel: FETCH_PARALLEL,
     ref: e => ({ gmailId: e.id })
   };
 }
 
 // Outlook can't be searched the way Gmail is (there is no "purchases" category), so each date window is listed by
 // subject and sender only, and just the emails that look like orders, receipts, returns or parcel updates are read in full.
-const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|shipped|shipping|on (its|it's|the) way|invoice|booking|confirmation|confirmed|your (items?|parcel|package))\b/i;
-const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|receipts?|returns?|shipping|ship-confirm|auto-confirm|order-update|confirm|confirmation)@/i;
+// Payments, tickets, rides and collections are included too ("Your payment to Rains", "Your Monday trip with Uber",
+// "Ready to collect"), and senders whose address says what they send (orders@, billing@, PayPal's service@).
+const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|booking|booked|reservation|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
+const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)@/i;
 export function looksLikeShopping(subject, from) {
   return SHOPPING_SUBJECT.test(String(subject || "")) || SHOPPING_SENDER.test(String(from || "").trim());
 }
@@ -462,7 +498,7 @@ function outlookMailbox(fetchImpl, token) {
       let incomplete = false, oldest = null;
       for (let page = 0; page < MAX_PAGES && next; page++) {
         if (page > 0 && !canPage()) { incomplete = true; break; }
-        const res = await fetchImpl(next, { headers: auth });
+        const res = await graphGet(fetchImpl, next, auth);
         if (!res.ok) { if (page === 0) return { failed: true }; incomplete = true; break; }
         const data = await res.json().catch(() => ({}));
         for (const m of Array.isArray(data.value) ? data.value : []) {
@@ -479,9 +515,11 @@ function outlookMailbox(fetchImpl, token) {
       return { entries, incomplete, moreBefore: next && oldest ? oldest.slice(0, 10).replace(/-/g, "/") : null };
     },
     async read(id) {
-      const r = await fetchImpl(GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", { headers: auth });
+      const r = await graphGet(fetchImpl, GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", auth);
+      if (r.status === 404) return GONE;
       return r.ok ? r.text() : null;
     },
+    parallel: OUTLOOK_PARALLEL,
     ref: e => ({ outlookId: e.id })
   };
 }
@@ -497,7 +535,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   const fetchImpl = (...a) => { calls++; return fetchImplIn(...a); };
   const budget = o.budget || CALL_BUDGET, maxFetch = o.maxFetch || MAX_FETCH_PER_SCAN;
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data, last_scan_at, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, last_scan_at, provider, full_rev FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
   const token = await mailToken(env, shopperId, row, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
@@ -505,7 +543,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
-  const sinceLast = o.sinceMs ? Math.max(fullLimit, o.sinceMs) : !full && row.last_scan_at ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
+  const sinceLast = o.sinceMs ? Math.max(fullLimit, o.sinceMs) : !full && !needsFullRead(row.last_scan_at, row.provider, row.full_rev) ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
   // A past year the shopper asked for (Wrapped history) is read on its own, from 31 Dec back to 1 Jan, whatever the usual look-back.
   const yr = o.year;
   const limitDay = yr ? yr + "/01/01" : ymd(sinceLast);
@@ -536,9 +574,9 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       const sn = known.get(refs[i]);
       if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
     }
-    const rawById = new Map(), writes = [];
-    for (let i = 0; i < toRead.length; i += FETCH_PARALLEL) {
-      await Promise.all(toRead.slice(i, i + FETCH_PARALLEL).map(async (mid) => {
+    const rawById = new Map(), writes = [], par = box.parallel || FETCH_PARALLEL;
+    for (let i = 0; i < toRead.length; i += par) {
+      await Promise.all(toRead.slice(i, i + par).map(async (mid) => {
         try { rawById.set(mid, await box.read(mid)); } catch (e) { rawById.set(mid, null); }
       }));
     }
@@ -551,7 +589,26 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (!rawById.has(id)) { incomplete = true; continue; }   // left for the next round
       fetched++;
       const rawText = rawById.get(id);
-      if (typeof rawText !== "string") continue;
+      if (rawText === GONE) continue;   // deleted or moved since it was listed
+      if (typeof rawText !== "string") {
+        // The mailbox couldn't give this email just now. It used to be skipped for good (that is how Outlook receipts went
+        // missing); now it is remembered and read again in a later round, up to MAX_READ_TRIES times.
+        const prevDetails = seen ? JSON.parse(seen.details) : null;
+        const tries = ((prevDetails && prevDetails.readTries) || 0) + 1, giveUp = tries >= MAX_READ_TRIES;
+        if (prevDetails && prevDetails.kind !== "not_receipt") {
+          // A receipt already read by an older reader keeps what it has; it is only re-read once the email can be fetched.
+          writes.push(env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
+            .bind(JSON.stringify({ ...prevDetails, readTries: tries, ...(giveUp ? { parserVersion: PARSER_VERSION } : {}) }), shopperId, ref));
+        } else {
+          const placeholder = JSON.stringify({ kind: "not_receipt", unread: true, readTries: tries, parserVersion: giveUp ? PARSER_VERSION : 0 });
+          writes.push(seen
+            ? env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?").bind(placeholder, shopperId, ref)
+            : env.RELAY_DB.prepare("INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+              .bind(crypto.randomUUID(), shopperId, ref, "not_receipt", placeholder, now));
+        }
+        if (!giveUp) incomplete = true;   // this window is read again next round
+        continue;
+      }
       const cls = classify(rawText, box.ref(listed.entries[i]));
       const details = cls.details, status = cls.status;
       let imageToStore = null;
@@ -605,7 +662,11 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   const more = incomplete || outOfBudget || before > limitDay;
   if (yr) {
     if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at) VALUES (?,?,?) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at").bind(shopperId, yr, now).run();
-  } else if (!more && !o.recent) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  } else if (!more && !o.recent) {
+    // A finished read of the whole look-back period also records which full read it was (see OUTLOOK_FULL_REV).
+    if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, OUTLOOK_FULL_REV, shopperId).run();
+    else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  }
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
 
@@ -994,6 +1055,7 @@ export async function handleGmailCallback(request, env, url, opts) {
 // A different mailbox is read from the start; the same mailbox connected again (a new sign-in) carries on where it was.
 export async function saveConnection(env, shopperId, provider, address, refreshToken, now) {
   const enc = await encrypt(env, refreshToken);
+  await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
   const same = "gmail_connections.provider IS excluded.provider AND gmail_connections.google_email IS excluded.google_email";
   await env.RELAY_DB.prepare(
@@ -1001,7 +1063,8 @@ export async function saveConnection(env, shopperId, provider, address, refreshT
      ON CONFLICT(shopper_id) DO UPDATE SET google_email=excluded.google_email, token_iv=excluded.token_iv,
        token_data=excluded.token_data, connected_at=excluded.connected_at, provider=excluded.provider,
        last_scan_at=CASE WHEN ${same} THEN gmail_connections.last_scan_at END,
-       auto_cursor=CASE WHEN ${same} THEN gmail_connections.auto_cursor END`)
+       auto_cursor=CASE WHEN ${same} THEN gmail_connections.auto_cursor END,
+       full_rev=CASE WHEN ${same} THEN gmail_connections.full_rev END`)
     .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
 }
 // The same agreement the consent screen records, for a sign-in that showed the wording before going to Microsoft.

@@ -20,4 +20,53 @@ t("shop names drop legal endings", () => { assert.equal(shopDisplayName({ name: 
 t("a shop with no name gets one from its email domain", () => { assert.equal(shopDisplayName({ domain: "appcharge.com" }), "Appcharge"); assert.equal(shopDisplayName({ domain: "email.zara.co.uk" }), "Zara"); assert.equal(shopDisplayName({ domain: "g.shopifyemail.com" }), null); assert.equal(shopDisplayName({}), null); });
 t("a receipt from a personal mailbox shows as forwarded, not a person's name", () => { assert.equal(shopDisplayName({ name: "Sam Smith", domain: "gmail.com" }), "Forwarded receipt"); assert.equal(shopDisplayName({ name: "Sam", domain: "icloud.com" }), "Forwarded receipt"); assert.equal(shopDisplayName({ name: "Gail's", domain: "gails.co.uk" }), "Gail's"); });
 t("Square's test-account placeholder name is replaced by Relay's shop label", () => { assert.equal(squareShopName({}, "Default Test Account"), "Relay Demo Store"); assert.equal(squareShopName({ SQUARE_DEFAULT_LABEL: "Kick Lane" }, ""), "Kick Lane"); assert.equal(squareShopName({}, "Bean & Leaf Café"), "Bean & Leaf Café"); });
+// Shops Relay knows by name or web address, before anything else.
+t("Nespresso is Food & drink (it was in Other)", () => {
+  assert.equal(c("Nespresso", "nespresso.com", ["Ispirazione Firenze Arpeggio", "Melozio"]).category, "food");
+  assert.equal(c(null, "news.nespresso.com").category, "food", "from the web address alone");
+  assert.equal(c("Nestlé Nespresso SA", "email.nespresso.co.uk").category, "food", "from a word in the legal name");
+  assert.equal(c("Nespresso", "nespresso.com", ["Vertuo Pods x10"]).returnable, false);
+});
+t("a coffee machine or mug from a coffee shop stays in Food & drink but can still be returned", () => {
+  const r = c("Nespresso", "nespresso.com", ["Vertuo Next Machine", "Barista Creations Pods"]);
+  assert.equal(r.category, "food"); assert.equal(r.returnable, true); assert.equal(r.notReturnableReason, null);
+});
+t("Rains is Fashion, by name or address", () => {
+  assert.equal(c("RAINS", "rains.com", ["Long Jacket"]).category, "fashion");
+  assert.equal(c(null, "e.rains.com").category, "fashion");
+});
+t("short shop names only count as the whole name", () => {
+  assert.equal(c("Post Office", "postoffice.co.uk", ["Stamps"]).category, "other", "not Office the shoe shop");
+  assert.equal(c("Next", "next.co.uk", []).category, "fashion");
+  assert.equal(c(null, "email.hm.com", ["Linen shirt"]).category, "fashion");
+  assert.equal(c("Boots UK", "boots.com", []).category, "beauty");
+  assert.equal(c("Very Good Coffee Co", "verygoodcoffee.test").category, "food", "not Very the catalogue shop");
+});
+t("Uber rides are travel and Uber Eats is food", () => {
+  assert.equal(c("Uber", "uber.com").category, "travel");
+  assert.equal(c("Uber Eats", "uber.com").category, "food");
+  assert.equal(c("Bolt", "bolt.eu").category, "travel");
+});
+t("shops that sell everything are sorted by what was bought", () => {
+  assert.equal(c("Amazon.co.uk", "amazon.co.uk", ["Nespresso Vertuo Pods, Mixed Pack"]).category, "food");
+  assert.equal(c("Amazon.co.uk", "amazon.co.uk", ["Anker USB-C Charger 20W"]).category, "electronics");
+  assert.equal(c("Amazon.co.uk", "amazon.co.uk", ["Thing"]).category, "other");
+  assert.equal(c("John Lewis", "johnlewis.com", ["Apple iPad Air"]).category, "electronics");
+  assert.equal(c("John Lewis", "johnlewis.com", []).category, "home", "the shop's usual group when the items don't say");
+  assert.equal(c("Marks & Spencer", "marksandspencer.com", ["Percy Pig sweets", "Chicken sandwich"]).category, "food");
+  assert.equal(c("Marks & Spencer", "marksandspencer.com", ["Cotton jumper"]).category, "fashion");
+  assert.equal(c("Sainsbury's", "sainsburys.co.uk").category, "food");
+});
+t("item words: colours and flavours don't make clothes into food", () => {
+  assert.equal(c("Tiny Shop", "tiny.test", ["Long Jacket Chocolate"]).category, "fashion");
+  assert.equal(c("Tiny Shop", "tiny.test", ["Cable knit jumper"]).category, "fashion");
+  assert.equal(c("Tiny Shop", "tiny.test", ["Tea towels, set of 3"]).category, "home");
+  assert.equal(c("Tiny Shop", "tiny.test", ["Single origin coffee"]).category, "food");
+  assert.equal(c("Tiny Shop", "tiny.test", ["Mickey Mouse T-shirt"]).category, "fashion");
+});
+t("a shop's own name says what it is when Relay doesn't know it", () => {
+  assert.equal(c("Ozone Coffee Roasters", "ozonecoffee.test").category, "food");
+  assert.equal(c("Northwest Beds", "beds.test").category, "home");
+  assert.equal(c("Smith's Pharmacy", "smithspharmacy.test").category, "beauty");
+});
 console.log(`\n${n} category tests passed`);

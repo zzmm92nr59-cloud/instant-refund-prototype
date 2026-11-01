@@ -18,6 +18,7 @@ import { handleSquareTestRoute, enrichSquarePurchases } from "./square-orders.js
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
+import { handleProfileRoute, profileDeleteStatements, ensureProfileTable } from "./profile.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
@@ -514,9 +515,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
       await ensurePushTables(env.RELAY_DB);
+      await ensureProfileTable(env.RELAY_DB);
       await forgetCard(env, shopper.id, o).catch(() => {});
       await env.RELAY_DB.batch([
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
+        ...profileDeleteStatements(env.RELAY_DB, shopper.id),
         ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
         ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
         ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
@@ -530,6 +533,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       ]);
       return json({ ok: true }, 200, cors);
     }
+    const profileResponse = await handleProfileRoute(request, env, url, cors, shopper, o);
+    if (profileResponse) return profileResponse;
     const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);
     if (gmailResponse) return gmailResponse;
     const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);

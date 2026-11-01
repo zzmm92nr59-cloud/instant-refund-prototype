@@ -93,6 +93,11 @@ await tile.waitFor();
 assert.equal(await page.locator(".rl-cat-ico svg").count() >= 1, true);
 const cardText = await page.locator(".rl-cats").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
+// A missing shop can be searched for straight from the Receipts page.
+await page.getByRole("button", { name: "Missing a receipt? Search Outlook for it" }).click();
+await page.getByRole("heading", { name: "Find a missing receipt" }).waitFor();
+await page.getByRole("button", { name: "Back" }).click();
+assert.equal(await page.locator(".rl-sheet").count(), 0, "Back closes the search");
 state.oneStep = false; state.connected = false;
 console.log("ok - one step: signed in with Outlook already connected, Receipts open and the scan starts; group tiles have drawn icons");
 
