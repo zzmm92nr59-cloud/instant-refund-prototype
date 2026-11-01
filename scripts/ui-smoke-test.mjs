@@ -39,7 +39,7 @@ try{
    assert.match(await page.locator('#refundResult').innerText(),/Refund advance simulated/);assert.match(await page.locator('#refundResult').innerText(),/Do not post anything/);
    await page.evaluate(()=>simulateDemoRefund());assert.equal((await log(page)).length,1);
    const nav=page.locator(width<760?'#foot':'#side');
-   for(const [tab,title] of [['Discover','Find something better.'],['Radar','Your deals, discovered.'],['Wrapped','Your year in purchases.'],['Profile','Your Relay profile'],['Wallet',"Everything you've bought, in one place."]]){await nav.getByRole('button',{name:new RegExp(tab)}).click();await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,tab+' overflow')}
+   for(const [tab,title] of [['Discover','Discover'],['Radar','Radar'],['Wrapped','Wrapped'],['Profile','Profile'],['Wallet',"Everything you've bought, in one place."]]){await nav.getByRole('button',{name:new RegExp(tab)}).click();await page.getByRole('heading',{name:title,exact:true}).waitFor();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,tab+' overflow')}
    await nav.getByRole('button',{name:/Profile/}).click();assert.match(await page.locator('#view').innerText(),/REFUND/);
    await page.locator('#demoShopper').selectOption('Ben');assert.equal(await page.locator('[data-purchase]').count(),0);
    await page.locator('#modeToggle').click();assert.doesNotMatch(await page.locator('#view').innerText(),/403|API returned/);

@@ -411,7 +411,7 @@
     }
     render();
   }
-  function money(minor, cur) { return (cur === "GBP" || !cur ? "£" : cur + " ") + (minor / 100).toFixed(2); }
+  function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + (cur === "GBP" || !cur ? "£" : cur + " ") + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
   function receiptView(sheet, back) {
     var box = el("textarea", { placeholder: "Paste the whole order-confirmation email here (including the From and Subject lines if you can)", rows: 7, maxLength: 200000,
       style: "width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #ddd6c6;border-radius:16px;font-size:14px;margin-bottom:12px;font-family:inherit" });
@@ -638,7 +638,7 @@
       // One tidy line per receipt: picture, shop name (opens the original email), what was bought, price and date.
       function receiptRow(row) {
         var who = (row.retailer && (row.retailer.name || row.retailer.domain)) || "Unknown store";
-        var names = (row.items || []).map(function (i) { return i.name; }).join(", ");
+        var names = (row.items || []).map(function (i) { return i.name + (i.variant && (row.items || []).length === 1 ? " · " + i.variant : ""); }).join(", ");
         var wrap = el("div", { className: "rl-order", style: "padding:12px" });
         var top = el("div", { style: "display:flex;gap:12px;align-items:center" });
         var thumb = el("div", { style: "flex:0 0 56px;width:56px;height:56px;border-radius:14px;background:#f1ecdf;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800;font-size:22px;color:#46601b" }, [el("span", { text: who.charAt(0).toUpperCase() })]);
@@ -753,17 +753,24 @@
       var drawnSig = null;
       function loadList() {
         // Show what was loaded last time straight away, then quietly update if anything changed.
+        if (onPage && !shopRows.length && memo.shopRows) shopRows = memo.shopRows;
         if (drawnSig === null && memo.receipts) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); }
-        if (onPage) (memo.purchases || api("/relay/my/purchases")).then(function (pr) {
+        // Shop orders and email receipts are drawn together, so the page never redraws itself a moment later.
+        var shopsLoaded = !onPage ? Promise.resolve() : (memo.purchases || api("/relay/my/purchases")).then(function (pr) {
           var rows = []; ((pr.ok && pr.body && pr.body.purchases) || []).forEach(function (o) { (o.items || []).forEach(function (it) { rows.push([o, it]); }); });
-          var had = shopRows.length; shopRows = rows; if (rows.length !== had && drawnSig !== null) drawList();
-        }, function () {});
-        api("/relay/my/receipts").then(function (x) {
+          var sig = JSON.stringify(rows.map(function (x) { return [x[0].id, x[1].lineId, x[1].exchange && x[1].exchange.status, x[1].returnInfo && x[1].returnInfo.status]; }));
+          var changed = sig !== memo.shopSig; shopRows = rows; memo.shopRows = rows; memo.shopSig = sig;
+          return changed;
+        }, function () { return false; });
+        Promise.all([api("/relay/my/receipts"), shopsLoaded]).then(function (both) {
+          var x = both[0], shopsChanged = both[1];
+          if (!x.ok) { if (drawnSig === null || shopsChanged) drawList(); return; }
           if (!x.ok) { if (drawnSig === null) drawList(); return; }
           var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
           memo.receipts = { rows: rows, sig: sig, at: Date.now() };
-          if (sig === drawnSig) return;
-          allRows = rows; drawnSig = sig; memoDrop("wrapped"); drawList();
+          if (sig === drawnSig && !shopsChanged) return;
+          if (sig !== drawnSig) memoDrop("wrapped");
+          allRows = rows; drawnSig = sig; drawList();
         });
       }
       var doScan = function (full) {
@@ -1032,7 +1039,7 @@
         if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load listings." }));
         var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
         var rows = rs[0].body.listings || [];
-        if (!rows.length) body.appendChild(el("p", { text: "Nothing listed by other members yet. List something yourself from the Sell tab." }));
+        if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return window? List it from the Sell tab." })]));
         rows.forEach(function (l) {
           var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
           photo(card, l.id, l.hasImage);
