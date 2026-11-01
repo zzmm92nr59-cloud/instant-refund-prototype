@@ -15,7 +15,7 @@ import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliv
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal } from "./original.js";
-import { categorise, storeKey, CATEGORIES } from "./receipt-category.js";
+import { categorise, storeKey, CATEGORIES, shopDisplayName } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 
@@ -661,6 +661,12 @@ export function attachReturnProgress(orders, deliveries, updates) {
   }
 }
 
+// An email Relay itself sent (from its own sending address), which the receipt reader can mistake for a purchase.
+function isRelayEmail(c, env) {
+  const r = c.retailer || {}, domain = String(r.domain || "").toLowerCase();
+  const own = (String(env.RELAY_EMAIL_FROM || "").match(/@([a-z0-9.-]+)/i) || [])[1];
+  return domain === "resend.dev" || Boolean(own && domain === own.toLowerCase()) || /^relay$/i.test(String(r.name || "").trim()) && !c.orderRef;
+}
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
@@ -717,11 +723,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   return cards.filter(c => {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
     const l = mine.get(storeKey(c));
-    return !(l && l.promo && !c.orderRef && c.kind !== "return_instructions");
+    if (l && l.promo && !c.orderRef && c.kind !== "return_instructions") return false;
+    // Relay's own emails (return labels, swap confirmations) are not purchases.
+    return !isRelayEmail(c, env);
   }).sort((a, b) => whenOf(b).localeCompare(whenOf(a)) || b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
     const k = storeKey(c), l = mine.get(k);
     const learned = (l && l.category) || crowdPick(k) || null;
-    return { ...c, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
+    const shown = shopDisplayName(c.retailer);
+    const retailer = c.retailer && shown && shown !== c.retailer.name ? { ...c.retailer, name: shown, legalName: c.retailer.name || null } : c.retailer;
+    return { ...c, retailer, ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
   });
 }
 
