@@ -54,8 +54,28 @@ export function buildWrapped(cards, year, now = Date.now()) {
     : topCat && topCat.receipts / mine.length >= 0.5 ? { label: topCat.label + " regular", why: topCat.receipts + " of your " + mine.length + " receipts were " + topCat.label.toLowerCase() + "." }
     : shops.size >= 10 ? { label: "The Explorer", why: "You bought from " + shops.size + " different shops." }
     : { label: "The Mixer", why: "Your shopping was spread across " + categories.length + " kinds of shop." };
+  // Which years have any receipts, so the app can offer them (newest first).
+  const yearCounts = new Map();
+  for (const c of cards || []) { if (!c || c.kind === "return_instructions") continue; const w = whenOf(c); if (w) { const y = Number(w.slice(0, 4)); yearCounts.set(y, (yearCounts.get(y) || 0) + 1); } }
+  const years = [...yearCounts.entries()].sort((a, b) => b[0] - a[0]).map(([y, n]) => ({ year: y, receipts: n }));
+  // The thing bought most often (by name), only when it really was a repeat.
+  const itemsByName = new Map();
+  for (const c of mine) for (const it of (Array.isArray(c.items) ? c.items : [])) {
+    const n = it && typeof it.name === "string" ? it.name.trim() : ""; if (!n || n.length > 80) continue;
+    const k = n.toLowerCase(); const e = itemsByName.get(k) || { name: n, times: 0, shop: (c.retailer && c.retailer.name) || null }; e.times++; itemsByName.set(k, e);
+  }
+  const topItemE = [...itemsByName.values()].sort((a, b) => b.times - a.times)[0];
+  const topItem = topItemE && topItemE.times >= 2 ? topItemE : null;
+  // Money the shops sent back, from refund emails Relay matched to a purchase.
+  const refunded = mine.filter(c => c.returnProgress && Number.isInteger(c.returnProgress.refundPence));
+  const refundedPence = refunded.reduce((n, c) => n + c.returnProgress.refundPence, 0);
+  const top = topShops[0] || null;
+  const topShopShare = top && spentPence > 0 && top.spentPence > 0 ? Math.round(top.spentPence / spentPence * 100) : null;
+  const activeMonths = byMonth.filter(m => m.receipts > 0).length;
+  const firstDate = mine.map(whenOf).sort()[0] || null;
   return {
-    year, receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
+    year, years, receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
+    topItem, refundedPence, refundsMatched: refunded.length, topShopShare, activeMonths, firstDate,
     coverage: { withTotal: gbp.length, noTotal, otherCurrency },
     topShops, categories, byMonth,
     busiestMonth: busiest && busiest.receipts ? busiest.month : null,
