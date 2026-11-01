@@ -1,6 +1,6 @@
 // Multi-location Square Sandbox adapter. Retailer records are not consumer-owned.
 // Uses the merchant-authorised Square token only. Customer emails are read only to link orders to their owners (hashed).
-import { squareHost } from "./square-env.js";
+import { squareHost, squareShopName } from "./square-env.js";
 import { sq, squareOrderStatements, squareItemsOfVariations, linkSquareOrderEmails } from "./square-orders.js";
 const DAYS = 60;
 const MAX_PAGES_PER_LOCATION = 10;
@@ -22,7 +22,7 @@ export async function squareRequest(env, path, init = {}) {
 export async function listSquareLocations(env, token) {
   const data = await squareRequest(env, "/v2/locations", { token });
   return (data.locations || []).filter(l => l.id && l.status === "ACTIVE")
-    .map(l => ({ id: l.id, name: l.business_name || l.name || "Square location", currency: l.currency || "GBP", merchantId: l.merchant_id || null }));
+    .map(l => ({ id: l.id, name: squareShopName(env, l.business_name || l.name), currency: l.currency || "GBP", merchantId: l.merchant_id || null }));
 }
 // Reads one location's recent orders, saves them in one batch per page, then finds whose orders they are
 // (by the customer's email at Square) so they show up in that shopper's wallet.
