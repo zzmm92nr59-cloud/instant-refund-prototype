@@ -408,7 +408,7 @@ await page.getByRole('button', { name: 'Open messages' }).waitFor();
 console.log('PASS messages: shown safely, contact details refused with a clear reason, reply sent, back returns to the listing');
 await page.locator('.rl-back').click({ position: { x: 4, y: 4 } });
 await page.getByRole('button', { name: /^.*Market$/ }).first().click();
-await page.getByRole('heading', { name: 'Swap and sell with other members.' }).waitFor();
+await page.getByRole('heading', { name: 'Market', exact: true }).waitFor();
 await page.locator('#marketPage').getByRole('button', { name: 'Browse', exact: true }).waitFor();
 await page.locator('#marketPage').getByRole('button', { name: 'Sell', exact: true }).waitFor();
 assert.equal(await page.locator('#marketPage').getByRole('button', { name: 'Back', exact: true }).count(), 0, 'the Market page has nothing to go back to');
