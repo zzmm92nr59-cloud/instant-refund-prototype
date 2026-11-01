@@ -445,10 +445,9 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (details.kind === "receipt") {
         // A photo that failed once is tried again whenever the reader version changes (a transient failure should not be permanent).
         details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && (prev.hasImage || !stale);
-        details.photoIsItem = photoShowsItem(rawText);
         if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN && calls + 2 < budget) {
           imagesTried++;
-          const urls = extractProductImageUrls(rawText);
+          const urls = extractProductImageUrls(rawText, details);
           const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
           details.imageTried = true;
           if (img) {
@@ -456,6 +455,8 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
             imageToStore = { receiptId, ...img };
           }
         }
+        // Only an email that has a photo needs checking that the photo is of the item (reading it again costs time).
+        if (details.hasImage) details.photoIsItem = photoShowsItem(rawText, details);
       }
       if (seen) {
         // The shopper's confirm/dismiss choice lives in the status column and is kept.
@@ -552,13 +553,13 @@ async function addEmail(env, shopperId, fetchImpl, now, messageId) {
   let image = null;
   if (details.kind === "receipt") {
     details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && Boolean(prev.hasImage);
-    details.photoIsItem = photoShowsItem(rawText);
     if (!details.imageTried) {
-      const urls = extractProductImageUrls(rawText);
+      const urls = extractProductImageUrls(rawText, details);
       image = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
       details.imageTried = true;
       if (image) details.hasImage = true;
     }
+    if (details.hasImage) details.photoIsItem = photoShowsItem(rawText, details);
   }
   if (seen) {
     await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = 'pending' WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(details), seen.id, shopperId).run();
