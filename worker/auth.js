@@ -414,12 +414,12 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (exchangeResponse) return exchangeResponse;
     const cardResponse = await handleCardRoute(request, env, url, cors, shopper, o);
     if (cardResponse) return cardResponse;
-    const returnResponse = await handleReturnRoute(request, env, url, cors, shopper);
+    const returnResponse = await handleReturnRoute(request, env, url, cors, shopper, o);
     if (returnResponse) return returnResponse;
     const squareTestResponse = await handleSquareTestRoute(request, env, url, cors, shopper, o);
     if (squareTestResponse) return squareTestResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
-      return json({ purchases: await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper))) }, 200, cors);
+      return json({ purchases: await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper)), o) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {
       // Reads a pasted order-confirmation email. Nothing is stored. The result is
       // shopper-supplied evidence (refundEligible is always false).
