@@ -290,8 +290,23 @@ export async function syncSquareRefunds(env, f, o = {}) {
     let order;
     try { order = (await sq(env, "/v2/orders/" + encodeURIComponent(ext), {}, f)).order; } catch { continue; }
     if (!order) continue;
-    const done = (order.refunds || []).filter(x => x.status === "COMPLETED");
-    let pool = done.reduce((n, x) => n + (Number(x.amount_money && x.amount_money.amount) || 0), 0);
+    // Completed refunds, from the order's payments (Square's refund records say COMPLETED only once the money has gone back).
+    // If the payments can't be read, the order's own refund list is used (Square marks those APPROVED once done).
+    let pool = 0, viaPayments = false;
+    for (const t of (order.tenders || []).slice(0, 3)) {
+      const pid = t.payment_id || t.id;
+      if (!pid) continue;
+      try {
+        const pay = (await sq(env, "/v2/payments/" + encodeURIComponent(pid), {}, f)).payment || {};
+        viaPayments = true;
+        for (const rid of (pay.refund_ids || []).slice(0, 10)) {
+          const rf = (await sq(env, "/v2/refunds/" + encodeURIComponent(rid), {}, f)).refund || {};
+          if (rf.status === "COMPLETED") pool += Number(rf.amount_money && rf.amount_money.amount) || 0;
+        }
+      } catch { /* fall back to the order's list */ }
+    }
+    if (!viaPayments) pool = (order.refunds || []).filter(x => x.status === "APPROVED" || x.status === "COMPLETED")
+      .reduce((n, x) => n + (Number(x.amount_money && x.amount_money.amount) || 0), 0);
     if (!pool) continue;
     // Refunds already matched to returns on this order are taken out of the pool first.
     const already = (await db.prepare("SELECT COALESCE(SUM(refund_minor),0) AS n FROM relay_returns WHERE order_id = ? AND status = 'refunded'").bind(orderId).first()).n;

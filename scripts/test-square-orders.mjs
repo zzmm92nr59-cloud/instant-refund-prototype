@@ -50,7 +50,7 @@ const orders = {
   O_NOBODY: order("O_NOBODY", { tenders: [{ payment_id: "P_NONE" }] })      // no email anywhere
 };
 payments.P_NONE = { id: "P_NONE" };
-let squareCalls = [], fail = null, payCalls = [];
+let squareCalls = [], fail = null, payCalls = [], refundSeq = 0, refundStatus = "COMPLETED", refundKeys = {};
 const PRICES = { "TEE-M": 2500, "TEE-L": 2500, "MUG-1": 900, "TEE-XL": 3000, "TEE-S": 2000 };
 const stock = { "TEE-M": 5, "TEE-L": 5, "MUG-1": 5, "TEE-XL": 5, "TEE-S": 5 };
 function makeOrder(o) {
@@ -76,7 +76,15 @@ const fetchImpl = async (url, init = {}) => {
   if (path === "/v2/orders/search") return json({ orders: Object.values(orders) });
   let m;
   if ((m = /^\/v2\/customers\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") return customers[m[1]] ? json({ customer: customers[m[1]] }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
-  if ((m = /^\/v2\/payments\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") return payments[m[1]] ? json({ payment: payments[m[1]] }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
+  if ((m = /^\/v2\/payments\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") {
+    if (payments[m[1]]) return json({ payment: payments[m[1]] });
+    const o = orders[m[1].slice(2)];
+    return o ? json({ payment: { id: m[1], refund_ids: (o.refunds || []).map(r => r.id) } }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
+  }
+  if ((m = /^\/v2\/refunds\/([A-Z_0-9]+)$/.exec(path)) && method === "GET") {
+    const rf = Object.values(orders).flatMap(o => o.refunds || []).find(r => r.id === m[1]);
+    return rf ? json({ refund: rf }) : json({ errors: [{ code: "NOT_FOUND" }] }, 404);
+  }
   if (path === "/v2/customers/search") return json({ customers: Object.values(customers).filter(c => c.email_address.toLowerCase() === body.query.filter.email_address.exact) });
   if (path === "/v2/customers" && method === "POST") { const c = { id: "C_NEW" + Object.keys(customers).length, email_address: body.email_address }; customers[c.id] = c; return json({ customer: c }); }
   if (path === "/v2/orders" && method === "POST") {
@@ -101,8 +109,10 @@ const fetchImpl = async (url, init = {}) => {
   }
   if (path === "/v2/refunds" && method === "POST") {
     const o = orders[body.payment_id.slice(2)];
-    (o.refunds = o.refunds || []).push({ id: "R" + (o.refunds.length + 1), status: "COMPLETED", amount_money: body.amount_money });
-    return json({ refund: { id: "R1", status: "COMPLETED", amount_money: body.amount_money } });
+    if (refundKeys[body.idempotency_key]) return json({ refund: { ...refundKeys[body.idempotency_key] } }); // Square's idempotency
+    const rf = refundKeys[body.idempotency_key] = { id: "R" + (++refundSeq), status: refundStatus, amount_money: body.amount_money };
+    (o.refunds = o.refunds || []).push(rf);
+    return json({ refund: { ...rf } });
   }
   if ((m = /^\/v2\/orders\/([A-Z_0-9]+)$/.exec(path))) return json({ order: orders[m[1]] });
   return json({ errors: [{ code: "NOT_FOUND" }] }, 404);
@@ -225,8 +235,14 @@ assert.equal(sync.refunded, 0);
 assert.equal((await purchases(carol)).find(p => p.id === ca.id).items[0].returnInfo.status, "requested");
 // The test shop refunds it (test orders only, only the owner, only with a return started).
 assert.equal((await call("/relay/my/testing/square-refund", { method: "POST", token: bob, body: { orderId: ca.id, lineId: ca.items[0].lineId } })).status, 404);
-const tr = await (await call("/relay/my/testing/square-refund", { method: "POST", token: carol, body: { orderId: ca.id, lineId: ca.items[0].lineId } })).json();
+refundStatus = "PENDING";
+let tr = await (await call("/relay/my/testing/square-refund", { method: "POST", token: carol, body: { orderId: ca.id, lineId: ca.items[0].lineId } })).json();
+assert.equal(tr.refunded, false, "a pending refund isn't shown as refunded");
+assert.equal((await purchases(carol)).find(p => p.id === ca.id).items[0].returnInfo.status, "requested");
+Object.values(orders).flatMap(o => o.refunds || []).forEach(r => { r.status = "COMPLETED"; }); refundStatus = "COMPLETED";
+tr = await (await call("/relay/my/testing/square-refund", { method: "POST", token: carol, body: { orderId: ca.id, lineId: ca.items[0].lineId } })).json();
 assert.equal(tr.refunded, true, JSON.stringify(tr)); assert.equal(tr.amountMinor, 2500);
+assert.equal(orders[ca.id.split(":").pop()].refunds.length, 1, "pressing again doesn't refund twice");
 const ri = (await purchases(carol)).find(p => p.id === ca.id).items[0].returnInfo;
 assert.equal(ri.status, "refunded"); assert.equal(ri.refundMinor, 2500);
 assert.equal((await call("/relay/my/testing/square-refund", { method: "POST", token: carol, body: { orderId: ca.id, lineId: ca.items[0].lineId } })).status, 409, "not refunded twice");
@@ -238,7 +254,7 @@ assert.equal((await call("/relay/my/return", { method: "POST", token: alice, bod
 assert.equal((await call("/relay/my/testing/square-refund", { method: "POST", token: alice, body: { orderId: al.id, lineId: "L1" } })).status, 404);
 orders.O_ALICE.refunds = [{ id: "RX", status: "PENDING", amount_money: { amount: 2500, currency: "GBP" } }];
 assert.equal((await syncSquareRefunds(env, fetchImpl)).refunded, 0, "a pending refund doesn't count");
-orders.O_ALICE.refunds[0].status = "COMPLETED";
+orders.O_ALICE.refunds[0].status = "APPROVED";
 assert.equal((await syncSquareRefunds(env, fetchImpl)).refunded, 1);
 assert.equal((await purchases(alice)).find(p => p.id === al.id).items[0].returnInfo.status, "refunded");
 // A partial refund smaller than the item doesn't mark it refunded.
