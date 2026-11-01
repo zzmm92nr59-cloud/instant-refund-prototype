@@ -109,6 +109,60 @@ export function buildWrapped(cards, year, now = Date.now()) {
     if (forwarded(c) || !THINGS.has(c.category || "other")) continue;
     for (const it of (c.items || [])) { const n = itemName(it); if (n && things.length < 300) things.push({ name: n, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
   }
+  // ---- The Spotify-style parts, each counted straight from the receipts. ----
+  // Your year's list (like "Your Top Songs"): every named thing, ranked by how many separate orders it was in, then spend.
+  const itemStats = new Map();
+  for (const c of mine) {
+    const here = new Set();
+    for (const it of (c.items || [])) {
+      const n = itemName(it); if (!n) continue;
+      const k = n.toLowerCase(); if (here.has(k)) continue; here.add(k);
+      const e = itemStats.get(k) || { name: n, times: 0, spentPence: 0, shop: forwarded(c) ? null : shopName(c) };
+      e.times++;
+      if (Number.isInteger(it.pricePence)) e.spentPence += it.pricePence * (Number(it.qty) > 1 && !it.lineTotal ? Number(it.qty) : 1);
+      itemStats.set(k, e);
+    }
+  }
+  const yearList = [...itemStats.values()].sort((a, b) => b.times - a.times || b.spentPence - a.spentPence).slice(0, 100);
+  const topItems = yearList.slice(0, 5);
+  // Your biggest buys (like "Top Albums"): the five largest receipts.
+  const topBuys = gbp.slice().sort((a, b) => b.totalPence - a.totalPence).slice(0, 5).map(c => ({ shop: shopName(c), item: (c.items || []).length === 1 ? itemName(c.items[0]) : null,
+    items: (c.items || []).length, totalPence: c.totalPence, date: whenOf(c), photoId: c.hasImage && c.id && THINGS.has(c.category || "other") ? c.id : null }));
+  // Shopping time (like "Minutes listened"): the days you bought something, and your favourite day of the week.
+  const shopDays = new Set(mine.map(whenOf));
+  const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], byDay = DAY.map(() => 0);
+  for (const d of shopDays) byDay[new Date(d + "T12:00:00Z").getUTCDay()]++;
+  const favDay = shopDays.size ? byDay.indexOf(Math.max(...byDay)) : -1;
+  const weekendDays = byDay[0] + byDay[6];
+  let streak = 0, run = 0; byMonth.forEach(m => { run = m.receipts ? run + 1 : 0; streak = Math.max(streak, run); });
+  const shoppingTime = { days: shopDays.size, favouriteDay: favDay >= 0 ? DAY[favDay] : null, favouriteDayCount: favDay >= 0 ? byDay[favDay] : 0,
+    weekendShare: shopDays.size ? Math.round(weekendDays / shopDays.size * 100) : 0, longestMonthStreak: streak };
+  // Shop sprint (like "Top 5 Artist Sprint"): each top shop's orders month by month.
+  const sprint = topShops.map(t => {
+    const months = MONTHS.map(() => 0);
+    for (const c of mine) if (!forwarded(c) && shopName(c).toLowerCase() === t.name.toLowerCase()) { const i = Number(whenOf(c).slice(5, 7)) - 1; if (i >= 0 && i < 12) months[i]++; }
+    return { name: t.name, months };
+  });
+  // Subscriptions (like "Top Podcasts"): digital things you paid for in at least three different months.
+  const subs = new Map();
+  for (const c of mine) {
+    if (c.category !== "digital" || forwarded(c)) continue;
+    const n = shopName(c), e = subs.get(n) || { name: n, months: new Set(), spentPence: 0, item: null };
+    e.months.add(whenOf(c).slice(0, 7)); if (gbp.includes(c)) e.spentPence += c.totalPence;
+    if (!e.item && (c.items || []).length) e.item = itemName(c.items[0]);
+    subs.set(n, e);
+  }
+  const subscriptions = [...subs.values()].filter(e => e.months.size >= 3).sort((a, b) => b.months.size - a.months.size || b.spentPence - a.spentPence).slice(0, 5)
+    .map(e => ({ name: e.name, months: e.months.size, spentPence: e.spentPence, item: e.item }));
+  // Badges (like Spotify's identity cards): only ones the receipts prove, each with the reason.
+  const badges = [];
+  if (topShopShare && topShopShare >= 30 && top) badges.push({ label: "Loyal to " + top.name, why: topShopShare + "% of your spending went there." });
+  if (shops.size >= 15) badges.push({ label: "The Explorer", why: "You bought from " + shops.size + " different shops." });
+  if (shoppingTime.weekendShare >= 40 && shopDays.size >= 5) badges.push({ label: "Weekend Shopper", why: shoppingTime.weekendShare + "% of your shopping days were Saturdays or Sundays." });
+  if (refunded.length >= 2 || withReturn >= 3) badges.push({ label: "Returns Pro", why: refunded.length >= 2 ? refunded.length + " refunds tracked back to you." : withReturn + " returns started." });
+  if (subscriptions.length >= 3) badges.push({ label: "Subscriber", why: subscriptions.length + " things you paid for month after month." });
+  if (streak >= 6) badges.push({ label: "Never Missed a Month", why: "You bought something " + streak + " months in a row." });
+  if (mine.some(c => (c.items || []).length >= 5)) badges.push({ label: "Big Basket", why: "At least one order with 5 or more things in it." });
   return {
     year, years, receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
     topItem, refundedPence, refundsMatched: refunded.length, topShopShare, activeMonths, firstDate,
@@ -117,7 +171,7 @@ export function buildWrapped(cards, year, now = Date.now()) {
     busiestMonth: busiest && busiest.receipts ? busiest.month : null,
     biggest: biggest ? { shop: shopName(biggest), totalPence: biggest.totalPence, date: whenOf(biggest), item: (biggest.items || []).length === 1 ? itemName(biggest.items[0]) : null,
       photoId: biggest.hasImage && biggest.id && THINGS.has(biggest.category || "other") ? biggest.id : null } : null,
-    firstBuy, photos, things,
+    firstBuy, photos, things, topItems, yearList, topBuys, shoppingTime, sprint, subscriptions, badges,
     returnsStarted: withReturn, personality,
     note: "Based on the receipts and order emails Relay found. In-store card purchases without an email receipt aren't included."
   };
