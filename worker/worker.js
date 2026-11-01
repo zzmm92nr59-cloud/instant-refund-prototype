@@ -1,5 +1,6 @@
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
+import { syncSquareRefunds } from "./square-orders.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
@@ -53,7 +54,7 @@ export default {
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
     // Catalogues are refreshed first so price alerts compare against the newest prices.
     const syncs = Promise.allSettled([
-      importHistoricalSquareOrders(env),
+      importHistoricalSquareOrders(env).then(() => syncSquareRefunds(env)).then(r => console.log("Square refunds checked", JSON.stringify(r))),
       syncSquareCatalogue(env),
       syncAllShopify(env),
       syncAwinFeeds(env)
