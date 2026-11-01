@@ -229,6 +229,20 @@ const eo1 = merged.find(x => x.orderRef === "EO-1");
 assert.ok(eo1 && eo1.returnPlan && eo1.returnPlan.returnId === "RT-778812" && eo1.returnPlan.deadline === "2026-11-27" && eo1.returnPlan.carrier === "Evri", JSON.stringify(eo1 && eo1.returnPlan));
 assert.match(eo1.returnPlan.gmailId, /^m4abcdef$/);
 assert.ok(eo1.category && typeof eo1.returnable === "boolean" && eo1.categoryLabel, "each receipt carries a group and a can-it-be-returned flag");
+{
+  // Relay's own emails are never shown as purchases; a shop with only a legal name is shown by its everyday name.
+  const src = sqlite.prepare("SELECT * FROM captured_receipts WHERE details LIKE '%EO-1%' AND status != 'not_receipt' LIMIT 1").get();
+  const d = JSON.parse(src.details);
+  sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)")
+    .run("relay-own-1", src.shopper_id, "relay-own-msg", src.status, JSON.stringify({ ...d, orderRef: null, retailer: { name: "Relay", domain: "resend.dev" } }), src.created_at + 1);
+  sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)")
+    .run("legal-name-1", src.shopper_id, "legal-name-msg", src.status, JSON.stringify({ ...d, orderRef: "LG-1", retailer: { name: "Anthropic Ireland, Limited", domain: "stripe.com" }, items: [] }), src.created_at + 2);
+  const after = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
+  assert.equal(after.some(x => x.id === "relay-own-1"), false, "Relay's own email is not a receipt");
+  const lg = after.find(x => x.id === "legal-name-1");
+  assert.ok(lg && lg.retailer.name === "Anthropic" && lg.retailer.legalName === "Anthropic Ireland, Limited" && lg.category === "digital", JSON.stringify(lg && lg.retailer));
+  sqlite.prepare("DELETE FROM captured_receipts WHERE id IN ('relay-own-1','legal-name-1')").run();
+}
 // 7c. Older receipts on later Gmail result pages are reached.
 gmailBox.m99 = receiptMail(99).replace("14 Oct 2026", "19 Nov 2025");
 paging = true;
