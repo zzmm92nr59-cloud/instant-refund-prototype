@@ -1,5 +1,6 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
+import { PERSONAL_MAIL } from "./receipt-category.js";
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function whenOf(card) {
@@ -12,7 +13,12 @@ export function buildWrapped(cards, year, now = Date.now()) {
   year = Number(year) || new Date(now).getUTCFullYear();
   // One order can arrive as several emails (confirmation, dispatch). It counts once.
   const seen = new Set();
-  const mine = (cards || []).filter(c => c && c.kind !== "return_instructions").filter(c => { const w = whenOf(c); return w && Number(w.slice(0, 4)) === year; }).filter(c => {
+  const inYear = (cards || []).filter(c => c && c.kind !== "return_instructions").filter(c => { const w = whenOf(c); return w && Number(w.slice(0, 4)) === year; });
+  // A receipt the shopper forwarded to themselves is the same purchase as the shop's own email: count it once.
+  const forwarded = c => PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""));
+  const days = (a, b) => Math.abs(Date.parse(a) - Date.parse(b)) / 864e5;
+  const originals = inYear.filter(c => !forwarded(c) && c.totalPence != null);
+  const mine = inYear.filter(c => !(forwarded(c) && c.totalPence != null && originals.some(o => o.totalPence === c.totalPence && days(whenOf(o), whenOf(c)) <= 7))).filter(c => {
     if (!c.orderRef) return true;
     const k = ((c.retailer && (c.retailer.domain || c.retailer.name)) || "") + "|" + c.orderRef;
     if (seen.has(k)) return false; seen.add(k); return true;
@@ -23,13 +29,13 @@ export function buildWrapped(cards, year, now = Date.now()) {
   const spentPence = gbp.reduce((s, c) => s + c.totalPence, 0);
   const shops = new Map();
   for (const c of mine) {
-    const name = (c.retailer && (c.retailer.name || c.retailer.domain)) || "Unknown shop";
+    const name = forwarded(c) ? "Forwarded receipts" : (c.retailer && (c.retailer.name || c.retailer.domain)) || "Unknown shop";
     const key = name.toLowerCase();
     const s = shops.get(key) || { name, domain: c.retailer && c.retailer.domain || null, receipts: 0, spentPence: 0 };
     s.receipts++; if (gbp.includes(c)) s.spentPence += c.totalPence;
     shops.set(key, s);
   }
-  const topShops = [...shops.values()].sort((a, b) => b.spentPence - a.spentPence || b.receipts - a.receipts).slice(0, 5);
+  const topShops = [...shops.values()].filter(s => s.name !== "Forwarded receipts").sort((a, b) => b.spentPence - a.spentPence || b.receipts - a.receipts).slice(0, 5);
   const cats = new Map();
   for (const c of mine) {
     const k = c.category || "other";
