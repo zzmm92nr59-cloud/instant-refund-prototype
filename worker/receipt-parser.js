@@ -377,6 +377,34 @@ export function looksPromotional(subject, headers, hasOrderRef) {
   return /^(bulk|list)$/i.test(String((headers && headers.precedence) || "").trim());
 }
 
+// Apple App Store / Apple services receipts put each purchase on separate lines above its price:
+// the app ("Royal Match"), then what was bought ("5,000 Coins"), then a link line ("Report a Problem"), then "£1.59".
+// Nothing here is guessed from other shops' emails: it only runs for Apple's own receipts.
+const APPLE_SECTION = /^(app store|apple services|itunes store|apple books|apple arcade|apple tv|apple music|apple one|icloud)$/i;
+const APPLE_NOISE = /report a problem|write a review|in-app purchase|^renews\b|^(monthly|yearly|annual|weekly|1 month|1 year|7 days)\b|^device\b|^family sharing|^purchased by|^cancel|^manage|^subscription|^\(|^free trial/i;
+const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
+export function appleItems(text) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const items = [];
+  for (let i = 0; i < rows.length; i++) {
+    if (/^(subtotal|total|vat|tax)\b/i.test(rows[i])) break;
+    const pm = rows[i].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
+    if (!pm) continue;
+    const found = [];
+    for (let j = i - 1; j >= 0 && j >= i - 6 && found.length < 2; j--) {
+      const r = rows[j];
+      if (/^£/.test(r) || APPLE_LABEL.test(r)) break;
+      if (APPLE_SECTION.test(r)) { if (!found.length) found.push(r); break; }
+      if (APPLE_NOISE.test(r) || r.length > 90) continue;
+      found.push(r);
+    }
+    if (!found.length) continue;
+    const [app, what] = found.length === 2 ? [found[1], found[0]] : [found[0], null];
+    items.push({ name: app, ...(what && what.toLowerCase() !== app.toLowerCase() ? { variant: what } : {}), qty: 1, pricePence: money(pm[1]) });
+  }
+  return items;
+}
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -422,6 +450,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }
