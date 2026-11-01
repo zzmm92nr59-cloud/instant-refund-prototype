@@ -1542,7 +1542,9 @@
     if (!memo.purchases) memo.purchases = api("/relay/my/purchases").then(function (r) { setTimeout(function () { memo.purchases = null; }, 1500); return r; }, function (e) { memo.purchases = null; throw e; });
     memo.purchases.then(function (r) {
       var rows = (r.ok && r.body && r.body.purchases) || [];
-      if (!rows.length) return;
+      var testHost = el("div", { style: "margin-top:14px" });
+      mountSquareTest(testHost, function () { memo.purchases = null; mountConfirmed(host); });
+      if (!rows.length) { host.appendChild(testHost); return; }
       host.appendChild(el("div", { className: "sectionhead" }, [el("h2", { text: "Confirmed by the shop" }), el("span", { className: "pill", text: rows.length + " order" + (rows.length === 1 ? "" : "s") })]));
       host.appendChild(el("p", { className: "small muted", text: "Orders placed with your Relay email at shops connected to Relay. The shop confirmed these, so you can exchange items here." }));
       var grid = el("div", { className: "purchase-grid" }); host.appendChild(grid);
@@ -1578,6 +1580,36 @@
           card.appendChild(d); grid.appendChild(card);
         });
       });
+      host.appendChild(testHost);
+    }).catch(function () {});
+  }
+
+  // ---- Test orders at Relay's Square test shop (only while Relay uses Square's sandbox; no card, no real money). ----
+  function mountSquareTest(host, done) {
+    api("/relay/my/testing/square-items").then(function (r) {
+      var items = (r.ok && r.body && r.body.items) || [];
+      if (!items.length) return;
+      var card = el("details", { className: "card", style: "padding:14px 16px" });
+      card.appendChild(el("summary", { text: "Try it with a test order", style: "font-weight:700;cursor:pointer" }));
+      card.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "Places an order at " + (r.body.store || "Relay's test shop") +
+        " (a Square test shop) under your Relay email, paid with Square's test payment. No card is needed and no real money moves. Up to 5 a day." }));
+      var pick = el("select", { style: "width:100%;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" });
+      items.forEach(function (i) {
+        pick.appendChild(el("option", { value: i.variationId, text: i.product + (i.variant && !/^(default|regular)$/i.test(i.variant) ? " · " + i.variant : "") + " · " + money(i.priceMinor, "GBP") +
+          (i.inStock ? "" : " · out of stock") }));
+      });
+      var msg = el("div", { className: "rl-msg" });
+      var go = el("button", { className: "darkbtn", text: "Place test order", onclick: function () {
+        go.disabled = true; say(msg, "Placing your test order…");
+        api("/relay/my/testing/square-order", { method: "POST", body: { variationId: pick.value } }).then(function (p) {
+          go.disabled = false;
+          if (p.ok && p.body && p.body.ok) { say(msg, "✓ " + p.body.message); setTimeout(done, 1200); return; }
+          var e = p.body && p.body.error;
+          say(msg, e === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
+        }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
+      } });
+      card.appendChild(pick); card.appendChild(go); card.appendChild(msg);
+      host.appendChild(card);
     }).catch(function () {});
   }
 
