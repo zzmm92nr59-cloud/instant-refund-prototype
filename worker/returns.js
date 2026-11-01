@@ -15,17 +15,21 @@
 // Post Office" instruction without a real label behind it, and the app tells the shopper to use the shop's own
 // returns process.
 //
+// Square shops: the same request and reference; the shop is emailed at its Square location's address, and the refund
+// shows in Relay once Square records it (see syncSquareRefunds in square-orders.js).
+//
 // Eligibility: order confirmed by the shop for this shopper, within 7 days of the order date,
 // and the item must not already have a return or exchange recorded.
 
 import { ensureOnce } from "./once.js";
 import { listConnectedShopifyStores } from "./shopify-connect.js";
 import { shopMakesLabels, orderAddress, createReturnLabel, saveLabel, labelResponse } from "./royal-mail.js";
+import { SQUARE_CONNECTION, notifySquareShopOfReturn } from "./square-orders.js";
 
 const API_VERSION = "2026-07";
-const REASON_TEXT = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
-const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const clean = (t, n) => String(t == null ? "" : t).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
+export const REASON_TEXT = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
+export const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+export const clean = (t, n) => String(t == null ? "" : t).replace(/[\u0000-\u001f]/g, " ").trim().slice(0, n);
 
 const json = (body, status = 200, cors = {}) =>
   Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -147,8 +151,10 @@ async function checkEligibility(env, shopper, orderId, lineId) {
 
   if (!order) return { eligible: false, reason: "not_your_order" };
 
+  // Shopify orders are keyed by the shop's address; Square orders by their Square location ("square:sandbox:<location>").
   const m = SHOP.exec(order.retailer);
-  if (!m) return { eligible: false, reason: "retailer_not_supported" };
+  const sqr = m ? null : SQUARE_CONNECTION.exec(String(order.retailer || ""));
+  if (!m && !sqr) return { eligible: false, reason: "retailer_not_supported" };
 
   // Check 7-day window from order date
   const orderedAt = new Date(order.orderedAt).getTime();
@@ -174,11 +180,11 @@ async function checkEligibility(env, shopper, orderId, lineId) {
 
   // No completed exchange on this line
   const existingExchange = await db.prepare(
-    "SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status = 'done'"
+    "SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status IN ('done','awaiting_payment')"
   ).bind(order.id, line.lineId).first();
   if (existingExchange) return { eligible: false, reason: "already_exchanged" };
 
-  return { eligible: true, order, shop: m[1], line, daysSince: Math.floor(daysSince) };
+  return { eligible: true, order, shop: m ? m[1] : order.retailer, square: Boolean(sqr), line, daysSince: Math.floor(daysSince) };
 }
 
 // POST /relay/my/return — start a return; get back a Relay reference, plus a Royal Mail label when the shop has set that up
@@ -209,6 +215,15 @@ async function initiateReturn(env, shopper, body, o = {}) {
 
   // A Royal Mail label, only if the shop connected its own Click & Drop account and Royal Mail returned a tracking number.
   let store = null, made = null;
+  // Square shops: no Royal Mail labels yet (those are set up through the Shopify app). The shop is emailed at the
+  // address on its Square location.
+  if (check.square) {
+    const shopNotified = await notifySquareShopOfReturn(env, { connection: check.shop, externalOrderId: check.order.ext, itemTitle: check.line.title,
+      quantity: check.line.quantity, priceMinor: check.line.priceMinor, reason: reason || null, returnRef }, o);
+    if (shopNotified) await db.prepare("UPDATE relay_returns SET shop_notified_at = ? WHERE id = ?").bind(Date.now(), returnId).run();
+    return [200, { returnId, returnRef, status: "requested", labelAvailable: false, shopNotified, inStore: true,
+      item: check.line.title, priceMinor: check.line.priceMinor, daysSince: check.daysSince }];
+  }
   if (await shopMakesLabels(env, check.shop)) {
     store = ((await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o)).catch(() => [])).find(x => x.domain === check.shop)) || null;
     const from = store ? await orderAddress(store, check.order.ext, o) : null;
