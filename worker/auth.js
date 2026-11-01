@@ -20,7 +20,7 @@ import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
-import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback } from "./gmail.js";
+import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
@@ -67,6 +67,9 @@ async function ensureAuthTablesRun(db) {
        id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, email_hash TEXT NOT NULL UNIQUE,
        created_at INTEGER NOT NULL)`,
     `CREATE TABLE IF NOT EXISTS auth_google_states (
+       state_hash TEXT PRIMARY KEY, client_hash TEXT NOT NULL, nonce_hash TEXT NOT NULL,
+       created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
+    `CREATE TABLE IF NOT EXISTS auth_microsoft_states (
        state_hash TEXT PRIMARY KEY, client_hash TEXT NOT NULL, nonce_hash TEXT NOT NULL,
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
     `CREATE TABLE IF NOT EXISTS auth_login_tokens (
@@ -314,6 +317,83 @@ async function googleCallback(request, env, url, opts) {
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
 
+// ---- Sign in with Microsoft (identity only: openid + email; no Outlook access) ----
+// Personal Microsoft accounts only. Purchases are matched to a shopper by email address, so Relay must be sure the
+// address really is theirs: only addresses Microsoft itself hosts (Outlook, Hotmail, Live, MSN) are accepted this way.
+// Anyone else signs in with the emailed link or code, which proves the address directly.
+const MS_CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
+const MICROSOFT_MAIL = /@(?:(?:outlook|hotmail|live)\.(?:com|co\.uk|com\.au|co\.jp|co\.nz|co\.za|co\.il|co\.th|co\.kr|com\.ar|com\.br|com\.gr|com\.mx|com\.my|com\.sg|com\.tr|com\.vn|fr|de|it|es|nl|be|ie|ca|at|ch|dk|se|no|fi|pt|jp|cz|hu|in|kr|lv|ph|sa|sk|cl|gr|ru)|msn\.com|passport\.com|windowslive\.com)$/;
+const MS_SIGNIN_SCOPE = "openid email profile";
+function decodeClaims(idToken) {
+  const part = typeof idToken === "string" ? idToken.split(".")[1] : "";
+  if (!part) return null;
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
+}
+
+async function microsoftStart(request, env, url, cors, opts) {
+  const { now } = opts;
+  const origin = request.headers.get("origin");
+  if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+  if (!outlookConfigured(env)) return json({ error: "microsoft_sign_in_not_configured" }, 503, cors);
+  const body = await readJson(request);
+  const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
+  if (!TOKEN_SHAPE.test(nonce)) return json({ error: "invalid_request" }, 400, cors);
+  const client = await sha256Hex("client:" + (request.headers.get("cf-connecting-ip") || "unknown"));
+  await env.RELAY_DB.prepare("DELETE FROM auth_microsoft_states WHERE expires_at <= ?").bind(now).run();
+  const n = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_microsoft_states WHERE client_hash = ? AND created_at > ?").bind(client, now - HOUR_MS).first();
+  if ((n?.n || 0) >= MAX_GOOGLE_STARTS_PER_CLIENT_PER_HOUR) return json({ error: "too_many_requests" }, 429, cors);
+  const state = randomToken();
+  await env.RELAY_DB.prepare("INSERT INTO auth_microsoft_states (state_hash,client_hash,nonce_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS).run();
+  const params = new URLSearchParams({
+    client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
+    scope: MS_SIGNIN_SCOPE, state, prompt: "select_account"
+  });
+  return json({ url: MS_AUTH + "/authorize?" + params }, 200, cors);
+}
+
+// Called from the shared Microsoft redirect when the state belongs to a sign-in. Returns null if it does not
+// (then it is a "Connect Outlook", handled in gmail.js).
+async function microsoftCallback(request, env, url, opts) {
+  const state = url.searchParams.get("state") || "";
+  if (!TOKEN_SHAPE.test(state)) return null;
+  const stateHash = await sha256Hex(state);
+  const known = await env.RELAY_DB.prepare("SELECT state_hash FROM auth_microsoft_states WHERE state_hash = ?").bind(stateHash).first();
+  if (!known) return null;
+  const { now } = opts;
+  const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
+  const back = result => Response.redirect(appUrl + "#msignin=" + result, 302);
+  const claimed = await env.RELAY_DB.prepare(
+    "UPDATE auth_microsoft_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash")
+    .bind(now, stateHash, now).first();
+  if (!claimed) return back("failed");
+  if (url.searchParams.get("error")) return back("denied");
+  const code = url.searchParams.get("code") || "";
+  if (!code || !outlookConfigured(env)) return back("failed");
+  let email = null, otherAddress = false;
+  try {
+    const res = await opts.fetchImpl(MS_AUTH + "/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ code, client_id: env.MICROSOFT_CLIENT_ID, client_secret: env.MICROSOFT_CLIENT_SECRET,
+        redirect_uri: microsoftRedirect(env, url), grant_type: "authorization_code", scope: MS_SIGNIN_SCOPE })
+    });
+    const tokens = res.ok ? await res.json().catch(() => null) : null;
+    // The ID token comes straight from Microsoft's token endpoint over TLS, so its claims are read and checked here.
+    const claims = tokens ? decodeClaims(tokens.id_token) : null;
+    if (claims && claims.iss === "https://login.microsoftonline.com/" + MS_CONSUMER_TENANT + "/v2.0" && claims.tid === MS_CONSUMER_TENANT &&
+        claims.aud === env.MICROSOFT_CLIENT_ID && Number(claims.exp) * 1000 > now) {
+      const address = normaliseEmail(claims.email || claims.preferred_username);
+      if (address && MICROSOFT_MAIL.test(address)) email = address;
+      else otherAddress = Boolean(address);
+    }
+  } catch { email = null; }
+  if (!email) return back(otherAddress ? "other_address" : "failed");
+  const token = randomToken();
+  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(await sha256Hex(token), email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+  return Response.redirect(appUrl + "#signin=" + token, 302);
+}
+
 async function listPurchases(env, shopper, orderId) {
   const where = orderId ? "AND o.id = ?" : "";
   const params = orderId ? [shopper.emailHash, orderId] : [shopper.emailHash];
@@ -351,7 +431,7 @@ async function listPurchases(env, shopper, orderId) {
 // Returns a Response for auth/"my" routes, or null when the route is not one of ours.
 export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const path = url.pathname;
-  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback";
+  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback" || path === "/relay/microsoft/callback";
   if (!isAuthRoute) return null;
   const o = { now: Date.now(), fetchImpl: (...args) => fetch(...args), ...opts }; // arrow wrapper: a bare fetch called as o.fetchImpl() throws "Illegal invocation" on Workers
   try {
@@ -359,6 +439,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
     if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
+    if (path === "/relay/auth/microsoft/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await microsoftStart(request, env, url, cors, o); }
+    // Which sign-in buttons the app should show. Says nothing about any shopper.
+    if (path === "/relay/auth/providers" && request.method === "GET")
+      return json({ email: configured(env), google: configured(env) && googleConfigured(env), microsoft: configured(env) && outlookConfigured(env) }, 200, cors);
     if (path.startsWith("/relay/auth/passkey/") && configured(env)) {
       await ensureAuthTables(env.RELAY_DB);
       const pk = await handlePasskeyAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
@@ -377,6 +461,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/gmail/callback" && request.method === "GET")
       return await handleGmailCallback(request, env, url, { ...o, appUrl: DEFAULT_APP_URL });
+    if (path === "/relay/microsoft/callback" && request.method === "GET") {
+      const ms = await microsoftCallback(request, env, url, o);
+      if (ms) return ms;
+      return await handleOutlookCallback(request, env, url, { ...o, appUrl: DEFAULT_APP_URL });
+    }
     const shopper = await sessionShopper(request, env, o.now);
     if (!shopper) return json({ error: "not_signed_in" }, 401, cors);
     if (path === "/relay/me" && request.method === "GET") return json({ email: shopper.email }, 200, cors);
