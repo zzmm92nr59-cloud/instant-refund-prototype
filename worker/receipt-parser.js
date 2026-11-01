@@ -383,6 +383,7 @@ export function looksPromotional(subject, headers, hasOrderRef) {
 const APPLE_SECTION = /^(app store|apple services|itunes store|apple books|apple arcade|apple tv|apple music|apple one|icloud)$/i;
 const APPLE_NOISE = /report a problem|write a review|in-app purchase|^(iphone|ipad|ipod|ipod touch|mac|apple watch|apple vision pro|apple tv)(\s?\w+)?$|^renews\b|^(monthly|yearly|annual|weekly|1 month|1 year|7 days)\b|^device\b|^family sharing|^purchased by|^cancel|^manage|^subscription|^\(|^free trial/i;
 const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
+const PRICE_WORDS = /^(you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
 export function appleItems(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   const items = [];
@@ -450,6 +451,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
+  result.items = result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()));
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
@@ -677,7 +680,26 @@ export function extractProductImageUrls(rawEmail) {
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   if (!html) return [];
-  const words = (parseReceiptEmail(rawEmail).items || []).flatMap(i => String(i.name || "").toLowerCase().split(/\W+/)).filter(w => w.length > 3);
+  return scoredPhotos(html, rawEmail).slice(0, 2).map(f => f.url);
+}
+// True when the best photo in the email is named after (or linked as) one of the items bought, so it really shows
+// the item. Shop logos, banners and adverts don't match an item name and are never treated as the item's photo.
+export function photoShowsItem(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  if (!html) return false;
+  const best = scoredPhotos(html, rawEmail)[0];
+  return Boolean(best && best.matched);
+}
+const COMMON = new Set(["with", "your", "from", "this", "that", "order", "item", "size", "colour", "color", "black", "white", "pack", "high", "rise"]);
+function scoredPhotos(html, rawEmail) {
+  const parsed = parseReceiptEmail(rawEmail), r = parsed.retailer || {};
+  // The shop's own name is in its logo's alt text, so it can't show that a photo is of the item.
+  const shop = String((r.name || "") + " " + (r.domain || "")).toLowerCase();
+  const words = (parsed.items || []).flatMap(i => String(i.name || "").toLowerCase().split(/\W+/)).filter(w => w.length > 3 && !COMMON.has(w) && !shop.includes(w));
   const found = [];
   for (const m of html.matchAll(/<img\b[^>]*>/gi)) {
     const tag = m[0];
@@ -693,10 +715,11 @@ export function extractProductImageUrls(rawEmail) {
     const w = Number((/\bwidth=["']?(\d+)/i.exec(tag) || [])[1] || 0), h = Number((/\bheight=["']?(\d+)/i.exec(tag) || [])[1] || 0);
     if ((w && w < 80) || (h && h < 80)) continue;
     let score = 0;
-    if (words.some(x => alt.includes(x) || url.toLowerCase().includes(x))) score += 3;
+    const matched = words.some(x => alt.includes(x) || url.toLowerCase().includes(x));
+    if (matched) score += 3;
     if (w >= 150 || h >= 150) score += 1;
     if (/product|item|catalog|media|images?/i.test(url)) score += 1;
-    if (!found.some(f => f.url === url)) found.push({ url, score, order: found.length });
+    if (!found.some(f => f.url === url)) found.push({ url, score, matched, order: found.length });
   }
-  return found.sort((a, b) => b.score - a.score || a.order - b.order).slice(0, 2).map(f => f.url);
+  return found.sort((a, b) => b.score - a.score || a.order - b.order);
 }
