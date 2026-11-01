@@ -16,9 +16,18 @@
   // Asks the server only when the answer isn't already remembered (and recent enough).
   function cachedGet(kind, path) {
     if (memoFresh(memo[kind])) return Promise.resolve(memo[kind].r);
-    return api(path).then(function (r) { if (r.ok) memo[kind] = { at: Date.now(), r: r }; return r; });
+    return api(path).then(function (r) { if (r.ok) { memo[kind] = { at: Date.now(), r: r }; if (kind === "gmail") rememberMailbox(r.body); } return r; });
   }
-  function save(v) { if (!v) memoReset(); try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
+  // Which inbox Relay reads for this shopper (Gmail or Outlook), remembered on the device so every screen names the right one.
+  var MAILBOX_KEY = "relay.mailbox";
+  function rememberMailbox(g) {
+    try { if (g && g.connected) localStorage.setItem(MAILBOX_KEY, g.provider === "microsoft" ? "outlook" : "gmail"); else if (g) localStorage.removeItem(MAILBOX_KEY); } catch (e) {}
+  }
+  function mailName() { try { return localStorage.getItem(MAILBOX_KEY) === "outlook" ? "Outlook" : "Gmail"; } catch (e) { return "Gmail"; } }
+  function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
+  // An email Relay can open again: its id in Gmail or in Outlook.
+  function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
+  function save(v) { if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} }
   function api(path, opts) {
     opts = opts || {};
     var s = load(), headers = { "Content-Type": "application/json" };
@@ -166,17 +175,44 @@
     [el("h2", { text: "Sign in to Relay" }),
      el("p", { text: "No password. We email you a one-time link. Purchases you made with that email address appear in your wallet." }),
      input, go, codeRow, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
-    sheet.insertBefore(googleButton(msg), sheet.children[2]);
+    var gb = googleButton(msg);
+    sheet.insertBefore(gb, sheet.children[2]);
     if (passkeysSupported()) sheet.insertBefore(el("div", { style: "margin-top:10px" }, [passkeyButton(msg)]), sheet.children[3]);
     sheet.insertBefore(el("p", { text: "or", style: "text-align:center;opacity:.6;margin:8px 0" }), sheet.children[passkeysSupported() ? 4 : 3]);
+    // Outlook, Hotmail and Live users: shown only once Microsoft sign-in is switched on.
+    signInProviders().then(function (p) {
+      if (p && p.microsoft && gb.parentNode === sheet) sheet.insertBefore(el("div", { style: "margin-top:10px" }, [microsoftButton(msg)]), gb.nextSibling);
+    });
+  }
+  var providersAsked = null;
+  function signInProviders() {
+    if (!providersAsked) providersAsked = api("/relay/auth/providers").then(function (r) { if (!r.ok) providersAsked = null; return r.ok ? r.body : null; }, function () { providersAsked = null; return null; });
+    return providersAsked;
+  }
+  function newNonce() {
+    var bytes = new Uint8Array(32); (window.crypto || window.msCrypto).getRandomValues(bytes);
+    return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  // Identity only: Microsoft tells Relay your Outlook address. Relay gets no access to your Outlook mail from this button.
+  function microsoftButton(msg) {
+    var b = el("button", { className: "rl-btn", text: "Continue with Microsoft", style: "background:#fff;color:#1f1f1f;border:1px solid #8c8c8c" });
+    b.onclick = function () {
+      b.disabled = true; say(msg, "Opening Microsoft…");
+      var nonce = newNonce();
+      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { b.disabled = false; return say(msg, "Your browser is blocking storage, so Microsoft sign-in can't work here. Use the email link instead.", true); }
+      api("/relay/auth/microsoft/start", { method: "POST", body: { nonce: nonce } }).then(function (r) {
+        if (r.ok && r.body && /^https:\/\/login\.microsoftonline\.com\//.test(r.body.url || "")) { location.href = r.body.url; return; }
+        b.disabled = false; say(msg, r.status === 503 ? "Microsoft sign-in isn't switched on yet. Use the email link instead." : "Couldn't start Microsoft sign-in. Try again, or use the email link.", true);
+      }).catch(function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    return b;
   }
   // Identity only: Google tells Relay your verified email. Relay gets no access to Gmail from this button.
   function googleButton(msg) {
     var b = el("button", { className: "rl-btn", text: "Continue with Google", style: "background:#fff;color:#1f1f1f;border:1px solid #dadce0" });
     b.onclick = function () {
       b.disabled = true; say(msg, "Opening Google…");
-      var bytes = new Uint8Array(32); (window.crypto || window.msCrypto).getRandomValues(bytes);
-      var nonce = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      var nonce = newNonce();
       try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { b.disabled = false; return say(msg, "Your browser is blocking storage, so Google sign-in can't work here. Use the email link instead.", true); }
       api("/relay/auth/google/start", { method: "POST", body: { nonce: nonce } }).then(function (r) {
         if (r.ok && r.body && /^https:\/\/accounts\.google\.com\//.test(r.body.url || "")) { location.href = r.body.url; return; }
@@ -467,8 +503,9 @@
         open(function (s) { gate(s, email); });
       }).catch(function () { agree.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
-    sheet.appendChild(el("h2", { text: "Before you start" }));
-    sheet.appendChild(el("p", { text: "Relay is only useful if it can see your receipts, so this is needed to use it." }));
+    sheet.appendChild(el("h2", { text: c.acceptedEarlier ? "We've updated this" : "Before you start" }));
+    sheet.appendChild(el("p", { text: c.acceptedEarlier ? "Relay can now read Outlook as well as Gmail, so the wording below changed to say so. What Relay reads and keeps is the same. Please agree again to keep your receipts updating."
+      : "Relay is only useful if it can see your receipts, so this is needed to use it." }));
     c.text.forEach(function (t) { sheet.appendChild(el("p", { text: t })); });
     sheet.appendChild(agree); sheet.appendChild(msg);
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
@@ -527,7 +564,7 @@
     if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "Missed the window? Sell or swap it", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openResale(x.id); } }));
     }
-    if (x.id && /^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") && openOriginal) {
+    if (x.id && mailRef(x) && openOriginal) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "View original receipt", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openOriginal(x.id); } }));
     }
     var legal = x.returnBy && x.returnable !== false && x.returnBy.basis === "uk_law" ? x.returnBy.date : null;
@@ -586,7 +623,7 @@
       if (rp.returnId) pl("Return ID: " + rp.returnId);
       (rp.steps || []).forEach(function (t) { pl("• " + t); });
       if (rp.estimatedRefundPence != null) pl("Estimated refund: " + money(rp.estimatedRefundPence, rp.currency) + " (an estimate from the email, not a confirmed refund)");
-      if (rp.id && /^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "") && openOriginal) {
+      if (rp.id && mailRef(rp) && openOriginal) {
         pb.appendChild(el("button", { className: "rl-btn", text: "Show my QR code / return email", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openOriginal(rp.id); } }));
       } else if (/^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "")) {
         pb.appendChild(el("a", { href: "https://mail.google.com/mail/u/0/#all/" + rp.gmailId, target: "_blank", rel: "noopener noreferrer", text: "Open the email with your QR code", style: "display:block;margin-top:6px;font-weight:600" }));
@@ -607,8 +644,8 @@
     return card;
   }
   function disconnectGmail(done, msg) {
-    ask("Disconnect Gmail and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
-      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
+    ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
+      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; rememberMailbox({ connected: false }); done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
     });
   }
   function gmailSection(box, c, msg, onPage) {
@@ -625,25 +662,39 @@
     cachedGet("gmail", "/relay/my/gmail").then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       if (!r.ok || !r.body.connected) list.textContent = "";
-      if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your Gmail status." })); return; }
+      if (!r.ok) { box.appendChild(el("p", { text: "Couldn't load your email connection." })); return; }
       if (!r.body.connected) {
-        box.appendChild(el("p", { text: c.gmailAvailable ? "Connect Gmail so Relay can find your order confirmations and receipts for you." : "Gmail connection isn't switched on yet. You can still add a receipt by pasting it below." }));
-        if (c.gmailAvailable) box.appendChild(el("button", { className: "rl-btn", text: "Connect Gmail", onclick: function () {
-          api("/relay/my/gmail/connect", { method: "POST" }).then(function (x) {
-            if (x.ok && /^https:\/\/accounts\.google\.com\//.test(x.body.url)) location.href = x.body.url;
-            else say(msg, "Couldn't start the Gmail connection. Please try again.", true);
-          }); } }));
+        var both = c.gmailAvailable && c.outlookAvailable;
+        box.appendChild(el("p", { text: both ? "Connect the email you shop with, Gmail or Outlook, so Relay can find your order confirmations and receipts for you."
+          : c.gmailAvailable ? "Connect Gmail so Relay can find your order confirmations and receipts for you."
+          : c.outlookAvailable ? "Connect Outlook so Relay can find your order confirmations and receipts for you."
+          : "Email connection isn't switched on yet. You can still add a receipt by pasting it below." }));
+        var connectBtn = function (label, provider, start, name) {
+          var b = el("button", { className: "rl-btn", text: label, style: "margin-top:8px" });
+          b.onclick = function () {
+            b.disabled = true;
+            api("/relay/my/gmail/connect", { method: "POST", body: provider ? { provider: provider } : undefined }).then(function (x) {
+              if (x.ok && x.body && start.test(x.body.url || "")) { location.href = x.body.url; return; }
+              b.disabled = false; say(msg, "Couldn't start the " + name + " connection. Please try again.", true);
+            }).catch(function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+          };
+          return b;
+        };
+        if (c.gmailAvailable) box.appendChild(connectBtn("Connect Gmail", null, /^https:\/\/accounts\.google\.com\//, "Gmail"));
+        if (c.outlookAvailable) box.appendChild(connectBtn("Connect Outlook", "microsoft", /^https:\/\/login\.microsoftonline\.com\//, "Outlook"));
+        if (c.outlookAvailable) box.appendChild(el("p", { text: "Outlook works with Outlook.com, Hotmail and Live addresses.", style: "font-size:13px;opacity:.75;margin-top:8px" }));
         return;
       }
-      if (!onPage) box.appendChild(el("p", { text: "Gmail connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
+      var MB = r.body.provider === "microsoft" ? "Outlook" : "Gmail", owner = MB === "Outlook" ? "Microsoft" : "Google";
+      if (!onPage) box.appendChild(el("p", { text: MB + " connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
       var lastScan = r.body.lastScanAt ? new Date(r.body.lastScanAt) : null;
-      var scanBtn = el("button", { className: "rl-btn", text: lastScan ? "Check for new receipts" : "Scan my Gmail for receipts" });
+      var scanBtn = el("button", { className: "rl-btn", text: lastScan ? "Check for new receipts" : "Scan my " + MB + " for receipts" });
       var status = el("div", { className: "rl-msg" });
       var autoAt = r.body.autoAt ? new Date(r.body.autoAt) : null;
       var checked = autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
       var when = function (d) { return d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
-      status.textContent = onPage ? "Gmail connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
-        : "Relay checks your Gmail for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
+      status.textContent = onPage ? MB + " connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
+        : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
       if (onPage) { scanBtn.className = "rl-po-secondary"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
@@ -691,7 +742,7 @@
             thumb.appendChild(el("img", { alt: "", src: u, style: "width:40px;height:40px;object-fit:contain" }));
           });
         }
-        var canOpen = row.id && /^[A-Za-z0-9]{6,40}$/.test(row.gmailId || "") && openOriginal;
+        var canOpen = row.id && mailRef(row) && openOriginal;
         var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
           : el("b", { text: who, style: "display:block;font-size:16px" });
         // No item names in the email: a short order number is the next most useful thing to show.
@@ -804,20 +855,20 @@
         scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
         var added = 0, rounds = 0, saved = ""; try { saved = localStorage.getItem("relay_scan_cursor") || ""; } catch (e) {}
         var tries = 0;
-        // A round that fails (Gmail or Relay busy for a moment) is tried again a few seconds later from the same place.
+        // A round that fails (the mailbox or Relay busy for a moment) is tried again a few seconds later from the same place.
         function retry(cursor) {
           tries++;
           if (tries > 3) {
             scanBtn.disabled = false;
             try { if (cursor) localStorage.setItem("relay_scan_cursor", cursor); } catch (e) {}
-            return say(status, (added ? "Found or updated " + added + " so far. " : "") + "Gmail is busy right now. Your place is saved: tap the button again in a minute to carry on.", true);
+            return say(status, (added ? "Found or updated " + added + " so far. " : "") + MB + " is busy right now. Your place is saved: tap the button again in a minute to carry on.", true);
           }
-          say(status, "Gmail is busy, trying again…" + (added ? " " + added + " found so far" : ""));
+          say(status, MB + " is busy, trying again…" + (added ? " " + added + " found so far" : ""));
           return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(cursor, true); });
         }
         function step(cursor, small) {
           return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
-            if (x.status === 401) { scanBtn.disabled = false; return say(status, "Google needs you to reconnect Gmail. Disconnect and connect again.", true); }
+            if (x.status === 401) { scanBtn.disabled = false; return say(status, owner + " needs you to reconnect " + MB + ". Disconnect and connect again.", true); }
             if (!x.ok) return retry(cursor);
             tries = 0;
             added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
@@ -830,6 +881,8 @@
               return step(x.body.cursor);
             }
             scanBtn.disabled = false; memo.gmail = null;
+            // "Connected. Scanning for receipts…" is out of date once the scan has finished.
+            if (onPage && msg.textContent && !/\berr\b/.test(msg.className)) say(msg, "");
             say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
           // A dropped connection is treated like a busy round: wait, then carry on from the same place.
           }, function () { return retry(cursor); });
@@ -846,30 +899,32 @@
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
       if (!onPage) {
         if (lastScan) box.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { doScan(true); } }));
-        if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
-        box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () { disconnectGmail(function () { gmailSection(box, c, msg, onPage); }, msg); } }));
+        if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search " + MB + " for it", onclick: function () { openFind(); } }));
+        box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect " + MB + " and delete captured receipts", onclick: function () { disconnectGmail(function () { gmailSection(box, c, msg, onPage); }, msg); } }));
       }
       if (window.__relayAutoFull) { window.__relayAutoFull = false; window.__relayAutoScan = false; doScan(true); }
       else if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
     }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
 
-  // ---- View original receipt: fetched live from Gmail when opened; nothing is stored ----
+  // ---- View original receipt: fetched live from Gmail or Outlook when opened; nothing is stored ----
   var openOriginal = null;
   function originalView(sheet, receiptId, onBack) {
     var msg = el("div", { className: "rl-msg" });
     var body = el("div");
-    [el("h2", { text: "Original receipt" }), el("p", { text: "Loading it from your Gmail…", style: "opacity:.7" }), body, msg,
+    var MB = mailName();
+    [el("h2", { text: "Original receipt" }), el("p", { text: "Loading it from your " + MB + "…", style: "opacity:.7" }), body, msg,
       el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
       if (!r.ok) {
-        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? "Gmail needs to be reconnected. Go back and tap Connect Gmail."
-          : r.status === 404 ? "That email is no longer in your Gmail, so it can't be shown."
+        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs to be reconnected. Go back, disconnect it and connect again."
+          : r.status === 404 ? "That email is no longer in your " + MB + ", so it can't be shown."
+          : r.status === 409 ? "Connect your email again to open the original."
           : "Couldn't load the original email. Try again in a moment.";
         return;
       }
-      note.textContent = "Shown straight from your Gmail. Relay doesn't keep a copy.";
+      note.textContent = "Shown straight from your " + MB + ". Relay doesn't keep a copy.";
       note.style.fontSize = "13px";
       var b = r.body || {};
       (b.links || []).forEach(function (l) {
@@ -890,14 +945,15 @@
     }).catch(function () { note.textContent = "Couldn't reach Relay."; });
   }
 
-  // ---- Find a missing receipt: search Gmail by store name, pick the right email, add it ----
+  // ---- Find a missing receipt: search the shopper's mailbox by store name, pick the right email, add it ----
   var openFind = null;
   function findView(sheet, onBack) {
     var input = el("input", { type: "search", placeholder: "Store name, e.g. lululemon", style: "margin-top:8px" });
-    var go = el("button", { className: "rl-btn", text: "Search my Gmail" });
+    var MB = mailName();
+    var go = el("button", { className: "rl-btn", text: "Search my " + MB });
     var msg = el("div", { className: "rl-msg" }), out = el("div");
     [el("h2", { text: "Find a missing receipt" }),
-     el("p", { text: "Search your Gmail for a store, then pick the order confirmation email. Relay only reads the one you pick.", style: "font-size:14px;opacity:.8" }),
+     el("p", { text: "Search your " + MB + " for a store, then pick the order confirmation email. Relay only reads the one you pick.", style: "font-size:14px;opacity:.8" }),
      input, go, msg, out, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     function search() {
       var q = input.value.trim();
@@ -905,7 +961,7 @@
       go.disabled = true; out.textContent = ""; say(msg, "Searching…");
       api("/relay/my/gmail/find", { method: "POST", body: { query: q } }).then(function (r) {
         go.disabled = false;
-        if (!r.ok) return say(msg, r.body && r.body.error === "gmail_reconnect_needed" ? "Gmail needs to be reconnected first." : r.status === 409 ? "Connect Gmail first." : "Couldn't search Gmail right now. Try again.", true);
+        if (!r.ok) return say(msg, r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs to be reconnected first." : r.status === 409 ? "Connect your email first." : "Couldn't search " + MB + " right now. Try again.", true);
         var list = (r.body && r.body.results) || [];
         say(msg, list.length ? "Tap Add on the order confirmation." : "Nothing found for that name. Try a shorter name.");
         list.forEach(function (x) {
@@ -1158,7 +1214,7 @@
         body.textContent = "";
         if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items." }));
         var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); });
-        if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your Gmail." }));
+        if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your email." }));
         items.forEach(function (i) { body.appendChild(sellCard(i)); });
         if (focusReceipt) body.appendChild(el("button", { className: "rl-btn ghost", text: "Show all my items", onclick: function () { focusReceipt = null; draw(); } }));
       });
@@ -1214,13 +1270,14 @@
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     if (window.go) {
       gbox.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
-      gbox.appendChild(el("p", { text: "Connect Gmail, scan for receipts and see them grouped by store type. Everything lives on the Receipts page." }));
+      gbox.appendChild(el("p", { text: "Connect your email (Gmail or Outlook), scan for receipts and see them grouped by store type. Everything lives on the Receipts page." }));
       gbox.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", onclick: function () { close(); window.go("receipts"); } }));
       api("/relay/my/gmail").then(function (g) {
+        if (g.ok) rememberMailbox(g.body);
         if (!g.ok || !g.body || !g.body.connected) return;
         gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
-        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search Gmail for it", onclick: function () { openFind(); } }));
-        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect Gmail and delete captured receipts", onclick: function () { disconnectGmail(function () { back.firstChild.textContent = ""; gate(back.firstChild, email); }, msg); } }));
+        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search " + mailName() + " for it", onclick: function () { openFind(); } }));
+        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect " + mailName() + " and delete captured receipts", onclick: function () { disconnectGmail(function () { back.firstChild.textContent = ""; gate(back.firstChild, email); }, msg); } }));
       });
     } else gmailSection(gbox, c || {}, msg);
     var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
@@ -1248,7 +1305,7 @@
       ask("Delete your Relay sign-in and everything linked to it? This can't be undone.", "Delete my account", function () {
         api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Withdraw my permission for Relay to read my receipts", onclick: function () {
-      ask("Withdraw permission? Relay will disconnect Gmail and delete everything it captured. You'll be asked again next time you open your account.", "Withdraw permission", function () {
+      ask("Withdraw permission? Relay will disconnect your email and delete everything it captured. You'll be asked again next time you open your account.", "Withdraw permission", function () {
         api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else say(msg, "Couldn't withdraw. Try again.", true); }); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
   }
@@ -1283,25 +1340,34 @@
       show();
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
   }
-  var gmailNotes = { connected: ["Gmail connected. Scanning for receipts…", false], denied: ["You chose not to connect Gmail. Relay needs a way to see your receipts, so you can try again or paste one.", true],
-    failed: ["Couldn't connect Gmail. Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect Gmail.", true], not_configured: ["Gmail connection isn't switched on yet.", true] };
+  // What to say when Google or Microsoft sends the shopper back after "Connect Gmail" / "Connect Outlook".
+  function mailNote(result, name) {
+    var notes = { connected: [name + " connected. Scanning for receipts…", false], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
+      failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true] };
+    return { text: notes[result][0], bad: notes[result][1] };
+  }
   function completeGmail() {
-    var m = /(?:^|[#&])gmail=(connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
+    var m = /(?:^|[#&])(gmail|outlook)=(connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
     memo.gmail = null; memo.receipts = null;
-    window.__relayAutoScan = m[1] === "connected";
-    if (window.go) { window.__relayReceiptsNote = { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }; window.go("receipts"); return; }
-    open(function (sheet) { gate(sheet, s.email || "", { text: gmailNotes[m[1]][0], bad: gmailNotes[m[1]][1] }); });
+    if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
+    var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
+    window.__relayAutoScan = m[2] === "connected";
+    if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
+    open(function (sheet) { gate(sheet, s.email || "", note); });
   }
   function completeGoogleNote() {
-    var m = /(?:^|[#&])gsignin=(denied|failed)(?:&|$)/.exec(location.hash || "");
+    var m = /(?:^|[#&])(gsignin|msignin)=(denied|failed|other_address)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); localStorage.removeItem("relay_gnonce"); } catch (e) {}
+    var who = m[1] === "msignin" ? "Microsoft" : "Google";
     open(function (sheet) {
-      sheet.appendChild(el("h2", { text: m[1] === "denied" ? "Google sign-in cancelled" : "Google sign-in didn't work" }));
-      sheet.appendChild(el("p", { text: m[1] === "denied" ? "No problem. You can try again or use an email link instead." : "Please try again, or use an email link instead." }));
+      sheet.appendChild(el("h2", { text: m[2] === "denied" ? who + " sign-in cancelled" : who + " sign-in didn't work" }));
+      sheet.appendChild(el("p", { text: m[2] === "denied" ? "No problem. You can try again or use an email link instead."
+        : m[2] === "other_address" ? "Microsoft sign-in works with Outlook, Hotmail and Live addresses. For any other address, use the email link or code instead."
+        : "Please try again, or use an email link instead." }));
       sheet.appendChild(el("button", { className: "rl-btn", text: "Back to sign in", onclick: show }));
     });
   }
@@ -1327,7 +1393,8 @@
       if (r.status === 401) { save(null); mountReceipts(host); return; }
       if (!r.ok) { host.appendChild(el("p", { text: "Couldn't reach Relay." })); return; }
       if (!r.body.accepted) {
-        host.appendChild(el("p", { text: "Relay needs your OK before it looks at your receipts. It takes a moment." }));
+        host.appendChild(el("p", { text: r.body.acceptedEarlier ? "Relay's permission wording changed: it now works with Outlook as well as Gmail. Agree again to keep your receipts updating."
+          : "Relay needs your OK before it looks at your receipts. It takes a moment." }));
         host.appendChild(el("button", { className: "rl-btn", text: "Review and agree", style: "max-width:260px", onclick: show }));
         return;
       }
@@ -1369,7 +1436,7 @@
       host.appendChild(el("div", { className: "rl-wr-cover" }, [
         el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED" }),
         el("h2", { text: "Your year in purchases, as a story." }),
-        el("p", { text: "Sign in and connect Gmail, and Relay builds your Wrapped from your real receipts." }),
+        el("p", { text: "Sign in and connect your email, and Relay builds your Wrapped from your real receipts." }),
         el("button", { className: "rl-wr-play", text: "Sign in", onclick: show })]));
       return;
     }
@@ -1395,7 +1462,7 @@
       cover.appendChild(el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }));
       if (!w.receipts) {
         cover.appendChild(el("h2", { text: "Nothing to wrap for " + year + " yet." }));
-        cover.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below and Relay will look for that year's receipts." : "Connect Gmail on the Receipts tab and Relay will find your order emails." }));
+        cover.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below and Relay will look for that year's receipts." : "Connect your email on the Receipts tab and Relay will find your order emails." }));
       } else {
         cover.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
         cover.appendChild(el("p", { text: w.receipts + " receipts · " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.coverage.withTotal ? " · " + money(w.spentPence, "GBP") : "") }));
@@ -1406,7 +1473,7 @@
       mountHistory(hb, w, function (firstYear) { Object.keys(memo).forEach(function (k) { if (/^wrapped/.test(k)) memoDrop(k); }); mountWrapped(host, firstYear || year); });
     }).catch(function () { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
-  // Opt-in: read past years of order emails so Wrapped works for them too. Same Gmail permission, same rules: only receipts and order emails.
+  // Opt-in: read past years of order emails so Wrapped works for them too. Same email permission, same rules: only receipts and order emails.
   function mountHistory(host, w, done) {
     host.textContent = "";
     var thisYear = new Date().getFullYear();
@@ -1439,8 +1506,8 @@
           status.textContent = "Reading " + y + (cursor ? " · back to " + cursor.replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2") : "") + "… " + found + " receipts found so far. Keep this page open.";
           api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
             if (!x.ok) {
-              if (x.status === 401) { status.textContent = "Google needs you to reconnect Gmail on the Receipts tab."; return; }
-              if (++errors > 8) { status.textContent = "Gmail is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
+              if (x.status === 401) { status.textContent = mailOwner() + " needs you to reconnect " + mailName() + " on the Receipts tab."; return; }
+              if (++errors > 8) { status.textContent = mailName() + " is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
               return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
             }
             errors = 0; found += (x.body.added || 0);
