@@ -16,7 +16,14 @@ const W = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts: 4
   coverage: { withTotal: 4, noTotal: 0, otherCurrency: 0 }, topShops: [{ name: "Lululemon", receipts: 1, spentPence: 21600 }, { name: "Kick Lane", receipts: 2, spentPence: 12000 }],
   categories: [{ category: "fashion", label: "Fashion", receipts: 4, topShop: { name: "Kick Lane", receipts: 2 } }], byMonth: months.map((m, i) => ({ month: m, receipts: i === 2 ? 2 : 0, spentPence: 0 })), busiestMonth: "Mar",
   biggest: { shop: "Lululemon", totalPence: 21600, date: "2026-03-02", item: "Align Pant", photoId: photos.length ? photos[0].id : null }, returnsStarted: 0, personality: { label: "The Style Seeker", why: "4 of your 4 receipts were fashion, most of them from Kick Lane." },
-  firstBuy: { shop: "Kick Lane", item: "Court Classic Trainers", date: "2026-01-04" }, photos, things: style.receipts.flatMap(r => r.items.map(i => ({ name: i.name, variant: i.variant, shop: r.retailer.name, pricePence: i.pricePence }))), note: "" });
+  firstBuy: { shop: "Kick Lane", item: "Court Classic Trainers", date: "2026-01-04" }, photos,
+  topItems: [{ name: "Align Pant", times: 3, spentPence: 29400, shop: "Lululemon" }, { name: "Socks, 3 pack", times: 2, spentPence: 1800, shop: "Kick Lane" }, { name: "Define Jacket", times: 1, spentPence: 11800, shop: "Lululemon" }],
+  yearList: [{ name: "Align Pant", times: 3, spentPence: 29400, shop: "Lululemon" }, { name: "Socks, 3 pack", times: 2, spentPence: 1800, shop: "Kick Lane" }, { name: "Define Jacket", times: 1, spentPence: 11800, shop: "Lululemon" }],
+  topBuys: [{ shop: "Lululemon", item: "Align Pant", items: 1, totalPence: 21600 }, { shop: "Kick Lane", item: null, items: 3, totalPence: 8500 }, { shop: "Kick Lane", item: "Hoodie", items: 1, totalPence: 3500 }],
+  shoppingTime: { days: 23, favouriteDay: "Saturday", favouriteDayCount: 7, weekendShare: 45, longestMonthStreak: 5 },
+  sprint: [{ name: "Lululemon", months: [0,0,2,1,0,0,0,0,0,0,0,0] }, { name: "Kick Lane", months: [1,0,1,0,0,0,0,0,0,0,0,0] }],
+  subscriptions: [{ name: "Apple", months: 8, spentPence: 3992, item: "Match Masters" }],
+  badges: [{ label: "Loyal to Lululemon", why: "64% of your spending went there." }, { label: "Weekend Shopper", why: "45% of your shopping days were Saturdays or Sundays." }], things: style.receipts.flatMap(r => r.items.map(i => ({ name: i.name, variant: i.variant, shop: r.retailer.name, pricePence: i.pricePence }))), note: "" });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const imageAsks = [];
@@ -67,12 +74,21 @@ for (let k = 0; k < 20; k++) {
   await page.waitForTimeout(1300);
   texts.push(await page.locator(".rl-story-body").innerText());
   if (texts.at(-1).includes("Some things you brought home")) { assert.equal(await page.locator(".rl-story-body .ph img").count(), 2); assert.match(await page.locator(".rl-story-body .ph").getAttribute("class"), /\bn2\b/, "the grid re-flows for the photos that loaded"); await page.screenshot({ path: "/tmp/shots/wrapped-photos.png" }); }
+  if (texts.at(-1).includes("Your shop sprint")) { assert.equal(await page.locator(".rl-story-body .sprint .row").count(), 3, "a header row and one row per shop"); await page.screenshot({ path: "/tmp/shots/wrapped-sprint.png" }); }
+  if (texts.at(-1).includes("Your badges")) await page.screenshot({ path: "/tmp/shots/wrapped-badges.png" });
   if (await page.getByRole("button", { name: "Watch again" }).count()) break;
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
 for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Some things you brought home/, /Photos from your own order emails/, /Your style in 2026/, /sporty and relaxed/,
+  /Your shopping time\s+23 days/, /Saturday was your day \(7 of them\)/, /5 months in a row/, /Your shop sprint/, /Your top 5 things\s+1\s+Align Pant\s+3×/, /Socks, 3 pack\s+2×/,
+  /Your regular\s+Things you paid for month after month\.\s+1\s+Apple · Match Masters\s+8 months/, /Your biggest buys/, /3 things · Kick Lane/, /Your badges\s+Loyal to Lululemon/, /Weekend Shopper/,
   /your go-to was Kick Lane \(2\)/, /Align Pant, at Lululemon on 2 March/, /The Style Seeker/, /Style\s+Sporty & Relaxed/]) assert.match(story, re);
+const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save my list" }).click()]);
+assert.equal(dl.suggestedFilename(), "relay-2026-top-things.csv");
+const csv = await (await import("node:fs/promises")).readFile(await dl.path(), "utf8");
+assert.equal(csv.split("\n")[0], "Rank,Item,Shop,Orders,Spent");
+assert.equal(csv.split("\n")[2], '2,"Socks, 3 pack",Kick Lane,2,18.00', "commas in names are quoted");
 await page.keyboard.press("Escape");
 
 // No checked photos: no photo slide and not a single picture anywhere in the story.
