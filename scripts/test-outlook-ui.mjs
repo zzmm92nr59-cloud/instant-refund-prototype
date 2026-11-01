@@ -9,7 +9,8 @@ await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http:/
 await mkdir("/tmp/shots", { recursive: true });
 const MS_URL = "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=x&state=s";
 const RID = "44444444-4444-4444-8444-444444444444";
-const state = { microsoft: true, accepted: true, earlier: false, connected: false, provider: "microsoft" };
+const state = { microsoft: true, accepted: true, earlier: false, connected: false, provider: "microsoft", oneStep: false };
+const WORDING = ["With your permission, Relay reads your email (Gmail or Outlook) in read-only mode.", "You can disconnect your email at any time."];
 const posts = [];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -22,9 +23,9 @@ await ctx.route("https://**/*", route => {
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!u.pathname.startsWith("/relay/")) return route.abort();
   if (m === "POST") posts.push({ path: u.pathname, body: route.request().postData() ? JSON.parse(route.request().postData()) : null });
-  if (u.pathname === "/relay/auth/providers") return j({ email: true, google: true, microsoft: state.microsoft });
+  if (u.pathname === "/relay/auth/providers") return j({ email: true, google: true, microsoft: state.microsoft, ...(state.microsoft ? { consent: { version: "v5", text: WORDING } } : {}) });
   if (u.pathname === "/relay/auth/microsoft/start") return j({ url: MS_URL });
-  if (u.pathname === "/relay/auth/verify") return j({ sessionToken: "T".repeat(43), email: "jess.tester@outlook.com", expiresAt: Date.now() + 864e5 });
+  if (u.pathname === "/relay/auth/verify") return j({ sessionToken: "T".repeat(43), email: "jess.tester@outlook.com", expiresAt: Date.now() + 864e5, ...(state.oneStep ? { outlookConnected: true } : {}) });
   if (u.pathname === "/relay/my/consent" && m === "GET") return j({ version: "v5", accepted: state.accepted, acceptedEarlier: state.earlier, gmailAvailable: true, outlookAvailable: true,
     text: ["With your permission, Relay reads your email (Gmail or Outlook) in read-only mode.", "You can disconnect your email at any time."] });
   if (u.pathname === "/relay/my/consent" && m === "POST") { state.accepted = true; return j({ ok: true }); }
@@ -52,10 +53,20 @@ await page.evaluate(() => window.RelayAccount.open());
 const msBtn = page.getByRole("button", { name: "Continue with Microsoft" });
 await msBtn.waitFor();
 await page.screenshot({ path: "/tmp/shots/signin-microsoft.png" });
-await Promise.all([page.waitForURL(/login\.microsoftonline\.com/), msBtn.click()]);
+// One step: the wording is shown first, then "Agree and continue" signs in and connects Outlook together.
+await msBtn.click();
+await page.getByRole("heading", { name: "Continue with Microsoft" }).waitFor();
+assert.ok(await page.getByText(WORDING[0]).count(), "Relay's wording is shown before going to Microsoft");
+await page.getByRole("button", { name: "Back" }).click();
+await page.getByRole("button", { name: "Continue with Google" }).waitFor();
+await page.getByRole("button", { name: "Continue with Microsoft" }).click();
+await page.getByRole("button", { name: "Agree and continue with Microsoft" }).waitFor();
+await page.screenshot({ path: "/tmp/shots/signin-microsoft-agree.png" });
+await Promise.all([page.waitForURL(/login\.microsoftonline\.com/), page.getByRole("button", { name: "Agree and continue with Microsoft" }).click()]);
 const start = posts.find(p => p.path === "/relay/auth/microsoft/start");
 assert.match(start.body.nonce, /^[A-Za-z0-9_-]{43}$/);
-console.log("ok - Continue with Microsoft appears once switched on and sends the shopper to Microsoft with this browser's nonce");
+assert.equal(start.body.consentVersion, "v5", "the wording version shown is the one agreed to");
+console.log("ok - Continue with Microsoft shows Relay's wording, then Agree and continue goes to Microsoft with this browser's nonce");
 
 // 2. Back from Microsoft: the one-time token and this browser's nonce sign the shopper in.
 await page.goto(origin + "/index.html#signin=" + "A".repeat(43)); await page.waitForTimeout(900);
@@ -66,6 +77,24 @@ assert.equal(await page.evaluate(() => localStorage.getItem("relay_gnonce")), nu
 assert.equal(await page.evaluate(() => window.RelayAccount.email()), "jess.tester@outlook.com");
 await page.keyboard.press("Escape");
 console.log("ok - coming back from Microsoft signs the shopper in");
+
+// 2b. Signed in and Outlook connected in that one step: straight to Receipts, the first scan starts, no "Connect Outlook".
+state.oneStep = true; state.connected = true; posts.length = 0;
+await page.evaluate(() => { localStorage.removeItem("relay.session.v1"); localStorage.setItem("relay_gnonce", "N".repeat(43)); });
+await page.goto(origin + "/index.html#signin=" + "B".repeat(43)); await page.waitForTimeout(1500);
+assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself");
+await page.getByText(/Found or updated 1 receipt/).waitFor();
+assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");
+assert.equal(await page.evaluate(() => localStorage.getItem("relay.mailbox")), "outlook", "every screen now names Outlook");
+await page.screenshot({ path: "/tmp/shots/one-step-receipts.png" });
+// Group tiles use drawn icons, not emoji.
+const tile = page.locator(".rl-cat-ico").first();
+await tile.waitFor();
+assert.equal(await page.locator(".rl-cat-ico svg").count() >= 1, true);
+const cardText = await page.locator(".rl-cats").innerText();
+assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
+state.oneStep = false; state.connected = false;
+console.log("ok - one step: signed in with Outlook already connected, Receipts open and the scan starts; group tiles have drawn icons");
 
 // 3. A Microsoft account with a non-Microsoft address is told to use the email link instead.
 await page.evaluate(() => { localStorage.removeItem("relay.session.v1"); });
