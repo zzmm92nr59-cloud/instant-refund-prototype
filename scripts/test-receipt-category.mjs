@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName } from "../worker/receipt-category.js";
+import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
 t("lululemon is fashion and returnable", () => { const r = c("lululemon", "lululemon.com", ["Align Leggings"]); assert.equal(r.category, "fashion"); assert.equal(r.returnable, true); });
@@ -13,4 +14,9 @@ t("pubs and restaurants are food", () => { assert.equal(c("The Red Lion Pub", "r
 t("a kitchen item is not food", () => assert.equal(c("Dunelm", "dunelm.com", ["Kitchen towel set"]).category, "home"));
 t("a learned category beats the keyword guess", () => { const r = categorise({ retailer: { name: "Zara", domain: "zara.com" }, items: [] }, "home"); assert.equal(r.category, "home"); assert.equal(r.returnable, true); });
 t("store keys ignore www and endings", () => { assert.equal(storeKey({ retailer: { domain: "www.Zara.co.uk" } }), storeKey({ retailer: { domain: "zara.com" } })); });
+t("game top-ups, phone top-ups and AI subscriptions are digital", () => { assert.equal(c(null, "appcharge.com").category, "digital"); assert.equal(c(null, "lycamobile.co.uk").category, "digital"); assert.equal(c("Anthropic Ireland, Limited", "stripe.com").category, "digital"); });
+t("grooming brands are beauty & health", () => assert.equal(c("grüum", "e.gruum.com").category, "beauty"));
+t("shop names drop legal endings", () => { assert.equal(shopDisplayName({ name: "Anthropic Ireland, Limited" }), "Anthropic"); assert.equal(shopDisplayName({ name: "Marks and Spencer plc" }), "Marks and Spencer"); assert.equal(shopDisplayName({ name: "Ltd" }), "Ltd"); });
+t("a shop with no name gets one from its email domain", () => { assert.equal(shopDisplayName({ domain: "appcharge.com" }), "Appcharge"); assert.equal(shopDisplayName({ domain: "email.zara.co.uk" }), "Zara"); assert.equal(shopDisplayName({ domain: "g.shopifyemail.com" }), null); assert.equal(shopDisplayName({}), null); });
+t("Square's test-account placeholder name is replaced by Relay's shop label", () => { assert.equal(squareShopName({}, "Default Test Account"), "Relay Demo Store"); assert.equal(squareShopName({ SQUARE_DEFAULT_LABEL: "Kick Lane" }, ""), "Kick Lane"); assert.equal(squareShopName({}, "Bean & Leaf Café"), "Bean & Leaf Café"); });
 console.log(`\n${n} category tests passed`);
