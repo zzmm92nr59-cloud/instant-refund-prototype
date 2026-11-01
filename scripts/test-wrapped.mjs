@@ -27,4 +27,16 @@ assert.equal(w.byMonth.length, 12);
 assert.ok(/in-store/i.test(w.note));
 const empty = buildWrapped([], 2026);
 assert.equal(empty.receipts, 0); assert.equal(empty.personality, null); assert.equal(empty.biggest, null); assert.equal(empty.busiestMonth, null);
+// Story facts.
+assert.deepEqual(w.years, [{ year: 2026, receipts: 6 }, { year: 2025, receipts: 1 }], "years with receipts, newest first (return emails left out)");
+assert.equal(w.topItem, null, "the same order arriving as two emails is not a repeat purchase");
+const rep = buildWrapped([1, 2, 3].map(i => ({ kind: "order", retailer: R("Game", "g.com"), orderDate: "2026-04-0" + i, orderRef: "G" + i, totalPence: 159, currency: "GBP", items: [{ name: "Coins" }] })), 2026);
+assert.deepEqual(rep.topItem, { name: "Coins", times: 3, shop: "Game" }, "bought on three separate orders");
+assert.equal(w.topShopShare, Math.round(7990 / (5990 + 4210 + 2000) * 100));
+assert.equal(w.activeMonths, 3);
+assert.equal(w.refundedPence, 0);
+const once = buildWrapped([{ kind: "order", retailer: R("A", "a.com"), orderDate: "2026-01-01", totalPence: 100, currency: "GBP", items: [{ name: "One" }] }], 2026);
+assert.equal(once.topItem, null, "something bought once is not 'on repeat'");
+const refunds = buildWrapped([{ kind: "order", retailer: R("A", "a.com"), orderDate: "2026-02-01", totalPence: 5000, currency: "GBP", items: [], returnProgress: { refundPence: 2500 } }], 2026);
+assert.equal(refunds.refundedPence, 2500); assert.equal(refunds.refundsMatched, 1);
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly");
