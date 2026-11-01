@@ -241,7 +241,11 @@ assert.ok(eo1.category && typeof eo1.returnable === "boolean" && eo1.categoryLab
   assert.equal(after.some(x => x.id === "relay-own-1"), false, "Relay's own email is not a receipt");
   const lg = after.find(x => x.id === "legal-name-1");
   assert.ok(lg && lg.retailer.name === "Anthropic" && lg.retailer.legalName === "Anthropic Ireland, Limited" && lg.category === "digital", JSON.stringify(lg && lg.retailer));
-  sqlite.prepare("DELETE FROM captured_receipts WHERE id IN ('relay-own-1','legal-name-1')").run();
+  sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)")
+    .run("apple-nototal-1", src.shopper_id, "apple-nototal-msg", src.status, JSON.stringify({ ...d, orderRef: "MQAPPLE01", totalPence: null, retailer: { name: "Apple", domain: "email.apple.com" }, items: [{ name: "Notes Pro", variant: "Annual", qty: 1, pricePence: 4399 }] }), src.created_at + 3);
+  const ap = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === "apple-nototal-1");
+  assert.ok(ap && ap.totalPence === 4399 && ap.totalFrom === "items", "an Apple receipt with no total line is totalled from its items");
+  sqlite.prepare("DELETE FROM captured_receipts WHERE id IN ('relay-own-1','legal-name-1','apple-nototal-1')").run();
 }
 // 7c. Older receipts on later Gmail result pages are reached.
 gmailBox.m99 = receiptMail(99).replace("14 Oct 2026", "19 Nov 2025");
