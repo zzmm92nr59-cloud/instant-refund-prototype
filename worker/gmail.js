@@ -44,15 +44,17 @@ const GMAIL_ID = /^[A-Za-z0-9]{6,40}$/;
 const STATE_TTL_MS = 10 * 60 * 1000;
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
-// Cloudflare's free plan allows 50 outside calls and 50 database calls per request, so a round reads at most 10 emails,
-// writes them in one database batch, and stops early (saying there is more) if it gets near either limit.
-const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 10, FETCH_PARALLEL = 5, CALL_BUDGET = 36;
+// Cloudflare's Workers Paid plan allows 1,000 outside calls and 1,000 database calls per request, so a round reads up to
+// 40 emails, saves each date window in one database batch, and stops early (saying there is more) long before either limit.
+// (On the free plan it was 10 emails a round, to fit 50 calls and 10 ms of processing.) A Worker keeps at most 6 connections
+// open at once, so emails are fetched 6 at a time.
+const PAGE_SIZE = 100, MAX_PAGES = 4, MAX_FETCH_PER_SCAN = 40, FETCH_PARALLEL = 6, CALL_BUDGET = 120;
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 const PARSER_VERSION = 17;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
-const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 3, DAY_MS = 24 * 60 * 60 * 1000;
+const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 24 * 60 * 60 * 1000;
 const SEARCH_TERMS =
   '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
@@ -173,8 +175,8 @@ export function gmailDeleteStatements(db, shopperId) {
 // Automatic checking: each run looks at new mail for the shopper checked longest ago, then carries on reading older
 // mail if their first full read isn't finished. Runs on its own schedule, so it has the request's limits to itself.
 // Only shoppers who agreed to Gmail reading (and haven't withdrawn) are included.
-// Small rounds: the free plan also allows only 10 ms of processing per run.
-const AUTO_PASSES_PER_RUN = 2, AUTO_RECENT_DAYS = 3, AUTO_MAX_BACK_DAYS = 30, AUTO_MAX_FETCH = 4;
+// Each run does a few passes of up to 15 emails (the paid plan allows 30 seconds of processing per run).
+const AUTO_PASSES_PER_RUN = 3, AUTO_RECENT_DAYS = 3, AUTO_MAX_BACK_DAYS = 30, AUTO_MAX_FETCH = 15;
 function ensureAutoColumns(db) {
   return ensureOnce(db, "gmail-auto", async () => {
     for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN auto_at INTEGER", "ALTER TABLE gmail_connections ADD COLUMN auto_cursor TEXT"]) {
@@ -297,7 +299,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
   return { deleted: true, revokedAtGoogle: revoked, provider: row && row.provider === "microsoft" ? "microsoft" : "google" };
 }
 
-const MAX_IMAGES_PER_SCAN = 1;
+const MAX_IMAGES_PER_SCAN = 3;
 const IMAGE_MAX_BYTES = 400000, IMAGE_MIN_BYTES = 2000;
 function b64Chunked(bytes) {
   let out = "";
@@ -989,16 +991,29 @@ export async function handleGmailCallback(request, env, url, opts) {
 }
 
 // One mailbox per shopper: connecting one replaces the other (receipts already captured stay until the shopper disconnects).
-async function saveConnection(env, shopperId, provider, address, refreshToken, now) {
+// A different mailbox is read from the start; the same mailbox connected again (a new sign-in) carries on where it was.
+export async function saveConnection(env, shopperId, provider, address, refreshToken, now) {
   const enc = await encrypt(env, refreshToken);
   await ensureAutoColumns(env.RELAY_DB);
-  // A newly connected mailbox is read from the start (the automatic checker's place in the old one is dropped).
+  const same = "gmail_connections.provider IS excluded.provider AND gmail_connections.google_email IS excluded.google_email";
   await env.RELAY_DB.prepare(
     `INSERT INTO gmail_connections (shopper_id,google_email,token_iv,token_data,connected_at,provider) VALUES (?,?,?,?,?,?)
      ON CONFLICT(shopper_id) DO UPDATE SET google_email=excluded.google_email, token_iv=excluded.token_iv,
-       token_data=excluded.token_data, connected_at=excluded.connected_at, provider=excluded.provider, last_scan_at=NULL, auto_cursor=NULL`)
+       token_data=excluded.token_data, connected_at=excluded.connected_at, provider=excluded.provider,
+       last_scan_at=CASE WHEN ${same} THEN gmail_connections.last_scan_at END,
+       auto_cursor=CASE WHEN ${same} THEN gmail_connections.auto_cursor END`)
     .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
 }
+// The same agreement the consent screen records, for a sign-in that showed the wording before going to Microsoft.
+export async function recordConsent(env, shopperId, now) {
+  await env.RELAY_DB.prepare(
+    `INSERT INTO shopper_consents (shopper_id,version,text_hash,accepted_at) VALUES (?,?,?,?)
+     ON CONFLICT(shopper_id,version) DO UPDATE SET accepted_at=excluded.accepted_at, withdrawn_at=NULL, text_hash=excluded.text_hash`)
+    .bind(shopperId, CONSENT_VERSION, await sha256Hex(CONSENT_TEXT.join("\n")), now).run();
+}
+// A mailbox token held for a moment between Microsoft's reply and the shopper's browser finishing the sign-in.
+export async function sealToken(env, plain) { return encrypt(env, plain); }
+export async function openToken(env, iv, data) { return decrypt(env, iv, data); }
 
 // Microsoft sends the browser back here after "Connect Outlook" (sign-in states are handled first, in auth.js).
 // As with Gmail, the single-use state bound to the shopper who started is the only thing that identifies them.
@@ -1053,10 +1068,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/consent" && m === "POST") {
     const body = await request.json().catch(() => null);
     if (!body || body.version !== CONSENT_VERSION) return json({ error: "consent_version_mismatch" }, 400, cors);
-    await env.RELAY_DB.prepare(
-      `INSERT INTO shopper_consents (shopper_id,version,text_hash,accepted_at) VALUES (?,?,?,?)
-       ON CONFLICT(shopper_id,version) DO UPDATE SET accepted_at=excluded.accepted_at, withdrawn_at=NULL, text_hash=excluded.text_hash`)
-      .bind(shopper.id, CONSENT_VERSION, await sha256Hex(CONSENT_TEXT.join("\n")), opts.now).run();
+    await recordConsent(env, shopper.id, opts.now);
     return json({ ok: true }, 200, cors);
   }
   if (path === "/relay/my/consent/withdraw" && m === "POST") {

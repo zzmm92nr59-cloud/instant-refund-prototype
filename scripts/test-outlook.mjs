@@ -67,6 +67,14 @@ const fetchImpl = async (url, init = {}) => {
     if (p.get("grant_type") === "authorization_code") {
       assert.equal(p.get("redirect_uri"), "https://w.test/relay/microsoft/callback");
       const code = p.get("code");
+      if (code.startsWith("signinmail-")) {
+        assert.equal(p.get("scope"), "openid email profile " + OUTLOOK_SCOPE, "one step: sign-in and read-only mail asked together");
+        const who = { email: "Amy.OneStep@outlook.com", preferred_username: "amy.onestep@outlook.com" };
+        if (code === "signinmail-good") return Response.json({ id_token: idToken(claimsFor(who)), access_token: "a1", refresh_token: "MSREFRESH-ONESTEP-PLAINTEXT",
+          scope: "openid email profile offline_access https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read" });
+        if (code === "signinmail-noread") return Response.json({ id_token: idToken(claimsFor(who)), access_token: "a1", refresh_token: "MSREFRESH-NOREAD-PLAINTEXT", scope: "openid email profile" });
+        return new Response('{"error":"invalid_grant"}', { status: 400 });
+      }
       if (code.startsWith("signin-")) {
         assert.equal(p.get("scope"), "openid email profile", "sign-in asks only who you are");
         const over = { "signin-good": {}, "signin-gmail": { email: "jess@gmail.com", preferred_username: "jess@gmail.com" }, "signin-aud": { aud: "someone-else" },
@@ -131,8 +139,13 @@ const NONCE = "N".repeat(43);
 
 // ---- 1. Which sign-in buttons to show ----
 let r = await call("/relay/auth/providers");
-assert.deepEqual(await r.json(), { email: true, google: true, microsoft: true });
-assert.equal((await (await call("/relay/auth/providers", { e: { ...env, MICROSOFT_CLIENT_ID: undefined } })).json()).microsoft, false, "no Microsoft button until it is set up");
+const pv = await r.json();
+assert.deepEqual({ email: pv.email, google: pv.google, microsoft: pv.microsoft }, { email: true, google: true, microsoft: true });
+assert.equal(pv.consent.version, CONSENT_VERSION, "the wording a one-step Microsoft sign-in agrees to is served with the buttons");
+assert.deepEqual(pv.consent.text, CONSENT_TEXT);
+const off = await (await call("/relay/auth/providers", { e: { ...env, MICROSOFT_CLIENT_ID: undefined } })).json();
+assert.equal(off.microsoft, false, "no Microsoft button until it is set up");
+assert.equal(off.consent, undefined);
 console.log("ok - the app is told whether Microsoft sign-in is switched on");
 
 // ---- 2. Continue with Microsoft ----
@@ -333,4 +346,52 @@ assert.equal(consent.accepted, false, "the new wording must be agreed to");
 assert.equal(consent.acceptedEarlier, true);
 assert.equal((await post("/relay/my/gmail/scan", bob, {})).status, 403, "no reading on the old agreement");
 console.log("ok - a changed wording is agreed to again before any more reading");
+
+// ---- 12. One step: "Agree and continue with Microsoft" signs in AND connects Outlook ----
+const oneStep = async (body = { nonce: NONCE, consentVersion: CONSENT_VERSION }) => {
+  const res = await call("/relay/auth/microsoft/start", { method: "POST", body });
+  return res.status === 200 ? new URL((await res.json()).url) : res.status;
+};
+assert.equal(await oneStep({ nonce: NONCE, consentVersion: "2026-10-v4" }), 400, "only the wording being shown now can be agreed to");
+const u1 = await oneStep();
+assert.equal(u1.searchParams.get("scope"), "openid email profile " + OUTLOOK_SCOPE, "sign-in and read-only mail in one Microsoft screen");
+const tokE = signinToken(await mscb("code=signinmail-good&state=" + u1.searchParams.get("state")));
+assert.ok(tokE);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_pending_mailbox").get().n, 1, "the mailbox waits for the browser to finish signing in");
+assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM auth_pending_mailbox").all()).includes("PLAINTEXT"), "and is held encrypted");
+// Finished in a different browser: refused, and nothing is connected or agreed for anyone.
+assert.equal((await call("/relay/auth/verify", { method: "POST", body: { token: tokE, nonce: "M".repeat(43) } })).status, 400);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_connections").get().n, 0, "nothing connected by a sign-in finished elsewhere");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shoppers WHERE email = 'amy.onestep@outlook.com'").get().n, 0);
+// Finished in the browser that showed the wording: signed in, agreement recorded and Outlook connected together.
+const u2 = await oneStep();
+const tokF = signinToken(await mscb("code=signinmail-good&state=" + u2.searchParams.get("state")));
+const vr = await (await call("/relay/auth/verify", { method: "POST", body: { token: tokF, nonce: NONCE } })).json();
+assert.equal(vr.outlookConnected, true); assert.equal(vr.email, "amy.onestep@outlook.com");
+const amy = vr.sessionToken;
+assert.equal((await (await call("/relay/my/consent", { token: amy })).json()).accepted, true, "agreement recorded against the wording shown at sign-in");
+g = await (await call("/relay/my/gmail", { token: amy })).json();
+assert.deepEqual([g.connected, g.provider, g.email], [true, "microsoft", "amy.onestep@outlook.com"], "Outlook connected, no second step");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_pending_mailbox").get().n, 1, "the used one is gone (only the abandoned attempt is left, until it expires)");
+tokenCalls.length = 0;
+assert.equal((await post("/relay/my/gmail/scan", amy, {})).status, 200, "reading starts straight away");
+assert.ok(tokenCalls.some(c => c.refresh_token === "MSREFRESH-ONESTEP-PLAINTEXT"), "with the token from the sign-in");
+// Signing in the same way again keeps the mailbox's place (no full re-read).
+sqlite.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE google_email = 'amy.onestep@outlook.com'").run(clock - 3600e3);
+const u3 = await oneStep();
+const tokG = signinToken(await mscb("code=signinmail-good&state=" + u3.searchParams.get("state")));
+assert.equal((await (await call("/relay/auth/verify", { method: "POST", body: { token: tokG, nonce: NONCE } })).json()).outlookConnected, true);
+assert.equal(sqlite.prepare("SELECT last_scan_at t FROM gmail_connections WHERE google_email = 'amy.onestep@outlook.com'").get().t, clock - 3600e3, "same mailbox carries on");
+// If Microsoft didn't grant mail access, the shopper is still signed in, just without Outlook connected.
+sqlite.prepare("DELETE FROM gmail_connections").run();
+const u4 = await oneStep();
+const tokH = signinToken(await mscb("code=signinmail-noread&state=" + u4.searchParams.get("state")));
+const vn = await (await call("/relay/auth/verify", { method: "POST", body: { token: tokH, nonce: NONCE } })).json();
+assert.ok(vn.sessionToken && !vn.outlookConnected);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_connections").get().n, 0);
+// Abandoned attempts are cleared once they expire.
+clock += 16 * 60 * 1000;
+await oneStep();
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_pending_mailbox").get().n, 0, "expired waiting mailboxes are deleted");
+console.log("ok - one step: Agree and continue with Microsoft signs in and connects Outlook, only in the browser that showed the wording");
 console.log("PASS Outlook: Microsoft sign-in and Outlook receipt reading (FAKE Microsoft and Outlook)");

@@ -69,7 +69,8 @@ await call("/relay/gmail/callback?code=good&state=" + state);
 assert.equal((await (await call("/relay/my/gmail", { token: alice })).json()).connected, true);
 const count = () => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n;
 
-// 1. Every round stays well inside the free plan's limits, however busy the mailbox; the app's loop still gets everything.
+// 1. Every round stays well inside the plan's limits (Workers Paid: 1,000 outside calls and 1,000 database calls a request),
+//    however busy the mailbox; the app's loop still gets everything.
 let cursor = "", rounds = 0, worstFetch = 0, worstDb = 0, more = true;
 while (more) {
   fetchCalls = 0; dbCalls = 0;
@@ -81,9 +82,9 @@ while (more) {
   assert.ok(rounds < 60, "scan finishes");
 }
 assert.equal(count(), 120, "every order email captured");
-assert.ok(worstFetch <= 40, "outside calls per round: " + worstFetch);
-assert.ok(worstDb <= 40, "database calls per round: " + worstDb);
-console.log(`ok - 120 emails in ${rounds} rounds; worst round ${worstFetch} outside calls and ${worstDb} database calls (limit 50 each)`);
+assert.ok(worstFetch <= 130, "outside calls per round: " + worstFetch);
+assert.ok(worstDb <= 130, "database calls per round: " + worstDb);
+console.log(`ok - 120 emails in ${rounds} rounds; worst round ${worstFetch} outside calls and ${worstDb} database calls (paid plan limit 1,000 each)`);
 
 // 2. A round that hits a limit answers (so the app can retry) instead of failing without a reply.
 failNext = 1;
@@ -99,7 +100,7 @@ fetchCalls = 0; dbCalls = 0;
 const auto = await autoScanGmail(env, clock, fetchImpl);
 assert.equal(auto.checked, 1);
 assert.equal(count(), 121, "new order found automatically");
-assert.ok(fetchCalls <= 45 && dbCalls <= 45, `automatic run within limits (${fetchCalls} outside, ${dbCalls} database)`);
+assert.ok(fetchCalls <= 150 && dbCalls <= 150, `automatic run within limits (${fetchCalls} outside, ${dbCalls} database)`);
 const st = await (await call("/relay/my/gmail", { token: alice })).json();
 assert.equal(st.autoAt, clock, "the app can say when Relay last checked");
 assert.ok(!("token_data" in st) && !JSON.stringify(st).includes("refresh"), "no token in the status answer");

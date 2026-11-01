@@ -192,7 +192,7 @@ const scanAll = async (token = alice, max = 60, full = false) => {
 calls = [];
 const first = await scanAll();
 assert.deepEqual({ ...first, calls: 0 }, { added: 2, updated: 0, alreadyCaptured: 0, notReceipts: 1, calls: 0, more: false });
-assert.ok(first.calls >= 5, "the whole look-back period is covered, a few months per call");
+assert.ok(first.calls >= 3, "the whole look-back period is covered, about half a year per call");
 assert.ok(calls.every(c => !c.url.includes("/send") && !c.url.includes("modify") && !c.url.includes("delete")), "only read calls to Gmail");
 assert.ok(calls.filter(c => c.url.includes("gmail.googleapis")).every(c => c.auth === "Bearer access-2"));
 const dump = JSON.stringify(sqlite.prepare("SELECT * FROM captured_receipts").all());
