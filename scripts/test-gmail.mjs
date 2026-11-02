@@ -222,6 +222,11 @@ assert.equal(merged.length, 2, "return email is not a separate card when its ord
   assert.equal(wr.status, 200);
   const w = await wr.json();
   assert.ok(w.receipts >= 0 && w.year === 2026 && Array.isArray(w.byMonth) && w.byMonth.length === 12 && w.coverage && /in-store/i.test(w.note), JSON.stringify(w).slice(0, 300));
+  const kinds = w.industries.map(k => k.category);
+  const one = await (await call("/relay/my/wrapped?year=2026&industry=" + (kinds[0] || "fashion"), { token: alice })).json();
+  assert.equal(one.industry, kinds[0] || "fashion", "the route passes the kind of shopping through");
+  assert.ok(one.receipts <= w.receipts, "a Wrapped for one kind of shopping only counts that kind");
+  assert.equal((await (await call("/relay/my/wrapped?year=2026&industry=nonsense", { token: alice })).json()).industry, null);
   assert.equal((await call("/relay/my/wrapped")).status, 401, "Wrapped needs sign-in");
   assert.equal(JSON.stringify(await (await call("/relay/my/wrapped?year=2026", { token: bob })).json()).includes("EO-1"), false, "another shopper's receipts never appear");
 }
