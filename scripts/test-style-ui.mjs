@@ -12,7 +12,10 @@ const style = { receipts: [
   { id: "a2", retailer: { name: "Studio North" }, category: "fashion", items: [{ name: "Oversized Hoodie", variant: "Oat / M", pricePence: 5500 }] },
   { id: "a3", retailer: { name: "Kick Lane" }, category: "fashion", items: [{ name: "Court Classic Trainers", variant: "White / UK 8", pricePence: 8500 }] }] };
 let photos = [{ id: "11111111-1111-4111-8111-111111111111", shop: "Lululemon", item: "Align Pant", more: 0, date: "2026-03-02" }, { id: "22222222-2222-4222-8222-222222222222", shop: "Kick Lane", item: "Court Trainers", more: 1, date: "2026-04-02" }, { id: "33333333-3333-4333-8333-333333333333", shop: "Gone", item: "Missing photo", more: 0 }];
-const W = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts: 4, shops: 3, items: 5, spentPence: 33600, currency: "GBP", topItem: null, refundedPence: 0, refundsMatched: 0, topShopShare: 40, activeMonths: 3, firstDate: "2026-01-04",
+// The whole year's Wrapped, or (with an industry) the Wrapped for one kind of shopping.
+let industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }, { category: "digital", label: "Digital & subscriptions", receipts: 8, spentPence: 3992 }];
+const W = (industry) => ({ ...base(), industries, ...(industry === "fashion" ? { industry: "fashion", industryLabel: "Fashion", personality: null, subscriptions: [] } : { industry: null }) });
+const base = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts: 4, shops: 3, items: 5, spentPence: 33600, currency: "GBP", topItem: null, refundedPence: 0, refundsMatched: 0, topShopShare: 40, activeMonths: 3, firstDate: "2026-01-04",
   coverage: { withTotal: 4, noTotal: 0, otherCurrency: 0 }, topShops: [{ name: "Lululemon", receipts: 1, spentPence: 21600 }, { name: "Kick Lane", receipts: 2, spentPence: 12000 }],
   categories: [{ category: "fashion", label: "Fashion", receipts: 4, topShop: { name: "Kick Lane", receipts: 2 } }], byMonth: months.map((m, i) => ({ month: m, receipts: i === 2 ? 2 : 0, spentPence: 0 })), busiestMonth: "Mar",
   biggest: { shop: "Lululemon", totalPence: 21600, date: "2026-03-02", item: "Align Pant", photoId: photos.length ? photos[0].id : null }, returnsStarted: 0, personality: { label: "The Style Seeker", why: "4 of your 4 receipts were fashion, most of them from Kick Lane." },
@@ -26,14 +29,14 @@ const W = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts: 4
   badges: [{ label: "Loyal to Lululemon", why: "64% of your spending went there." }, { label: "Weekend Shopper", why: "45% of your shopping days were Saturdays or Sundays." }], things: style.receipts.flatMap(r => r.items.map(i => ({ name: i.name, variant: i.variant, shop: r.retailer.name, pricePence: i.pricePence }))), note: "" });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-const imageAsks = [];
+const imageAsks = [], wrappedAsks = [];
 await ctx.route("https://**/*", route => { const u = new URL(route.request().url()); const j = b => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
   if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!u.pathname.startsWith("/relay/")) return route.abort();
   const im = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(u.pathname);
   if (im) { imageAsks.push(im[1]); return im[1].startsWith("3") ? route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "{}" }) : route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG }); }
   if (u.pathname === "/relay/my/style") return j(style);
-  if (u.pathname === "/relay/my/wrapped") return j(W());
+  if (u.pathname === "/relay/my/wrapped") { wrappedAsks.push(u.searchParams.get("industry")); return j(W(u.searchParams.get("industry"))); }
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
   return j({}); });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
@@ -80,16 +83,63 @@ for (let k = 0; k < 20; k++) {
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Some things you brought home/, /Photos from your own order emails/, /Your style in 2026/, /sporty and relaxed/,
-  /Your shopping time\s+23 days/, /Saturday was your day \(7 of them\)/, /5 months in a row/, /Your shop sprint/, /Your top 5 things\s+1\s+Align Pant\s+3×/, /Socks, 3 pack\s+2×/,
-  /Your regular\s+Things you paid for month after month\.\s+1\s+Apple · Match Masters\s+8 months/, /Your biggest buys/, /3 things · Kick Lane/, /Your badges\s+Loyal to Lululemon/, /Weekend Shopper/,
-  /your go-to was Kick Lane \(2\)/, /Align Pant, at Lululemon on 2 March/, /The Style Seeker/, /Style\s+Sporty & Relaxed/]) assert.match(story, re);
+// The whole year: no top-5 lists that mix kinds of shopping, and the style slide belongs to fashion.
+for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Some things you brought home/,
+  /Your shopping time\s+23 days/, /Saturday was your day \(7 of them\)/, /5 months in a row/, /Your shop sprint/,
+  /Your regular\s+Things you paid for month after month\.\s+1\s+Apple · Match Masters\s+8 months/, /Your badges\s+Loyal to Lululemon/, /Weekend Shopper/,
+  /your go-to was Kick Lane \(2\)/, /Align Pant, at Lululemon on 2 March/, /The Style Seeker/]) assert.match(story, re);
+for (const re of [/Your top 5/, /Your biggest buys/, /Your style in 2026/, /Photos from your own order emails/]) assert.doesNotMatch(story, re);
+assert.equal(await page.getByRole("button", { name: "Save my list" }).count(), 0, "no mixed list to save");
+await page.keyboard.press("Escape");
+
+// Fashion on its own: its own top 5, biggest buys, go-to shop and style.
+await page.locator(".rl-wr-kinds").getByRole("button", { name: "Fashion" }).click();
+await page.getByRole("heading", { name: "Your 2026 in fashion." }).waitFor();
+assert.equal(wrappedAsks.at(-1), "fashion");
+assert.equal(await page.locator(".rl-wr-kinds button.on").innerText(), "Fashion");
+await page.screenshot({ path: "/tmp/shots/wrapped-fashion.png" });
+await page.getByRole("button", { name: /Play your fashion story/ }).click();
+const fashion = [];
+for (let k = 0; k < 20; k++) {
+  await page.waitForTimeout(1300);
+  fashion.push(await page.locator(".rl-story-body").innerText());
+  if (await page.getByRole("button", { name: "Watch again" }).count()) break;
+  await page.keyboard.press("ArrowRight");
+}
+const fs1 = fashion.join("\n");
+assert.ok(fashion.some(x => /Your top 5 pieces/.test(x)));
+for (const re of [/RELAY WRAPPED · FASHION/, /Your 2026 in fashion\./, /Your go-to for fashion/, /Your top fashion shops/, /Your top 5 pieces\s+1\s+Align Pant\s+3×/, /Socks, 3 pack\s+2×/,
+  /Your biggest fashion buys/, /3 things · Kick Lane/, /Your style in 2026/, /sporty and relaxed/, /MY 2026 IN FASHION ON RELAY/, /Style\s+Sporty & Relaxed/, /Top piece\s+Align Pant/]) assert.match(fs1, re);
+for (const re of [/Your favourite kind of shopping/, /Your regular/, /The Style Seeker/]) assert.doesNotMatch(fs1, re);
 const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save my list" }).click()]);
-assert.equal(dl.suggestedFilename(), "relay-2026-top-things.csv");
+assert.equal(dl.suggestedFilename(), "relay-2026-fashion-top-things.csv");
 const csv = await (await import("node:fs/promises")).readFile(await dl.path(), "utf8");
 assert.equal(csv.split("\n")[0], "Rank,Item,Shop,Orders,Spent");
 assert.equal(csv.split("\n")[2], '2,"Socks, 3 pack",Kick Lane,2,18.00', "commas in names are quoted");
 await page.keyboard.press("Escape");
+await page.locator(".rl-wr-kinds").getByRole("button", { name: "All" }).click();
+await page.getByRole("heading", { name: "Your 2026 in purchases." }).waitFor();
+
+// A year that is all one kind of shopping has nothing to mix: no chips, and the whole story keeps its top 5, buys, style and list.
+industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }];
+await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/wrapped/.test(k)) localStorage.removeItem(k); });
+await page.reload(); await page.waitForTimeout(800);
+await page.evaluate(() => window.go("wrapped"));
+await page.getByRole("button", { name: /Play your story/ }).waitFor();
+assert.equal(await page.locator(".rl-wr-kinds").count(), 0, "no chips when there's only one kind");
+await page.getByRole("button", { name: /Play your story/ }).click();
+const single = [];
+for (let k = 0; k < 20; k++) {
+  await page.waitForTimeout(700);
+  single.push(await page.locator(".rl-story-body").innerText());
+  if (await page.getByRole("button", { name: "Watch again" }).count()) break;
+  await page.keyboard.press("ArrowRight");
+}
+for (const re of [/Your top 5 things\s+1\s+Align Pant/, /Your biggest buys/, /Your style in 2026/]) assert.match(single.join("\n"), re);
+const [dl2] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save my list" }).click()]);
+assert.equal(dl2.suggestedFilename(), "relay-2026-top-things.csv");
+await page.keyboard.press("Escape");
+industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }, { category: "digital", label: "Digital & subscriptions", receipts: 8, spentPence: 3992 }];
 
 // No checked photos: no photo slide and not a single picture anywhere in the story.
 photos = [];
@@ -107,5 +157,5 @@ for (let k = 0; k < 20; k++) {
 }
 assert.ok(!plain.join("\n").includes("brought home"));
 assert.deepEqual(errors, []);
-console.log("PASS Wrapped: real photos of things you bought (or none at all), first buy, style slide, go-to shop, biggest item");
+console.log("PASS Wrapped: real photos of things you bought (or none at all), first buy, no mixed top 5s, a fashion Wrapped with its own top 5, buys and style");
 await browser.close(); server.close();
