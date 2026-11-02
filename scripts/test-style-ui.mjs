@@ -31,6 +31,12 @@ const base = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts
   sprint: [{ name: "Lululemon", months: [0,0,2,1,0,0,0,0,0,0,0,0] }, { name: "Kick Lane", months: [1,0,1,0,0,0,0,0,0,0,0,0] }],
   subscriptions: [{ name: "Apple", months: 8, spentPence: 3992, item: "Match Masters" }],
   badges: [{ label: "Loyal to Lululemon", why: "64% of your spending went there." }, { label: "Weekend Shopper", why: "45% of your shopping days were Saturdays or Sundays." }], things: style.receipts.flatMap(r => r.items.map(i => ({ name: i.name, variant: i.variant, shop: r.retailer.name, pricePence: i.pricePence }))), note: "" });
+// Products from shops on Relay: trainers and a tote at a shop the shopper buys from, and a dog bed (they've never bought pet things).
+const shopProducts = [
+  { product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify:kick:1", sku: "shopify:kick:1", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Court Classic Trainers", variation: "White / UK 9", catalogueId: "shopify:kick:2", sku: "shopify:kick:2", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Canvas Tote", variation: "Natural", catalogueId: "shopify:kick:3", sku: "shopify:kick:3", priceMinor: 2400, currency: "GBP", quantity: 30, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Cosy Dog Bed", variation: "Large", catalogueId: "shopify:pets:1", sku: "shopify:pets:1", priceMinor: 3900, currency: "GBP", quantity: 12, storeName: "Pet Pantry", provider: "shopify" }];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const imageAsks = [], wrappedAsks = [];
@@ -40,6 +46,7 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   const im = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(u.pathname);
   if (im) { imageAsks.push(im[1]); return im[1].startsWith("3") ? route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "{}" }) : route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG }); }
   if (u.pathname === "/relay/my/style") return j(style);
+  if (u.pathname === "/relay/shopify/catalogue") return j({ published: true, products: shopProducts });
   if (u.pathname === "/relay/my/wrapped") { wrappedAsks.push(u.searchParams.get("industry")); return j(W(u.searchParams.get("industry"))); }
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
   if (u.pathname === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
@@ -50,25 +57,40 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.addInitScript(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "S".repeat(43), email: "c@example.com" })));
 await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 
-// Discover: off until the shopper turns it on, then a plain description from their receipts.
+// Discover: picks are off until the shopper turns them on. Then they come from the year's spending (from Wrapped: 89% fashion
+// here), the shops they buy from and their sizes from receipts, and each pick says why it's there.
 await page.evaluate(() => window.go("discover"));
-await page.getByText("Let Relay learn what you like").waitFor();
-await page.getByRole("button", { name: "Show me my style" }).click();
-const card = page.locator("#tasteCard");
-await card.getByText("YOUR STYLE, FROM YOUR RECEIPTS").waitFor();
-const t = await card.innerText();
-assert.match(t, /You're sporty and relaxed, mostly in neutrals\. Usually a size M, UK 8 in shoes\./);
-for (const want of ["Sporty · 3", "Black", "Size M", "UK 8 shoes", "Lululemon"]) assert.ok(t.includes(want), "style card shows " + want);
-assert.match(t, /From 4 items on your receipts/);
-// Searching a store says what's put first there.
-await page.locator("#storeSearch").fill("Kick Lane");
-await card.getByText("At Kick Lane:").waitFor();
-assert.match(await card.innerText(), /At Kick Lane: things in your size M, UK 8, black, sporty pieces are shown first\./);
-await page.screenshot({ path: "/tmp/shots/style-card.png", fullPage: false });
-// Forget clears it.
-await card.getByRole("button", { name: "Forget" }).click();
-assert.equal(await card.getByText("YOUR STYLE, FROM YOUR RECEIPTS").count(), 0);
-console.log("PASS Discover style: opt-in, sizes/colours/styles from receipts, store search explains what goes first, forget works");
+await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
+await page.locator(".dc-invite").getByRole("button", { name: "Turn on" }).click();
+const panel = page.locator(".dc-for");
+await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
+await panel.locator(".dc-basis", { hasText: "sporty" }).waitFor();
+const basis = await panel.locator(".dc-basis").innerText();
+assert.match(basis, /^From your 2026 spending: 89% fashion, 11% digital & subscriptions\./);
+assert.match(basis, /You're sporty and relaxed, mostly in neutrals\. Usually a size M, UK 8 in shoes\./);
+const picks = panel.locator(".dc-strip [data-card-select]");
+assert.equal(await picks.first().locator("h3").innerText(), "Court Classic Trainers", "the best match comes first");
+assert.equal(await picks.first().locator(".dc-why").innerText(), "You spend most on fashion · You buy from Kick Lane");
+assert.ok(!(await panel.innerText()).includes("Cosy Dog Bed"), "nothing they've never spent on is pushed at them");
+// The list below follows the same order, and the pet shop's product is still there, just later.
+const grid = await page.locator("#catalogResults [data-card-select] h3").allInnerTexts();
+assert.equal(grid[0], "Court Classic Trainers"); assert.ok(grid.includes("Cosy Dog Bed"));
+// Two shops and two kinds of product: chips to narrow it down (and picks step aside while filtering).
+await page.locator("#dcKinds").getByRole("button", { name: "Pets" }).click();
+assert.deepEqual(await page.locator("#catalogResults [data-card-select] h3").allInnerTexts(), ["Cosy Dog Bed"]);
+assert.equal(await page.locator(".dc-for").count(), 0);
+await page.locator("#dcKinds").getByRole("button", { name: "Everything" }).click();
+await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
+assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White · UK 8, UK 9", "the colour is said once, then the sizes");
+await page.waitForTimeout(1300);   // the drawings finish drawing themselves in
+await page.screenshot({ path: "/tmp/shots/discover-for-you.png", fullPage: true });
+// Forgetting the style keeps the spending picks; turning picks off goes back to the invitation.
+await panel.getByRole("button", { name: "Forget my style" }).click();
+await page.waitForTimeout(200);
+assert.doesNotMatch(await panel.locator(".dc-basis").innerText(), /sporty/);
+await panel.getByRole("button", { name: "Turn off" }).click();
+await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
+console.log("PASS Discover: opt-in picks from the year's spending, shops and sizes, each with a reason; filters, forget and turn off work");
 
 // Wrapped: one story a year on the Profile page. Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.
