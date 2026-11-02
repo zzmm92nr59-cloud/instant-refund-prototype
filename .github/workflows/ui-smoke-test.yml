@@ -40,3 +40,5 @@ jobs:
         run: node scripts/test-style-ui.mjs
       - name: Test against the common "built in a hurry" tells (sizes, colours, double taps, caching, first visit)
         run: node scripts/test-polish-ui.mjs
+      - name: Test the sign-up journey (one visit to Google or Microsoft, scan from the start)
+        run: node scripts/test-signup-ui.mjs

@@ -55,7 +55,7 @@ await msBtn.waitFor();
 await page.screenshot({ path: "/tmp/shots/signin-microsoft.png" });
 // One step: the wording is shown first, then "Agree and continue" signs in and connects Outlook together.
 await msBtn.click();
-await page.getByRole("heading", { name: "Continue with Microsoft" }).waitFor();
+await page.getByRole("heading", { name: "Sign in and bring in your receipts" }).waitFor();
 assert.ok(await page.getByText(WORDING[0]).count(), "Relay's wording is shown before going to Microsoft");
 await page.getByRole("button", { name: "Back" }).click();
 await page.getByRole("button", { name: "Continue with Google" }).waitFor();
@@ -75,14 +75,22 @@ assert.equal(verify.body.token, "A".repeat(43));
 assert.equal(verify.body.nonce, start.body.nonce, "the nonce saved before leaving is sent back");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay_gnonce")), null, "and then forgotten");
 assert.equal(await page.evaluate(() => window.RelayAccount.email()), "jess.tester@outlook.com");
+// Signed in: the sign-up steps carry on (no name yet, so that's asked first).
+await page.getByRole("heading", { name: "What should we call you?" }).waitFor();
 await page.keyboard.press("Escape");
 console.log("ok - coming back from Microsoft signs the shopper in");
 
 // 2b. Signed in and Outlook connected in that one step: straight to Receipts, the first scan starts, no "Connect Outlook".
 state.oneStep = true; state.connected = true; posts.length = 0;
 await page.evaluate(() => { localStorage.removeItem("relay.session.v1"); localStorage.setItem("relay_gnonce", "N".repeat(43)); });
-await page.goto(origin + "/index.html#signin=" + "B".repeat(43)); await page.waitForTimeout(1500);
-assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself");
+await page.goto(origin + "/index.html#signin=" + "B".repeat(43));
+// The sign-up steps: the scan is already counting while the name is asked, then "See my receipts".
+await page.getByRole("heading", { name: "What should we call you?" }).waitFor();
+await page.waitForTimeout(800);
+assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself, straight away");
+await page.locator(".rl-jscan").waitFor();
+await page.getByRole("button", { name: "Skip" }).click();
+await page.getByRole("button", { name: "See my receipts" }).click();
 await page.getByText(/Found or updated 1 receipt/).waitFor();
 assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.mailbox")), "outlook", "every screen now names Outlook");

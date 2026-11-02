@@ -154,6 +154,27 @@
     ".rl-faq[open] summary::after{transform:rotate(-135deg)}.rl-faq p{margin:0 0 14px!important}" +
     ".rl-sheet .rl-arow:active,.rl-sheet .rl-ahead:active,.rl-sheet .rl-aout:active{transform:scale(.985);filter:none}" +
     "@media(prefers-reduced-motion:reduce){.rl-arow,.rl-ahead,.rl-aout,.rl-faq summary::after{transition:none}.rl-sheet .rl-arow:active,.rl-sheet .rl-ahead:active,.rl-sheet .rl-aout:active{transform:none}}" +
+    // Getting started: the journey from Welcome to "You're all set".
+    ".rl-jr{padding-top:0}.rl-jtop{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin:0 -16px;padding:6px 8px;background:rgba(246,243,236,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}" +
+    ".rl-dots{display:flex;gap:6px}.rl-dots span{width:8px;height:8px;border-radius:99px;background:#d9d3c4;transition:width .2s,background .2s}.rl-dots span.on{width:22px;background:#101828}.rl-dots span.done{background:#7da23a}" +
+    ".rl-jbody{padding:8px 2px 4px}.rl-jkick{font-size:12px;font-weight:800;letter-spacing:.1em;color:#3f6212;margin:6px 0 6px}" +
+    ".rl-sheet h2.rl-jh{font-family:Georgia,serif;font-size:30px;line-height:1.1;letter-spacing:-.02em;color:#101828;margin:6px 0 10px}" +
+    ".rl-sheet p.rl-jsub{font-size:16px;color:#475467;margin:0 0 20px}" +
+    ".rl-jcard{background:#fff;border:1px solid #ebe5d8;border-radius:18px;padding:6px 16px;margin:0 0 16px}" +
+    ".rl-jpt{display:flex;gap:12px;align-items:flex-start;padding:10px 0;font-size:15px;color:#101828;line-height:1.4}.rl-jpt+.rl-jpt{border-top:1px solid #f0ebe0}" +
+    ".rl-jic{flex:none;display:inline-grid;place-items:center;color:#3f6212;margin-top:1px}" +
+    ".rl-jwords{margin:0 0 16px;background:#efeadf;border-radius:16px;padding:12px 12px 4px;max-height:32vh;overflow:auto}.rl-jwords>b{display:block;font-size:14px;color:#101828;margin:0 2px 8px}.rl-jwords:focus-visible{outline:2px solid #101828;outline-offset:2px}" +
+    ".rl-jwords p{font-size:14px!important;color:#344054!important;background:#fff;border-radius:12px;padding:10px 12px;margin:0 0 8px!important}" +
+    ".rl-btn.rl-prov{background:#fff;color:#101828;border:1.5px solid #101828;margin-top:10px}.rl-btn.rl-prov:first-child{margin-top:0}" +
+    ".rl-jr .rl-btn+.rl-btn{margin-top:10px}" +
+    ".rl-sheet p.rl-jnote{font-size:13.5px;color:#5b6475;margin:10px 2px 0}" +
+    ".rl-sheet p.rl-jlegal{font-size:13px;color:#5b6475;margin:22px 2px 0;text-align:center}.rl-jlegal a{color:#3f6212;font-weight:700;display:inline-block;line-height:20px;padding:12px 2px;margin:-12px 0}" +
+    ".rl-jhint{margin-top:14px}.rl-jhint p{font-size:14px!important;color:#344054!important;margin:0 0 4px!important}" +
+    ".rl-jlabel{display:block;font-weight:700;font-size:14px;margin:4px 0 6px;color:#101828}" +
+    ".rl-jscan{background:#101828;color:#fff;border-radius:18px;padding:16px;margin:0 0 18px}.rl-jscan-t{display:flex;gap:12px;align-items:center}.rl-jscan .rl-jic{color:#c7f567;width:36px;height:36px;border-radius:10px;background:rgba(199,245,103,.12)}" +
+    ".rl-jscan b{display:block;font-size:17px}.rl-jscan span{display:block;font-size:13.5px;color:#c9d0df}" +
+    ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#c7f567;border-radius:99px;transition:width .6s ease}" +
+    "@media(prefers-reduced-motion:reduce){.rl-jbar i,.rl-dots span{transition:none}}" +
     // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
     ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}";
   document.head.appendChild(css);
@@ -367,47 +388,344 @@
     no_deadline: "There's no return deadline to remind you about.", deadline_passed: "That deadline has already passed.", consent_required: "Please agree to the permission step first.", invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address.", invalid_code: "That code isn't right. Check your authenticator app, or type a recovery code.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
 
+  // ---- Getting started: one journey from "Welcome" to "You're all set" ----
+  // Google and Microsoft sign you in AND bring your email in, in one visit (after you've read what Relay does). An email
+  // link signs you in, and then you connect your inbox once. Either way the first scan starts at once and you see it
+  // counting while you add your name, so the first screen after is full, not empty.
+  var JI = {
+    check: '<path d="m5 12.5 4.2 4.2L19 7"/>',
+    mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
+    eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+    trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
+    face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
+    back: '<path d="m15 6-6 6 6 6"/>'
+  };
+  function jIc(n, px) {
+    var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
+    s.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 20) + '" height="' + (px || 20) + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + JI[n] + "</svg>";
+    return s;
+  }
+  // The frame of every step: progress dots (when there is more than one step), Back or Close, then the step itself.
+  function jFrame(sheet, o) {
+    sheet.textContent = ""; sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var top = el("div", { className: "rl-jtop" });
+    top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
+    if (o.of > 1) {
+      var dots = el("div", { className: "rl-dots" }); dots.setAttribute("role", "img"); dots.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
+      for (var i = 1; i <= o.of; i++) dots.appendChild(el("span", { className: i < o.at ? "done" : i === o.at ? "on" : "" }));
+      top.appendChild(dots);
+    } else top.appendChild(el("span"));
+    top.appendChild(o.noClose ? el("span") : el("button", { type: "button", className: "rl-abtn done", text: o.closeText || "Close", onclick: o.onClose || close }));
+    sheet.appendChild(top);
+    var body = el("div", { className: "rl-jbody" });
+    if (o.kicker) body.appendChild(el("div", { className: "rl-jkick", text: o.kicker }));
+    body.appendChild(el("h2", { className: "rl-jh", text: o.title }));
+    if (o.sub) body.appendChild(el("p", { className: "rl-jsub", text: o.sub }));
+    sheet.appendChild(body);
+    return body;
+  }
+  // Which inbox an address most likely lives in, so the right button comes first.
+  function mailKindOf(email) {
+    var d = String(email || "").split("@")[1] || "";
+    if (/^(gmail|googlemail)\.com$/.test(d)) return "google";
+    if (/^(outlook|hotmail|live|msn)\.[a-z.]+$/.test(d)) return "microsoft";
+    return "";
+  }
+  // Steps someone chose to leave for later, kept per account on this device so later sign-ins don't ask again.
+  var ONBOARD_KEY = "relay.onboard.v1";
+  function obKey(email) { var h = 0, s = String(email || ""); for (var i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0; return "a" + h.toString(36); }
+  function obGet(email) { try { var all = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "{}"); return all[obKey(email)] || {}; } catch (e) { return {}; } }
+  function obSet(email, patch) {
+    try { var all = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "{}"), k = obKey(email); all[k] = Object.assign({}, all[k] || {}, patch); localStorage.setItem(ONBOARD_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+
+  // Step 1, signed out: welcome, and how to continue.
   function signedOutView(sheet) {
-    var input = el("input", { type: "email", placeholder: "you@example.com", autocomplete: "email", inputMode: "email" });
+    signInExtra = {};
+    var body = jFrame(sheet, { kicker: "WELCOME TO RELAY", title: "Everything you buy, in one place.", sub: "Relay finds your receipts in your email, keeps track of return deadlines and tells you when prices drop. No password needed." });
     var msg = el("div", { className: "rl-msg" });
-    var go = el("button", { className: "rl-btn", text: "Email me a sign-in link" });
+    var gBtn = el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with Google", onclick: function () { providerStep(sheet, "google"); } });
+    var mBtn = el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with Microsoft", onclick: function () { providerStep(sheet, "microsoft"); } });
+    var mHint = el("p", { className: "rl-jnote", text: "Microsoft works with Outlook, Hotmail and Live addresses." });
+    gBtn.style.display = mBtn.style.display = mHint.style.display = "none";
+    var eBtn = el("button", { type: "button", className: "rl-btn ghost", text: "Continue with email", onclick: function () { emailStep(sheet); } });
+    [gBtn, mBtn, mHint, eBtn].forEach(function (n) { body.appendChild(n); });
+    if (passkeysSupported()) body.appendChild(passkeyButton(msg));
+    body.appendChild(msg);
+    var legal = el("p", { className: "rl-jlegal" });
+    legal.appendChild(document.createTextNode("By continuing you agree to Relay's "));
+    legal.appendChild(el("a", { href: "./terms.html", text: "Terms of use" }));
+    legal.appendChild(document.createTextNode(" and "));
+    legal.appendChild(el("a", { href: "./privacy.html", text: "Privacy policy" }));
+    legal.appendChild(document.createTextNode("."));
+    body.appendChild(legal);
+    signInProviders().then(function (p) {
+      if (!document.body.contains(body)) return;
+      if (p && p.google) gBtn.style.display = "";
+      if (p && p.microsoft) { mBtn.style.display = ""; mHint.style.display = ""; }
+      if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
+    });
+  }
+  // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
+  function providerStep(sheet, kind) {
+    var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet); }, of: 3, at: 1,
+      title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
+    var points = el("div", { className: "rl-jcard" });
+    [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
+      .forEach(function (x) { points.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+    body.appendChild(points);
+    var words = el("div", { className: "rl-jwords", role: "region", tabIndex: 0 }, [el("b", { text: "What you're agreeing to" })]);
+    words.setAttribute("aria-label", "Relay's permission wording");
+    body.appendChild(words);
+    var note = el("div", { className: "rl-msg" });
+    var agree = el("button", { type: "button", className: "rl-btn", text: "Agree and continue with " + who, disabled: true });
+    var just = el("button", { type: "button", className: "rl-btn ghost", text: "Just sign in for now" });
+    body.appendChild(agree); body.appendChild(just); body.appendChild(note);
+    body.appendChild(el("p", { className: "rl-jnote", text: "Already use Relay? “Just sign in” skips the permission step." }));
+    var consent = null;
+    signInProviders().then(function (p) {
+      consent = p && p.consent;
+      if (consent && consent.text) { consent.text.forEach(function (t) { words.appendChild(el("p", { text: t })); }); agree.disabled = false; }
+      else { agree.style.display = "none"; words.style.display = "none"; }
+    });
+    function go(button, withMail) {
+      if (agree.dataset.busy) return;
+      agree.dataset.busy = "1"; agree.disabled = just.disabled = true; say(note, "Opening " + who + "…");
+      var free = function () { delete agree.dataset.busy; agree.disabled = !consent; just.disabled = false; };
+      var nonce = newNonce();
+      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
+      var body2 = { nonce: nonce }; if (withMail && consent) body2.consentVersion = consent.version;
+      var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
+      api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
+        if (r.ok && r.body && host.test(r.body.url || "")) { location.href = r.body.url; return; }
+        free();
+        if (r.body && r.body.error === "consent_version_mismatch") providersAsked = null;
+        say(note, r.status === 503 ? who + " sign-in isn't switched on yet. Continue with email instead." : r.body && r.body.error === "consent_version_mismatch" ? "Relay's wording has just changed. Go back and try again." : "Couldn't open " + who + ". Please try again.", true);
+      }).catch(function () { free(); say(note, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    agree.onclick = function () { go(agree, true); };
+    just.onclick = function () { go(just, false); };
+  }
+  // Step 2 by email: a one-time link or code.
+  function emailStep(sheet, typed) {
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet); }, title: "Continue with email", sub: "We'll email you a link and a 6-digit code. No password." });
+    var input = el("input", { type: "email", id: "rl-signin-email", placeholder: "you@example.com", autocomplete: "email", inputMode: "email", value: typed || "" });
+    input.setAttribute("aria-label", "Your email address");
+    var hint = el("div", { className: "rl-jhint" });
+    var msg = el("div", { className: "rl-msg" });
+    var go = el("button", { type: "button", className: "rl-btn", text: "Email me a sign-in link" });
+    // Gmail and Outlook addresses: one step through Google or Microsoft saves signing in and then connecting separately.
+    function showHint() {
+      var k = mailKindOf(input.value.trim()); hint.textContent = "";
+      if (!k) return;
+      var who = k === "google" ? "Google" : "Microsoft";
+      hint.appendChild(el("p", { text: "Using " + (k === "google" ? "Gmail" : "Outlook") + "? Continue with " + who + " instead and you'll be signed in with your receipts on their way, in one step." }));
+      hint.appendChild(el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with " + who, onclick: function () { providerStep(sheet, k); } }));
+    }
+    input.addEventListener("input", showHint);
     go.onclick = function () {
       go.disabled = true; say(msg, "Sending…");
       api("/relay/auth/request", { method: "POST", body: { email: input.value } }).then(function (r) {
         go.disabled = false;
-        if (r.ok) {
-          say(msg, "Check your inbox. Open the link, or type the 6-digit code below. Both work once and expire in 15 minutes.");
-          codeRow.style.display = "block";
-        }
-        else say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
+        if (r.ok) return codeStep(sheet, input.value.trim());
+        say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
       }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
-    var codeIn = el("input", { type: "text", placeholder: "6-digit code", autocomplete: "one-time-code", inputMode: "numeric", maxLength: 7 });
-    var codeGo = el("button", { className: "rl-btn", text: "Sign in with code" });
-    var codeRow = el("div", { style: "display:none;margin-top:12px" }, [codeIn, codeGo]);
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.click(); });
+    [input, go, msg, hint].forEach(function (n) { body.appendChild(n); });
+    showHint();
+    setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+  }
+  function codeStep(sheet, email) {
+    var body = jFrame(sheet, { back: function () { emailStep(sheet, email); }, title: "Check your inbox", sub: "We sent a sign-in link to " + email + ". Open it on this device, or type the 6-digit code from the same email. It works once, for 15 minutes." });
+    var codeIn = el("input", { type: "text", id: "rl-signin-code", placeholder: "6-digit code", autocomplete: "one-time-code", inputMode: "numeric", maxLength: 7 });
+    codeIn.setAttribute("aria-label", "6-digit code");
+    var msg = el("div", { className: "rl-msg" });
+    var codeGo = el("button", { type: "button", className: "rl-btn", text: "Continue" });
     codeGo.onclick = function () {
       codeGo.disabled = true; say(msg, "Checking…");
-      api("/relay/auth/verify-code", { method: "POST", body: { email: input.value, code: codeIn.value } }).then(function (r) {
+      api("/relay/auth/verify-code", { method: "POST", body: { email: email, code: codeIn.value } }).then(function (r) {
         codeGo.disabled = false;
         if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
         if (r.body.needsSecondStep) return secondStepView(sheet, r.body.pendingToken);
-        save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
-        keepStorage();
-        paintAvatars(); loadProfile();
-        show();
+        signedIn(r.body);
       }).catch(function () { codeGo.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
-    [el("h2", { text: "Sign in to Relay" }),
-     el("p", { text: "No password. We email you a one-time link. Purchases you made with that email address appear in your wallet." }),
-     input, go, codeRow, msg, el("button", { className: "rl-btn ghost", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
-    var gb = googleButton(msg);
-    sheet.insertBefore(gb, sheet.children[2]);
-    if (passkeysSupported()) sheet.insertBefore(el("div", { style: "margin-top:10px" }, [passkeyButton(msg)]), sheet.children[3]);
-    sheet.insertBefore(el("p", { text: "or", style: "text-align:center;opacity:.6;margin:8px 0" }), sheet.children[passkeysSupported() ? 4 : 3]);
-    // Outlook, Hotmail and Live users: shown only once Microsoft sign-in is switched on.
-    signInProviders().then(function (p) {
-      if (p && p.microsoft && gb.parentNode === sheet) sheet.insertBefore(el("div", { style: "margin-top:10px" }, [microsoftButton(msg, sheet, p.consent)]), gb.nextSibling);
+    codeIn.addEventListener("keydown", function (e) { if (e.key === "Enter") codeGo.click(); });
+    [codeIn, codeGo, msg, el("button", { type: "button", className: "rl-btn ghost", text: "Use a different email", onclick: function () { emailStep(sheet); } })].forEach(function (n) { body.appendChild(n); });
+    setTimeout(function () { try { codeIn.focus(); } catch (e) {} }, 50);
+  }
+  // Every way of signing in ends here: keep the session, then carry on with what's still needed.
+  var signInExtra = {};
+  function signedIn(b) {
+    save({ token: b.sessionToken, email: b.email, expiresAt: b.expiresAt });
+    keepStorage(); paintAvatars(); loadProfile();
+    var extra = Object.assign({}, signInExtra, b); signInExtra = {};
+    if (extra.mailConnected || extra.outlookConnected) {
+      rememberMailbox({ connected: true, provider: extra.mailConnected === "google" ? "google" : "microsoft" });
+      memo.consent = null; memo.gmail = null; memo.receipts = null;
+    }
+    var connected = Boolean(extra.mailConnected || extra.outlookConnected);
+    startJourney({ suggestedName: extra.suggestedName || "", justConnected: connected, viaProvider: connected });
+  }
+  // After signing in: only the steps this person still needs. Someone already set up goes straight to Home.
+  function startJourney(info) {
+    var s = load(); if (!s || !s.token) return open(signedOutView);
+    var email = s.email || "";
+    open(function (sheet) {
+      sheet.classList.add("rl-full", "rl-jr");
+      sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:60px;border-radius:16px;margin:56px 0 14px" }));
+      sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:200px;border-radius:18px" }));
+      Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail")]).then(function (r) {
+        if (!document.body.contains(sheet)) return;
+        if (r[1].status === 401) { save(null); return open(signedOutView); }
+        var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {};
+        if (g && g.connected) rememberMailbox(g);
+        var fl = obGet(email);
+        var st = { email: email, consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null };
+        var steps = [];
+        if (!p.name && !fl.nameSkipped) steps.push("name");
+        if (!st.connected && !fl.mailLater) steps.push("mail");
+        if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
+        steps.push("done");
+        runJourney(sheet, st, steps, 0);
+      }).catch(function () {
+        if (!document.body.contains(sheet)) return;
+        sheet.textContent = "";
+        var body = jFrame(sheet, { title: "Couldn't reach Relay", sub: "You're signed in. Check your connection, then carry on." });
+        body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Try again", onclick: function () { startJourney(info); } }));
+      });
     });
+  }
+  // Reads the inbox from the very start (Relay's own job does the work; asking for rounds just makes it quicker and shows
+  // progress). The count shows on every step until the shopper leaves the journey.
+  function journeyScan(sheet, st) {
+    if (st.scanner) return st.scanner;
+    var listeners = [], last = st.scan || null, stopped = false, done = false;
+    function tell() { listeners.forEach(function (f) { try { f(last, done); } catch (e) {} }); }
+    function step() {
+      if (stopped || !document.body.contains(sheet)) return;
+      api("/relay/my/gmail/scan", { method: "POST", body: {} }).then(function (x) {
+        if (stopped || !document.body.contains(sheet)) return;
+        if (!x.ok) return setTimeout(step, 5000);
+        last = x.body.job || last;
+        if (last && last.state === "failed") { done = true; tell(); return; }
+        if (x.body.busy) { tell(); return setTimeout(step, x.body.retryAfterMs || 4000); }
+        if (x.body.more) { tell(); return step(); }
+        done = true; memo.receipts = null; memo.gmail = null; tell();
+      }, function () { setTimeout(step, 5000); });
+    }
+    st.scanner = { on: function (f) { listeners.push(f); f(last, done); }, stop: function () { stopped = true; } };
+    step();
+    return st.scanner;
+  }
+  // The live count: what's been found, and how far back it has read (the first scan covers about the last 16 months).
+  function scanCard(sheet, st) {
+    var box = mailNameOf(st.provider);
+    var card = el("div", { className: "rl-jscan", role: "status" });
+    var line = el("b", { text: "Reading your " + box + "…" }), sub = el("span", { text: "Looking for receipts and order confirmations" });
+    var bar = el("div", { className: "rl-jbar" }, [el("i")]);
+    card.appendChild(el("div", { className: "rl-jscan-t" }, [jIc("mail"), el("div", {}, [line, sub])]));
+    card.appendChild(bar);
+    journeyScan(sheet, st).on(function (job, done) {
+      if (!document.body.contains(card)) return;
+      var found = (job && job.found) || 0;
+      var m = /^(\d{4})-(\d{2})/.exec((job && job.scannedBack) || ""), pct = 6;
+      if (m) { var months = (Date.now() - Date.UTC(+m[1], +m[2] - 1, 1)) / (30.4 * 864e5); pct = Math.max(6, Math.min(96, Math.round(months / 16 * 100))); }
+      if (job && job.state === "failed") { line.textContent = "Relay will keep reading in the background"; sub.textContent = "Your receipts will appear as they're found."; pct = 100; }
+      else if (done) { line.textContent = found ? found + " receipt" + (found === 1 ? "" : "s") + " found" : "All read"; sub.textContent = found ? "They're ready in Receipts." : "Nothing yet. New receipts will appear as they arrive."; pct = 100; }
+      else { line.textContent = found ? found + " receipt" + (found === 1 ? "" : "s") + " found so far" : "Reading your " + box + "…"; sub.textContent = m ? "Read back to " + new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : "Looking for receipts and order confirmations"; }
+      bar.firstChild.style.width = pct + "%";
+      card.classList.toggle("done", Boolean(done));
+    });
+    return card;
+  }
+  function mailNameOf(provider) { return provider === "microsoft" ? "Outlook" : "Gmail"; }
+  function runJourney(sheet, st, steps, i) {
+    // Through Google or Microsoft the permission step was step 1, so the count carries on from there.
+    var off = st.justConnected && st.viaProvider ? 1 : 0, kind = steps[i], of = steps.length + off, at = i + 1 + off;
+    var next = function () { runJourney(sheet, st, steps, i + 1); };
+    var back = i > 0 ? function () { runJourney(sheet, st, steps, i - 1); } : null;
+    var leave = function () { if (st.scanner) st.scanner.stop(); close(); };
+    if (kind === "name") {
+      var body = jFrame(sheet, { back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
+        title: "What should we call you?", sub: "Your first name is fine. Only you see it." });
+      if (st.connected) body.appendChild(scanCard(sheet, st));
+      var input = el("input", { type: "text", id: "rl-onboard-name", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: st.name || st.suggested || "" });
+      input.setAttribute("aria-label", "Your name");
+      var note = el("div", { className: "rl-msg" });
+      var go = el("button", { type: "button", className: "rl-btn", text: "Continue" });
+      go.onclick = function () {
+        var v = input.value.trim();
+        if (!v) { obSet(st.email, { nameSkipped: true }); return next(); }
+        go.disabled = true; say(note, "Saving…");
+        api("/relay/my/profile", { method: "POST", body: { name: v } }).then(function (r) {
+          go.disabled = false;
+          if (r.ok) { keepProfile(r.body); profileChanged(); st.name = r.body.name; return next(); }
+          say(note, r.body && r.body.error === "bad_name" ? "Use letters, spaces, hyphens or apostrophes, up to 40 characters." : "Couldn't save your name. Please try again.", true);
+        }).catch(function () { go.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      };
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.click(); });
+      [el("label", { htmlFor: "rl-onboard-name", className: "rl-jlabel", text: "Your name" }), input, go, note].forEach(function (n) { body.appendChild(n); });
+      if (st.suggested && !st.name) body.appendChild(el("p", { className: "rl-jnote", text: "Filled in from your " + (st.provider === "microsoft" ? "Microsoft" : "Google") + " account. Change it if you like." }));
+      return;
+    }
+    if (kind === "mail") {
+      var c = st.consent || {}, first = mailKindOf(st.email) || (c.gmailAvailable ? "google" : "microsoft");
+      var body2 = jFrame(sheet, { back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { mailLater: true }); next(); },
+        title: "Bring in your receipts", sub: "Connect the email you shop with. Relay reads it once now, then keeps up with new receipts by itself." });
+      var pts = el("div", { className: "rl-jcard" });
+      [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["trash", "Disconnect and delete everything at any time"]]
+        .forEach(function (x) { pts.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+      body2.appendChild(pts);
+      var needAgree = !c.accepted && c.text;
+      if (needAgree) {
+        var words = el("div", { className: "rl-jwords", role: "region", tabIndex: 0 }, [el("b", { text: "What you're agreeing to" })]);
+        words.setAttribute("aria-label", "Relay's permission wording");
+        c.text.forEach(function (t) { words.appendChild(el("p", { text: t })); });
+        body2.appendChild(words);
+      }
+      var note2 = el("div", { className: "rl-msg" });
+      var connect = function (provider, label, host, button) {
+        button.disabled = true; say(note2, "Opening " + (provider ? "Microsoft" : "Google") + "…");
+        var agreed = needAgree ? api("/relay/my/consent", { method: "POST", body: { version: c.version } }) : Promise.resolve({ ok: true });
+        agreed.then(function (a) {
+          if (!a.ok) throw new Error("consent");
+          memo.consent = null;
+          return api("/relay/my/gmail/connect", { method: "POST", body: provider ? { provider: provider } : undefined });
+        }).then(function (x) {
+          // Coming back from Google or Microsoft carries on here, at "You're all set".
+          if (x.ok && x.body && host.test(x.body.url || "")) { obSet(st.email, { back: "done" }); location.href = x.body.url; return; }
+          button.disabled = false; say(note2, "Couldn't start the " + label + " connection. Please try again.", true);
+        }).catch(function () { button.disabled = false; say(note2, "Couldn't reach Relay. Check your connection.", true); });
+      };
+      var verb = needAgree ? "Agree and connect " : "Connect ";
+      var gb = el("button", { type: "button", className: "rl-btn", text: verb + "Gmail" }), ob = el("button", { type: "button", className: "rl-btn", text: verb + "Outlook" });
+      gb.onclick = function () { connect(null, "Gmail", /^https:\/\/accounts\.google\.com\//, gb); };
+      ob.onclick = function () { connect("microsoft", "Outlook", /^https:\/\/login\.microsoftonline\.com\//, ob); };
+      var order = first === "microsoft" ? [ob, gb] : [gb, ob];
+      order.forEach(function (b, k) { if (k) b.className = "rl-btn ghost"; if ((b === gb && c.gmailAvailable !== false) || (b === ob && c.outlookAvailable)) body2.appendChild(b); });
+      body2.appendChild(note2);
+      if (c.outlookAvailable) body2.appendChild(el("p", { className: "rl-jnote", text: "Outlook works with Outlook.com, Hotmail and Live addresses." }));
+      if (st.mailNote) say(note2, st.mailNote.text, st.mailNote.bad);
+      return;
+    }
+    // Done: a short welcome, the scan still counting, and where to go first.
+    var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
+    var body3 = jFrame(sheet, { of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
+      kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
+      sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app." : "You can connect your email any time from Account, under Receipts." });
+    if (st.connected) body3.appendChild(scanCard(sheet, st));
+    var tips = el("div", { className: "rl-jcard" });
+    [["check", "Return deadlines from your receipts, counted down for you"], ["eye", "Price drops on things you watch, sent to your phone"]].forEach(function (x) { tips.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+    body3.appendChild(tips);
+    if (st.connected) {
+      body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "See my receipts", onclick: function () { leave(); if (window.go) { window.__relayAutoScan = true; window.go("receipts"); } } }));
+      body3.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
+    } else body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
   }
   var providersAsked = null;
   function signInProviders() {
@@ -417,48 +735,6 @@
   function newNonce() {
     var bytes = new Uint8Array(32); (window.crypto || window.msCrypto).getRandomValues(bytes);
     return btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  // One step for Outlook users: Relay's wording is shown here first, and agreeing signs in and connects Outlook (read-only) together.
-  // Without the wording (an older server), the button only signs in.
-  function microsoftButton(msg, sheet, consent) {
-    var b = el("button", { className: "rl-btn", text: "Continue with Microsoft", style: "background:#fff;color:#1f1f1f;border:1px solid #8c8c8c" });
-    function go(button, note, body) {
-      button.disabled = true; say(note, "Opening Microsoft…");
-      var nonce = newNonce();
-      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { button.disabled = false; return say(note, "Your browser is blocking storage, so Microsoft sign-in can't work here. Use the email link instead.", true); }
-      api("/relay/auth/microsoft/start", { method: "POST", body: Object.assign({ nonce: nonce }, body) }).then(function (r) {
-        if (r.ok && r.body && /^https:\/\/login\.microsoftonline\.com\//.test(r.body.url || "")) { location.href = r.body.url; return; }
-        button.disabled = false; say(note, r.status === 503 ? "Microsoft sign-in isn't switched on yet. Use the email link instead." : "Couldn't start Microsoft sign-in. Try again, or use the email link.", true);
-      }).catch(function () { button.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
-    }
-    b.onclick = function () {
-      if (!consent || !sheet || !consent.text) return go(b, msg, {});
-      sheet.textContent = "";
-      var note = el("div", { className: "rl-msg" });
-      var agree = el("button", { className: "rl-btn", text: "Agree and continue with Microsoft" });
-      agree.onclick = function () { go(agree, note, { consentVersion: consent.version }); };
-      sheet.appendChild(el("h2", { text: "Continue with Microsoft" }));
-      sheet.appendChild(el("p", { text: "Sign in with your Outlook account and Relay finds your receipts straight away, in one step." }));
-      var words = el("div", { style: "background:#f7f5ef;border-radius:16px;padding:12px 14px;margin:0 0 14px;max-height:34vh;overflow:auto" });
-      consent.text.forEach(function (t) { words.appendChild(el("p", { text: t, style: "font-size:13px;margin:0 0 8px" })); });
-      sheet.appendChild(words); sheet.appendChild(agree); sheet.appendChild(note);
-      sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Back", onclick: function () { open(signedOutView); } }));
-    };
-    return b;
-  }
-  // Identity only: Google tells Relay your verified email. Relay gets no access to Gmail from this button.
-  function googleButton(msg) {
-    var b = el("button", { className: "rl-btn", text: "Continue with Google", style: "background:#fff;color:#1f1f1f;border:1px solid #dadce0" });
-    b.onclick = function () {
-      b.disabled = true; say(msg, "Opening Google…");
-      var nonce = newNonce();
-      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { b.disabled = false; return say(msg, "Your browser is blocking storage, so Google sign-in can't work here. Use the email link instead.", true); }
-      api("/relay/auth/google/start", { method: "POST", body: { nonce: nonce } }).then(function (r) {
-        if (r.ok && r.body && /^https:\/\/accounts\.google\.com\//.test(r.body.url || "")) { location.href = r.body.url; return; }
-        b.disabled = false; say(msg, r.status === 503 ? "Google sign-in isn't switched on yet. Use the email link instead." : "Couldn't start Google sign-in. Try again, or use the email link.", true);
-      }).catch(function () { b.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
-    };
-    return b;
   }
 
   // ---- Face ID / passkeys (WebAuthn). The phone keeps the private key; Relay stores only the public key. ----
@@ -472,7 +748,7 @@
     return "Face ID / passkey isn't working on this device or browser. Use the email link instead.";
   }
   function passkeyButton(msg) {
-    var b = el("button", { className: "rl-btn", text: "Sign in with Face ID / passkey" });
+    var b = el("button", { type: "button", className: "rl-btn ghost", text: "Sign in with Face ID or a passkey" });
     b.onclick = function () {
       b.disabled = true; say(msg, "Waiting for Face ID…");
       api("/relay/auth/passkey/options", { method: "POST" }).then(function (o) {
@@ -485,10 +761,7 @@
         }).then(function (v) {
           b.disabled = false;
           if (!v.ok) return say(msg, "That passkey wasn't accepted. If you haven't added one yet, sign in another way first and add it from your account.", true);
-          save({ token: v.body.sessionToken, email: v.body.email, expiresAt: v.body.expiresAt });
-          keepStorage();
-          paintAvatars(); loadProfile();
-          show();
+          signedIn(v.body);
         });
       }).catch(function (e) { b.disabled = false; say(msg, passkeyProblem(e), true); });
     };
@@ -640,10 +913,7 @@
       api("/relay/auth/2fa/verify", { method: "POST", body: { pendingToken: pendingToken, code: input.value } }).then(function (r) {
         go.disabled = false;
         if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
-        save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
-        keepStorage();
-        paintAvatars(); loadProfile();
-        show();
+        signedIn(r.body);
       }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
     [el("h2", { text: "One more step" }),
@@ -1765,21 +2035,21 @@
   function completeLinkSignIn() {
     var m = /(?:^|[#&])signin=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash || "");
     if (!m) return;
+    signInExtra = {};
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
-    open(function (sheet) { sheet.appendChild(el("h2", { text: "Signing you in…" })); });
+    open(function (sheet) {
+      sheet.classList.add("rl-full", "rl-jr");
+      jFrame(sheet, { noClose: true, title: "Signing you in…", sub: "Just a moment." });
+      sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:160px;border-radius:18px" }));
+    });
     var gn = ""; try { gn = localStorage.getItem("relay_gnonce") || ""; localStorage.removeItem("relay_gnonce"); } catch (e) {}
     api("/relay/auth/verify", { method: "POST", body: gn ? { token: m[1], nonce: gn } : { token: m[1] } }).then(function (r) {
       if (!r.ok) return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
         sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
         sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
-      if (r.body.outlookConnected) { rememberMailbox({ connected: true, provider: "microsoft" }); memo.consent = null; memo.gmail = null; memo.receipts = null; }
-      if (r.body.needsSecondStep) return open(function (sheet) { secondStepView(sheet, r.body.pendingToken); });
-      save({ token: r.body.sessionToken, email: r.body.email, expiresAt: r.body.expiresAt });
-      keepStorage();
-      paintAvatars(); loadProfile();
-      // Signed in and Outlook connected together: straight to Receipts, where the first scan starts by itself.
-      if (r.body.outlookConnected && window.go) { close(); window.__relayAutoScan = true; window.__relayReceiptsNote = mailNote("connected", "Outlook"); window.go("receipts"); return; }
-      show();
+      // Signed in (and, through Google or Microsoft, the inbox connected and its first scan started): on to what's still needed.
+      if (r.body.needsSecondStep) { signInExtra = { mailConnected: r.body.mailConnected, outlookConnected: r.body.outlookConnected, suggestedName: r.body.suggestedName }; return open(function (sheet) { secondStepView(sheet, r.body.pendingToken); }); }
+      signedIn(r.body);
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
   }
   // What to say when Google or Microsoft sends the shopper back after "Connect Gmail" / "Connect Outlook".
@@ -1796,6 +2066,7 @@
     memo.gmail = null; memo.receipts = null;
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
+    if (obGet(s.email).back) { obSet(s.email, { back: null }); return startJourney(m[2] === "connected" ? { justConnected: true } : { mailNote: note }); }
     window.__relayAutoScan = m[2] === "connected";
     if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
     open(function (sheet) { gate(sheet, s.email || "", note); });
