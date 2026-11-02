@@ -44,3 +44,5 @@ jobs:
         run: node scripts/test-signup-ui.mjs
       - name: Test the wallet only shows what can still go back, with shop logos
         run: node scripts/test-wallet-fresh-ui.mjs
+      - name: Test receipt groups (every receipt, header, filters, months, rows)
+        run: node scripts/test-receipts-cat-ui.mjs
