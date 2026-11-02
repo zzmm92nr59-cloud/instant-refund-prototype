@@ -35,6 +35,7 @@ export const CONSENT_TEXT = [
 ];
 
 const SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
+export const GMAIL_SCOPE = SCOPE;
 // Outlook: Microsoft personal accounts (Outlook.com, Hotmail, Live). Read-only mail access, plus the address of the mailbox.
 export const MS_AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const GRAPH = "https://graph.microsoft.com/v1.0";
