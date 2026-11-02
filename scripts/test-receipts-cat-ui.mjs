@@ -96,6 +96,15 @@ assert.equal(await page.locator(".rl-rr").count(), 1);
 assert.match(await page.locator(".rl-rr").innerText(), /Long Jacket[\s\S]*£95\.00[\s\S]*20 days left/);
 await page.screenshot({ path: "/tmp/shots/cat-fashion.png" });
 console.log("ok - 'Can still return' shows what can still go back, with the days left");
+// Home only shows what can still go back: never supermarket or takeaway food, even when the email mentions a deadline.
+food[0].returns = { deadline: day(10) };
+await page.evaluate(() => window.go("profile"));
+const wallet = page.locator("#walletPage");
+await wallet.getByText("Long Jacket").first().waitFor();
+const homeText = await wallet.innerText();
+assert.ok(!/Greggs|Deliveroo|Sausage roll|Meal \d/.test(homeText), "no food on Home: " + homeText.slice(0, 200));
+assert.ok(!/Bucket Hat/.test(homeText), "nothing past its return date");
+console.log("ok - Home shows only what can still be returned");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS receipt groups: every receipt, a clear header, filters, months with totals, tidy rows");
 await browser.close(); server.close();
