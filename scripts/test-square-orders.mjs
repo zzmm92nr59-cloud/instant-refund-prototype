@@ -396,6 +396,8 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_card_anchors WHERE
 assert.equal((await tap(kim)).suggested, false);
 for (let i = 0; i < 10; i++) await claimIt(lee, { receiptNumber: "X" + i + "ZZ" });
 assert.equal((await claimIt(lee, {})).status, 429, "10 tries a day");
+const shopList = await (await call("/relay/my/instore/shops", { token: kim })).json();
+assert.ok(shopList.shops.length >= 1 && shopList.live === false, "Square's test shops are marked as not live, so the app keeps them to testers");
 console.log("21 ok: receipt claims");
 
 // 22. Deleting an account removes remembered cards and suggestions.
