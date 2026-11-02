@@ -534,7 +534,9 @@ const s6 = await stateFrom(bob);
 await cb("code=good-code&state=" + s6);
 await post("/relay/my/gmail/scan", bob);
 assert.ok(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts").get().n > 0);
+const revokesBefore = calls.filter(c => c.url === "https://oauth2.googleapis.com/revoke").length;
 assert.equal((await post("/relay/my/delete", bob)).status, 200);
+assert.equal(calls.filter(c => c.url === "https://oauth2.googleapis.com/revoke").length, revokesBefore + 1, "deleting the account also cancels Relay's Gmail access at Google");
 for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "gmail_oauth_states", "shopper_consents"])
   assert.equal(sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE shopper_id NOT IN (SELECT id FROM shoppers)`).get().n, 0, t + " cleaned on account deletion");
 
