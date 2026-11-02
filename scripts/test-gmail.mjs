@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION, sendReturnReminders } from "../worker/gmail.js";
+import { CONSENT_VERSION, sendReturnReminders, needsFullRead } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -556,6 +556,38 @@ for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "
   assert.equal(all.length, 260, "the Receipts page gets every receipt");
   assert.equal(all[259].orderRef, "R10259", "including the oldest");
   console.log("ok - more than 100 receipts: all of them reach the Receipts page");
+}
+// A recent order still in its return window reaches Home even when hundreds of emails were read after it, and receipts
+// stored by an older reader are tidied when listed (no payment lines as items, one clean shop name, no payment company as the shop).
+{
+  const busy = await signIn("busy.shopper@example.com", "8.8.8.9");
+  await post("/relay/my/consent", busy, { version: CONSENT_VERSION });
+  const bid = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'busy.shopper@example.com'").get().id;
+  const ins = sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)");
+  const day = n => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+  ins.run(crypto.randomUUID(), bid, "lulu", "pending", JSON.stringify({ kind: "receipt", retailer: { name: "lululemon", domain: "e.lululemon.com" }, orderRef: "C1", orderDate: day(-10), totalPence: 6900, currency: "GBP",
+    items: [{ name: "Align Flared Pant", qty: 1, pricePence: 6900 }, { name: "Mastercard Credit Card Payment (400000******1234):", qty: 1 }], returns: { deadline: day(20) } }), 1000);
+  ins.run(crypto.randomUUID(), bid, "swar", "pending", JSON.stringify({ kind: "receipt", retailer: { name: "Swarovski Customer Service GB", domain: "swarovski.com" }, orderRef: "S1", orderDate: day(-300), totalPence: 8550, currency: "GBP", items: [{ name: "Promos Applied [SAVE50]", qty: 1 }] }), 1001);
+  ins.run(crypto.randomUUID(), bid, "kick", "pending", JSON.stringify({ kind: "receipt", retailer: { name: "Kick Lane", domain: "g.shopifyemail.com" }, orderRef: "1004", orderDate: day(-300), totalPence: 9500, currency: "GBP", items: [] }), 1002);
+  for (let i = 0; i < 600; i++) ins.run(crypto.randomUUID(), bid, "sb" + i, "pending", JSON.stringify({ kind: "receipt", retailer: { name: "Sainsbury's", domain: "sainsburys.co.uk" }, orderDate: day(-(i % 9)), totalPence: 8000 + i, currency: "GBP",
+    items: [{ name: "You've saved", qty: 1, pricePence: 2000 }], returns: { deadline: day(5) } }), 5000 + i);
+  const home = (await (await call("/relay/my/receipts", { token: busy })).json()).receipts;
+  const lulu = home.find(x => x.orderRef === "C1");
+  assert.ok(lulu, "the recent lululemon order is listed although 600 emails were read after it");
+  assert.deepEqual(lulu.items.map(i => i.name), ["Align Flared Pant"], "the card payment line is not an item");
+  assert.equal(lulu.returnable, true);
+  const sb = home.filter(x => x.retailer.name === "Sainsbury's");
+  assert.ok(sb.length > 0 && sb.every(x => x.returnable === false && x.items.length === 0), "supermarket food is never returnable and 'You've saved' is not an item");
+  const all = (await (await call("/relay/my/receipts?all=1", { token: busy })).json()).receipts;
+  const sw = all.find(x => x.orderRef === "S1"), kl = all.find(x => x.orderRef === "1004");
+  assert.equal(sw.retailer.name, "Swarovski"); assert.equal(sw.category, "fashion"); assert.deepEqual(sw.items, []);
+  assert.equal(kl.retailer.name, "Kick Lane"); assert.equal(kl.retailer.domain, null, "Shopify's address is not shown as the shop's"); assert.equal(kl.storeKey, "kicklane");
+  console.log("ok - recent returnable orders always reach Home; old receipts are tidied when listed");
+  // Mailboxes read by the older reader are read once more in the background, Gmail and Outlook alike; then never again.
+  assert.equal(needsFullRead(Date.now(), "google", null), true); assert.equal(needsFullRead(Date.now(), null, 1), true);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 2), false);
+  assert.equal(needsFullRead(null, "google", 2), true, "never read at all");
+  console.log("ok - every mailbox is read once more with the improved reader");
 }
 
 console.log("PASS consent record, Gmail connect/callback rules, encrypted token, receipts-only scan, privacy of captured receipts, disconnect, withdrawal and deletion (FAKE Google and Gmail)");
