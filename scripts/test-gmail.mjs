@@ -42,6 +42,8 @@ const boxDates = {};
 const ymdOf = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const imageCalls = [];
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(3000, 7)]);
+// A PNG of a given size in pixels (only the header matters to Relay), padded past the "too small to be a picture" limit.
+const pngPx = (px) => { const h = Buffer.alloc(24); Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(h); h.writeUInt32BE(13, 8); h.write("IHDR", 12); h.writeUInt32BE(px, 16); h.writeUInt32BE(px, 20); return Buffer.concat([h, Buffer.alloc(400, 1)]); };
 let emails = [];
 const fetchImpl = async (url, init = {}) => {
   url = String(url);
@@ -63,6 +65,14 @@ const fetchImpl = async (url, init = {}) => {
     if (url.endsWith("fake.png")) return new Response("<svg onload=alert(1)>" .repeat(200), { headers: { "content-type": "image/png" } });
     return new Response("nope", { status: 404 });
   }
+  // Google's copy of shops' icons: a sharp one for a shop that blocks Relay, a tiny globe for a shop Google doesn't know.
+  if (url.startsWith("https://www.google.com/s2/favicons?")) {
+    logoCalls.push(url);
+    const d = new URL(url).searchParams.get("domain");
+    if (d === "blockedshop.co.uk") return new Response(pngPx(128), { headers: { "content-type": "image/png" } });
+    return new Response(pngPx(16), { headers: { "content-type": "image/png" } });
+  }
+  if (/^https:\/\/(www\.)?(blockedshop|unknownshop)\.co\.uk\//.test(url)) { logoCalls.push(url); return new Response("blocked", { status: 403 }); }
   if (/^https:\/\/(www\.)?(sainsburys\.co\.uk|logo-less\.test)\//.test(url)) {
     logoCalls.push(url);
     if (url === "https://sainsburys.co.uk/apple-touch-icon.png") return new Response(Buffer.concat([PNG, Buffer.alloc(400)]), { headers: { "content-type": "image/png" } });
@@ -452,6 +462,19 @@ assert.equal((await (await call("/relay/my/receipts", { token: alice })).json())
   assert.equal(logoCalls.length, n, "a logo is fetched once and shared");
   for (const bad of ["127.0.0.1", "localhost", "evil.test", "a_b.com"]) assert.equal((await call("/relay/my/logo/" + bad, { token: alice })).status, 404, bad + " refused");
   assert.equal((await call("/relay/my/logo/nologo.example", { token: alice })).status, 404, "no logo found is a clean 404");
+  // A shop whose own website blocks Relay: Google's copy of its icon is used (and only its address is sent).
+  const bl = await call("/relay/my/logo/email.blockedshop.co.uk", { token: alice });
+  assert.equal(bl.status, 200, "logo from Google's copy when the shop blocks Relay");
+  assert.ok(logoCalls.some(u => u === "https://www.google.com/s2/favicons?domain=blockedshop.co.uk&sz=128"), "only the shop's address goes to Google");
+  // A shop Google doesn't know: its tiny globe is not a logo, so there is none (the app draws one instead).
+  assert.equal((await call("/relay/my/logo/unknownshop.co.uk", { token: alice })).status, 404, "Google's 16px globe is refused");
+  // A forwarded receipt's mailbox or a payment company is never fetched as a shop's logo.
+  const before = logoCalls.length;
+  for (const d of ["gmail.com", "g.shopifyemail.com", "privaterelay.appleid.com"]) assert.equal((await call("/relay/my/logo/" + d, { token: alice })).status, 404, d);
+  assert.equal(logoCalls.length, before, "nothing fetched for them");
+  // A shop with no logo found before the new places to look were added is looked up again.
+  sqlite.prepare("INSERT OR REPLACE INTO retailer_logos (domain,type,data,found,fetched_at) VALUES (?,?,?,?,?)").run("blockedshop.co.uk", null, null, 0, Date.UTC(2026, 9, 1));
+  assert.equal((await call("/relay/my/logo/blockedshop.co.uk", { token: bob })).status, 200, "an old miss is retried");
   // Speed: database set-up runs once per worker instance, not on every request (it used to add seconds to each call).
   let creates = 0; const realPrepare = db.prepare; db.prepare = (sql) => { if (/CREATE (TABLE|INDEX)/i.test(sql)) creates++; return realPrepare(sql); };
   for (let i = 0; i < 3; i++) assert.equal((await call("/relay/my/receipts", { token: alice })).status, 200);

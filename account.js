@@ -69,16 +69,157 @@
   }
   // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
   // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
-  function shopLogo(box, dom, px) {
-    if (!box || !dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return;
+  // onMiss runs when the shop has no logo Relay can show (no address, none found, or the picture won't load).
+  function shopLogo(box, dom, px, onMiss) {
+    var miss = function () { if (onMiss) onMiss(); };
+    if (!box || !dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return miss();
     var put = function (src) {
       var pic = el("img", { alt: "", className: "rl-logo-img", style: "width:" + px + "px;height:" + px + "px;object-fit:contain" });
       pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); box.appendChild(pic); };
+      pic.onerror = miss;
       pic.src = src;
     };
     var known = Object.keys(STORE_LOGOS).filter(function (k) { return dom === k || dom.slice(-(k.length + 1)) === "." + k; })[0];
     if (known) return put("logos/" + known + "." + STORE_LOGOS[known]);
-    apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) { if (u) put(u); });
+    apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) { if (u) put(u); else miss(); });
+  }
+  // ---- Drawings for receipts with no photo and no logo ----
+  // A small line drawing of what was most likely bought, picked from the item's name, then the shop's name, then the kind of
+  // shop. It draws itself in, does one small move (steam rises, a phone buzzes, a plane glides), then stays still.
+  // Parts with class "m" make the move; "f" parts are softly filled.
+  var ILL = {
+    cup: '<path d="M5 10h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5Z"/><path d="M16 11.5h1.5a2.2 2.2 0 0 1 0 4.4H16"/><path class="m" d="M8.5 3.5c-.6.8-.6 1.7 0 2.5M12.5 3.5c-.6.8-.6 1.7 0 2.5"/>',
+    pint: '<path class="f" d="M6.5 6.5h10l-1.2 14H7.7Z"/><path d="M16.5 9h1.7a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-1.9"/><path d="M6.5 6.5c0-1.6 1.2-2.6 2.6-2.6.6-.8 1.5-1.2 2.4-1.2s1.8.4 2.4 1.2c1.4 0 2.6 1 2.6 2.6"/><path class="m" d="M10 15v.01M12.5 12.5v.01M11 10v.01"/>',
+    wine: '<path class="f" d="M8 3h8l-.4 5a3.6 3.6 0 0 1-7.2 0Z"/><path d="M12 11.6V19"/><path d="M8.5 20.5h7"/><path class="m" d="M8.6 6.5h6.8"/>',
+    pizza: '<path class="f" d="M12 21 3.6 6.2a15 15 0 0 1 16.8 0Z"/><path d="M5 8.8a12 12 0 0 1 14 0"/><circle class="m" cx="10" cy="11.5" r="1.2"/><circle class="m" cx="14" cy="11" r="1.1"/><circle class="m" cx="12" cy="15.2" r="1.1"/>',
+    burger: '<path class="f" d="M4 11a8 6 0 0 1 16 0Z"/><path d="M3.5 14c1.4 1.2 2.6-1 4.1 0s2.7-1 4.4 0 2.7-1 4.3 0 2.5-1 4.2 0"/><path d="M5 17h14v.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 17.5Z"/><path class="m" d="M9 8v.01M12 7v.01M15 8v.01"/>',
+    bowl: '<path class="f" d="M3.5 11h17a8.5 8.5 0 0 1-17 0Z"/><path class="m" d="M14 3.2 10.4 10M18.4 4 13 10.4"/>',
+    cake: '<path class="f" d="M6.2 12h11.6l-1.5 8.5H7.7Z"/><path d="M5.5 12a6.5 5 0 0 1 13 0"/><path d="M9.5 12.5l.6 7.5M14.5 12.5l-.6 7.5"/><circle class="m" cx="12" cy="5" r="1.2"/>',
+    basket: '<path class="f" d="M3.5 9.5h17l-1.8 9.6a1.5 1.5 0 0 1-1.5 1.2H6.8a1.5 1.5 0 0 1-1.5-1.2Z"/><path d="M8 9.5 11 4M16 9.5 13 4"/><path d="M9 13v4M12 13v4M15 13v4"/><circle class="m" cx="12" cy="6.5" r="1.4"/>',
+    delivery: '<path class="f" d="M7 8h12l-1 12H8Z"/><path d="M10 8V6.5a3 3 0 0 1 6 0V8"/><path class="m" d="M2.5 12h3M3 15.5h2.5M2 19h3"/>',
+    shaker: '<path class="f" d="M8 8h8l-1 12.5H9Z"/><path d="M7.5 5h9v3h-9Z"/><path d="M10 3.5h4V5h-4Z"/><path class="m" d="M10 13h4M10.4 16h3.2"/>',
+    shoe: '<path class="f" d="M3 17.5V11.6l4.4-1.9 2.6 3.1 6.2 1.5c2.5.6 4.3 1.8 4.8 3.2Z"/><path d="M3 17.5h18M3 20h18"/><path class="m" d="M10.6 12.6l1-1.5M13.1 13.3l1-1.4"/>',
+    jacket: '<path class="f" d="M8 4 4.5 6.5 3 19h4.5l1-7.5M16 4l3.5 2.5L21 19h-4.5l-1-7.5"/><path d="M8 4l4 4 4-4M8.5 11.5V20h7v-8.5"/><path class="m" d="M12 8v12"/>',
+    dress: '<path d="M9.5 3v3.5M14.5 3v3.5"/><path class="f" d="M9.5 6.5h5l-1 3.5h-3Z"/><path class="f m" d="M10.5 10h3l4 10.5h-11Z"/>',
+    trousers: '<path class="f" d="M7 3h10l1.5 18H14l-2-10.5L10 21H5.5Z"/><path class="m" d="M7.2 6.2h9.6"/>',
+    tshirt: '<path class="f" d="M9 3.5 4 5.8 2.5 10l3.2 1.3L7 10v10.5h10V10l1.3 1.3 3.2-1.3L20 5.8 15 3.5c-.4 1.5-1.6 2.5-3 2.5s-2.6-1-3-2.5Z"/><path class="m" d="M10 13h4"/>',
+    gem: '<path class="f" d="M7 4h10l4 5-9 11L3 9Z"/><path d="M3 9h18M9.5 4 8 9l4 11 4-11-1.5-5"/><path class="m" d="M19.5 1.5v3M18 3h3"/>',
+    bag: '<path class="f" d="M5 9h14l-1.2 11H6.2Z"/><path class="m" d="M9 9V7a3 3 0 0 1 6 0v2"/>',
+    phone: '<rect class="f" x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 18.5h3"/><path class="m" d="M3.5 9.5a8 8 0 0 0 0 5M20.5 9.5a8 8 0 0 1 0 5"/>',
+    laptop: '<rect class="f" x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 18.5h18"/><path class="m" d="M8.5 10h4"/>',
+    headphones: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect class="f" x="3" y="14" width="4" height="6.5" rx="1.5"/><rect class="f" x="17" y="14" width="4" height="6.5" rx="1.5"/><path class="m" d="M12 9.5v4.2a1.4 1.4 0 1 1-1.4-1.4H12"/>',
+    gamepad: '<path class="f" d="M7 8h10a4 4 0 0 1 4 4.5l-.6 4a2.5 2.5 0 0 1-4.3 1.3L14.5 16h-5l-1.6 1.8A2.5 2.5 0 0 1 3.6 16.5l-.6-4A4 4 0 0 1 7 8Z"/><path d="M8 11v3M6.5 12.5h3"/><circle class="m" cx="15.5" cy="11.5" r=".8"/><circle class="m" cx="17" cy="13.5" r=".8"/>',
+    plug: '<path d="M9 3v4M15 3v4"/><path class="f" d="M7 7h10v4a5 5 0 0 1-10 0Z"/><path class="m" d="M12 16v5"/>',
+    sofa: '<path d="M5 11V8.5A2.5 2.5 0 0 1 7.5 6h9A2.5 2.5 0 0 1 19 8.5V11"/><path class="f" d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4.5H3Z"/><path class="m" d="M5 17.5V20M19 17.5V20"/>',
+    bed: '<path d="M3 19V6.5M3 13.5h18V19"/><path class="f" d="M3 13.5V11a2 2 0 0 1 2-2h4.5a2 2 0 0 1 2 2v2.5"/><path class="m" d="M15 5.5h3l-3 3h3"/>',
+    lamp: '<path class="f" d="M8 3h8l2.5 7h-13Z"/><path d="M12 10v8.5M8.5 20.5h7"/><path class="m" d="M7 13.5 5 15.5M17 13.5l2 2"/>',
+    candle: '<rect class="f" x="8.5" y="10" width="7" height="11" rx="1.2"/><path d="M12 8.5V10"/><path class="m" d="M12 2c2.2 2.4 2.2 4.8 0 6.6-2.2-1.8-2.2-4.2 0-6.6Z"/>',
+    flower: '<path d="M12 14.2V21"/><path class="f" d="M12 18c-2.2-.2-3.8-1.4-4.4-3.3 2.2.1 3.8 1.3 4.4 3.3Z"/><circle cx="12" cy="4.4" r="2.6"/><circle cx="15.6" cy="8" r="2.6"/><circle cx="12" cy="11.6" r="2.6"/><circle cx="8.4" cy="8" r="2.6"/><circle class="f m" cx="12" cy="8" r="1.4"/>',
+    pan: '<path class="f" d="M4 10.5h12v7A2.5 2.5 0 0 1 13.5 20h-7A2.5 2.5 0 0 1 4 17.5Z"/><path d="M16 12.5h4.5M3 10.5h14M10 8.5v2"/><path class="m" d="M7.5 3.5c-.6.8-.6 1.7 0 2.5M12.5 3.5c-.6.8-.6 1.7 0 2.5"/>',
+    wrench: '<path class="f m" d="M15 3.5a4.5 4.5 0 0 0-4.2 6.1L4 16.4a1.9 1.9 0 0 0 2.7 2.7l6.8-6.8A4.5 4.5 0 0 0 19.6 8l-2.8 2.8-2.6-.6-.6-2.6L16.4 4.8A4.5 4.5 0 0 0 15 3.5Z"/>',
+    perfume: '<path class="f" d="M7 10h10v9.5a1.5 1.5 0 0 1-1.5 1.5h-7A1.5 1.5 0 0 1 7 19.5Z"/><path d="M10 7h4v3h-4ZM10.5 4h3v3h-3Z"/><path class="m" d="M16 4.5h2.5M16.5 2.2l2-1.2M16.5 6.8l2 1.2"/>',
+    lipstick: '<path class="f" d="M8.5 12h7v9h-7Z"/><path class="m" d="M9.5 12V7.5l5-3.2V12"/>',
+    jar: '<path d="M6 5.5h12v3.5H6Z"/><path class="f" d="M5 9h14v9.5A2.5 2.5 0 0 1 16.5 21h-9A2.5 2.5 0 0 1 5 18.5Z"/><path class="m" d="M9 14.5h6"/>',
+    pill: '<path class="f m" d="M10.5 4.5a4.95 4.95 0 0 1 7 7l-6 6a4.95 4.95 0 0 1-7-7Z"/><path d="M7.5 9.5l7 7"/>',
+    train: '<rect class="f" x="6" y="3" width="12" height="14" rx="3"/><path d="M6 9.5h12"/><circle cx="9" cy="13.5" r=".9"/><circle cx="15" cy="13.5" r=".9"/><path class="m" d="M8.5 17 6.5 21M15.5 17l2 4"/>',
+    plane: '<path class="f m" d="M21.5 3 2.5 10.5l7 3 3 7Z"/><path d="M9.5 13.5 21.5 3"/>',
+    car: '<path class="f" d="M3.5 16v-3.5l2-5A2 2 0 0 1 7.4 6h9.2a2 2 0 0 1 1.9 1.5l2 5V16Z"/><path d="M3.5 12.5h17"/><circle class="m" cx="7.5" cy="16.5" r="1.8"/><circle class="m" cx="16.5" cy="16.5" r="1.8"/>',
+    key: '<circle class="f" cx="8" cy="15" r="4"/><path class="m" d="M11 12l8.5-8.5M16 7l2 2M18.2 4.8l2 2"/>',
+    suitcase: '<rect class="f" x="3.5" y="7.5" width="17" height="12" rx="2"/><path d="M9 7.5v-2A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5v2"/><path class="m" d="M3.5 12.5h17"/>',
+    app: '<rect class="f" x="3.5" y="3.5" width="17" height="17" rx="5"/><path class="m" d="M10 8.8l5.2 3.2-5.2 3.2Z"/>',
+    music: '<path d="M9 18V5l11-2v13"/><circle class="f" cx="6.5" cy="18" r="2.5"/><circle class="f m" cx="17.5" cy="16" r="2.5"/>',
+    cloud: '<path class="f m" d="M7 18.5a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5 3.75 3.75 0 0 1 0 7.5Z"/>',
+    newspaper: '<path class="f" d="M4 5h13v14.5A1.5 1.5 0 0 0 18.5 21H6a2 2 0 0 1-2-2Z"/><path d="M17 9h3v10.5a1.5 1.5 0 0 1-3 0"/><path class="m" d="M7 9h7M7 12.5h7M7 16h4"/>',
+    ticket: '<path class="f m" d="M3.5 7.5h17V10a2 2 0 0 0 0 4v2.5h-17V14a2 2 0 0 0 0-4Z"/><path d="M15 7.5v9"/>',
+    gift: '<path class="f" d="M4 10h16v10.5H4Z"/><path d="M3 7h18v3H3ZM12 7v13.5"/><path class="m" d="M12 7c-1.5-3-5-3-4.5-.5.4 1.5 4.5.5 4.5.5Zm0 0c1.5-3 5-3 4.5-.5-.4 1.5-4.5.5-4.5.5Z"/>',
+    target: '<circle class="f" cx="11" cy="13" r="8"/><circle cx="11" cy="13" r="4.5"/><circle cx="11" cy="13" r="1.3"/><path class="m" d="M11 13l8-8M17 4.5h2.5V7"/>',
+    book: '<path class="f" d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5Z"/><path class="m" d="M13 4h5.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H13Z"/>',
+    paw: '<path class="f" d="M7.5 16.5c0-2.4 2-4.2 4.5-4.2s4.5 1.8 4.5 4.2c0 1.9-1.7 3-4.5 3s-4.5-1.1-4.5-3Z"/><circle class="m" cx="6.2" cy="11" r="1.6"/><circle class="m" cx="9.4" cy="7" r="1.6"/><circle class="m" cx="14.6" cy="7" r="1.6"/><circle class="m" cx="17.8" cy="11" r="1.6"/>',
+    dice: '<rect class="f m" x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r=".9"/><circle cx="12" cy="12" r=".9"/><circle cx="15.5" cy="15.5" r=".9"/>',
+    parcel: '<path class="f m" d="M3.5 8 12 4l8.5 4v8.5L12 20.5l-8.5-4Z"/><path d="M3.5 8 12 12l8.5-4M12 12v8.5"/>',
+    shop: '<path class="f" d="M5 8h14l-1.2 12.5H6.2Z"/><path class="m" d="M9 10V7a3 3 0 0 1 6 0v3"/>'
+  };
+  // What a receipt's words most likely mean, in order: the first rule that matches the item names, else the shop's name.
+  var ILL_RULES = [
+    ["shoe", /\b(trainers?|sneakers?|runners?|shoes?|boots?|sandals?|loafers?|heels|sliders?|slippers?|cleats?)\b/i],
+    ["jacket", /\b(jackets?|coats?|parkas?|puffer|gilets?|raincoats?|blazers?|anorak|fleece)\b/i],
+    ["dress", /\b(dress(es)?|skirts?|jumpsuits?|playsuits?)\b/i],
+    ["trousers", /\b(trousers|jeans|leggings|pants?|joggers|shorts|chinos|tights)\b/i],
+    ["gem", /\b(rings?|necklaces?|bracelets?|earrings?|pendants?|jewell?ery|chains?|swarovski|goldsmiths|pandora|missoma|tiffany|beaverbrooks)\b/i],
+    ["bag", /\b(handbags?|backpacks?|rucksacks?|totes?|purses?|wallets?|crossbody)\b/i],
+    ["tshirt", /\b(t-?shirts?|tees?|tops?|shirts?|hoodies?|jumpers?|sweaters?|sweatshirts?|knitwear|cardigans?|vests?|polos?|bras?|socks|underwear|swimwear|bikini)\b/i],
+    ["phone", /\b(iphone|smartphone|mobile phone|galaxy s\d|pixel \d|sim only|sim card|top-?up|airtime|lycamobile|giffgaff|voxi|vodafone)\b/i],
+    ["headphones", /\b(headphones?|earbuds?|earphones?|airpods|speakers?|soundbar|jbl|bose|sonos|beats)\b/i],
+    ["gamepad", /\b(playstation|ps5|xbox|nintendo|switch oled|controller|console|steam|coins|gems|diamonds|v-?bucks|robux|match masters|royal match|candy crush|game pass|in-app)\b/i],
+    ["laptop", /\b(laptop|macbook|chromebook|computer|monitor|keyboard|mouse|ipad|tablet|kindle paperwhite)\b/i],
+    ["plug", /\b(chargers?|cables?|adapters?|plugs?|batter(y|ies)|power bank|usb|hdmi|smart ?watch|apple watch|fitbit)\b/i],
+    ["bed", /\b(beds?|mattress(es)?|duvets?|pillows?|bedding|sheets|tempur|bensons|dreams)\b/i],
+    ["sofa", /\b(sofas?|armchairs?|chairs?|bean ?bags?|beanbags|stools?|tables?|furniture|dfs|sofology)\b/i],
+    ["lamp", /\b(lamps?|lights?|lighting|bulbs?|lanterns?)\b/i],
+    ["candle", /\b(candles?|diffusers?|wax melts?|reed diffuser|yankee|neom)\b/i],
+    ["flower", /\b(flowers?|bouquets?|roses?|florist|plants?|seeds|garden|eflorist|interflora|bloom)\b/i],
+    ["pan", /\b(pans?|pots?|cookware|kettles?|toasters?|air fryer|blenders?|ninja|knives|kitchen|mugs?|plates|bowls|cutlery|towels?|nespresso machine)\b/i],
+    ["wrench", /\b(drills?|screws?|tools?|paint|wickes|screwfix|toolstation|b&q|bandq|diy)\b/i],
+    ["cup", /\b(coffee|latte|cappuccino|espresso|americano|flat white|mocha|tea|chai|hot chocolate|nespresso|pods?|capsules?|costa|starbucks|caffe nero|pret)\b/i],
+    ["pint", /\b(beers?|lagers?|pints?|ales?|ipa|stout|guinness|ciders?|pub|tavern|wetherspoons?|greene king|stonegate|brewdog|brewery)\b/i],
+    ["wine", /\b(wines?|prosecco|champagne|gin|vodka|rum|whisk(e)?y|tequila|cocktails?|spirits|naked wines|majestic)\b/i],
+    ["pizza", /\b(pizzas?|pizzeria|domino'?s|dominos|papa john'?s|pizza hut|franco manca|calzone|margherita|pepperoni)\b/i],
+    ["burger", /\b(burgers?|mcdonald'?s|mcdonalds|five guys|burger king|kfc|chicken|nuggets?|fries|wings|wraps?|kebab|hot dog|grill|bbq|joint)\b/i],
+    ["bowl", /\b(noodles?|ramen|sushi|curry|wok|thai|chinese|indian|biryani|dumplings?|rice|pho|poke|bowl|katsu|wagamama|itsu|wasabi|panda|tortilla|burrito|tacos?|salad|soup)\b/i],
+    ["cake", /\b(cakes?|cupcakes?|doughnuts?|donuts?|muffins?|cookies?|brownies?|croissants?|pastr(y|ies)|bakery|greggs|sausage rolls?|bagels?|sandwich(es)?|baguettes?|sweets|krispy kreme)\b/i],
+    ["basket", /\b(sainsbury'?s|sainsburys|tesco|asda|morrisons|waitrose|ocado|aldi|lidl|co-?op|iceland|supermarket|groceries|grocer|bananas?|milk|eggs|bread)\b/i],
+    ["delivery", /\b(just eat|deliveroo|uber eats|takeaway|delivery fee)\b/i],
+    ["shaker", /\b(protein|whey|creatine|myprotein|supplements?|vitamins?|shaker|bulk|pre-?workout)\b/i],
+    ["perfume", /\b(perfume|fragrances?|eau de|parfum|cologne|aftershave|scent)\b/i],
+    ["lipstick", /\b(lipsticks?|lip ?gloss|mascara|eyeliner|make-?up|foundation|concealer|blush|bronzer|nail polish)\b/i],
+    ["jar", /\b(serums?|moisturi[sz]ers?|cleansers?|creams?|spf|sun ?screen|skin ?care|shampoo|conditioner|body wash|razors?|grooming|beard|lumin|gruum|grüum)\b/i],
+    ["pill", /\b(pharmacy|chemist|paracetamol|ibuprofen|plasters|prescription|medicine|boots|superdrug)\b/i],
+    ["train", /\b(train|rail|railcard|lner|trainline|avanti|gwr|southeastern|thameslink|scotrail|eurostar|tfl|oyster|return ticket)\b/i],
+    ["plane", /\b(flights?|airlines?|airways|ryanair|easyjet|jet2|wizz|airport|boarding)\b/i],
+    ["car", /\b(uber|bolt|taxi|cabs?|ride|car hire|parking|ringgo|justpark|petrol|fuel|addison lee|zipcar)\b/i],
+    ["key", /\b(hotels?|premier inn|travelodge|airbnb|booking\.com|hostels?)\b/i],
+    ["music", /\b(spotify|apple music|music|songs?|albums?|tidal|deezer|audible|audiobooks?)\b/i],
+    ["app", /\b(netflix|disney|prime video|youtube|now tv|britbox|dazn|stream(ing)?|tv licen[cs]e|subscription|membership|apple)\b/i],
+    ["cloud", /\b(icloud|cloud|storage|vpn|nordvpn|software|anthropic|openai|chatgpt|claude|eleven ?labs|elevenlabs|ai|google one|dropbox|microsoft 365)\b/i],
+    ["newspaper", /\b(news|newspapers?|magazines?|edition|guardian|telegraph|economist|champion)\b/i],
+    ["ticket", /\b(tickets?|theatre|concert|gigs?|events?|eventim|ticketmaster|todaytix|cinema|odeon|cineworld|vue|experiences?|buyagift|virgin experience|days? out)\b/i],
+    ["gift", /\b(gifts?|presents?|personalised|hampers?|gift cards?|e-?gift)\b/i],
+    ["target", /\b(darts?|golf|tennis|football|gym|fitness|yoga|bikes?|cycling|sports?)\b/i],
+    ["book", /\b(books?|novels?|waterstones|kindle|paperback|hardback)\b/i],
+    ["paw", /\b(pets?|dogs?|cats?|puppy|kitten|pets at home|zooplus|treats)\b/i],
+    ["dice", /\b(casino|bet|betting|bingo|lottery|lotto|slots|poker)\b/i],
+    ["parcel", /\b(royal mail|parcels?|postage|stamps|evri|dpd|inpost)\b/i]
+  ];
+  var KIND_ILL = { food: "bowl", fashion: "tshirt", electronics: "plug", home: "sofa", beauty: "jar", travel: "suitcase", digital: "app", experiences: "ticket", other: "shop" };
+  function illKey(x) {
+    var items = (x.items || []).map(function (i) { return i && i.name; }).filter(Boolean).join(" · ");
+    var shop = [x.retailer && x.retailer.name, x.retailer && x.retailer.legalName].filter(Boolean).join(" · ");
+    for (var t = 0, texts = [items, shop]; t < texts.length; t++) {
+      if (!texts[t]) continue;
+      for (var i = 0; i < ILL_RULES.length; i++) if (ILL_RULES[i][1].test(texts[t])) return ILL_RULES[i][0];
+    }
+    return KIND_ILL[x.category] || "shop";
+  }
+  // Draws the picture into a picture box (in the colours of the receipt's group).
+  function illustrate(box, x, px, only) {
+    var key = only && ILL[only] ? only : illKey(x), c = CAT_ICONS[x.category] || CAT_ICONS.other;
+    box.textContent = ""; box.classList.add("rl-ill", "ill-" + key); box.setAttribute("data-ill", key);
+    box.style.background = c[0]; box.style.color = c[1];
+    box.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 28) + '" height="' + (px || 28) + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      ILL[key].replace(/<(path|rect|circle)\b/g, '<$1 pathLength="1"') + "</svg>";
+  }
+  // Where the shop's logo comes from (the server says; older saved lists only have the shop's address).
+  function logoDom(x) { var r = (x && x.retailer) || {}; return r.logoDomain !== undefined ? r.logoDomain : r.domain; }
+  // A receipt's picture: the item's own photo when Relay checked it's of the item, else the shop's logo, else a drawing.
+  function receiptPic(box, x, px, logoPx) {
+    var draw = function () { illustrate(box, x, px); };
+    var logo = function () { shopLogo(box, logoDom(x), logoPx || 32, draw); };
+    var named = (x.items || []).filter(function (i) { return i && i.name; });
+    if (named.length <= 1 && x.hasImage && x.id) apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) {
+      if (!u) return logo();
+      box.textContent = ""; box.classList.add("rl-has-photo"); box.appendChild(el("img", { src: u, alt: "" }));
+    });
+    else logo();
   }
   // Delivery companies send "on its way" emails of their own: they aren't the shop you bought from.
   var CARRIER_DOMAIN = /(^|\.)(royalmail\.(com|co\.uk)|parcelforce\.(com|co\.uk)|evri\.com|hermes(world|-europe)?\.(com|co\.uk)|myhermes\.co\.uk|dpd(local)?\.co\.uk|dpd\.com|yodel\.co\.uk|dhl\.(com|co\.uk)|ups\.com|fedex\.com|inpost\.co\.uk|tnt\.com|ukmail\.com|apc-overnight\.com)$/i;
@@ -235,6 +376,18 @@
     ".rl-rr+.rl-rr{border-top:1px solid #f0ebe0}.rl-rr.open{background:#fbfaf6}" +
     ".rl-rr-main{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:68px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
     ".rl-rr-main:active{background:#f3efe6}.rl-rr-main:focus-visible{outline:2px solid #101828;outline-offset:-2px}" +
+    // Drawings for receipts with no photo or logo: the lines draw themselves in, then one part makes a small move, twice.
+    ".rl-ill svg{overflow:visible}.rl-ill svg *{stroke-dasharray:1;stroke-dashoffset:1;animation:rlilldraw .8s cubic-bezier(.4,0,.2,1) forwards}.rl-ill svg .f{fill:currentColor;fill-opacity:.14}" +
+    ".rl-ill svg :nth-child(2){animation-delay:.08s}.rl-ill svg :nth-child(3){animation-delay:.16s}.rl-ill svg :nth-child(n+4){animation-delay:.24s}@keyframes rlilldraw{to{stroke-dashoffset:0}}" +
+    ".rl-ill svg .m{transform-box:fill-box;transform-origin:center;animation:rlilldraw .8s cubic-bezier(.4,0,.2,1) forwards,var(--mv,rlillhop) 1.1s ease-in-out .85s 2 alternate}" +
+    ".ill-cup,.ill-pan,.ill-pint,.ill-candle{--mv:rlillrise}.ill-shoe,.ill-cake,.ill-gift,.ill-basket,.ill-paw,.ill-music,.ill-pizza,.ill-burger,.ill-shaker{--mv:rlillhop}" +
+    ".ill-tshirt,.ill-jacket,.ill-dress,.ill-trousers,.ill-bag,.ill-flower,.ill-wine,.ill-bowl,.ill-ticket,.ill-lipstick{--mv:rlillsway}.ill-phone,.ill-lamp,.ill-headphones,.ill-laptop,.ill-plug{--mv:rlillblink}" +
+    ".ill-wrench,.ill-dice,.ill-key,.ill-pill{--mv:rlilltwist}.ill-plane,.ill-delivery,.ill-car,.ill-train,.ill-suitcase{--mv:rlillglide}.ill-gem,.ill-perfume,.ill-jar,.ill-cloud,.ill-app,.ill-newspaper,.ill-book,.ill-target,.ill-gamepad,.ill-bed,.ill-sofa,.ill-parcel,.ill-shop{--mv:rlillpop}" +
+    ".ill-sway .m,.ill-tshirt .m,.ill-jacket .m,.ill-dress .m,.ill-trousers .m,.ill-bag .m,.ill-flower .m{transform-origin:center top}" +
+    "@keyframes rlillrise{from{transform:translateY(1px);opacity:.5}to{transform:translateY(-2px);opacity:1}}@keyframes rlillhop{from{transform:translateY(0)}to{transform:translateY(-2px)}}" +
+    "@keyframes rlillsway{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}@keyframes rlillblink{from{opacity:.25}to{opacity:1}}@keyframes rlilltwist{from{transform:rotate(-12deg)}to{transform:rotate(12deg)}}" +
+    "@keyframes rlillglide{from{transform:translate(-1.5px,1px)}to{transform:translate(1.5px,-1px)}}@keyframes rlillpop{from{transform:scale(.88)}to{transform:scale(1.06)}}" +
+    "@media(prefers-reduced-motion:reduce){.rl-ill svg *{animation:none!important;stroke-dashoffset:0}}" +
     ".rl-rr-pic{flex:none;width:48px;height:48px;border-radius:14px;background:#f1ecdf;display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:15px;color:#46601b}.rl-rr-pic.rl-has-photo img{width:100%;height:100%;object-fit:cover}" +
     ".rl-rr-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-rr-mid b{font-size:15.5px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-rr-mid span{font-size:13.5px;color:#5b6475;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-rr-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.rl-rr-end b{font-size:15.5px;color:#101828}" +
@@ -1303,10 +1456,9 @@
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
         btn.setAttribute("aria-expanded", "false");
-        var thumb = el("span", { className: "rl-rr-pic", text: initials(who) });
+        var thumb = el("span", { className: "rl-rr-pic" });
         thumb.setAttribute("aria-hidden", "true");
-        if (named.length <= 1 && row.hasImage && row.id) apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; thumb.classList.add("rl-has-photo"); thumb.appendChild(el("img", { src: u, alt: "" })); } else shopLogo(thumb, row.retailer && row.retailer.domain, 32); });
-        else shopLogo(thumb, row.retailer && row.retailer.domain, 32);
+        receiptPic(thumb, row, 28, 32);
         var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
         var left = daysLeft(deadlineOf(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
@@ -2911,12 +3063,14 @@
     var o = { day: "numeric", month: "short" }; if (t.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
     return t.toLocaleDateString("en-GB", o);
   }
-  function initials(name) { return String(name || "Shop").split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0).toUpperCase(); }).join(""); }
   // One shop-confirmed item: picture, shop, what it is, price, where it's up to, and what you can do.
   function confirmedCard(o, it, redraw, deadline) {
     var card = el("div", { className: "rl-po" });
     var img = el("div", { className: "rl-po-img" });
-    if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) img.appendChild(el("img", { src: it.imageUrl, alt: "" })); else img.textContent = initials(o.store);
+    img.setAttribute("aria-hidden", "true");
+    // The shop's own product photo; without one, a drawing of the item (never just initials).
+    var drawIt = function () { illustrate(img, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 36); };
+    if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; img.appendChild(ph); } else drawIt();
     var info = el("div", { className: "rl-po-info" }, [
       el("div", { className: "rl-po-shop", text: o.store || "Shop" }),
       el("h3", { text: it.title }),
@@ -2976,10 +3130,9 @@
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
     var card = el("div", { className: "rl-po" });
-    var img = el("div", { className: "rl-po-img", text: initials(who) });
-    var logo = function () { shopLogo(img, x.retailer && x.retailer.domain, 44); };
-    if ((x.items || []).length <= 1 && x.hasImage && x.id) apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) { img.textContent = ""; img.appendChild(el("img", { src: u, alt: "" })); } else logo(); });
-    else logo();
+    var img = el("div", { className: "rl-po-img" });
+    img.setAttribute("aria-hidden", "true");
+    receiptPic(img, x, 36, 44);
     // One item of a multi-item order gets its own card (opts.item is its position on the receipt).
     var one = opts.item != null ? (x.items || [])[opts.item] : null;
     var first = one || (x.items || [])[0] || {};
@@ -3375,7 +3528,7 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate }, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {

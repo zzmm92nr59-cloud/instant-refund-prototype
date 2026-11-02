@@ -322,3 +322,34 @@ export function agreedShopNames(cards) {
   return out;
 }
 const nameFits = (name, domain) => { const n = letters(name), b = domainBase(domain); return Boolean(n && b && (n.includes(b) || b.includes(n))); };
+
+// Web addresses of well-known shops that often email through a payment or ordering company, so the email itself doesn't
+// carry the shop's own address. Used only to find the shop's logo; anything not listed gets a drawing in the app instead.
+const SHOP_DOMAINS = {
+  mcdonalds: "mcdonalds.com", tortilla: "tortilla.co.uk", anthropic: "anthropic.com", elevenlabs: "elevenlabs.io", lner: "lner.co.uk",
+  tedbaker: "tedbaker.com", pret: "pret.co.uk", pretamanger: "pret.co.uk", leon: "leon.co", wagamama: "wagamama.com", nandos: "nandos.co.uk",
+  fiveguys: "fiveguys.co.uk", itsu: "itsu.com", wasabi: "wasabi.uk.com", costa: "costa.co.uk", costacoffee: "costa.co.uk", starbucks: "starbucks.co.uk",
+  caffenero: "caffenero.com", greggs: "greggs.co.uk", gails: "gailsbread.co.uk", dishoom: "dishoom.com", honestburgers: "honestburgers.co.uk",
+  francomanca: "francomanca.co.uk", pizzaexpress: "pizzaexpress.com", burgerking: "burgerking.co.uk", kfc: "kfc.co.uk", subway: "subway.com",
+  dominos: "dominos.co.uk", papajohns: "papajohns.co.uk", pizzahut: "pizzahut.co.uk", uber: "uber.com", ubereats: "ubereats.com", bolt: "bolt.eu",
+  deliveroo: "deliveroo.co.uk", justeat: "just-eat.co.uk", greeneking: "greeneking.co.uk", wetherspoon: "jdwetherspoon.com", jdwetherspoon: "jdwetherspoon.com",
+  spotify: "spotify.com", netflix: "netflix.com", openai: "openai.com", nordvpn: "nordvpn.com",
+};
+const nameWords = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/['’.]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+// The web address to show a shop's logo from: its own address (never a personal mailbox or a payment company), else a
+// well-known shop's address found from its name, else none.
+export function logoDomainFor(retailer) {
+  const r = retailer || {};
+  const d = String(r.domain || "").toLowerCase().replace(/[^a-z0-9.-]/g, "");
+  if (d && !isVia(d) && !PERSONAL_MAIL.test(d)) return d;
+  // A forwarded receipt carries a person's name, not a shop's: no logo from it.
+  if (PERSONAL_MAIL.test(d)) return null;
+  for (const name of [r.name, r.legalName]) {
+    const w = nameWords(name);
+    for (let n = Math.min(3, w.length); n >= 1; n--) for (let i = 0; i + n <= w.length; i++) {
+      const k = w.slice(i, i + n).join("");
+      if (Object.prototype.hasOwnProperty.call(SHOP_DOMAINS, k)) return SHOP_DOMAINS[k];
+    }
+  }
+  return null;
+}

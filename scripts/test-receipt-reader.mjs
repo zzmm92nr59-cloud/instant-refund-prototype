@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { cleanItem, cleanItems, cleanShopName, rankShop, shopNamesInText, forwardedSender, looksLikePerson } from "../worker/receipt-reader.js";
 import { parseReceiptEmail } from "../worker/receipt-parser.js";
-import { categorise, shopDisplayName, storeKey, legacyStoreKey, agreedShopNames } from "../worker/receipt-category.js";
+import { categorise, shopDisplayName, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor } from "../worker/receipt-category.js";
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(x => ({ name: x })) });
 
@@ -82,6 +82,16 @@ t("shops sending through Shopify or Stripe each keep their own key (and the old 
   assert.equal(storeKey(a), "kicklane");
   assert.equal(legacyStoreKey(a), "gshopifyemail");
   assert.equal(storeKey({ retailer: { name: "Zara", domain: "zara.com" } }), "zara");
+});
+t("each shop's logo comes from its own address, or a well-known shop's address found from its name; never a mailbox or a payment company", () => {
+  assert.equal(logoDomainFor({ name: "Wetherspoon", domain: "jdwetherspoon.co.uk" }), "jdwetherspoon.co.uk");
+  assert.equal(logoDomainFor({ name: "McDonald's" }), "mcdonalds.com", "sent through Apple's private relay, no address of its own");
+  assert.equal(logoDomainFor({ name: "LNER on board service" }), "lner.co.uk");
+  assert.equal(logoDomainFor({ name: "Ted Baker", domain: "global-e.com" }), "tedbaker.com");
+  assert.equal(logoDomainFor({ name: "Uber Eats" }), "ubereats.com", "the longer name wins");
+  assert.equal(logoDomainFor({ name: "Kick Lane", domain: "g.shopifyemail.com" }), null, "Shopify's logo is not the shop's");
+  assert.equal(logoDomainFor({ name: "Leon Smith", domain: "gmail.com" }), null, "a forwarded receipt from a person called Leon is not Leon the restaurant");
+  assert.equal(logoDomainFor({ name: "Apple Pie Bakery" }), null);
 });
 const mail = (from, subject, html) => `From: ${from}\nSubject: ${subject}\nDate: Sat, 31 Oct 2026 10:00:00 +0000\nContent-Type: text/html; charset=utf-8\n\n${html}`;
 t("a Shopify shop's email: the shop's own name, its items read from 'Name × 1', no Shopify address as the shop", () => {
