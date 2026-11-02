@@ -142,7 +142,8 @@ assert.ok(!/Gmail/.test(pageText), "no Gmail wording for an Outlook shopper: " +
 await page.screenshot({ path: "/tmp/shots/receipts-outlook-connected.png" });
 // The original email opens from Outlook.
 await page.getByText("Fashion", { exact: true }).first().click();
-await page.getByRole("button", { name: "Example Outfitters" }).first().click();
+await page.locator(".rl-rr-main", { hasText: "Example Outfitters" }).first().click();
+await page.getByRole("button", { name: "Open the original email" }).click();
 await page.getByText("Shown straight from your Outlook. Relay doesn't keep a copy.").waitFor();
 await page.keyboard.press("Escape");
 await page.evaluate(() => window.RelayAccount.open());
