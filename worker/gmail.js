@@ -17,7 +17,7 @@ import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliv
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
-import { categorise, storeKey, legacyStoreKey, agreedShopNames, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { categorise, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
@@ -399,22 +399,47 @@ function logoTypeOf(bytes) {
   return null;
 }
 const LOGO_MAX_BYTES = 150000, LOGO_MIN_BYTES = 200, LOGO_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
+// Shops with no logo found before this moment are looked up again (the list of places to look grew: see logoSources).
+const LOGO_SOURCES_SINCE = Date.UTC(2026, 10, 2, 23, 0);
+// The size of a picture in pixels (the larger side), when it can be read from its first bytes: PNG, GIF and icon files.
+export function imagePx(b) {
+  if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return Math.max((b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0);
+  if (b.length > 10 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return Math.max(b[6] | b[7] << 8, b[8] | b[9] << 8);
+  if (b.length > 6 && b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0) {
+    let best = 0; const n = b[4] | b[5] << 8;
+    for (let i = 0; i < n && 6 + i * 16 + 1 < b.length; i++) best = Math.max(best, b[6 + i * 16] || 256);
+    return best;
+  }
+  return null;
+}
+// Where a shop's logo can come from, best first: the shop's own app icon; then Google's copy of the shop's icon (many big
+// shops block requests from servers, Google's copy doesn't), which must be at least 32 pixels because Google answers
+// unknown shops with a tiny globe; then the shop's own favicon. Only the shop's web address is sent, never who's asking.
+function logoSources(domain) {
+  return [
+    { url: `https://${domain}/apple-touch-icon.png` }, { url: `https://www.${domain}/apple-touch-icon.png` },
+    { url: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`, minPx: 32 },
+    { url: `https://${domain}/favicon.ico` }, { url: `https://www.${domain}/favicon.ico` },
+  ];
+}
 async function fetchLogo(fetchImpl, domain) {
-  for (const u of [`https://${domain}/apple-touch-icon.png`, `https://www.${domain}/apple-touch-icon.png`, `https://${domain}/favicon.ico`, `https://www.${domain}/favicon.ico`]) {
+  for (const src of logoSources(domain)) {
     try {
-      const res = await fetchImpl(u, { headers: { Accept: "image/*" }, redirect: "follow" });
+      const res = await fetchImpl(src.url, { headers: { Accept: "image/*" }, redirect: "follow" });
       if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
       const bytes = new Uint8Array(await res.arrayBuffer());
       if (bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;
       const type = logoTypeOf(bytes);
-      if (type) return { type, data: b64Chunked(bytes) };
+      if (!type) continue;
+      if (src.minPx) { const px = imagePx(bytes); if (px == null || px < src.minPx) continue; }
+      return { type, data: b64Chunked(bytes) };
     } catch { /* try the next address */ }
   }
   return null;
 }
 async function logoFor(env, fetchImpl, domain, now) {
   const row = await env.RELAY_DB.prepare("SELECT type, data, found, fetched_at FROM retailer_logos WHERE domain = ?").bind(domain).first();
-  if (row && (row.found || now - row.fetched_at < LOGO_RETRY_MS)) return row.found ? row : null;
+  if (row && (row.found || (now - row.fetched_at < LOGO_RETRY_MS && row.fetched_at >= LOGO_SOURCES_SINCE))) return row.found ? row : null;
   const img = await fetchLogo(fetchImpl, domain);
   await env.RELAY_DB.prepare("INSERT OR REPLACE INTO retailer_logos (domain,type,data,found,fetched_at) VALUES (?,?,?,?,?)")
     .bind(domain, img ? img.type : null, img ? img.data : null, img ? 1 : 0, now).run();
@@ -1175,6 +1200,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const shown = (domain && agreed.get(domain)) || shopDisplayName({ ...r0, domain });
     const via = r0.via || (isVia(domain) ? domain : null);
     const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
+    // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).
+    retailer.logoDomain = logoDomainFor(retailer);
     c = { ...c, retailer, items: cleanItems(c.items) };
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
     return { ...c, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
@@ -1440,7 +1467,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   const lg = /^\/relay\/my\/logo\/([A-Za-z0-9.-]{3,80})$/.exec(path);
   if (lg && m === "GET") {
     const d = logoDomain(lg[1]);
-    if (!d) return json({ error: "not_found" }, 404, cors);
+    // A personal mailbox (a forwarded receipt) or a payment company is never shown as the shop.
+    const asked = lg[1].toLowerCase();
+    if (!d || PERSONAL_MAIL.test(d) || isVia(d) || PERSONAL_MAIL.test(asked) || isVia(asked)) return json({ error: "not_found" }, 404, cors);
     const row = await logoFor(env, opts.fetchImpl, d, opts.now || Date.now());
     if (!row) return json({ error: "not_found" }, 404, cors);
     return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
