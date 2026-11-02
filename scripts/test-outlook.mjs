@@ -145,7 +145,9 @@ assert.equal(pv.consent.version, CONSENT_VERSION, "the wording a one-step Micros
 assert.deepEqual(pv.consent.text, CONSENT_TEXT);
 const off = await (await call("/relay/auth/providers", { e: { ...env, MICROSOFT_CLIENT_ID: undefined } })).json();
 assert.equal(off.microsoft, false, "no Microsoft button until it is set up");
-assert.equal(off.consent, undefined);
+assert.equal(off.consent.version, CONSENT_VERSION, "Google sign-in is still on, and it connects Gmail with the same wording");
+const none = await (await call("/relay/auth/providers", { e: { ...env, MICROSOFT_CLIENT_ID: undefined, GOOGLE_CLIENT_ID: undefined } })).json();
+assert.equal(none.consent, undefined, "no wording when neither one-step sign-in is on");
 console.log("ok - the app is told whether Microsoft sign-in is switched on");
 
 // ---- 2. Continue with Microsoft ----
