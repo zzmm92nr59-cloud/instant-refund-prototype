@@ -70,4 +70,17 @@ assert.deepEqual(food.topItem, { name: "Vertuo pods", times: 3, shop: "Nespresso
 assert.deepEqual(food.topItems.map(x => x.name), ["Vertuo pods"]);
 assert.equal(buildWrapped(mix, 2026, Date.now(), { industry: "<script>" }).industry, null, "an unknown kind is ignored");
 assert.equal(buildWrapped(mix, 2026, Date.now(), { industry: "<script>" }).receipts, 5);
+// One story a year: a chapter per kind of shopping, biggest spend first, each counted only from its own receipts.
+const ch = w.chapters;
+assert.deepEqual(ch.map(c => c.category), ["fashion", "food", "digital"], "biggest spend first, and no chapter for Other");
+assert.equal(ch[0].spentPence, 7990); assert.equal(ch[0].share, Math.round(7990 / (5990 + 4210 + 2000) * 100));
+assert.equal(ch[0].topShop.name, "Zara"); assert.equal(ch[0].receipts, 2);
+assert.equal(ch[1].spentPence, 4210); assert.equal(ch[1].topShop.name, "Tesco");
+assert.equal(ch[2].withTotal, 0, "Apple's receipt had no amount, so its chapter shows no spend");
+assert.deepEqual(ch[0].fact, { kind: "perPiece", pence: Math.round(7990 / 2), pieces: 2 }, "fashion: pieces and the average price per piece");
+assert.equal(buildWrapped(cards, 2026, Date.now(), { industry: "fashion" }).chapters, undefined, "a one-kind Wrapped has no chapters of its own");
+assert.deepEqual(empty.chapters, []);
+const foodYear = buildWrapped([1, 2, 3, 4, 5].map(i => ({ kind: "order", retailer: R("Greggs", "greggs.co.uk"), orderDate: "2026-02-0" + i, totalPence: 700, currency: "GBP", category: "food", items: [{ name: "Sausage roll" }] })), 2026, Date.UTC(2026, 11, 31));
+assert.deepEqual(foodYear.chapters[0].fact, { kind: "perWeek", pence: Math.round(3500 / 52), orders: 5 });
+assert.deepEqual(foodYear.chapters[0].topItem, { name: "Sausage roll", times: 5 });
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly; one Wrapped per kind of shopping");

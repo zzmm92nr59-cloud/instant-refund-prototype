@@ -181,8 +181,26 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   if (subscriptions.length >= 3) badges.push({ label: "Subscriber", why: subscriptions.length + " things you paid for month after month." });
   if (streak >= 6) badges.push({ label: "Never Missed a Month", why: "You bought something " + streak + " months in a row." });
   if (mine.some(c => (c.items || []).length >= 5)) badges.push({ label: "Big Basket", why: "At least one order with 5 or more things in it." });
+  // One chapter per kind of shopping for the year's single story: its share of the year, where it went, what it was, and
+  // one fun number of its own. Every figure is counted from the receipts, like the rest.
+  const chapters = industry || opts.noChapters ? undefined : industries.filter(k => k.category !== "other" && k.receipts > 0).map(k => {
+    const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true });
+    const weeks = Math.max(1, Math.ceil((Math.min(now, Date.UTC(year + 1, 0, 1)) - Date.UTC(year, 0, 1)) / (7 * 864e5)));
+    const named = (w.topItems || []).filter(x => x.name);
+    const fact = chapterFact(k.category, w, weeks);
+    return {
+      category: k.category, label: CATEGORIES[k.category], receipts: w.receipts, spentPence: w.spentPence, withTotal: w.coverage.withTotal,
+      share: spentPence > 0 && w.spentPence > 0 ? Math.max(1, Math.round(w.spentPence / spentPence * 100)) : null,
+      topShop: w.topShops[0] ? { name: w.topShops[0].name, receipts: w.topShops[0].receipts, spentPence: w.topShops[0].spentPence } : null,
+      shops: w.shops, items: w.items, topItem: named[0] && named[0].times >= 2 ? { name: named[0].name, times: named[0].times } : null,
+      things: named.slice(0, 3).map(x => x.name),
+      biggest: w.biggest ? { shop: w.biggest.shop, item: w.biggest.item, totalPence: w.biggest.totalPence, photoId: w.biggest.photoId } : null,
+      busiestMonth: w.busiestMonth, favouriteDay: w.shoppingTime.days >= 3 ? w.shoppingTime.favouriteDay : null,
+      photos: (w.photos || []).slice(0, 3), subscriptions: (w.subscriptions || []).length, fact,
+    };
+  });
   return {
-    year, years, industry, industryLabel: industry ? CATEGORIES[industry] : null, industries,
+    year, years, industry, industryLabel: industry ? CATEGORIES[industry] : null, industries, chapters,
     receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
     topItem, refundedPence, refundsMatched: refunded.length, topShopShare, activeMonths, firstDate,
     coverage: { withTotal: gbp.length, noTotal, otherCurrency },
@@ -194,4 +212,19 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     returnsStarted: withReturn, personality,
     note: "Based on the receipts and order emails Relay found. In-store card purchases without an email receipt aren't included."
   };
+}
+
+// One playful number for each kind of shopping, worked out from that kind's receipts only (null when the receipts can't back it).
+function chapterFact(kind, w, weeks) {
+  const perWeek = w.spentPence ? Math.round(w.spentPence / weeks) : 0;
+  const per = (n) => (w.coverage.withTotal && n ? Math.round(w.spentPence / n) : 0);
+  if (kind === "food") return w.receipts >= 4 ? { kind: "perWeek", pence: perWeek, orders: w.receipts } : null;
+  if (kind === "fashion") return w.items >= 2 && per(w.items) ? { kind: "perPiece", pence: per(w.items), pieces: w.items } : null;
+  if (kind === "electronics") return w.items ? { kind: "gadgets", count: w.items } : null;
+  if (kind === "home") return w.items ? { kind: "homeThings", count: w.items } : null;
+  if (kind === "beauty") return w.items ? { kind: "beautyThings", count: w.items } : null;
+  if (kind === "travel") return w.receipts ? { kind: "trips", count: w.receipts } : null;
+  if (kind === "digital") return w.activeMonths ? { kind: "perMonth", pence: w.spentPence ? Math.round(w.spentPence / w.activeMonths) : 0, months: w.activeMonths } : null;
+  if (kind === "experiences") return w.receipts ? { kind: "outings", count: w.receipts } : null;
+  return null;
 }

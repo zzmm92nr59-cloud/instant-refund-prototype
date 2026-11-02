@@ -55,7 +55,7 @@ const measure = () => page.evaluate(() => {
   for (const el of document.querySelectorAll("*")) { const s = getComputedStyle(el); if (/rgb\((48, 37, 93|91, 33, 182|124, 77, 189|30, 27, 75|109, 40, 217|76, 29, 149)\)/.test(s.backgroundImage + s.backgroundColor)) out.purple.push(el.className || el.tagName); }
   return out;
 });
-for (const pg of ["profile", "receipts", "discover", "radar", "wrapped"]) {
+for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
   await page.evaluate(p => window.go(p), pg); await page.waitForTimeout(1200);
   const m = await measure();
   assert.deepEqual(m.small, [], pg + ": everything tappable is at least 44px tall");
@@ -63,15 +63,15 @@ for (const pg of ["profile", "receipts", "discover", "radar", "wrapped"]) {
   assert.deepEqual(m.symbols, [], pg + ": no symbol characters used as icons in buttons");
   assert.deepEqual(m.purple, [], pg + ": no purple");
 }
-await page.locator(".avatar").click(); await page.getByRole("heading", { name: "Account", exact: true }).waitFor(); await page.waitForTimeout(600);
+await page.locator(".avatar").click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
 for (const sub of [null, "Email connection", "Email permission", "Delete my account", "Help", "Two-step sign-in"]) {
-  if (sub) { await page.locator(".rl-arow", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Account" }).waitFor(); await page.waitForTimeout(300); }
-  const m = await measure(), where = "Account" + (sub ? " > " + sub : "");
+  if (sub) { await page.locator(".rl-arow", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
+  const m = await measure(), where = "Profile" + (sub ? " > " + sub : "");
   assert.deepEqual(m.small, [], where + ": everything tappable is at least 44px tall");
   assert.deepEqual(m.tiny, [], where + ": no text smaller than 12px");
   assert.deepEqual(m.symbols, [], where + ": no symbol characters used as icons");
   assert.deepEqual(m.purple, [], where + ": no purple");
-  if (sub) await page.getByRole("button", { name: "Back to Account" }).click();
+  if (sub) await page.getByRole("button", { name: "Back to Profile" }).click();
 }
 // The legal pages are real pages, reachable from the Account page.
 for (const [label, heading] of [["Terms of use", "Terms of use"], ["Privacy policy", "Privacy policy"]]) {
@@ -81,12 +81,11 @@ for (const [label, heading] of [["Terms of use", "Terms of use"], ["Privacy poli
   assert.doesNotMatch(await lp.locator("body").innerText(), /\b(demo|sandbox|test mode|lorem|TODO)\b/i, label + ": no placeholder or test wording");
   await lp.close();
 }
-await page.getByRole("button", { name: "Done" }).click();
 console.log("ok - no purple, 44px tap targets, no tiny text and no symbol icons on Profile, Receipts, Discover, Price alerts, Wrapped and every Account page");
 
 // Wrapped: the story has no purple slides either.
-await page.evaluate(() => window.go("wrapped"));
-await page.getByRole("button", { name: /Play your story/ }).click();
+await page.evaluate(() => window.go("me"));
+await page.getByRole("button", { name: /Play your 2026 story/ }).click();
 const slideBgs = [];
 for (let k = 0; k < 14; k++) { await page.waitForTimeout(250); slideBgs.push(await page.locator(".rl-story-frame").evaluate(f => getComputedStyle(f).backgroundColor)); if (await page.getByRole("button", { name: "Watch again" }).count()) break; await page.keyboard.press("ArrowRight"); }
 assert.ok(!slideBgs.some(c => /rgb\((48, 37, 93|91, 33, 182|30, 27, 75)\)/.test(c)), "no purple slides: " + slideBgs.join(" "));

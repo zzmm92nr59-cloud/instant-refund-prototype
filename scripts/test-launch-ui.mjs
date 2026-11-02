@@ -52,7 +52,7 @@ const lit = () => page.locator("#foot button.active").innerText();
 // 1. A new visitor: Home first, welcoming them; four tabs; nothing that reads like a test build.
 await page.goto(origin + "/index.html");
 await page.getByRole("heading", { name: "Welcome to Relay" }).waitFor();
-assert.deepEqual((await tabs()).map(t => t.trim()), ["Home", "Receipts", "Discover", "Wrapped"]);
+assert.deepEqual((await tabs()).map(t => t.trim()), ["Home", "Receipts", "Discover", "Profile"]);
 assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES);
 await page.getByRole("button", { name: "Sign in or create an account" }).click();
 await page.locator(".rl-sheet").waitFor();
@@ -120,33 +120,34 @@ await page.getByRole("heading", { name: "Discover" }).waitFor();
 console.log("ok - Price alerts lists what's watched, lives under Discover, and stops watching on request");
 
 // 4. Receipts and Wrapped read cleanly too.
-for (const tab of ["Receipts", "Wrapped"]) {
+for (const tab of ["Receipts", "Profile"]) {
   await page.locator("#foot").getByRole("button", { name: tab }).click();
   await page.waitForTimeout(900);
   assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES, tab);
 }
-// 5. The Account page: no Market, no test card, no empty-purchases caveat.
+// 5. The Profile page (the avatar opens it): no Market, no test card, no empty-purchases caveat.
 await page.locator(".avatar").click();
-await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
-await page.waitForTimeout(600);
-const sheet = await page.locator(".rl-sheet").innerText();
+await page.getByRole("heading", { name: "Profile", exact: true }).waitFor();
+await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
+assert.equal(await page.locator("#foot button.active").innerText(), "Profile");
+assert.equal(await page.getByRole("button", { name: "Done" }).count(), 0, "a page, not a sheet: nothing to close");
+const sheet = await page.locator("#mePage").innerText();
 assert.doesNotMatch(sheet, /Swap & resell|TEST MODE|Card for swaps|No purchases matched/);
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
-await page.getByRole("button", { name: "Done" }).click();
 // Someone who saved a card during a test-mode swap can always find it again to remove it (labelled as test mode).
 cardSaved = true;
 await page.locator(".avatar").click();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByRole("button", { name: "Remove card" }).waitFor();
 await page.getByText("TEST MODE · no real money").waitFor();
-await page.getByRole("button", { name: "Done" }).click();
+await page.getByRole("button", { name: "Back to Profile" }).click();
 cardSaved = false;
 console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Market and the test card are hidden (a saved card can still be removed)");
 
 // 6. Testing tools, switched on with a link: Market tab, sandbox items (labelled), test card and a way to switch off.
 await page.goto(origin + "/index.html?testtools=1");
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
-assert.deepEqual((await tabs()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Wrapped", "Market"]);
+assert.deepEqual((await tabs()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile", "Market"]);
 await page.getByRole("heading", { name: "Testing tools" }).waitFor();
 await page.getByText("Bought in a shop? Add it from the receipt").waitFor();
 await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
@@ -155,10 +156,9 @@ await page.locator(".avatar").click();
 await page.getByRole("button", { name: "Swap & resell", exact: true }).waitFor();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByText("TEST MODE · no real money").waitFor();
-await page.getByRole("button", { name: "Done" }).click();
 await page.goto(origin + "/index.html?testtools=0");
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
-assert.deepEqual((await tabs()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Wrapped"]);
+assert.deepEqual((await tabs()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile"]);
 assert.equal(await page.getByRole("heading", { name: "Testing tools" }).count(), 0);
 console.log("ok - testing tools appear only after ?testtools=1, and ?testtools=0 hides them again");
 
@@ -166,7 +166,7 @@ console.log("ok - testing tools appear only after ?testtools=1, and ?testtools=0
 await page.setViewportSize({ width: 1280, height: 900 });
 await page.reload();
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
-assert.deepEqual((await page.locator("#side button").allInnerTexts()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Wrapped"]);
+assert.deepEqual((await page.locator("#side button").allInnerTexts()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile"]);
 await page.screenshot({ path: "/tmp/shots/launch-desktop.png" });
 // 8. If the account part of the app can't load, the Home page says so instead of waiting forever.
 //    (A fresh browser with no service worker, so account.js can't come from the app's offline copy.)
@@ -199,7 +199,7 @@ await p2.locator("#foot").getByRole("button", { name: "Wallet" }).click();
 await p2.getByRole("heading", { name: "Wallet", exact: true }).first().waitFor();
 await p2.locator("#walletPage").getByText("Long Jacket").waitFor();
 assert.equal(await p2.locator("#foot button.active").innerText(), "Wallet");
-assert.deepEqual((await p2.locator("#foot button").allInnerTexts()).map(x => x.trim()), ["Home", "Wallet", "Receipts", "Discover", "Wrapped", "Market"]);
+assert.deepEqual((await p2.locator("#foot button").allInnerTexts()).map(x => x.trim()), ["Home", "Wallet", "Receipts", "Discover", "Profile", "Market"]);
 await p2.close();
 console.log("ok - ?testing=1 keeps a Wallet tab with the shopper's wallet");
 assert.deepEqual(errors, [], "no page errors");
