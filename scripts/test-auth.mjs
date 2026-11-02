@@ -195,21 +195,21 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   const genv = { ...env, GOOGLE_CLIENT_ID: "client-id.apps.test", GOOGLE_CLIENT_SECRET: "client-secret-test" };
   const b64u = o => Buffer.from(JSON.stringify(o)).toString("base64url");
   const nonceOf = () => Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64url");
-  let claims = {};
+  let claims = {}, grant = {};
   const gfetch = async (url, init) => {
     if (String(url) === "https://oauth2.googleapis.com/token") {
       const p = new URLSearchParams(String(init.body));
       if (p.get("code") !== "good-code" || p.get("client_secret") !== "client-secret-test") return new Response("{}", { status: 400 });
-      return Response.json({ access_token: "a", id_token: "h." + b64u({ iss: "https://accounts.google.com", aud: "client-id.apps.test", exp: Math.floor(clock / 1000) + 3600, email: "alice@example.com", email_verified: true, ...claims }) + ".s" });
+      return Response.json({ access_token: "a", ...grant, id_token: "h." + b64u({ iss: "https://accounts.google.com", aud: "client-id.apps.test", exp: Math.floor(clock / 1000) + 3600, email: "alice@example.com", email_verified: true, ...claims }) + ".s" });
     }
     return new Response("blocked", { status: 500 });
   };
   const gcall = (path, { method = "GET", body, token } = {}) =>
     handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": "9.9.9.9", ...(token ? { authorization: "Bearer " + token } : {}) },
       body: body ? JSON.stringify(body) : undefined }), genv, new URL("https://w.test" + path), {}, { now: clock, fetchImpl: gfetch });
-  async function flow(code = "good-code", extra = "") {
+  async function flow(code = "good-code", extra = "", startBody = {}) {
     const nonce = nonceOf();
-    const st = await (await gcall("/relay/auth/google/start", { method: "POST", body: { nonce } })).json();
+    const st = await (await gcall("/relay/auth/google/start", { method: "POST", body: { nonce, ...startBody } })).json();
     const u = new URL(st.url);
     const cb = await gcall(`/relay/gmail/callback?code=${code}&state=${u.searchParams.get("state")}${extra}`);
     return { nonce, u, cb, loc: cb.headers.get("location") || "" };
@@ -219,7 +219,8 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: { nonce: "x" } })).status, 400);
   const a = await flow();
   assert.equal(a.u.origin + a.u.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
-  assert.equal(a.u.searchParams.get("scope"), "openid email", "identity only: no Gmail access requested");
+  assert.equal(a.u.searchParams.get("scope"), "openid email profile", "identity only (with the name to offer): no Gmail access requested");
+  assert.equal(a.u.searchParams.get("access_type"), null, "and no lasting key asked for");
   assert.equal(a.u.searchParams.get("redirect_uri"), "https://w.test/relay/gmail/callback", "reuses the already-registered redirect address");
   const tok = /#signin=([A-Za-z0-9_-]{43})$/.exec(a.loc);
   assert.ok(tok, a.loc);
@@ -249,6 +250,73 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.match(again.headers.get("location"), /#gsignin=failed$/, "state cannot be replayed");
   assert.match((await gcall(`/relay/gmail/callback?code=good-code&state=${"A".repeat(43)}`)).headers.get("location"), /#gmail=failed$/, "unknown state still goes to the Gmail handler");
   assert.equal(JSON.stringify(sqlite.prepare("SELECT * FROM auth_google_states").all()).includes("good-code"), false, "no code stored");
+
+  // One step: "Agree and continue with Google" signs in AND connects Gmail (read-only), and the first scan starts.
+  const { CONSENT_VERSION } = await import("../worker/gmail.js");
+  const GM = "https://www.googleapis.com/auth/gmail.readonly";
+  assert.equal((await gcall("/relay/auth/google/start", { method: "POST", body: { nonce: nonceOf(), consentVersion: "2026-01-old" } })).status, 400, "only the wording shown now can be agreed to");
+  claims = { name: "Alice Example" };
+  grant = { refresh_token: "GOOGLE-REFRESH-ONESTEP-PLAINTEXT", scope: "openid email profile " + GM };
+  const o1 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+  assert.equal(o1.u.searchParams.get("scope"), "openid email profile " + GM, "sign-in and read-only Gmail on one Google screen");
+  assert.equal(o1.u.searchParams.get("access_type"), "offline");
+  assert.match(o1.u.searchParams.get("prompt"), /consent/);
+  const t1 = /#signin=([A-Za-z0-9_-]{43})$/.exec(o1.loc)[1];
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM auth_pending_mailbox").all()).includes("PLAINTEXT"), "the Gmail key waits encrypted");
+  // Another browser can't finish it: nothing is connected or agreed.
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: t1, nonce: nonceOf() } })).status, 400);
+  const o2 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+  const v2 = await (await gcall("/relay/auth/verify", { method: "POST", body: { token: /#signin=([A-Za-z0-9_-]{43})$/.exec(o2.loc)[1], nonce: o2.nonce } })).json();
+  assert.equal(v2.mailConnected, "google", "Gmail connected in the same step");
+  assert.equal(v2.suggestedName, "Alice Example", "the name Google holds is offered");
+  assert.equal(v2.outlookConnected, undefined);
+  const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'alice@example.com'").get().id;
+  assert.equal(sqlite.prepare("SELECT google_email FROM gmail_connections WHERE shopper_id = ?").get(aliceId).google_email, "alice@example.com", "Gmail connected for the account that signed in");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopper_consents WHERE shopper_id = ? AND version = ? AND withdrawn_at IS NULL").get(aliceId, CONSENT_VERSION).n, 1, "agreement recorded");
+  assert.equal(sqlite.prepare("SELECT state FROM mail_scan_jobs WHERE shopper_id = ?").get(aliceId).state, "running", "the first scan starts straight away");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopper_profiles WHERE shopper_id = ?").get(aliceId)?.n || 0, 0, "the name is only offered, not saved without asking");
+  assert.equal(sqlite.prepare("SELECT provider FROM gmail_connections WHERE shopper_id = ?").get(aliceId).provider, null, "stored as Connect Gmail stores it, so the same mailbox keeps its place");
+  const verifyOneStep = async () => {
+    const o = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+    const t = /#signin=([A-Za-z0-9_-]{43})$/.exec(o.loc)[1];
+    return (await gcall("/relay/auth/verify", { method: "POST", body: { token: t, nonce: o.nonce } })).json();
+  };
+  // An inbox already connected (here, Outlook) is never swapped silently.
+  sqlite.prepare("UPDATE gmail_connections SET provider = 'microsoft', google_email = 'alice@outlook.com' WHERE shopper_id = ?").run(aliceId);
+  const kept = await verifyOneStep();
+  assert.equal(kept.mailConnected, undefined); assert.equal(kept.mailKept, true);
+  assert.deepEqual({ ...sqlite.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?").get(aliceId) }, { provider: "microsoft", google_email: "alice@outlook.com" }, "the Outlook connection is kept");
+  sqlite.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").run(aliceId);
+  // With 2-step sign-in on, nothing is agreed or connected before the code is given.
+  sqlite.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").run(aliceId);
+  sqlite.prepare("INSERT INTO auth_totp (shopper_id, secret_enc, enabled, created_at) VALUES (?, 'x', 1, ?)").run(aliceId, clock);
+  const two = await verifyOneStep();
+  assert.equal(two.needsSecondStep, true);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_connections WHERE shopper_id = ?").get(aliceId).n, 0, "no inbox connected before 2-step is passed");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopper_consents WHERE shopper_id = ?").get(aliceId).n, 0, "and nothing agreed");
+  sqlite.prepare("DELETE FROM auth_totp WHERE shopper_id = ?").run(aliceId);
+  // The wording changed while away at Google: not counted as agreed, nothing connected.
+  const o5 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+  sqlite.prepare("UPDATE auth_pending_mailbox SET consent_version = '2026-01-old'").run();
+  const v5 = await (await gcall("/relay/auth/verify", { method: "POST", body: { token: /#signin=([A-Za-z0-9_-]{43})$/.exec(o5.loc)[1], nonce: o5.nonce } })).json();
+  assert.ok(v5.sessionToken && !v5.mailConnected);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopper_consents WHERE shopper_id = ?").get(aliceId).n, 0, "wording not shown is never recorded as agreed");
+  // Gmail unticked on Google's screen: signed in, nothing connected.
+  sqlite.prepare("DELETE FROM gmail_connections").run();
+  grant = { refresh_token: "R", scope: "openid email profile" };
+  const o3 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+  const v3 = await (await gcall("/relay/auth/verify", { method: "POST", body: { token: /#signin=([A-Za-z0-9_-]{43})$/.exec(o3.loc)[1], nonce: o3.nonce } })).json();
+  assert.ok(v3.sessionToken && !v3.mailConnected);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM gmail_connections").get().n, 0);
+  // A name that isn't a name is not offered.
+  claims = { name: "<script>alert(1)</script>" }; grant = {};
+  const o4 = await flow();
+  const v4 = await (await gcall("/relay/auth/verify", { method: "POST", body: { token: /#signin=([A-Za-z0-9_-]{43})$/.exec(o4.loc)[1], nonce: o4.nonce } })).json();
+  assert.equal(v4.suggestedName, undefined);
+  claims = {}; grant = {};
+  const pv = await (await gcall("/relay/auth/providers")).json();
+  assert.equal(pv.consent.version, CONSENT_VERSION, "the wording is served for Google sign-in too");
+  console.log("ok - one step: Agree and continue with Google signs in, connects Gmail and starts the first scan");
 }
 
 
