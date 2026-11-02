@@ -18,11 +18,11 @@ import { handleSquareTestRoute, enrichSquarePurchases } from "./square-orders.js
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
-import { handleProfileRoute, profileDeleteStatements, ensureProfileTable } from "./profile.js";
+import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, revokeMailbox, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
-  CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
+  CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
@@ -96,6 +96,13 @@ async function ensureAuthTablesRun(db) {
   await runAll(db, statements);
   // Whether a Microsoft sign-in also asked to connect Outlook (the wording version the shopper agreed to on the sign-in screen).
   try { await db.prepare("ALTER TABLE auth_microsoft_states ADD COLUMN mail_consent TEXT").run(); } catch { /* already there */ }
+  // Google can now connect Gmail in the same step as signing in, as Microsoft does for Outlook.
+  try { await db.prepare("ALTER TABLE auth_google_states ADD COLUMN mail_consent TEXT").run(); } catch { /* already there */ }
+  try { await db.prepare("ALTER TABLE auth_pending_mailbox ADD COLUMN provider TEXT").run(); } catch { /* already there */ }
+  // The wording version agreed to on the sign-in screen, so a change while away at Google or Microsoft isn't counted as agreed.
+  try { await db.prepare("ALTER TABLE auth_pending_mailbox ADD COLUMN consent_version TEXT").run(); } catch { /* already there */ }
+  // The name Google or Microsoft gave, offered (never saved without asking) on the "What should we call you?" step.
+  try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN suggested_name TEXT").run(); } catch { /* already there */ }
   await ensureGmailTables(db);
 }
 
@@ -194,25 +201,38 @@ async function verifyLink(request, env, cors, opts) {
   // Single atomic claim: only one request can ever turn a link into a session.
   const claimed = await env.RELAY_DB.prepare(
     `UPDATE auth_login_tokens SET used_at = ?
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email, client_hash`)
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email, client_hash, suggested_name`)
     .bind(now, await sha256Hex(token), now).first();
   if (!claimed) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  const named = claimed.suggested_name ? { suggestedName: claimed.suggested_name } : {};
   // Google sign-ins are tied to the browser that started them, so a link someone else triggers is useless.
   if (String(claimed.client_hash).startsWith("gnonce:")) {
     const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
     if (!nonce || claimed.client_hash !== "gnonce:" + (await sha256Hex("gnonce:" + nonce))) return json({ error: "invalid_or_expired_link" }, 400, cors);
-    // "Sign in and connect Outlook": the shopper agreed to the wording on the sign-in screen of this same browser,
-    // so the agreement is recorded and Outlook connected now, in one step.
+    // "Sign in and connect your email": the shopper agreed to the wording on the sign-in screen of this same browser,
+    // so the agreement is recorded and Gmail or Outlook connected now, in one step. Connecting starts the first scan.
     const pending = await env.RELAY_DB.prepare(
-      "DELETE FROM auth_pending_mailbox WHERE token_hash = ? AND expires_at > ? RETURNING address, token_iv, token_data").bind(await sha256Hex(token), now).first();
+      "DELETE FROM auth_pending_mailbox WHERE token_hash = ? AND expires_at > ? RETURNING address, token_iv, token_data, provider, consent_version").bind(await sha256Hex(token), now).first();
     if (pending) {
+      const provider = pending.provider === "google" ? "google" : "microsoft";
       const shopperId = await ensureShopper(env, claimed.email, now);
-      await recordConsent(env, shopperId, now);
-      await saveConnection(env, shopperId, "microsoft", pending.address, await openToken(env, pending.token_iv, pending.token_data), now);
-      return startSession(env, claimed.email, now, cors, { extra: { outlookConnected: true } });
+      // Nothing is agreed or connected yet when 2-step sign-in still has to be passed (connecting waits for the app's own
+      // step after sign-in), or when the wording changed since it was shown.
+      const twoStep = await env.RELAY_DB.prepare("SELECT 1 AS on1 FROM auth_totp WHERE shopper_id = ? AND enabled = 1").bind(shopperId).first();
+      const sameWording = (pending.consent_version || CONSENT_VERSION) === CONSENT_VERSION;
+      // An inbox already connected (a different one) is never swapped silently: the shopper keeps it.
+      const current = await env.RELAY_DB.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+      const other = current && !(((current.provider === "microsoft") === (provider === "microsoft")) && current.google_email === pending.address);
+      if (!twoStep && sameWording && !other) {
+        await recordConsent(env, shopperId, now);
+        // Gmail connections are stored the way "Connect Gmail" stores them, so the same mailbox keeps its place.
+        await saveConnection(env, shopperId, provider === "google" ? null : "microsoft", pending.address, await openToken(env, pending.token_iv, pending.token_data), now);
+        return startSession(env, claimed.email, now, cors, { extra: { ...named, mailConnected: provider, ...(provider === "microsoft" ? { outlookConnected: true } : {}) } });
+      }
+      return startSession(env, claimed.email, now, cors, { extra: { ...named, ...(other ? { mailKept: true } : {}) } });
     }
   }
-  return startSession(env, claimed.email, now, cors);
+  return startSession(env, claimed.email, now, cors, { extra: named });
 }
 
 async function ensureShopper(env, email, now) {
@@ -288,16 +308,23 @@ async function googleStart(request, env, url, cors, opts) {
   const body = await readJson(request);
   const nonce = body && typeof body.nonce === "string" ? body.nonce : "";
   if (!TOKEN_SHAPE.test(nonce)) return json({ error: "invalid_request" }, 400, cors);
+  // "Agree and continue with Google": the shopper read Relay's wording on the sign-in screen and agreed, so Google is also
+  // asked for read-only Gmail access, and signing in and Connect Gmail happen in one visit to Google.
+  if (body.consentVersion !== undefined && body.consentVersion !== CONSENT_VERSION) return json({ error: "consent_version_mismatch" }, 400, cors);
+  const withMail = body.consentVersion === CONSENT_VERSION;
   const client = await sha256Hex("client:" + (request.headers.get("cf-connecting-ip") || "unknown"));
   await env.RELAY_DB.prepare("DELETE FROM auth_google_states WHERE expires_at <= ?").bind(now).run();
+  await env.RELAY_DB.prepare("DELETE FROM auth_pending_mailbox WHERE expires_at <= ?").bind(now).run();
   const n = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_google_states WHERE client_hash = ? AND created_at > ?").bind(client, now - HOUR_MS).first();
   if ((n?.n || 0) >= MAX_GOOGLE_STARTS_PER_CLIENT_PER_HOUR) return json({ error: "too_many_requests" }, 429, cors);
   const state = randomToken();
-  await env.RELAY_DB.prepare("INSERT INTO auth_google_states (state_hash,client_hash,nonce_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS).run();
+  await env.RELAY_DB.prepare("INSERT INTO auth_google_states (state_hash,client_hash,nonce_hash,created_at,expires_at,mail_consent) VALUES (?,?,?,?,?,?)")
+    .bind(await sha256Hex(state), client, await sha256Hex("gnonce:" + nonce), now, now + GOOGLE_STATE_TTL_MS, withMail ? CONSENT_VERSION : null).run();
   const params = new URLSearchParams({
     client_id: env.GOOGLE_CLIENT_ID, redirect_uri: googleRedirect(env, url), response_type: "code",
-    scope: "openid email", state, prompt: "select_account", include_granted_scopes: "false"
+    scope: withMail ? "openid email profile " + GMAIL_SCOPE : "openid email profile", state, include_granted_scopes: "false",
+    // Google only hands over a lasting key for Gmail when it shows its own permission screen, so that is asked for too.
+    ...(withMail ? { access_type: "offline", prompt: "consent select_account" } : { prompt: "select_account" })
   });
   return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
 }
@@ -313,13 +340,14 @@ async function googleCallback(request, env, url, opts) {
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const back = result => Response.redirect(appUrl + "#gsignin=" + result, 302);
   const claimed = await env.RELAY_DB.prepare(
-    "UPDATE auth_google_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash")
+    "UPDATE auth_google_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING nonce_hash, mail_consent")
     .bind(now, stateHash, now).first();
   if (!claimed) return back("failed");
   if (url.searchParams.get("error")) return back("denied");
   const code = url.searchParams.get("code") || "";
   if (!code) return back("failed");
-  let email = null;
+  const withMail = claimed.mail_consent === CONSENT_VERSION;
+  let email = null, mailbox = null, name = null;
   try {
     const res = await opts.fetchImpl("https://oauth2.googleapis.com/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -332,13 +360,24 @@ async function googleCallback(request, env, url, opts) {
     if (part) {
       const claims = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(part.replace(/-/g, "+").replace(/_/g, "/")), c => c.charCodeAt(0))));
       const issOk = claims.iss === "https://accounts.google.com" || claims.iss === "accounts.google.com";
-      if (issOk && claims.aud === env.GOOGLE_CLIENT_ID && Number(claims.exp) * 1000 > now && claims.email_verified === true) email = normaliseEmail(claims.email);
+      if (issOk && claims.aud === env.GOOGLE_CLIENT_ID && Number(claims.exp) * 1000 > now && claims.email_verified === true) {
+        email = normaliseEmail(claims.email);
+        name = providerName(claims);
+      }
     }
+    // Read-only Gmail granted as well (Google lets people untick it): kept, encrypted, until this browser finishes signing in.
+    const granted = String((tokens && tokens.scope) || "").split(/\s+/);
+    if (withMail && tokens && typeof tokens.refresh_token === "string" && granted.includes(GMAIL_SCOPE)) mailbox = tokens.refresh_token;
   } catch { email = null; }
   if (!email) return back("failed");
-  const token = randomToken();
-  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(await sha256Hex(token), email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+  const token = randomToken(), tokenHash = await sha256Hex(token);
+  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at,suggested_name) VALUES (?,?,?,?,?,?)")
+    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS, name).run();
+  if (mailbox) {
+    const sealed = await sealToken(env, mailbox);
+    await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at,provider,consent_version) VALUES (?,?,?,?,?,?,?,?)")
+      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS, "google", claimed.mail_consent).run();
+  }
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
 
@@ -349,6 +388,11 @@ async function googleCallback(request, env, url, opts) {
 const MS_CONSUMER_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad";
 const MICROSOFT_MAIL = /@(?:(?:outlook|hotmail|live)\.(?:com|co\.uk|com\.au|co\.jp|co\.nz|co\.za|co\.il|co\.th|co\.kr|com\.ar|com\.br|com\.gr|com\.mx|com\.my|com\.sg|com\.tr|com\.vn|fr|de|it|es|nl|be|ie|ca|at|ch|dk|se|no|fi|pt|jp|cz|hu|in|kr|lv|ph|sa|sk|cl|gr|ru)|msn\.com|passport\.com|windowslive\.com)$/;
 const MS_SIGNIN_SCOPE = "openid email profile";
+// The person's name as Google or Microsoft holds it, tidied to what the profile accepts. Only offered, never saved without asking.
+function providerName(claims) {
+  const raw = String((claims && (claims.name || [claims.given_name, claims.family_name].filter(Boolean).join(" "))) || "");
+  return cleanName(raw) || null;
+}
 function decodeClaims(idToken) {
   const part = typeof idToken === "string" ? idToken.split(".")[1] : "";
   if (!part) return null;
@@ -401,7 +445,7 @@ async function microsoftCallback(request, env, url, opts) {
   const code = url.searchParams.get("code") || "";
   if (!code || !outlookConfigured(env)) return back("failed");
   const withMail = claimed.mail_consent === CONSENT_VERSION;
-  let email = null, otherAddress = false, mailbox = null;
+  let email = null, otherAddress = false, mailbox = null, name = null;
   try {
     const res = await opts.fetchImpl(MS_AUTH + "/token", {
       method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -416,18 +460,18 @@ async function microsoftCallback(request, env, url, opts) {
     if (claims && claims.iss === "https://login.microsoftonline.com/" + MS_CONSUMER_TENANT + "/v2.0" && claims.tid === MS_CONSUMER_TENANT &&
         claims.aud === env.MICROSOFT_CLIENT_ID && Number(claims.exp) * 1000 > now) {
       const address = normaliseEmail(claims.email || claims.preferred_username);
-      if (address && MICROSOFT_MAIL.test(address)) email = address;
+      if (address && MICROSOFT_MAIL.test(address)) { email = address; name = providerName(claims); }
       else otherAddress = Boolean(address);
     }
   } catch { email = null; }
   if (!email) return back(otherAddress ? "other_address" : "failed");
   const token = randomToken(), tokenHash = await sha256Hex(token);
-  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS).run();
+  await env.RELAY_DB.prepare("INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at,suggested_name) VALUES (?,?,?,?,?,?)")
+    .bind(tokenHash, email, "gnonce:" + claimed.nonce_hash, now, now + LINK_TTL_MS, name).run();
   if (mailbox) {
     const sealed = await sealToken(env, mailbox);
-    await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at) VALUES (?,?,?,?,?,?)")
-      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS).run();
+    await env.RELAY_DB.prepare("INSERT INTO auth_pending_mailbox (token_hash,address,token_iv,token_data,created_at,expires_at,provider,consent_version) VALUES (?,?,?,?,?,?,?,?)")
+      .bind(tokenHash, email, sealed.iv, sealed.data, now, now + LINK_TTL_MS, "microsoft", claimed.mail_consent).run();
   }
   return Response.redirect(appUrl + "#signin=" + token, 302);
 }
@@ -480,10 +524,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/microsoft/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await microsoftStart(request, env, url, cors, o); }
     // Which sign-in buttons the app should show. Says nothing about any shopper.
     if (path === "/relay/auth/providers" && request.method === "GET") {
-      const microsoft = configured(env) && outlookConfigured(env);
-      // The wording a Microsoft sign-in agrees to (it also connects Outlook), shown on the sign-in screen before going to Microsoft.
-      return json({ email: configured(env), google: configured(env) && googleConfigured(env), microsoft,
-        ...(microsoft ? { consent: { version: CONSENT_VERSION, text: CONSENT_TEXT } } : {}) }, 200, cors);
+      const microsoft = configured(env) && outlookConfigured(env), google = configured(env) && googleConfigured(env);
+      // The wording a Google or Microsoft sign-in agrees to (it also connects Gmail or Outlook), shown before going there.
+      return json({ email: configured(env), google, microsoft,
+        ...(microsoft || google ? { consent: { version: CONSENT_VERSION, text: CONSENT_TEXT } } : {}) }, 200, cors);
     }
     if (path.startsWith("/relay/auth/passkey/") && configured(env)) {
       await ensureAuthTables(env.RELAY_DB);
