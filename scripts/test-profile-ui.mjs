@@ -39,14 +39,14 @@ await page.reload(); await page.waitForTimeout(500);
 const avatar = page.locator(".avatar").first();
 assert.equal((await avatar.textContent()).trim(), "JT", "no name or photo yet: both initials, from jess.tester@");
 
-// 1. Account page: add a name and a photo.
+// 1. The Profile page (the avatar opens it): add a name and a photo.
 await avatar.click();
-await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+await page.locator("#mePage .rl-ahead").waitFor();
 await page.getByRole("button", { name: "Edit your name and photo" }).click();
 await page.getByRole("heading", { name: "Your profile" }).waitFor();
 await page.getByLabel("Your name").fill("Jess Tester");
-await page.locator('.rl-sheet input[type="file"]').setInputFiles("icons/icon-512.png");
-await page.locator(".rl-sheet .rl-face img").waitFor();
+await page.locator('#mePage input[type="file"]').setInputFiles("icons/icon-512.png");
+await page.locator("#mePage .rl-face img").waitFor();
 await page.screenshot({ path: "/tmp/shots/profile-edit.png" });
 await page.getByRole("button", { name: "Save" }).click();
 await page.waitForTimeout(400);
@@ -58,10 +58,10 @@ assert.ok(bytes.length < 150_000, "small enough: " + bytes.length);
 assert.ok(!bytes.includes(Buffer.from("Exif")), "no camera details (like location) are left in it");
 const size = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = src; }), sent.photo);
 assert.deepEqual(size, [256, 256], "cut to a 256 × 256 square");
-await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+await page.locator("#mePage .rl-ahead").waitFor();
 assert.equal(await page.locator(".rl-ahead b").textContent(), "Jess Tester", "once saved, back on the Account page with the name");
 assert.equal(await page.locator(".rl-ahead .rl-face img").count(), 1, "and the photo");
-await page.getByRole("button", { name: "Done" }).click();
+await page.evaluate(() => window.go("profile"));
 assert.match(await page.locator("#homeHello").textContent(), /, Jess$/, "Home greets them by first name");
 assert.ok(await avatar.evaluate(a => a.classList.contains("rl-has-photo") && a.style.backgroundImage.startsWith('url("data:image/jpeg')), "the avatar shows the photo");
 await page.screenshot({ path: "/tmp/shots/profile-page.png" });
@@ -76,16 +76,16 @@ console.log("ok - the avatar shows the photo straight away on the next visit");
 
 // 3. The Account page shows them, and editing goes there and back.
 await avatar.click();
-await page.locator(".rl-sheet").getByText("Jess Tester").first().waitFor();
-await page.locator(".rl-sheet .rl-face img").waitFor();
-assert.equal(await page.locator(".rl-sheet .rl-face img").count(), 1);
+await page.locator("#mePage").getByText("Jess Tester").first().waitFor();
+await page.locator("#mePage .rl-face img").waitFor();
+assert.equal(await page.locator("#mePage .rl-face img").count(), 1);
 await page.screenshot({ path: "/tmp/shots/profile-account-sheet.png" });
 await page.getByRole("button", { name: "Edit your name and photo" }).click();
 await page.getByRole("heading", { name: "Your profile" }).waitFor();
 // Remove the photo: the avatar goes back to the first letter of the name.
 await page.getByRole("button", { name: "Remove photo" }).click();
 await page.getByRole("button", { name: "Save" }).click();
-await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+await page.locator("#mePage .rl-ahead").waitFor();
 assert.equal(posts[posts.length - 1].photo, null, "removing sends no photo");
 assert.equal((await avatar.textContent()).trim(), "JT", "both initials of the name");
 assert.ok(!(await avatar.evaluate(a => a.classList.contains("rl-has-photo"))));

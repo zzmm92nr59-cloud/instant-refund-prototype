@@ -14,7 +14,11 @@ const style = { receipts: [
 let photos = [{ id: "11111111-1111-4111-8111-111111111111", shop: "Lululemon", item: "Align Pant", more: 0, date: "2026-03-02" }, { id: "22222222-2222-4222-8222-222222222222", shop: "Kick Lane", item: "Court Trainers", more: 1, date: "2026-04-02" }, { id: "33333333-3333-4333-8333-333333333333", shop: "Gone", item: "Missing photo", more: 0 }];
 // The whole year's Wrapped, or (with an industry) the Wrapped for one kind of shopping.
 let industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }, { category: "digital", label: "Digital & subscriptions", receipts: 8, spentPence: 3992 }];
-const W = (industry) => ({ ...base(), industries, ...(industry === "fashion" ? { industry: "fashion", industryLabel: "Fashion", personality: null, subscriptions: [] } : { industry: null }) });
+const W = () => ({ ...base(), industries, industry: null, chapters: [
+  { category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600, withTotal: 4, share: 89, topShop: { name: "Kick Lane", receipts: 2, spentPence: 12000 }, shops: 3, items: 5,
+    topItem: { name: "Align Pant", times: 3 }, things: ["Align Pant"], biggest: { shop: "Lululemon", item: "Align Pant", totalPence: 21600 }, busiestMonth: "Mar", favouriteDay: "Saturday", photos: [], subscriptions: 0, fact: { kind: "perPiece", pence: 6720, pieces: 5 } },
+  { category: "digital", label: "Digital & subscriptions", receipts: 8, spentPence: 3992, withTotal: 8, share: 11, topShop: { name: "Apple", receipts: 8, spentPence: 3992 }, shops: 1, items: 8,
+    topItem: null, things: [], biggest: null, busiestMonth: "Mar", favouriteDay: null, photos: [], subscriptions: 1, fact: { kind: "perMonth", pence: 499, months: 8 } }] });
 const base = () => ({ year: 2026, years: [{ year: 2026, receipts: 4 }], receipts: 4, shops: 3, items: 5, spentPence: 33600, currency: "GBP", topItem: null, refundedPence: 0, refundsMatched: 0, topShopShare: 40, activeMonths: 3, firstDate: "2026-01-04",
   coverage: { withTotal: 4, noTotal: 0, otherCurrency: 0 }, topShops: [{ name: "Lululemon", receipts: 1, spentPence: 21600 }, { name: "Kick Lane", receipts: 2, spentPence: 12000 }],
   categories: [{ category: "fashion", label: "Fashion", receipts: 4, topShop: { name: "Kick Lane", receipts: 2 } }], byMonth: months.map((m, i) => ({ month: m, receipts: i === 2 ? 2 : 0, spentPence: 0 })), busiestMonth: "Mar",
@@ -38,6 +42,9 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   if (u.pathname === "/relay/my/style") return j(style);
   if (u.pathname === "/relay/my/wrapped") { wrappedAsks.push(u.searchParams.get("industry")); return j(W(u.searchParams.get("industry"))); }
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
+  if (u.pathname === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
+  if (u.pathname === "/relay/my/gmail") return j({ connected: true, provider: "google", email: "c@example.com", lastScanAt: Date.now() });
+  if (u.pathname === "/relay/my/profile") return j({ email: "c@example.com", name: "Cat", photo: null });
   return j({}); });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 await page.addInitScript(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "S".repeat(43), email: "c@example.com" })));
@@ -63,93 +70,46 @@ await card.getByRole("button", { name: "Forget" }).click();
 assert.equal(await card.getByText("YOUR STYLE, FROM YOUR RECEIPTS").count(), 0);
 console.log("PASS Discover style: opt-in, sizes/colours/styles from receipts, store search explains what goes first, forget works");
 
-// Wrapped: real photos only; a photo that can't be fetched is left out, never replaced.
+// Wrapped: one story a year on the Profile page. Total, where it went, a chapter (with its own scene) per kind of
+// shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.
 await page.evaluate(() => window.go("wrapped"));
-await page.getByRole("button", { name: /Play your story/ }).waitFor();
-const strip = page.locator(".rl-wr-strip");
-await page.waitForFunction(() => document.querySelectorAll(".rl-wr-strip img").length === 2);
-await page.waitForTimeout(300);
-assert.equal(await strip.locator("figure").count(), 2, "the photo that couldn't load is removed, not swapped for another picture");
-assert.ok((await strip.innerText()).includes("Court Trainers +1"));
-await page.getByRole("button", { name: /Play your story/ }).click();
-const texts = [];
+assert.equal(await page.evaluate(() => window.page), "me", "the old Wrapped address opens Profile");
+await page.getByRole("button", { name: "Play your 2026 story" }).waitFor();
+assert.match(await page.locator("#rl-wrapped").innerText(), /Your 2026 in purchases\.\s+£336\.00 · 4 receipts · 2 chapters/);
+assert.equal(await page.locator(".rl-wr-kinds").count(), 0, "no separate Wrapped per kind any more: one story");
+assert.equal(await page.locator("#rl-wrapped .rl-wr-dots i").count(), 2, "the card's colour strip shows how the year split");
+await page.getByRole("button", { name: "Play your 2026 story" }).click();
+assert.equal(await page.locator(".rl-story-x svg").count(), 1, "close is a drawn icon"); assert.equal((await page.locator(".rl-story-x").innerText()).trim(), "");
+const texts = [], scenes = [];
 for (let k = 0; k < 20; k++) {
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(900);
   texts.push(await page.locator(".rl-story-body").innerText());
-  if (texts.at(-1).includes("Some things you brought home")) { assert.equal(await page.locator(".rl-story-body .ph img").count(), 2); assert.match(await page.locator(".rl-story-body .ph").getAttribute("class"), /\bn2\b/, "the grid re-flows for the photos that loaded"); await page.screenshot({ path: "/tmp/shots/wrapped-photos.png" }); }
-  if (texts.at(-1).includes("Your shop sprint")) { assert.equal(await page.locator(".rl-story-body .sprint .row").count(), 3, "a header row and one row per shop"); await page.screenshot({ path: "/tmp/shots/wrapped-sprint.png" }); }
-  if (texts.at(-1).includes("Your badges")) await page.screenshot({ path: "/tmp/shots/wrapped-badges.png" });
+  if (await page.locator(".rl-story-body .scene").count()) scenes.push(await page.locator(".rl-story-body .scene").getAttribute("class"));
+  if (texts.at(-1).includes("Some things you brought home")) { assert.equal(await page.locator(".rl-story-body .ph img").count(), 2); assert.match(await page.locator(".rl-story-body .ph").getAttribute("class"), /\bn2\b/, "the grid re-flows for the photos that loaded"); }
+  if (texts.at(-1).includes("CHAPTER 1")) await page.screenshot({ path: "/tmp/shots/wrapped-chapter-fashion.png" });
+  if (texts.at(-1).includes("Where it went")) await page.screenshot({ path: "/tmp/shots/wrapped-split.png" });
   if (await page.getByRole("button", { name: "Watch again" }).count()) break;
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-// The whole year: no top-5 lists that mix kinds of shopping, and the style slide belongs to fashion.
-for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Some things you brought home/,
-  /Your shopping time\s+23 days/, /Saturday was your day \(7 of them\)/, /5 months in a row/, /Your shop sprint/,
-  /Your regular\s+Things you paid for month after month\.\s+1\s+Apple · Match Masters\s+8 months/, /Your badges\s+Loyal to Lululemon/, /Weekend Shopper/,
-  /your go-to was Kick Lane \(2\)/, /Align Pant, at Lululemon on 2 March/, /The Style Seeker/]) assert.match(story, re);
-for (const re of [/Your top 5/, /Your biggest buys/, /Your style in 2026/, /Photos from your own order emails/]) assert.doesNotMatch(story, re);
-assert.equal(await page.getByRole("button", { name: "Save my list" }).count(), 0, "no mixed list to save");
+const order = [/RELAY WRAPPED 2026/, /In 2026 you spent/, /Where it went/, /CHAPTER 1 · FASHION/, /CHAPTER 2 · DIGITAL & SUBSCRIPTIONS/, /Your top shops/, /Your busiest month/, /MY 2026 ON RELAY/];
+let at = -1; for (const re of order) { const i = texts.findIndex((x, n) => n > at && re.test(x)); assert.ok(i > at, "in order: " + re); at = i; }
+for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Fashion\s+89% · £336\.00|Fashion\s+\d+% · £/, /Digital & subscriptions/,
+  /89% of your year · 4 orders · 3 places/, /5 pieces added to your wardrobe, about £67\.20 each\./, /Your go-to shop\s+Kick Lane · 2×/, /Bought again and again\s+Align Pant · 3×/, /Your style\s+Sporty & Relaxed/,
+  /About £4\.99 a month on apps and subscriptions\./, /Your badges\s+Loyal to Lululemon/, /Biggest chapter\s+Fashion/]) assert.match(story, re);
+assert.deepEqual(scenes.map(c => c.replace("scene ", "")), ["sc-fashion", "sc-digital"], "each chapter has its own scene");
+for (const re of [/Your top 5/, /Your shop sprint/, /Your favourite kind of shopping/]) assert.doesNotMatch(story, re);
 await page.keyboard.press("Escape");
-
-// Fashion on its own: its own top 5, biggest buys, go-to shop and style.
-await page.locator(".rl-wr-kinds").getByRole("button", { name: "Fashion" }).click();
-await page.getByRole("heading", { name: "Your 2026 in fashion." }).waitFor();
-assert.equal(wrappedAsks.at(-1), "fashion");
-assert.equal(await page.locator(".rl-wr-kinds button.on").innerText(), "Fashion");
-await page.screenshot({ path: "/tmp/shots/wrapped-fashion.png" });
-await page.getByRole("button", { name: /Play your fashion story/ }).click();
-const fashion = [];
-for (let k = 0; k < 20; k++) {
-  await page.waitForTimeout(1300);
-  fashion.push(await page.locator(".rl-story-body").innerText());
-  if (await page.getByRole("button", { name: "Watch again" }).count()) break;
-  await page.keyboard.press("ArrowRight");
-}
-const fs1 = fashion.join("\n");
-assert.ok(fashion.some(x => /Your top 5 pieces/.test(x)));
-for (const re of [/RELAY WRAPPED · FASHION/, /Your 2026 in fashion\./, /Your go-to for fashion/, /Your top fashion shops/, /Your top 5 pieces\s+1\s+Align Pant\s+3×/, /Socks, 3 pack\s+2×/,
-  /Your biggest fashion buys/, /3 things · Kick Lane/, /Your style in 2026/, /sporty and relaxed/, /MY 2026 IN FASHION ON RELAY/, /Style\s+Sporty & Relaxed/, /Top piece\s+Align Pant/]) assert.match(fs1, re);
-for (const re of [/Your favourite kind of shopping/, /Your regular/, /The Style Seeker/]) assert.doesNotMatch(fs1, re);
-const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save my list" }).click()]);
-assert.equal(dl.suggestedFilename(), "relay-2026-fashion-top-things.csv");
-const csv = await (await import("node:fs/promises")).readFile(await dl.path(), "utf8");
-assert.equal(csv.split("\n")[0], "Rank,Item,Shop,Orders,Spent");
-assert.equal(csv.split("\n")[2], '2,"Socks, 3 pack",Kick Lane,2,18.00', "commas in names are quoted");
-await page.keyboard.press("Escape");
-await page.locator(".rl-wr-kinds").getByRole("button", { name: "All" }).click();
-await page.getByRole("heading", { name: "Your 2026 in purchases." }).waitFor();
-
-// A year that is all one kind of shopping has nothing to mix: no chips, and the whole story keeps its top 5, buys, style and list.
-industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }];
-await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/wrapped/.test(k)) localStorage.removeItem(k); });
-await page.reload(); await page.waitForTimeout(800);
-await page.evaluate(() => window.go("wrapped"));
-await page.getByRole("button", { name: /Play your story/ }).waitFor();
-assert.equal(await page.locator(".rl-wr-kinds").count(), 0, "no chips when there's only one kind");
-await page.getByRole("button", { name: /Play your story/ }).click();
-const single = [];
-for (let k = 0; k < 20; k++) {
-  await page.waitForTimeout(700);
-  single.push(await page.locator(".rl-story-body").innerText());
-  if (await page.getByRole("button", { name: "Watch again" }).count()) break;
-  await page.keyboard.press("ArrowRight");
-}
-for (const re of [/Your top 5 things\s+1\s+Align Pant/, /Your biggest buys/, /Your style in 2026/]) assert.match(single.join("\n"), re);
-const [dl2] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Save my list" }).click()]);
-assert.equal(dl2.suggestedFilename(), "relay-2026-top-things.csv");
-await page.keyboard.press("Escape");
-industries = [{ category: "fashion", label: "Fashion", receipts: 4, spentPence: 33600 }, { category: "digital", label: "Digital & subscriptions", receipts: 8, spentPence: 3992 }];
 
 // No checked photos: no photo slide and not a single picture anywhere in the story.
 photos = [];
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/wrapped/.test(k)) localStorage.removeItem(k); });
 await page.reload(); await page.waitForTimeout(800);
-await page.evaluate(() => window.go("wrapped"));
-await page.getByRole("button", { name: /Play your story/ }).click();
+await page.evaluate(() => window.go("me"));
+await page.getByRole("button", { name: "Play your 2026 story" }).click();
 const plain = [];
 for (let k = 0; k < 20; k++) {
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(500);
   plain.push(await page.locator(".rl-story-body").innerText());
   assert.equal(await page.locator(".rl-story-body img").count(), 0, "no stand-in pictures");
   if (await page.getByRole("button", { name: "Watch again" }).count()) break;
@@ -157,5 +117,5 @@ for (let k = 0; k < 20; k++) {
 }
 assert.ok(!plain.join("\n").includes("brought home"));
 assert.deepEqual(errors, []);
-console.log("PASS Wrapped: real photos of things you bought (or none at all), first buy, no mixed top 5s, a fashion Wrapped with its own top 5, buys and style");
+console.log("PASS Wrapped: one yearly story on Profile (total, split, a chapter with its own scene per kind, highlights), real photos only");
 await browser.close(); server.close();
