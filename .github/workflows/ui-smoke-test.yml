@@ -38,3 +38,5 @@ jobs:
         run: node scripts/test-launch-ui.mjs
       - name: Test Wrapped for each kind of shopping, and the Discover style card
         run: node scripts/test-style-ui.mjs
+      - name: Test against the common "built in a hurry" tells (sizes, colours, double taps, caching, first visit)
+        run: node scripts/test-polish-ui.mjs
