@@ -34,3 +34,7 @@ jobs:
         run: node scripts/ui-smoke-test.mjs
       - name: Test swaps with a price difference and saving a card (stand-in Stripe)
         run: node scripts/test-swap-ui.mjs
+      - name: Test the app as shoppers see it at launch (four tabs, Profile with wallet, no test wording)
+        run: node scripts/test-launch-ui.mjs
+      - name: Test Wrapped for each kind of shopping, and the Discover style card
+        run: node scripts/test-style-ui.mjs
