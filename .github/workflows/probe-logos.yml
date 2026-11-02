@@ -1,0 +1,19 @@
+name: Probe logo sources (temporary)
+on:
+  push:
+    branches: [probe-logos]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > p.mjs <<'JS'
+          for (const d of ["jdwetherspoon.co.uk", "just-eat.co.uk", "myprotein.com", "sainsburys.co.uk", "qwzx-not-a-shop-8812.co.uk"]) {
+            for (const accept of ["image/*", "image/png"]) {
+              const r = await fetch(`https://www.google.com/s2/favicons?domain=${d}&sz=128`, { headers: { Accept: accept }, redirect: "follow" });
+              const b = new Uint8Array(await r.arrayBuffer());
+              console.log(d, "accept=" + accept, r.status, r.headers.get("content-type"), b.length, "bytes", Buffer.from(b.slice(0, 16)).toString("hex"), r.url.slice(0, 60));
+            }
+          }
+          JS
+          node p.mjs
