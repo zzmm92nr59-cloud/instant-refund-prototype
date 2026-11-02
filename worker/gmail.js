@@ -17,7 +17,8 @@ import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliv
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
-import { categorise, storeKey, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { categorise, storeKey, legacyStoreKey, agreedShopNames, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { cleanItems, isVia } from "./receipt-reader.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 import { ensurePushTables, subsOf, sendPush } from "./push.js";
@@ -60,6 +61,12 @@ const MAX_READ_TRIES = 3;
 // Bump to have every Outlook mailbox's whole look-back period listed again once (only emails never read are read).
 // 1: emails Outlook refused during earlier scans were never captured.
 const OUTLOOK_FULL_REV = 1;
+// Raised when the receipt reader improves enough that every mailbox should be read once more in the background
+// (only emails read by an older reader are opened again). 2: shop, item and group ranking.
+const READER_FULL_REV = 2;
+const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
+// Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
+const RECENT_ORDER_DAYS = 120;
 const sleep = ms => new Promise(res => setTimeout(res, ms));
 // A request Outlook refused for being too busy is asked once more after the wait it asks for (at most 2 seconds here;
 // anything longer is left for the next round).
@@ -75,7 +82,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 17;
+const PARSER_VERSION = 18;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -254,8 +261,8 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
 
 // Whether the mailbox still needs its whole look-back period read: never finished, or an Outlook mailbox read before
 // the fix in OUTLOOK_FULL_REV.
-function needsFullRead(lastScanAt, provider, fullRev) {
-  return !lastScanAt || (provider === "microsoft" && (fullRev || 0) < OUTLOOK_FULL_REV);
+export function needsFullRead(lastScanAt, provider, fullRev) {
+  return !lastScanAt || (fullRev || 0) < (provider === "microsoft" ? FULL_REV : READER_FULL_REV);
 }
 
 async function hasConsent(db, shopperId) {
@@ -681,7 +688,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at) VALUES (?,?,?) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at").bind(shopperId, yr, now).run();
   } else if (!more && !o.recent) {
     // A finished read of the whole look-back period also records which full read it was (see OUTLOOK_FULL_REV).
-    if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, OUTLOOK_FULL_REV, shopperId).run();
+    if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, FULL_REV, shopperId).run();
     else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
   }
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
@@ -1085,8 +1092,19 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const rows = await env.RELAY_DB.prepare(
     "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT " + maxRows)
     .bind(shopperId).all();
-  lap("rowsMs"); if (timing) timing.rowCount = (rows.results || []).length;
-  const all = (rows.results || []).map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
+  // Recent orders always come too, even when lots of newer emails were read after them (otherwise an order still inside
+  // its return window could miss the wallet just because many receipts arrived since).
+  let recentRows = [];
+  if (!opts.rows || opts.rows < 3000) {
+    const since = new Date(Date.now() - RECENT_ORDER_DAYS * DAY_MS).toISOString().slice(0, 10);
+    recentRows = (await env.RELAY_DB.prepare(
+      "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') AND json_extract(details, '$.orderDate') >= ? ORDER BY created_at DESC LIMIT 1000")
+      .bind(shopperId, since).all()).results || [];
+  }
+  const seenRow = new Set();
+  const rowList = [...(rows.results || []), ...recentRows].filter(r => !seenRow.has(r.id) && seenRow.add(r.id));
+  lap("rowsMs"); if (timing) timing.rowCount = rowList.length;
+  const all = rowList.map(r => ({ id: r.id, status: r.status, createdAt: r.createdAt, ...JSON.parse(r.details) }));
   lap("parseMs");
   const plans = all.filter(x => x.kind === "return_instructions");
   const deliveries = all.filter(x => x.kind === "delivery_update");
@@ -1094,7 +1112,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update"));
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
-  const keys = [...new Set(orders.map(storeKey).filter(Boolean))];
+  const keys = [...new Set(orders.flatMap(o => [storeKey(o), legacyStoreKey(o)]).filter(Boolean))];
   const lookups = [];
   for (let i = 0; i < keys.length; i += 40) {
     const chunk = keys.slice(i, i + 40), qs = chunk.map(() => "?").join(",");
@@ -1134,22 +1152,32 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     return a.length && a[0].n >= 2 && (a.length === 1 || a[0].n > a[1].n) ? a[0].category : null;
   };
   lap("prepMs");
+  const recentDay = new Date(Date.now() - RECENT_ORDER_DAYS * DAY_MS).toISOString().slice(0, 10);
+  // One name per shop across all receipts from the same address (see agreedShopNames).
+  const agreed = agreedShopNames(cards);
   return cards.filter(c => {
     // A store the shopper said "this is just promotions" about only hides emails that carry no order number.
-    const l = mine.get(storeKey(c));
+    const l = mine.get(storeKey(c)) || mine.get(legacyStoreKey(c));
     if (l && l.promo && !c.orderRef && c.kind !== "return_instructions") return false;
     // Relay's own emails (return labels, swap confirmations) are not purchases.
     return !isRelayEmail(c, env);
-  }).sort((a, b) => whenOf(b).localeCompare(whenOf(a)) || b.createdAt - a.createdAt).slice(0, maxCards).map(c => {
-    const k = storeKey(c), l = mine.get(k);
-    const learned = (l && l.category) || crowdPick(k) || null;
+  }).sort((a, b) => whenOf(b).localeCompare(whenOf(a)) || b.createdAt - a.createdAt)
+    .filter((c, i) => i < maxCards || String(c.orderDate || "") >= recentDay).map(c => {
+    const k = storeKey(c), old = legacyStoreKey(c), l = mine.get(k) || mine.get(old);
+    const learned = (l && l.category) || crowdPick(k) || (old !== k ? crowdPick(old) : null) || null;
     // Apple receipts list every charge as an item, so when the total line wasn't found the items add up to it.
     if (c.totalPence == null && /(^|\.)apple\.com$/i.test((c.retailer && c.retailer.domain) || "") && (c.items || []).length && c.items.every(i => Number.isInteger(i.pricePence)))
       c = { ...c, totalPence: c.items.reduce((n, i) => n + i.pricePence, 0), totalFrom: "items" };
-    const shown = shopDisplayName(c.retailer);
-    const retailer = c.retailer && shown && shown !== c.retailer.name ? { ...c.retailer, name: shown, legalName: c.retailer.name || null } : c.retailer;
+    // Receipts read by an older version are tidied here too: lines that aren't items go, the shop gets one clean name, and a
+    // payment company's address (Shopify, Stripe…) is never shown as the shop's.
+    const r0 = c.retailer || {};
+    const domain = r0.domain ? String(r0.domain).toLowerCase().replace(/[^a-z0-9.-]/g, "") : null;
+    const shown = (domain && agreed.get(domain)) || shopDisplayName({ ...r0, domain });
+    const via = r0.via || (isVia(domain) ? domain : null);
+    const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
+    c = { ...c, retailer, items: cleanItems(c.items) };
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
-    return { ...c, retailer, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
+    return { ...c, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
   });
 }
 

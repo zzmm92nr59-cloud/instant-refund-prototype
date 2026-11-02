@@ -9,6 +9,8 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
+import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain } from "./receipt-reader.js";
+import { PERSONAL_MAIL } from "./receipt-category.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -161,8 +163,9 @@ function money(str) {
 function retailerFromFrom(fromHeader) {
   if (!fromHeader) return null;
   const name = fromHeader.match(/^\s*"?([^"<]+?)"?\s*</);
-  const addr = fromHeader.match(/<?([^<>\s]+@[^<>\s]+)>?/);
-  const domain = addr ? addr[1].split("@")[1].toLowerCase() : null;
+  const addr = fromHeader.match(/<?([^<>\s"']+@[^<>\s"']+)>?/);
+  // (A quote straight after the address, as in `orders@tempur.com"`, is not part of it.)
+  const domain = addr ? addr[1].split("@")[1].toLowerCase().replace(/[^a-z0-9.-]+$/, "") : null;
   const generic = /^(orders?|noreply|no-reply|info|hello|customer.?service|team|support|shop|store|sales)\b/i;
   const display = name ? name[1].trim() : null;
   return {
@@ -289,6 +292,22 @@ function fromText(text, refDate) {
       }
       const vm = rows[i].match(/\/\s*(.{2,60})$/);
       if (nameLines.length) items.push({ name: nameLines.join(" ").trim(), qty: Number(v[1]), pricePence: price, lineTotal: true, ...(vm ? { variant: vm[1].trim() } : {}) });
+    }
+  }
+  // Shopify-style: "Product name × 1" on one line, maybe a size or colour under it, then its price.
+  if (!items.length) {
+    const rows = text.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+    for (let i = 0; i < rows.length; i++) {
+      const head = rows[i].match(/^(\p{L}[^£|]{1,100}?)\s*[×x]\s?(\d{1,2})$/u);
+      if (!head || /total|subtotal|delivery|shipping|discount/i.test(head[1])) continue;
+      let price = null, variant = null;
+      for (let j = i + 1; j < Math.min(rows.length, i + 4) && price == null; j++) {
+        const pm = rows[j].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
+        if (pm) price = money(pm[1]);
+        else if (!variant && rows[j].length <= 60 && !/[×]|£/.test(rows[j]) && /\//.test(rows[j])) variant = rows[j];
+        else if (!variant && rows[j].length <= 40 && /^(size|colou?r|style)\b/i.test(rows[j])) variant = rows[j];
+      }
+      if (price != null) items.push({ name: head[1].trim(), qty: Number(head[2]), pricePence: price, lineTotal: true, ...(variant ? { variant } : {}) });
     }
   }
   const sub = text.match(/\bsubtotal\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
@@ -437,6 +456,25 @@ export function appleItems(text) {
   return items;
 }
 
+// The shop, ranked from every clue in the email (see receipt-reader.js).
+function shopOf({ ld, sender, fromName, subject, text, html }) {
+  const domain = sender?.domain || null;
+  const personal = PERSONAL_MAIL.test(domain || "");
+  const fw = forwardedSender(text);
+  const ranked = rankShop({
+    dataName: ld?.retailerName || null,
+    forwardedName: fw?.name || null, forwardedDomain: fw?.domain || null,
+    senderName: sender?.name ? fromName : null, senderDomain: domain, personal,
+    bodyNames: shopNamesInText(text, subject),
+    linkDomain: mainLinkDomain(html),
+  });
+  // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
+  const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
+  if (ranked.via) out.via = ranked.via;
+  if (!out.name && !out.domain && domain) out.domain = domain;
+  return out;
+}
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -449,6 +487,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
 
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
+  // The sender's display name exactly as written (retailerFromFrom drops generic ones such as "Orders").
+  const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
 
   const sig = receiptSignals(subject, text);
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
@@ -472,10 +512,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     source: "shopper_email",
     refundEligible: false, // shopper-supplied evidence never triggers refunds
     method: chosen.method,
-    retailer: {
-      name: chosen.retailerName || sender?.name || null,
-      domain: sender?.domain || null,
-    },
+    retailer: shopOf({ ld, sender, fromName, subject, text, html }),
     orderRef: chosen.orderRef ?? txt.orderRef,
     orderDate: chosen.orderDate ?? txt.orderDate,
     currency: chosen.currency ?? txt.currency,
@@ -483,7 +520,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     items: chosen.items.length ? chosen.items : txt.items,
   };
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
-  result.items = result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()));
+  result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };

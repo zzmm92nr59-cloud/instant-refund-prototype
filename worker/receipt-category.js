@@ -1,14 +1,22 @@
 // Sorts a captured receipt into a shopping group and says whether it can normally be returned.
 // This is a best guess from the store and item names, not a fact: the app shows it as a label the shopper can see,
 // and the shopper can move a receipt to another group (which then wins for that shop).
+// How the guess is made: every clue adds points to a group (a shop Relay knows 6, each item 3, words in the shop's name
+// or web address 2, a shop that sells everything 1.5, weak item words such as colours and flavours 1), and the group
+// with the most points wins. Nothing scores: Other.
+import { cleanShopName, isVia, looksLikePerson, nameFromDomain, domainBase as readerBase } from "./receipt-reader.js";
 export const CATEGORIES = {
   fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden",
-  beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other",
+  beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other",
 };
 
 // 1. Shops Relay knows, by name or web address (letters and digits only: "H&M" is "hm", "Sainsbury's" is "sainsburys").
 // A shop's group is used before its item names, so a Zara "phone case" stays Fashion and a Currys kettle stays Electronics.
 const SHOP_LIST = {
+  experiences: "eventim ticketmaster seetickets axs dice todaytix londontheatredirect atgtickets lwtheatres nimaxtheatres delfontmackintosh " +
+    "eventbrite skiddle fatsoma ticketswap stubhub viagogo gigantic ticketline virginexperiencedays buyagift redletterdays experiencedays " +
+    "odeon cineworld myvue vue picturehouses everymancinema curzon showcasecinemas altontowers thorpepark legoland chessington merlinentertainments " +
+    "londoneye madametussauds sealife wonderdays tripadvisor getyourguide viator klook headout",
   food: "nespresso lavazza illy pactcoffee pact taylorsofharrogate bettys yorkshiretea twinings whittard teapigs clipperteas " +
     "starbucks costa costacoffee caffenero nero pret pretamanger greggs gails joeandthejuice blankstreet " +
     "tesco sainsburys asda morrisons waitrose ocado lidl aldi iceland coop cooperative spar budgens londis nisa costco amazonfresh " +
@@ -29,7 +37,7 @@ const SHOP_LIST = {
     "roblox ubisoft patreon substack onlyfans twitch discord discordnitro duolingo notion canva github cloudflare googleone googleworkspace " +
     "lycamobile lyca giffgaff voxi smarty lebara tescomobile ee o2 vodafone three virginmedia bt sky nowtv plusnet talktalk hyperoptic " +
     "communityfibre idmobile deezer tidal nytimes thetimes theguardian economist ft medium strava headspace calm tinder hinge bumble linkedin " +
-    "grammarly 1password nordvpn expressvpn surfshark proton protonmail zoom slack figma paramountplus britbox discoveryplus dazn crunchyroll " +
+    "grammarly 1password nordaccount elevenlabs nordvpn expressvpn surfshark proton protonmail zoom slack figma paramountplus britbox discoveryplus dazn crunchyroll " +
     "wix squarespace godaddy namecheap",
   electronics: "samsung currys ao aocom dell lenovo hp sony bose dyson gopro nintendo playstation oneplus xiaomi huawei anker belkin logitech " +
     "razer corsair scan overclockers ebuyer cex webuy backmarket musicmagpie sonos jbl bangolufsen garmin fitbit ring panasonic lg tcl hisense " +
@@ -41,12 +49,13 @@ const SHOP_LIST = {
     "escentual theperfumeshop perfumeshop fragrancedirect thefragranceshop fragranceshop specsavers visionexpress myvitamins vitabiotics hims numan " +
     "lloydspharmacy wellpharmacy chemist4u pharmacy2u simpleonlinepharmacy oralb gillette harrys kingofshaves ghd cloudnine babyliss gruum nivea " +
     "olaplex kerastase aveda bareminerals nars urbandecay toofaced drunkelephant paulaschoice theinkeylist inkeylist revolutionbeauty makeuprevolution " +
-    "elfcosmetics healthspan",
+    "elfcosmetics healthspan lumin luminskin thescentreserve scentreserve",
   home: "ikea bq bandq diy wickes screwfix toolstation dunelm johnlewis wayfair made madecom homebase habitat therange bm bmstores homebargains wilko " +
     "robertdyas lakeland lecreuset josephjoseph oliverbonas hmhome zarahome laredoute loaf sofa sofacom dfs sofology furniturevillage oakfurnitureland " +
     "cotswoldco swoon thewhitecompany whitecompany sohohome heals conranshop coxandcox rockettstgeorge grahamandgreen emmasleep simbasleep evesleep otty " +
     "silentnight dreams bensonsforbeds mattressonline bedkingdom crocus thompsonmorgan suttons vanmeuwen primrose gardeningexpress patch " +
-    "beardsanddaisies hortology bloomandwild interflora yankeecandle neom petsathome zooplus jollyes tails butternutbox lilyskitchen",
+    "beardsanddaisies hortology bloomandwild interflora yankeecandle neom petsathome zooplus jollyes tails butternutbox lilyskitchen " +
+    "tempur sharkninja ninjakitchen karaca eflorist myeflorist greatbeanbags nkuku denelli",
   fashion: "rains lululemon zara hm handm asos next uniqlo nike adidas puma newbalance primark boohoo boohooman prettylittlething missguided shein gap " +
     "levi levis ralphlauren thenorthface northface patagonia jdsports sportsdirect schuh office officeshoes riverisland topshop topman mango cos " +
     "cosstores arket otherstories andotherstories weekday monki massimodutti pullandbear pullbear bershka stradivarius reiss allsaints tedbaker " +
@@ -58,7 +67,8 @@ const SHOP_LIST = {
     "quizclothing inthestyle nastygal karenmillen coast oasis warehouse sezane ganni acnestudios jacquemus axelarigato veja onrunning hoka asics " +
     "salomon arcteryx rab montane mountainwarehouse cotswoldoutdoor blacks gooutdoors regatta craghoppers berghaus jackwolfskin columbia decathlon " +
     "underarmour reebok fila ellesse lacoste tommyhilfiger calvinklein hugoboss armani gucci prada burberry louisvuitton balenciaga moncler " +
-    "canadagoose stoneisland fredperry jackandjones veromoda nobodyschild marksspencer marksandspencer ms",
+    "canadagoose stoneisland fredperry jackandjones veromoda nobodyschild marksspencer marksandspencer ms " +
+    "tiffany ctshirts charlestyrwhitt detalecph",
 };
 // Names that are also ordinary words ("Next", "Very", "Office", "Boots"): these only count when they are the shop's whole
 // name or web address, never one word in a longer name ("Post Office" is not the shoe shop).
@@ -70,6 +80,10 @@ const WHOLE_ONLY = new Set(("next very office gap cos mango arket weekday whistl
 const MIXED = new Set(("amazon amazonfresh ebay argos very johnlewis tesco asda sainsburys marksspencer marksandspencer ms selfridges harrods tkmaxx " +
   "temu aliexpress etsy notonthehighstreet costco bm bmstores wilko homebargains therange next debenhams houseoffraser qvc groupon wowcher " +
   "vinted depop lidl aldi").split(" "));
+// Supermarkets and food delivery: their food is never returnable, whatever the item is called ("paper cups").
+const GROCER = new Set("tesco asda sainsburys morrisons waitrose ocado lidl aldi iceland coop cooperative spar budgens londis nisa costco amazonfresh deliveroo justeat ubereats boltfood wolt getir gorillas zapp".split(" "));
+// Betting and casinos: never something to return.
+const NO_RETURN = /\b(casino|bet365|betfair|paddy ?power|william ?hill|sky ?bet|ladbrokes|betway|betfred|coral|bingo|lottery|lotto|poker|slots?)\b|admiralcasino|nationallottery/i;
 const SHOPS = new Map();
 for (const [cat, list] of Object.entries(SHOP_LIST)) for (const k of list.split(/\s+/)) if (k && !SHOPS.has(k)) SHOPS.set(k, cat);
 for (const k of MIXED) if (!SHOPS.has(k)) SHOPS.set(k, null);
@@ -94,20 +108,28 @@ const NAME_WORDS = [
   ["travel", /\b(taxi|taxis|cabs?|cars|airport|airways|airlines?|rail|railway|trains?|hotels?|hostel|inn hotel|parking|car hire|travel|holidays?|cottages?|ferries|coaches|tours?)\b/i],
   ["beauty", /\b(pharmacy|chemist|beauty|cosmetics|skin|skincare|salon|spa|barbers?|opticians?|eyewear|dental|dentist|health|wellness|fragrances?|perfumes?)\b/i],
   ["electronics", /\b(electronics|electricals?|electrical|tech|technology|computers?|phones|mobiles|gadgets|cameras?|audio|hifi|hi-fi|gaming)\b/i],
-  ["home", /\b(furniture|beds|bedding|sofas?|mattress(es)?|garden|gardens|plants?|flowers|florist|interiors?|homewares?|home|kitchens|bathrooms?|lighting|diy|hardware|carpets?|flooring|tiles|paint|pets?)\b/i],
+  ["home", /\b(furniture|beds|bedding|bean ?bags?|sofas?|mattress(es)?|garden|gardens|plants?|flowers|florist|interiors?|homewares?|home|kitchens|bathrooms?|lighting|diy|hardware|carpets?|flooring|tiles|paint|pets?)\b/i],
   ["fashion", /\b(fashion|clothing|clothes|apparel|boutique|shoes|footwear|wear|jewell?ery|jewellers?|denim|knitwear|sportswear|outdoor clothing|tailoring|tailors?)\b/i],
-  ["digital", /\b(software|apps?|subscriptions?|streaming|games store)\b/i],
+  ["digital", /\b(software|apps?|subscriptions?|streaming|games store|digital edition|newspapers?|magazines?|news)\b/i],
+  ["experiences", /\b(tickets?|theatres?|theaters?|cinemas?|concerts?|events?|experiences?|attractions?|escape rooms?|bowling|karting)\b/i],
 ];
 const HARDWARE = /\b(iphone|ipad|macbook|imac|mac mini|mac studio|airpods|apple watch|airtag|apple tv 4k|homepod|apple pencil|magic (mouse|keyboard|trackpad)|charger|cable|case|keyboard|mouse|monitor|laptop|phone|tablet|headphones)\b/i;
 // Kitchen things a coffee or food shop also sells: they can usually be returned even though the group is Food & drink.
 const APPLIANCE = /\b(machines?|frothers?|aeroccino|grinders?|kettles?|toasters?|blenders?|cafeti[eè]res?|french press|mugs?|cups|glass(es)?|tumblers?|flasks?|carafes?)\b/i;
 // The order ties are settled in: groups that can usually be returned first, so a return window is never hidden.
-const TIE_ORDER = ["electronics", "fashion", "home", "beauty", "food", "digital", "travel"];
+const TIE_ORDER = ["electronics", "fashion", "home", "beauty", "food", "digital", "travel", "experiences"];
 
 // A stable key for a store, so what the app learns about "Zara" applies to every Zara email.
+// A payment or ordering company's address (Shopify, Stripe, Square…) is shared by many shops, so there the shop's name is used.
 export function storeKey(card) {
   const r = card && card.retailer || {};
-  const raw = (r.domain || r.name || "").toLowerCase().replace(/^www\./, "").replace(/\.(co\.uk|com|uk|net|org|io|eu)$/, "");
+  const raw = ((isVia(r.domain) || isVia(r.via)) && r.name ? r.name : r.domain || r.name || "").toLowerCase().replace(/^www\./, "").replace(/["']/g, "").replace(/\.(co\.uk|com|uk|net|org|io|eu)$/, "");
+  return raw.replace(/[^a-z0-9]+/g, "").slice(0, 60);
+}
+// The key this store had before payment companies' addresses were handled (kept so what a shopper taught Relay still applies).
+export function legacyStoreKey(card) {
+  const r = card && card.retailer || {};
+  const raw = (r.via || r.domain || r.name || "").toLowerCase().replace(/^www\./, "").replace(/\.(co\.uk|com|uk|net|org|io|eu)$/, "");
   return raw.replace(/[^a-z0-9]+/g, "").slice(0, 60);
 }
 
@@ -116,12 +138,7 @@ const words = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[\
   .split(/[^a-z0-9]+/).filter(Boolean);
 const FILLER = new Set(["uk", "gb", "ltd", "limited", "plc", "inc", "llc", "gmbh", "official", "store", "stores", "shop", "online", "london", "europe", "eu", "international", "group", "co", "com", "the"]);
 // The shop's web address without its country ending or mail-sending part: "e.rains.com" → "rains", "email.hm.com" → "hm".
-function domainBase(domain) {
-  const parts = String(domain || "").toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
-  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store|dk|se|nl)$/.test(parts[parts.length - 1])) parts.pop();
-  const kept = parts.filter(p => !MAIL_SUBDOMAIN.test(p));
-  return (kept.length ? kept[kept.length - 1] : parts[parts.length - 1] || "").replace(/[^a-z0-9]/g, "");
-}
+function domainBase(domain) { return readerBase(domain).replace(/[^a-z0-9]/g, ""); }
 // The shop Relay recognises in a receipt, if any: { key, cat } (cat is null for a shop that sells everything).
 export function knownShop(card) {
   const r = card && card.retailer || {};
@@ -142,58 +159,78 @@ export function knownShop(card) {
   if (d && SHOPS.has(d)) return { key: d, cat: SHOPS.get(d) };
   return null;
 }
-// The group the item names point to (the one with most items), or null.
-function itemsGroup(items) {
-  const count = {};
+// Points from what was bought: 3 per item for a clear match (the first matching rule), 2 for a brand named in the item,
+// 1 for weak words that are also colours or flavours ("chocolate", "coffee", "wine").
+const WEAK_FOOD = ITEM_RULES[ITEM_RULES.length - 1][1];
+function itemPoints(items, add) {
   for (const it of items || []) {
     const name = it && typeof it.name === "string" ? it.name : "";
     if (!name) continue;
     let cat = null;
-    for (const [c, re] of ITEM_RULES) if (re.test(name)) { cat = c; break; }
+    for (const [c, re] of ITEM_RULES) if (re !== WEAK_FOOD && re.test(name)) { cat = c; break; }
+    if (cat) { add(cat, 3); continue; }
     // A brand named in the item ("Nespresso Vertuo Pods" bought on Amazon).
-    if (!cat) {
-      const w = words(name);
-      for (let n = Math.min(3, w.length); n >= 1 && !cat; n--) for (let i = 0; i + n <= w.length && !cat; i++) {
-        const k = w.slice(i, i + n).join("");
-        if (SHOPS.get(k) && !WHOLE_ONLY.has(k) && !MIXED.has(k) && k.length >= 4) cat = SHOPS.get(k);
-      }
+    const w = words(name);
+    for (let n = Math.min(3, w.length); n >= 1 && !cat; n--) for (let i = 0; i + n <= w.length && !cat; i++) {
+      const k = w.slice(i, i + n).join("");
+      if (SHOPS.get(k) && !WHOLE_ONLY.has(k) && !MIXED.has(k) && k.length >= 4) cat = SHOPS.get(k);
     }
-    if (cat) count[cat] = (count[cat] || 0) + 1;
+    if (cat) { add(cat, 2); continue; }
+    if (WEAK_FOOD.test(name)) add("food", 1);
   }
-  let best = null;
-  for (const c of TIE_ORDER) if (count[c] && (!best || count[c] > count[best])) best = c;
-  return best;
+}
+// "GreatBeanBags" → "Great Bean Bags", so the words in a shop's name can be read.
+const spaced = (s) => String(s || "").replace(/([a-z])([A-Z])/g, "$1 $2");
+
+// Every group's points for a receipt.
+export function categoryScores(card) {
+  card = card || {};
+  const score = {};
+  const add = (c, n) => { score[c] = (score[c] || 0) + n; };
+  const r = card.retailer || {};
+  const shown = shopDisplayName(r);
+  const named = shown && shown !== "Forwarded receipt" ? shown : null;
+  const shop = knownShop({ retailer: { name: named || r.name, domain: isVia(r.domain) ? null : r.domain } }) || knownShop({ retailer: { name: r.legalName } });
+  if (shop && shop.cat) add(shop.cat, MIXED.has(shop.key) ? 1.5 : 6);
+  itemPoints(card.items, add);
+  const nameText = [spaced(named), spaced(r.name), spaced(r.legalName)].filter(Boolean).join(" ");
+  const domainText = isVia(r.domain) ? "" : (nameFromDomain(r.domain) || "");
+  for (const [c, re] of NAME_WORDS) if (re.test(nameText) || re.test(domainText)) { add(c, 2); break; }
+  return score;
 }
 
 // `learned` is what the app has been taught about this store (a category the shopper chose, or one many shoppers agree on).
 export function categorise(card, learned) {
   card = card || {};
   const items = (card.items || []).map(i => i && i.name).filter(Boolean).join(" ");
-  if (learned && CATEGORIES[learned]) return finish(learned, items);
   const r = card.retailer || {};
-  const store = [r.name, r.domain].filter(Boolean).join(" ");
+  const store = [r.name, r.legalName, r.domain].filter(Boolean).join(" ");
+  const noReturn = NO_RETURN.test(store);
+  if (learned && CATEGORIES[learned]) return finish(learned, items, noReturn);
   // Apple sells both phones and App Store credit: the items decide.
-  if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items);
+  if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store) && !isVia(r.domain)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items, noReturn);
+  const score = categoryScores(card);
+  let best = null;
+  for (const c of TIE_ORDER) if (score[c] && (!best || score[c] > score[best])) best = c;
   const shop = knownShop(card);
-  let category = null;
-  if (shop && shop.cat && !MIXED.has(shop.key)) category = shop.cat;
-  if (!category) category = itemsGroup(card.items);
-  if (!category && shop && shop.cat) category = shop.cat;
-  if (!category) for (const [c, re] of NAME_WORDS) if (re.test(r.name || "") || re.test(domainBase(r.domain))) { category = c; break; }
-  return finish(category || "other", items);
+  return finish(best || "other", items, noReturn, best === "food" && Boolean(shop && GROCER.has(shop.key)));
 }
-function finish(category, items) {
-  // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned.
-  const returnable = category === "food" ? APPLIANCE.test(items || "") : category !== "digital" && category !== "travel";
+function finish(category, items, noReturn, grocer) {
+  // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned (not from a supermarket).
+  const returnable = noReturn ? false : category === "food" ? !grocer && APPLIANCE.test(items || "") : category !== "digital" && category !== "travel" && category !== "experiences";
   const reason = returnable ? null :
+    noReturn ? "Bets and games of chance can't be returned." :
     category === "digital" ? "Digital purchases and subscriptions usually can't be returned. Cancel or ask the provider instead." :
-    category === "food" ? "Food and drink usually can't be returned." : "Travel and rides usually can't be returned.";
+    category === "food" ? "Food and drink usually can't be returned." :
+    category === "experiences" ? "Tickets and experiences usually can't be returned. Check the event's own terms." : "Travel and rides usually can't be returned.";
   return { category, categoryLabel: CATEGORIES[category], returnable, notReturnableReason: reason };
 }
 
 // A shop name a person would say. Receipts often carry a company's legal name ("Anthropic Ireland, Limited")
 // or no name at all, only the sending domain ("appcharge.com"), so this tidies the first and builds one from the second.
-const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifyemail: null, stripe: null, paypal: null, squareup: null };
+const KNOWN_NAMES = { appcharge: "Appcharge", lycamobile: "Lycamobile", shopifyemail: null, stripe: null, paypal: null, squareup: null,
+  mcdonalds: "McDonald's", ctshirts: "Charles Tyrwhitt", sharkninja: "Ninja", dominospizza: "Domino's", dominos: "Domino's", nordaccount: "NordVPN",
+  admiralcasino: "Admiral Casino", greatbeanbags: "Great Bean Bags", thescentreserve: "The Scent Reserve", myeflorist: "eFlorist", eflorist: "eFlorist" };
 const MAIL_SUBDOMAIN = /^(e|em|email|emails|mail|mailer|news|newsletter|info|hello|noreply|no-reply|orders?|shop|store|click|links?|g|t|m|r|reply|notify|notifications?|updates?|service|customerservice|support|accounts?)$/i;
 // Personal email services: a receipt "from" one of these is one the shopper (or a friend) forwarded, not a shop.
 export const PERSONAL_MAIL = /(^|\.)(gmail\.com|googlemail\.com|outlook\.com|hotmail\.(com|co\.uk)|live\.(com|co\.uk)|msn\.com|icloud\.com|me\.com|mac\.com|yahoo\.(com|co\.uk)|ymail\.com|aol\.com|proton\.me|protonmail\.com|pm\.me|btinternet\.com|sky\.com|virginmedia\.com)$/i;
@@ -201,21 +238,33 @@ export function shopDisplayName(retailer) {
   const r = retailer || {};
   // Never show a person's name as a shop.
   if (PERSONAL_MAIL.test(String(r.domain || ""))) return "Forwarded receipt";
-  let name = String(r.name || "").trim();
-  if (name) {
+  const via = isVia(r.domain);
+  const raw = String(r.name || "").trim();
+  if (raw) {
     // "Anthropic Ireland, Limited" → "Anthropic"; "Acme UK Ltd." → "Acme"
-    const short = name.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim();
-    return short || name;
+    const short = raw.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim() || raw;
+    // "Swarovski Customer Service GB" → "Swarovski"; "Groupon 🎄" → "Groupon".
+    const clean = cleanShopName(short);
+    const known = clean && KNOWN_NAMES[letters(clean)];
+    if (known) return known;
+    // A person's name from the shop's own address ("Liam Hartley" at clarechampion.ie): the address names the shop instead.
+    if (clean && !via && r.domain && looksLikePerson(clean, r.domain)) return nameOfDomain(r.domain) || clean;
+    if (clean) return clean;
+    if (!via && r.domain) return nameOfDomain(r.domain) || short;
+    return short;
   }
-  const parts = String(r.domain || "").toLowerCase().replace(/^www\./, "").split(".").filter(Boolean);
-  if (!parts.length) return null;
-  // Drop the country/generic ending (".com", ".co.uk") and any mail-sending subdomain ("e.", "email.").
-  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store)$/.test(parts[parts.length - 1])) parts.pop();
-  const base = parts.filter(p => !MAIL_SUBDOMAIN.test(p)).pop() || parts.pop();
-  if (Object.prototype.hasOwnProperty.call(KNOWN_NAMES, base)) return KNOWN_NAMES[base];
+  if (via) return null;
+  return nameOfDomain(r.domain);
+}
+const letters = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+function nameOfDomain(domain) {
+  const base = readerBase(domain).replace(/[^a-z0-9-]/g, "");
   if (!base) return null;
+  if (Object.prototype.hasOwnProperty.call(KNOWN_NAMES, base)) return KNOWN_NAMES[base];
   // "just-eat" → "Just Eat"; "tvbedsnorthwest" → "TV Beds North West" (only when every piece is a known word).
-  return base.split("-").filter(Boolean).map(w => splitWords(w) || cap(w)).join(" ");
+  const split = base.split("-").filter(Boolean).map(w => splitWords(w) || null);
+  if (split.every(Boolean)) return split.join(" ");
+  return nameFromDomain(domain);
 }
 const cap = (w) => SHORT_CAPS.has(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1);
 // Short pieces written in capitals in a shop name.
@@ -253,3 +302,23 @@ function splitWords(w) {
   // "northwest"/"southeast" read better as two words in a name.
   return parts.flatMap(p => /^(north|south)(east|west)$/.test(p) ? [p.slice(0, 5), p.slice(5)] : [p]).map(cap).join(" ");
 }
+
+// One name per shop across all of a shopper's receipts: each receipt from the same web address votes with its tidied
+// name, a name that matches the address counts three times, and a person's name hardly counts. Returns domain → name.
+export function agreedShopNames(cards) {
+  const votes = new Map();
+  for (const c of cards || []) {
+    const r = (c && c.retailer) || {}, d = String(r.domain || "").toLowerCase().replace(/["'<>]/g, "");
+    if (!d || isVia(d) || PERSONAL_MAIL.test(d)) continue;
+    const shown = shopDisplayName(r);
+    if (!shown) continue;
+    const raw = cleanShopName(r.name);
+    const w = raw && looksLikePerson(raw, d) ? 0.2 : nameFits(shown, d) ? 3 : 1;
+    const m = votes.get(d) || new Map();
+    m.set(shown, (m.get(shown) || 0) + w); votes.set(d, m);
+  }
+  const out = new Map();
+  for (const [d, m] of votes) { let best = null, n = -1; for (const [name, v] of m) if (v > n) { best = name; n = v; } out.set(d, best); }
+  return out;
+}
+const nameFits = (name, domain) => { const n = letters(name), b = domainBase(domain); return Boolean(n && b && (n.includes(b) || b.includes(n))); };

@@ -35,6 +35,7 @@ jobs:
           node scripts/test-auth.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-category.mjs
+          node scripts/test-receipt-reader.mjs
           node scripts/test-gmail.mjs
           node scripts/test-resale.mjs
           node scripts/test-resale-admin.mjs
