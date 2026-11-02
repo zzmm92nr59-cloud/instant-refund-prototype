@@ -11,11 +11,20 @@ for(const file of files){
  sandbox.window=sandbox;const context=vm.createContext(sandbox);
  for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)){const src=match[1].match(/src="\.\/([^"?]+)/);vm.runInContext(src?readFileSync(src[1],'utf8'):match[2],context,{timeout:2000})}
  assert.deepEqual(errors,[]);
- assert.match(el('view').innerHTML,/What you can still return or swap/);
- for(const tab of ['wallet','discover','radar','wrapped','profile']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp(tab));assert.ok(el('view').innerHTML.length>100)}
+ // A new visitor lands on Profile, which welcomes them and asks them to sign in. No demo, sandbox or test wording.
+ assert.match(el('view').innerHTML,/Welcome to Relay/);
+ assert.doesNotMatch(el('view').innerHTML+el('side').innerHTML,/demo|sandbox|simulat|fictional|test/i);
+ // Four tabs for shoppers, Profile first. Market is for testing only; Wallet lives inside Profile; Radar is Price alerts in Discover.
+ assert.deepEqual([...el('side').innerHTML.matchAll(/go\('([a-z]+)'\)/g)].map(m=>m[1]),['profile','receipts','discover','wrapped']);
+ for(const tab of ['profile','receipts','discover','wrapped']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp('active[^>]*go\\(\''+tab));assert.ok(el('view').innerHTML.length>100)}
+ sandbox.go('wallet');assert.equal(sandbox.page,'profile','the wallet opens on the Profile page');
+ sandbox.go('radar');assert.match(el('view').innerHTML,/Price alerts/);assert.match(el('side').innerHTML,/active[^>]*go\('discover/,'Price alerts sits inside Discover');
+ // Testing tools add the Market tab back.
+ sandbox.localStorage.setItem('relay-testing-tools','1');sandbox.go('profile');assert.match(el('side').innerHTML,/go\('market'\)/);assert.match(el('view').innerHTML,/Testing tools/);
+ sandbox.localStorage.setItem('relay-testing-tools','0');sandbox.go('profile');assert.doesNotMatch(el('side').innerHTML,/market/);
  sandbox.startSample();sandbox.openPurchase('relay-sample-Ava-unit-0');assert.match(el('view').innerHTML,/INSTANT REFUND/);assert.match(el('view').innerHTML,/Swap item/);
  sandbox.page='refund';sandbox.render();assert.match(el('view').innerHTML,/refundReason/);
  sandbox.page='exchange';sandbox.render();assert.match(el('view').innerHTML,/Reason for exchange/);
  sandbox.exchangeContext=true;sandbox.go('discover');assert.match(el('catalogResults').innerHTML,/DEMO-NORTH-003/);
- console.log('PASS',file,'offline startup, five tabs, sample purchase, refund and replacement options');
+ console.log('PASS',file,'offline startup, four tabs with Profile first, testing tools, sample purchase, refund and replacement options');
 }

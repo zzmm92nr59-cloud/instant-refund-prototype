@@ -1,6 +1,6 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
-import { PERSONAL_MAIL } from "./receipt-category.js";
+import { PERSONAL_MAIL, CATEGORIES } from "./receipt-category.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -20,8 +20,13 @@ function whenOf(card) {
   return null;
 }
 
-export function buildWrapped(cards, year, now = Date.now()) {
+// The kinds of shopping a Wrapped can be about on its own ("your 2026 in fashion"), so a top 5 never mixes a coat with a coffee.
+export const INDUSTRIES = Object.keys(CATEGORIES);
+const kindOf = (c) => (c && CATEGORIES[c.category] ? c.category : "other");
+
+export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   year = Number(year) || new Date(now).getUTCFullYear();
+  const industry = opts && INDUSTRIES.includes(opts.industry) ? opts.industry : null;
   // One order can arrive as several emails (confirmation, dispatch). It counts once.
   const seen = new Set();
   const inYear = (cards || []).filter(c => c && c.kind !== "return_instructions").filter(c => { const w = whenOf(c); return w && Number(w.slice(0, 4)) === year; });
@@ -31,11 +36,22 @@ export function buildWrapped(cards, year, now = Date.now()) {
   const originals = inYear.filter(c => !forwarded(c) && c.totalPence != null);
   const shopRefs = new Set((cards || []).filter(c => c && !forwarded(c) && c.orderRef).map(c => String(c.orderRef).toUpperCase()));
   const copy = c => forwarded(c) && ((c.orderRef && shopRefs.has(String(c.orderRef).toUpperCase())) || (c.totalPence != null && originals.some(o => o.totalPence === c.totalPence && days(whenOf(o), whenOf(c)) <= 7)));
-  const mine = inYear.filter(c => !copy(c)).filter(c => {
+  const everything = inYear.filter(c => !copy(c)).filter(c => {
     if (!c.orderRef) return true;
     const k = ((c.retailer && (c.retailer.domain || c.retailer.name)) || "") + "|" + c.orderRef;
     if (seen.has(k)) return false; seen.add(k); return true;
   });
+  // Each kind of shopping this year, biggest spend first, so the app can offer a Wrapped for each one.
+  const kinds = new Map();
+  for (const c of everything) {
+    const k = kindOf(c), e = kinds.get(k) || { category: k, label: CATEGORIES[k], receipts: 0, spentPence: 0 };
+    e.receipts++; if (c.totalPence != null && (!c.currency || c.currency === "GBP")) e.spentPence += c.totalPence;
+    kinds.set(k, e);
+  }
+  const industries = [...kinds.values()].sort((a, b) => b.spentPence - a.spentPence || b.receipts - a.receipts);
+  const mine = industry ? everything.filter(c => kindOf(c) === industry) : everything;
+  // Words for the reasons below: "your spending" for the whole year, "your spending on fashion" for one kind.
+  const on = industry ? " on " + CATEGORIES[industry].toLowerCase() : "";
   const gbp = mine.filter(c => c.totalPence != null && (!c.currency || c.currency === "GBP"));
   const otherCurrency = mine.filter(c => c.totalPence != null && c.currency && c.currency !== "GBP").length;
   const noTotal = mine.filter(c => c.totalPence == null).length;
@@ -75,7 +91,7 @@ export function buildWrapped(cards, year, now = Date.now()) {
   const withReturn = mine.filter(c => c.returnPlan).length;
   const topCat = categories[0];
   // A label from what the receipts actually show. It is a plain description, not a personality test.
-  const personality = !mine.length ? null
+  const personality = !mine.length || industry ? null
     : topCat && topCat.receipts / mine.length >= 0.5 ? { label: (KIND_LABEL[topCat.category] || topCat.label + " regular"), why: topCat.receipts + " of your " + mine.length + " receipts were " + topCat.label.toLowerCase() + (topCat.topShop ? ", most of them from " + topCat.topShop.name : "") + "." }
     : shops.size >= 10 ? { label: "The Explorer", why: "You bought from " + shops.size + " different shops." }
     : { label: "The Mixer", why: "Your shopping was spread across " + categories.length + " kinds of shop." };
@@ -158,15 +174,16 @@ export function buildWrapped(cards, year, now = Date.now()) {
     .map(e => ({ name: e.name, months: e.months.size, spentPence: e.spentPence, item: e.item }));
   // Badges (like Spotify's identity cards): only ones the receipts prove, each with the reason.
   const badges = [];
-  if (topShopShare && topShopShare >= 30 && top) badges.push({ label: "Loyal to " + top.name, why: topShopShare + "% of your spending went there." });
-  if (shops.size >= 15) badges.push({ label: "The Explorer", why: "You bought from " + shops.size + " different shops." });
+  if (topShopShare && topShopShare >= 30 && top) badges.push({ label: "Loyal to " + top.name, why: topShopShare + "% of your spending" + on + " went there." });
+  if (shops.size >= 15) badges.push({ label: "The Explorer", why: "You bought" + (industry ? " " + CATEGORIES[industry].toLowerCase() : "") + " from " + shops.size + " different shops." });
   if (shoppingTime.weekendShare >= 40 && shopDays.size >= 5) badges.push({ label: "Weekend Shopper", why: shoppingTime.weekendShare + "% of your shopping days were Saturdays or Sundays." });
   if (refunded.length >= 2 || withReturn >= 3) badges.push({ label: "Returns Pro", why: refunded.length >= 2 ? refunded.length + " refunds tracked back to you." : withReturn + " returns started." });
   if (subscriptions.length >= 3) badges.push({ label: "Subscriber", why: subscriptions.length + " things you paid for month after month." });
   if (streak >= 6) badges.push({ label: "Never Missed a Month", why: "You bought something " + streak + " months in a row." });
   if (mine.some(c => (c.items || []).length >= 5)) badges.push({ label: "Big Basket", why: "At least one order with 5 or more things in it." });
   return {
-    year, years, receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
+    year, years, industry, industryLabel: industry ? CATEGORIES[industry] : null, industries,
+    receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
     topItem, refundedPence, refundsMatched: refunded.length, topShopShare, activeMonths, firstDate,
     coverage: { withTotal: gbp.length, noTotal, otherCurrency },
     topShops, categories, byMonth,

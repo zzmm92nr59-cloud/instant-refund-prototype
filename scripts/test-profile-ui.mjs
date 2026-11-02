@@ -73,7 +73,8 @@ console.log("ok - the avatar shows the photo straight away on the next visit");
 
 // 3. The account sheet shows them too, and Edit goes there and back.
 await avatar.click();
-await page.getByText("Jess Tester").first().waitFor();
+await page.locator(".rl-sheet").getByText("Jess Tester").first().waitFor();
+await page.locator(".rl-sheet .rl-face img").waitFor();
 assert.equal(await page.locator(".rl-sheet .rl-face img").count(), 1);
 await page.screenshot({ path: "/tmp/shots/profile-account-sheet.png" });
 await page.locator(".rl-sheet").getByRole("button", { name: "Edit", exact: true }).click();

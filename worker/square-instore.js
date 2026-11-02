@@ -184,7 +184,8 @@ export async function handleInstoreRoute(request, env, url, cors, shopper, o = {
       const [s, out] = await answer(env, shopper, ans[1], body && body.answer === "mine", now);
       return json(out, s, cors);
     }
-    if (path === "/relay/my/instore/shops" && request.method === "GET") return json({ shops: (await shops(env, f)).map(s => ({ id: s.id, name: s.name })) }, 200, cors);
+    // live: false while Relay uses Square's test (sandbox) shops, so the app keeps this to people testing Relay.
+    if (path === "/relay/my/instore/shops" && request.method === "GET") return json({ shops: (await shops(env, f)).map(s => ({ id: s.id, name: s.name })), live: squareIsProduction(env) }, 200, cors);
     if (path === "/relay/my/instore/claim" && request.method === "POST") {
       const [s, out] = await claim(env, shopper, await request.json().catch(() => ({})), f, now);
       return json(out, s, cors);

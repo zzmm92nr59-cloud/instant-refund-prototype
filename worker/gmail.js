@@ -1341,7 +1341,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/wrapped" && m === "GET") {
     const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
-    return json(buildWrapped(cards, url.searchParams.get("year"), opts.now), 200, cors);
+    return json(buildWrapped(cards, url.searchParams.get("year"), opts.now, { industry: url.searchParams.get("industry") }), 200, cors);
   }
   // Everything the shopper bought that their style can be learned from: physical things only (no food, travel or apps),
   // across all their receipts rather than just the newest. The app works the style out on the device from this list.
