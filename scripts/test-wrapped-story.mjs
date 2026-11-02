@@ -19,6 +19,9 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   if (!u.pathname.startsWith("/relay/")) return route.abort();
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [{ year: 2024, doneAt: 1 }], earliest: 2016 });
   if (u.pathname === "/relay/my/gmail/scan") { const b = JSON.parse(route.request().postData() || "{}"); scans.push(b); return j(b.cursor ? { ok: true, added: 2, more: false } : { ok: true, added: 1, more: true, cursor: "2025/06/01" }); }
+  if (u.pathname === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
+  if (u.pathname === "/relay/my/gmail") return j({ connected: true, provider: "google", email: "c@example.com" });
+  if (u.pathname === "/relay/my/profile") return j({ email: "c@example.com", name: "Cat" });
   if (u.pathname === "/relay/my/wrapped") { asked.push(u.searchParams.get("year")); return j(W(Number(u.searchParams.get("year")))); }
   return j({}); });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
@@ -27,8 +30,8 @@ await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("heading", { name: "Your 2026 in purchases." }).waitFor();
 assert.deepEqual(await page.locator(".rl-wr-years").first().locator("button").allInnerTexts(), ["2026", "2024"], "only years with receipts (plus this year) are offered");
-await page.getByText("from 3 of 5 receipts").waitFor();
-await page.getByRole("button", { name: /Play your story/ }).click();
+await page.locator("#rl-wrapped").getByText("£122.00 · 5 receipts", { exact: true }).waitFor();
+await page.getByRole("button", { name: "Play your 2026 story" }).click();
 const texts = [];
 for (let k = 0; k < 20; k++) {
   await page.waitForTimeout(1600); // let count-up numbers land
@@ -37,10 +40,10 @@ for (let k = 0; k < 20; k++) {
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-for (const re of [/Your 2026, one receipt at a time/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./, /Your number one shop\s+Zara/, /65% of everything you spent/,
-  /Your top shops/, /Your favourite kind of shopping\s+Fashion/, /On repeat/, /Your busiest month\s+March/, /Your biggest treat/, /£20\.00/, /Fashion regular/, /MY 2026 ON RELAY/])
+for (const re of [/Your 2026, one receipt at a time/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./,
+  /Your top shops\s+1\s+Zara/, /Your busiest month\s+March/, /Your biggest treat/, /£59\.90/, /Fashion regular/, /MY 2026 ON RELAY/])
   assert.match(story, re);
-assert.equal(texts.length, 11, "11 slides for a full year");
+assert.equal(texts.length, 7, "7 slides for a year with no chapters: year, total, top shops, busiest month, biggest treat, style, summary");
 // Tapping the left side goes back a slide.
 await page.getByRole("button", { name: "Watch again" }).click();
 await page.keyboard.press("ArrowRight");
@@ -52,11 +55,14 @@ assert.equal(await page.evaluate(() => window.__xss), undefined, "item and shop 
 // An empty year says so, and has no story to play.
 await page.locator(".rl-wr-years").first().locator("button", { hasText: "2024" }).click();
 await page.getByRole("heading", { name: "Nothing to wrap for 2024 yet." }).waitFor();
-assert.equal(await page.getByRole("button", { name: /Play your story/ }).count(), 0);
-// Earlier years: pick one, Relay reads it in rounds, then shows that year.
+assert.equal(await page.getByRole("button", { name: /Play your/ }).count(), 0);
+// Earlier years: behind one button; pick one, Relay reads it in rounds, then shows that year.
+await page.getByRole("button", { name: "Add an earlier year" }).click();
 await page.locator(".rl-wr-glance", { hasText: "Add earlier years" }).waitFor();
+await page.locator(".rl-wr-glance .rl-wr-years button", { hasText: /^2025$/ }).waitFor();
 const chips = await page.locator(".rl-wr-glance .rl-wr-years button").allInnerTexts();
-assert.equal(chips[0], "2025"); assert.ok(chips.includes("2024 ✓"), "a year already read is ticked");
+assert.equal(chips[0], "2025"); assert.ok(chips.includes("2024"));
+assert.equal(await page.getByRole("button", { name: "2024, already read" }).locator("svg").count(), 1, "a year already read gets a drawn tick, not a symbol");
 const read = page.getByRole("button", { name: "Read these years" });
 assert.equal(await read.isDisabled(), true, "nothing picked, nothing to read");
 await page.locator(".rl-wr-glance .rl-wr-years button", { hasText: /^2025$/ }).click();

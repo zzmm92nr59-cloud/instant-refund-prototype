@@ -2307,7 +2307,7 @@
         card.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below." : "Once Relay has found your receipts, your year's story appears here." }));
       } else {
         card.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
-        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " · " : "") + w.receipts + (w.receipts === 1 ? " receipt · " : " receipts · ") + (w.chapters || []).length + ((w.chapters || []).length === 1 ? " chapter" : " chapters") }));
+        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " · " : "") + w.receipts + (w.receipts === 1 ? " receipt" : " receipts") + ((w.chapters || []).length ? " · " + w.chapters.length + (w.chapters.length === 1 ? " chapter" : " chapters") : "") }));
         var dots = el("div", { className: "rl-wr-dots" });
         var tot = (w.industries || []).reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
         if (tot) (w.industries || []).forEach(function (k) { var pct = k.spentPence / tot * 100; if (pct >= 0.5) dots.appendChild(el("i", { title: (KIND[k.category] || KIND.other).label, style: "flex:" + pct.toFixed(1) + ";background:" + (KIND[k.category] || KIND.other).bar })); });
@@ -2340,8 +2340,10 @@
       var doneYears = {}; ((r.ok && r.body.years) || []).forEach(function (y) { doneYears[y.year] = true; });
       var earliest = (r.ok && r.body.earliest) || thisYear - 10;
       for (var y = thisYear - 1; y >= Math.max(earliest, thisYear - 8); y--) (function (y) {
-        var b = el("button", { type: "button", text: doneYears[y] ? y + " ✓" : String(y), title: doneYears[y] ? "Already read" + (have[y] ? " · " + have[y] + " receipts" : "") : "", ariaPressed: "false",
-          onclick: function () { picked[y] = !picked[y]; b.className = picked[y] ? "on" : ""; b.ariaPressed = picked[y] ? "true" : "false"; go.disabled = !Object.keys(picked).some(function (k) { return picked[k]; }); } });
+        // A year already read gets a small drawn tick (never a symbol character).
+        var b = el("button", { type: "button", text: String(y), className: doneYears[y] ? "read" : "", title: doneYears[y] ? "Already read" + (have[y] ? " · " + have[y] + " receipts" : "") : "", ariaLabel: doneYears[y] ? y + ", already read" : String(y), ariaPressed: "false",
+          onclick: function () { picked[y] = !picked[y]; b.className = (picked[y] ? "on " : "") + (doneYears[y] ? "read" : ""); b.ariaPressed = picked[y] ? "true" : "false"; go.disabled = !Object.keys(picked).some(function (k) { return picked[k]; }); } });
+        if (doneYears[y]) b.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:6px"><path d="m5 12.5 4.2 4.2L19 7"/></svg>');
         chips.appendChild(b);
       })(y);
     });
