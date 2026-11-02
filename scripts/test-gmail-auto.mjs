@@ -91,6 +91,10 @@ failNext = 1;
 const busy = await post("/relay/my/gmail/scan", alice, {});
 assert.equal(busy.status, 503);
 assert.deepEqual(await busy.json(), { error: "scan_busy", retryAfterMs: 3000 });
+// The scan the app asked for is still waiting to be finished (by the app's next try, or by Relay if the app has gone).
+let again = { more: true }, tries = 0;
+while (again.more && tries++ < 10) again = await (await post("/relay/my/gmail/scan", alice, {})).json();
+assert.equal(again.more, false); assert.equal(again.job.state, "done");
 console.log("ok - a failed round answers 'busy' so the app waits and carries on");
 
 // 3. Automatic check: new mail arrives and is picked up without the app being opened.
