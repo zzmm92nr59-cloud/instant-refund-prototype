@@ -29,7 +29,8 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars(); }
+  function save(v) { var was = load(); if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+    if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   function api(path, opts) {
     opts = opts || {};
     var s = load(), headers = { "Content-Type": "application/json" };
@@ -81,7 +82,7 @@
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:#fff;color:#101828}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
-    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}" +
+    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;padding:8px 15px;border-radius:999px;background:#f2f4ec;color:#263513;font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
     ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:radial-gradient(120% 140% at 100% 0%,#5b21b6 0%,#30255d 35%,#101828 75%);color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}" +
     ".rl-wr-play{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:14px 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
     ".rl-wr-glance{background:#fff;border:1px solid #ebe6da;border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:#101828}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:#f7f5ef;border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:12px;color:#667085;font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:#101828;margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:12px;color:#667085}.rl-wr-note{font-size:12px;color:#667085;margin:12px 0 0}" +
@@ -253,7 +254,7 @@
   }
   function editProfile() { open(function (sheet) { profileView(sheet, close, "Cancel"); }); }
   // The top of the Profile page: photo, name and email, and a way to change them.
-  function mountProfile(host) {
+  function mountProfile(host, actions) {
     if (!host) return;
     function draw() {
       if (!document.body.contains(host)) return false;
@@ -263,10 +264,13 @@
       host.appendChild(el("div", { style: "display:flex;gap:16px;align-items:center;margin:0 0 12px" }, [
         el("button", { type: "button", ariaLabel: p.photo ? "Change your photo" : "Add a photo", style: "all:unset;cursor:pointer;border-radius:50%;flex:none", onclick: editProfile }, [face(p, 64)]),
         el("div", { style: "min-width:0" }, [
-          el("div", { className: "eyebrow", text: "SIGNED IN" }),
-          el("h2", { text: p.name || p.email, style: "margin:2px 0 2px;word-break:break-word" }),
+          el("h2", { text: p.name || p.email, style: "margin:0 0 2px;word-break:break-word" }),
           el("div", { className: "small muted", text: p.name ? p.email : "Add your name and a photo so Relay feels like yours.", style: "word-break:break-all" })])]));
-      host.appendChild(el("button", { type: "button", className: "outline", text: p.name || p.photo ? "Edit profile" : "Add name and photo", onclick: editProfile }));
+      var edit = el("button", { type: "button", className: "outline", text: p.name || p.photo ? "Edit profile" : "Add name and photo", onclick: editProfile });
+      if (actions && document.body.contains(actions)) {
+        var old = actions.querySelector("[data-rl-edit]"); if (old) old.remove();
+        edit.setAttribute("data-rl-edit", "1"); actions.insertBefore(edit, actions.firstChild);
+      } else host.appendChild(edit);
     }
     profileWatchers.push(draw);
     draw();
@@ -500,9 +504,11 @@
   function cardSection(box) {
     api("/relay/my/card").then(function (r) {
       if (!r.ok || !r.body || !r.body.enabled) return;
+      var test = r.body.testMode !== false;
+      if (test && !testingOn() && !r.body.card) return;
       box.textContent = "";
       box.appendChild(el("h2", { text: "Card for swaps", style: "font-size:18px;margin-top:8px" }));
-      box.appendChild(el("span", { text: "TEST MODE · no real money", style: "display:inline-block;margin-bottom:6px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;background:#fff3d7;color:#7a540c" }));
+      if (test) box.appendChild(el("span", { text: "TEST MODE · no real money", style: "display:inline-block;margin-bottom:6px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;background:#fff3d7;color:#7a540c" }));
       box.appendChild(el("p", { text: "Used only when you swap to a size or colour that costs more: you pay the difference, after you've agreed it. Saving it charges nothing." }));
       var note = el("div", { className: "rl-msg" });
       if (r.body.card) {
@@ -737,7 +743,7 @@
         if (x.reminder === "off") card.appendChild(el("span", { text: "We'll email you once, at your sign-in address.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
       }
     }
-    if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale) {
+    if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale && marketOn()) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "Missed the window? Sell or swap it", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openResale(x.id); } }));
     }
     if (x.id && mailRef(x) && openOriginal) {
@@ -764,7 +770,7 @@
       if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
         rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return with " + who + " →", style: "display:block;margin-top:6px;font-weight:600" }));
       }
-      rb.appendChild(el("span", { text: "Read from the email. Check it matches the store's own policy.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
+      rb.appendChild(el("span", { text: "From your order email.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
       card.appendChild(rb);
     }
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);
@@ -1477,7 +1483,8 @@
         el("span", { text: email, style: "display:block;font-size:14px;color:#5b6475;word-break:break-all" })]));
       head.appendChild(el("button", { type: "button", text: "Edit", onclick: editHere, style: "all:unset;cursor:pointer;font-weight:700;font-size:14px;padding:8px 14px;border:1px solid #ddd6c6;border-radius:999px" }));
     }
-    [el("h2", { text: "Your account" }), head, gbox, el("h2", { text: "Your purchases", style: "font-size:18px;margin-top:8px" }), list, msg].forEach(function (n) { sheet.appendChild(n); });
+    var listHead = el("h2", { text: "Shop orders", style: "font-size:18px;margin-top:8px;display:none" });
+    [el("h2", { text: "Your account" }), head, gbox, listHead, list, msg].forEach(function (n) { sheet.appendChild(n); });
     drawHead(); profileWatchers.push(drawHead); loadProfile();
     if (notice) say(msg, notice.text, notice.bad);
     var abox = el("div"); sheet.insertBefore(abox, gbox.nextSibling);
@@ -1491,7 +1498,7 @@
     openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
     if (window.go) {
       gbox.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
-      gbox.appendChild(el("p", { text: "Connect your email (Gmail or Outlook), scan for receipts and see them grouped by store type. Everything lives on the Receipts page." }));
+      gbox.appendChild(el("p", { text: "Relay finds the receipts in your Gmail or Outlook and sorts them for you." }));
       gbox.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", onclick: function () { close(); window.go("receipts"); } }));
       api("/relay/my/gmail").then(function (g) {
         if (g.ok) rememberMailbox(g.body);
@@ -1504,20 +1511,19 @@
     var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
     var cbox = el("div"); sheet.insertBefore(cbox, list.previousSibling); cardSection(cbox);
     var tbox = el("div"); sheet.insertBefore(tbox, list.previousSibling); twoStepSection(tbox);
-    list.appendChild(el("p", { text: "Loading…" }));
     api("/relay/my/purchases").then(function (r) {
       list.textContent = "";
       if (r.status === 401) { save(null); close(); return; }
       var rows = (r.body && r.body.purchases) || [];
-      if (!r.ok) { list.appendChild(el("p", { text: "Couldn't load your purchases." })); return; }
-      if (!rows.length) { list.appendChild(el("p", { text: "No purchases matched this email yet. Only orders placed with this exact address, at stores connected to Relay, show up here." })); return; }
+      if (!r.ok || !rows.length) return;
+      listHead.style.display = "";
       rows.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
         list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
           el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") + " · ✓ confirmed by the shop" })]));
       });
-    }).catch(function () { list.textContent = ""; list.appendChild(el("p", { text: "Couldn't reach Relay." })); });
-    sheet.appendChild(el("button", { className: "rl-btn", text: "Swap & resell", style: "margin-top:10px", onclick: function () { openResale(); } }));
+    }).catch(function () { list.textContent = ""; });
+    if (marketOn()) sheet.appendChild(el("button", { className: "rl-btn", text: "Swap & resell", style: "margin-top:10px", onclick: function () { openResale(); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt by pasting it", onclick: function () {
       if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
     sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
@@ -1653,8 +1659,20 @@
 
   // ---- Wrapped: a year of purchases, built only from the shopper's own captured receipts ----
   function memoDrop(prefix) { Object.keys(memo).forEach(function (k) { if (k.indexOf(prefix) === 0) delete memo[k]; }); }
-  function mountWrapped(host, year) {
+  // Words for a Wrapped about one kind of shopping, so every list and title stays about that one thing.
+  var IND = {
+    fashion: { chip: "Fashion", inn: "in fashion", go: "Your go-to for fashion", shops: "Your top fashion shops", things: "Your top 5 pieces", one: "Top piece", buys: "Your biggest fashion buys", treat: "Your biggest fashion buy" },
+    food: { chip: "Food & drink", inn: "in food & drink", go: "Your go-to for food & drink", shops: "Your top food & drink spots", things: "What you ordered most", one: "Ordered most", buys: "Your biggest food & drink orders", treat: "Your biggest food & drink order" },
+    electronics: { chip: "Electronics", inn: "in electronics", go: "Your go-to for tech", shops: "Your top tech shops", things: "Your top 5 gadgets", one: "Top gadget", buys: "Your biggest tech buys", treat: "Your biggest tech buy" },
+    home: { chip: "Home", inn: "for your home", go: "Your go-to for the home", shops: "Your top home shops", things: "Your top 5 home buys", one: "Top home buy", buys: "Your biggest home buys", treat: "Your biggest home buy" },
+    beauty: { chip: "Beauty", inn: "in beauty", go: "Your go-to for beauty", shops: "Your top beauty shops", things: "Your top 5 beauty picks", one: "Top pick", buys: "Your biggest beauty buys", treat: "Your biggest beauty buy" },
+    travel: { chip: "Travel", inn: "in travel", go: "Your go-to for getting about", shops: "Your top travel companies", things: "Your top 5 journeys", one: "Top journey", buys: "Your biggest trips", treat: "Your biggest trip" },
+    digital: { chip: "Digital", inn: "in apps & subscriptions", go: "Your top app or service", shops: "Your top apps & services", things: "Your top 5 apps & subscriptions", one: "Top app", buys: "Your biggest digital buys", treat: "Your biggest digital buy" }
+  };
+  function mountWrapped(host, year, industry) {
     host.textContent = "";
+    if (!IND[industry]) industry = null;
+    var words = industry ? IND[industry] : null;
     var s = load();
     if (!s || !s.token) {
       host.appendChild(el("div", { className: "rl-wr-cover" }, [
@@ -1666,35 +1684,47 @@
     }
     var thisYear = new Date().getFullYear();
     year = year || thisYear;
-    var yrs = el("div", { className: "rl-wr-years" });
-    var cover = el("div", { className: "rl-wr-cover" }, [el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }), el("h2", { text: "Adding up your " + year + "…" })]);
+    var yrs = el("div", { className: "rl-wr-years" }), kinds = el("div", { className: "rl-wr-kinds", role: "group", ariaLabel: "Wrapped for one kind of shopping" });
+    var kicker = "✦ RELAY WRAPPED " + year + (words ? " · " + words.chip.toUpperCase() : "");
+    var cover = el("div", { className: "rl-wr-cover" }, [el("div", { className: "rl-wr-kicker", text: kicker }), el("h2", { text: "Adding up your " + year + (words ? " " + words.inn : "") + "…" })]);
     var extra = el("div");
-    host.appendChild(yrs); host.appendChild(cover); host.appendChild(extra);
+    host.appendChild(yrs); host.appendChild(kinds); host.appendChild(cover); host.appendChild(extra);
     // Building Wrapped is heavy work for the server, so one failed try is retried once before showing an error.
-    var getW = function () { return cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year); };
+    var getW = function () { return cachedGet("wrapped" + year + (industry ? ":" + industry : ""), "/relay/my/wrapped?year=" + year + (industry ? "&industry=" + industry : "")); };
     getW().catch(function () { return { ok: false }; }).then(function (r) { return r.ok || r.status === 401 ? r : new Promise(function (ok) { setTimeout(ok, 1200); }).then(getW); }).then(function (r) {
       if (r.status === 401) { save(null); mountWrapped(host, year); return; }
       if (!r.ok) { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't build Wrapped just now. Please try again." })); return; }
       var w = r.body;
+      // Another year with none of this kind of shopping: show that year's whole Wrapped instead.
+      if (industry && !w.receipts && (w.industries || []).length) { mountWrapped(host, year, null); return; }
       var list = (w.years || []).map(function (y) { return y.year; });
       if (list.indexOf(year) < 0) list.push(year);
       if (list.indexOf(thisYear) < 0) list.push(thisYear);
       list.sort(function (a, b) { return b - a; }).forEach(function (y) {
-        yrs.appendChild(el("button", { type: "button", text: String(y), ariaPressed: y === year ? "true" : "false", className: y === year ? "on" : "", onclick: function () { mountWrapped(host, y); } }));
+        yrs.appendChild(el("button", { type: "button", text: String(y), ariaPressed: y === year ? "true" : "false", className: y === year ? "on" : "", onclick: function () { mountWrapped(host, y, industry); } }));
       });
+      // One Wrapped per kind of shopping the year has (biggest spend first). "Other" isn't a kind anyone wants a story about.
+      var own = (w.industries || []).filter(function (k) { return IND[k.category] && k.receipts > 0; });
+      if (own.length && (w.industries || []).length > 1) {
+        [{ category: null }].concat(own).forEach(function (k) {
+          var on = (k.category || null) === industry;
+          kinds.appendChild(el("button", { type: "button", text: k.category ? IND[k.category].chip : "All", ariaPressed: on ? "true" : "false", className: on ? "on" : "",
+            onclick: function () { if (!on) mountWrapped(host, year, k.category); } }));
+        });
+      } else kinds.remove();
       cover.textContent = "";
-      cover.appendChild(el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED " + year }));
+      cover.appendChild(el("div", { className: "rl-wr-kicker", text: kicker }));
       if (!w.receipts) {
         cover.appendChild(el("h2", { text: "Nothing to wrap for " + year + " yet." }));
         cover.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below and Relay will look for that year's receipts." : "Connect your email on the Receipts tab and Relay will find your order emails." }));
       } else {
-        cover.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
-        cover.appendChild(el("p", { text: w.receipts + " receipts · " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.coverage.withTotal ? " · " + money(w.spentPence, "GBP") : "") }));
-        cover.appendChild(el("button", { className: "rl-wr-play", text: "▶  Play your story", onclick: function () { playStory(w); } }));
+        cover.appendChild(el("h2", { text: "Your " + year + (words ? " " + words.inn : " in purchases") + "." }));
+        cover.appendChild(el("p", { text: w.receipts + (w.receipts === 1 ? " receipt · " : " receipts · ") + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.coverage.withTotal ? " · " + money(w.spentPence, "GBP") : "") }));
+        cover.appendChild(el("button", { className: "rl-wr-play", text: "▶  Play your " + (words ? words.chip.toLowerCase() + " " : "") + "story", onclick: function () { playStory(w); } }));
       }
       if (w.receipts) extra.appendChild(wrappedGlance(w));
       var hb = el("div"); extra.appendChild(hb);
-      mountHistory(hb, w, function (firstYear) { Object.keys(memo).forEach(function (k) { if (/^wrapped/.test(k)) memoDrop(k); }); mountWrapped(host, firstYear || year); });
+      mountHistory(hb, w, function (firstYear) { Object.keys(memo).forEach(function (k) { if (/^wrapped/.test(k)) memoDrop(k); }); mountWrapped(host, firstYear || year, industry); });
     }).catch(function () { cover.textContent = ""; cover.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
   // Opt-in: read past years of order emails so Wrapped works for them too. Same email permission, same rules: only receipts and order emails.
@@ -1704,7 +1734,7 @@
     var card = el("div", { className: "rl-wr-glance" });
     host.appendChild(card);
     card.appendChild(el("h3", { text: "Add earlier years" }));
-    card.appendChild(el("p", { text: "Relay normally reads the last 16 months of your email. Pick earlier years and Relay will look through those years' order confirmations and receipts too, so you can play Wrapped for them. It only reads purchase emails, the same as now, and you can delete everything from Account & security.", style: "color:#475467;font-size:14px;margin:0 0 12px;line-height:1.5" }));
+    card.appendChild(el("p", { text: "Pick a year and Relay finds its order emails, so you can play that year's Wrapped too.", style: "color:#475467;font-size:14px;margin:0 0 12px;line-height:1.5" }));
     var chips = el("div", { className: "rl-wr-years" }), picked = {}, status = el("p", { className: "rl-wr-note", style: "font-size:13px" });
     var go = el("button", { className: "rl-po-primary", text: "Read these years", style: "max-width:260px", disabled: true });
     card.appendChild(chips); card.appendChild(go); card.appendChild(status);
@@ -1747,15 +1777,15 @@
   function wrappedGlance(w) {
     var box = el("div", { className: "rl-wr-glance" });
     function stat(label, big, small) { return el("div", {}, [el("span", { text: label }), el("strong", { text: big }), el("small", { text: small || "" })]); }
-    var cat = w.categories[0], top = w.topShops[0];
+    var cat = w.categories[0], top = w.topShops[0], words = IND[w.industry], first = (w.topItems || [])[0];
     box.appendChild(el("h3", { text: "At a glance" }));
     box.appendChild(el("div", { className: "rl-wr-stats" }, [
-      stat("Spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", "from " + w.coverage.withTotal + " of " + w.receipts + " receipts"),
+      stat("Spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", w.coverage.withTotal < w.receipts ? "from " + w.coverage.withTotal + " of " + w.receipts + " receipts" : w.receipts + (w.receipts === 1 ? " receipt" : " receipts")),
       stat("Top shop", top ? top.name : "—", top ? top.receipts + (top.receipts === 1 ? " order" : " orders") : ""),
-      stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + " receipts" : ""),
+      words ? stat(words.one, first ? first.name : "—", first && first.times > 1 ? first.times + " orders" : "")
+        : stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + " receipts" : ""),
       stat("Busiest month", w.busiestMonth || "—", "")]));
     if ((w.photos || []).length) { box.appendChild(el("h3", { text: "Things you bought", style: "margin:16px 0 8px;font-size:15px" })); box.appendChild(photoGrid(w.photos, "rl-wr-strip")); }
-    box.appendChild(el("p", { className: "rl-wr-note", text: w.note }));
     return box;
   }
   var MONTH_FULL = { Jan: "January", Feb: "February", Mar: "March", Apr: "April", May: "May", Jun: "June", Jul: "July", Aug: "August", Sep: "September", Oct: "October", Nov: "November", Dec: "December" };
@@ -1790,10 +1820,15 @@
   function longDate(d) { return new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long" }); }
   function storySlides(w) {
     var S = [], cat = w.categories[0], top = w.topShops[0], gbp = function (p) { return money(p, "GBP"); };
-    var photos = (w.photos || []).slice(0, 9), style = wrappedStyle(w);
+    // A Wrapped about one kind of shopping (fashion, food & drink…) keeps every list to that kind. The whole year's
+    // Wrapped has no top-5 lists of things or buys, so a coat is never ranked against a coffee.
+    var words = IND[w.industry] || null, kind = words ? words.chip.toLowerCase() : "";
+    var kinds = Array.isArray(w.industries) ? w.industries : null, oneKind = !kinds || kinds.length <= 1, lists = !!words || oneKind;
+    var photos = (w.photos || []).slice(0, 9);
+    var style = w.industry === "fashion" || (!words && (!kinds || (kinds.length === 1 && kinds[0].category === "fashion"))) ? wrappedStyle(w) : null;
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
-      b.appendChild(el("div", { className: "k", text: "✦ RELAY WRAPPED" }));
-      b.appendChild(el("h1", { text: "Your " + w.year + ", one receipt at a time." }));
+      b.appendChild(el("div", { className: "k", text: "✦ RELAY WRAPPED" + (words ? " · " + words.chip.toUpperCase() : "") }));
+      b.appendChild(el("h1", { text: words ? "Your " + w.year + " " + words.inn + "." : "Your " + w.year + ", one receipt at a time." }));
       var fb = w.firstBuy;
       if (fb && fb.date) b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + (fb.item ? " with " + fb.item : "") + (fb.shop ? (fb.item ? " from " : " at ") + fb.shop : "") + "." }));
       b.appendChild(el("p", { text: w.receipts + " receipts and " + w.shops + (w.shops === 1 ? " shop" : " shops") + " later, here's what Relay saw." }));
@@ -1808,17 +1843,17 @@
     if (w.coverage.withTotal) S.push({ bg: "#30255d", fg: "#fff", accent: "#e4d8ff", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
-      b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
+      b.appendChild(el("p", { text: (words ? "on " + w.industryLabel.toLowerCase() + ", " : "") + "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
       if (w.coverage.noTotal) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts. " + w.coverage.noTotal + " had no amount Relay could read." }));
     } });
     if (top) S.push({ bg: "#c7f567", fg: "#16210a", accent: "#16210a", build: function (b) {
-      b.appendChild(el("p", { className: "lead", text: "Your number one shop" }));
+      b.appendChild(el("p", { className: "lead", text: words ? words.go : "Your number one shop" }));
       b.appendChild(el("div", { className: "big name", text: top.name }));
       b.appendChild(el("p", { text: top.receipts + (top.receipts === 1 ? " order" : " orders") + (top.spentPence ? " · " + gbp(top.spentPence) : "") }));
-      if (w.topShopShare) b.appendChild(el("p", { className: "pill", text: "That's " + w.topShopShare + "% of everything you spent" }));
+      if (w.topShopShare && w.topShopShare < 100) b.appendChild(el("p", { className: "pill", text: "That's " + w.topShopShare + "% of " + (words ? "your " + kind + " spending" : "everything you spent") }));
     } });
     if (w.topShops.length > 1) S.push({ bg: "#172554", fg: "#fff", accent: "#93c5fd", build: function (b) {
-      b.appendChild(el("p", { className: "lead", text: "Your top shops" }));
+      b.appendChild(el("p", { className: "lead", text: words ? words.shops : "Your top shops" }));
       var ol = el("ol", { className: "rank" });
       w.topShops.forEach(function (sh, i) {
         ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: sh.name }), el("em", { text: sh.spentPence ? gbp(sh.spentPence) : sh.receipts + " orders" })]));
@@ -1836,13 +1871,12 @@
         g.appendChild(row); });
       b.appendChild(g);
     } });
-    var ti = (w.topItems || []).filter(function (x) { return x.name; });
+    var ti = lists ? (w.topItems || []).filter(function (x) { return x.name; }) : [];
     if (ti.length >= 3) S.push({ bg: "#7c2d12", fg: "#fff", accent: "#fdba74", build: function (b) {
-      b.appendChild(el("p", { className: "lead", text: "Your top 5 things" }));
+      b.appendChild(el("p", { className: "lead", text: words ? words.things : "Your top 5 things" }));
       var ol = el("ol", { className: "rank" });
       ti.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: x.name }), el("em", { text: x.times > 1 ? x.times + "×" : x.spentPence ? gbp(x.spentPence) : (x.shop || "") })])); });
       b.appendChild(ol);
-      b.appendChild(el("p", { className: "fine", text: "Ranked by how many orders each was in, then by what you spent." }));
     } });
     var subs = w.subscriptions || [];
     if (subs.length) S.push({ bg: "#1e1b4b", fg: "#fff", accent: "#a5b4fc", build: function (b) {
@@ -1852,7 +1886,7 @@
       subs.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: x.item && x.item !== x.name ? x.name + " · " + x.item : x.name }), el("em", { text: x.months + " months" + (x.spentPence ? " · " + gbp(x.spentPence) : "") })])); });
       b.appendChild(ol);
     } });
-    if (cat) S.push({ bg: "#f6c7e2", fg: "#3f1430", accent: "#3f1430", build: function (b) {
+    if (cat && !words) S.push({ bg: "#f6c7e2", fg: "#3f1430", accent: "#3f1430", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your favourite kind of shopping" }));
       b.appendChild(el("div", { className: "big name", text: cat.label }));
       b.appendChild(el("p", { text: cat.receipts + " of your " + w.receipts + " receipts" + (cat.topShop && cat.topShop.receipts > 1 ? ", and your go-to was " + cat.topShop.name + " (" + cat.topShop.receipts + ")" : "") + "." }));
@@ -1866,7 +1900,6 @@
     if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#30255d", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: photos.length === 1 ? "One thing you brought home" : "Some things you brought home" }));
       b.appendChild(photoGrid(photos.length > 6 ? photos.slice(0, 6) : photos, "ph"));
-      b.appendChild(el("p", { className: "fine", text: "Photos from your own order emails." }));
     } });
     if (style) S.push({ bg: "#1f3d2b", fg: "#fff", accent: "#c7f567", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your style in " + w.year }));
@@ -1875,7 +1908,6 @@
       style.styles.forEach(function (x) { ch.appendChild(el("span", { text: x.name })); });
       style.colours.slice(0, 3).forEach(function (x) { ch.appendChild(el("span", {}, [el("i", { style: "background:" + (SW[x.name] || "#ccc") }), document.createTextNode(x.name.charAt(0).toUpperCase() + x.name.slice(1))])); });
       b.appendChild(ch);
-      b.appendChild(el("p", { className: "fine", text: "Read from the sizes, colours and names on " + style.bought + (style.bought === 1 ? " item" : " items") + " you bought." }));
     } });
     if (w.topItem) S.push({ bg: "#ff8a5b", fg: "#2b0d00", accent: "#2b0d00", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "On repeat" }));
@@ -1895,14 +1927,14 @@
       if (bm) b.appendChild(el("p", { text: bm.receipts + " receipts" + (bm.spentPence ? " · " + gbp(bm.spentPence) : "") + "." }));
     } });
     if (w.biggest) S.push({ bg: "#0f5132", fg: "#fff", accent: "#b7f0cf", build: function (b) {
-      b.appendChild(el("p", { className: "lead", text: "Your biggest treat" }));
+      b.appendChild(el("p", { className: "lead", text: words ? words.treat : "Your biggest treat" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.biggest.totalPence, gbp, 1100);
       b.appendChild(el("p", { text: (w.biggest.item ? w.biggest.item + ", " : "") + "at " + w.biggest.shop + (w.biggest.date ? " on " + longDate(w.biggest.date) : "") + "." }));
       if (w.biggest.photoId) b.appendChild(photoGrid([{ id: w.biggest.photoId, item: w.biggest.item, shop: w.biggest.shop }], "ph"));
     } });
-    var tb = w.topBuys || [];
+    var tb = lists ? w.topBuys || [] : [];
     if (tb.length >= 3) S.push({ bg: "#064e3b", fg: "#fff", accent: "#6ee7b7", build: function (b) {
-      b.appendChild(el("p", { className: "lead", text: "Your biggest buys" }));
+      b.appendChild(el("p", { className: "lead", text: words ? words.buys : "Your biggest buys" }));
       var ol = el("ol", { className: "rank" });
       tb.forEach(function (x, i) { ol.appendChild(el("li", { style: "animation-delay:" + (0.15 + i * 0.18) + "s" }, [el("b", { text: String(i + 1) }), el("span", { text: (x.item || (x.items > 1 ? x.items + " things" : "Order")) + " · " + x.shop }), el("em", { text: gbp(x.totalPence) })])); });
       b.appendChild(ol);
@@ -1926,20 +1958,21 @@
       b.appendChild(el("p", { text: w.personality.why }));
     } });
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", summary: true, build: function (b, again, close) {
-      var card = el("div", { className: "sum" }, [el("div", { className: "k", text: "✦ MY " + w.year + " ON RELAY" })]);
-      var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], [style && style.styles[0] ? "Style" : "Shops", style && style.styles[0] ? style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & ") : String(w.shops)]];
+      var title = "My " + w.year + (words ? " " + words.inn : "") + " on Relay", firstThing = (w.topItems || [])[0];
+      var card = el("div", { className: "sum" }, [el("div", { className: "k", text: "✦ " + title.toUpperCase() })]);
+      var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], words ? [words.one, firstThing ? firstThing.name : "—"] : ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], [style && style.styles[0] ? "Style" : "Shops", style && style.styles[0] ? style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & ") : String(w.shops)]];
       var g = el("div", { className: "sumgrid" }); rows.forEach(function (r) { g.appendChild(el("div", {}, [el("span", { text: r[0] }), el("strong", { text: r[1] })])); }); card.appendChild(g);
       b.appendChild(card);
-      var text = "My " + w.year + " on Relay: " + rows.map(function (r) { return r[0] + " " + r[1]; }).join(" · ");
+      var text = title + ": " + rows.map(function (r) { return r[0] + " " + r[1]; }).join(" · ");
       var msg = el("p", { className: "fine" });
       b.appendChild(el("div", { className: "acts" }, [
         el("button", { type: "button", text: "Share", onclick: function (e) { e.stopPropagation();
-          if (navigator.share) navigator.share({ title: "My " + w.year + " on Relay", text: text }).catch(function () {});
+          if (navigator.share) navigator.share({ title: title, text: text }).catch(function () {});
           else if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { msg.textContent = "Copied. Paste it anywhere."; }, function () {}); } }),
-        (w.yearList || []).length ? el("button", { type: "button", className: "ghost", text: "Save my list", onclick: function (e) { e.stopPropagation();
+        lists && (w.yearList || []).length ? el("button", { type: "button", className: "ghost", text: "Save my list", onclick: function (e) { e.stopPropagation();
           var q = function (v) { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
           var csv = "Rank,Item,Shop,Orders,Spent\n" + w.yearList.map(function (x, i) { return [i + 1, x.name, x.shop || "", x.times, x.spentPence ? (x.spentPence / 100).toFixed(2) : ""].map(q).join(","); }).join("\n");
-          var a = el("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })) }); a.download = "relay-" + w.year + "-top-things.csv"; document.body.appendChild(a); a.click(); a.remove();
+          var a = el("a", { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })) }); a.download = "relay-" + w.year + (w.industry ? "-" + w.industry : "") + "-top-things.csv"; document.body.appendChild(a); a.click(); a.remove();
           msg.textContent = "Saved your top " + w.yearList.length + " things."; } }) : null,
         el("button", { type: "button", className: "ghost", text: "Watch again", onclick: function (e) { e.stopPropagation(); again(); } }),
         el("button", { type: "button", className: "ghost", text: "Done", onclick: function (e) { e.stopPropagation(); close(); } })].filter(Boolean)));
@@ -1949,7 +1982,7 @@
   }
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
-    var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });
+    var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + (IND[w.industry] ? " " + IND[w.industry].chip : "") + " Wrapped" });
     var frame = el("div", { className: "rl-story-frame" });
     var bars = el("div", { className: "rl-story-bars" });
     slides.forEach(function () { bars.appendChild(el("div", {}, [el("i")])); });
@@ -2286,6 +2319,8 @@
   }
   // Test shop tools (Square sandbox test orders, test refunds, card-only test payments) only for people testing Relay:
   // switched on from Profile → Testing, or with ?testing=1. Shoppers never see them.
+  // The Market isn't part of the launch: it shows for people testing Relay and in the ?demo=1 walkthrough.
+  function marketOn() { try { return testingOn() || /[?&]demo=1(&|$)/.test(location.search); } catch (e) { return false; } }
   function testingOn() {
     try { return /[?&]testing=1(&|$)/.test(location.search) || localStorage.getItem("relay-testing-tools") === "1"; } catch (e) { return false; }
   }
@@ -2427,8 +2462,9 @@
   }
   function skeleton(host, n) { for (var i = 0; i < n; i++) host.appendChild(el("div", { className: "rl-po rl-skel" })); }
   // The wallet: everything you can still return or swap, newest deadline first, in one list. Everything else is in Receipts.
-  function mountWallet(host) {
+  function mountWallet(host, opts) {
     if (!host) return;
+    opts = opts || {};
     host.textContent = "";
     var s = load();
     if (!s || !s.token) {
@@ -2438,11 +2474,13 @@
       return;
     }
     var top = el("div"); host.appendChild(top);
-    var refresh = function () { memo.purchases = null; mountWallet(host); };
+    var refresh = function () { memo.purchases = null; mountWallet(host, opts); };
     mountInstore(top, refresh, "suggest");
-    var head = el("div", { className: "sectionhead" }, [el("h2", { text: "Still returnable" })]);
+    var head = el("div", { className: "sectionhead" }, [el("h2", { text: opts.title || "Still returnable" })]);
     var grid = el("div", { className: "rl-po-grid" }); skeleton(grid, 3);
-    host.appendChild(head); host.appendChild(grid);
+    host.appendChild(head);
+    if (opts.sub) host.appendChild(el("p", { className: "small muted", text: opts.sub, style: "margin:-6px 0 12px" }));
+    host.appendChild(grid);
     var foot = el("div"); host.appendChild(foot);
     loadBoth().then(function (both) {
       var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
@@ -2580,7 +2618,7 @@
       // Add a purchase from a shop receipt.
       var box = el("details", { className: "card", style: "padding:14px 16px;margin:0 0 12px" });
       box.appendChild(el("summary", { text: "Bought in a shop? Add it from the receipt", style: "font-weight:700;cursor:pointer" }));
-      box.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "For shops on Relay that use Square. Enter what's on your receipt; all four must match one purchase." }));
+      box.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "Pick the shop and enter what's on your receipt." }));
       var inp = function (ph, type, mode) { return el("input", { placeholder: ph, type: type || "text", inputMode: mode || "text", style: "width:100%;box-sizing:border-box;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" }); };
       var shopSel = el("select", { style: "width:100%;padding:10px;border-radius:12px;border:1px solid #ddd;font:inherit;margin-bottom:8px" });
       var rn = inp("Receipt number (e.g. #A1b2)"), amt = inp("Amount paid, e.g. 29.99", "text", "decimal"), dt = inp("Date", "date"), l4 = inp("Last 4 digits of your card", "text", "numeric");
@@ -2597,12 +2635,14 @@
             : e === "too_many_tries" ? "That's 10 tries today. Please try again tomorrow." : "Couldn't look just now. Please try again.", true);
         }, function () { go.disabled = false; say(cmsg, "Couldn't reach Relay. Please try again.", true); });
       } });
-      box.addEventListener("toggle", function () {
-        if (!box.open || shopSel.options.length) return;
-        api("/relay/my/instore/shops").then(function (sh) { ((sh.body && sh.body.shops) || []).forEach(function (o) { shopSel.appendChild(el("option", { value: o.id, text: o.name })); }); });
-      });
       [shopSel, rn, amt, dt, l4, go, cmsg].forEach(function (n) { box.appendChild(n); });
-      if (part !== "suggest") host.appendChild(box);
+      // Only offered when there are real shops to find a purchase in (Square's test shops are for people testing Relay).
+      if (part !== "suggest") cachedGet("instoreShops", "/relay/my/instore/shops").then(function (sh) {
+        var list = (sh.ok && sh.body && sh.body.shops) || [];
+        if (!list.length || !(sh.body.live || testingOn())) return;
+        list.forEach(function (o) { shopSel.appendChild(el("option", { value: o.id, text: o.name })); });
+        host.appendChild(box);
+      }, function () {});
     }).catch(function () {});
   }
 
