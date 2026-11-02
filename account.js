@@ -67,6 +67,29 @@
     return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) ||
       (x.returnBy && x.returnable !== false && x.returnBy.date) || null;
   }
+  // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
+  // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
+  function shopLogo(box, dom, px) {
+    if (!box || !dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return;
+    var put = function (src) {
+      var pic = el("img", { alt: "", className: "rl-logo-img", style: "width:" + px + "px;height:" + px + "px;object-fit:contain" });
+      pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); box.appendChild(pic); };
+      pic.src = src;
+    };
+    var known = Object.keys(STORE_LOGOS).filter(function (k) { return dom === k || dom.slice(-(k.length + 1)) === "." + k; })[0];
+    if (known) return put("logos/" + known + "." + STORE_LOGOS[known]);
+    apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) { if (u) put(u); });
+  }
+  // Delivery companies send "on its way" emails of their own: they aren't the shop you bought from.
+  var CARRIER_DOMAIN = /(^|\.)(royalmail\.(com|co\.uk)|parcelforce\.(com|co\.uk)|evri\.com|hermes(world|-europe)?\.(com|co\.uk)|myhermes\.co\.uk|dpd(local)?\.co\.uk|dpd\.com|yodel\.co\.uk|dhl\.(com|co\.uk)|ups\.com|fedex\.com|inpost\.co\.uk|tnt\.com|ukmail\.com|apc-overnight\.com)$/i;
+  function isCarrier(x) { return CARRIER_DOMAIN.test(String((x && x.retailer && x.retailer.domain) || "")); }
+  // "On its way" only while that's still likely: three weeks after the order (or the last delivery date). After that an
+  // old "shipped" email says nothing about now, so it isn't shown and doesn't keep an order in the wallet.
+  function freshDelivery(x) {
+    var dv = x && x.delivery; if (!dv || !dv.status || dv.status === "delivered") return false;
+    var ref = dv.at || x.orderDate; if (!ref || !/^\d{4}-\d{2}-\d{2}/.test(ref)) return false;
+    return (Date.now() - Date.parse(ref.slice(0, 10) + "T00:00:00Z")) / 864e5 <= 21;
+  }
   function daysLeft(dl) {
     if (!dl || !/^\d{4}-\d{2}-\d{2}$/.test(dl)) return null;
     return Math.round((Date.parse(dl) - Date.parse(new Date().toISOString().slice(0, 10))) / 864e5);
@@ -87,7 +110,7 @@
     ".rl-po{background:#fff;border:1px solid #ebe6da;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(16,24,40,.04)}" +
     ".rl-po-top{display:flex;gap:14px;align-items:flex-start}.rl-po-info{flex:1;min-width:0}" +
     ".rl-po-img{width:68px;height:68px;border-radius:16px;background:#f3efe6;flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:#526549}" +
-    ".rl-po-img img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-po-img img{width:100%;height:100%;object-fit:cover}.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 1px #e7e1d2}.rl-po-img img.rl-logo-img{object-fit:contain}" +
     ".rl-po-shop{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#526549}" +
     ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:#101828}.rl-po-meta{font-size:13px;color:#667085}" +
     ".rl-po-price{font-weight:800;font-size:17px;white-space:nowrap;color:#101828}" +
@@ -1045,7 +1068,7 @@
       apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
     }
     var dv = x.delivery;
-    if (!slim && dv && dv.status) {
+    if (!slim && dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) {
       var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
       var today = new Date().toISOString().slice(0, 10);
       var said = dv.status === "delivered" ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "") :
@@ -1236,23 +1259,7 @@
           apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; im.src = u; thumb.appendChild(im); } else showLogo(); });
         } else showLogo();
         // More than one product (or no photo): the store's own logo, fetched once from the store's website.
-        function showLogo() {
-          var dom = row.retailer && row.retailer.domain;
-          if (!dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return;
-          var known = Object.keys(STORE_LOGOS).filter(function (k) { return dom === k || dom.slice(-(k.length + 1)) === "." + k; })[0];
-          if (known) {
-            var pic = el("img", { alt: "", style: "width:40px;height:40px;object-fit:contain" });
-            pic.onerror = function () { pic.remove(); thumb.style.background = ""; thumb.style.border = ""; };
-            pic.onload = function () { thumb.textContent = ""; thumb.style.background = "#fff"; thumb.style.border = "1px solid #e7e1d2"; thumb.appendChild(pic); };
-            pic.src = "logos/" + known + "." + STORE_LOGOS[known];
-            return;
-          }
-          apiBlob("/relay/my/logo/" + encodeURIComponent(dom)).then(function (u) {
-            if (!u) return;
-            thumb.textContent = ""; thumb.style.background = "#fff"; thumb.style.border = "1px solid #e7e1d2";
-            thumb.appendChild(el("img", { alt: "", src: u, style: "width:40px;height:40px;object-fit:contain" }));
-          });
-        }
+        function showLogo() { shopLogo(thumb, row.retailer && row.retailer.domain, 40); }
         var canOpen = row.id && mailRef(row) && openOriginal;
         var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
           : el("b", { text: who, style: "display:block;font-size:16px" });
@@ -2882,7 +2889,9 @@
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
     var card = el("div", { className: "rl-po" });
     var img = el("div", { className: "rl-po-img", text: initials(who) });
-    if ((x.items || []).length <= 1 && x.hasImage && x.id) apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) { img.textContent = ""; img.appendChild(el("img", { src: u, alt: "" })); } });
+    var logo = function () { shopLogo(img, x.retailer && x.retailer.domain, 44); };
+    if ((x.items || []).length <= 1 && x.hasImage && x.id) apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) { img.textContent = ""; img.appendChild(el("img", { src: u, alt: "" })); } else logo(); });
+    else logo();
     // One item of a multi-item order gets its own card (opts.item is its position on the receipt).
     var one = opts.item != null ? (x.items || [])[opts.item] : null;
     var first = one || (x.items || [])[0] || {};
@@ -2893,7 +2902,7 @@
       el("div", { className: "rl-po-meta", text: [first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]),
       el("div", { className: "rl-po-price", text: price })]));
     var dv = x.delivery;
-    if (dv && dv.status) {
+    if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) {
       var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
       card.appendChild(el("div", { className: "rl-po-status" + (dv.status === "delivered" ? "" : " wait"), text: (dv.status === "delivered" ? "✓ Delivered" + (dv.at ? " " + day(dv.at) : "")
         : dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? "Due " + (dv.at ? day(dv.at) : "today") : "On its way") + (dv.carrier ? " · " + dv.carrier : "") }));
@@ -2996,8 +3005,8 @@
         items.push({ deadline: new Date(Date.parse(o.orderedAt) + 7 * 864e5).toISOString().slice(0, 10), node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
       }); });
       orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
-        if (x.returnable === false) return;
-        var dl = deadlineOf(x), onWay = x.delivery && x.delivery.status && x.delivery.status !== "delivered";
+        if (x.returnable === false || isCarrier(x)) return;
+        var dl = deadlineOf(x), onWay = freshDelivery(x);
         if (!((dl && dl >= today) || (onWay && !dl))) return;
         var parts = emailItems(x), anyMarked = parts.some(function (p) { return p.returning; });
         // A return is under way but Relay doesn't know which items: the Returns page asks, and nothing shows here meanwhile.
