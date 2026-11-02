@@ -18,7 +18,8 @@ database_id = "6d3a035f-b869-4e1f-af61-bb34f2f5c51c"
 migrations_dir = "migrations"
 
 [triggers]
-crons = ["0 * * * *", "7,22,37,52 * * * *"]
+# Hourly: shops, price alerts, reminders. Every 15 minutes: new mail. Every minute: scans carried on after the shopper left the app.
+crons = ["0 * * * *", "7,22,37,52 * * * *", "* * * * *"]
 
 # Server logs (Workers Logs), so errors and slow requests can be looked into. Logs hold request paths and
 # Relay's own console lines, which never include tokens or email text.
