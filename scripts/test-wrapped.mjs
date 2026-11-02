@@ -47,4 +47,27 @@ const fw = buildWrapped([
 assert.equal(fw.spentPence, 187000 + 2500, "the forwarded copy isn't added twice");
 assert.equal(fw.receipts, 2);
 assert.ok(!fw.topShops.some(s => /Sam Smith|Forwarded/.test(s.name)), "a person's name is never a top shop");
-console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly");
+// One Wrapped per kind of shopping: a top 5 never mixes a coat with a coffee.
+assert.deepEqual(w.industries.map(k => [k.category, k.receipts, k.spentPence]), [["fashion", 2, 7990], ["food", 1, 4210], ["digital", 1, 0], ["other", 1, 0]], "each kind of shopping this year, biggest spend first");
+assert.equal(w.industry, null);
+const mix = [
+  { kind: "order", retailer: R("Zara", "zara.com"), orderDate: "2026-03-10", orderRef: "Z1", totalPence: 5990, currency: "GBP", category: "fashion", items: [{ name: "Coat" }] },
+  { kind: "order", retailer: R("Zara", "zara.com"), orderDate: "2026-04-10", orderRef: "Z2", totalPence: 2990, currency: "GBP", category: "fashion", items: [{ name: "Coat" }, { name: "Scarf" }] },
+  { kind: "order", retailer: R("Nespresso", "nespresso.com"), orderDate: "2026-04-12", orderRef: "N1", totalPence: 4200, currency: "GBP", category: "food", items: [{ name: "Vertuo pods" }] },
+  { kind: "order", retailer: R("Nespresso", "nespresso.com"), orderDate: "2026-05-12", orderRef: "N2", totalPence: 4200, currency: "GBP", category: "food", items: [{ name: "Vertuo pods" }] },
+  { kind: "order", retailer: R("Nespresso", "nespresso.com"), orderDate: "2026-06-12", orderRef: "N3", totalPence: 4200, currency: "GBP", category: "food", items: [{ name: "Vertuo pods" }] }];
+const fashion = buildWrapped(mix, 2026, Date.now(), { industry: "fashion" });
+assert.equal(fashion.industry, "fashion"); assert.equal(fashion.industryLabel, "Fashion");
+assert.equal(fashion.receipts, 2); assert.equal(fashion.spentPence, 5990 + 2990);
+assert.deepEqual(fashion.topItems.map(x => x.name), ["Coat", "Scarf"], "only fashion things in the fashion top 5");
+assert.deepEqual(fashion.topBuys.map(x => x.shop), ["Zara", "Zara"]);
+assert.deepEqual(fashion.topShops.map(x => x.name), ["Zara"]);
+assert.equal(fashion.personality, null, "no 'what kind of shopper' label inside one kind of shopping");
+assert.match(fashion.badges[0].why, /of your spending on fashion went there/);
+assert.deepEqual(fashion.industries.map(k => k.category), ["food", "fashion"], "the list of kinds still covers the whole year");
+const food = buildWrapped(mix, 2026, Date.now(), { industry: "food" });
+assert.deepEqual(food.topItem, { name: "Vertuo pods", times: 3, shop: "Nespresso" });
+assert.deepEqual(food.topItems.map(x => x.name), ["Vertuo pods"]);
+assert.equal(buildWrapped(mix, 2026, Date.now(), { industry: "<script>" }).industry, null, "an unknown kind is ignored");
+assert.equal(buildWrapped(mix, 2026, Date.now(), { industry: "<script>" }).receipts, 5);
+console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly; one Wrapped per kind of shopping");
