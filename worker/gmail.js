@@ -400,7 +400,10 @@ function logoTypeOf(bytes) {
 }
 const LOGO_MAX_BYTES = 150000, LOGO_MIN_BYTES = 200, LOGO_RETRY_MS = 7 * 24 * 60 * 60 * 1000;
 // Shops with no logo found before this moment are looked up again (the list of places to look grew: see logoSources).
-const LOGO_SOURCES_SINCE = Date.UTC(2026, 10, 2, 23, 0);
+// It is the moment the new list went live everywhere, so "no logo" answers the old list gave are never kept.
+const LOGO_SOURCES_SINCE = Date.UTC(2026, 10, 2, 23, 30);
+// A shop's website that hangs instead of answering is given up on quickly, so the app can draw a picture instead.
+const LOGO_WAIT_MS = 4000;
 // The size of a picture in pixels (the larger side), when it can be read from its first bytes: PNG, GIF and icon files.
 export function imagePx(b) {
   if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return Math.max((b[16] << 24 | b[17] << 16 | b[18] << 8 | b[19]) >>> 0, (b[20] << 24 | b[21] << 16 | b[22] << 8 | b[23]) >>> 0);
@@ -425,7 +428,7 @@ function logoSources(domain) {
 async function fetchLogo(fetchImpl, domain) {
   for (const src of logoSources(domain)) {
     try {
-      const res = await fetchImpl(src.url, { headers: { Accept: "image/*" }, redirect: "follow" });
+      const res = await fetchImpl(src.url, { headers: { Accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(LOGO_WAIT_MS) });
       if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
       const bytes = new Uint8Array(await res.arrayBuffer());
       if (bytes.length < LOGO_MIN_BYTES || bytes.length > LOGO_MAX_BYTES) continue;

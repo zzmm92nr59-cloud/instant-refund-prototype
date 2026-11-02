@@ -473,7 +473,7 @@ assert.equal((await (await call("/relay/my/receipts", { token: alice })).json())
   for (const d of ["gmail.com", "g.shopifyemail.com", "privaterelay.appleid.com"]) assert.equal((await call("/relay/my/logo/" + d, { token: alice })).status, 404, d);
   assert.equal(logoCalls.length, before, "nothing fetched for them");
   // A shop with no logo found before the new places to look were added is looked up again.
-  sqlite.prepare("INSERT OR REPLACE INTO retailer_logos (domain,type,data,found,fetched_at) VALUES (?,?,?,?,?)").run("blockedshop.co.uk", null, null, 0, Date.UTC(2026, 9, 1));
+  sqlite.prepare("INSERT OR REPLACE INTO retailer_logos (domain,type,data,found,fetched_at) VALUES (?,?,?,?,?)").run("blockedshop.co.uk", null, null, 0, Date.UTC(2026, 10, 2, 23, 10));
   assert.equal((await call("/relay/my/logo/blockedshop.co.uk", { token: bob })).status, 200, "an old miss is retried");
   // Speed: database set-up runs once per worker instance, not on every request (it used to add seconds to each call).
   let creates = 0; const realPrepare = db.prepare; db.prepare = (sql) => { if (/CREATE (TABLE|INDEX)/i.test(sql)) creates++; return realPrepare(sql); };
