@@ -189,7 +189,8 @@ await p2.getByRole("button", { name: "Sign out" }).click();
 await p2.getByRole("heading", { name: "Welcome to Relay" }).waitFor();
 await p2.goto(origin + "/index.html#signin=" + "L".repeat(43));
 await p2.locator("#homeHello", { hasText: "Jess" }).waitFor();
-await p2.getByRole("heading", { name: "Account", exact: true }).waitFor();
+await p2.waitForTimeout(800);
+assert.equal(await p2.locator(".rl-sheet").count(), 0, "already set up (name, email connected): straight to Home, no sign-up steps");
 console.log("ok - signing out shows the welcome screen, signing in by email link shows Home, without reloading");
 
 // 10. The ?testing=1 tools keep their Wallet tab.
