@@ -5,7 +5,7 @@ import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
-import { sendReturnReminders, autoScanGmail } from "./gmail.js";
+import { sendReturnReminders, autoScanGmail, runScanJobs } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
@@ -47,8 +47,11 @@ function syncShopSoon(env, shop) {
   return state.done;
 }
 const GMAIL_CRON = "7,22,37,52 * * * *";
+// Every minute: scans shoppers started and then left the app for are carried on until they finish.
+const SCAN_JOBS_CRON = "* * * * *";
 export default {
   async scheduled(event, env, ctx) {
+    if (event && event.cron === SCAN_JOBS_CRON) { ctx.waitUntil(runScanJobs(env).then(r => { if (r.jobs) console.log("background scans", JSON.stringify(r)); }).catch(e => console.error("background scans failed", String(e && e.message || e).slice(0, 120)))); return; }
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));

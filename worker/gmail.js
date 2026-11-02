@@ -20,6 +20,7 @@ import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { categorise, storeKey, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
+import { ensurePushTables, subsOf, sendPush } from "./push.js";
 
 // v5: the same permission, worded for Outlook as well as Gmail.
 export const CONSENT_VERSION = "2026-11-v5";
@@ -167,7 +168,12 @@ async function ensureGmailTablesRun(db) {
     // Which items of an email order the shopper is sending back (an email receipt covers the whole order).
     `CREATE TABLE IF NOT EXISTS receipt_item_marks (
        shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, item_index INTEGER NOT NULL, status TEXT NOT NULL,
-       updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id, item_index))`
+       updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id, item_index))`,
+    // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
+    `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
+       shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
+       added INTEGER NOT NULL DEFAULT 0, scanned_back TEXT, rounds INTEGER NOT NULL DEFAULT 0, background INTEGER NOT NULL DEFAULT 0,
+       started_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, app_at INTEGER, finished_at INTEGER, lease_until INTEGER, lease_id TEXT, error TEXT)`
   ];
   await runAll(db, statements);
   // Which kind of mailbox a connection (or a connection being started) is: NULL for Gmail, 'microsoft' for Outlook.
@@ -192,6 +198,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").bind(shopperId)
   ];
@@ -216,6 +223,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
   const rows = ((await env.RELAY_DB.prepare(
     `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
      WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
      ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION).all()).results || []);
   let passes = 0, calls = 0;
   const out = [];
@@ -322,7 +330,8 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
-    env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId)
+    env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId)
   ];
   if (withdraw) statements.push(env.RELAY_DB.prepare(
     "UPDATE shopper_consents SET withdrawn_at = ? WHERE shopper_id = ? AND withdrawn_at IS NULL").bind(Date.now(), shopperId));
@@ -668,6 +677,126 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
     else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
   }
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
+}
+
+// ---- Scans that carry on after the shopper leaves the app ----
+// A scan the shopper starts is kept as a job: where it has got to and how much it has found. While the app is open it asks
+// for the rounds itself (quick, with progress on screen). Once the app is closed (or the phone locks), the scheduled worker
+// carries on every minute until the job is done, and sends a phone notification if the shopper turned them on.
+// A short lease means only one of them reads a mailbox at a time.
+const JOB_LEASE_MS = 90 * 1000;        // how long a runner may hold a mailbox before someone else can take over
+const JOB_APP_MS = 30 * 1000;          // the app counts as driving a scan if it asked within this time
+const JOB_ROUNDS_PER_RUN = 5;          // rounds per scheduled run (each round stays well inside the per-request limits)
+const JOB_RUN_MS = 40 * 1000;          // a scheduled run stops starting new rounds after this long
+async function jobOf(env, shopperId) {
+  return env.RELAY_DB.prepare("SELECT * FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId).first();
+}
+export function jobView(j) {
+  return j ? { state: j.state, full: Boolean(j.full_read), found: j.added || 0, scannedBack: j.scanned_back ? String(j.scanned_back).replace(/\//g, "-") : null,
+    startedAt: j.started_at, updatedAt: j.updated_at, finishedAt: j.finished_at || null, error: j.error || null } : null;
+}
+// Starts a scan, or carries on the one already running: asking again never restarts it, except to widen it to a full
+// re-read or when a mailbox has just been (re)connected.
+export async function startScanJob(env, shopperId, now, { full = false, restart = false } = {}) {
+  const cur = await jobOf(env, shopperId);
+  if (!restart && cur && cur.state === "running" && (cur.full_read || !full)) return cur;
+  await env.RELAY_DB.prepare(
+    `INSERT INTO mail_scan_jobs (shopper_id,job_id,state,full_read,cursor,added,scanned_back,rounds,background,started_at,updated_at,app_at,finished_at,lease_until,error)
+     VALUES (?, ?, 'running', ?, NULL, 0, NULL, 0, 0, ?, ?, NULL, NULL, NULL, NULL)
+     ON CONFLICT(shopper_id) DO UPDATE SET job_id = excluded.job_id, state = 'running', full_read = excluded.full_read, cursor = NULL, added = 0,
+       scanned_back = NULL, rounds = 0, background = 0, started_at = excluded.started_at, updated_at = excluded.updated_at, finished_at = NULL, error = NULL`)
+    .bind(shopperId, randomToken(), full ? 1 : 0, now, now).run();
+  return jobOf(env, shopperId);
+}
+// Takes the mailbox for one runner. Null if someone else has it (or there is nothing running).
+async function claimScanJob(env, shopperId, now) {
+  return env.RELAY_DB.prepare(
+    "UPDATE mail_scan_jobs SET lease_until = ?, lease_id = ? WHERE shopper_id = ? AND state = 'running' AND (lease_until IS NULL OR lease_until < ?) RETURNING *")
+    .bind(now + JOB_LEASE_MS, randomToken(), shopperId, now).first();
+}
+// Gives the mailbox back, only if this runner still holds it.
+const releaseLease = (env, job) => env.RELAY_DB.prepare("UPDATE mail_scan_jobs SET lease_until = NULL, lease_id = NULL WHERE shopper_id = ? AND lease_id = ?").bind(job.shopper_id, job.lease_id);
+// One round of a job, from where it had got to. Progress is only saved onto the same job (a scan restarted meanwhile is left alone).
+async function runScanJobRound(env, job, fetchImpl, now, o = {}) {
+  const db = env.RELAY_DB, same = [job.shopper_id, job.job_id];
+  let r;
+  try { r = await scan(env, job.shopper_id, fetchImpl, now, job.cursor || "", Boolean(job.full_read), o.small ? { maxFetch: 2 } : {}); }
+  catch (e) { await releaseLease(env, job).run(); throw e; }
+  if (r.status !== 200) {
+    // A mailbox that needs connecting again (or was disconnected) ends the job; a busy mailbox is simply tried again later.
+    const stop = r.status === 401 || r.status === 409;
+    await db.batch([db.prepare(`UPDATE mail_scan_jobs SET updated_at = ?, error = ?, state = CASE WHEN ? THEN 'failed' ELSE state END,
+        finished_at = CASE WHEN ? THEN ? ELSE finished_at END WHERE shopper_id = ? AND job_id = ?`)
+      .bind(now, (r.body && r.body.error) || "failed", stop ? 1 : 0, stop ? 1 : 0, now, ...same), releaseLease(env, job)]);
+    return r;
+  }
+  const b = r.body;
+  await db.batch([db.prepare(`UPDATE mail_scan_jobs SET cursor = ?, added = added + ?, rounds = rounds + 1, scanned_back = ?, state = ?, updated_at = ?,
+      finished_at = ?, error = NULL, background = background + ? WHERE shopper_id = ? AND job_id = ?`)
+    .bind(b.more ? b.cursor : null, (b.added || 0) + (b.updated || 0), b.scannedBack || null, b.more ? "running" : "done", now,
+      b.more ? null : now, o.background ? 1 : 0, ...same), releaseLease(env, job)]);
+  return r;
+}
+// A round asked for by the app. If the scheduled worker is reading this mailbox right now, the app is told so (with the
+// progress so far) and asks again a moment later.
+async function appScanRound(env, shopperId, fetchImpl, now, { full = false, small = false, busyWaitMs = 3000 } = {}) {
+  await startScanJob(env, shopperId, now, { full });
+  await env.RELAY_DB.prepare("UPDATE mail_scan_jobs SET app_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+  const job = await claimScanJob(env, shopperId, now);
+  if (!job) {
+    const j = await jobOf(env, shopperId);
+    if (!j || j.state !== "running") return { status: 200, body: { ok: true, added: 0, updated: 0, more: false, cursor: null, job: jobView(j) } };
+    // Older copies of the app ask again straight away, so the answer waits a little.
+    if (busyWaitMs) await sleep(busyWaitMs);
+    return { status: 200, body: { ok: true, busy: true, added: 0, updated: 0, more: true, cursor: j.cursor, scannedBack: j.scanned_back, retryAfterMs: 4000, job: jobView(j) } };
+  }
+  const r = await runScanJobRound(env, job, fetchImpl, now, { small });
+  return { status: r.status, body: { ...r.body, job: jobView(await jobOf(env, shopperId)) } };
+}
+// The scheduled worker's part: jobs the app isn't driving are carried on, a few rounds a run, until they are done.
+export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => fetch(...a), o = {}) {
+  if (!env.RELAY_DB) return { jobs: 0, rounds: 0 };
+  await ensureGmailTables(env.RELAY_DB);
+  const clock = o.clock || (() => Date.now());
+  const began = clock(), maxRounds = o.rounds || JOB_ROUNDS_PER_RUN, runMs = o.runMs || JOB_RUN_MS;
+  const rows = ((await env.RELAY_DB.prepare(
+    `SELECT j.shopper_id AS id FROM mail_scan_jobs j
+     WHERE j.state = 'running' AND (j.lease_until IS NULL OR j.lease_until < ?) AND (j.app_at IS NULL OR j.app_at < ?)
+       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = j.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+     ORDER BY j.updated_at LIMIT 5`).bind(now, now - JOB_APP_MS, CONSENT_VERSION).all()).results || []);
+  let rounds = 0, finished = 0, notified = 0;
+  for (const row of rows) {
+    if (rounds >= maxRounds || clock() - began > runMs) break;
+    let job = await claimScanJob(env, row.id, now);
+    while (job && job.state === "running" && rounds < maxRounds && clock() - began <= runMs) {
+      let r;
+      try { r = await runScanJobRound(env, job, fetchImpl, now, { background: true }); }
+      catch (e) { console.error("background scan round failed", String(e && e.message || e).slice(0, 120)); break; }
+      rounds++;
+      const next = await jobOf(env, row.id);
+      // Stop when the round failed, the job ended, or the app came back and is asking for the rounds itself.
+      if (r.status !== 200 || !next || next.state !== "running" || (next.app_at && next.app_at >= now)) { job = next; break; }
+      job = await claimScanJob(env, row.id, now);
+    }
+    const done = await jobOf(env, row.id);
+    if (done && done.state === "done" && done.finished_at === now && done.background > 0) {
+      finished++;
+      if (done.added > 0) notified += await tellScanDone(env, row.id, done.added, { now, fetchImpl: o.pushFetch });
+    }
+  }
+  return { jobs: rows.length, rounds, finished, notified };
+}
+// "Your receipts are ready" on the shopper's phone, only for scans that finished while they were away. No shop names.
+async function tellScanDone(env, shopperId, found, o) {
+  let sent = 0;
+  try {
+    await ensurePushTables(env.RELAY_DB);
+    for (const sub of await subsOf(env.RELAY_DB, shopperId)) {
+      try { if ((await sendPush(env, sub, { title: "Your receipts are ready", body: "Relay finished checking your email and found " + found + (found === 1 ? " purchase email." : " purchase emails."), url: "./" }, o)).ok) sent++; }
+      catch { /* one device failing never stops the rest */ }
+    }
+  } catch { /* no notifications set up: nothing to send */ }
+  return sent;
 }
 
 
@@ -1066,6 +1195,8 @@ export async function saveConnection(env, shopperId, provider, address, refreshT
        auto_cursor=CASE WHEN ${same} THEN gmail_connections.auto_cursor END,
        full_rev=CASE WHEN ${same} THEN gmail_connections.full_rev END`)
     .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
+  // The first read starts straight away on Relay's side, so it happens even if the shopper closes the app at once.
+  await startScanJob(env, shopperId, now, { restart: true });
 }
 // The same agreement the consent screen records, for a sign-in that showed the wording before going to Microsoft.
 export async function recordConsent(env, shopperId, now) {
@@ -1165,7 +1296,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       "SELECT * FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first()
       .then(x => x && { provider: x.provider === "microsoft" ? "microsoft" : "google", googleEmail: x.google_email, email: x.google_email,
         connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
-    return json({ connected: Boolean(c), ...(c || {}) }, 200, cors);
+    // A scan in progress (or just finished), so the app can show it carrying on after the shopper comes back.
+    const scanJob = c ? jobView(await jobOf(env, shopper.id)) : null;
+    return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}) }, 200, cors);
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
@@ -1175,8 +1308,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       const thisYear = new Date(opts.now).getUTCFullYear(), want = Number(sb && sb.year);
       if (sb && sb.year !== undefined && !(Number.isInteger(want) && want >= thisYear - HISTORY_YEARS && want < thisYear))
         return json({ error: "bad_year", earliest: thisYear - HISTORY_YEARS }, 400, cors);
-      const r = await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.full === true),
-        { ...(sb && sb.small === true ? { maxFetch: 2 } : {}), ...(want ? { year: want } : {}) });
+      // A past year for Wrapped is read on its own; every other scan is a job that carries on if the shopper leaves the app.
+      const r = want
+        ? await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", false, { ...(sb && sb.small === true ? { maxFetch: 2 } : {}), year: want })
+        : await appScanRound(env, shopper.id, opts.fetchImpl, opts.now, { full: Boolean(sb && sb.full === true), small: Boolean(sb && sb.small === true), busyWaitMs: opts.busyWaitMs ?? 3000 });
       return json(r.body, r.status, cors);
     } catch (e) {
       // A round that hits a limit still answers, so the app can wait a moment and carry on from where it was.

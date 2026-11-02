@@ -1028,44 +1028,71 @@
           allRows = rows; drawnSig = sig; drawList();
         });
       }
+      // Reading happens on Relay's side as a job, so it carries on if the shopper leaves the app (or the phone locks).
+      // While this page is open the app asks for the rounds itself (quicker, with progress on screen); if Relay is already
+      // busy with them, the app just shows how far it has got.
+      var scanning = false;
+      try { localStorage.removeItem("relay_scan_cursor"); } catch (e) {}
+      var monthOf = function (sb) { var m = /^(\d{4})[\/-](\d{2})/.exec(sb || ""); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : ""; };
+      var progress = function (job) {
+        var found = (job && job.found) || 0, label = monthOf(job && job.scannedBack);
+        say(status, (label ? "Reading back to " + label : "Reading your " + MB) + "… " + found + " found so far. You can close Relay, it carries on.");
+      };
       var doScan = function (full) {
-        scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
-        var added = 0, rounds = 0, saved = ""; try { saved = localStorage.getItem("relay_scan_cursor") || ""; } catch (e) {}
-        var tries = 0;
-        // A round that fails (the mailbox or Relay busy for a moment) is tried again a few seconds later from the same place.
-        function retry(cursor) {
+        if (scanning) return;
+        scanning = true; scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
+        var rounds = 0, tries = 0;
+        function finish(text, bad) { scanning = false; scanBtn.disabled = false; memo.gmail = null; if (text) say(status, text, bad); }
+        // A round that fails (the mailbox or Relay busy for a moment) is tried again a few seconds later; Relay also carries on by itself.
+        function retry() {
           tries++;
-          if (tries > 3) {
-            scanBtn.disabled = false;
-            try { if (cursor) localStorage.setItem("relay_scan_cursor", cursor); } catch (e) {}
-            return say(status, (added ? "Found or updated " + added + " so far. " : "") + MB + " is busy right now. Your place is saved: tap the button again in a minute to carry on.", true);
-          }
-          say(status, MB + " is busy, trying again…" + (added ? " " + added + " found so far" : ""));
-          return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(cursor, true); });
+          if (tries > 3) return finish(MB + " is busy right now. Relay will carry on by itself and your receipts will appear here.");
+          say(status, MB + " is busy, trying again…");
+          return new Promise(function (res) { setTimeout(res, 3000 * tries); }).then(function () { return step(true); });
         }
-        function step(cursor, small) {
-          return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign(cursor ? { cursor: cursor } : {}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
-            if (x.status === 401) { scanBtn.disabled = false; return say(status, owner + " needs you to reconnect " + MB + ". Disconnect and connect again.", true); }
-            if (!x.ok) return retry(cursor);
+        function step(small) {
+          // The shopper went to another page: Relay carries on by itself.
+          if (!document.body.contains(status)) { scanning = false; return; }
+          return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
+            if (x.status === 401) return finish(owner + " needs you to reconnect " + MB + ". Disconnect and connect again.", true);
+            if (!x.ok) return retry();
             tries = 0;
-            added += (x.body.added || 0) + (x.body.updated || 0); rounds++;
+            var job = x.body.job;
+            if (job && job.state === "failed") return finish(job.error === "gmail_reconnect_needed" ? owner + " needs you to reconnect " + MB + ". Disconnect and connect again." : "Couldn't finish reading " + MB + ". Please try again later.", true);
+            // Relay is reading this mailbox right now: show its progress and look again in a moment.
+            if (x.body.busy) { progress(job); loadList(); return new Promise(function (res) { setTimeout(res, x.body.retryAfterMs || 4000); }).then(function () { return step(); }); }
+            rounds++;
             loadList();
-            try { if (x.body.more && x.body.cursor) localStorage.setItem("relay_scan_cursor", x.body.cursor); else localStorage.removeItem("relay_scan_cursor"); } catch (e) {}
-            if (x.body.more && x.body.cursor && rounds < 80) {
-              var m = /^(\d{4})\/(\d{2})/.exec(x.body.scannedBack || "");
-              var label = m ? new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : "";
-              say(status, "Scanning" + (label ? " back to " + label : " older emails") + "… " + added + " found so far");
-              return step(x.body.cursor);
-            }
-            scanBtn.disabled = false; memo.gmail = null;
+            if (x.body.more && rounds < 150) { progress(job); return step(); }
+            if (x.body.more) return finish("Still reading in the background. New receipts will appear here as they're found.");
             // "Connected. Scanning for receipts…" is out of date once the scan has finished.
             if (onPage && msg.textContent && !/\berr\b/.test(msg.className)) say(msg, "");
-            say(status, (x.body.more ? "Stopped early. Scan again to carry on. " : "") + (added ? "Found or updated " + added + " receipt or return email" + (added === 1 ? "" : "s") + ". Please check them below." : "Nothing new found."));
-          // A dropped connection is treated like a busy round: wait, then carry on from the same place.
-          }, function () { return retry(cursor); });
+            try { if (job && job.finishedAt) localStorage.setItem("relay.scanSeen", String(job.finishedAt)); } catch (e) {}
+            var found = job ? job.found : (x.body.added || 0) + (x.body.updated || 0);
+            finish(found ? "Found or updated " + found + " receipt or return email" + (found === 1 ? "" : "s") + ". Please check them below." : "Nothing new found.");
+          // A dropped connection is treated like a busy round: wait, then carry on.
+          }, function () { return retry(); });
         }
-        step(full ? "" : saved).catch(function () { scanBtn.disabled = false; say(status, "Couldn't reach Relay. Check your connection and try again.", true); });
+        Promise.resolve(step()).catch(function () { finish("Couldn't reach Relay. Check your connection and try again.", true); });
       };
+      // Coming back to the app: carry on showing a scan Relay kept going, or say it finished while the shopper was away.
+      var resume = function (job) {
+        if (!job || scanning || !document.body.contains(status)) return;
+        if (job.state === "running") { progress(job); doScan(job.full); return; }
+        var seen = ""; try { seen = localStorage.getItem("relay.scanSeen") || ""; } catch (e) {}
+        if (job.state === "done" && job.finishedAt && String(job.finishedAt) !== seen && Date.now() - job.finishedAt < 24 * 3600e3) {
+          try { localStorage.setItem("relay.scanSeen", String(job.finishedAt)); } catch (e) {}
+          say(status, "Finished reading your " + MB + " while you were away: " + job.found + " found.");
+        }
+      };
+      window.__relayScanResume = function () {
+        if (scanning || !document.body.contains(status)) return;
+        api("/relay/my/gmail").then(function (g) { if (g.ok && g.body && g.body.scan) { loadList(); resume(g.body.scan); } });
+      };
+      if (!window.__relayScanVisBound) {
+        window.__relayScanVisBound = true;
+        document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && window.__relayScanResume) window.__relayScanResume(); });
+      }
       scanBtn.onclick = function () { doScan(false); };
       if (onPage) {
         status.style.cssText = "margin:0;font-size:13px;color:#667085";
@@ -1085,6 +1112,7 @@
       }
       if (window.__relayAutoFull) { window.__relayAutoFull = false; window.__relayAutoScan = false; doScan(true); }
       else if (window.__relayAutoScan) { window.__relayAutoScan = false; scanBtn.onclick(); }
+      else resume(r.body.scan);
     }).catch(function () { box.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
 
