@@ -1368,7 +1368,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ receipts: things }, 200, cors);
   }
   if (path === "/relay/my/receipts" && m === "GET") {
-    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing);
+    // The Receipts page asks for everything (?all=1); Home and the wallet only need the newest, so they stay quick.
+    const all = url.searchParams.get("all") === "1";
+    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? { rows: 3000, cards: 3000 } : {});
     timing.totalMs = Date.now() - t0;
     return json({ receipts: list, timing }, 200, cors);
   }

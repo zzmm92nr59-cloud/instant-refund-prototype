@@ -540,4 +540,22 @@ assert.equal(calls.filter(c => c.url === "https://oauth2.googleapis.com/revoke")
 for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "gmail_oauth_states", "shopper_consents"])
   assert.equal(sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE shopper_id NOT IN (SELECT id FROM shoppers)`).get().n, 0, t + " cleaned on account deletion");
 
+// More than 100 receipts: Home gets the newest 100 (quick), the Receipts page asks for all of them.
+{
+  const heavy = await signIn("heavy.shopper@example.com", "8.8.8.8");
+  await post("/relay/my/consent", heavy, { version: CONSENT_VERSION });
+  const hid = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'heavy.shopper@example.com'").get().id;
+  const ins = sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)");
+  for (let i = 0; i < 260; i++) {
+    const d = new Date(Date.UTC(2026, 9, 1) - i * 86400000).toISOString().slice(0, 10);
+    ins.run(crypto.randomUUID(), hid, "m" + i, "pending", JSON.stringify({ kind: "receipt", retailer: { name: "Shop " + i, domain: "shop" + i + ".example" }, orderRef: "R" + (10000 + i), orderDate: d, totalPence: 1000 + i, currency: "GBP", items: [{ name: "Thing " + i, qty: 1 }] }), Date.now() - i);
+  }
+  const few = (await (await call("/relay/my/receipts", { token: heavy })).json()).receipts;
+  const all = (await (await call("/relay/my/receipts?all=1", { token: heavy })).json()).receipts;
+  assert.equal(few.length, 100, "Home and the wallet get the newest 100");
+  assert.equal(all.length, 260, "the Receipts page gets every receipt");
+  assert.equal(all[259].orderRef, "R10259", "including the oldest");
+  console.log("ok - more than 100 receipts: all of them reach the Receipts page");
+}
+
 console.log("PASS consent record, Gmail connect/callback rules, encrypted token, receipts-only scan, privacy of captured receipts, disconnect, withdrawal and deletion (FAKE Google and Gmail)");

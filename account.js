@@ -198,6 +198,27 @@
     ".rl-jscan b{display:block;font-size:17px}.rl-jscan span{display:block;font-size:13.5px;color:#c9d0df}" +
     ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#c7f567;border-radius:99px;transition:width .6s ease}" +
     "@media(prefers-reduced-motion:reduce){.rl-jbar i,.rl-dots span{transition:none}}" +
+    // A group's page: header, filters, receipts by month.
+    ".rl-cat-back{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 14px 0 10px;border-radius:999px;background:#fff;border:1px solid #e7e1d2;font-weight:700;font-size:15px;color:#101828}.rl-cat-back-i{font-size:22px;line-height:1;margin-top:-2px}" +
+    ".rl-cat-back:active{background:#f3efe6}.rl-cat-back:focus-visible{outline:2px solid #101828;outline-offset:2px}" +
+    ".rl-cat-hero{display:flex;gap:16px;align-items:center;border-radius:24px;padding:18px;margin:14px 0 14px}.rl-cat-hero h3{margin:0;font-family:Georgia,serif;font-size:28px;letter-spacing:-.02em;line-height:1.1}.rl-cat-hero-t span{display:block;font-size:14px;font-weight:600;opacity:.85;margin-top:4px}" +
+    ".rl-cat-note{font-size:13.5px;color:#5b6475;margin:-4px 2px 12px}" +
+    ".rl-cat-chips{display:flex;gap:8px;overflow-x:auto;padding:2px;margin:0 -2px 12px;scrollbar-width:none}.rl-cat-chips::-webkit-scrollbar{display:none}" +
+    ".rl-cat-chips button{all:unset;flex:none;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:#fff;border:1px solid #e7e1d2;font-weight:700;font-size:14px;color:#101828}" +
+    ".rl-cat-chips button.on{background:#101828;color:#fff;border-color:#101828}.rl-cat-chips button:focus-visible{outline:2px solid #101828;outline-offset:2px}" +
+    ".rl-cat-search{width:100%;box-sizing:border-box;min-height:48px;padding:12px 16px;border:1px solid #e7e1d2;border-radius:14px;font-size:16px;background:#fff;font-family:inherit;margin:0 0 6px}" +
+    ".rl-cat-month{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:18px 4px 8px}.rl-cat-month b{font-size:15px;color:#101828}.rl-cat-month span{font-size:13px;color:#5b6475}" +
+    ".rl-cat-list{background:#fff;border:1px solid #ebe5d8;border-radius:18px;overflow:hidden}" +
+    ".rl-rr+.rl-rr{border-top:1px solid #f0ebe0}.rl-rr.open{background:#fbfaf6}" +
+    ".rl-rr-main{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:68px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
+    ".rl-rr-main:active{background:#f3efe6}.rl-rr-main:focus-visible{outline:2px solid #101828;outline-offset:-2px}" +
+    ".rl-rr-pic{flex:none;width:48px;height:48px;border-radius:14px;background:#f1ecdf;display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:15px;color:#46601b}.rl-rr-pic.rl-has-photo img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-rr-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-rr-mid b{font-size:15.5px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-rr-mid span{font-size:13.5px;color:#5b6475;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".rl-rr-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.rl-rr-end b{font-size:15.5px;color:#101828}" +
+    ".rl-rr-chip{font-size:12px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:#e3f4c8;color:#3f5a17}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
+    ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:#344054;margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:#5b6475;margin-top:4px}" +
+    ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
+    "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
     // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
     ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}";
   document.head.appendChild(css);
@@ -1246,51 +1267,118 @@
       var GROUP_KEYS = ["fashion", "electronics", "food", "home", "beauty", "travel", "digital", "other"];
       var allRows = memo.receipts ? memo.receipts.rows : [];
       function pill(text, bg, fg) { return el("span", { text: text, style: "display:inline-block;margin-top:4px;padding:3px 9px;border-radius:999px;font-weight:700;font-size:12px;background:" + bg + ";color:" + fg }); }
-      // One tidy line per receipt: picture, shop name (opens the original email), what was bought, price and date.
+      // One tidy line per receipt: picture (the item's photo, or the shop's logo), what was bought, the shop and date,
+      // and the price. The whole line opens the details underneath; nothing in it looks like a link.
       function receiptRow(row) {
         var who = (row.retailer && (row.retailer.name || row.retailer.domain)) || "Unknown store";
-        var names = (row.items || []).map(function (i) { return i.name + (i.variant && (row.items || []).length === 1 ? " · " + i.variant : ""); }).join(", ");
-        var wrap = el("div", { className: "rl-order", style: "padding:12px" });
-        var top = el("div", { style: "display:flex;gap:12px;align-items:center" });
-        var thumb = el("div", { style: "flex:0 0 56px;width:56px;height:56px;border-radius:14px;background:#f1ecdf;display:flex;align-items:center;justify-content:center;overflow:hidden;font-weight:800;font-size:22px;color:#46601b" }, [el("span", { text: who.charAt(0).toUpperCase() })]);
-        var single = (row.items || []).length <= 1;
-        if (single && row.hasImage && row.id) {
-          var im = el("img", { alt: "", style: "width:56px;height:56px;object-fit:cover" });
-          apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; im.src = u; thumb.appendChild(im); } else showLogo(); });
-        } else showLogo();
-        // More than one product (or no photo): the store's own logo, fetched once from the store's website.
-        function showLogo() { shopLogo(thumb, row.retailer && row.retailer.domain, 40); }
-        var canOpen = row.id && mailRef(row) && openOriginal;
-        var shop = canOpen ? el("button", { text: who, title: "Open the original receipt", style: "all:unset;cursor:pointer;font-weight:800;text-decoration:underline;text-underline-offset:3px;display:block;font-size:16px", onclick: function () { openOriginal(row.id); } })
-          : el("b", { text: who, style: "display:block;font-size:16px" });
-        // No item names in the email: a short order number is the next most useful thing to show.
-        var ref = !names && row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
-        var meta = [names ? (names.length > 60 ? names.slice(0, 57) + "…" : names) : ref, row.totalPence == null ? null : money(row.totalPence, row.currency), row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ");
-        var mid = el("div", { style: "flex:1;min-width:0" }, [shop, el("span", { text: meta || "Details not found", style: "display:block;font-size:13px;opacity:.75;margin-top:2px" })]);
+        var named = (row.items || []).filter(function (i) { return i.name; });
+        var names = named.map(function (i) { return i.name + (i.variant && named.length === 1 ? " · " + i.variant : ""); }).join(", ");
+        var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
+        var title = named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
+        var sub = [named.length ? who : ref, row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt";
+        var wrap = el("div", { className: "rl-rr" });
+        var btn = el("button", { type: "button", className: "rl-rr-main" });
+        btn.setAttribute("aria-expanded", "false");
+        var thumb = el("span", { className: "rl-rr-pic", text: initials(who) });
+        thumb.setAttribute("aria-hidden", "true");
+        if (named.length <= 1 && row.hasImage && row.id) apiBlob("/relay/my/receipts/" + row.id + "/image").then(function (u) { if (u) { thumb.textContent = ""; thumb.classList.add("rl-has-photo"); thumb.appendChild(el("img", { src: u, alt: "" })); } else shopLogo(thumb, row.retailer && row.retailer.domain, 32); });
+        else shopLogo(thumb, row.retailer && row.retailer.domain, 32);
+        var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
         var left = daysLeft(deadlineOf(row));
-        if (left !== null) mid.appendChild(left < 0 ? pill("Deadline passed", "#ece8dd", "#5b6475") : left <= 2 ? pill(left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left", "#fde0dd", "#b3261e") : left <= 7 ? pill(left + " days left", "#ffefc9", "#77520a") : pill(left + " days left", "#e3f4c8", "#46601b"));
-        else if (row.returnable === false) mid.appendChild(pill("Usually can't be returned", "#ece8dd", "#5b6475"));
-        var more = el("button", { className: "rl-btn ghost", text: "Details", style: "flex:0 0 auto;padding:8px 12px;font-size:13px;width:auto" });
-        top.appendChild(thumb); top.appendChild(mid); top.appendChild(more); wrap.appendChild(top);
+        if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
+        btn.appendChild(thumb);
+        btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), el("span", { text: sub })]));
+        btn.appendChild(end);
+        wrap.appendChild(btn);
         var detail = null;
-        more.onclick = function () {
-          if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; more.textContent = "Details"; more.setAttribute("aria-expanded", "false"); return; }
-          detail = el("div", { style: "margin-top:10px" });
+        btn.onclick = function () {
+          if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
+          detail = el("div", { className: "rl-rr-detail" });
+          if (names && named.length > 1) detail.appendChild(el("p", { className: "rl-rr-items", text: names }));
           detail.appendChild(receiptCard(row, loadList, true));
-          var pick = el("select", { ariaLabel: "Move to another group", style: "margin-top:10px;width:100%" }, [el("option", { value: "", text: "Wrong group? Move it to…" })]);
+          var acts = el("div", { className: "rl-rr-acts" });
+          if (row.id && mailRef(row) && openOriginal) acts.appendChild(el("button", { type: "button", className: "rl-po-secondary", text: "Open the original email", onclick: function () { openOriginal(row.id); } }));
+          if (acts.childNodes.length) detail.appendChild(acts);
+          var pick = el("select", { ariaLabel: "Move to another group", className: "rl-rr-move" }, [el("option", { value: "", text: "Wrong group? Move it to…" })]);
           GROUP_KEYS.forEach(function (k) { pick.appendChild(el("option", { value: k, text: groupNames[k] || k })); });
           pick.onchange = function () { if (!pick.value) return;
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
           detail.appendChild(pick);
-          if (row.categoryLearned) detail.appendChild(el("span", { text: "Grouped the way you taught Relay.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
-          wrap.appendChild(detail); memo.openIds[row.id] = true; more.textContent = "Hide"; more.setAttribute("aria-expanded", "true");
+          if (row.categoryLearned) detail.appendChild(el("span", { text: "Grouped the way you taught Relay.", className: "rl-rr-note" }));
+          wrap.appendChild(detail); memo.openIds[row.id] = true; btn.setAttribute("aria-expanded", "true"); wrap.classList.add("open");
         };
         var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names].filter(Boolean).join(" ").toLowerCase();
         wrap.setAttribute("data-find", find);
-        if (memo.openIds[row.id]) more.onclick();
+        if (memo.openIds[row.id]) btn.onclick();
         return wrap;
       }
       var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", other: "Other" };
+      // One group's page: a header in the group's colour with what's in it, filters, then receipts by month (newest first)
+      // with each month's total. Long groups show 40 at a time.
+      var GBP = function (rs) { return rs.reduce(function (n, r) { return n + (Number.isInteger(r.totalPence) && (!r.currency || r.currency === "GBP") ? r.totalPence : 0); }, 0); };
+      function drawCategory(k, rowsIn) {
+        var rows = rowsIn.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); });
+        var today = new Date().toISOString().slice(0, 10);
+        var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
+        var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
+        var c = CAT_ICONS[k] || CAT_ICONS.other;
+        list.appendChild(el("button", { type: "button", className: "rl-cat-back", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }, [el("span", { text: "\u2039", className: "rl-cat-back-i" }), el("span", { text: "All groups" })]));
+        list.lastChild.firstChild.setAttribute("aria-hidden", "true");
+        var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
+        var spent = GBP(rows);
+        var hero = el("div", { className: "rl-cat-hero", style: "background:" + c[0] + ";color:" + c[1] }, [catIcon(k, 52),
+          el("div", { className: "rl-cat-hero-t" }, [el("h3", { text: groupNames[k] }),
+            el("span", { text: [rows.length + (rows.length === 1 ? " receipt" : " receipts"), spent ? money(spent, "GBP") + " spent" : null, oldest ? "since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null].filter(Boolean).join(" · ") })])]);
+        hero.firstChild.style.background = "rgba(255,255,255,.7)";
+        list.appendChild(hero);
+        if (rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
+        // Filters: all, what can still go back (when there is any), and each year.
+        var filters = [["all", "All"]];
+        if (rows.some(canReturn)) filters.push(["return", "Can still return"]);
+        if (years.length > 1) years.forEach(function (y) { filters.push([y, y]); });
+        var f = memo.catFilter && filters.some(function (x) { return x[0] === memo.catFilter; }) ? memo.catFilter : "all";
+        var chips = el("div", { className: "rl-cat-chips", role: "group" });
+        chips.setAttribute("aria-label", "Show");
+        if (filters.length > 1) filters.forEach(function (x) {
+          var b = el("button", { type: "button", className: x[0] === f ? "on" : "", text: x[1], onclick: function () { memo.catFilter = x[0]; draw(); } });
+          b.setAttribute("aria-pressed", x[0] === f ? "true" : "false");
+          chips.appendChild(b);
+        });
+        var cq = el("input", { type: "search", className: "rl-cat-search", placeholder: "Search " + groupNames[k].toLowerCase() + ": shop, item or order number" });
+        cq.setAttribute("aria-label", "Search " + groupNames[k].toLowerCase());
+        var body = el("div");
+        list.appendChild(chips); list.appendChild(cq); list.appendChild(body);
+        var shown = 40;
+        function draw() {
+          f = memo.catFilter && filters.some(function (x) { return x[0] === memo.catFilter; }) ? memo.catFilter : "all";
+          Array.prototype.forEach.call(chips.children, function (b, i) { var on = filters[i][0] === f; b.className = on ? "on" : ""; b.setAttribute("aria-pressed", on ? "true" : "false"); });
+          var q = cq.value.trim().toLowerCase();
+          var pick = rows.filter(function (r) {
+            if (f === "return" && !canReturn(r)) return false;
+            if (/^\d{4}$/.test(f) && String(r.orderDate || "").slice(0, 4) !== f) return false;
+            if (!q) return true;
+            var names = (r.items || []).map(function (i) { return i.name; }).join(" ");
+            return [r.retailer && r.retailer.name, r.retailer && r.retailer.domain, r.orderRef, names].filter(Boolean).join(" ").toLowerCase().indexOf(q) !== -1;
+          });
+          body.textContent = "";
+          if (!pick.length) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: q ? "Nothing matches that search" : "Nothing here" }), el("p", { text: q ? "Try a shop name, an item or an order number." : "Try another filter." })])); return; }
+          var month = null, card = null;
+          pick.slice(0, shown).forEach(function (r) {
+            var m = r.orderDate ? r.orderDate.slice(0, 7) : "none";
+            if (m !== month) {
+              month = m;
+              var inMonth = pick.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
+              body.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
+                el("span", { text: inMonth.length + (inMonth.length === 1 ? " receipt" : " receipts") + (tot ? " · " + money(tot, "GBP") : "") })]));
+              card = el("div", { className: "rl-cat-list" }); body.appendChild(card);
+            }
+            card.appendChild(receiptRow(r));
+          });
+          if (pick.length > shown) body.appendChild(el("button", { type: "button", className: "rl-po-secondary rl-cat-more", text: "Show " + Math.min(40, pick.length - shown) + " more of " + (pick.length - shown), onclick: function () { shown += 40; draw(); } }));
+        }
+        cq.addEventListener("input", function () { shown = 40; draw(); });
+        draw();
+      }
       function drawList() {
         list.textContent = "";
         var rows = allRows;
@@ -1316,17 +1404,7 @@
           return;
         }
         if (memo.openCat && by[memo.openCat]) {
-          list.appendChild(el("button", { className: "rl-btn ghost", text: "‹ All groups", style: "width:auto;padding:8px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }));
-          list.appendChild(el("h3", { style: "font-size:20px;margin:14px 0 4px;color:#0f1b33;display:flex;align-items:center;gap:10px" }, [catIcon(memo.openCat, 32), el("span", { text: groupNames[memo.openCat] + " (" + by[memo.openCat].length + ")" })]));
-          if (by[memo.openCat][0].returnable === false && by[memo.openCat][0].notReturnableReason) list.appendChild(el("p", { text: by[memo.openCat][0].notReturnableReason, style: "font-size:13px;margin:0 0 8px" }));
-          var cq = el("input", { type: "search", placeholder: "Search " + groupNames[memo.openCat].toLowerCase() + " (shop, item, order number)", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid #e7e1d2;border-radius:14px;font-size:15px;background:#fff;font-family:inherit" });
-          var ch = el("div");
-          by[memo.openCat].forEach(function (r) { ch.appendChild(receiptRow(r)); });
-          var none = el("p", { text: "No receipts match that search.", style: "display:none;color:#667085" });
-          cq.addEventListener("input", function () { var q = cq.value.trim().toLowerCase(), n = 0;
-            Array.prototype.forEach.call(ch.children, function (c) { var hit = !q || (c.getAttribute("data-find") || "").indexOf(q) !== -1; c.style.display = hit ? "" : "none"; if (hit) n++; });
-            none.style.display = n ? "none" : ""; });
-          list.appendChild(cq); list.appendChild(ch); list.appendChild(none);
+          drawCategory(memo.openCat, by[memo.openCat]);
           return;
         }
         memo.openCat = null;
@@ -1359,7 +1437,7 @@
           var changed = sig !== memo.shopSig; shopRows = rows; memo.shopRows = rows; memo.shopSig = sig;
           return changed;
         }, function () { return false; });
-        Promise.all([api("/relay/my/receipts"), shopsLoaded]).then(function (both) {
+        Promise.all([api("/relay/my/receipts" + (onPage ? "?all=1" : "")), shopsLoaded]).then(function (both) {
           var x = both[0], shopsChanged = both[1];
           if (!x.ok) { if (drawnSig === null || shopsChanged) drawList(); return; }
           if (!x.ok) { if (drawnSig === null) drawList(); return; }
