@@ -1,5 +1,5 @@
 // Browser test: your name and profile photo. Stubbed Relay server, made-up account.
-// Checks the Profile page and account sheet show the name and photo, a chosen photo is cut to a 256 × 256 JPEG on the
+// Checks the Account page (opened from the initials at the top) shows the name and photo, Home greets them by name, a chosen photo is cut to a 256 × 256 JPEG on the
 // device (with no camera details left in it) before it is sent, the avatar shows it on every visit, and signing out clears it.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -37,11 +37,12 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload(); await page.waitForTimeout(500);
 const avatar = page.locator(".avatar").first();
-assert.equal((await avatar.textContent()).trim(), "J", "no name or photo yet: the first letter of the email");
+assert.equal((await avatar.textContent()).trim(), "JT", "no name or photo yet: both initials, from jess.tester@");
 
-// 1. Profile page: add a name and a photo.
-await page.evaluate(() => window.go("profile")); await page.waitForTimeout(400);
-await page.getByRole("button", { name: "Add name and photo" }).click();
+// 1. Account page: add a name and a photo.
+await avatar.click();
+await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+await page.getByRole("button", { name: "Edit your name and photo" }).click();
 await page.getByRole("heading", { name: "Your profile" }).waitFor();
 await page.getByLabel("Your name").fill("Jess Tester");
 await page.locator('.rl-sheet input[type="file"]').setInputFiles("icons/icon-512.png");
@@ -57,12 +58,14 @@ assert.ok(bytes.length < 150_000, "small enough: " + bytes.length);
 assert.ok(!bytes.includes(Buffer.from("Exif")), "no camera details (like location) are left in it");
 const size = await page.evaluate(src => new Promise(r => { const i = new Image(); i.onload = () => r([i.naturalWidth, i.naturalHeight]); i.src = src; }), sent.photo);
 assert.deepEqual(size, [256, 256], "cut to a 256 × 256 square");
-assert.equal(await page.locator(".rl-sheet").count(), 0, "the sheet closes once saved");
-assert.equal(await page.locator("#profileHead h2").textContent(), "Jess Tester", "the Profile page shows the name");
-assert.equal(await page.locator("#profileHead .rl-face img").count(), 1, "and the photo");
+await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
+assert.equal(await page.locator(".rl-ahead b").textContent(), "Jess Tester", "once saved, back on the Account page with the name");
+assert.equal(await page.locator(".rl-ahead .rl-face img").count(), 1, "and the photo");
+await page.getByRole("button", { name: "Done" }).click();
+assert.match(await page.locator("#homeHello").textContent(), /, Jess$/, "Home greets them by first name");
 assert.ok(await avatar.evaluate(a => a.classList.contains("rl-has-photo") && a.style.backgroundImage.startsWith('url("data:image/jpeg')), "the avatar shows the photo");
 await page.screenshot({ path: "/tmp/shots/profile-page.png" });
-console.log("ok - a name and photo are added on the Profile page; the photo is a 256 × 256 JPEG made on the device, with no camera details");
+console.log("ok - a name and photo are added on the Account page; the photo is a 256 × 256 JPEG made on the device, with no camera details");
 
 // 2. Next visit: the photo shows straight away, before Relay answers.
 state.delay = 1500;
@@ -71,26 +74,26 @@ assert.ok(await avatar.evaluate(a => a.classList.contains("rl-has-photo")), "sho
 state.delay = 0;
 console.log("ok - the avatar shows the photo straight away on the next visit");
 
-// 3. The account sheet shows them too, and Edit goes there and back.
+// 3. The Account page shows them, and editing goes there and back.
 await avatar.click();
 await page.locator(".rl-sheet").getByText("Jess Tester").first().waitFor();
 await page.locator(".rl-sheet .rl-face img").waitFor();
 assert.equal(await page.locator(".rl-sheet .rl-face img").count(), 1);
 await page.screenshot({ path: "/tmp/shots/profile-account-sheet.png" });
-await page.locator(".rl-sheet").getByRole("button", { name: "Edit", exact: true }).click();
+await page.getByRole("button", { name: "Edit your name and photo" }).click();
 await page.getByRole("heading", { name: "Your profile" }).waitFor();
 // Remove the photo: the avatar goes back to the first letter of the name.
 await page.getByRole("button", { name: "Remove photo" }).click();
 await page.getByRole("button", { name: "Save" }).click();
-await page.getByRole("heading", { name: "Your account" }).waitFor();
+await page.getByRole("heading", { name: "Account", exact: true }).waitFor();
 assert.equal(posts[posts.length - 1].photo, null, "removing sends no photo");
-assert.equal((await avatar.textContent()).trim(), "J");
+assert.equal((await avatar.textContent()).trim(), "JT", "both initials of the name");
 assert.ok(!(await avatar.evaluate(a => a.classList.contains("rl-has-photo"))));
-console.log("ok - the account sheet shows the name and photo, and the photo can be removed");
+console.log("ok - the Account page shows the name and photo, and the photo can be removed");
 
 // 4. A name Relay refuses: the shopper is told why and nothing changes.
 state.refuseName = true;
-await page.locator(".rl-sheet").getByRole("button", { name: "Edit", exact: true }).click();
+await page.getByRole("button", { name: "Edit your name and photo" }).click();
 await page.getByLabel("Your name").fill("<b>Jess</b>");
 await page.getByRole("button", { name: "Save" }).click();
 await page.getByText("Use letters, spaces, hyphens or apostrophes").waitFor();

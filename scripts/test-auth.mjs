@@ -181,6 +181,11 @@ clock += 80 * DAY;
 assert.equal((await call("/relay/me", { token: bob })).status, 200, "a session in regular use is kept alive");
 clock += 91 * DAY;
 assert.equal((await call("/relay/me", { token: bob })).status, 401, "an unused session expires after 90 days");
+// Old sign-in links and codes (and the scrambled IP kept with them) go a day after they were made.
+assert.ok(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE created_at <= ?").get(clock - DAY).n > 0, "old sign-in links are still there before the next sign-in");
+await signIn("tidy@example.com", "203.0.113.77");
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE created_at <= ?").get(clock - DAY).n, 0, "a sign-in clears links and codes older than a day");
+assert.ok(sqlite.prepare("SELECT COUNT(*) n FROM auth_login_tokens WHERE email = 'tidy@example.com'").get().n > 0, "today's are kept for the hourly limits");
 
 // 8. Non-auth routes untouched.
 assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/status"), env, new URL("https://w.test/relay/shopify/status"), {}, {}), null);

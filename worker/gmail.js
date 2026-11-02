@@ -306,7 +306,9 @@ async function mailToken(env, shopperId, row, fetchImpl) {
   return t.access;
 }
 
-async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
+// Tells Google to cancel Relay's access to the shopper's Gmail. Microsoft has no equivalent call: the shopper removes
+// Relay from their Microsoft account's app list, and the stored token is deleted either way.
+export async function revokeMailbox(env, shopperId, fetchImpl) {
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   let revoked = false;
@@ -320,6 +322,11 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
       revoked = res.ok;
     } catch { revoked = false; }
   }
+  return { row, revoked };
+}
+
+async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
+  const { row, revoked } = await revokeMailbox(env, shopperId, fetchImpl);
   const statements = [
     // Listings are made from captured receipts, so they come down with them.
     env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'declined' WHERE status = 'pending' AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId),

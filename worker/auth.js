@@ -21,7 +21,7 @@ import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable } from "./profile.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
-import { ensureGmailTables, gmailDeleteStatements, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
+import { ensureGmailTables, gmailDeleteStatements, revokeMailbox, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -237,6 +237,8 @@ async function startSession(env, email, now, cors, opts = {}) {
     "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at) VALUES (?,?,?,?)")
     .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS).run();
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
+  // Old sign-in links and codes: the hourly limits only look back an hour, so a day later they're no longer needed.
+  await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE created_at <= ?").bind(now - 24 * HOUR_MS).run();
   return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email, ...extra }, 200, cors);
 }
 
@@ -517,6 +519,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       await ensurePushTables(env.RELAY_DB);
       await ensureProfileTable(env.RELAY_DB);
       await forgetCard(env, shopper.id, o).catch(() => {});
+      // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
+      await ensureGmailTables(env.RELAY_DB).then(() => revokeMailbox(env, shopper.id, o.fetchImpl)).catch(() => {});
       await env.RELAY_DB.batch([
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...profileDeleteStatements(env.RELAY_DB, shopper.id),

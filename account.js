@@ -14,7 +14,20 @@
   var STORE_LOGOS = {"morrisons.com":"png","aldi.co.uk":"png","lidl.co.uk":"svg","marksandspencer.com":"png","coop.co.uk":"png","boots.com":"ico","iceland.co.uk":"png","amazon.co.uk":"ico","spacenk.com":"ico","debenhams.com":"ico","selfridges.com":"ico","boohoo.com":"ico","ebay.co.uk":"ico","prettylittlething.com":"ico","missguided.co.uk":"png","newlook.com":"png","riverisland.com":"png","topshop.com":"png","primark.com":"ico","matalan.co.uk":"png","peacocks.co.uk":"png","dorothyperkins.com":"ico","burton.co.uk":"ico","bonmarche.co.uk":"ico","wallis.co.uk":"ico","nike.com":"png","jdsports.co.uk":"png","schuh.co.uk":"png","office.co.uk":"ico","drmartens.com":"png","gymshark.com":"png","ugg.com":"ico","trespass.com":"png","ikea.com":"ico","dunelm.com":"png","wayfair.co.uk":"ico","wickes.co.uk":"png","screwfix.com":"png","toolstation.com":"png","sofology.co.uk":"ico","furniturevillage.co.uk":"png","made.com":"ico","dreams.co.uk":"ico","apple.com":"png","box.co.uk":"ico","samsung.com":"png","laptopsdirect.co.uk":"png","overclockers.co.uk":"ico","hughes.co.uk":"ico","jessops.com":"png","smythstoys.com":"png","game.co.uk":"png","hmv.com":"ico","zooplus.co.uk":"png","petsathome.com":"ico","just-eat.co.uk":"png","deliveroo.co.uk":"png","greggs.co.uk":"png","ebuyer.com":"png","ubereats.com":"png","pret.co.uk":"svg","nandos.co.uk":"png","starbucks.co.uk":"png","costa.co.uk":"png","nationalrail.co.uk":"png","trainline.com":"png","booking.com":"png","airbnb.co.uk":"ico","easyjet.com":"ico","ryanair.com":"png","britishairways.com":"png"};
   var MEMO_MS = 5 * 60 * 1000;
   function memoFresh(e) { return e && Date.now() - e.at < MEMO_MS; }
-  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; }
+  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} }
+  // The last receipts and shop orders are also kept on this device (for the signed-in account only, removed on sign-out),
+  // so opening Relay shows them at once instead of a loading screen, then updates them.
+  var DISK_KEY = "relay.cache.v1";
+  function diskRead() { try { var c = JSON.parse(localStorage.getItem(DISK_KEY) || "null"), s = load(); return c && s && c.email && c.email === s.email ? c : null; } catch (e) { return null; } }
+  function diskWrite(kind, value) {
+    try { var s = load(); if (!s || !s.email) return; var c = diskRead() || { email: s.email }; c[kind] = value; c.at = Date.now();
+      var t = JSON.stringify(c); if (t.length < 2500000) localStorage.setItem(DISK_KEY, t); else localStorage.removeItem(DISK_KEY); } catch (e) {}
+  }
+  (function () {
+    var c = diskRead(); if (!c) return;
+    if (Array.isArray(c.receipts)) memo.receipts = { rows: c.receipts, sig: JSON.stringify(c.receipts), at: 0 };
+    if (Array.isArray(c.purchases)) memo.walletPurchases = c.purchases;
+  })();
   // Asks the server only when the answer isn't already remembered (and recent enough).
   function cachedGet(kind, path) {
     if (memoFresh(memo[kind])) return Promise.resolve(memo[kind].r);
@@ -29,7 +42,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { var was = load(); if (!v) { memoReset(); try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   function api(path, opts) {
     opts = opts || {};
@@ -75,17 +88,17 @@
     ".rl-po-top{display:flex;gap:14px;align-items:flex-start}.rl-po-info{flex:1;min-width:0}" +
     ".rl-po-img{width:68px;height:68px;border-radius:16px;background:#f3efe6;flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:#526549}" +
     ".rl-po-img img{width:100%;height:100%;object-fit:cover}" +
-    ".rl-po-shop{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#526549}" +
+    ".rl-po-shop{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#526549}" +
     ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:#101828}.rl-po-meta{font-size:13px;color:#667085}" +
     ".rl-po-price{font-weight:800;font-size:17px;white-space:nowrap;color:#101828}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:#eef6df;color:#3f5a17}.rl-po-status.wait{background:#f4f2ec;color:#475467}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
-    ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
+    ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:#fff;color:#101828}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
-    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;padding:7px 16px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;padding:8px 15px;border-radius:999px;background:#f2f4ec;color:#263513;font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
-    ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:radial-gradient(120% 140% at 100% 0%,#5b21b6 0%,#30255d 35%,#101828 75%);color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}" +
-    ".rl-wr-play{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:14px 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
-    ".rl-wr-glance{background:#fff;border:1px solid #ebe6da;border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:#101828}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:#f7f5ef;border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:12px;color:#667085;font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:#101828;margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:12px;color:#667085}.rl-wr-note{font-size:12px;color:#667085;margin:12px 0 0}" +
+    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:7px 18px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:8px 17px;border-radius:999px;background:#f2f4ec;color:#263513;font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
+    ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:#101828;color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}@media(max-width:520px){.rl-wr-cover{padding:24px 22px}}" +
+    ".rl-wr-play{all:unset;cursor:pointer;box-sizing:border-box;display:inline-flex;align-items:center;min-height:52px;background:#c7f567;color:#16210a;font-weight:900;padding:0 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
+    ".rl-wr-glance{background:#fff;border:1px solid #ebe6da;border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:#101828}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:#f7f5ef;border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:13px;color:#667085;font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:#101828;margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:13px;color:#667085}.rl-wr-note{font-size:12px;color:#667085;margin:12px 0 0}" +
     ".rl-story{position:fixed;inset:0;z-index:10050;background:rgba(5,8,18,.92);display:flex;align-items:center;justify-content:center}.rl-story-frame{position:relative;width:min(440px,100vw);height:min(820px,100dvh);border-radius:26px;overflow:hidden;transition:background .5s,color .5s;cursor:pointer;user-select:none;-webkit-user-select:none}@media(max-width:500px){.rl-story-frame{border-radius:0}}" +
     ".rl-story-bars{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:2}.rl-story-bars div{flex:1;height:3px;border-radius:3px;background:rgba(127,127,127,.35);overflow:hidden}.rl-story-bars i{display:block;height:100%;width:0;background:currentColor}.rl-story-bars .done i{width:100%}.rl-story-bars .now i{animation:rlbar linear forwards}.rl-story-frame.paused .rl-story-bars .now i{animation-play-state:paused}@keyframes rlbar{to{width:100%}}" +
     ".rl-story-x{all:unset;position:absolute;top:22px;right:16px;z-index:3;font-size:30px;line-height:1;cursor:pointer;opacity:.8;padding:4px 8px}.rl-story-body{position:absolute;inset:0;display:flex;align-items:center;padding:56px 30px 40px}" +
@@ -99,15 +112,50 @@
     ".rl-story-slide .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.rl-story-slide .chips span{border:2px solid currentColor;border-radius:999px;padding:6px 12px;font-weight:800;font-size:14px;display:inline-flex;align-items:center;gap:6px}.rl-story-slide .chips i{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 1px rgba(0,0,0,.25)}" +
     ".rl-story-slide .sprint{margin-top:18px;display:grid;gap:10px}.rl-story-slide .sprint .row{display:grid;grid-template-columns:96px repeat(12,1fr);gap:3px;align-items:center;font-size:12px;font-weight:800}.rl-story-slide .sprint .row span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:4px}.rl-story-slide .sprint i{display:block;aspect-ratio:1;border-radius:4px;background:var(--accent);opacity:0;animation:rlfade .4s forwards}.rl-story-slide .sprint .head i{background:none;opacity:1;animation:none;font-style:normal;text-align:center;font-size:10px;opacity:.7}@keyframes rlfade{to{opacity:var(--o)}}" +
     ".rl-story-slide .badges{display:grid;gap:10px;margin-top:16px}.rl-story-slide .badges div{border:2px solid currentColor;border-radius:18px;padding:12px 14px;opacity:0;animation:rlup .5s forwards}.rl-story-slide .badges b{display:block;font-size:19px;color:var(--accent)}.rl-story-slide .badges small{font-size:13px;opacity:.85}" +
-    ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:#f4f1ea;overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:11px;color:#475467;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-    ".rl-story-slide .sum{background:linear-gradient(160deg,#5b21b6,#30255d 60%,#172554);border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
+    ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:#f4f1ea;overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:12px;color:#475467;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".rl-story-slide .sum{background:#1f3d2b;border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,#f4f2ec,#fbfaf6,#f4f2ec);background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
     ".rl-empty{background:#fff;border:1px dashed #d9d3c4;border-radius:22px;padding:22px}.rl-empty h3{margin:0 0 6px;font-size:18px;color:#101828}.rl-empty p{margin:0 0 12px;color:#475467;font-size:14px}" +
     ".rl-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:1fr;gap:12px;margin-top:8px}" +
     ".rl-face{display:inline-grid;place-items:center;border-radius:50%;overflow:hidden;background:#e9efd6;color:#2b3d12;font-weight:900;line-height:1;flex:none;box-shadow:0 0 0 1px rgba(16,24,40,.06)}.rl-face img{width:100%;height:100%;object-fit:cover;display:block}" +
-    ".avatar.rl-has-photo{width:38px;height:38px;padding:0;box-sizing:border-box;background-size:cover;background-position:center;background-repeat:no-repeat}" +
+    ".avatar.rl-has-photo{width:44px;height:44px;padding:0;box-sizing:border-box;background-size:cover;background-position:center;background-repeat:no-repeat}" +
     ".rl-po-more{margin:6px 0 4px;padding:10px 16px;border-radius:999px;border:1.5px solid #101828;background:#fff;font-weight:700;cursor:pointer}" +
-    ".rl-order b{display:block}.rl-order span{color:#5b6475;font-size:14px}";
+    ".rl-order b{display:block}.rl-order span{color:#5b6475;font-size:14px}" +
+    // The Account page: full height on a phone, grouped rows like a phone's Settings.
+    ".rl-sheet.rl-full{max-width:560px;background:#f6f3ec;padding:0 16px calc(28px + env(safe-area-inset-bottom));min-height:min(92dvh,880px);max-height:calc(94dvh - var(--rl-kb,0px))}" +
+    "@media(max-width:639px){.rl-sheet.rl-full{border-radius:22px 22px 0 0}}" +
+    ".rl-abar{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:0 -16px;padding:6px 8px;background:rgba(246,243,236,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}" +
+    ".rl-abar-t{font-size:16px;color:#101828;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56vw}" +
+    ".rl-abtn{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:2px;padding:0 10px;border-radius:12px;font-size:16px;font-weight:600;color:#101828;justify-self:start}" +
+    ".rl-abtn.done{justify-self:end;font-weight:800}.rl-abtn:active{background:rgba(16,24,40,.08)}.rl-abtn:focus-visible{outline:2px solid #101828;outline-offset:2px}.rl-ab-i{display:inline-flex}" +
+    ".rl-sheet h2.rl-atitle{font-family:Georgia,serif;font-size:32px;margin:2px 2px 14px;letter-spacing:-.02em;color:#101828}" +
+    ".rl-ahead{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #ebe5d8;border-radius:20px;padding:16px;transition:background .15s}" +
+    ".rl-ahead:active{background:#f3efe6}.rl-ahead:focus-visible{outline:2px solid #101828;outline-offset:2px}" +
+    ".rl-ahead-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.rl-ahead-t b{font-size:19px;color:#101828;overflow:hidden;text-overflow:ellipsis}" +
+    ".rl-ahead-t span{font-size:14px;color:#5b6475;word-break:break-all}.rl-ahead-t em{font-style:normal;font-size:14px;font-weight:700;color:#3f6212;margin-top:2px}" +
+    ".rl-agroup{margin-top:22px}.rl-agroup h3{margin:0 4px 8px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5b6475}" +
+    ".rl-acard{background:#fff;border:1px solid #ebe5d8;border-radius:18px;overflow:hidden}" +
+    ".rl-arow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:56px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
+    ".rl-arow+.rl-arow{border-top:1px solid #f0ebe0}.rl-arow:active{background:#f3efe6}.rl-arow:focus-visible{outline:2px solid #101828;outline-offset:-2px}" +
+    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:#f1ede3;color:#101828}" +
+    ".rl-arow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}.rl-arow-t b{font-size:16px;font-weight:650;color:#101828}.rl-arow-d{font-size:13.5px;color:#5b6475}" +
+    ".rl-arow-c{flex:none;display:inline-flex;color:#a39d90}" +
+    ".rl-arow.danger b{color:#b3261e}.rl-arow.danger .rl-ai{background:#fde8e6;color:#b3261e}" +
+    ".rl-aout{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:52px;margin-top:22px;text-align:center;background:#fff;border:1px solid #ebe5d8;border-radius:18px;font-size:16px;font-weight:700;color:#b3261e;transition:background .15s}" +
+    ".rl-aout:active{background:#f3efe6}.rl-aout:disabled{opacity:.6}.rl-aout:focus-visible{outline:2px solid #101828;outline-offset:2px}" +
+    ".rl-afoot{text-align:center;font-size:13px!important;color:#5b6475;margin:14px 0 0!important;word-break:break-all}" +
+    ".rl-asub{background:#fff;border:1px solid #ebe5d8;border-radius:18px;padding:18px 16px;margin-top:8px}" +
+    ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
+    ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:#101828!important}" +
+    ".rl-full .rl-msg:empty{display:none}.rl-full>h2:first-child{margin-top:24px}" +
+    ".rl-btn.rl-red{color:#b3261e}.rl-btn.rl-danger{background:#b3261e;color:#fff}" +
+    ".rl-faq{border-top:1px solid #f0ebe0}.rl-faq:first-child{border-top:0}.rl-faq summary{cursor:pointer;min-height:48px;display:flex;align-items:center;font-weight:700;font-size:16px;color:#101828;list-style:none;padding:6px 0}" +
+    ".rl-faq summary::-webkit-details-marker{display:none}.rl-faq summary::after{content:'';margin-left:auto;width:8px;height:8px;border-right:2px solid #a39d90;border-bottom:2px solid #a39d90;transform:rotate(45deg);transition:transform .15s;flex:none}" +
+    ".rl-faq[open] summary::after{transform:rotate(-135deg)}.rl-faq p{margin:0 0 14px!important}" +
+    ".rl-sheet .rl-arow:active,.rl-sheet .rl-ahead:active,.rl-sheet .rl-aout:active{transform:scale(.985);filter:none}" +
+    "@media(prefers-reduced-motion:reduce){.rl-arow,.rl-ahead,.rl-aout,.rl-faq summary::after{transition:none}.rl-sheet .rl-arow:active,.rl-sheet .rl-ahead:active,.rl-sheet .rl-aout:active{transform:none}}" +
+    // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
+    ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -154,10 +202,21 @@
     // Each screen showing the name or photo redraws itself; one that has been closed drops out.
     profileWatchers = profileWatchers.filter(function (f) { try { return f() !== false; } catch (e) { return false; } });
   }
-  function firstLetter(p) { var t = String((p && (p.name || p.email)) || "").trim(); return t ? Array.from(t)[0].toUpperCase() : "R"; }
+  // Both initials, like the top of Spotify or Apple Music: "Connor Gamble" is CG. With no name yet, the email's
+  // own parts are used (connor.gamble@ is CG); a single word gives its first letter.
+  function firstLetter(p) {
+    function first(w) { return Array.from(w)[0].toUpperCase(); }
+    var name = String((p && p.name) || "").trim();
+    var words = name ? name.split(/[\s\-]+/) : String((p && p.email) || "").split("@")[0].split(/[._+\-\d]+/);
+    words = words.filter(function (w) { return /^\p{L}/u.test(w); });
+    if (words.length > 1) return first(words[0]) + first(words[words.length - 1]);
+    if (words.length) return first(words[0]);
+    var t = name || String((p && p.email) || "").trim();
+    return t ? first(t) : "R";
+  }
   // A round picture of the shopper: their photo, or the first letter of their name (or email).
   function face(p, px) {
-    var n = el("span", { className: "rl-face", style: "width:" + px + "px;height:" + px + "px;font-size:" + Math.round(px * 0.42) + "px" });
+    var n = el("span", { className: "rl-face", style: "width:" + px + "px;height:" + px + "px;font-size:" + Math.round(px * 0.38) + "px" });
     n.setAttribute("aria-hidden", "true");
     if (p && p.photo) n.appendChild(el("img", { src: p.photo, alt: "" })); else n.textContent = firstLetter(p);
     return n;
@@ -695,7 +754,7 @@
   }
   function gate(sheet, email, notice) {
     sheet.textContent = "";
-    sheet.appendChild(el("p", { text: "Loading…" }));
+    sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:56px;border-radius:16px;margin-bottom:12px" })); sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:180px;border-radius:16px" }));
     api("/relay/my/consent").then(function (r) {
       sheet.textContent = "";
       if (r.status === 401) { save(null); close(); return; }
@@ -722,7 +781,7 @@
       var said = dv.status === "delivered" ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "") :
         dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? (dv.at && dv.at !== today ? "Due " + day(dv.at) : "Due today") : "On its way";
       var dl = el("div", { style: "clear:both;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px" }, [
-        el("span", { text: (dv.status === "delivered" ? "✓ " : "📦 ") + said + (dv.carrier ? " · " + dv.carrier : ""),
+        el("span", { text: (dv.status === "delivered" ? "✓ " : "") + said + (dv.carrier ? " · " + dv.carrier : ""),
           style: "font-weight:700;padding:4px 10px;border-radius:999px;background:" + (dv.status === "delivered" ? "#e3f4c8;color:#46601b" : "#e7eefc;color:#1d3f8a") })]);
       if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel →", style: "font-weight:600" }));
       card.appendChild(dl);
@@ -827,7 +886,7 @@
   }
   function disconnectGmail(done, msg) {
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
-      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.openCat = null; rememberMailbox({ connected: false }); done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
+      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} rememberMailbox({ connected: false }); done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
     });
   }
   function gmailSection(box, c, msg, onPage) {
@@ -1006,7 +1065,7 @@
           grid.appendChild(el("button", { type: "button", ariaLabel: groupNames[k] + ", " + by[k].length + " receipts", onclick: function () { memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); },
             style: "all:unset;cursor:pointer;box-sizing:border-box;min-height:150px;height:100%;border-radius:22px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;background:#fff;border:1px solid #e7e1d2;box-shadow:0 2px 10px rgba(15,27,51,.06)" },
             [catIcon(k),
-             el("span", {}, [el("b", { text: groupNames[k], style: "display:block;font-size:17px;color:#0f1b33" }), el("span", { text: by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), style: "display:block;font-size:14px;opacity:.8;margin-top:2px" }), el("span", { text: sub, style: "display:block;font-size:12px;margin-top:6px;color:" + (soon ? "#b3261e" : "#5b6475") + ";font-weight:" + (soon ? "700" : "400") })])]));
+             el("span", {}, [el("b", { text: groupNames[k], style: "display:block;font-size:17px;color:#0f1b33" }), el("span", { text: by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), style: "display:block;font-size:14px;opacity:.8;margin-top:2px" }), el("span", { text: sub, style: "display:block;font-size:13px;margin-top:6px;color:" + (soon ? "#b3261e" : "#5b6475") + ";font-weight:" + (soon ? "700" : "400") })])]));
         });
         list.appendChild(grid);
       }
@@ -1028,7 +1087,7 @@
           if (!x.ok) { if (drawnSig === null || shopsChanged) drawList(); return; }
           if (!x.ok) { if (drawnSig === null) drawList(); return; }
           var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
-          memo.receipts = { rows: rows, sig: sig, at: Date.now() };
+          memo.receipts = { rows: rows, sig: sig, at: Date.now() }; diskWrite("receipts", rows);
           if (sig === drawnSig && !shopsChanged) return;
           if (sig !== drawnSig) memoDrop("wrapped");
           allRows = rows; drawnSig = sig; drawList();
@@ -1106,7 +1165,7 @@
         box.appendChild(list);
         // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
         box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Missing a receipt? Search " + MB + " for it",
-          style: "all:unset;cursor:pointer;display:block;margin:20px auto 6px;font-size:14px;font-weight:700;color:#3f5a17;text-decoration:underline;text-underline-offset:3px",
+          style: "all:unset;cursor:pointer;box-sizing:border-box;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:#3f5a17;text-decoration:underline;text-underline-offset:3px",
           onclick: function () { open(function (sheet) { findView(sheet, close); }); } }));
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
@@ -1469,72 +1528,225 @@
     }
     draw();
   }
+  // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
+  // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
+  var ACC_IC = {
+    mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
+    paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9.5 4V3h5v1M9.5 10h5M9.5 14h5"/>',
+    bag: '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+    bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
+    lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+    card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
+    shield: '<path d="M12 3.5 19 6v5.5c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6Z"/><path d="m9 12 2 2 4-4"/>',
+    trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
+    doc: '<path d="M7 3.5h7l4 4v13H7Z"/><path d="M14 3.5v4h4M10 12h5M10 16h5"/>',
+    help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5M12 17h.01"/>',
+    swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
+    flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    out: '<path d="M14 4.5h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/>',
+    chev: '<path d="m9 6 6 6-6 6"/>', back: '<path d="m15 6-6 6 6 6"/>',
+    ext: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/>'
+  };
+  function accIc(n, px, cls) {
+    var s = el("span", { className: cls || "rl-ai" }); s.setAttribute("aria-hidden", "true");
+    s.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 20) + '" height="' + (px || 20) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ACC_IC[n] + "</svg>";
+    return s;
+  }
+  // One row: icon, label, an optional line underneath, and a chevron (or an arrow for pages that open outside the app).
+  function accRow(icon, label, detail, onclick, opts) {
+    opts = opts || {};
+    var sub = el("span", { className: "rl-arow-d", text: detail || "" });
+    if (!detail) sub.style.display = "none";
+    var tag = opts.href ? "a" : "button";
+    var props = { className: "rl-arow" + (opts.danger ? " danger" : "") };
+    if (opts.href) { props.href = opts.href; } else { props.type = "button"; props.onclick = onclick; }
+    var row = el(tag, props, [accIc(icon), el("span", { className: "rl-arow-t" }, [el("b", { text: label }), sub]), accIc(opts.href ? "ext" : "chev", 18, "rl-arow-c")]);
+    row.setDetail = function (t) { sub.textContent = t || ""; sub.style.display = t ? "" : "none"; };
+    return row;
+  }
+  function accGroup(title, rows) {
+    var card = el("div", { className: "rl-acard" }, rows);
+    return el("section", { className: "rl-agroup" }, (title ? [el("h3", { text: title })] : []).concat([card]));
+  }
+  // The bar across the top: Back on the left (on inner pages), the page name, and Done on the right.
+  function accBar(sheet, title, onBack) {
+    var bar = el("div", { className: "rl-abar" }, [
+      onBack ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back to Account", onclick: onBack }, [accIc("back", 20, "rl-ab-i"), el("span", { text: "Account" })]) : el("span"),
+      el("b", { className: "rl-abar-t", text: onBack ? title : "" }),
+      el("button", { type: "button", className: "rl-abtn done", text: "Done", onclick: close })]);
+    sheet.appendChild(bar);
+    if (!onBack) sheet.appendChild(el("h2", { className: "rl-atitle", text: title }));
+  }
+  var HELP = [
+    ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
+    ["A receipt is missing. What can I do?", "Open Account, then Email connection, and choose Find a missing receipt to search your inbox for that store. You can also paste a receipt in, or run a full re-scan."],
+    ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
+    ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
+    ["How do I stop Relay reading my email?", "Open Account, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
+    ["How do I delete my account?", "Open Account, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
+  ];
+  var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
   function signedInView(sheet, email, notice, c) {
-    var list = el("div"), msg = el("div", { className: "rl-msg" });
-    var gbox = el("div");
-    var head = el("div", { style: "display:flex;gap:14px;align-items:center;margin:0 0 16px" });
-    function editHere() { back.firstChild.textContent = ""; profileView(back.firstChild, function () { gate(back.firstChild, email); }); }
+    sheet.textContent = "";
+    sheet.classList.add("rl-full");
+    sheet.setAttribute("aria-label", "Account");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var msg = el("div", { className: "rl-msg" });
+    function home() { signedInView(sheet, email, null, c); }
+    // An inner page with the top bar. Each section keeps its own heading out of the way: the bar already names it.
+    function page(title, build) {
+      sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {}
+      accBar(sheet, title, home);
+      var body = el("div", { className: "rl-asub" }); sheet.appendChild(body);
+      build(body);
+    }
+    // Screens that bring their own heading and Back button.
+    function screen(view) { sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {} view(sheet); }
+    openFind = function () { screen(function (sh) { findView(sh, home); }); };
+    openOriginal = function (id) { screen(function (sh) { originalView(sh, id, home); }); };
+    openResale = function (rid) { screen(function (sh) { resaleView(sh, home, rid); }); };
+    function editHere() { screen(function (sh) { profileView(sh, home); }); }
+
+    accBar(sheet, "Account");
+    var head = el("button", { type: "button", className: "rl-ahead", ariaLabel: "Edit your name and photo", onclick: editHere });
     function drawHead() {
       if (!document.body.contains(head)) return false;
       var p = profileNow() || { email: email };
       head.textContent = "";
-      head.appendChild(el("button", { type: "button", ariaLabel: "Change your name and photo", style: "all:unset;cursor:pointer;border-radius:50%;flex:none", onclick: editHere }, [face(p, 52)]));
-      head.appendChild(el("div", { style: "min-width:0;flex:1" }, [el("b", { text: p.name || "Add your name", style: "display:block;font-size:17px;color:" + (p.name ? "#0f1b33" : "#5b6475") }),
-        el("span", { text: email, style: "display:block;font-size:14px;color:#5b6475;word-break:break-all" })]));
-      head.appendChild(el("button", { type: "button", text: "Edit", onclick: editHere, style: "all:unset;cursor:pointer;font-weight:700;font-size:14px;padding:8px 14px;border:1px solid #ddd6c6;border-radius:999px" }));
+      head.appendChild(face(p, 60));
+      head.appendChild(el("span", { className: "rl-ahead-t" }, [el("b", { text: p.name || "Add your name" }), el("span", { text: email }), el("em", { text: p.name || p.photo ? "Edit profile" : "Add your name and photo" })]));
+      head.appendChild(accIc("chev", 18, "rl-arow-c"));
     }
-    var listHead = el("h2", { text: "Shop orders", style: "font-size:18px;margin-top:8px;display:none" });
-    [el("h2", { text: "Your account" }), head, gbox, listHead, list, msg].forEach(function (n) { sheet.appendChild(n); });
+    sheet.appendChild(head); sheet.appendChild(msg);
     drawHead(); profileWatchers.push(drawHead); loadProfile();
     if (notice) say(msg, notice.text, notice.bad);
-    var abox = el("div"); sheet.insertBefore(abox, gbox.nextSibling);
+
+    // Receipts
+    var mailRow = accRow("mail", "Email connection", "Checking…", function () { page("Email connection", mailPage); });
+    var receiptRows = [mailRow, accRow("paste", "Add a receipt by pasting it", "", function () { screen(function (sh) { receiptView(sh, home); }); })];
+    var ordersRow = accRow("bag", "Shop orders", "", function () { page("Shop orders", ordersPage); }); ordersRow.style.display = "none";
+    receiptRows.push(ordersRow);
+    if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "", function () { openResale(); }));
+    sheet.appendChild(accGroup("Receipts", receiptRows));
+    var mailState = null;
+    api("/relay/my/gmail").then(function (g) {
+      if (g.ok) rememberMailbox(g.body);
+      mailState = g.ok && g.body ? g.body : null;
+      mailRow.setDetail(!mailState ? "" : mailState.connected ? mailName() + " · connected" : "Not connected yet");
+    }).catch(function () { mailRow.setDetail(""); });
+    var orders = [];
+    api("/relay/my/purchases").then(function (r) {
+      if (r.status === 401) { save(null); close(); return; }
+      orders = (r.ok && r.body && r.body.purchases) || [];
+      if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + " confirmed by the shop"); }
+    }).catch(function () {});
+
+    // Alerts (only where the app's pages are here to open)
+    if (window.go) {
+      var alertRow = accRow("bell", "Price alerts", "", function () { close(); window.go("radar"); });
+      sheet.appendChild(accGroup("Alerts", [alertRow]));
+      alertStatus().then(function (st) {
+        var n = st && st.watches ? st.watches.length : 0;
+        alertRow.setDetail(n ? "Watching " + n + " product" + (n === 1 ? "" : "s") : "Get told when prices drop");
+      });
+    }
+
+    // Sign-in & security
+    var secRows = [];
+    if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
+    var twoRow = accRow("lock", "Two-step sign-in", "", function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); });
+    secRows.push(twoRow);
+    var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
+    cardRow.style.display = "none"; secRows.push(cardRow);
+    sheet.appendChild(accGroup("Sign-in & security", secRows));
+    api("/relay/my/2fa").then(function (r) { if (r.ok && r.body) twoRow.setDetail(r.body.enabled ? "On" : "Off"); }).catch(function () {});
+    api("/relay/my/card").then(function (r) {
+      if (!r.ok || !r.body || !r.body.enabled) return;
+      if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
+      cardRow.style.display = ""; cardRow.setDetail(r.body.card ? cardText(r.body.card) : "None saved");
+    }).catch(function () {});
+
+    // Privacy & data
+    sheet.appendChild(accGroup("Privacy & data", [
+      accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); }),
+      accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })]));
+
+    // Help & legal
+    sheet.appendChild(accGroup("Help & legal", [
+      accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }),
+      accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
+      accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
+
+    // Reviewing member reports: only for the people who do that.
+    var abox = el("div"); sheet.appendChild(abox);
     api("/relay/my/admin/me").then(function (r) {
       if (!r.ok || !r.body || r.body.admin !== true) return;
-      abox.appendChild(el("button", { className: "rl-btn ghost", text: "Review reports (" + (r.body.openReports || 0) + ")", style: "margin-bottom:8px",
-        onclick: function () { back.firstChild.textContent = ""; adminView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
+      abox.appendChild(accGroup("Team", [accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); })]));
     }).catch(function () {});
-    openFind = function () { back.firstChild.textContent = ""; findView(back.firstChild, function () { gate(back.firstChild, email); }); };
-    openOriginal = function (id) { back.firstChild.textContent = ""; originalView(back.firstChild, id, function () { gate(back.firstChild, email); }); };
-    openResale = function (rid) { back.firstChild.textContent = ""; resaleView(back.firstChild, function () { gate(back.firstChild, email); }, rid); };
-    if (window.go) {
-      gbox.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
-      gbox.appendChild(el("p", { text: "Relay finds the receipts in your Gmail or Outlook and sorts them for you." }));
-      gbox.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", onclick: function () { close(); window.go("receipts"); } }));
-      api("/relay/my/gmail").then(function (g) {
-        if (g.ok) rememberMailbox(g.body);
-        if (!g.ok || !g.body || !g.body.connected) return;
-        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
-        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search " + mailName() + " for it", onclick: function () { openFind(); } }));
-        gbox.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect " + mailName() + " and delete captured receipts", onclick: function () { disconnectGmail(function () { back.firstChild.textContent = ""; gate(back.firstChild, email); }, msg); } }));
-      });
-    } else gmailSection(gbox, c || {}, msg);
-    var pbox = el("div"); sheet.insertBefore(pbox, list.previousSibling); passkeySection(pbox, msg);
-    var cbox = el("div"); sheet.insertBefore(cbox, list.previousSibling); cardSection(cbox);
-    var tbox = el("div"); sheet.insertBefore(tbox, list.previousSibling); twoStepSection(tbox);
-    api("/relay/my/purchases").then(function (r) {
-      list.textContent = "";
-      if (r.status === 401) { save(null); close(); return; }
-      var rows = (r.body && r.body.purchases) || [];
-      if (!r.ok || !rows.length) return;
-      listHead.style.display = "";
-      rows.forEach(function (o) {
+
+    var outBtn = el("button", { type: "button", className: "rl-aout", text: "Sign out" });
+    outBtn.onclick = function () { outBtn.disabled = true; api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); };
+    sheet.appendChild(outBtn);
+    sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
+
+    function mailPage(b) {
+      if (!window.go) return gmailSection(b, c || {}, msg);
+      var note = el("div", { className: "rl-msg" });
+      var on = mailState && mailState.connected;
+      b.appendChild(el("p", { text: on ? "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." : "Connect the email you shop with, Gmail or Outlook, and Relay brings your receipts in for you." }));
+      b.appendChild(el("button", { className: "rl-btn", text: on ? "Open my receipts" : "Connect your email", onclick: function () { close(); window.go("receipts"); } }));
+      if (on) {
+        b.appendChild(el("button", { className: "rl-btn ghost", text: "Find a missing receipt", onclick: function () { openFind(); } }));
+        b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
+        b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
+        b.appendChild(el("button", { className: "rl-btn ghost rl-red", text: "Disconnect " + mailName(), onclick: function () { disconnectGmail(home, note); } }));
+        b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting deletes every receipt Relay captured from this inbox." }));
+      }
+      b.appendChild(note);
+    }
+    function ordersPage(b) {
+      b.appendChild(el("p", { text: "Orders the shop itself confirmed to Relay." }));
+      orders.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
-        list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
-          el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") + " · ✓ confirmed by the shop" })]));
+        b.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
+          el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
       });
-    }).catch(function () { list.textContent = ""; });
-    if (marketOn()) sheet.appendChild(el("button", { className: "rl-btn", text: "Swap & resell", style: "margin-top:10px", onclick: function () { openResale(); } }));
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Add a receipt by pasting it", onclick: function () {
-      if (back) back.firstChild.textContent = ""; receiptView(back.firstChild, function () { gate(back.firstChild, email); }); } }));
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Sign out", onclick: function () {
-      api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); }); } }));
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Delete my Relay account", onclick: function () {
-      ask("Delete your Relay sign-in and everything linked to it? This can't be undone.", "Delete my account", function () {
-        api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { save(null); close(); } else say(msg, "Couldn't delete. Try again.", true); }); }); } }));
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Withdraw my permission for Relay to read my receipts", onclick: function () {
-      ask("Withdraw permission? Relay will disconnect your email and delete everything it captured. You'll be asked again next time you open your account.", "Withdraw permission", function () {
-        api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else say(msg, "Couldn't withdraw. Try again.", true); }); }); } }));
-    sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
+    }
+    function permissionPage(b) {
+      var note = el("div", { className: "rl-msg" });
+      b.appendChild(el("p", { text: "This is what you agreed to when you connected your email." }));
+      ((c && c.text) || CONSENT_FALLBACK).forEach(function (t) { b.appendChild(el("p", { className: "rl-aterm", text: t })); });
+      var w = el("button", { className: "rl-btn ghost rl-red", text: "Withdraw my permission" });
+      w.onclick = function () {
+        ask("Withdraw permission? Relay will disconnect your email and delete everything it captured. You'll be asked again next time you open your account.", "Withdraw permission", function () {
+          w.disabled = true;
+          api("/relay/my/consent/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { memoReset(); gate(sheet, email); } else { w.disabled = false; say(note, "Couldn't withdraw. Try again.", true); } })
+            .catch(function () { w.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+        });
+      };
+      b.appendChild(w); b.appendChild(note);
+    }
+    function deletePage(b) {
+      var note = el("div", { className: "rl-msg" });
+      b.appendChild(el("p", { text: "This removes your sign-in, your email connection, every receipt Relay captured, your profile, price alerts, passkeys, two-step sign-in and any saved card. If you connected Gmail, Relay also cancels its access at Google." }));
+      b.appendChild(el("p", { text: "Records of returns and swaps you made through Relay are kept, because the shops involved rely on them. Deleting can't be undone." }));
+      var d = el("button", { className: "rl-btn rl-danger", text: "Delete my account" });
+      d.onclick = function () {
+        ask("Delete your Relay account and everything linked to it? This can't be undone.", "Delete my account", function () {
+          d.disabled = true;
+          api("/relay/my/delete", { method: "POST" }).then(function (r) { if (r.ok) { memoReset(); save(null); close(); } else { d.disabled = false; say(note, "Couldn't delete your account. Try again.", true); } })
+            .catch(function () { d.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+        });
+      };
+      b.appendChild(d); b.appendChild(note);
+    }
+    function helpPage(b) {
+      HELP.forEach(function (q) {
+        b.appendChild(el("details", { className: "rl-faq" }, [el("summary", { text: q[0] }), el("p", { text: q[1] })]));
+      });
+      b.appendChild(el("p", { className: "rl-anote", text: "Read the full terms and privacy policy under Help & legal." }));
+    }
   }
   function show() {
     var s = load();
@@ -1545,7 +1757,7 @@
     var a = document.querySelector(".avatar");
     if (!a) return;
     a.style.cursor = "pointer"; a.setAttribute("role", "button"); a.setAttribute("tabindex", "0");
-    a.setAttribute("aria-label", "Account and sign in");
+    a.setAttribute("aria-label", "Account");
     a.addEventListener("click", show);
     a.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); show(); } });
     paintAvatars(); loadProfile();
@@ -1617,7 +1829,8 @@
       openResale = function (rid) { open(function (sh) { resaleView(sh, close, rid); }); };
     };
     pageLaunchers();
-    host.appendChild(el("p", { text: "Loading…" }));
+    if (memo.receipts) { var sk0 = el("div", { className: "rl-cats" }); for (var k0 = 0; k0 < 4; k0++) sk0.appendChild(el("div", { className: "rl-po rl-skel", style: "min-height:150px;margin:0" })); host.appendChild(sk0); }
+    else host.appendChild(el("div", { className: "rl-skel", style: "min-height:150px;border-radius:22px" }));
     cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountReceipts(host); return; }
@@ -1676,7 +1889,7 @@
     var s = load();
     if (!s || !s.token) {
       host.appendChild(el("div", { className: "rl-wr-cover" }, [
-        el("div", { className: "rl-wr-kicker", text: "✦ RELAY WRAPPED" }),
+        el("div", { className: "rl-wr-kicker", text: "RELAY WRAPPED" }),
         el("h2", { text: "Your year in purchases, as a story." }),
         el("p", { text: "Sign in and connect your email, and Relay builds your Wrapped from your real receipts." }),
         el("button", { className: "rl-wr-play", text: "Sign in", onclick: show })]));
@@ -1685,7 +1898,7 @@
     var thisYear = new Date().getFullYear();
     year = year || thisYear;
     var yrs = el("div", { className: "rl-wr-years" }), kinds = el("div", { className: "rl-wr-kinds", role: "group", ariaLabel: "Wrapped for one kind of shopping" });
-    var kicker = "✦ RELAY WRAPPED " + year + (words ? " · " + words.chip.toUpperCase() : "");
+    var kicker = "RELAY WRAPPED " + year + (words ? " · " + words.chip.toUpperCase() : "");
     var cover = el("div", { className: "rl-wr-cover" }, [el("div", { className: "rl-wr-kicker", text: kicker }), el("h2", { text: "Adding up your " + year + (words ? " " + words.inn : "") + "…" })]);
     var extra = el("div");
     host.appendChild(yrs); host.appendChild(kinds); host.appendChild(cover); host.appendChild(extra);
@@ -1720,7 +1933,10 @@
       } else {
         cover.appendChild(el("h2", { text: "Your " + year + (words ? " " + words.inn : " in purchases") + "." }));
         cover.appendChild(el("p", { text: w.receipts + (w.receipts === 1 ? " receipt · " : " receipts · ") + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.coverage.withTotal ? " · " + money(w.spentPence, "GBP") : "") }));
-        cover.appendChild(el("button", { className: "rl-wr-play", text: "▶  Play your " + (words ? words.chip.toLowerCase() + " " : "") + "story", onclick: function () { playStory(w); } }));
+        var play = el("button", { className: "rl-wr-play", onclick: function () { playStory(w); } });
+        play.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="vertical-align:-3px;margin-right:8px"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor"/></svg>';
+        play.appendChild(document.createTextNode("Play your " + (words ? words.chip.toLowerCase() + " " : "") + "story"));
+        cover.appendChild(play);
       }
       if (w.receipts) extra.appendChild(wrappedGlance(w));
       var hb = el("div"); extra.appendChild(hb);
@@ -1783,7 +1999,7 @@
       stat("Spent", w.coverage.withTotal ? money(w.spentPence, "GBP") : "—", w.coverage.withTotal < w.receipts ? "from " + w.coverage.withTotal + " of " + w.receipts + " receipts" : w.receipts + (w.receipts === 1 ? " receipt" : " receipts")),
       stat("Top shop", top ? top.name : "—", top ? top.receipts + (top.receipts === 1 ? " order" : " orders") : ""),
       words ? stat(words.one, first ? first.name : "—", first && first.times > 1 ? first.times + " orders" : "")
-        : stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + " receipts" : ""),
+        : stat("Favourite kind", cat ? cat.label : "—", cat ? cat.receipts + (cat.receipts === 1 ? " receipt" : " receipts") : ""),
       stat("Busiest month", w.busiestMonth || "—", "")]));
     if ((w.photos || []).length) { box.appendChild(el("h3", { text: "Things you bought", style: "margin:16px 0 8px;font-size:15px" })); box.appendChild(photoGrid(w.photos, "rl-wr-strip")); }
     return box;
@@ -1827,7 +2043,7 @@
     var photos = (w.photos || []).slice(0, 9);
     var style = w.industry === "fashion" || (!words && (!kinds || (kinds.length === 1 && kinds[0].category === "fashion"))) ? wrappedStyle(w) : null;
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
-      b.appendChild(el("div", { className: "k", text: "✦ RELAY WRAPPED" + (words ? " · " + words.chip.toUpperCase() : "") }));
+      b.appendChild(el("div", { className: "k", text: "RELAY WRAPPED" + (words ? " · " + words.chip.toUpperCase() : "") }));
       b.appendChild(el("h1", { text: words ? "Your " + w.year + " " + words.inn + "." : "Your " + w.year + ", one receipt at a time." }));
       var fb = w.firstBuy;
       if (fb && fb.date) b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + (fb.item ? " with " + fb.item : "") + (fb.shop ? (fb.item ? " from " : " at ") + fb.shop : "") + "." }));
@@ -1840,7 +2056,7 @@
       b.appendChild(el("p", { text: "You bought something on " + st.days + " days of " + w.year + "." + (st.favouriteDay && st.favouriteDayCount > 1 ? " " + st.favouriteDay + " was your day (" + st.favouriteDayCount + " of them)." : "") }));
       if (st.longestMonthStreak >= 3) b.appendChild(el("p", { className: "pill", text: st.longestMonthStreak + " months in a row with a purchase" }));
     } });
-    if (w.coverage.withTotal) S.push({ bg: "#30255d", fg: "#fff", accent: "#e4d8ff", build: function (b) {
+    if (w.coverage.withTotal) S.push({ bg: "#14532d", fg: "#fff", accent: "#c7f567", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
       b.appendChild(el("p", { text: (words ? "on " + w.industryLabel.toLowerCase() + ", " : "") + "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
@@ -1879,7 +2095,7 @@
       b.appendChild(ol);
     } });
     var subs = w.subscriptions || [];
-    if (subs.length) S.push({ bg: "#1e1b4b", fg: "#fff", accent: "#a5b4fc", build: function (b) {
+    if (subs.length) S.push({ bg: "#134e4a", fg: "#fff", accent: "#99f6e4", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: subs.length === 1 ? "Your regular" : "Your regulars" }));
       b.appendChild(el("p", { text: "Things you paid for month after month." }));
       var ol = el("ol", { className: "rank" });
@@ -1897,7 +2113,7 @@
       });
       b.appendChild(bars);
     } });
-    if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#30255d", build: function (b) {
+    if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#101828", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: photos.length === 1 ? "One thing you brought home" : "Some things you brought home" }));
       b.appendChild(photoGrid(photos.length > 6 ? photos.slice(0, 6) : photos, "ph"));
     } });
@@ -1916,7 +2132,7 @@
       var t = w.topItem.times, weeks = w.activeMonths ? w.activeMonths * 4.3 : 52;
       b.appendChild(el("p", { text: "You kept coming back for it" + (w.topItem.shop ? " at " + w.topItem.shop : "") + "." + (t >= weeks ? " That's more than once a week." : t >= 12 ? " That's about " + Math.round(t / Math.max(1, w.activeMonths || 12)) + " a month." : "") }));
     } });
-    if (w.busiestMonth) S.push({ bg: "#263f8c", fg: "#fff", accent: "#d7e4ff", build: function (b) {
+    if (w.busiestMonth) S.push({ bg: "#0f3d5c", fg: "#fff", accent: "#bae6fd", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your busiest month" }));
       b.appendChild(el("div", { className: "big name", text: MONTH_FULL[w.busiestMonth] || w.busiestMonth }));
       var max = Math.max.apply(null, w.byMonth.map(function (m) { return m.receipts; })) || 1;
@@ -1952,14 +2168,14 @@
       else b.appendChild(el("div", { className: "big", text: String(w.returnsStarted) }));
       if (w.returnsStarted) b.appendChild(el("p", { text: w.returnsStarted + (w.returnsStarted === 1 ? " return" : " returns") + " started from your orders." }));
     } });
-    if (w.personality) S.push({ bg: "#5b21b6", fg: "#fff", accent: "#e9d5ff", build: function (b) {
+    if (w.personality) S.push({ bg: "#9a3412", fg: "#fff", accent: "#fed7aa", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your shopping style" }));
       b.appendChild(el("div", { className: "big name", text: w.personality.label }));
       b.appendChild(el("p", { text: w.personality.why }));
     } });
     S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", summary: true, build: function (b, again, close) {
       var title = "My " + w.year + (words ? " " + words.inn : "") + " on Relay", firstThing = (w.topItems || [])[0];
-      var card = el("div", { className: "sum" }, [el("div", { className: "k", text: "✦ " + title.toUpperCase() })]);
+      var card = el("div", { className: "sum" }, [el("div", { className: "k", text: title.toUpperCase() })]);
       var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], words ? [words.one, firstThing ? firstThing.name : "—"] : ["Favourite kind", cat ? cat.label : "—"], ["Busiest month", w.busiestMonth ? MONTH_FULL[w.busiestMonth] : "—"], ["Receipts", String(w.receipts)], [style && style.styles[0] ? "Style" : "Shops", style && style.styles[0] ? style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & ") : String(w.shops)]];
       var g = el("div", { className: "sumgrid" }); rows.forEach(function (r) { g.appendChild(el("div", {}, [el("span", { text: r[0] }), el("strong", { text: r[1] })])); }); card.appendChild(g);
       b.appendChild(card);
@@ -2306,7 +2522,7 @@
                   list.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } }));
                   return;
                 }
-                say(msg, EXCHANGE_ERR[res.body && res.body.error] || ("The shop didn't accept the change" + (res.body && res.body.detail ? ": " + res.body.detail : ".")), true);
+                say(msg, EXCHANGE_ERR[res.body && res.body.error] || "The shop didn't accept the change. Please try again, or contact the shop.", true);
                 list.querySelectorAll("button").forEach(function (n) { n.disabled = false; });
               });
             });
@@ -2434,7 +2650,7 @@
     if (opts.markable && x.id) {
       var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
       if (!idxs.length) idxs = [0];
-      card.appendChild(el("button", { type: "button", className: "rl-link", text: opts.markable === "undo" ? "Not sending this back" : "I'm sending this back", style: "all:unset;cursor:pointer;color:#46601b;font-weight:800;font-size:14px;margin-top:10px;display:inline-block;text-decoration:underline;text-underline-offset:3px",
+      card.appendChild(el("button", { type: "button", className: "rl-link", text: opts.markable === "undo" ? "Not sending this back" : "I'm sending this back", style: "all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;line-height:44px;color:#46601b;font-weight:800;font-size:15px;margin-top:2px;display:inline-block;text-decoration:underline;text-underline-offset:3px",
         onclick: function (e) { var b = e.currentTarget; b.disabled = true; b.textContent = "Saving…";
           markItems(x, idxs, opts.markable === "undo" ? null : "returning").then(function (ok) { if (ok && opts.changed) opts.changed(); else { b.disabled = false; b.textContent = "Couldn't save. Try again"; } }); } }));
     }
@@ -2452,8 +2668,13 @@
   }
   function loadBoth() {
     var p = memo.purchases || api("/relay/my/purchases");
-    return Promise.all([p.then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }),
-      api("/relay/my/receipts").then(function (r) { return (r.ok && r.body && r.body.receipts) || []; }, function () { return []; })]);
+    return Promise.all([p.then(function (r) { return r.ok ? (r.body && r.body.purchases) || [] : null; }, function () { return null; }),
+      api("/relay/my/receipts").then(function (r) { return r.ok ? (r.body && r.body.receipts) || [] : null; }, function () { return null; })]).then(function (both) {
+      // Remember what came back, so the next visit shows it straight away.
+      if (both[0]) { memo.walletPurchases = both[0]; diskWrite("purchases", both[0]); }
+      if (both[1]) { memo.receipts = { rows: both[1], sig: JSON.stringify(both[1]), at: Date.now() }; diskWrite("receipts", both[1]); }
+      return [both[0] || memo.walletPurchases || [], both[1] || (memo.receipts && memo.receipts.rows) || []];
+    });
   }
   function orderRows(rows) { return rows.filter(function (x) { return x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update"; }); }
   function notConfirmed(purchases) {
@@ -2474,7 +2695,7 @@
       return;
     }
     var top = el("div"); host.appendChild(top);
-    var refresh = function () { memo.purchases = null; mountWallet(host, opts); };
+    var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountWallet(host, opts); };
     mountInstore(top, refresh, "suggest");
     var head = el("div", { className: "sectionhead" }, [el("h2", { text: opts.title || "Still returnable" })]);
     var grid = el("div", { className: "rl-po-grid" }); skeleton(grid, 3);
@@ -2482,7 +2703,22 @@
     if (opts.sub) host.appendChild(el("p", { className: "small muted", text: opts.sub, style: "margin:-6px 0 12px" }));
     host.appendChild(grid);
     var foot = el("div"); host.appendChild(foot);
-    loadBoth().then(function (both) {
+    // A new shopper with no email connected yet: the first thing they see is how to bring their receipts in.
+    var start = el("div"); host.insertBefore(start, head);
+    cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      if (!g.ok || !g.body || g.body.connected || !document.body.contains(start)) return;
+      start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:#fbfdf6" }, [
+        el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and fills in your wallet.", style: "margin:0;color:#475467;font-size:15px;line-height:1.45" }),
+        el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } })]));
+    }, function () {});
+    // Draws what was loaded last time at once, then again only if something changed.
+    var drawn = null;
+    var sigOf = function (both) { try { return JSON.stringify(both); } catch (e) { return String(Math.random()); } };
+    var drawBoth = function (both) {
+      var sg = sigOf(both); if (sg === drawn) return; drawn = sg;
+      var oldPill = head.querySelector(".pill"); if (oldPill) oldPill.remove();
+      foot.textContent = "";
       var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
         if (!it.returnable && !it.exchangeable) return;
@@ -2509,7 +2745,9 @@
         el("button", { className: "rl-po-secondary", text: "Returns & swaps", onclick: function () { window.go && window.go("returns"); } })]));
       var box = el("div", { style: "margin-top:10px" }); foot.appendChild(box); mountInstore(box, refresh, "box");
       if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); foot.appendChild(t); mountSquareTest(t, refresh); }
-    });
+    };
+    if (memo.walletPurchases && memo.receipts) drawBoth([memo.walletPurchases, memo.receipts.rows]);
+    loadBoth().then(function (both) { if (document.body.contains(grid)) drawBoth(both); });
   }
   function whichItems(x, parts, done) {
     var who = (x.retailer && x.retailer.name) || "this shop";
@@ -2724,7 +2962,7 @@
       return;
     }
     var msg = el("p", { className: "small muted", style: "min-height:18px;margin:10px 0 0" });
-    var body = el("div", {}, [el("p", { text: "Checking…", className: "small muted" })]);
+    var body = el("div", {}, [el("div", { className: "rl-skel", style: "min-height:48px;border-radius:14px" })]);
     box.appendChild(body); box.appendChild(msg);
     function draw() {
       Promise.all([thisDevice(), alertStatus()]).then(function (r) {
@@ -2752,7 +2990,7 @@
         var row = el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" });
         row.appendChild(el("button", { className: "rl-btn", text: "Send a test alert", style: "width:auto", onclick: function () {
           say(msg, "Sending…");
-          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered" + (x.body && x.body.why ? " (" + x.body.why + ")" : "") + ". Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
+          api("/relay/my/push/test", { method: "POST" }).then(function (x) { say(msg, x.ok && x.body.sent ? "Sent. It should appear on this device in a few seconds." : x.status === 429 ? "Give it a few seconds, then try again." : "It couldn't be delivered. Try turning alerts off and on again.", !(x.ok && x.body.sent)); });
         } }));
         row.appendChild(el("button", { className: "rl-btn ghost", text: "Check prices now", style: "width:auto", onclick: function () {
           say(msg, "Checking the shops…");
@@ -2769,9 +3007,18 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
-  function start() { bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
+  function keyboardWatch() {
+    var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;
+    var fit = function () { var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)); document.documentElement.style.setProperty("--rl-kb", (kb > 60 ? kb : 0) + "px"); };
+    vv.addEventListener("resize", fit); vv.addEventListener("scroll", fit); fit();
+    document.addEventListener("focusin", function (e) {
+      var t = e.target; if (!t || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (x) {} }, 300);
+    });
+  }
+  function start() { keyboardWatch(); if (load()) keepStorage(); bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
