@@ -64,3 +64,5 @@ jobs:
         run: node scripts/test-add-receipt-ui.mjs
       - name: Test the sign-in page and Home (Relay's navy, return countdowns, colourful tiles)
         run: node scripts/test-home-look-ui.mjs
+      - name: Test more than one inbox in the app (listed, added, removed one at a time, searched together)
+        run: node scripts/test-inboxes-ui.mjs

@@ -20,6 +20,9 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
   const account = await one("SELECT email, created_at AS createdAt FROM shoppers WHERE id = ?", id);
   const profile = await one("SELECT name, photo_type AS photoType, photo_data AS photoData, updated_at AS updatedAt FROM shopper_profiles WHERE shopper_id = ?", id);
   const mail = await one("SELECT provider, google_email AS address, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id = ?", id);
+  // Other inboxes the shopper connected (kept as "<id>~<n>").
+  const moreMail = (await rows("SELECT shopper_id AS box, provider, google_email AS address, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id LIKE ? ORDER BY shopper_id", id + "~%"))
+    .filter((m) => /~\d{1,2}$/.test(m.box));
   const captured = await rows("SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status <> 'not_receipt' ORDER BY created_at", id);
   const notReceipts = await one("SELECT COUNT(*) AS n FROM captured_receipts WHERE shopper_id = ? AND status = 'not_receipt'", id);
   // twoStep below is the authenticator app; codes by text are under phone.
@@ -47,6 +50,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       connectedAt: iso(mail.connectedAt), lastCheckedAt: iso(mail.lastScanAt),
       earlierYearsRead: (await rows("SELECT year FROM gmail_history_years WHERE shopper_id = ? AND done_at IS NOT NULL ORDER BY year DESC", id)).map((y) => y.year),
     },
+    otherEmailConnections: moreMail.map((m) => ({ inbox: Number(m.box.split("~")[1]), provider: m.provider === "microsoft" ? "Outlook" : "Gmail", address: m.address || null,
+      connectedAt: iso(m.connectedAt), lastCheckedAt: iso(m.lastScanAt) })),
     receipts: captured.map((r) => ({ id: r.id, status: r.status, capturedAt: iso(r.createdAt), ...(parse(r.details) || {}) })),
     emailsLookedAtButNotKept: notReceipts ? notReceipts.n : 0,
     yourChoices: {
