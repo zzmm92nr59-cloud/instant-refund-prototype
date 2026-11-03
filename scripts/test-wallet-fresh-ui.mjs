@@ -57,7 +57,7 @@ assert.ok(!/Due |On its way/.test(await lamp.innerText()), "an old delivery line
 // Pictures: no product photo, so the shop's logo (a known one from Relay's own set, or fetched once) instead of initials.
 await kick.locator(".rl-po-img.rl-has-logo img").waitFor();
 await lamp.locator(".rl-po-img.rl-has-logo img").waitFor();
-assert.equal(await lamp.locator(".rl-po-img img").getAttribute("src"), "logos/amazon.co.uk.ico", "Relay's own copy of a well-known shop's logo");
+assert.equal(await lamp.locator(".rl-po-img img").getAttribute("src"), "logos/amazon.co.uk.png", "Relay's own copy of a well-known shop's logo");
 assert.deepEqual(logoAsks, ["kicklane.example"], "other shops' logos come from Relay, once");
 await page.screenshot({ path: "/tmp/shots/wallet-fresh.png" });
 console.log("ok - wallet: old 'shipped' orders and delivery companies left out; recent and returnable shown, each with the shop's logo");
