@@ -17,11 +17,12 @@ database_name = "relay-purchase-ledger"
 database_id = "6d3a035f-b869-4e1f-af61-bb34f2f5c51c"
 migrations_dir = "migrations"
 
-# Run the Worker next to its database. Relay's D1 database is in Eastern North America and most requests make several
-# database calls one after another: run from London, each call crossed the Atlantic (about 100 ms). Placed near the
-# database, the calls take a few milliseconds and only the shopper's own request makes the trip.
+# Relay's D1 database is in Eastern North America, so from London each database call crosses the Atlantic. Pinning the
+# Worker to aws:us-east-1 was tried (3 Nov 2026) and measured slower: requests gained about 80 ms each and database calls
+# didn't get quicker. Smart Placement moves the Worker only where Cloudflare measures it running faster, so it can't
+# make things worse.
 [placement]
-region = "aws:us-east-1"
+mode = "smart"
 
 [triggers]
 # Hourly: shops, price alerts, reminders. Every 15 minutes: new mail. Every minute: scans carried on after the shopper left the app.

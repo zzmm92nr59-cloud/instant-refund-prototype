@@ -34,6 +34,7 @@ jobs:
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
+          node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-category.mjs
           node scripts/test-receipt-reader.mjs
@@ -77,6 +78,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+          wranglerVersion: "4"
           command: d1 execute relay-purchase-ledger --remote --file=migrations/0002_retailer_catalogue_inventory.sql
       - name: Seed fictional demo retailers and inventory
         uses: cloudflare/wrangler-action@v3
@@ -84,6 +86,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+          wranglerVersion: "4"
           command: d1 execute relay-purchase-ledger --remote --file=migrations/0003_demo_inventory.sql
       - name: Deploy existing Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
@@ -91,7 +94,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
-          # Wrangler 4 understands the placement setting in wrangler.toml (running the Worker next to the database).
+          # Every step that reads wrangler.toml uses Wrangler 4: it understands the placement setting (running the Worker
+          # next to the database), which Wrangler 3 rejects.
           wranglerVersion: "4"
           command: deploy
 

@@ -65,6 +65,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+          wranglerVersion: "4"
           command: d1 execute relay-purchase-ledger --remote --file=migrations/0001_relay_purchase_ledger.sql
       - name: Commit D1 binding
         run: |
