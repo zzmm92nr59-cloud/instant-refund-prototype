@@ -626,9 +626,9 @@
   },
   "thebodyshop.com": {
    "file": "thebodyshop.com.png",
-   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/f0/6c/3e/f06c3eb6-fb39-fe9d-6712-753281499944/AppIcon-0-0-1x_U007emarketing-0-2-0-85-220.png/512x512bb.jpg",
-   "px": 192,
-   "bytes": 3707
+   "from": "https://www.thebodyshop.com/cdn/shop/files/tbs-favicon-32x32.png?crop=center&height=192&v=1727868854&width=192",
+   "px": 32,
+   "bytes": 1430
   },
   "kikocosmetics.com": {
    "file": "kikocosmetics.com.svg",
@@ -926,9 +926,9 @@
   },
   "boden.com": {
    "file": "boden.com.png",
-   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple116/v4/ac/45/1c/ac451cba-1d5f-c255-da1c-9d355383e5a1/AppIcon-0-0-1x_U007emarketing-0-0-0-7-0-0-sRGB-0-0-0-GLES2_U002c0-512MB-85-220-0-0.png/512x512bb.jpg",
-   "px": 192,
-   "bytes": 6185
+   "from": "https://www.boden.com/cdn/shop/files/boden-favicon.png?crop=center&height=192&v=1739807956&width=192",
+   "px": 100,
+   "bytes": 2112
   },
   "joules.com": {
    "file": "joules.com.png",
@@ -1848,12 +1848,6 @@
    "px": 192,
    "bytes": 6148
   },
-  "harveynichols.com": {
-   "file": "harveynichols.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=harveynichols.com&sz=256",
-   "px": 192,
-   "bytes": 10485
-  },
   "homesense.com": {
    "file": "homesense.com.svg",
    "from": "https://us.homesense.com/favicon.svg",
@@ -1991,12 +1985,6 @@
    "from": "https://www.google.com/s2/favicons?domain=cultfurniture.com&sz=256",
    "px": 192,
    "bytes": 8723
-  },
-  "sofa.com": {
-   "file": "sofa.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=sofa.com&sz=256",
-   "px": 150,
-   "bytes": 8310
   },
   "currys.co.uk": {
    "file": "currys.co.uk.png",
@@ -2399,12 +2387,6 @@
    "from": "https://www.krispykreme.co.uk/media/favicon/default/favicon-32x32.png",
    "px": 32,
    "bytes": 1054
-  },
-  "hawksmoor.com": {
-   "file": "hawksmoor.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=hawksmoor.com&sz=256",
-   "px": 80,
-   "bytes": 3742
   },
   "tgifridays.co.uk": {
    "file": "tgifridays.co.uk.png",
@@ -3132,12 +3114,6 @@
    "px": 512,
    "bytes": 411
   },
-  "ea.com": {
-   "file": "ea.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=ea.com&sz=256",
-   "px": 192,
-   "bytes": 4234
-  },
   "surfshark.com": {
    "file": "surfshark.com.png",
    "from": "https://surfshark.com/website/_next/public/global/favicon-192.png",
@@ -3258,12 +3234,6 @@
    "px": 32,
    "bytes": 565
   },
-  "tails.com": {
-   "file": "tails.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=tails.com&sz=256",
-   "px": 48,
-   "bytes": 482
-  },
   "petplanet.co.uk": {
    "file": "petplanet.co.uk.png",
    "from": "https://petplanet.co.uk/cdn/shop/files/favicon-96x96.png?crop=center&height=32&v=1755512009&width=32",
@@ -3317,18 +3287,6 @@
    "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/68/f9/70/68f9703a-7eb7-e192-6fec-f6f383b238e6/AppIcon-0-0-1x_U007emarketing-0-2-0-85-220.png/512x512bb.jpg",
    "px": 192,
    "bytes": 8543
-  },
-  "schuh.co.uk": {
-   "file": "schuh.co.uk.png",
-   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/4b/22/2e/4b222e49-b217-3d87-5fb0-d5d99477f341/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
-   "px": 192,
-   "bytes": 10989
-  },
-  "go-outdoors.co.uk": {
-   "file": "go-outdoors.co.uk.png",
-   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/cd/45/96/cd4596a2-8f75-0d53-1fe2-291974ed5ea6/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg",
-   "px": 192,
-   "bytes": 6381
   },
   "converse.com": {
    "file": "converse.com.png",
@@ -3425,6 +3383,12 @@
    "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/28/da/77/28da77e3-21e4-c7e0-4b08-7f5051544180/AppIcon-0-0-1x_U007emarketing-0-8-0-0-85-220.png/512x512bb.jpg",
    "px": 192,
    "bytes": 4568
+  },
+  "newbalance.co.uk": {
+   "file": "newbalance.co.uk.png",
+   "from": "https://www.google.com/s2/favicons?domain=newbalance.co.uk&sz=256",
+   "px": 48,
+   "bytes": 640
   }
  },
  "misses": [
@@ -3441,10 +3405,6 @@
    "tried": []
   },
   {
-   "domain": "newbalance.co.uk",
-   "tried": []
-  },
-  {
    "domain": "lecreuset.co.uk",
    "tried": []
   },
@@ -3458,5 +3418,5 @@
   }
  ],
  "total": 581,
- "found": 570
+ "found": 564
 }
