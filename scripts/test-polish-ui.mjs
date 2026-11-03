@@ -176,7 +176,7 @@ state.serverWatches = [{ sku: "shopify:kick:variant:1", product: "Court Classic 
 await page.evaluate(() => localStorage.removeItem("relay-radar-v2"));
 await page.reload();
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
-await page.getByText("1 thing watched").waitFor();
+await page.locator(".htile", { hasText: "Price alerts" }).getByText("1 watched").waitFor();
 console.log("ok - watches come back from the account when this device lost them");
 
 // Signing out removes the copy kept on this device.

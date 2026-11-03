@@ -101,9 +101,10 @@ await tile.waitFor();
 assert.equal(await page.locator(".rl-tile .rl-tile-art svg, .rl-tile .rl-tile-pic").count() >= 1, true);
 const cardText = await page.locator(".rl-tiles").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
-// A missing shop can be searched for straight from the Receipts page.
-await page.getByRole("button", { name: "Missing a receipt? Search Outlook for it" }).click();
-await page.getByRole("heading", { name: "Find a missing receipt" }).waitFor();
+// A missing receipt can be added straight from the Receipts page, searching Outlook as you type.
+await page.getByRole("button", { name: "Missing a receipt? Add it" }).click();
+await page.getByRole("heading", { name: "Add a receipt" }).waitFor();
+assert.equal(await page.locator("#rl-ar-q").getAttribute("placeholder"), "Search your Outlook");
 await page.getByRole("button", { name: "Back" }).click();
 assert.equal(await page.locator(".rl-sheet").count(), 0, "Back closes the search");
 state.oneStep = false; state.connected = false;
@@ -148,12 +149,12 @@ await page.getByText("Shown straight from your Outlook. Relay doesn't keep a cop
 await page.keyboard.press("Escape");
 await page.evaluate(() => window.RelayAccount.open());
 await page.locator(".rl-arow", { hasText: "Outlook · connected" }).click();
-await page.getByRole("button", { name: "Find a missing receipt" }).waitFor();
+await page.getByRole("button", { name: "Add a missing receipt" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Disconnect Outlook" }).count());
 assert.ok(await page.getByText("Disconnecting deletes every receipt Relay captured from this inbox.").count());
-await page.getByRole("button", { name: "Find a missing receipt" }).click();
-await page.getByRole("button", { name: "Search my Outlook" }).waitFor();
-assert.ok(await page.getByText("Search your Outlook for a store").count());
+await page.getByRole("button", { name: "Add a missing receipt" }).click();
+await page.getByRole("searchbox", { name: "Search Outlook for a receipt" }).waitFor();
+assert.equal(await page.locator("#rl-ar-q").getAttribute("placeholder"), "Search your Outlook");
 console.log("ok - with Outlook connected, the scan starts, the original opens from Outlook and every screen names Outlook");
 
 // 6. Someone who agreed to the earlier wording is told what changed.
