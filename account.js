@@ -327,7 +327,8 @@
     ".rl-wr-glance{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:var(--rl-text)}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:var(--rl-fill);border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:13px;color:var(--rl-text2);font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:var(--rl-text);margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:13px;color:var(--rl-text2)}.rl-wr-note{font-size:12px;color:var(--rl-text2);margin:12px 0 0}" +
     ".rl-story{position:fixed;inset:0;z-index:10050;background:rgba(5,8,18,.92);display:flex;align-items:center;justify-content:center}.rl-story-frame{position:relative;width:min(440px,100vw);height:min(820px,100dvh);border-radius:26px;overflow:hidden;transition:background .5s,color .5s;cursor:pointer;user-select:none;-webkit-user-select:none}@media(max-width:500px){.rl-story-frame{border-radius:0}}" +
     ".rl-story-bars{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:2}.rl-story-bars div{flex:1;height:3px;border-radius:3px;background:rgba(127,127,127,.35);overflow:hidden}.rl-story-bars i{display:block;height:100%;width:0;background:currentColor}.rl-story-bars .done i{width:100%}.rl-story-bars .now i{animation:rlbar linear forwards}.rl-story-frame.paused .rl-story-bars .now i{animation-play-state:paused}@keyframes rlbar{to{width:100%}}" +
-    ".rl-story-x{all:unset;position:absolute;top:22px;right:16px;z-index:3;font-size:30px;line-height:1;cursor:pointer;opacity:.8;padding:4px 8px}.rl-story-body{position:absolute;inset:0;display:flex;align-items:center;padding:56px 30px 40px}" +
+    ".rl-story-x,.rl-story-snd{all:unset;position:absolute;top:18px;right:10px;z-index:3;width:44px;height:44px;display:grid;place-items:center;border-radius:999px;cursor:pointer;opacity:.85;transition:transform .12s}.rl-story-snd{right:56px}" +
+    ".rl-story-x:active,.rl-story-snd:active{transform:scale(.88)}.rl-story-x:focus-visible,.rl-story-snd:focus-visible{outline:2px solid currentColor;outline-offset:2px}.rl-story-body{position:absolute;inset:0;display:flex;align-items:center;padding:70px 30px 40px}" +
     ".rl-story-slide{width:100%}.rl-story-slide>*{opacity:0;animation:rlup .6s cubic-bezier(.2,.8,.2,1) forwards}.rl-story-slide>*:nth-child(2){animation-delay:.15s}.rl-story-slide>*:nth-child(3){animation-delay:.35s}.rl-story-slide>*:nth-child(4){animation-delay:.55s}.rl-story-slide>*:nth-child(5){animation-delay:.75s}@keyframes rlup{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}" +
     ".rl-story-slide .k{font-size:12px;font-weight:900;letter-spacing:2px;color:var(--accent)}.rl-story-slide h1{font-size:42px;line-height:1.02;letter-spacing:-1.5px;margin:14px 0}.rl-story-slide p{font-size:18px;line-height:1.4;margin:10px 0;opacity:.9}.rl-story-slide .lead{font-size:20px;font-weight:800;opacity:1}.rl-story-slide .big{font-size:64px;font-weight:900;letter-spacing:-2.5px;line-height:1;margin:12px 0;color:var(--accent);word-break:break-word}.rl-story-slide .big.name{font-size:46px;letter-spacing:-1.5px}.rl-story-slide .fine{font-size:13px;opacity:.75}.rl-story-slide .pill{display:inline-block;border:2px solid currentColor;border-radius:999px;padding:6px 14px;font-weight:800;font-size:15px}" +
     ".rl-story-slide .rank{list-style:none;padding:0;margin:16px 0 0}.rl-story-slide .rank li{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.15);opacity:0;animation:rlup .5s forwards;font-size:19px;font-weight:800}.rl-story-slide .rank b{font-size:28px;color:var(--accent);width:28px}.rl-story-slide .rank span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rl-story-slide .rank em{font-style:normal;font-size:14px;opacity:.75;font-weight:600}" +
@@ -3136,6 +3137,101 @@
     } });
     return S;
   }
+  // ---- Wrapped's soundtrack: original music the app makes itself (Web Audio), so there's no song to license or download.
+  // A four-bar loop at 112 beats a minute (A minor: Am F C G, then C G Am F at its fullest), built up as the story goes on:
+  // pads and hats to start, then kick and bass, then the melody; the last slide keeps the pads and melody and eases off.
+  // On iPhone it follows the silent switch. It pauses while the story is held or the app is in the background, and the
+  // speaker button turns it off (remembered on this device). ----
+  var STORY_SOUND_KEY = "relay.storySound.v1";
+  function storySoundOn() { try { return localStorage.getItem(STORY_SOUND_KEY) !== "off"; } catch (e) { return true; } }
+  function rememberStorySound(on) { try { localStorage.setItem(STORY_SOUND_KEY, on ? "on" : "off"); } catch (e) {} }
+  function noteHz(n) { return 440 * Math.pow(2, (n - 69) / 12); }
+  // What plays on each beat, at each level (0 intro, 1 and 2 building, 3 full, 4 the last slide). Works with a live or an
+  // offline audio context, so the same song can be listened to before it ships.
+  function storySong(ctx, out) {
+    var SPB = 60 / 112;
+    var A = { chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], roots: [45, 41, 48, 43],
+      arp: [[69, 72, 76, 72, 69, 71, 72, 76], [69, 72, 77, 72, 69, 72, 77, 76], [67, 72, 76, 79, 76, 72, 67, 72], [67, 71, 74, 79, 74, 71, 67, 71]] };
+    var B = { chords: [[48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60]], roots: [48, 43, 45, 41],
+      arp: [[72, 76, 79, 76, 84, 79, 76, 72], [71, 74, 79, 74, 83, 79, 74, 71], [72, 76, 81, 76, 84, 81, 76, 72], [72, 77, 81, 77, 84, 81, 77, 72]] };
+    var noise = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate), d = noise.getChannelData(0);
+    for (var k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
+    function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + dec); }
+    function voice(type, hz, cutoff) {
+      var o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = type; o.frequency.value = hz; f.type = "lowpass"; f.frequency.value = cutoff; o.connect(f); f.connect(g); g.connect(out);
+      return { o: o, g: g };
+    }
+    function kick(t) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = "sine"; o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(44, t + 0.12);
+      env(g, t, 0.004, 0.8, 0.32); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.42);
+    }
+    function hiss(t, v, len, type, hz, q) {
+      var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      s.buffer = noise; f.type = type; f.frequency.value = hz; if (q) f.Q.value = q;
+      env(g, t, 0.002, v, len); s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + len + 0.05);
+    }
+    function tone(t, n, len, type, v, cutoff) { var x = voice(type, noteHz(n), cutoff); env(x.g, t, 0.008, v, len); x.o.start(t); x.o.stop(t + len + 0.1); }
+    function pad(t, notes, len, v) {
+      notes.forEach(function (n) { [-8, 8].forEach(function (cents) {
+        var x = voice("sawtooth", noteHz(n), 1000); x.o.detune.value = cents;
+        x.g.gain.setValueAtTime(0.0001, t); x.g.gain.linearRampToValueAtTime(v, t + 0.4); x.g.gain.setValueAtTime(v, t + len - 0.25); x.g.gain.linearRampToValueAtTime(0.0001, t + len + 0.2);
+        x.o.start(t); x.o.stop(t + len + 0.3);
+      }); });
+    }
+    return {
+      spb: SPB,
+      // A soft rush between slides.
+      swoosh: function (t) {
+        var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        s.buffer = noise; s.loop = true; f.type = "bandpass"; f.Q.value = 1.2; f.frequency.setValueAtTime(500, t); f.frequency.exponentialRampToValueAtTime(4000, t + 0.45);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
+        s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + 0.6);
+      },
+      beat: function (b, t, level) {
+        var inBar = b % 4, part = level === 3 ? B : A, c = Math.floor(b / 4) % 4, drums = level >= 1 && level <= 3;
+        if (inBar === 0) pad(t, part.chords[c], SPB * 4, level === 4 ? 0.022 : 0.03);
+        if (drums && (level >= 2 || inBar % 2 === 0)) kick(t);
+        if (level >= 2 && level <= 3 && inBar % 2 === 1) hiss(t, 0.42, 0.16, "bandpass", 1700, 0.9);
+        if (level <= 3) { hiss(t + SPB / 2, level === 0 ? 0.07 : 0.12, level === 3 ? 0.2 : 0.045, "highpass", 7600); if (drums) hiss(t, 0.06, 0.04, "highpass", 8200); }
+        if (drums) { tone(t, part.roots[c] - 12, SPB * 0.45, "sawtooth", 0.2, 640); if (level >= 2) tone(t + SPB / 2, part.roots[c] - 12, SPB * 0.4, "sawtooth", 0.16, 640); }
+        if (level >= 2) for (var h = 0; h < 2; h++) tone(t + h * SPB / 2, part.arp[c][inBar * 2 + h], 0.26, level === 4 ? "sine" : "triangle", level === 3 ? 0.12 : 0.085, 3400);
+      }
+    };
+  }
+  // The live player. Returns null where the browser can't make sound.
+  function storyMusic() {
+    var AC = window.AudioContext || window.webkitAudioContext, ctx;
+    if (!AC) return null;
+    try { ctx = new AC(); } catch (e) { return null; }
+    try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (e) {}
+    var comp = ctx.createDynamicsCompressor(), master = ctx.createGain();
+    master.gain.value = 0.0001; comp.connect(master); master.connect(ctx.destination);
+    var song = storySong(ctx, comp), level = 0, beat = 0, next = ctx.currentTime + 0.1, held = false, hidden = false, stopped = false;
+    function fade(v, s) { var t = ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t); master.gain.exponentialRampToValueAtTime(Math.max(v, 0.0001), t + s); }
+    var timer = setInterval(function () {
+      if (stopped || ctx.state !== "running") return;
+      if (next < ctx.currentTime) next = ctx.currentTime + 0.05;
+      while (next < ctx.currentTime + 0.25) { song.beat(beat, next, level); beat++; next += song.spb; }
+    }, 50);
+    function sync() { if (stopped) return; if (held || hidden) ctx.suspend().catch(function () {}); else ctx.resume().catch(function () {}); }
+    function vis() { hidden = document.hidden; sync(); }
+    document.addEventListener("visibilitychange", vis);
+    ctx.resume().catch(function () {}); fade(0.6, 1.2);
+    return {
+      context: ctx,
+      level: function (l, swoosh) { if (swoosh && ctx.state === "running") song.swoosh(ctx.currentTime + 0.02); level = l; },
+      hold: function (on) { held = Boolean(on); sync(); },
+      stop: function () {
+        if (stopped) return; stopped = true; clearInterval(timer); document.removeEventListener("visibilitychange", vis);
+        try { fade(0.0001, 0.3); } catch (e) {}
+        setTimeout(function () { try { ctx.close(); } catch (e) {} }, 400);
+      }
+    };
+  }
+  var SOUND_ON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.3a4 4 0 0 1 0 5.4M18.2 6.8a7.5 7.5 0 0 1 0 10.4"/></svg>';
+  var SOUND_OFF = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>';
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
     var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });
@@ -3145,11 +3241,23 @@
     var closeBtn = el("button", { type: "button", className: "rl-story-x", ariaLabel: "Close" });
     closeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     var body = el("div", { className: "rl-story-body" });
-    frame.appendChild(bars); frame.appendChild(closeBtn); frame.appendChild(body); root.appendChild(frame);
+    // The soundtrack starts with the tap that opened the story (phones only allow sound after a tap).
+    var music = null, soundOn = storySoundOn(), sound = el("button", { type: "button", className: "rl-story-snd" });
+    var levelOf = function (n) { return slides[n].summary ? 4 : n < 2 ? n : Math.floor(n / 2) % 2 ? 3 : 2; };
+    function drawSound() { sound.innerHTML = soundOn ? SOUND_ON : SOUND_OFF; sound.setAttribute("aria-label", soundOn ? "Turn the music off" : "Turn the music on"); sound.setAttribute("aria-pressed", String(soundOn)); }
+    function startMusic() { if (!music && soundOn) { music = storyMusic(); if (music) music.level(levelOf(i)); } }
+    sound.onclick = function (e) {
+      e.stopPropagation(); soundOn = !soundOn; rememberStorySound(soundOn); drawSound();
+      if (soundOn) startMusic(); else if (music) { music.stop(); music = null; }
+    };
+    drawSound(); startMusic();
+    frame.appendChild(bars); frame.appendChild(sound); frame.appendChild(closeBtn); frame.appendChild(body); root.appendChild(frame);
     document.body.appendChild(root); document.body.style.overflow = "hidden";
-    function close() { clearTimeout(timer); document.removeEventListener("keydown", key); root.remove(); document.body.style.overflow = ""; }
+    function close() { clearTimeout(timer); document.removeEventListener("keydown", key); if (music) { music.stop(); music = null; } root.remove(); document.body.style.overflow = ""; }
     function show(n) {
+      var was = i;
       i = Math.max(0, Math.min(slides.length - 1, n)); clearTimeout(timer);
+      if (music) music.level(levelOf(i), i !== was);
       var sl = slides[i];
       frame.style.background = sl.bg; frame.style.color = sl.fg; frame.style.setProperty("--accent", sl.accent);
       Array.prototype.forEach.call(bars.children, function (b, k) { b.className = k < i ? "done" : k === i ? "now" : ""; b.firstChild.style.animationDuration = DUR + "ms"; });
@@ -3162,8 +3270,8 @@
     closeBtn.onclick = function (e) { e.stopPropagation(); close(); };
     // Tap the right side to go on, the left side to go back; press and hold to pause.
     frame.addEventListener("click", function (e) { if (e.target.closest("button")) return; var r = frame.getBoundingClientRect(); if (e.clientX - r.left < r.width * 0.33) show(i - 1); else if (!slides[i].summary) show(i + 1); });
-    frame.addEventListener("pointerdown", function () { paused = true; frame.classList.add("paused"); });
-    frame.addEventListener("pointerup", function () { if (!paused) return; paused = false; frame.classList.remove("paused"); });
+    frame.addEventListener("pointerdown", function () { paused = true; frame.classList.add("paused"); if (music) music.hold(true); });
+    frame.addEventListener("pointerup", function () { if (!paused) return; paused = false; frame.classList.remove("paused"); if (music) music.hold(false); });
     show(0);
   }
 
@@ -4045,6 +4153,8 @@
   }
   window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+    // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
+    storySong: storySong,
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
