@@ -5,7 +5,9 @@ const require = createRequire(import.meta.url); const { chromium } = require("pl
 const out = process.argv[2] || "/tmp/shots";
 fs.mkdirSync(out, { recursive: true });
 const report = JSON.parse(fs.readFileSync("logos/_report.json", "utf8"));
-const files = fs.readdirSync("logos").filter(f => !f.startsWith("_")).sort();
+// ONLY=domain,domain shows just those shops.
+const only = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
+const files = fs.readdirSync("logos").filter(f => !f.startsWith("_") && (!only || only.has(f.replace(/\.(png|svg|ico|jpg|webp|gif)$/, "")))).sort();
 const mime = { png: "image/png", svg: "image/svg+xml", ico: "image/x-icon", jpg: "image/jpeg", webp: "image/webp", gif: "image/gif" };
 const PER = 48;
 const browser = await chromium.launch();
