@@ -113,6 +113,7 @@ export function rankShop(clues) {
   const senderDomain = c.senderDomain && !isVia(c.senderDomain) && !c.personal ? c.senderDomain : null;
   const shopDomain = c.forwardedDomain || senderDomain || c.linkDomain || null;
   if (c.dataName) add(c.dataName, 8, shopDomain);
+  if (c.titleName) add(c.titleName, 6, shopDomain);
   if (c.forwardedName) add(c.forwardedName, 7, c.forwardedDomain);
   // A payment company sending under its own name ("Dojo" from dojo.tech) says nothing about the shop.
   const viaName = c.senderName && isVia(c.senderDomain) && nameFitsDomain(cleanShopName(c.senderName) || "", c.senderDomain);
@@ -231,7 +232,7 @@ export function cleanItems(items) {
 const CELL_QTY = /^(?:x\s?)?(\d{1,2})(?:\s?x)?$/i;
 const CELL_PRICE = /^([-−–])?\s?£\s?(\d{1,4}(?:,\d{3})*\.\d{2})\s?\*?$/;
 // Unit prices and notes that sit inside a row: "£4.00/unit", "£1.20 each", "Substitution allowed".
-const CELL_NOTE = /^£\s?\d[\d,]*\.\d{2}\s*(?:\/|per\b|each\b|ea\b)|^(?:substitutions?\b|no substitut|substituted\b|nectar price|clubcard price|was\s£|save\s£|price per\b|view item\b|buy again\b|write a review\b)/i;
+const CELL_NOTE = /^£\s?\d[\d,]*\.\d{2}\s*(?:\/|per\b|each\b|ea\b)|^(?:substitutions?\b|no substitut|substituted\b|nectar price|clubcard price|was\s£|save\s£|price per\b|view item\b|buy again\b|write a review\b)|^(?:item|sku|style|article|product|ref)\s?(?:#|no\.?|number|code)\s*:?\s*[\w-]{3,24}$/i;
 const CELL_END = /^(?:sub-?\s?total|total\b|order total|grand total|basket total|items? total|vat\b|tax\b|delivery\b|shipping\b|postage\b|service (?:fee|charge)|payment\b|discount|offer discount|promotion|you(?:'|’)?ve saved|you saved|savings\b|tip\b|bag (?:charge|levy)|carrier bag|credit\b|voucher|gift card|amount (?:paid|due)|paid\b|balance\b|estimated total|rewards?\b)/i;
 const CELL_HEAD = /^(?:qty|quantity|items?|item (?:detail|details|name|cost|price)|description|products?|price|amount|cost|each|unit price|line total)$/i;
 const CELL_PLUS = /^[+•]$/;
@@ -244,8 +245,11 @@ export function itemsFromCells(text) {
   const cells = [];
   for (const line of String(text || "").split(/\r\n|\r|\n/)) {
     for (const raw of line.split("|")) {
-      const c = raw.replace(/[​-‍͏­⁠﻿]/g, "").replace(/\s+/g, " ").trim();
-      if (c) cells.push(c);
+      const c = raw.replace(/[\u200b-\u200d\u034f\u00ad\u2060\ufeff]/g, "").replace(/\s+/g, " ").trim();
+      // "1 x W Restfeel Slide": the quantity and the name share a cell.
+      const qn = /^(\d{1,2})\s?[x×]\s+(\p{L}.{1,118})$/u.exec(c);
+      if (qn) cells.push(qn[1], qn[2]);
+      else if (c) cells.push(c);
     }
     if (cells.length > 4000) break;
   }
@@ -296,7 +300,7 @@ export function itemsFromCells(text) {
       // (in a name-first table, any other name is a note under the item)
     }
     done();
-    return { end: j, items: rows.map(r => {
+    return { end: j, items: rows.filter(r => !(r.pence === 0 && /\b(non[- ]?chargeable|carrier bag|shopper|bag for life|paper bag)\b/i.test(r.name))).map(r => {
       let name = r.name, extras = r.extras;
       // A deal's headline ("£1.99 for a Chicken Big Mac!") is not the thing bought: the part under it is.
       if (/£|!$/.test(name)) { const k = extras.findIndex(e => !/£|!$/.test(e)); if (k >= 0) { name = extras[k]; extras = extras.filter((_, i) => i !== k); } }
@@ -316,4 +320,30 @@ export function itemsFromCells(text) {
     i = Math.max(i, run.end - 1);
   }
   return best;
+}
+
+// ---- Web shops for mobile games ---------------------------------------------------------------------------------
+// Appcharge and Xsolla sell game currency on a game's behalf and send the receipt under their own name ("Purchase
+// Confirmation #676-712-348" from no-reply@appcharge.com). The game is the heading at the top ("MATCH MASTERS-CANDIVORE":
+// the game, then its studio) and what was bought sits under "Items" ("Coins | 2,200").
+export const GAME_SHOP = /(^|\.)(appcharge\.com|xsolla\.com)$/i;
+const cellsOf = (text) => String(text || "").split(/\r\n|\r|\n/).flatMap((l) => l.split("|"))
+  .map((c) => c.replace(/[\u200b-\u200d\u034f\u00ad\u2060\ufeff]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
+export function gameTitle(text) {
+  for (const c of cellsOf(text).slice(0, 12)) {
+    if (c.length < 3 || c.length > 48 || /\d/.test(c) || !/\p{L}{2}/u.test(c)) continue;
+    if (/\b(purchase|confirmation|receipt|order|thank|thanks|hello|hi|dear|payment|invoice|powered)\b/i.test(c)) continue;
+    let name = c.replace(/\s*[-–]\s*[A-Z0-9][A-Z0-9 &.]{1,30}$/, "").trim() || c;
+    if (name === name.toUpperCase()) name = name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+    return name;
+  }
+  return null;
+}
+export function gameItems(text) {
+  const cells = cellsOf(text);
+  const i = cells.findIndex((c) => /^items?$/i.test(c));
+  if (i < 0) return [];
+  const name = cells[i + 1] || "", amount = cells[i + 2] || "";
+  if (!/^\p{L}[\p{L} ]{1,30}$/u.test(name) || !/^\d{1,3}(?:,\d{3})*$|^\d{1,7}$/.test(amount)) return [];
+  return [{ name: amount + " " + name, qty: 1 }];
 }

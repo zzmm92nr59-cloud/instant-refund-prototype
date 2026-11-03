@@ -549,4 +549,37 @@ t("a notice that a payment didn't go through is not a receipt", () => {
   const plan = `From: Example Marketplace <payments@examplemarket.test>\nSubject: Your order confirmation\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: EM-555\nKettle - £30.00\nOrder total: £30.00\nUpdate payment method\n`;
   assert.equal(parseReceiptEmail(plan).ok, true);
 });
+t("shop e-receipt: '1 x Name' with an item number under it, and a free carrier bag left out", () => {
+  const html = `<p>Receipt</p><p>Thanks for shopping with us — your receipt is below.</p><p>Order Details</p>
+<p>1 x W Example Slide BLK/BLK 7</p><p>Item# 128840211</p><p>£48.00</p><p>1 x NON CHARGEABLE LRG SHOPPER</p><p>Item# 100200300</p><p>£0.00</p>
+<p>Subtotal</p><p>£48.00</p><p>20% VAT (Included in price)</p><p>£8.00</p><p>Total</p><p>£48.00</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Athletica <receipts@e.exampleathletica.test>", "Your Example Athletica receipt", "Mon, 07 Sep 2026 15:10:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["W Example Slide BLK/BLK 7", 1, 4800]]);
+  assert.equal(r.totalPence, 4800);
+});
+
+t("train booking: the journey in the subject is the item, and 'Total amount' is the total", () => {
+  const html = `<p>Your trip to Exampleton departing Sunday, 27 September 2026 is confirmed</p><p>This is just a booking confirmation.</p>
+<table><tr><td>12:54 London Bridge</td></tr><tr><td>13:09 Exampleton</td></tr><tr><td>1x Anytime Day Single</td></tr><tr><td>1x Adult</td></tr></table>
+<p>Payment information</p><table><tr><td>Transaction ID:</td><td>99887766</td></tr><tr><td>Total amount:</td><td>£6.25</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("Example Rail <auto-confirm@info.examplerail.test>", "Your booking confirmation for London to Exampleton (27 September at 12:54)", "Sun, 27 Sep 2026 12:30:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.equal(r.totalPence, 625);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["London to Exampleton", 1, 625]]);
+  const back = parseReceiptEmail(htmlMail("Example Rail <auto-confirm@info.examplerail.test>", "Your booking confirmation for return trip London to Examplecastle (20 August at 05:30)", "Sun, 17 Aug 2026 12:30:00 +0100", html));
+  assert.equal(back.items[0].name, "London to Examplecastle (return)");
+});
+
+t("game web shop: the game named at the top is the shop, and the game currency is the item", () => {
+  const html = `<h1>Purchase Confirmation</h1><h2>EXAMPLE QUEST-EXAMPLE STUDIOS</h2><table><tr><td>Receipt Number</td><td>123-456-789</td></tr>
+<tr><td>Payment Date</td><td>October 31, 2026 1:16 PM GMT</td></tr><tr><td>Items</td></tr><tr><td>Coins</td><td>2,200</td></tr>
+<tr><td>Subtotal</td><td>£1.33</td></tr><tr><td>Tax (20%)</td><td>£0.26</td></tr><tr><td>Total</td><td>£1.59</td></tr></table><p>Powered by</p>`;
+  const r = parseReceiptEmail(htmlMail("no-reply <no-reply@appcharge.com>", "Purchase Confirmation #123-456-789", "Sat, 31 Oct 2026 13:16:00 +0000", html));
+  assert.equal(r.ok, true);
+  assert.equal(r.retailer.name, "Example Quest");
+  assert.equal(r.retailer.domain, "appcharge.com", "the web shop's address stays, so the receipt is still filed as a digital purchase");
+  assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["2,200 Coins", 159]]);
+  assert.equal(r.totalPence, 159);
+});
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);
