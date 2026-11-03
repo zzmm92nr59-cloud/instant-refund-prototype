@@ -33,6 +33,7 @@ jobs:
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
+          node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-category.mjs
           node scripts/test-receipt-reader.mjs

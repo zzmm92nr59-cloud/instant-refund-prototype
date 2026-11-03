@@ -50,16 +50,25 @@
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
   // them all, so nothing out of date shows after an edit. fresh: true asks Relay regardless.
   var READ_REUSE_MS = 60 * 1000, reads = {};
+  // Relay answers from the nearest copy of its database and hands back a bookmark with each answer. Sending the newest one
+  // back means no answer is ever older than one already seen, so a change just made always shows. It's only sent once
+  // Relay has given one (a server that doesn't give them wouldn't expect it).
+  var bookmark = null;
   function api(path, opts) {
     opts = opts || {};
     var method = opts.method || "GET", s = load(), headers = {};
     // Reads carry no body, so they don't say it's JSON (one less reason for the browser to ask first).
     if (method !== "GET") { headers["Content-Type"] = "application/json"; reads = {}; }
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
+    if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
     if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < READ_REUSE_MS)) return hit.answer.then(copyAnswer);
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
-      .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; }); });
+      .then(function (r) {
+        var b = r.headers && r.headers.get && r.headers.get("x-d1-bookmark");
+        if (b && /^[0-9A-Za-z._:-]{8,160}$/.test(b) && (!bookmark || b > bookmark)) bookmark = b;
+        return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
+      });
     if (key) {
       var entry = { answer: answer, waiting: true, at: 0 };
       reads[key] = entry;
