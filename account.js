@@ -2640,6 +2640,7 @@
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
     phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>',
+    devices: '<rect x="2.5" y="5" width="13.5" height="9.5" rx="1.6"/><path d="M1.5 18h15"/><rect x="18" y="8.5" width="4.5" height="11" rx="1.2"/>',
     card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
     shield: '<path d="M12 3.5 19 6v5.5c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6Z"/><path d="m9 12 2 2 4-4"/>',
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
@@ -2773,6 +2774,7 @@
     phoneRow.style.display = "none"; secRows.push(phoneRow);
     var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
     secRows.push(twoRow);
+    secRows.push(accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); }));
     var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
     cardRow.style.display = "none"; secRows.push(cardRow);
     sheet.appendChild(accGroup("Sign-in & security", secRows));
@@ -2830,6 +2832,24 @@
         b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting deletes every receipt Relay captured from this inbox." }));
       }
       b.appendChild(note);
+    }
+    // Lost a phone, or signed in on a shared computer: sign Relay out everywhere else in one tap (this device stays in).
+    function devicesPage(b) {
+      b.appendChild(el("p", { text: "Signs Relay out on every other phone, tablet and computer, including ones that are lost or shared. You stay signed in here." }));
+      var note = el("div", { className: "rl-msg" });
+      var again = function (text) { go.disabled = false; go.textContent = "Sign out other devices"; say(note, text, true); };
+      var go = el("button", { type: "button", className: "rl-btn", text: "Sign out other devices", onclick: function () {
+        go.disabled = true; go.textContent = "Signing out…";
+        api("/relay/my/devices/sign-out-others", { method: "POST", body: {} }).then(function (r) {
+          if (!r.ok) return again("That didn't work. Check your connection and try again.");
+          var n = (r.body && r.body.count) || 0;
+          go.textContent = "Done";
+          say(note, n ? (n === 1 ? "1 other device was" : n + " other devices were") + " signed out. Only this one is signed in now." : "No other devices were signed in. Only this one is.");
+        }, function () { again("That didn't work. Check your connection and try again."); });
+      } });
+      b.appendChild(go);
+      b.appendChild(note);
+      b.appendChild(el("p", { className: "rl-anote", text: "Relay emails you whenever how you sign in changes (two-step sign-in, your phone number, a passkey or a recovery code), so you'd know if it wasn't you." }));
     }
     function ordersPage(b) {
       b.appendChild(el("p", { text: "Orders the shop itself confirmed to Relay." }));

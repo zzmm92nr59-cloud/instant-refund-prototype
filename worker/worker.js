@@ -122,6 +122,8 @@ const relayWorker = {
       if (retailerResponse) return retailerResponse;
     }
     const authResponse = await handleAuthRoute(request, env, url, corsHeaders, {
+      // Emails that can go after the response (security notices) don't hold it up.
+      later: (p) => { try { ctx.waitUntil(p); } catch { /* not in a Worker: it simply runs */ } },
       // "Check prices now" refreshes the shops' catalogues first, then compares prices.
       syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), syncAllShopify(env)]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
     });

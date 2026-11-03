@@ -456,7 +456,9 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.deepEqual(await (await call("/relay/my/2fa", { token: tfSession })).json(), { enabled: false, app: false, text: false, phoneEnding: null, textAvailable: false, recoveryCodesLeft: 0 });
   assert.equal((await post("/relay/my/2fa/enable", tfSession, { code: "123456" })).status, 400, "cannot switch on before setup");
   // a passkey registered now must keep working without the second step later
+  emails = [];
   const pkDev = newDevice(); const po = await opts(tfSession); assert.equal((await reg(tfSession, create(pkDev, po.challenge))).status, 200);
+  assert.deepEqual(emails.map(e => [e.body.subject, e.body.to[0]]), [["Relay: A passkey was added", "tf@example.com"]], "adding a passkey is emailed to the shopper");
   const setup = await (await post("/relay/my/2fa/setup", tfSession, {})).json();
   assert.match(setup.otpauthUrl, /^otpauth:\/\/totp\/Relay%3Atf%40example\.com\?secret=[A-Z2-7]{32}&issuer=Relay/);
   const key = unb32(setup.secret);

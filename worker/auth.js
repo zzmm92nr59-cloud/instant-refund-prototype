@@ -25,6 +25,7 @@ import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phon
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, revokeMailbox, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
+import { tellShopper } from "./security-mail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
@@ -564,6 +565,15 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/logout" && request.method === "POST") {
       await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE session_hash = ?").bind(shopper.sessionHash).run();
       return json({ ok: true }, 200, cors);
+    }
+    // Signs Relay out everywhere else (a lost phone, a shared computer, someone who shouldn't be in); this device stays signed in.
+    if (path === "/relay/my/devices/sign-out-others" && request.method === "POST") {
+      const origin = request.headers.get("origin");
+      if (origin && !allowedOrigins(env).has(origin)) return json({ error: "origin_not_allowed" }, 403, cors);
+      const gone = await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ? AND session_hash != ? RETURNING session_hash").bind(shopper.id, shopper.sessionHash).all();
+      const count = (gone.results || []).length;
+      if (count) await tellShopper(env, o, shopper.email, "others_out", { count });
+      return json({ ok: true, count }, 200, cors);
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
       await ensurePushTables(env.RELAY_DB);
