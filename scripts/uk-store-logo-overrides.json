@@ -69,5 +69,18 @@
  "luminskin.com": "drop",
  "tiffany.co.uk": "drop",
  "tvbedsnorthwest.co.uk": "drop",
- "coachinginngroup.co.uk": "drop"
+ "coachinginngroup.co.uk": "drop",
+ "glossier.com": "appstore:Glossier|Glossier",
+ "krispykreme.co.uk": "appstore:Krispy Kreme UK|Krispy Kreme",
+ "eurostar.com": "appstore:Eurostar|Eurostar",
+ "ticketmaster.co.uk": "appstore:Ticketmaster UK|Ticketmaster",
+ "dropbox.com": "appstore:Dropbox|Dropbox",
+ "ring.com": "appstore:Ring Always Home|Ring",
+ "three.co.uk": "appstore:Three UK|Hutchison",
+ "tescomobile.com": "appstore:Tesco Mobile|Tesco Mobile",
+ "idmobile.co.uk": "appstore:iD Mobile|iD Mobile",
+ "lakeland.co.uk": "appstore:Lakeland|Lakeland",
+ "graze.com": "appstore:graze|graze",
+ "poundland.co.uk": "appstore:Poundland|Poundland",
+ "hamleys.com": "appstore:Hamleys|Hamleys"
 }
