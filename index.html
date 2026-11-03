@@ -446,13 +446,32 @@ function selectStore(value){storeFilter=value;renderCatalog()}
 // ---- Discover for shoppers: products from shops on Relay, one card per product, and picks from what you spend ----
 let discoverKind="all",discoverSpend=null,discoverSpendAsked=false;
 const DC_KINDS={fashion:"Fashion",home:"Home",pets:"Pets",beauty:"Beauty",electronics:"Tech",food:"Food & drink",other:"Other"};
-const DC_SPEND_KIND={pets:"home"};const DC_PETS=/\b(pets?|dogs?|cats?|pupp(?:y|ies)|kittens?)\b/i;
+const DC_PETS=/\b(pets?|dogs?|cats?|pupp(?:y|ies)|kittens?)\b/i;
+// What kind of thing a product is, from its name (checked in this order), then from the shop's name.
+const DC_KIND_RULES=[
+ ["pets",/\b(pets?|dogs?|cats?|pupp(?:y|ies)|kittens?|collars?|leads?|leash(?:es)?|litter|scratching|squeaky|chew|bird ?feeders?)\b/i],
+ ["home",/\b(cushions?|throws?|blankets?|duvets?|pillows?|rugs?|lamps?|lights?|candles?|vases?|mugs?|plates?|bowls?|glass(?:es)?|flutes?|cutlery|pans?|pots?|planters?|plants?|garden(?:ing)?|watering|shears|pruners?|bird ?houses?|seeds?|hose|ladders?|hammers?|drills?|screwdrivers?|spanners?|wrench(?:es)?|saws?|spirit levels?|tool ?box(?:es)?|tools?|tape measures?|paint|rollers?|shelf|shelves|frames?|mirrors?|towels?|bedding|guest book|confetti|bunting|napkins?|champagne|kettles?|toasters?)\b/i],
+ ["beauty",/\b(perfume|fragrance|eau de|lipstick|mascara|serum|moisturi[sz]er|cleanser|shampoo|conditioner|skincare|make-?up|nail polish|body wash)\b/i],
+ ["electronics",/\b(phones?|headphones|earbuds|speakers?|laptops?|tablets?|chargers?|cables?|cameras?|consoles?|monitors?|keyboards?|smart ?watch)\b/i],
+ ["fashion",/\b(trainers?|sneakers?|shoes?|boots?|sandals?|sliders?|slippers?|heels|loafers|jackets?|coats?|shells?|parkas?|jumpers?|sweaters?|cardigans?|hoodies?|t-?shirts?|tees?|shirts?|blouses?|dress(?:es)?|skirts?|trousers|chinos?|jeans|leggings|shorts|suits?|blazers?|ties?|scarf|scarves|hats?|caps?|gloves|socks|veils?|bags?|totes?|clutch(?:es)?|backpacks?|purses?|wallets?|belts?|watch(?:es)?|rings?|necklaces?|earrings?|bracelets?|jewell?ery|sunglasses)\b/i],
+ ["food",/\b(coffee|tea|chocolates?|wine|beer|gin|snacks?|sauces?|cheese|bread|cakes?|biscuits?|hampers?)\b/i]];
+const DC_SHOP_KIND=[["pets",/\bpets?\b/i],["home",/\b(home|garden|hardware|diy|tools?|hammer|interiors?)\b/i],["beauty",/\b(beauty|cosmetics|perfumery|skin)\b/i],["food",/\b(deli|bakery|coffee|grocer|wine)\b/i]];
+// A drawing for things the receipt drawings don't cover (a ladder is drawn as a tool, not a shopping bag).
+const DC_DRAW_HINTS=[[/\b(ladders?|hammers?|drills?|screwdrivers?|spanners?|wrench(?:es)?|saws?|spirit levels?|tool ?box(?:es)?|tools?|tape measures?|paint|rollers?)\b/i,"wrench"],
+ [/\b(cushions?|throws?|blankets?|pillows?|duvets?|bedding)\b/i,"sofa"],[/\b(watering|plants?|planters?|pots?|garden(?:ing)?|shears|pruners?|seeds?|bird ?houses?|flowers?|confetti)\b/i,"flower"],
+ [/\b(lights?|lamps?)\b/i,"lamp"],[/\b(candles?)\b/i,"candle"],[/\b(flutes?|champagne|wine glass(?:es)?)\b/i,"wine"],[/\b(mugs?|cups?)\b/i,"cup"],[/\b(bowls?|plates?)\b/i,"bowl"]];
+function dcKindOf(product,store){for(const [k,re] of DC_KIND_RULES)if(re.test(product))return k;for(const [k,re] of DC_SHOP_KIND)if(re.test(store))return k;return null}
 function dcDrawing(){return window.RelayAccount&&RelayAccount.drawing}
 // One product, all its sizes and colours together.
-function dcGroups(rows){const map=new Map();for(const p of rows){const key=storeKey(storeOf(p))+"|"+String(p.product||"").trim().toLowerCase();if(!map.has(key))map.set(key,[]);map.get(key).push(p)}
+function dcGroups(rows){const gs=dcGroupsRaw(rows),most=new Map();
+ for(const g of gs)if(g.kind!=="other"){const m=most.get(g.store)||{};m[g.kind]=(m[g.kind]||0)+1;most.set(g.store,m)}
+ for(const g of gs)if(g.kind==="other"&&most.has(g.store)){const m=most.get(g.store),k=Object.keys(m).sort((a,b)=>m[b]-m[a])[0];if(m[k]>=2)g.kind=k}
+ return gs}
+function dcGroupsRaw(rows){const map=new Map();for(const p of rows){const key=storeKey(storeOf(p))+"|"+String(p.product||"").trim().toLowerCase();if(!map.has(key))map.set(key,[]);map.get(key).push(p)}
  return [...map.values()].map(vs=>{const d=dcDrawing(),of=d?d.of(vs[0].product):{key:"shop",kind:"other"};
   // A dog bed, or anything from a pet shop, is for pets (the drawing still shows what it is).
-  if(DC_PETS.test(vs[0].product+" "+storeOf(vs[0])))of.kind="pets";const prices=vs.map(v=>Number(v.priceMinor)).filter(Number.isFinite);
+  of.kind=DC_PETS.test(vs[0].product+" "+storeOf(vs[0]))?"pets":dcKindOf(String(vs[0].product||""),storeOf(vs[0]))||of.kind;
+  if(of.key==="shop"){const h=DC_DRAW_HINTS.find(([re])=>re.test(String(vs[0].product||"")));if(h)of.key=h[1]}const prices=vs.map(v=>Number(v.priceMinor)).filter(Number.isFinite);
   const stock=vs.map(v=>v.quantity==null||v.quantity===""?null:Number(v.quantity));const known=stock.filter(q=>q!==null&&Number.isFinite(q));
   const inStock=vs.filter((v,i)=>stock[i]===null||stock[i]>0);const lead=inStock[0]||vs[0];
   return {key:storeKey(storeOf(vs[0]))+"|"+vs[0].product,store:storeOf(vs[0]),product:vs[0].product,variants:vs,lead,imageUrl:(vs.find(v=>/^https:\/\//.test(String(v.imageUrl||"")))||{}).imageUrl||"",
@@ -461,9 +480,12 @@ function dcGroups(rows){const map=new Map();for(const p of rows){const key=store
    left:known.length&&known.every(q=>q<=0)?0:known.length?known.reduce((n,q)=>n+Math.max(0,q),0):null}})}
 function dcPrice(g){return g.min===g.max?priceIn(g.min,g.currency):"From "+priceIn(g.min,g.currency)}
 // "White · UK 7–9", "S, M, L" (at most four, then "+2 more"). What every option shares ("White") is said once.
+const DC_SIZES=["xxs","xs","s","m","l","xl","xxl","xxxl"],DC_SIZE_WORDS={small:"s",medium:"m",large:"l","extra large":"xl"};
+function dcSizeRank(x){const t=String(x).toLowerCase().trim(),i=DC_SIZES.indexOf(DC_SIZE_WORDS[t]||t);if(i>=0)return i;const n=parseFloat(t.replace(/^(uk|eu|us)\s?/,""));return Number.isFinite(n)?100+n:null}
 function dcOptions(g){const o=[...new Set(g.options)];if(!o.length)return"";const parts=o.map(x=>x.split(/\s*\/\s*/));let common=[],vary=o;
  if(o.length>1&&parts[0].length>1&&parts.every(p=>p.length===parts[0].length)){const same=parts[0].map((x,i)=>parts.every(p=>p[i].toLowerCase()===x.toLowerCase()));
   if(same.some(Boolean)&&!same.every(Boolean)){common=parts[0].filter((x,i)=>same[i]);vary=[...new Set(parts.map(p=>p.filter((x,i)=>!same[i]).join(" / ")))]}}
+ if(vary.every(x=>dcSizeRank(x)!==null))vary=vary.slice().sort((a,b)=>dcSizeRank(a)-dcSizeRank(b));
  const uk=vary.map(x=>/^uk\s?(\d+(\.5)?)$/i.exec(x));let list;
  if(uk.every(Boolean)&&vary.length>2){const n=uk.map(m=>Number(m[1])).sort((a,b)=>a-b);list="UK "+n[0]+"–"+n[n.length-1]}
  else list=vary.slice(0,4).join(", ")+(vary.length>4?" +"+(vary.length-4)+" more":"");
@@ -474,21 +496,36 @@ function dcPicture(g,px){if(/^https:\/\//.test(g.imageUrl))return '<img class="d
 function dcWatchBtn(sku){const on=!!watch[sku];return '<button class="dc-watch'+(on?' on':'')+'" data-watch="'+safe(sku)+'" aria-pressed="'+(on?'true':'false')+'" aria-label="'+(on?'Watching the price':'Watch price')+'">'+ic(on?"check":"bell")+'</button>'}
 function dcCard(g,why){return '<div class="dc-cardwrap"><div class="dc-card" role="button" tabindex="0" data-card-select="'+safe(g.lead.sku)+'" aria-label="'+safe(g.product+", "+g.store+", "+dcPrice(g))+'"><div class="dc-pic">'+dcPicture(g)+'</div><div class="dc-body"><div class="dc-shop">'+safe(g.store)+(testTools()&&!liveProduct(g.lead)?' · TEST':'')+'</div><h3>'+safe(g.product)+'</h3>'+(dcOptions(g)?'<div class="dc-opts">'+safe(dcOptions(g))+'</div>':'')+'<div class="dc-row"><b>'+dcPrice(g)+'</b>'+dcStock(g)+'</div>'+(why?'<div class="dc-why">'+safe(why)+'</div>':'')+'</div></div>'+dcWatchBtn(g.lead.sku)+'</div>'}
 // Picks from what the shopper spends: the kinds of shopping they spend most on, shops they buy from, their sizes, their usual price.
+// Picks follow where the money goes: the six places are shared out between the kinds of thing the shopper spends on, in
+// proportion to their spending (45% home and 10% fashion is about five home picks to one fashion), at most three from one
+// shop. Within a kind, a shop they buy from, their size and their usual price come first. Kinds they never spend on aren't pushed.
 function dcPicks(groups){if(!discoverSpend)return[];const pr=typeof RelayRecommendationEngine!=="undefined"?RelayRecommendationEngine.profile(personalisationHistory(),getTaps()):{sizes:{}};
- const share=k=>{const c=DC_SPEND_KIND[k]||k,x=discoverSpend.kinds.find(y=>y.category===c);return x?x.share:0};
- const top=discoverSpend.kinds.slice().sort((a,b)=>b.share-a.share).map(x=>x.category);
  const sizes=[pr.sizes&&pr.sizes.clothing&&pr.sizes.clothing.value,pr.sizes&&pr.sizes.footwear&&pr.sizes.footwear.value].filter(Boolean).map(x=>String(x).toLowerCase());
- const shops=new Set(discoverSpend.shops.map(storeKey));
- return groups.map(g=>{let score=0;const why=[];const sh=share(g.kind);
-  if(sh>=0.03){score+=1+4*sh;const c=DC_SPEND_KIND[g.kind]||g.kind,rank=top.indexOf(c);why.push(rank===0?"You spend most on "+(DC_KINDS[g.kind]||"this").toLowerCase():Math.round(sh*100)+"% of your spending is "+(DC_KINDS[g.kind]||"this").toLowerCase())}
-  if(shops.has(storeKey(g.store))){score+=2;why.push("You buy from "+g.store)}
-  const fit=g.options.flatMap(o=>o.split(/\s*[\/,|]\s*/)).find(o=>sizes.includes(o.toLowerCase()));if(fit){score+=2;why.push("In your size, "+fit)}
-  if(pr.typicalPriceMinor&&g.min>=pr.typicalPriceMinor*.5&&g.min<=pr.typicalPriceMinor*1.6){score+=1;if(why.length<2)why.push("Around what you usually pay")}
-  return {g,score,why}}).filter(x=>x.score>=1&&x.why.length).sort((a,b)=>b.score-a.score).slice(0,6)}
+ const shops=new Set(discoverSpend.shops.map(storeKey)),inStock=groups.filter(g=>g.left!==0);
+ const kinds=discoverSpend.kinds.filter(k=>k.share>=0.03&&k.category!=="other"&&inStock.some(g=>g.kind===k.category)).sort((a,b)=>b.share-a.share);
+ if(!kinds.length)return[];
+ const top=discoverSpend.kinds.slice().sort((a,b)=>b.share-a.share)[0];
+ const said=k=>(k.category===top.category?"You spend most on ":Math.round(k.share*100)+"% of your spending is ")+String(k.label||DC_KINDS[k.category]||"this").toLowerCase();
+ const fitOf=g=>{const why=[];let s=0;
+  if(shops.has(storeKey(g.store))){s+=1;why.push("You buy from "+g.store)}
+  const fit=g.options.flatMap(o=>o.split(/\s*[\/,|]\s*/)).find(o=>sizes.includes(o.toLowerCase()));if(fit){s+=1;why.push("In your size, "+fit)}
+  if(pr.typicalPriceMinor&&g.min>=pr.typicalPriceMinor*.5&&g.min<=pr.typicalPriceMinor*1.6){s+=.5;if(!why.length)why.push("Around what you usually pay")}
+  return {s,why}};
+ const pool=new Map(kinds.map(k=>[k.category,inStock.filter(g=>g.kind===k.category).map((g,i)=>({g,i,...fitOf(g)})).sort((a,b)=>b.s-a.s||a.i-b.i)]));
+ const taken=new Map(kinds.map(k=>[k.category,0])),perShop=new Map(),out=[];
+ while(out.length<6){
+  // Each place goes to the kind with the most spending per pick it already has.
+  let best=null;for(const k of kinds){const left=pool.get(k.category).some(x=>(perShop.get(x.g.store)||0)<3);if(left&&(!best||k.share/(taken.get(k.category)+1)>best.share/(taken.get(best.category)+1)))best=k}
+  if(!best)break;
+  const list=pool.get(best.category),minShop=Math.min(...list.filter(x=>(perShop.get(x.g.store)||0)<3).map(x=>perShop.get(x.g.store)||0));
+  const x=list.find(y=>(perShop.get(y.g.store)||0)===minShop&&(perShop.get(y.g.store)||0)<3);
+  list.splice(list.indexOf(x),1);taken.set(best.category,taken.get(best.category)+1);perShop.set(x.g.store,(perShop.get(x.g.store)||0)+1);
+  out.push({g:x.g,score:best.share*10+x.s,why:[said(best),...x.why]})}
+ return out}
 function dcForYou(groups){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();if(!signed)return"";
  if(!personalise)return '<div class="dc-invite"><div><b>Picks from what you spend</b><p>Relay can put things first that match what you buy, your sizes and what you usually pay. It uses your receipts and stays private to you.</p></div><button class="darkbtn" onclick="togglePersonalise()">Turn on</button></div>';
  if(!discoverSpend)return discoverSpendAsked?'<div class="dc-for"><div class="dc-forhead"><h2>Picked for you</h2><button class="link small" onclick="togglePersonalise()">Turn off</button></div><p class="small muted">Once Relay has found receipts from this year, picks from your spending show here.</p></div>':'<div class="dc-for"><div class="skel" style="height:220px;border-radius:20px"></div></div>';
- const kinds=discoverSpend.kinds.slice().sort((a,b)=>b.share-a.share).slice(0,3).map(k=>Math.round(k.share*100)+"% "+String(k.label||"").toLowerCase());
+ const kinds=discoverSpend.kinds.filter(k=>k.category!=="other").sort((a,b)=>b.share-a.share).slice(0,3).map(k=>Math.round(k.share*100)+"% "+String(k.label||"").toLowerCase());
  const picks=dcPicks(groups),pr=typeof RelayRecommendationEngine!=="undefined"?RelayRecommendationEngine.profile(personalisationHistory(),getTaps()):null;
  return '<div class="dc-for"><div class="dc-forhead"><h2>Picked for you</h2><span>'+(pr&&pr.headline?'<button class="link small" onclick="forgetTaste()">Forget my style</button> · ':'')+'<button class="link small" onclick="togglePersonalise()">Turn off</button></span></div><p class="dc-basis">From your '+discoverSpend.year+' spending: '+safe(kinds.join(", "))+'.'+(pr&&pr.headline?' '+safe(pr.headline):'')+'</p>'
   +(picks.length?'<div class="dc-strip">'+picks.map(x=>dcCard(x.g,x.why.slice(0,2).join(" · "))).join("")+'</div>':'<p class="small muted" style="margin:6px 0 0">Nothing from shops on Relay matches what you buy yet. As more shops join, picks show up here.</p>')+'</div>'}
@@ -508,11 +545,12 @@ function renderShopperCatalog(root){
  if(discoverKind!=="all"&&!kindCount.has(discoverKind))discoverKind="all";
  const shopsEl=$("dcShops"),kindsEl=$("dcKinds");
  if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>b[1]-a[1]).map(([n,c])=>dcChip(safe(n)+' <span>'+c+'</span>',sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
- if(kindsEl)kindsEl.innerHTML=kindCount.size>1?dcChip("Everything",discoverKind==="all",'data-kind="all"')+[...kindCount.keys()].sort((a,b)=>kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
+ if(kindsEl)kindsEl.innerHTML=kindCount.size>1?dcChip("Everything",discoverKind==="all",'data-kind="all"')+[...kindCount.keys()].sort((a,b)=>(a==="other")-(b==="other")||kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
  let groups=inShop.filter(g=>(discoverKind==="all"||g.kind===discoverKind)&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
  const forYou=$("dcForYou");if(forYou)forYou.innerHTML=query||storeFilter!=="all"||discoverKind!=="all"?"":dcForYou(all);
  if(sort==="low")groups.sort((a,b)=>a.min-b.min);else if(sort==="high")groups.sort((a,b)=>b.max-a.max);
- else if(personalise&&discoverSpend){const order=new Map(dcPicks(groups).map((x,i)=>[x.g.key,i]));groups.sort((a,b)=>(order.has(a.key)?order.get(a.key):99)-(order.has(b.key)?order.get(b.key):99))}
+ else if(personalise&&discoverSpend){const order=new Map(dcPicks(groups).map((x,i)=>[x.g.key,i])),sh=k=>{const x=discoverSpend.kinds.find(y=>y.category===k);return x?x.share:0};
+  groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||a[1]-b[1]).map(x=>x[0])}
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p></div>';
  const wire=box=>{if(!box)return;

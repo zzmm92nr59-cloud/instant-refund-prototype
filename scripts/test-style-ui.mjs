@@ -36,7 +36,10 @@ const shopProducts = [
   { product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify:kick:1", sku: "shopify:kick:1", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Court Classic Trainers", variation: "White / UK 9", catalogueId: "shopify:kick:2", sku: "shopify:kick:2", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Canvas Tote", variation: "Natural", catalogueId: "shopify:kick:3", sku: "shopify:kick:3", priceMinor: 2400, currency: "GBP", quantity: 30, storeName: "Kick Lane", provider: "shopify" },
-  { product: "Cosy Dog Bed", variation: "Large", catalogueId: "shopify:pets:1", sku: "shopify:pets:1", priceMinor: 3900, currency: "GBP", quantity: 12, storeName: "Pet Pantry", provider: "shopify" }];
+  { product: "Cosy Dog Bed", variation: "Large", catalogueId: "shopify:pets:1", sku: "shopify:pets:1", priceMinor: 3900, currency: "GBP", quantity: 12, storeName: "Pet Pantry", provider: "shopify" },
+  // Two home shops (their products' names say what they are, or the shop's does).
+  ...[["Linen Cushion", "Oat"], ["Metal Watering Can", ""], ["Knitted Throw Blanket", ""], ["Solar String Lights", ""]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hg:" + i, sku: "shopify:hg:" + i, priceMinor: 2500 + i * 100, currency: "GBP", quantity: 8, storeName: "Home and Garden", provider: "shopify" })),
+  ...[["Claw Hammer", ""], ["Cordless Drill 18V", ""], ["Aluminium Step Ladder", "3 step"], ["Aluminium Step Ladder", "5 step"]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hh:" + i, sku: "shopify:hh:" + i, priceMinor: 1500 + i * 2000, currency: "GBP", quantity: 5, storeName: "Hammer & Home", provider: "shopify" }))];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const imageAsks = [], wrappedAsks = [];
@@ -90,7 +93,35 @@ await page.waitForTimeout(200);
 assert.doesNotMatch(await panel.locator(".dc-basis").innerText(), /sporty/);
 await panel.getByRole("button", { name: "Turn off" }).click();
 await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
-console.log("PASS Discover: opt-in picks from the year's spending, shops and sizes, each with a reason; filters, forget and turn off work");
+// Sizes read in their natural order, and the ladder's two sizes are one product.
+assert.equal(await page.locator("#catalogResults [data-card-select]", { hasText: "Aluminium Step Ladder" }).count(), 1);
+assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Aluminium Step Ladder" }).locator(".dc-opts").innerText(), "3 step, 5 step");
+// Someone whose money mostly goes on their home: most picks are for the home, even though they buy from a shoe shop in their
+// size. The places are shared out by spending (45% home to 10% fashion), never more than three from one shop, and nothing is
+// picked for food because no shop on Relay sells it yet.
+const fashionYear = industries;
+industries = [{ category: "home", label: "Home & garden", receipts: 9, spentPence: 45000 }, { category: "food", label: "Food & drink", receipts: 20, spentPence: 33000 },
+  { category: "fashion", label: "Fashion", receipts: 3, spentPence: 10000 }, { category: "other", label: "Other", receipts: 4, spentPence: 12000 }];
+await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
+await page.reload(); await page.waitForTimeout(600);
+await page.evaluate(() => window.go("discover"));
+await page.locator(".dc-invite").getByRole("button", { name: "Turn on" }).click();
+await panel.locator(".dc-basis", { hasText: "45% home & garden" }).waitFor();
+const homePicks = await panel.locator(".dc-strip [data-card-select]").evaluateAll(cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, c.querySelector(".dc-why").textContent]));
+assert.equal(homePicks.length, 6);
+assert.equal(homePicks.filter(p => p[0] === "Home and Garden" || p[0] === "Hammer & Home").length, 5, "five of six picks are for the home");
+assert.deepEqual(homePicks.filter(p => p[0] === "Kick Lane").map(p => p[1]), ["Court Classic Trainers"], "one pick for the 10% spent on fashion");
+assert.ok(homePicks.every(p => ["Home and Garden", "Hammer & Home", "Kick Lane"].includes(p[0]) && homePicks.filter(q => q[0] === p[0]).length <= 3), "at most three from one shop");
+assert.match(homePicks[0][2], /^You spend most on home & garden/);
+assert.equal(homePicks.find(p => p[1] === "Court Classic Trainers")[2], "10% of your spending is fashion · You buy from Kick Lane");
+assert.deepEqual((await page.locator("#catalogResults [data-card-select] h3").allInnerTexts()).slice(0, 5).sort(), homePicks.slice(0, 5).map(p => p[1]).sort(), "the list below starts the same way");
+await page.waitForTimeout(1300);
+await page.screenshot({ path: "/tmp/shots/discover-home-picks.png", fullPage: false });
+await panel.getByRole("button", { name: "Turn off" }).click();
+industries = fashionYear;
+await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
+await page.reload(); await page.waitForTimeout(600);
+console.log("PASS Discover: opt-in picks shared out by where the money goes (shops, sizes and price within each kind), each with a reason; filters, forget and turn off work");
 
 // Wrapped: one story a year on the Profile page. Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.
