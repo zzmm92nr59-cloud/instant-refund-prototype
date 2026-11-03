@@ -20,7 +20,8 @@ import { handleExportRoute } from "./export.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
-import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
+import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
+import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, revokeMailbox, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
@@ -92,7 +93,8 @@ async function ensureAuthTablesRun(db) {
        token_hash TEXT PRIMARY KEY, address TEXT, token_iv TEXT NOT NULL, token_data TEXT NOT NULL,
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
     ...PASSKEY_TABLE_SQL,
-    ...TOTP_TABLE_SQL
+    ...TOTP_TABLE_SQL,
+    ...PHONE_TABLE_SQL
   ];
   await runAll(db, statements);
   // Whether a Microsoft sign-in also asked to connect Outlook (the wording version the shopper agreed to on the sign-in screen).
@@ -221,7 +223,7 @@ async function verifyLink(request, env, cors, opts) {
       const shopperId = await ensureShopper(env, claimed.email, now);
       // Nothing is agreed or connected yet when 2-step sign-in still has to be passed (connecting waits for the app's own
       // step after sign-in), or when the wording changed since it was shown.
-      const twoStep = await env.RELAY_DB.prepare("SELECT 1 AS on1 FROM auth_totp WHERE shopper_id = ? AND enabled = 1").bind(shopperId).first();
+      const twoStep = await twoStepOn(env, shopperId);
       const sameWording = (pending.consent_version || CONSENT_VERSION) === CONSENT_VERSION;
       // An inbox already connected (a different one) is never swapped silently: the shopper keeps it.
       const current = await env.RELAY_DB.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
@@ -253,7 +255,8 @@ async function startSession(env, email, now, cors, opts = {}) {
   if (!opts.skipSecondStep) {
     const second = await secondStepFor(env, shopper.id, now);
     if (second && second.tooMany) return json({ error: "too_many_requests" }, 429, cors);
-    if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, email, ...extra }, 200, cors);
+    if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, methods: second.methods,
+      ...(second.phoneEnding ? { phoneEnding: second.phoneEnding } : {}), email, ...extra }, 200, cors);
   }
   const sessionToken = randomToken();
   await env.RELAY_DB.prepare(
@@ -537,7 +540,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       const pk = await handlePasskeyAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
       if (pk) return pk;
     }
-    if (path === "/relay/auth/2fa/verify" && configured(env)) {
+    if ((path === "/relay/auth/2fa/verify" || path === "/relay/auth/2fa/text") && configured(env)) {
       await ensureAuthTables(env.RELAY_DB);
       const t = await handleTotpAuthRoute(path, request.method, request, env, cors, o, passkeyHelpers);
       if (t) return t;
@@ -575,6 +578,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
         ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
         ...totpDeleteStatements(env.RELAY_DB, shopper.id),
+        ...phoneDeleteStatements(env.RELAY_DB, shopper.id),
         ...pushDeleteStatements(env.RELAY_DB, shopper.id),
         ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash, shopper.id)),
         ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
@@ -602,6 +606,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (passkeyResponse) return passkeyResponse;
     const totpResponse = await handleTotpShopperRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
     if (totpResponse) return totpResponse;
+    const phoneResponse = await handlePhoneRoute(path, request.method, request, env, cors, o, passkeyHelpers, shopper);
+    if (phoneResponse) return phoneResponse;
     const exchangeResponse = await handleExchangeRoute(request, env, url, cors, shopper, o);
     if (exchangeResponse) return exchangeResponse;
     const cardResponse = await handleCardRoute(request, env, url, cors, shopper, o);

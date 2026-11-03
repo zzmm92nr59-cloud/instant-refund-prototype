@@ -5,6 +5,7 @@ import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
 import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
+import { tidyTexts } from "./phone.js";
 import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
@@ -61,6 +62,7 @@ const relayWorker = {
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
+    ctx.waitUntil(tidyTexts(env).catch(() => {}));
     // Catalogues are refreshed first so price alerts compare against the newest prices.
     const syncs = Promise.allSettled([
       importHistoricalSquareOrders(env).then(() => syncSquareRefunds(env)).then(r => console.log("Square refunds checked", JSON.stringify(r))),

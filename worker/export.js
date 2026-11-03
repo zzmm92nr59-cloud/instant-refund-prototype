@@ -3,6 +3,7 @@
 // no session or sign-in codes, no two-step secret, no passkey keys and no payment-company references. Tables that a
 // shopper has never used may not exist yet, so each part is read on its own and an empty part is simply empty.
 
+import { exportPhone } from "./phone.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -21,6 +22,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
   const mail = await one("SELECT provider, google_email AS address, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id = ?", id);
   const captured = await rows("SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status <> 'not_receipt' ORDER BY created_at", id);
   const notReceipts = await one("SELECT COUNT(*) AS n FROM captured_receipts WHERE shopper_id = ? AND status = 'not_receipt'", id);
+  // twoStep below is the authenticator app; codes by text are under phone.
   const totp = await one("SELECT enabled, enabled_at AS enabledAt FROM auth_totp WHERE shopper_id = ?", id);
   const devices = await one("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?", id);
   const sessions = await rows("SELECT created_at AS createdAt, expires_at AS expiresAt FROM auth_sessions WHERE shopper_id = ? AND expires_at > ?", id, now);
@@ -35,6 +37,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       passkeys: (await rows("SELECT name, created_at AS createdAt, last_used_at AS lastUsedAt FROM auth_passkeys WHERE shopper_id = ?", id))
         .map((p) => ({ name: p.name, createdAt: iso(p.createdAt), lastUsedAt: iso(p.lastUsedAt) })),
       twoStep: totp ? { on: Boolean(totp.enabled), since: iso(totp.enabledAt) } : { on: false },
+      // The phone number on the account, and whether sign-in codes are texted to it.
+      phone: await exportPhone(env, id),
     },
     emailPermission: (await rows("SELECT version, accepted_at AS acceptedAt, withdrawn_at AS withdrawnAt FROM shopper_consents WHERE shopper_id = ? ORDER BY accepted_at", id))
       .map((c) => ({ version: c.version, agreedAt: iso(c.acceptedAt), withdrawnAt: iso(c.withdrawnAt) })),

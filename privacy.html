@@ -58,14 +58,15 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <li>Receipts you paste in yourself.</li>
 <li>Products and shops you ask us to watch for price drops, and your alert settings.</li>
 <li>Passkeys (Face ID, Touch ID or screen lock sign-in). We keep the public part of the key, a name for the device and when it was last used. Your fingerprint or face never leaves your device.</li>
-<li>Two-step sign-in. We keep your authenticator key encrypted, and your recovery codes only in scrambled form.</li>
+<li>A mobile number, if you add one. We keep it encrypted, show it in the app only as its last three digits (Download my data gives you the whole number), and use it only to text you sign-in codes: never for marketing, and never shown to anyone else.</li>
+<li>Two-step sign-in. We keep your authenticator key encrypted, and your recovery codes and any codes we text you only in scrambled form.</li>
 <li>A card for swaps, if you save one. The card is handled by Stripe; we keep only its brand, last four digits and expiry date.</li>
 <li>If you list something to swap or sell to other members: the listing, your messages with other members, and the first half of your postcode so people can see roughly how far away it is.</li>
 </ul>
 <h3>Purchases from shops connected to Relay</h3>
 <p>Some shops connect to Relay through Shopify or Square. When one of them confirms an order of yours, we keep its items and amounts so it appears in your account. For in-store purchases, we may keep a scrambled code made from the card you paid with (never the card number) along with its brand and last four digits, so we can suggest which purchases are yours. When you start a return or swap through Relay, we keep a record of it, including the item, the reason and any tracking number.</p>
 <h3>Technical information</h3>
-<p>To stop people repeatedly trying to sign in to accounts, we keep a scrambled form of your IP address with each sign-in request for about a day. Our hosting provider keeps short-term logs of requests to Relay's servers for running and fixing the service.</p>
+<p>To stop people repeatedly trying to sign in to accounts, we keep a scrambled form of your IP address with each sign-in request for about a day. When we text a code, we keep a scrambled form of the account, the phone number and the IP address for about two days, so nobody can use Relay to flood a phone with texts; this stays for those two days even if the account is deleted. Our hosting provider keeps short-term logs of requests to Relay's servers for running and fixing the service.</p>
 <h3>On your device</h3>
 <p>Relay stores a few things in your browser so it works quickly: your sign-in, a copy of your receipts so they show straight away, and settings like your price alerts. We don't use cookies for advertising or tracking. Signing out removes your sign-in and the copy of your receipts from that device.</p>
 
@@ -97,11 +98,12 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Cloudflare</th><td>Hosts Relay's servers and database.</td></tr>
 <tr><th>Google and Microsoft</th><td>Sign-in with Google or Microsoft, and reading your Gmail or Outlook when you connect it.</td></tr>
 <tr><th>Resend</th><td>Sends sign-in emails and return reminders, so it receives your email address and the message.</td></tr>
+<tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
 <tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference.</td></tr>
 <tr><th>Royal Mail</th><td>If you print a returns label, receives the name and address needed for it.</td></tr>
 <tr><th>Apple, Google, Mozilla and Microsoft push services</th><td>Deliver notifications to your device. The messages are encrypted.</td></tr>
-<tr><th>GitHub Pages and Google Fonts</th><td>Deliver the Relay app and its typeface to your browser, so they see your IP address like any website.</td></tr>
+<tr><th>GitHub Pages</th><td>Delivers the Relay app to your browser, so it sees your IP address like any website.</td></tr>
 </table>
 <p>Product photos are copied from the shop's own picture link when Relay reads the email, and your device gets them from Relay. Shop logos come with the app, or Relay's servers look them up from the shop's website or Google's logo service; only the shop's web address is sent, never anything about you. When you open an original email in Relay, its pictures load from the sender's servers, as they would in your email app, so the sender may see that it was opened. Pictures of products in Discover load from the shops' image servers or their product-feed partner's (such as Awin), which see your device's IP address like any website.</p>
 <p>If you use swap and resell, other members see your listing and the messages you send them, but never your email address.</p>
@@ -111,8 +113,8 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <table class="table">
 <tr><th>Receipts and purchase details from your email</th><td>Until you disconnect your email, withdraw your permission or delete your account.</td></tr>
 <tr><th>Your sign-in session</th><td>Up to 90 days after you last used Relay, or until you sign out.</td></tr>
-<tr><th>Sign-in links, codes and scrambled IP addresses</th><td>About a day.</td></tr>
-<tr><th>Name, photo, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>
+<tr><th>Sign-in links and codes, and the scrambled IP addresses and phone numbers kept to stop misuse</th><td>Up to two days.</td></tr>
+<tr><th>Name, photo, phone number, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>
 <tr><th>Returns, swaps and payments made through Relay</th><td>Kept after you delete your account, because the shops involved rely on them.</td></tr>
 <tr><th>If you're blocked from swap and sell</th><td>A scrambled form of your email address is kept, so a blocked member can't rejoin to get round the block.</td></tr>
 </table>
