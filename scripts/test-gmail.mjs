@@ -608,7 +608,10 @@ for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "
   console.log("ok - recent returnable orders always reach Home; old receipts are tidied when listed");
   // Mailboxes read by the older reader are read once more in the background, Gmail and Outlook alike; then never again.
   assert.equal(needsFullRead(Date.now(), "google", null), true); assert.equal(needsFullRead(Date.now(), null, 1), true);
-  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 2), false);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 3), false);
+  // Reader 3 (forwarded receipts from every email app, Safe Links, character sets): Gmail and Outlook mailboxes are both read again.
+  assert.equal(needsFullRead(Date.now(), "google", 2), true); assert.equal(needsFullRead(Date.now(), "microsoft", 2), true);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 3), false);
   assert.equal(needsFullRead(null, "google", 2), true, "never read at all");
   console.log("ok - every mailbox is read once more with the improved reader");
 }

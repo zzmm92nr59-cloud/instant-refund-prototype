@@ -62,8 +62,9 @@ const MAX_READ_TRIES = 3;
 // 1: emails Outlook refused during earlier scans were never captured.
 const OUTLOOK_FULL_REV = 1;
 // Raised when the receipt reader improves enough that every mailbox should be read once more in the background
-// (only emails read by an older reader are opened again). 2: shop, item and group ranking.
-const READER_FULL_REV = 2;
+// (only emails read by an older reader are opened again). 2: shop, item and group ranking. 3: forwarded receipts from
+// every email app (Outlook's, Apple Mail's, Yahoo's as well as Gmail's), Microsoft's Safe Links, and text in other character sets.
+const READER_FULL_REV = 3;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -82,13 +83,16 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 18;
+const PARSER_VERSION = 19;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
 const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 24 * 60 * 60 * 1000;
+// Gmail's own Purchases and Reservations labels, and the same kinds of subject Outlook mailboxes are read for (see
+// SHOPPING_SUBJECT): bookings, tickets, trips and invoices as well as orders and receipts.
 const SEARCH_TERMS =
-  '(category:purchases OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"))' +
+  '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
+  ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped)';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
@@ -532,21 +536,38 @@ function gmailMailbox(fetchImpl, token) {
 // subject and sender only, and just the emails that look like orders, receipts, returns or parcel updates are read in full.
 // Payments, tickets, rides and collections are included too ("Your payment to Rains", "Your Monday trip with Uber",
 // "Ready to collect"), and senders whose address says what they send (orders@, billing@, PayPal's service@).
-const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|booking|booked|reservation|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
-const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)@/i;
+const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|booking|booked|reservation|itinerary|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
+const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)(\+[^@\s]*)?@/i;
 export function looksLikeShopping(subject, from) {
   return SHOPPING_SUBJECT.test(String(subject || "")) || SHOPPING_SENDER.test(String(from || "").trim());
 }
 const OUTLOOK_PAGE = 200;
+// Gmail leaves Spam and Bin out of every search. Outlook's list of messages includes Junk Email and Deleted Items, so those
+// two folders are left out here the same way (a fake "order" sitting in Junk never becomes a receipt). If Outlook won't say
+// which folders they are, nothing is left out.
+async function outlookSkippedFolders(fetchImpl, auth) {
+  const ids = new Set();
+  await Promise.all(["junkemail", "deleteditems"].map(async (name) => {
+    try {
+      const r = await graphGet(fetchImpl, GRAPH + "/me/mailFolders/" + name + "?$select=id", auth);
+      const id = r.ok ? (await r.json().catch(() => ({}))).id : null;
+      if (typeof id === "string" && id) ids.add(id);
+    } catch (e) { /* left in rather than lost */ }
+  }));
+  return ids;
+}
+const OUTLOOK_SELECT = "id,internetMessageId,subject,from,receivedDateTime,parentFolderId";
 function outlookMailbox(fetchImpl, token) {
   const auth = { Authorization: "Bearer " + token };
   const at = d => d.replace(/\//g, "-") + "T00:00:00Z";
+  let skipped = null;
   return {
     prefix: "outlook:",
     async list(afterD, before, canPage) {
       const entries = [];
+      if (!skipped) skipped = await outlookSkippedFolders(fetchImpl, auth);
       let next = GRAPH + "/me/messages?$filter=" + encodeURIComponent("receivedDateTime ge " + at(afterD) + " and receivedDateTime lt " + at(before)) +
-        "&$orderby=" + encodeURIComponent("receivedDateTime desc") + "&$select=id,internetMessageId,subject,from,receivedDateTime&$top=" + OUTLOOK_PAGE;
+        "&$orderby=" + encodeURIComponent("receivedDateTime desc") + "&$select=" + OUTLOOK_SELECT + "&$top=" + OUTLOOK_PAGE;
       let incomplete = false, oldest = null;
       for (let page = 0; page < MAX_PAGES && next; page++) {
         if (page > 0 && !canPage()) { incomplete = true; break; }
@@ -556,6 +577,7 @@ function outlookMailbox(fetchImpl, token) {
         for (const m of Array.isArray(data.value) ? data.value : []) {
           if (!m || typeof m.id !== "string" || !OUTLOOK_ID.test(m.id)) continue;
           if (typeof m.receivedDateTime === "string" && /^\d{4}-\d{2}-\d{2}T/.test(m.receivedDateTime)) oldest = m.receivedDateTime;
+          if (skipped.has(m.parentFolderId)) continue;
           if (!looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address)) continue;
           const mid = typeof m.internetMessageId === "string" ? m.internetMessageId.trim() : "";
           entries.push({ id: m.id, key: mid && mid.length <= 400 ? mid : m.id });
@@ -888,9 +910,12 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
 
 // Outlook's own search, newest first; order-type emails are put at the top of the list.
 async function findOutlook(env, shopperId, fetchImpl, auth, q) {
-  const l = await fetchImpl(GRAPH + "/me/messages?$search=" + encodeURIComponent('"' + q + '"') + "&$top=25&$select=id,internetMessageId,subject,from,receivedDateTime", { headers: auth });
+  const [l, skipped] = await Promise.all([
+    fetchImpl(GRAPH + "/me/messages?$search=" + encodeURIComponent('"' + q + '"') + "&$top=25&$select=" + OUTLOOK_SELECT, { headers: auth }),
+    outlookSkippedFolders(fetchImpl, auth)]);
   if (!l.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const found = ((await l.json().catch(() => ({}))).value || []).filter(m => m && typeof m.id === "string" && OUTLOOK_ID.test(m.id));
+  // Junk and Deleted Items are left out, as Gmail's search leaves out Spam and Bin.
+  const found = ((await l.json().catch(() => ({}))).value || []).filter(m => m && typeof m.id === "string" && OUTLOOK_ID.test(m.id) && !skipped.has(m.parentFolderId));
   const looks = m => looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address);
   const ordered = [...found.filter(looks), ...found.filter(m => !looks(m))].slice(0, 15);
   const results = [];

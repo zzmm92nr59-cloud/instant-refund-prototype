@@ -120,4 +120,54 @@ t("a department's sender name, a stray quote and payment lines are tidied when t
   assert.deepEqual(r.items.map(i => i.name), ["Swan pendant"]);
   assert.ok(!JSON.stringify(r).includes("400000"), "no card digits are kept anywhere");
 });
+t("a forwarded receipt names the shop, whichever email app forwarded it", () => {
+  const body = "\n\nThank you for your order\nOrder number: 1234567890\n";
+  const personal = (d) => /(^|\.)(gmail\.com|outlook\.com|hotmail\.co\.uk|icloud\.com|yahoo\.co\.uk)$/.test(d);
+  const forms = {
+    "Gmail": "---------- Forwarded message ---------\nFrom: lululemon <orders@e.lululemon.com>\nDate: Sat, 1 Nov 2026 at 10:15\nSubject: Your order\nTo: <me@gmail.com>",
+    "Gmail, read from its HTML": "---------- Forwarded message ---------\nFrom: lululemon &lt; orders@e.lululemon.com &gt;\nDate: Sat, 1 Nov 2026 at 10:15",
+    "Outlook.com": "________________________________\nFrom: lululemon <orders@e.lululemon.com>\nSent: 01 November 2026 10:15\nTo: Me <me@outlook.com>\nSubject: Your order",
+    "Outlook, read from its HTML": "From: lululemon &lt;orders@e.lululemon.com&gt;\nSent: 01 November 2026 10:15\nTo: Me &lt;me@outlook.com&gt;",
+    "Outlook for Windows": "________________________________\nFrom: lululemon <orders@e.lululemon.com<mailto:orders@e.lululemon.com>>\nSent: 01 November 2026 10:15",
+    "Outlook, plain text": "-----Original Message-----\nFrom: lululemon [mailto:orders@e.lululemon.com]\nSent: 01 November 2026 10:15",
+    "Outlook for iOS": "Get Outlook for iOS<https://aka.ms/o0ukef>\n________________________________\nFrom: lululemon <orders@e.lululemon.com>\nSent: Saturday, November 1, 2026 10:15:07 AM",
+    "Apple Mail": "Begin forwarded message:\n\nFrom: lululemon <orders@e.lululemon.com>\nSubject: Your order\nDate: 1 November 2026 at 10:15:07 GMT",
+    "Yahoo": "----- Forwarded Message -----\nFrom: lululemon <orders@e.lululemon.com>\nTo: me@yahoo.co.uk <me@yahoo.co.uk>\nSent: Saturday, 1 November 2026, 10:15:07 GMT",
+    // Passed on twice: the friend who forwarded it first is skipped, the shop is found.
+    "a forward of a forward": "---------- Forwarded message ---------\nFrom: Sam <sam@hotmail.co.uk>\nDate: 2 Nov 2026\n\n________________________________\nFrom: lululemon <orders@e.lululemon.com>\nSent: 01 November 2026 10:15",
+  };
+  for (const [app, head] of Object.entries(forms)) assert.deepEqual(forwardedSender(head + body, { personal }), { name: "lululemon", domain: "e.lululemon.com" }, app);
+  // Only a header block counts: a train ticket's "From: London Kings Cross" has no address, and a line in a receipt isn't a forward.
+  assert.equal(forwardedSender("From: London Kings Cross\nTo: York\nDate: 1 Nov 2026"), null);
+  assert.equal(forwardedSender("Questions? Email help@shop.test\nFrom: our team with love"), null);
+  // The whole email, sent on from Outlook.com to the shopper's Gmail.
+  const r = parseReceiptEmail("From: Sam Tester <sam@hotmail.co.uk>\r\nSubject: FW: Your Ted Baker order\r\nContent-Type: text/plain\r\n\r\n" +
+    "________________________________\nFrom: Ted Baker <orders@tedbaker.com>\nSent: 01 November 2026 10:15\nTo: Sam\nSubject: Your Ted Baker order\n\n" +
+    "Thank you for your order\nOrder number: TB-55123\nCotton Oxford Shirt - Qty 1 - £89.00\nOrder total: £89.00\n");
+  assert.equal(r.ok, true, "\"Your Ted Baker order\" is an order subject");
+  assert.deepEqual(r.retailer, { name: "Ted Baker", domain: "tedbaker.com" });
+});
+
+t("short names in capitals keep them; long ones are tidied; legal endings go", () => {
+  assert.equal(rankShop({ senderName: "LNER", senderDomain: "lner.co.uk" }).name, "LNER");
+  assert.equal(rankShop({ senderName: "ASOS", senderDomain: "asos.com" }).name, "ASOS");
+  assert.equal(rankShop({ senderName: "H&M", senderDomain: "hm.com" }).name, "H&M");
+  assert.equal(rankShop({ senderName: "SWAROVSKI", senderDomain: "swarovski.com" }).name, "Swarovski");
+  assert.equal(shopDisplayName({ name: "Anthropic, PBC", domain: null }), "Anthropic");
+});
+
+t("emails read the same whatever the mail service did to them", () => {
+  const html = '<p>Thank you for your order</p><p>Order number: 55123</p><p>Levi&rsquo;s 501&reg; Jeans 32&quot; - Qty 1 - &pound;90.00</p><p>Order total: &#xA3;90.00</p>' +
+    '<p><a href="https://eur02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.levi.com%2Freturns&amp;data=05%7C02%7C%7Cabc&amp;sdata=x%3D&amp;reserved=0">Start a return</a> ' +
+    '<a href="https://eur02.safelinks.protection.outlook.com/?url=https%3A%2F%2Fwww.levi.com%2Faccount&amp;data=05%7C02&amp;reserved=0">Account</a></p>';
+  const mail = (enc, cs, b) => `From: Levi's <orders@levi.test>\r\nSubject: Thank you for your order\r\nContent-Type: text/html; charset="${cs}"\r\nContent-Transfer-Encoding: ${enc}\r\n\r\n${b}`;
+  const a = parseReceiptEmail(mail("7bit", "utf-8", html));
+  assert.deepEqual(a.items.map(i => i.name), ["Levi’s 501® Jeans 32\""], "named and hex character codes are decoded");
+  assert.equal(a.totalPence, 9000);
+  assert.equal(a.returns && a.returns.portalUrl, "https://www.levi.com/returns", "Microsoft's Safe Links wrapper is taken off");
+  // The same email as base64 in windows-1252, the way Outlook may hand it over: "£" is a single byte there.
+  const b = parseReceiptEmail(mail("base64", "windows-1252", Buffer.from(html.replace("&#xA3;", "£"), "latin1").toString("base64")));
+  assert.equal(b.totalPence, 9000, "a base64 part is read in its own character set");
+});
+
 console.log(`\nPASS receipt reader: ${n} checks`);

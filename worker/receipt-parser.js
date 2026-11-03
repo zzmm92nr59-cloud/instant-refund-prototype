@@ -28,14 +28,13 @@ function decodeQuotedPrintable(text, charset = "utf-8") {
   catch { return new TextDecoder("utf-8", { fatal: false }).decode(Uint8Array.from(bytes)); }
 }
 
-function decodeBase64(text) {
-  try {
-    const bin = atob(text.replace(/\s+/g, ""));
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  } catch {
-    return "";
-  }
+// A base64 part is decoded in the character set it declares (Outlook often sends parts as base64 in windows-1252, where
+// "£" is one byte that would come out garbled if read as UTF-8).
+function decodeBase64(text, charset = "utf-8") {
+  let bytes;
+  try { bytes = Uint8Array.from(atob(text.replace(/\s+/g, "")), (c) => c.charCodeAt(0)); } catch { return ""; }
+  try { return new TextDecoder(charset, { fatal: false }).decode(bytes); }
+  catch { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
 }
 
 // RFC 2047 "encoded words" in headers, e.g. =?UTF-8?Q?Thanks_for_your_order?= or =?UTF-8?B?...?=
@@ -81,8 +80,20 @@ function decodeBody(headers, body) {
   const enc = (headers["content-transfer-encoding"] || "").toLowerCase();
   const cs = ((headers["content-type"] || "").match(/charset="?([^";\s]+)"?/i) || [])[1] || "utf-8";
   if (enc.includes("quoted-printable")) return decodeQuotedPrintable(body, cs);
-  if (enc.includes("base64")) return decodeBase64(body);
+  if (enc.includes("base64")) return decodeBase64(body, cs);
   return body;
+}
+
+// Microsoft 365 rewrites every link in a protected mailbox to go through Safe Links
+// (https://eur01.safelinks.protection.outlook.com/?url=<the real address>&data=...). The real address is put back, so a
+// shop's links read the same from Outlook as from Gmail (its web address, its returns page, its parcel tracking).
+const SAFE_LINK = /https?:\/\/[a-z0-9-]+\.safelinks\.protection\.outlook\.com\/?\?url=([^&"'\s<>]+)(?:&(?:amp;)?[^"'\s<>]*)?/gi;
+export function unwrapSafeLinks(text) {
+  const s = String(text || "");
+  if (!/safelinks\.protection\.outlook\.com/i.test(s)) return s;
+  return s.replace(SAFE_LINK, (m, url) => {
+    try { const real = decodeURIComponent(url); return /^https?:\/\/[^\s"'<>]+$/i.test(real) ? real : m; } catch { return m; }
+  });
 }
 
 // Collects text/plain and text/html parts, walking nested multipart bodies.
@@ -99,7 +110,7 @@ function collectParts(headers, body, out, depth = 0) {
     }
     return;
   }
-  const decoded = decodeBody(headers, body);
+  const decoded = unwrapSafeLinks(decodeBody(headers, body));
   if (/text\/html/i.test(type)) out.html.push(decoded);
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
 }
@@ -135,17 +146,29 @@ function walkShownParts(headers, body, out, depth) {
   else if (/text\/plain/i.test(type) && !/attachment/i.test(headers["content-disposition"] || "")) out.text.push(decodeBody(headers, body));
 }
 
+// The characters shops' HTML most often writes as named entities ("Levi&rsquo;s", "25&quot;", "&lt;orders@shop.com&gt;").
+const ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", pound: "£", euro: "€", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
+  ndash: "–", mdash: "—", hellip: "…", middot: "·", bull: "•", times: "×", copy: "©", reg: "®", trade: "™", deg: "°", frac12: "½", eacute: "é",
+  egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "" };
+function decodeEntities(text) {
+  // One pass, so "&amp;lt;" becomes "&lt;" (what the shop wrote), not "<".
+  return text.replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{1,7});/gi, (m, e) => {
+    if (e[0] === "#") {
+      const n = e[1] === "x" || e[1] === "X" ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+      return n === 160 ? " " : n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : m;
+    }
+    const v = ENTITIES[e.toLowerCase()];
+    return v === undefined ? m : v;
+  });
+}
 function htmlToText(html) {
-  return html
+  return decodeEntities(html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/t[dh]>/gi, " | ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&pound;/gi, "£")
-    .replace(/&amp;/gi, "&")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/<[^>]+>/g, " "))
+    .replace(/\u00a0/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/ *\n */g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -406,7 +429,8 @@ function extractReturns(text, html, orderDate) {
 // An email that is not an order confirmation must not be turned into a purchase.
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
-  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b/.test(s);
+  // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
+  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s);
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
   return { subjectHit, bodyHit };
 }
@@ -457,10 +481,11 @@ export function appleItems(text) {
 }
 
 // The shop, ranked from every clue in the email (see receipt-reader.js).
-function shopOf({ ld, sender, fromName, subject, text, html }) {
+function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   const domain = sender?.domain || null;
   const personal = PERSONAL_MAIL.test(domain || "");
-  const fw = forwardedSender(text);
+  const fwOpts = { subject, personal: (d) => PERSONAL_MAIL.test(d) };
+  const fw = forwardedSender(text, fwOpts) || (otherText ? forwardedSender(otherText, fwOpts) : null);
   const ranked = rankShop({
     dataName: ld?.retailerName || null,
     forwardedName: fw?.name || null, forwardedDomain: fw?.domain || null,
@@ -512,7 +537,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     source: "shopper_email",
     refundEligible: false, // shopper-supplied evidence never triggers refunds
     method: chosen.method,
-    retailer: shopOf({ ld, sender, fromName, subject, text, html }),
+    retailer: shopOf({ ld, sender, fromName, subject, text, html, otherText: text === fromHtml ? plain : fromHtml }),
     orderRef: chosen.orderRef ?? txt.orderRef,
     orderDate: chosen.orderDate ?? txt.orderDate,
     currency: chosen.currency ?? txt.currency,
