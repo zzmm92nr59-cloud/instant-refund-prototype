@@ -165,6 +165,8 @@ await polished("two-step: recovery codes"); await shot("recovery");
 await page.getByRole("button", { name: "I've saved them" }).click();
 await page.locator(".rl-2s", { hasText: "Text message" }).getByText("On", { exact: true }).waitFor();
 await page.getByText("8 recovery codes left.").waitFor();
+assert.equal(await page.getByRole("button", { name: "Set up authenticator app" }).count(), 0, "one way at a time: no app while texts are on");
+await page.getByText("One way at a time. To switch, turn this one off first.").waitFor();
 await polished("two-step: on");
 // The number can't be changed while codes go to it.
 await page.getByRole("button", { name: "Back to Profile" }).click();
@@ -200,16 +202,14 @@ assert.ok((await page.evaluate(() => localStorage.getItem("relay.session.v1"))).
 assert.deepEqual(st.verifies, ["111111", "654321"]);
 console.log("ok - signing in: 'Check your phone', the code texted once, straight away; the texted code finishes it");
 
-// 5. Lost phone: a recovery code. Both methods: the app is offered too.
-reset({ ending: "123", twoStep: true, app: true, left: 8, methods: ["text", "app"] });
+// 5. With the authenticator app: "Enter your code", and a recovery code if the phone is lost.
+reset({ ending: "123", twoStep: false, app: true, left: 8, methods: ["app"] });
 await page.evaluate(() => localStorage.clear()); await page.goto(origin + "/index.html");
 await page.getByRole("button", { name: "Sign in or create an account" }).click();
 await page.getByRole("button", { name: "Continue with email" }).click();
 await page.locator("#rl-signin-email").fill(EMAIL);
 await page.getByRole("button", { name: "Email me a sign-in link" }).click();
 await page.locator("#rl-signin-code").fill("123456");
-await page.getByRole("heading", { name: "Check your phone" }).waitFor();
-await page.getByRole("button", { name: "Use my authenticator app instead" }).click();
 await page.getByRole("heading", { name: "Enter your code" }).waitFor();
 await page.getByText("Open your authenticator app").waitFor();
 await polished("sign-in: app code");
@@ -223,8 +223,8 @@ await page.getByText("That recovery code isn't right, or it's already been used.
 await page.locator("#rl-2s-code").fill(RECOVERY[0]);
 await page.getByRole("button", { name: "Confirm" }).click();
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
-assert.equal(st.signinTexts, 1, "texted once, even after switching to the app and back");
-console.log("ok - a recovery code gets in without the phone; with the app on too, either code works");
+assert.equal(st.signinTexts, 0, "no text when codes come from the app");
+console.log("ok - with the app: its code, or a recovery code without the phone");
 
 // 6. Turning codes by text off needs a code (texted now, or a recovery code).
 reset({ ending: "123", twoStep: true, left: 8 });
@@ -234,6 +234,8 @@ await page.getByRole("button", { name: "Turn off codes by text" }).click();
 await page.getByText("To turn this off, type the code we've just texted to your number ending 123.").waitFor();
 assert.equal(await page.locator("#rl-2s-manage").getAttribute("placeholder"), "6-digit code or recovery code");
 await polished("two-step: turning off");
+await paste("#rl-2s-manage", "ab234-567cd");
+assert.equal(await page.locator("#rl-2s-manage").inputValue(), "", "a recovery code pasted here isn't turned into a 6-digit code");
 await page.locator("#rl-2s-manage").fill(RECOVERY[1]);
 await page.getByRole("button", { name: "Turn off", exact: true }).click();
 await page.getByText("Codes by text are off.").waitFor();
