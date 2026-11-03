@@ -119,6 +119,9 @@ async function candidates(domain) {
 }
 const score = (p, k) => Math.min(p, 512) + (k === "png" || k === "svg" ? 40 : k === "ico" ? 0 : 20);
 const existing = file => { for (const e of ["png", "svg", "ico", "jpg", "webp", "gif"]) if (fs.existsSync("logos/" + file + "." + e)) return e; return null; };
+// Without the internet (a test run here, or a laptop offline) nothing is changed: no logo is removed or replaced.
+{ const probe = await grab("https://www.google.com/s2/favicons?domain=google.com&sz=64");
+  if (!(probe.status === 200 && kind(probe.b))) { console.log("offline: no logos changed"); process.exit(0); } }
 let report = { hits: {}, misses: [] };
 try { const old = JSON.parse(fs.readFileSync("logos/_report.json", "utf8")); if (old && old.hits) report.hits = old.hits; if (old && Array.isArray(old.misses)) report.misses = old.misses; } catch {}
 // Logos already saved by an earlier run are measured, so a new one only replaces them when it is sharper.
