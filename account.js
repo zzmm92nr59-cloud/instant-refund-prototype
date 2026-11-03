@@ -678,7 +678,8 @@
     phone_invalid: "That isn't a UK mobile number. Type it like 07700 900123.", sms_not_configured: "Relay can't send texts right now. Please try again later.",
     sms_send_failed: "The text didn't send. Check the number and try again.", wait: "A code is on its way. You can ask for another in a few seconds.",
     two_step_on: "Sign-in codes go to this number. Turn off codes by text under Two-step sign-in first.", no_phone: "Add your phone number first.",
-    already_enabled: "That's already on.", not_enabled: "That's already off.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
+    already_enabled: "That's already on.", not_enabled: "That's already off.",
+    text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
 
   // ---- Getting started: one journey from "Welcome" to "You're all set" ----
@@ -1206,8 +1207,9 @@
     var full = function () { if (onFull && /^\d{6}$/.test(input.value)) onFull(); };
     input.addEventListener("paste", function (e) {
       var t = ""; try { t = (e.clipboardData || window.clipboardData).getData("text") || ""; } catch (x) {}
-      var m = /(?:^|\D)(\d{3})[ -]?(\d{3})(?!\d)/.exec(t);
-      if (m) { e.preventDefault(); input.value = m[1] + m[2]; full(); }
+      // Where a recovery code also fits, six digits only count on their own (not inside a code like ab234-567cd).
+      var m = recovery ? /(?:^|[^0-9A-Za-z-])(\d{6})(?![0-9A-Za-z-])/.exec(t) : /(?:^|\D)(\d{3})[ -]?(\d{3})(?!\d)/.exec(t);
+      if (m) { e.preventDefault(); input.value = m[2] ? m[1] + m[2] : m[1]; full(); }
     });
     input.addEventListener("input", function () {
       if (!recovery) { var d = input.value.replace(/\D/g, "").slice(0, 6); if (d !== input.value) input.value = d; }
@@ -1448,8 +1450,10 @@
         if (!r.ok) return say(note, "Couldn't load your settings. Check your connection and try again.", true);
         var s = r.body;
         body.appendChild(el("p", { text: "With this on, signing in with an email link, Google or Microsoft also asks for a code. Face ID sign-in doesn't need one." }));
+        // One way at a time, so a stolen session can't add its own way and use it to switch the shopper's off.
         if (s.textAvailable || s.text) body.appendChild(textCard(s));
         body.appendChild(appCard(s));
+        if (s.text || s.app) body.appendChild(el("p", { className: "rl-jnote", text: "One way at a time. To switch, turn this one off first." }));
         if (s.enabled) {
           var left = s.recoveryCodesLeft;
           body.appendChild(el("p", { className: "rl-jnote", text: left + " recovery code" + (left === 1 ? "" : "s") + " left." + (left <= 2 ? " You're running low: turn two-step sign-in off and on again for a fresh set." : "") }));
@@ -1469,8 +1473,9 @@
     function textCard(s) {
       var c = card("phone", "Text message", s.text, s.text ? "Codes go to your number ending " + s.phoneEnding + "."
         : s.phoneEnding ? "Text a code to your number ending " + s.phoneEnding + " each time you sign in." : "Text a code to your mobile each time you sign in.");
+      if (s.app) return c;
       if (s.text) c.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Turn off codes by text", onclick: function () {
-        codeOnly(body, note, "To turn this off, type the code we've just texted to your number ending " + s.phoneEnding + ". No phone? Type a recovery code" + (s.app ? " or an app code" : "") + " instead.", "Turn off",
+        codeOnly(body, note, "To turn this off, type the code we've just texted to your number ending " + s.phoneEnding + ". No phone? Type a recovery code instead.", "Turn off",
           function (code) { return api("/relay/my/2fa/text", { method: "POST", body: { on: false, code: code } }); }, function () { render("Codes by text are off."); }, function () { render(); }, true);
       } }));
       else c.appendChild(el("button", { type: "button", className: "rl-btn", text: "Turn on codes by text", onclick: function () {
@@ -1481,8 +1486,9 @@
     }
     function appCard(s) {
       var c = card("lock", "Authenticator app", s.app, s.app ? "Codes come from your authenticator app." : "Use an app like Google Authenticator, 1Password or Authy for the code.");
+      if (s.text) return c;
       c.appendChild(s.app ? el("button", { type: "button", className: "rl-btn ghost", text: "Turn off the app", onclick: appOff })
-        : el("button", { type: "button", className: "rl-btn" + (s.text ? " ghost" : ""), text: "Set up authenticator app", onclick: setup }));
+        : el("button", { type: "button", className: "rl-btn" + (s.textAvailable ? " ghost" : ""), text: "Set up authenticator app", onclick: setup }));
       return c;
     }
     function appOff() {

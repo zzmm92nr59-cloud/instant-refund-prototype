@@ -201,8 +201,11 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
   }
   if (method !== "POST") return null;
 
+  // One way at a time: texts or an app. Otherwise someone holding a stolen session could add their own way (no code from
+  // the shopper's needed) and then use it to switch the shopper's off. Switching ways means turning the first one off,
+  // which takes a code from it or a recovery code.
   // Codes by text. Turning it on proves the phone is in hand now: a code texted to the number being added, or (for a number
-  // already on the account) one texted by /text/send. Turning it off needs a texted code, an app code or a recovery code.
+  // already on the account) one texted by /text/send. Turning it off needs a texted code or a recovery code.
   if (path === "/relay/my/2fa/text/send") {
     const phone = await confirmedPhone(env, shopper.id);
     if (!phone) return h.json({ error: "no_phone" }, 400, cors);
@@ -214,13 +217,13 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
     if (await tooManyFails(env, shopper.id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
     if (b && b.on === true) {
       if (on.text) return h.json({ error: "already_enabled" }, 400, cors);
+      if (on.app) return h.json({ error: "app_on" }, 409, cors);
       const managed = await useTextCode(env, shopper.id, "manage", "manage:" + shopper.id, code, now);
       if (managed) {
         const set = await env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 1, two_step_at = ? WHERE shopper_id = ? RETURNING shopper_id").bind(now, shopper.id).first();
         if (!set) return h.json({ error: "no_phone" }, 400, cors);
       } else if (!(await confirmNumberWithCode(env, shopper.id, code, now, { twoStep: true }))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
-      // With the app already on, the recovery codes from then still work; otherwise these are the first.
-      if (on.app) return h.json({ ok: true, recoveryCodesLeft: await recoveryLeft() }, 200, cors);
+      // The first way on comes with recovery codes, shown once.
       const fresh = await newRecoveryCodes();
       await env.RELAY_DB.batch(fresh.statements);
       return h.json({ ok: true, recoveryCodes: fresh.codes }, 200, cors);
@@ -230,7 +233,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
       if (!(await checkCode(env, shopper.id, code, now, ["manage", "manage:" + shopper.id]))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
       await env.RELAY_DB.batch([
         env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 0, two_step_at = NULL WHERE shopper_id = ?").bind(shopper.id),
-        ...(on.app ? [] : [env.RELAY_DB.prepare("DELETE FROM auth_totp_recovery WHERE shopper_id = ?").bind(shopper.id)])
+        env.RELAY_DB.prepare("DELETE FROM auth_totp_recovery WHERE shopper_id = ?").bind(shopper.id)
       ]);
       return h.json({ ok: true }, 200, cors);
     }
@@ -239,6 +242,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
 
   if (path === "/relay/my/2fa/setup") {
     if (row && row.enabled) return h.json({ error: "already_enabled" }, 400, cors);
+    if (on.text) return h.json({ error: "text_on" }, 409, cors);
     const secret = crypto.getRandomValues(new Uint8Array(20));
     await env.RELAY_DB.prepare(
       "INSERT INTO auth_totp (shopper_id, secret_enc, enabled, last_step, created_at) VALUES (?,?,0,0,?) ON CONFLICT(shopper_id) DO UPDATE SET secret_enc = excluded.secret_enc, enabled = 0, last_step = 0, created_at = excluded.created_at")
@@ -253,6 +257,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
 
   if (path === "/relay/my/2fa/enable") {
     if (!row || row.enabled) return h.json({ error: row ? "already_enabled" : "setup_first" }, 400, cors);
+    if (on.text) return h.json({ error: "text_on" }, 409, cors);
     if (await tooManyFails(env, shopper.id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
     const digits = code.replace(/\s/g, "");
     const step = /^\d{6}$/.test(digits) ? await matchingStep(await unseal(env, row.secret_enc), digits, now) : null;
@@ -266,9 +271,8 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
   if (path === "/relay/my/2fa/disable") {
     if (!row || !row.enabled) return h.json({ error: "not_enabled" }, 400, cors);
     if (await tooManyFails(env, shopper.id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
-    if (!(await checkCode(env, shopper.id, code, now, on.text ? ["manage", "manage:" + shopper.id] : null))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
-    // Codes by text stay on (with the same recovery codes) if they're on; otherwise everything goes.
-    await env.RELAY_DB.batch(on.text ? [env.RELAY_DB.prepare("DELETE FROM auth_totp WHERE shopper_id = ?").bind(shopper.id)] : totpDeleteStatements(env.RELAY_DB, shopper.id));
+    if (!(await checkCode(env, shopper.id, code, now))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
+    await env.RELAY_DB.batch(totpDeleteStatements(env.RELAY_DB, shopper.id));
     return h.json({ ok: true }, 200, cors);
   }
   return null;

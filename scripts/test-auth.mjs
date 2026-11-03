@@ -681,50 +681,75 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   clock += 31000;
   r = await post("/relay/my/2fa/text/send", busy, {}, "8.8.4.1");
   assert.equal(r.status, 429); assert.equal((await r.json()).error, "too_many_requests", "five texts an hour per shopper");
+  assert.equal((await post("/relay/my/phone/remove", busy, {})).status, 200);
+  clock += 31000;
+  assert.equal((await post("/relay/my/phone/start", busy, { phone: "07700 900322" }, "8.8.4.2")).status, 429, "removing the number doesn't reset the shopper's count");
+  // Codes to confirm a number: three an hour to one number, whoever asks, even after deleting an account. A stranger using
+  // those up doesn't stop the number's owner getting their own codes.
+  const owner = (await firstFactor("owner@example.com", "8.8.0.24")).sessionToken;
+  clock += 31000; texts = []; assert.equal((await post("/relay/my/phone/start", owner, { phone: "07700 900555" }, "8.8.6.2")).status, 200);
+  assert.equal((await post("/relay/my/phone/confirm", owner, { code: codeOf(texts[0]) })).status, 200);
   const a1 = (await firstFactor("pest1@example.com", "8.8.0.21")).sessionToken;
-  for (let i = 0; i < 3; i++) { clock += 31000; assert.equal((await post("/relay/my/phone/start", a1, { phone: "07700 900555" }, "8.8.5." + i)).status, 200); }
+  for (let i = 0; i < 2; i++) { clock += 31000; assert.equal((await post("/relay/my/phone/start", a1, { phone: "07700 900555" }, "8.8.5." + i)).status, 200); }
   assert.equal((await post("/relay/my/delete", a1, {})).status, 200);
   const a2 = (await firstFactor("pest2@example.com", "8.8.0.22")).sessionToken;
-  for (let i = 0; i < 2; i++) { clock += 31000; assert.equal((await post("/relay/my/phone/start", a2, { phone: "07700 900555" }, "8.8.6." + i)).status, 200); }
   clock += 31000;
-  assert.equal((await post("/relay/my/phone/start", a2, { phone: "07700 900555" }, "8.8.6.9")).status, 429, "five texts an hour per number, whoever asks, even after deleting an account");
-  const sent = sqlite.prepare("SELECT COUNT(*) n FROM auth_sms_log WHERE created_at > ?").get(clock - 24 * HOUR).n;
+  assert.equal((await post("/relay/my/phone/start", a2, { phone: "07700 900555" }, "8.8.6.1")).status, 429, "three 'confirm' texts an hour per number");
+  texts = [];
+  assert.equal((await post("/relay/my/2fa/text/send", owner, {}, "8.8.6.2")).status, 200, "the account's own texts have their own allowance");
+  assert.equal(texts[0].To, "+447700900555");
+  // Requests sent all at once can't slip past: forty taps send one text.
+  const burst = (await firstFactor("burst@example.com", "8.8.0.25")).sessionToken;
+  texts = []; clock += 31000;
+  const many = await Promise.all(Array.from({ length: 40 }, () => post("/relay/my/phone/start", burst, { phone: "07700 900777" }, "8.8.9.1")));
+  assert.equal(many.filter(x => x.status === 200).length, 1); assert.equal(texts.length, 1, "forty taps at once send one text");
+  // Guesses sent all at once still get five tries between them, and only the newest code works.
+  const right = codeOf(texts[0]);
+  const guesses = await Promise.all([...Array.from({ length: 30 }, (_, i) => post("/relay/my/phone/confirm", burst, { code: String(100000 + i) === right ? "999999" : String(100000 + i) })), post("/relay/my/phone/confirm", burst, { code: right })]);
+  assert.ok(guesses.filter(x => x.status === 200).length <= 1);
+  assert.ok(sqlite.prepare("SELECT MAX(attempts) m FROM auth_sms_codes WHERE purpose = 'confirm' AND ref = ?").get("confirm:" + sqlite.prepare("SELECT id FROM shoppers WHERE email = ?").get("burst@example.com").id).m <= 5, "never more than five tries on a code");
+  clock += 31000; texts = []; await post("/relay/my/phone/start", burst, { phone: "07700 900778" }, "8.8.9.1"); const c778a = codeOf(texts[0]);
+  clock += 31000; texts = []; await post("/relay/my/phone/start", burst, { phone: "07700 900778" }, "8.8.9.1"); const c778b = codeOf(texts[0]);
+  if (c778a !== c778b) assert.equal((await post("/relay/my/phone/confirm", burst, { code: c778a })).status, 400, "a newer code replaces the last one");
+  assert.equal((await post("/relay/my/phone/confirm", burst, { code: c778b })).status, 200);
+  // The daily cap for 'confirm' texts across Relay (sign-in texts have a cap of their own).
+  const sent = sqlite.prepare("SELECT COUNT(*) n FROM auth_sms_log WHERE kind = 'confirm' AND created_at > ?").get(clock - 24 * HOUR).n;
   env.SMS_DAILY_LIMIT = String(sent + 1);
   const a3 = (await firstFactor("fine@example.com", "8.8.0.23")).sessionToken;
   assert.equal((await post("/relay/my/phone/start", a3, { phone: "07700 900666" }, "8.8.7.1")).status, 200);
   clock += 31000;
   assert.equal((await post("/relay/my/phone/start", a3, { phone: "07700 900667" }, "8.8.7.2")).status, 429, "the daily cap across Relay");
+  clock += 31000;
+  assert.equal((await post("/relay/my/2fa/text/send", owner, {}, "8.8.6.3")).status, 200, "sign-in and settings texts aren't stopped by it");
   delete env.SMS_DAILY_LIMIT;
-  assert.ok(sqlite.prepare("SELECT * FROM auth_sms_log").all().every(row => Object.keys(row).join() === "phone_hash,client_hash,created_at"), "the send log keeps only scrambled numbers and addresses");
-  console.log("ok - text limits: a short wait between texts, five an hour per shopper and per number (deleting an account doesn't reset it), a daily cap");
+  assert.ok(sqlite.prepare("SELECT * FROM auth_sms_log").all().every(row => Object.keys(row).join() === "who_hash,phone_hash,client_hash,ref_hash,kind,created_at"
+    && /^[0-9a-f]{64}$/.test(row.who_hash) && /^[0-9a-f]{64}$/.test(row.phone_hash)), "the send log keeps only scrambled accounts, numbers and addresses");
+  console.log("ok - text limits: one step, so taps or guesses sent all at once can't slip past; 'confirm' texts can't use up anyone's sign-in texts; removing or deleting resets nothing");
 
-  // Switching it off needs a code: texted now, an app code or a recovery code. Nothing else.
+  // Switching it off needs a code: texted now or a recovery code. Nothing else.
   clock += 2 * HOUR;
   const sb = done.sessionToken;
   assert.equal((await post("/relay/my/2fa/text", sb, { on: false, code: "000000" })).status, 400);
   assert.equal((await post("/relay/my/2fa/text", s2, { on: false, code: rec[1] })).status, 400, "another shopper can't switch it off");
+  // One way at a time: with texts on, an app can't be added (so a stolen session can't add its own and switch texts off).
+  assert.equal((await post("/relay/my/2fa/setup", sb, {})).status, 409, "no app while texts are on");
   texts = []; assert.equal((await post("/relay/my/2fa/text/send", sb, {}, "8.8.8.1")).status, 200);
   assert.equal((await post("/relay/my/2fa/text", sb, { on: false, code: codeOf(texts[0]) })).status, 200);
   assert.deepEqual(await (await get("/relay/my/2fa", sb)).json(), { enabled: false, app: false, text: false, phoneEnding: "123", textAvailable: true, recoveryCodesLeft: 0 });
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_totp_recovery").get().n, 0, "recovery codes go when nothing needs them");
   assert.ok((await firstFactor("phone@example.com", "8.8.0.8")).sessionToken, "signing in is back to one step");
-  // Both: the app and texts. Texts are offered first, either code works, and switching the app off keeps texts and the codes.
+  // ...and with the app on, texts can't be added, even with a code texted to a new number.
   const setup = await (await post("/relay/my/2fa/setup", sb, {})).json();
   const key = unb32(setup.secret);
-  const en = await post("/relay/my/2fa/enable", sb, { code: hotp(key, stepNow()) }); assert.equal(en.status, 200);
+  assert.equal((await post("/relay/my/2fa/enable", sb, { code: hotp(key, stepNow()) })).status, 200);
   clock += 31000; texts = []; await post("/relay/my/2fa/text/send", sb, {}, "8.8.8.2");
-  r = await post("/relay/my/2fa/text", sb, { on: true, code: codeOf(texts[0]) });
-  assert.equal(r.status, 200); const both = await r.json();
-  assert.equal(both.recoveryCodes, undefined, "the app's recovery codes still work"); assert.equal(both.recoveryCodesLeft, 8);
-  const pb = await firstFactor("phone@example.com", "8.8.0.9");
-  assert.deepEqual(pb.methods, ["text", "app"]);
-  clock += 30000;
-  assert.equal((await post("/relay/auth/2fa/verify", undefined, { pendingToken: pb.pendingToken, code: hotp(key, stepNow()) })).status, 200, "an app code works too");
+  assert.equal((await post("/relay/my/2fa/text", sb, { on: true, code: codeOf(texts[0]) })).status, 409, "no texts while the app is on");
+  clock += 31000; texts = []; await post("/relay/my/phone/start", sb, { phone: "07700 900888" }, "8.8.8.3");
+  assert.equal((await post("/relay/my/2fa/text", sb, { on: true, code: codeOf(texts[0]) })).status, 409, "not even with a new number");
+  assert.deepEqual((await firstFactor("phone@example.com", "8.8.0.9")).methods, ["app"]);
   clock += 30000;
   assert.equal((await post("/relay/my/2fa/disable", sb, { code: hotp(key, stepNow()) })).status, 200);
-  st = await (await get("/relay/my/2fa", sb)).json();
-  assert.equal(st.app, false); assert.equal(st.text, true); assert.equal(st.recoveryCodesLeft, 8, "texts stay on with the same recovery codes");
-  assert.deepEqual((await firstFactor("phone@example.com", "8.8.0.10")).methods, ["text"]);
+  assert.equal((await (await get("/relay/my/2fa", sb)).json()).enabled, false);
   // Deleting the account removes the number and every code.
   assert.equal((await post("/relay/my/delete", sb, {})).status, 200);
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_phone WHERE shopper_id NOT IN (SELECT id FROM shoppers)").get().n, 0);
@@ -735,7 +760,7 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   await tidyTexts(env, clock + 2 * 24 * HOUR + 1);
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM auth_sms_log").get().n + sqlite.prepare("SELECT COUNT(*) n FROM auth_sms_codes").get().n, 0, "nothing kept past two days");
   for (const k of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM"]) delete env[k];
-  console.log("ok - switching codes by text off needs a code; app and texts together; deletion removes the number and its codes; nothing kept past two days");
+  console.log("ok - switching codes by text off needs a code; one way at a time (texts or an app); deletion removes the number and its codes; nothing kept past two days");
 }
 
 console.log("PASS shopper sign-in, single-use links, expiry, rate limits, ownership isolation, logout and deletion, phone numbers and codes by text (fake email and text delivery)");

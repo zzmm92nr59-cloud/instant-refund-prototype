@@ -3,13 +3,18 @@
 // the number and the texts). Passkey (Face ID) sign-in never needs it.
 //
 // Rules (do not weaken):
-//  * The number is stored encrypted (AES-GCM, key derived from AUTH_SECRET) and shown back only as its last three digits.
+//  * The number is stored encrypted (AES-GCM, key derived from AUTH_SECRET). The app shows it only as its last three
+//    digits; "Download my data" gives the account holder the whole number.
 //  * Codes are random, 6 digits, work once, expire after 10 minutes and are stored only as keyed hashes bound to what they
 //    were sent for (confirming this shopper's number, one half-finished sign-in, or changing two-step settings), so a code
-//    sent for one thing is useless for anything else. Five wrong tries and that code is dead.
+//    sent for one thing is useless for anything else. Only the newest code for each thing works, and five wrong tries
+//    (counted before the code is compared, so tries sent all at once can't slip past) and it's dead.
 //  * UK mobile numbers only (07…; not 070 personal numbers or 076 pagers): no premium-rate or international texts.
 //  * Texts are capped per shopper, per number, per device address and across all of Relay each day, so nobody can run up a
-//    bill or flood someone's phone. The caps survive account deletion: the log keeps only scrambled numbers and addresses.
+//    bill or flood someone's phone. Each text is checked against every cap and recorded in one database step, so requests
+//    sent all at once can't slip past. Codes to confirm a new number (which anyone with an account can ask for, to any
+//    number) have caps of their own, so a stranger can't use them up and stop someone's sign-in codes. The caps survive
+//    account deletion: the log keeps only scrambled accounts, numbers and addresses.
 //  * Each text ends with "@<app host> #<code>", the standard line that lets iPhones and Android phones offer the code
 //    straight from the notification (and only on Relay's own site).
 //  * Texts go through Twilio only when its secrets are set. Without them nothing pretends to send: the routes say texts
@@ -21,8 +26,11 @@ export const RESEND_AFTER_MS = 30 * 1000;
 const MAX_CODE_TRIES = 5;
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
-const LIMITS = { shopperHour: 5, shopperDay: 10, numberHour: 5, numberDay: 10, clientHour: 10 };
-const DEFAULT_DAILY_LIMIT = 300;
+// Per account (every kind of text); per number, separately for "confirm a new number" and the account's own texts (sign-in
+// and changing two-step); per device address for "confirm" texts only (many phones share one address on mobile data).
+const LIMITS = { shopperHour: 5, shopperDay: 10, confirmNumberHour: 3, confirmNumberDay: 5, accountNumberHour: 5, accountNumberDay: 10, confirmClientHour: 10 };
+// Across Relay each day: SMS_DAILY_LIMIT for "confirm" texts, SMS_ACCOUNT_DAILY_LIMIT for the rest.
+const DEFAULT_CONFIRM_DAILY = 200, DEFAULT_ACCOUNT_DAILY = 1000;
 
 export const PHONE_TABLE_SQL = [
   `CREATE TABLE IF NOT EXISTS auth_phone (
@@ -34,11 +42,14 @@ export const PHONE_TABLE_SQL = [
      attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, used_at INTEGER)`,
   `CREATE INDEX IF NOT EXISTS idx_sms_codes_ref ON auth_sms_codes(ref, purpose, created_at)`,
   `CREATE INDEX IF NOT EXISTS idx_sms_codes_shopper ON auth_sms_codes(shopper_id, created_at)`,
-  // Every text sent, for the caps only: scrambled number, scrambled device address and when. Nothing else.
-  `CREATE TABLE IF NOT EXISTS auth_sms_log (phone_hash TEXT NOT NULL, client_hash TEXT NOT NULL, created_at INTEGER NOT NULL)`,
-  `CREATE INDEX IF NOT EXISTS idx_sms_log_phone ON auth_sms_log(phone_hash, created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_sms_log_client ON auth_sms_log(client_hash, created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_sms_log_time ON auth_sms_log(created_at)`
+  // Every text asked for, for the caps only: scrambled account, number, device address and what it was for, and when.
+  `CREATE TABLE IF NOT EXISTS auth_sms_log (who_hash TEXT NOT NULL, phone_hash TEXT NOT NULL, client_hash TEXT NOT NULL,
+     ref_hash TEXT NOT NULL, kind TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS idx_sms_log_who ON auth_sms_log(who_hash, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_sms_log_phone ON auth_sms_log(phone_hash, kind, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_sms_log_client ON auth_sms_log(client_hash, kind, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_sms_log_ref ON auth_sms_log(ref_hash, created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_sms_log_kind ON auth_sms_log(kind, created_at)`
 ];
 
 export function phoneDeleteStatements(db, shopperId) {
@@ -117,28 +128,38 @@ async function sendText(env, fetchImpl, to, body) {
 export async function issueTextCode(env, o, { shopperId, purpose, ref, phone, clientHash }) {
   const db = env.RELAY_DB, now = o.now;
   if (!textConfigured(env)) return { error: "sms_not_configured", status: 503 };
-  const phoneHash = await keyed(env, "relay-phone:" + phone);
-  // A short wait between texts for the same thing, so a second tap never sends twice.
-  const last = await db.prepare("SELECT MAX(created_at) AS t FROM auth_sms_codes WHERE purpose = ? AND ref = ?").bind(purpose, ref).first();
-  if (last && last.t && now - last.t < RESEND_AFTER_MS) return { error: "wait", status: 429, retryAfter: Math.ceil((RESEND_AFTER_MS - (now - last.t)) / 1000) };
-  const n = async (sql, ...a) => ((await db.prepare(sql).bind(...a).first()) || {}).n || 0;
-  const daily = Number(env.SMS_DAILY_LIMIT) > 0 ? Number(env.SMS_DAILY_LIMIT) : DEFAULT_DAILY_LIMIT;
-  if (await n("SELECT COUNT(*) AS n FROM auth_sms_codes WHERE shopper_id = ? AND created_at > ?", shopperId, now - HOUR_MS) >= LIMITS.shopperHour ||
-      await n("SELECT COUNT(*) AS n FROM auth_sms_codes WHERE shopper_id = ? AND created_at > ?", shopperId, now - DAY_MS) >= LIMITS.shopperDay ||
-      await n("SELECT COUNT(*) AS n FROM auth_sms_log WHERE phone_hash = ? AND created_at > ?", phoneHash, now - HOUR_MS) >= LIMITS.numberHour ||
-      await n("SELECT COUNT(*) AS n FROM auth_sms_log WHERE phone_hash = ? AND created_at > ?", phoneHash, now - DAY_MS) >= LIMITS.numberDay ||
-      await n("SELECT COUNT(*) AS n FROM auth_sms_log WHERE client_hash = ? AND created_at > ?", clientHash, now - HOUR_MS) >= LIMITS.clientHour ||
-      await n("SELECT COUNT(*) AS n FROM auth_sms_log WHERE created_at > ?", now - DAY_MS) >= daily)
+  const kind = purpose === "confirm" ? "confirm" : "account";
+  const who = await keyed(env, "relay-shopper:" + shopperId), phoneHash = await keyed(env, "relay-phone:" + phone);
+  const refHash = await keyed(env, "relay-ref:" + purpose + ":" + ref);
+  const confirm = kind === "confirm";
+  const daily = Number(confirm ? env.SMS_DAILY_LIMIT : env.SMS_ACCOUNT_DAILY_LIMIT) > 0 ? Number(confirm ? env.SMS_DAILY_LIMIT : env.SMS_ACCOUNT_DAILY_LIMIT)
+    : confirm ? DEFAULT_CONFIRM_DAILY : DEFAULT_ACCOUNT_DAILY;
+  // One step: checked against every cap (and the short wait between texts for the same thing) and recorded together.
+  const booked = await db.prepare(
+    `INSERT INTO auth_sms_log (who_hash, phone_hash, client_hash, ref_hash, kind, created_at)
+     SELECT ?1, ?2, ?3, ?4, ?5, ?6
+     WHERE NOT EXISTS (SELECT 1 FROM auth_sms_log WHERE ref_hash = ?4 AND created_at > ?6 - ?7)
+       AND (SELECT COUNT(*) FROM auth_sms_log WHERE who_hash = ?1 AND created_at > ?6 - ?8) < ?10
+       AND (SELECT COUNT(*) FROM auth_sms_log WHERE who_hash = ?1 AND created_at > ?6 - ?9) < ?11
+       AND (SELECT COUNT(*) FROM auth_sms_log WHERE phone_hash = ?2 AND kind = ?5 AND created_at > ?6 - ?8) < ?12
+       AND (SELECT COUNT(*) FROM auth_sms_log WHERE phone_hash = ?2 AND kind = ?5 AND created_at > ?6 - ?9) < ?13
+       AND (?5 <> 'confirm' OR (SELECT COUNT(*) FROM auth_sms_log WHERE client_hash = ?3 AND kind = 'confirm' AND created_at > ?6 - ?8) < ?14)
+       AND (SELECT COUNT(*) FROM auth_sms_log WHERE kind = ?5 AND created_at > ?6 - ?9) < ?15
+     RETURNING created_at`)
+    .bind(who, phoneHash, clientHash, refHash, kind, now, RESEND_AFTER_MS, HOUR_MS, DAY_MS, LIMITS.shopperHour, LIMITS.shopperDay,
+      confirm ? LIMITS.confirmNumberHour : LIMITS.accountNumberHour, confirm ? LIMITS.confirmNumberDay : LIMITS.accountNumberDay, LIMITS.confirmClientHour, daily).first();
+  if (!booked) {
+    const last = await db.prepare("SELECT MAX(created_at) AS t FROM auth_sms_log WHERE ref_hash = ?").bind(refHash).first();
+    if (last && last.t && now - last.t < RESEND_AFTER_MS) return { error: "wait", status: 429, retryAfter: Math.max(1, Math.ceil((RESEND_AFTER_MS - (now - last.t)) / 1000)) };
     return { error: "too_many_requests", status: 429 };
-  // Confirming a number: only the newest number asked for can be confirmed.
-  if (purpose === "confirm")
-    await db.prepare("UPDATE auth_sms_codes SET used_at = ? WHERE purpose = ? AND ref = ? AND used_at IS NULL AND phone_hash <> ?").bind(now, purpose, ref, phoneHash).run();
+  }
+  // Only the newest code for each thing works (and only the newest number asked for can be confirmed).
+  await db.prepare("UPDATE auth_sms_codes SET used_at = ? WHERE purpose = ? AND ref = ? AND used_at IS NULL").bind(now, purpose, ref).run();
   const code = newCode(), hash = await codeHash(env, purpose, ref, code), ending = phone.slice(-3);
   await db.prepare(
     `INSERT INTO auth_sms_codes (code_hash, shopper_id, purpose, ref, phone_enc, phone_end, phone_hash, created_at, expires_at)
      VALUES (?,?,?,?,?,?,?,?,?)`).bind(hash, shopperId, purpose, ref, await sealPhone(env, phone), ending, phoneHash, now, now + CODE_TTL_MS).run();
-  // Every try counts towards the caps, including one Twilio turns down.
-  await db.prepare("INSERT INTO auth_sms_log (phone_hash, client_hash, created_at) VALUES (?,?,?)").bind(phoneHash, clientHash, now).run();
+  // A text Twilio turns down still counts towards the caps (it was booked above), but leaves no code behind.
   if (!(await sendText(env, o.fetchImpl, phone, textFor(env, purpose, code)))) {
     await db.prepare("DELETE FROM auth_sms_codes WHERE code_hash = ?").bind(hash).run();
     return { error: "sms_send_failed", status: 502 };
@@ -158,22 +179,19 @@ export async function tidyTexts(env, now = Date.now()) {
   } catch (e) { if (!/no such table/i.test(String(e && e.message))) throw e; }
 }
 
-// Uses up a texted code. Returns the row it matched ({ phone_enc, phone_end }) or null (and counts a wrong try).
+// Uses up a texted code. Returns the row it matched ({ phone_enc, phone_end }) or null.
+// The try is counted first, in the same step that finds the live code, so tries sent all at once each use one of the five.
 export async function useTextCode(env, shopperId, purpose, ref, code, now) {
   const digits = String(code || "").replace(/\s/g, "");
   if (!/^\d{6}$/.test(digits)) return null;
   const db = env.RELAY_DB;
-  const row = await db.prepare(
-    `UPDATE auth_sms_codes SET used_at = ?
-     WHERE code_hash = ? AND shopper_id = ? AND purpose = ? AND ref = ? AND used_at IS NULL AND expires_at > ? AND attempts < ?
-     RETURNING phone_enc, phone_end`).bind(now, await codeHash(env, purpose, ref, digits), shopperId, purpose, ref, now, MAX_CODE_TRIES).first();
-  if (row) {
-    // Any other code still waiting for the same thing is no longer needed.
-    await db.prepare("UPDATE auth_sms_codes SET used_at = ? WHERE purpose = ? AND ref = ? AND used_at IS NULL").bind(now, purpose, ref).run();
-    return row;
-  }
-  await db.prepare("UPDATE auth_sms_codes SET attempts = attempts + 1 WHERE purpose = ? AND ref = ? AND shopper_id = ? AND used_at IS NULL").bind(purpose, ref, shopperId).run();
-  return null;
+  const live = (await db.prepare(
+    `UPDATE auth_sms_codes SET attempts = attempts + 1
+     WHERE shopper_id = ? AND purpose = ? AND ref = ? AND used_at IS NULL AND expires_at > ? AND attempts < ? RETURNING code_hash`)
+    .bind(shopperId, purpose, ref, now, MAX_CODE_TRIES).all()).results || [];
+  const hash = await codeHash(env, purpose, ref, digits);
+  if (!live.some(r => r.code_hash === hash)) return null;
+  return await db.prepare("UPDATE auth_sms_codes SET used_at = ? WHERE code_hash = ? AND used_at IS NULL RETURNING phone_enc, phone_end").bind(now, hash).first();
 }
 
 // The shopper's confirmed number ({ phone, ending, twoStep }) or null.
