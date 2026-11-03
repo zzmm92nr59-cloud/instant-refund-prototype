@@ -1,6 +1,6 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
-import { PERSONAL_MAIL, CATEGORIES, itemKind } from "./receipt-category.js";
+import { PERSONAL_MAIL, CATEGORIES, itemKind, categoryShares } from "./receipt-category.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -23,6 +23,26 @@ function whenOf(card) {
 // The kinds of shopping a Wrapped can be about on its own ("your 2026 in fashion"), so a top 5 never mixes a coat with a coffee.
 export const INDUSTRIES = Object.keys(CATEGORIES);
 const kindOf = (c) => (c && CATEGORIES[c.category] ? c.category : "other");
+// What one item is: the group the receipts list gave it (a supermarket shop's kitchen roll is Home & garden), or for a
+// receipt from elsewhere, the receipt's own group.
+const kindOfItem = (it, c) => (it && typeof it.category === "string" && CATEGORIES[it.category] ? it.category : kindOf(c));
+// A receipt with different kinds of things in it (a supermarket shop with kitchen roll in it, an Amazon order of coffee
+// pods and a charger) becomes one part per kind, each with its own items and its share of the total by what those items
+// cost, so each kind's money and things are counted where they belong. Only when the receipt prices every item: Relay
+// never guesses how money was split, so otherwise the receipt stays whole in its own group. The part that is the
+// receipt's own kind keeps its photo, its return and any refund; the parts add up to the total exactly.
+function partsOf(c) {
+  const s = c.totalPence != null && !c.part ? categoryShares(c) : null;
+  if (!s) return [c];
+  const main = s.some(p => p.category === kindOf(c)) ? kindOf(c) : s[0].category;
+  const pence = s.map(p => Math.floor(c.totalPence * p.share));
+  const left = c.totalPence - pence.reduce((a, b) => a + b, 0);
+  return s.map((p, j) => {
+    const own = p.category === main;
+    return { ...c, category: p.category, categoryLabel: CATEGORIES[p.category], items: p.items.map(i => c.items[i]), totalPence: pence[j] + (own ? left : 0),
+      part: own ? "main" : "share", ...(own ? {} : { hasImage: false, returnPlan: null, returnProgress: null }) };
+  }).filter(p => p.totalPence > 0 || p.part === "main");
+}
 
 export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   year = Number(year) || new Date(now).getUTCFullYear();
@@ -41,15 +61,18 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     const k = ((c.retailer && (c.retailer.domain || c.retailer.name)) || "") + "|" + c.orderRef;
     if (seen.has(k)) return false; seen.add(k); return true;
   });
-  // Each kind of shopping this year, biggest spend first, so the app can offer a Wrapped for each one.
-  const kinds = new Map();
-  for (const c of everything) {
+  // Each kind of shopping this year, biggest spend first, so the app can offer a Wrapped for each one. A receipt
+  // with several kinds of things in it counts in each, with the money its things of that kind cost.
+  const parts = everything.flatMap(partsOf);
+  const kinds = new Map(), mainly = new Map();
+  for (const c of parts) {
     const k = kindOf(c), e = kinds.get(k) || { category: k, label: CATEGORIES[k], receipts: 0, spentPence: 0 };
     e.receipts++; if (c.totalPence != null && (!c.currency || c.currency === "GBP")) e.spentPence += c.totalPence;
     kinds.set(k, e);
+    if (c.part !== "share") mainly.set(k, (mainly.get(k) || 0) + 1);
   }
   const industries = [...kinds.values()].sort((a, b) => b.spentPence - a.spentPence || b.receipts - a.receipts);
-  const mine = industry ? everything.filter(c => kindOf(c) === industry) : everything;
+  const mine = industry ? parts.filter(c => kindOf(c) === industry) : everything;
   // Words for the reasons below: "your spending" for the whole year, "your spending on fashion" for one kind.
   const on = industry ? " on " + CATEGORIES[industry].toLowerCase() : "";
   const gbp = mine.filter(c => c.totalPence != null && (!c.currency || c.currency === "GBP"));
@@ -87,7 +110,14 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   byMonth.forEach(m => delete m._i);
   const busiest = byMonth.slice().sort((a, b) => b.receipts - a.receipts)[0];
   const biggest = gbp.slice().sort((a, b) => b.totalPence - a.totalPence)[0];
-  const itemCount = mine.reduce((s, c) => s + (Array.isArray(c.items) ? c.items.reduce((n, i) => n + (Number(i && i.qty) > 0 ? Number(i.qty) : 1), 0) : 0), 0);
+  // In one kind's Wrapped, a thing that is plainly another kind (kitchen roll in a supermarket shop that couldn't be split
+  // by price) isn't one of its things.
+  const otherKind = (it, c) => {
+    if (!industry) return false;
+    const k = it && typeof it.category === "string" ? kindOfItem(it, c) : itemKind(it && it.name);
+    return Boolean(k) && k !== industry;
+  };
+  const itemCount = mine.reduce((s, c) => s + (Array.isArray(c.items) ? c.items.reduce((n, i) => n + (otherKind(i, c) ? 0 : Number(i && i.qty) > 0 ? Number(i.qty) : 1), 0) : 0), 0);
   const withReturn = mine.filter(c => c.returnPlan).length;
   const topCat = categories[0];
   // A label from what the receipts actually show. It is a plain description, not a personality test.
@@ -101,10 +131,8 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   const years = [...yearCounts.entries()].sort((a, b) => b[0] - a[0]).map(([y, n]) => ({ year: y, receipts: n }));
   // The thing bought most often (by name), only when it really was a repeat.
   const itemsByName = new Map();
-  // In one kind's Wrapped, a thing that is plainly another kind (kitchen roll in a supermarket food shop) isn't its top item.
-  const otherKind = (n) => { if (!industry) return false; const k = itemKind(n); return Boolean(k) && k !== industry; };
   for (const c of mine) for (const it of (Array.isArray(c.items) ? c.items : [])) {
-    const n = it && typeof it.name === "string" ? it.name.trim() : ""; if (!n || n.length > 80 || otherKind(n)) continue;
+    const n = it && typeof it.name === "string" ? it.name.trim() : ""; if (!n || n.length > 80 || otherKind(it, c)) continue;
     const k = n.toLowerCase(); const e = itemsByName.get(k) || { name: n, times: 0, shop: (c.retailer && c.retailer.name) || null }; e.times++; itemsByName.set(k, e);
   }
   const topItemE = [...itemsByName.values()].sort((a, b) => b.times - a.times)[0];
@@ -125,9 +153,10 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     .map(c => ({ id: c.id, shop: shopName(c), item: itemName((c.items || [])[0]), more: Math.max(0, (c.items || []).length - 1), date: whenOf(c) }));
   // Things (not food, travel or apps) for the style slide: the app works the style out from these, on the device.
   const things = [];
+  // Each item by what it is, so a jacket from a supermarket counts and the bread in the same order doesn't.
   for (const c of mine) {
-    if (forwarded(c) || !THINGS.has(c.category || "other")) continue;
-    for (const it of (c.items || [])) { const n = itemName(it); if (n && things.length < 300) things.push({ name: n, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
+    if (forwarded(c)) continue;
+    for (const it of (c.items || [])) { const n = itemName(it); if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
   }
   // ---- The Spotify-style parts, each counted straight from the receipts. ----
   // Your year's list (like "Your Top Songs"): every named thing, ranked by how many separate orders it was in, then spend.
@@ -135,7 +164,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   for (const c of mine) {
     const here = new Set();
     for (const it of (c.items || [])) {
-      const n = itemName(it); if (!n || otherKind(n)) continue;
+      const n = itemName(it); if (!n || otherKind(it, c)) continue;
       const k = n.toLowerCase(); if (here.has(k)) continue; here.add(k);
       const e = itemStats.get(k) || { name: n, times: 0, spentPence: 0, shop: forwarded(c) ? null : shopName(c) };
       e.times++;
@@ -185,7 +214,9 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   if (mine.some(c => (c.items || []).length >= 5)) badges.push({ label: "Big Basket", why: "At least one order with 5 or more things in it." });
   // One chapter per kind of shopping for the year's single story: its share of the year, where it went, what it was, and
   // one fun number of its own. Every figure is counted from the receipts, like the rest.
-  const chapters = industry || opts.noChapters ? undefined : industries.filter(k => k.category !== "other" && k.receipts > 0).map(k => {
+  // A kind gets its own chapter when some receipt was mostly that kind, or its things turned up in at least three
+  // receipts (one pack of batteries in a supermarket shop isn't a year in electronics).
+  const chapters = industry || opts.noChapters ? undefined : industries.filter(k => k.category !== "other" && k.receipts > 0 && (mainly.get(k.category) || k.receipts >= 3)).map(k => {
     const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true });
     const weeks = Math.max(1, Math.ceil((Math.min(now, Date.UTC(year + 1, 0, 1)) - Date.UTC(year, 0, 1)) / (7 * 864e5)));
     const named = (w.topItems || []).filter(x => x.name);

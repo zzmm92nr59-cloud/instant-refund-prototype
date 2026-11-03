@@ -406,6 +406,8 @@ assert.equal(JSON.parse(advert.details).photoIsItem, false, "but it isn't of the
 const listed = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(listed.find(x => x.orderRef === "EO-5").hasImage, true, "a real item photo is shown");
 assert.equal(listed.find(x => x.orderRef === "EO-9").hasImage, false, "an advert is never shown as the item");
+const jumper = listed.find(x => x.orderRef === "EO-5").items.find(i => i.name === "Wool jumper");
+assert.deepEqual([jumper.category, jumper.categorySure], ["fashion", true], "each item says what it is, and whether its own name said so");
 // The style list: physical things from every receipt, only the shopper's own.
 const style = await (await call("/relay/my/style", { token: alice })).json();
 assert.ok(style.receipts.some(x => x.items.some(i => i.name === "Wool jumper")), "things bought are listed for the style");
@@ -608,11 +610,11 @@ for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "
   console.log("ok - recent returnable orders always reach Home; old receipts are tidied when listed");
   // Mailboxes read by the older reader are read once more in the background, Gmail and Outlook alike; then never again.
   assert.equal(needsFullRead(Date.now(), "google", null), true); assert.equal(needsFullRead(Date.now(), null, 1), true);
-  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 9), false);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 10), false);
   // Reader 4 (the address each order was sent to): Gmail and Outlook mailboxes are both read again.
   assert.equal(needsFullRead(Date.now(), "google", 3), true); assert.equal(needsFullRead(Date.now(), "microsoft", 3), true);
-  assert.equal(needsFullRead(Date.now(), "microsoft", 9), false);
-  assert.equal(needsFullRead(Date.now(), "google", 8), true, "read with an older reader");
+  assert.equal(needsFullRead(Date.now(), "microsoft", 10), false);
+  assert.equal(needsFullRead(Date.now(), "google", 9), true, "read with an older reader");
   assert.equal(needsFullRead(null, "google", 2), true, "never read at all");
   console.log("ok - every mailbox is read once more with the improved reader");
 }

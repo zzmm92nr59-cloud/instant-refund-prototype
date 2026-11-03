@@ -17,7 +17,7 @@ import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliv
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
-import { categorise, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { categorise, itemCategories, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
@@ -70,7 +70,8 @@ const OUTLOOK_FULL_REV = 1;
 // 7: totals a line below their word, names over two cells, labels between a row's values, names starting with a number.
 // 8: the game named in a game web shop's HTML even when its plain-text part leads with the shop's support line.
 // 9: the shop behind a pay-later, voucher or ticket platform's email (Klarna, GiftPro, Toggle, Ventrata).
-const READER_FULL_REV = 9;
+// 10: a supermarket's order summary under its last item ("Trolley cost") is no longer added to that item's price.
+const READER_FULL_REV = 10;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -89,7 +90,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 25;
+const PARSER_VERSION = 26;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -1301,8 +1302,14 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).
     retailer.logoDomain = logoDomainFor(retailer);
     c = { ...c, retailer, items: cleanItems(c.items) };
+    const group = categorise(c, learned);
+    // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
+    // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
+    const kinds = itemCategories(c, learned);
+    const items = (c.items || []).map((it, i) => (it && typeof it.name === "string" && it.name
+      ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure) } : it));
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
-    return { ...c, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...categorise(c, learned), categoryLearned: Boolean(learned), storeKey: k };
+    return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k };
   });
 }
 
@@ -1509,10 +1516,12 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/style" && m === "GET") {
     const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
     const things = [];
+    // Each item by what it is: a jacket from a supermarket counts, the bread in the same order doesn't.
+    const NOT_THINGS = ["food", "travel", "digital"];
     for (const c of cards) {
-      if (c.kind === "return_instructions" || ["food", "travel", "digital"].includes(c.category)) continue;
+      if (c.kind === "return_instructions") continue;
       if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
-      const items = (c.items || []).filter(i => i && typeof i.name === "string" && i.name.trim()).slice(0, 20)
+      const items = (c.items || []).filter(i => i && typeof i.name === "string" && i.name.trim() && !NOT_THINGS.includes(typeof i.category === "string" ? i.category : c.category)).slice(0, 20)
         .map(i => ({ name: i.name.slice(0, 120), variant: typeof i.variant === "string" ? i.variant.slice(0, 80) : null, pricePence: Number.isInteger(i.pricePence) ? i.pricePence : null, qty: i.qty || 1 }));
       if (!items.length) continue;
       things.push({ id: c.id, retailer: { name: (c.retailer && (c.retailer.name || c.retailer.domain)) || null }, orderDate: c.orderDate || null, category: c.category, hasImage: Boolean(c.hasImage), items });
