@@ -322,8 +322,8 @@
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid var(--rl-text);text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:var(--rl-card);color:var(--rl-text)}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
     "button.rl-po-primary,button.rl-po-secondary{font:inherit;font-weight:700;font-size:14px}.rl-po-primary:active,.rl-po-secondary:active,.rl-rg-row:active{transform:scale(.97)}" +
-    ".rl-rg-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid var(--rl-line);border-radius:14px;background:var(--rl-card);font:inherit;text-align:left;cursor:pointer;color:var(--rl-text)}" +
-    ".rl-rg-l{flex:none;width:104px;font-size:13px;color:var(--rl-text2)}.rl-rg-row b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--rl-accent)}" +
+    ".rl-rg-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'l c' 'v c';align-items:center;column-gap:12px;row-gap:1px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid var(--rl-line);border-radius:14px;background:var(--rl-card);font:inherit;text-align:left;cursor:pointer;color:var(--rl-text)}" +
+    ".rl-rg-l{grid-area:l;font-size:13px;color:var(--rl-text2)}.rl-rg-row b{grid-area:v;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{grid-area:c;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--rl-accent)}" +
     ".rl-rg-next{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:14px;line-height:1.45}" +
     ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:7px 18px;border-radius:999px;border:1px solid var(--rl-line);font-weight:800;font-size:14px;background:var(--rl-card);color:var(--rl-text)}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:8px 17px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
     ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:#101828;color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}@media(max-width:520px){.rl-wr-cover{padding:24px 22px}}" +
@@ -533,7 +533,7 @@
     ".rl-rr-pic{flex:none;width:48px;height:48px;border-radius:14px;background:var(--rl-fill);display:grid;place-items:center;overflow:hidden;font-weight:800;font-size:15px;color:var(--rl-accent)}.rl-rr-pic.rl-has-photo img{width:100%;height:100%;object-fit:cover}" +
     ".rl-rr-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-rr-mid b{font-size:15.5px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-rr-mid span{font-size:13.5px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-rr-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.rl-rr-end b{font-size:15.5px;color:var(--rl-text)}" +
-    ".rl-rr-chip{font-size:12px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
+    ".rl-rr-chip{font-size:13px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
@@ -1125,7 +1125,8 @@
     card.appendChild(el("div", { className: "rl-jscan-t" }, [jIc("mail"), el("div", {}, [line, sub])]));
     card.appendChild(bar);
     journeyScan(sheet, st).on(function (job, done) {
-      if (!document.body.contains(card)) return;
+      // (The first call comes before the card is on the page: it fills it in then. Once the card has gone, it stops.)
+      if (card.parentNode && !document.body.contains(card)) return;
       var found = (job && job.found) || 0;
       var m = /^(\d{4})-(\d{2})/.exec((job && job.scannedBack) || ""), pct = 6;
       if (m) { var months = (Date.now() - Date.UTC(+m[1], +m[2] - 1, 1)) / (30.4 * 864e5); pct = Math.max(6, Math.min(96, Math.round(months / 16 * 100))); }
@@ -1810,7 +1811,7 @@
       var dl = el("div", { style: "clear:both;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px" }, [
         el("span", { text: (dv.status === "delivered" ? "✓ " : "") + said + (dv.carrier ? " · " + dv.carrier : ""),
           style: "font-weight:700;padding:4px 10px;border-radius:999px;background:" + (dv.status === "delivered" ? "#e3f4c8;color:var(--rl-accent)" : "#e7eefc;color:#1d3f8a") })]);
-      if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel →", style: "font-weight:600" }));
+      if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel", style: "font-weight:600;display:inline-flex;align-items:center;min-height:44px" }));
       card.appendChild(dl);
     }
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
@@ -2068,7 +2069,7 @@
           b.setAttribute("aria-pressed", x[0] === f ? "true" : "false");
           chips.appendChild(b);
         });
-        var cq = el("input", { type: "search", className: "rl-cat-search", placeholder: "Search " + groupNames[k].toLowerCase() + ": shop, item or order number" });
+        var cq = el("input", { type: "search", className: "rl-cat-search", placeholder: "Search " + groupNames[k].toLowerCase() });
         cq.setAttribute("aria-label", "Search " + groupNames[k].toLowerCase());
         var body = el("div");
         list.appendChild(chips); list.appendChild(cq); list.appendChild(body);
@@ -3849,6 +3850,12 @@
     return card;
   }
   // "Return by 14 Nov · 13 days left", red when it's close.
+  // How a date is put: the shop's own ("Return by"), the least the law allows from delivery ("at least"), or one Relay
+  // worked out from the order date, which is the safe one to go by ("To be safe, return by").
+  function deadlineLead(x, dl, plain) {
+    var by = x.returnBy && dl === x.returnBy.date ? x.returnBy : null;
+    return !by ? plain : by.estimate ? "To be safe, return by " : by.basis === "uk_law" ? "Return by at least " : plain;
+  }
   function deadlineChip(dl, lead) {
     var d = daysLeft(dl), day = new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
     var txt = (lead || "Return by ") + day + (d === null ? "" : d === 0 ? " · last day" : d === 1 ? " · 1 day left" : " · " + d + " days left");
@@ -3895,7 +3902,7 @@
         : dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? "Due " + (dv.at ? day(dv.at) : "today") : "On its way") + (dv.carrier ? " · " + dv.carrier : "") }));
     }
     var dl = deadlineOf(x);
-    if (opts.deadline !== false && dl) card.appendChild(deadlineChip(dl, x.returnBy && dl === x.returnBy.date ? "Return by at least " : "Return by "));
+    if (opts.deadline !== false && dl) card.appendChild(deadlineChip(dl, deadlineLead(x, dl, "Return by ")));
     if (opts.extra) opts.extra(card);
     var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
@@ -3912,7 +3919,7 @@
       open(function (sheet) {
         sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
         sheet.appendChild(receiptCard(x, function () {}, true));
-        if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) sheet.appendChild(el("a", { className: "rl-btn ghost", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel ↗", style: "display:block;text-align:center;text-decoration:none;margin-top:10px" }));
+        if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) sheet.appendChild(el("a", { className: "rl-btn ghost", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel", style: "display:block;text-align:center;text-decoration:none;margin-top:10px" }));
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
       });
     } }));
@@ -3943,7 +3950,7 @@
   function returnGuide(sheet, x, who, portal) {
     sheet.appendChild(el("h2", { text: "Return to " + who, style: "margin:0 0 6px" }));
     var dl = deadlineOf(x);
-    if (dl) sheet.appendChild(deadlineChip(dl, x.returnBy && dl === x.returnBy.date ? "Return by at least " : "Send it back by "));
+    if (dl) sheet.appendChild(deadlineChip(dl, deadlineLead(x, dl, "Send it back by ")));
     sheet.appendChild(el("p", { text: who + "'s returns page asks for these. Tap one to copy it.", style: "margin:14px 0 10px;color:var(--rl-text2);font-size:15px;line-height:1.45" }));
     var rows = el("div");
     var copyRow = function (label, value) {

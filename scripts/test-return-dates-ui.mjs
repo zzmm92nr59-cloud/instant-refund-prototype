@@ -94,7 +94,7 @@ for (const thing of ["Bananas", "Kitchen Roll", "Semi Skimmed Milk", "Wool Coat"
 assert.match(text, /3 items/);
 const kettle = wallet.locator(".rl-po").filter({ hasText: "Glass Kettle 1.7L" });
 assert.match(await kettle.innerText(), /1 of 3 in this order/);
-assert.match(await kettle.innerText(), /Return by at least [\s\S]*11 days left/, "the kettle counts down: " + await kettle.innerText());
+assert.match(await kettle.innerText(), /To be safe, return by [\s\S]*11 days left/, "the kettle counts down, and says the date is the safe one: " + await kettle.innerText());
 // The strip above the tab bar names the kettle, not the bananas.
 const next = page.locator(".rl-next");
 await next.waitFor();

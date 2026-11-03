@@ -58,7 +58,9 @@ const measure = () => page.evaluate(() => {
   }
   for (const el of document.querySelectorAll("#view *, .rl-sheet *")) {
     if (!vis(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
-    if (parseFloat(getComputedStyle(el).fontSize) < 12) out.tiny.push(el.textContent.trim().slice(0, 30));
+    // Rule 6: everyday text 13px or more; a label in capitals can be 12px.
+    const st = getComputedStyle(el), px = parseFloat(st.fontSize), t = el.textContent.trim();
+    if (px < 12 || (px < 13 && st.textTransform !== "uppercase" && t !== t.toUpperCase())) out.tiny.push(t.slice(0, 30) + " " + px);
   }
   for (const el of document.querySelectorAll("*")) { const s = getComputedStyle(el); if (/rgb\((48, 37, 93|91, 33, 182|124, 77, 189|30, 27, 75|109, 40, 217|76, 29, 149)\)/.test(s.backgroundImage + s.backgroundColor)) out.purple.push(el.className || el.tagName); }
   return out;
@@ -67,7 +69,7 @@ for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
   await page.evaluate(p => window.go(p), pg); await page.waitForTimeout(1200);
   const m = await measure();
   assert.deepEqual(m.small, [], pg + ": everything tappable is at least 44px tall");
-  assert.deepEqual(m.tiny, [], pg + ": no text smaller than 12px");
+  assert.deepEqual(m.tiny, [], pg + ": no everyday text under 13px (capitals 12px)");
   assert.deepEqual(m.symbols, [], pg + ": no symbol characters used as icons in buttons");
   assert.deepEqual(m.purple, [], pg + ": no purple");
 }
@@ -76,7 +78,7 @@ for (const sub of [null, "Email connection", "Email permission", "Download my da
   if (sub) { await page.locator(".rl-arow", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
   const m = await measure(), where = "Profile" + (sub ? " > " + sub : "");
   assert.deepEqual(m.small, [], where + ": everything tappable is at least 44px tall");
-  assert.deepEqual(m.tiny, [], where + ": no text smaller than 12px");
+  assert.deepEqual(m.tiny, [], where + ": no everyday text under 13px (capitals 12px)");
   assert.deepEqual(m.symbols, [], where + ": no symbol characters used as icons");
   assert.deepEqual(m.purple, [], where + ": no purple");
   if (sub) await page.getByRole("button", { name: "Back to Profile" }).click();

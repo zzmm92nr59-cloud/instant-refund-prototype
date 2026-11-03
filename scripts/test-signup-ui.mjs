@@ -154,9 +154,12 @@ assert.equal(st.profilePosts.length, 0, "and not saved without asking");
 await sheet.locator(".rl-jscan").getByText(/receipts? found so far/).waitFor();
 assert.equal(await sheet.getByRole("img", { name: "Step 2 of 3" }).count(), 1, "the count carries on from the permission step");
 await polished("name"); await page.screenshot({ path: "/tmp/shots/signup-3-name.png" });
+// The first read finishes while the name is being added: "You're all set" shows the count it reached straight away
+// (it used to go back to "Reading your Gmail…" and stay there).
+await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
 await sheet.getByRole("button", { name: "Continue" }).click();
 await sheet.getByRole("heading", { name: "You're all set, Jess." }).waitFor();
-await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
+assert.match(await sheet.locator(".rl-jscan").innerText(), /12 receipts found/, "the count carries over to 'You're all set' at once");
 assert.deepEqual(st.profilePosts, [{ name: "Jess Tester" }]);
 assert.equal(st.connects, 0, "no second visit to Google to connect Gmail");
 assert.equal(st.consentPosts, 0, "the agreement made before Google isn't asked for again");
