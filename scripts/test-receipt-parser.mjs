@@ -494,6 +494,14 @@ t("supermarket order: name, quantity and price, with unit prices and notes in be
   assert.equal(r.totalPence, 1065);
 });
 
+t("shop order: the option under a product's name is not its name", () => {
+  const html = `<p>We've received your order #1050999</p><table><tr><td>Product</td><td>Quantity</td><td>Price</td></tr>
+<tr><td>Example Pen - Mango Ice<br>Flavour: Mango Ice</td><td>2</td><td>£ 1.98</td></tr>
+<tr><td>Example Pen - Cola<br>Flavour: Cola</td><td>1</td><td>£ 0.99</td></tr></table><p>Total: £2.97</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Vapes <shop@examplevapes.test>", "Your Example Vapes order has been received!", "Mon, 12 Jun 2023 10:00:00 +0100", html));
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence, i.variant]), [["Example Pen - Mango Ice", 2, 198, "Flavour: Mango Ice"], ["Example Pen - Cola", 1, 99, "Flavour: Cola"]]);
+});
+
 t("fast food: a deal's headline gives way to the item under it; 'Total (including VAT)'; a two-figure year", () => {
   const html = `<p>Here's the receipt for your order</p><table><tr><td>Order Date:</td><td>27/05/24 14:46</td></tr></table>
 <table><tr><td>Qty</td><td>Item Detail</td><td>Item Cost</td></tr>

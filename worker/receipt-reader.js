@@ -235,6 +235,7 @@ const CELL_NOTE = /^£\s?\d[\d,]*\.\d{2}\s*(?:\/|per\b|each\b|ea\b)|^(?:substitu
 const CELL_END = /^(?:sub-?\s?total|total\b|order total|grand total|basket total|items? total|vat\b|tax\b|delivery\b|shipping\b|postage\b|service (?:fee|charge)|payment\b|discount|offer discount|promotion|you(?:'|’)?ve saved|you saved|savings\b|tip\b|bag (?:charge|levy)|carrier bag|credit\b|voucher|gift card|amount (?:paid|due)|paid\b|balance\b|estimated total|rewards?\b)/i;
 const CELL_HEAD = /^(?:qty|quantity|items?|item (?:detail|details|name|cost|price)|description|products?|price|amount|cost|each|unit price|line total)$/i;
 const CELL_PLUS = /^[+•]$/;
+const CELL_OPTION = /^(?:flavou?r|size|colou?r|style|variant|option|strength|fit|length|width|material|scent|shade|type)\s*:\s*\S/i;
 // What comes after a table when it has no totals of its own.
 const CELL_AFTER = /^(?:thank(?:s| you)\b|we hope\b|enjoy\b|need (?:help|to)\b|questions?\b|contact\b|track (?:your|my)\b|view (?:your|my|order)\b|download\b|manage (?:your|my)\b|get the app\b)/i;
 const pennies = s => Math.round(Number(String(s).replace(/,/g, "")) * 100);
@@ -287,7 +288,11 @@ export function itemsFromCells(text) {
         if (!cur.name) { if (sentence(c)) break; cur.name = c; }
         else if (!sentence(c) && c !== cur.name && !cur.extras.includes(c)) cur.extras.push(c);
         else if (sentence(c) && cur.pence != null) break;
-      } else if (qtyAt(next(j)) != null && priceAt(next(next(j)))) { done(); cur = { name: c, extras: [] }; }
+      } else if (qtyAt(next(j)) != null && priceAt(next(next(j)))) {
+        done();
+        // "Nerd Pen - Banana Ice | Flavour: Banana Ice | 2 | £1.98": the option under the product's name is not its name.
+        cur = CELL_OPTION.test(c) && j > 0 && nameAt(j - 1) && !CELL_OPTION.test(cells[j - 1]) ? { name: cells[j - 1], extras: [c] } : { name: c, extras: [] };
+      }
       // (in a name-first table, any other name is a note under the item)
     }
     done();
