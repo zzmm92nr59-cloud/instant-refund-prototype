@@ -406,6 +406,8 @@ assert.equal(JSON.parse(advert.details).photoIsItem, false, "but it isn't of the
 const listed = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.equal(listed.find(x => x.orderRef === "EO-5").hasImage, true, "a real item photo is shown");
 assert.equal(listed.find(x => x.orderRef === "EO-9").hasImage, false, "an advert is never shown as the item");
+const jumper = listed.find(x => x.orderRef === "EO-5").items.find(i => i.name === "Wool jumper");
+assert.deepEqual([jumper.category, jumper.categorySure], ["fashion", true], "each item says what it is, and whether its own name said so");
 // The style list: physical things from every receipt, only the shopper's own.
 const style = await (await call("/relay/my/style", { token: alice })).json();
 assert.ok(style.receipts.some(x => x.items.some(i => i.name === "Wool jumper")), "things bought are listed for the style");

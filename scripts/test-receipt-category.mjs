@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind, itemCategories, categoryShares } from "../worker/receipt-category.js";
 import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
@@ -103,5 +103,59 @@ t("a supermarket basket stays Food & drink, however much kitchen roll is in it",
   assert.equal(itemKind("Super Absorbent Kitchen Towels"), "home");
   assert.equal(itemKind("Greek Yoghurt 950g"), "food");
   assert.equal(itemKind("Highland Venison Grillsteaks"), null, "a name that doesn't say");
+});
+// Each item on a receipt is scored on its own, and the receipt's group is built from those scores.
+const priced = (shop, domain, rows, total) => ({ retailer: { name: shop, domain }, items: rows.map(([name, pricePence, qty]) => ({ name, pricePence, qty: qty || 1 })), totalPence: total });
+const weekly = priced("Sainsbury's", "sainsburys.co.uk", [["Semi Skimmed Milk 2.27L", 165], ["Soft White Medium Bread 800g", 140], ["Classic Clean Toilet Tissue x9", 650],
+  ["Super Absorbent Kitchen Towels x2", 300], ["Total Toothpaste 75ml", 250], ["Bananas Loose", 90], ["Baked Beanz 4x415g", 400], ["Highland Venison Grillsteaks", 500],
+  ["Platinum Dishwasher Tablets x40", 900], ["AA Batteries x4", 500], ["Mature Cheddar 350g", 375], ["Fabric Conditioner 1.16L", 350], ["Closed Cup Mushrooms 300g", 95],
+  ["Spreadable Butter 500g", 450], ["Cat Food Pouches 12x100g", 500], ["Strawberries 400g", 250]], 6900);
+t("each item on a supermarket receipt gets its own group, with how sure it is", () => {
+  const k = itemCategories(weekly), by = name => k[weekly.items.findIndex(i => i.name === name)];
+  assert.deepEqual(by("Super Absorbent Kitchen Towels x2"), { category: "home", points: 3, sure: true, ranked: [{ category: "home", points: 3 }, { category: "food", points: 1 }] },
+    "kitchen roll is Home & garden; the supermarket's lean towards food comes second");
+  assert.equal(by("Bananas Loose").category, "food"); assert.equal(by("Bananas Loose").sure, true);
+  assert.equal(by("Total Toothpaste 75ml").category, "beauty");
+  assert.equal(by("AA Batteries x4").category, "electronics");
+  assert.equal(by("Classic Clean Toilet Tissue x9").category, "home");
+  assert.equal(by("Fabric Conditioner 1.16L").category, "home", "fabric conditioner, not hair conditioner");
+  assert.equal(by("Cat Food Pouches 12x100g").category, "home", "pet food goes with the pets, not the shopper's food");
+  assert.deepEqual(by("Highland Venison Grillsteaks"), { category: "food", points: 1, sure: false, ranked: [{ category: "food", points: 1 }] }, "a name that doesn't say: the supermarket's food");
+  assert.equal(categorise(weekly).category, "food", "the receipt is still the week's groceries");
+  assert.equal(itemCategories({ retailer: { name: "Tiny Shop" }, items: [{ name: "Thing" }, { name: "" }] }).every(x => x === null), true, "nothing points anywhere: no guess");
+});
+t("a shop Relay knows lends its group to its items, but an item's own clear name wins", () => {
+  const lush = itemCategories({ retailer: { name: "Lush", domain: "lush.com" }, items: [{ name: "Honey I Washed The Kids Soap" }, { name: "Honey Lip Scrub" }] });
+  assert.equal(lush[0].category, "beauty"); assert.equal(lush[1].category, "beauty", "\"honey\" is a flavour there, not food");
+  const currys = itemCategories({ retailer: { name: "Currys", domain: "currys.co.uk" }, items: [{ name: "Kettle" }, { name: "Extended warranty" }] });
+  assert.equal(currys[0].category, "home"); assert.equal(currys[1].category, "electronics"); assert.equal(currys[1].sure, false);
+  assert.equal(itemCategories({ retailer: { name: "Marks & Spencer", domain: "marksandspencer.com" }, items: [{ name: "Percy Pig sweets" }] })[0].category, "food",
+    "a shop that sells everything only leans a little");
+  assert.equal(itemCategories({ retailer: { name: "Zara" }, items: [{ name: "Chicken sandwich" }] }, "home")[0].category, "food", "a group the shopper chose leans, but doesn't rename things");
+  assert.equal(itemCategories({ retailer: { name: "Zara" }, items: [{ name: "Gift wrap" }] }, "home")[0].category, "home");
+});
+t("items count by what they cost, when the receipt says", () => {
+  assert.equal(c("Amazon.co.uk", "amazon.co.uk", ["Nespresso Vertuo Pods, Mixed Pack", "Anker USB-C Charger 20W"]).category, "electronics", "no prices: one each, and a tie goes to the returnable kind");
+  assert.equal(categorise(priced("Amazon.co.uk", "amazon.co.uk", [["Nespresso Vertuo Pods, Mixed Pack", 3000], ["Anker USB-C Charger 20W", 1500]], 4500)).category, "food");
+  assert.equal(categorise(priced("Amazon.co.uk", "amazon.co.uk", [["Nespresso Vertuo Pods, Mixed Pack", 900], ["Anker USB-C Charger 20W", 1500]], 2400)).category, "electronics");
+  // A supermarket: one jacket in a big food shop is groceries; a jacket and a pint of milk is clothes.
+  const big = [["F&F Denim Jacket", 1500], ["Finest Sourdough", 150], ["Whole Milk 4 Pints", 145], ["Chicken Breast Fillets 650g", 450], ["Crumpets 6 Pack", 120],
+    ["Free Range Eggs x12", 300], ["Mature Cheddar 350g", 375], ["Lasagne Sheets", 120], ["Bolognese Sauce", 180], ["Lean Beef Mince 500g", 450], ["Garden Peas 1kg", 160]];
+  assert.equal(categorise(priced("Tesco", "tesco.com", big, 3950)).category, "food");
+  assert.equal(categorise(priced("Tesco", "tesco.com", [["F&F Denim Jacket", 4500], ["Whole Milk 4 Pints", 145]], 4645)).category, "fashion");
+  assert.equal(categorise(priced("Tesco", "tesco.com", [["F&F Denim Jacket", 4500], ["Whole Milk 4 Pints", 145]], 4645)).returnable, true, "so its return window shows");
+});
+t("a receipt's money splits by what each item is, only when every item is priced", () => {
+  const s = categoryShares({ ...weekly, category: "food" });
+  assert.deepEqual(s.map(x => x.category), ["home", "food", "electronics", "beauty"], "biggest share first");
+  const sum = weekly.items.reduce((n, i) => n + i.pricePence, 0), cost = names => names.reduce((n, x) => n + weekly.items.find(i => i.name === x).pricePence, 0);
+  assert.ok(Math.abs(s.find(x => x.category === "home").share - cost(["Classic Clean Toilet Tissue x9", "Super Absorbent Kitchen Towels x2", "Platinum Dishwasher Tablets x40", "Fabric Conditioner 1.16L", "Cat Food Pouches 12x100g"]) / sum) < 1e-9,
+    "Home & garden's share is what the household things cost");
+  assert.ok(Math.abs(s.reduce((n, x) => n + x.share, 0) - 1) < 1e-9, "the shares add up to the whole receipt");
+  assert.deepEqual(s.find(x => x.category === "beauty").items, [4], "and say which items are in each");
+  assert.equal(categoryShares({ ...weekly, items: weekly.items.map((i, n) => (n === 3 ? { name: i.name } : i)) }), null, "an item without a price: no split");
+  assert.equal(categoryShares({ ...weekly, totalPence: 600 }), null, "prices nowhere near the total (a misread price): no split");
+  assert.equal(categoryShares(priced("Zara", "zara.com", [["Coat", 5990], ["Scarf", 1990]], 7980)), null, "one kind of thing: nothing to split");
+  assert.equal(categoryShares({ ...weekly, totalPence: null }), null);
 });
 console.log(`\n${n} category tests passed`);

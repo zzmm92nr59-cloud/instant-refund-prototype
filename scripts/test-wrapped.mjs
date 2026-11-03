@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildWrapped } from "../worker/wrapped.js";
+import { categorise, itemCategories } from "../worker/receipt-category.js";
 const R = (name, domain) => ({ name, domain });
 const cards = [
   { id: "1", kind: "order", retailer: R("Zara", "zara.com"), orderDate: "2026-03-10", totalPence: 5990, currency: "GBP", category: "fashion", categoryLabel: "Fashion", items: [{ name: "Coat", qty: 1 }], orderRef: "A1", createdAt: Date.parse("2026-03-11") },
@@ -89,4 +90,43 @@ const shop = [1, 2, 3, 4].map(i => ({ kind: "order", retailer: R("Sainsbury's", 
 const groceries = buildWrapped(shop, 2026, Date.UTC(2026, 11, 31));
 assert.deepEqual(groceries.chapters.find(c => c.category === "food").topItem, { name: "Greek Yoghurt 950g", times: 3 });
 assert.equal(groceries.topItem.name, "Super Absorbent Kitchen Towels", "the whole year's list still counts everything bought");
+// Each item counted where it belongs: a receipt with different kinds of things in it (and a price on every item) is
+// split by what those things cost, the way the receipts list gives each item its own group.
+const listed = (c) => {
+  const g = categorise(c), k = itemCategories(c);
+  return { kind: "order", currency: "GBP", ...c, ...g, items: c.items.map((it, i) => ({ qty: 1, ...it, category: k[i] ? k[i].category : g.category, categorySure: Boolean(k[i] && k[i].sure) })) };
+};
+const SB = R("Sainsbury's", "sainsburys.co.uk");
+const weeks = [1, 2, 3].map(i => listed({ id: "s" + i, retailer: SB, orderDate: "2026-04-0" + i, totalPence: 600,
+  items: [{ name: "Super Absorbent Kitchen Towels", pricePence: 300 }, { name: "Greek Yoghurt 950g", pricePence: 200 }, { name: "Bananas Loose", pricePence: 100 }] }));
+const noPrices = listed({ id: "s4", retailer: SB, orderDate: "2026-04-04", totalPence: 1000, items: [{ name: "Super Absorbent Kitchen Towels" }, { name: "Greek Yoghurt 950g" }] });
+const batteries = listed({ id: "s5", retailer: SB, orderDate: "2026-04-05", totalPence: 800, items: [{ name: "AA Batteries x4", pricePence: 300 }, { name: "Greek Yoghurt 950g", pricePence: 500 }] });
+const amazon = listed({ id: "a1", retailer: R("Amazon.co.uk", "amazon.co.uk"), orderDate: "2026-05-01", totalPence: 4500, returnPlan: { orderRef: "AZ" },
+  items: [{ name: "Nespresso Vertuo Pods, Mixed Pack", pricePence: 3000 }, { name: "Anker USB-C Charger 20W", pricePence: 1500 }] });
+const jl = listed({ id: "j1", retailer: R("John Lewis", "johnlewis.com"), orderDate: "2026-06-01", totalPence: 8000, hasImage: true,
+  items: [{ name: "Wool jumper", pricePence: 6000 }, { name: "Scented candle", pricePence: 2000 }] });
+const mixed = [...weeks, noPrices, batteries, amazon, jl];
+assert.deepEqual([weeks[0].category, noPrices.category, batteries.category, amazon.category, jl.category], ["food", "food", "food", "food", "fashion"]);
+const y = buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31));
+assert.equal(y.receipts, 7, "the year still counts each receipt once");
+assert.equal(y.spentPence, 3 * 600 + 1000 + 800 + 4500 + 8000);
+assert.equal(y.industries.reduce((n, k) => n + k.spentPence, 0), y.spentPence, "every penny is counted once, in one kind");
+const ind = Object.fromEntries(y.industries.map(k => [k.category, k]));
+assert.equal(ind.home.spentPence, 3 * 300 + 2000, "the kitchen roll from each weekly shop and the candle are Home & garden");
+assert.equal(ind.electronics.spentPence, 300 + 1500, "the batteries and the charger are Electronics");
+assert.equal(ind.food.spentPence, 3 * 300 + 1000 + 500 + 3000, "what's left of the food shops, the unpriced shop whole, and the coffee pods");
+assert.equal(ind.fashion.spentPence, 6000);
+assert.deepEqual(y.chapters.map(c => c.category).sort(), ["fashion", "food", "home"], "Home & garden gets a chapter (kitchen roll in 3 shops); two gadgets in other orders don't");
+const homeCh = y.chapters.find(c => c.category === "home");
+assert.equal(homeCh.receipts, 4); assert.equal(homeCh.spentPence, 2900); assert.equal(homeCh.shops, 2); assert.equal(homeCh.topShop.name, "John Lewis", "the candle cost more than three lots of kitchen roll");
+assert.deepEqual(homeCh.topItem, { name: "Super Absorbent Kitchen Towels", times: 3 });
+assert.deepEqual(homeCh.photos, [], "John Lewis's photo stays with the jumper");
+assert.equal(y.chapters.find(c => c.category === "fashion").photos.length, 1);
+const foodW = buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31), { industry: "food" });
+assert.equal(foodW.yearList.some(x => /Kitchen Towels/.test(x.name)), false, "kitchen roll is never one of the food things, priced or not");
+assert.deepEqual(foodW.topItem, { name: "Greek Yoghurt 950g", times: 5, shop: "Sainsbury's" });
+assert.equal(foodW.returnsStarted, 1, "the Amazon return stays with the order's own part");
+assert.equal(buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31), { industry: "electronics" }).returnsStarted, 0);
+assert.equal(buildWrapped(mixed, 2026, Date.UTC(2026, 11, 31), { industry: "electronics" }).spentPence, 1800);
+assert.ok(y.things.some(x => x.name === "Wool jumper") && !y.things.some(x => x.name === "Bananas Loose"), "the style slide gets things, not the bananas");
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly; one Wrapped per kind of shopping");
