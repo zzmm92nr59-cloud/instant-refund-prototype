@@ -59,6 +59,7 @@ jobs:
           node scripts/test-parcels.mjs
           node scripts/test-gmail-auto.mjs
           node scripts/test-gmail-busy.mjs
+          node scripts/test-delete-account.mjs
           node scripts/test-square-orders.mjs
           node --check worker/returns.js
           node scripts/test-returns-offline.mjs

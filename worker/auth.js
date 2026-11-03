@@ -14,7 +14,7 @@ import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
-import { handleSquareTestRoute, enrichSquarePurchases } from "./square-orders.js";
+import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
@@ -573,7 +573,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
         ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
         ...totpDeleteStatements(env.RELAY_DB, shopper.id),
         ...pushDeleteStatements(env.RELAY_DB, shopper.id),
-        ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash)),
+        ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash, shopper.id)),
+        ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
+        // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
+        env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
         env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
         env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),

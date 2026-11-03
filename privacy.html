@@ -34,13 +34,14 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <!-- Before launch: have this reviewed by a qualified lawyer, and add a "Who we are" section naming the company
      (registered name, number and address) and an email address for privacy requests. Relay's code has none of these yet. -->
 <h1>Privacy policy</h1>
-<p class="updated">Last updated 2 November 2026</p>
+<p class="updated">Last updated 3 November 2026</p>
 
 <section class="summary">
 <h2>The short version</h2>
 <ul>
 <li>Relay only reads your email if you connect it, and only in read-only mode. It looks for order confirmations, receipts and return emails, and nothing else.</li>
 <li>It keeps the details of each purchase (store, items, total, return deadline) and a link back to the email. It does not keep the emails themselves.</li>
+<li>Your emails are read by Relay's own rules on Relay's own servers. No AI reads them, and they are never sent to an AI company.</li>
 <li>Relay never sells your data, never shows you ads, and has no tracking or analytics.</li>
 <li>You can disconnect your email, withdraw your permission or delete your account at any time, from the Account page.</li>
 </ul>
@@ -72,7 +73,8 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <p>If you connect Gmail or Outlook, you give Relay read-only access. It cannot send, delete, move or change anything in your inbox.</p>
 <ul>
 <li><strong>What it looks for:</strong> order confirmations, receipts and return emails. Other emails are not kept.</li>
-<li><strong>What it keeps from each one:</strong> the store, order number, date, total and items; return details such as the deadline, how to return, any return ID or link; one small product photo from the email if there is one; and a link back to the original email so you can open it yourself.</li>
+<li><strong>What it keeps from each one:</strong> the store, order number, date, total and items; the email address the shop sent the order to (so a returns page gets the right one); return details such as the deadline, how to return, any return ID or link; one small product photo from the email if there is one; and a link back to the original email so you can open it yourself.</li>
+<li><strong>How it reads them:</strong> with fixed rules that run on Relay's own servers. No AI model reads your emails, and they are never sent to an AI company or used to train one.</li>
 <li><strong>How far back:</strong> about the last 16 months. If you ask for a Wrapped of an earlier year, Relay looks through that year as well.</li>
 <li><strong>Keeping up to date:</strong> while your email is connected, Relay checks for new receipts every so often in the background.</li>
 <li><strong>The key to your inbox:</strong> stored encrypted, and used only to look for receipts.</li>
@@ -101,7 +103,8 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Apple, Google, Mozilla and Microsoft push services</th><td>Deliver notifications to your device. The messages are encrypted.</td></tr>
 <tr><th>GitHub Pages and Google Fonts</th><td>Deliver the Relay app and its typeface to your browser, so they see your IP address like any website.</td></tr>
 </table>
-<p>Product pictures and shop logos in the app are loaded from shops' own websites. If you use swap and resell, other members see your listing and the messages you send them, but never your email address.</p>
+<p>Product photos are copied from the shop's own picture link when Relay reads the email, and your device gets them from Relay. Shop logos come with the app, or Relay's servers look them up from the shop's website or Google's logo service; only the shop's web address is sent, never anything about you. When you open an original email in Relay, its pictures load from the sender's servers, as they would in your email app, so the sender may see that it was opened. Pictures of products in Discover load from the shops' image servers or their product-feed partner's (such as Awin), which see your device's IP address like any website.</p>
+<p>If you use swap and resell, other members see your listing and the messages you send them, but never your email address.</p>
 <p>We may also share information if the law requires it.</p>
 
 <h2 id="keep">How long we keep it</h2>
@@ -111,13 +114,14 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Sign-in links, codes and scrambled IP addresses</th><td>About a day.</td></tr>
 <tr><th>Name, photo, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>
 <tr><th>Returns, swaps and payments made through Relay</th><td>Kept after you delete your account, because the shops involved rely on them.</td></tr>
+<tr><th>If you're blocked from swap and sell</th><td>A scrambled form of your email address is kept, so a blocked member can't rejoin to get round the block.</td></tr>
 </table>
 
 <h2 id="rights">Your choices and rights</h2>
 <ul>
 <li><strong>Disconnect your email:</strong> Account, then Email connection. This deletes every receipt Relay captured from that inbox. For Gmail, Relay also cancels its access at Google.</li>
 <li><strong>Withdraw your permission:</strong> Account, then Privacy &amp; data. This disconnects your email and deletes what Relay captured.</li>
-<li><strong>Delete your account:</strong> Account, then Delete my account. This removes your sign-in, email connection, receipts, profile, price alerts, passkeys, two-step sign-in and saved card. For Gmail, Relay also cancels its access at Google. If you connected Outlook, you can also remove Relay from the apps connected to your Microsoft account.</li>
+<li><strong>Delete your account:</strong> Account, then Delete my account. This removes your sign-in, email connection, receipts, profile, price alerts, passkeys, two-step sign-in, saved card, and your swap and sell listings and messages. For Gmail, Relay also cancels its access at Google. If you connected Outlook, you can also remove Relay from the apps connected to your Microsoft account.</li>
 <li><strong>Turn off notifications:</strong> on the Price alerts page, or in your phone's settings.</li>
 </ul>
 <p>You also have the right to ask for a copy of your data, to have it corrected or deleted, to object to how we use it, and to complain to a data protection regulator. In the UK that is the Information Commissioner's Office, at <a href="https://ico.org.uk" rel="noopener">ico.org.uk</a>.</p>

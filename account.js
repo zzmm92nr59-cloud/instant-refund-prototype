@@ -478,7 +478,7 @@
     // Each screen showing the name or photo redraws itself; one that has been closed drops out.
     profileWatchers = profileWatchers.filter(function (f) { try { return f() !== false; } catch (e) { return false; } });
   }
-  // Both initials, like the top of Spotify or Apple Music: "Connor Gamble" is CG. With no name yet, the email's
+  // Both initials, like the top of Spotify or Apple Music: "Sam Taylor" is ST. With no name yet, the email's
   // own parts are used (connor.gamble@ is CG); a single word gives its first letter.
   function firstLetter(p) {
     function first(w) { return Array.from(w)[0].toUpperCase(); }
