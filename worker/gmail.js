@@ -66,7 +66,8 @@ const OUTLOOK_FULL_REV = 1;
 // every email app (Outlook's, Apple Mail's, Yahoo's as well as Gmail's), Microsoft's Safe Links, and text in other character sets.
 // 4: the address each order was sent to, for starting returns. 5: items laid out as table cells (pubs, takeaways,
 // fast food, supermarkets), totals with a note in brackets, month-first dates, payment notices that aren't receipts.
-const READER_FULL_REV = 5;
+// 6: "1 x Name" rows, "Total amount", the journey of a travel booking, the game behind a game web shop's receipt.
+const READER_FULL_REV = 6;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -85,7 +86,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 21;
+const PARSER_VERSION = 22;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped

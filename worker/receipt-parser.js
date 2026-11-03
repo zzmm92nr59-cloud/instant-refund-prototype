@@ -9,7 +9,7 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
-import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells } from "./receipt-reader.js";
+import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
@@ -299,7 +299,7 @@ function fromText(text, refDate) {
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   const totalMatch =
-    text.match(/\b(?:order\s+)?total(?:\s+paid)?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    text.match(/\b(?:order\s+)?total(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
@@ -534,6 +534,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     senderName: sender?.name ? fromName : null, senderDomain: domain, personal,
     bodyNames: shopNamesInText(text, subject),
     linkDomain: mainLinkDomain(html),
+    titleName: GAME_SHOP.test(domain || "") ? gameTitle(text) : null,
   });
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
@@ -542,6 +543,8 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   return out;
 }
 
+// "Your booking confirmation for London to Orpington (27 September at 12:54)", "... for return trip London to Nottingham (20 August ...".
+const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L} .'’&-]{1,40}?) to (\p{Lu}[\p{L} .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
 export function parseReceiptEmail(rawEmail, opts = {}) {
@@ -595,6 +598,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
+  // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
+  if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = gameItems(text).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
+  // A travel booking names the journey in its subject and nowhere as an item: the journey is what was bought.
+  if (!result.items.length) {
+    const j = JOURNEY.exec(subject || "");
+    if (j) result.items = [{ name: `${j[2].trim()} to ${j[3].trim()}${j[1] ? " (return)" : ""}`, qty: 1, pricePence: result.totalPence ?? null }];
+  }
   if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }
