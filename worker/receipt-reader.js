@@ -200,6 +200,9 @@ const PAYMENT = /\b(visa|mastercard|master card|amex|american express|maestro|de
 const MONEY_WORDS = /^(?:you(?:'|’)?ve saved|you(?:'|’)?ve save|you saved|you save|savings?|total savings|was|now|rrp|refund|item refund|refunded|refund amount|credit(?=\s*(?:applied|balance|note|used|:|$))|store credit|account credit|vouchers?|gift ?cards?(?: balance)?|e-?gift balance|promos?(?: applied)?|promo(?:tion(?:al)?)? (?:code|discount)|discount(?: code)?|coupon|offers?(?: applied)?|tip|gratuity|service charge|bag charge|carrier bag|delivery(?: charge| fee)?|postage(?: (?:and|&) packing)?|shipping|subtotal|sub total|total|vat|tax|balance|amount(?: due| paid)?|deposit|change|cashback|points|nectar|clubcard)\b/i;
 const LABEL_ONLY = /^(?:from|to|card|item|items|product|products|qty|quantity|price|unit price|each|description|summary|order|order summary|order details|details|name|size|colou?r|sku|ref|reference|date|time|status|ordered|dispatched|delivered|sold by|seller|item no|article|style|code)(?:\s*[:#]?\s*\d+)?(?:\s+(?:price|qty|quantity|each|total|item|items))*\s*$/i;
 const CARD_DIGITS = /\d{4,}[*•xX]{3,}|[*•]{3,}\s?\d{2,}|\b(?:x{3,}|\*{3,})\d{3,4}\b/;
+// Partner offers some shops list with the order ("10% off sitewide at Ninja!", "Free SimplyCook box",
+// "Amazon Music Unlimited – Get 3 months free"): not things that were bought.
+const OFFER_LINE = /^(?:\d{1,3}\s?% off\b|free\s+(?:[\p{L}'’-]+\s+){1,3}(?:box|trial|months?)\b)|\b(?:get|claim|enjoy)\s+\d+\s+months?\b[^£]*\bfree\b|\bfree for \d+ months?\b/iu;
 
 // Returns the item tidied ({ name, qty, ... }) or null when the line isn't an item.
 export function cleanItem(item) {
@@ -212,7 +215,7 @@ export function cleanItem(item) {
   name = name.replace(/\s*[-–:|]+$/, "").trim();
   if (letters(name).replace(/[0-9]/g, "").length < 2) return null;
   if (/:\s*$/.test(item.name.trim()) || /:$/.test(name)) return null;
-  if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name)) return null;
+  if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || OFFER_LINE.test(name)) return null;
   // "Mastercard", "Paid with Apple Pay": how it was paid. ("Credit card holder" is a thing you can buy.)
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
@@ -258,7 +261,7 @@ export function itemsFromCells(text) {
   const priceAt = i => { const m = CELL_PRICE.exec(cells[i] || ""); return m ? { pence: pennies(m[2]), negative: Boolean(m[1]) } : null; };
   const nameAt = i => { const c = cells[i]; return Boolean(c) && c.length <= 120 && /\p{L}{2}/u.test(c) && !CELL_HEAD.test(c) && !CELL_END.test(c) && !CELL_AFTER.test(c) && !CELL_NOTE.test(c) && !priceAt(i); };
   // The next cell that counts (unit prices and notes are passed over).
-  const next = i => { let j = i + 1; while (j < cells.length && CELL_NOTE.test(cells[j])) j++; return j; };
+  const next = i => { let j = i + 1; while (j < cells.length && (CELL_NOTE.test(cells[j]) || CELL_HEAD.test(cells[j]))) j++; return j; };
   // A sentence is the end of a table, not a name ("If you require a breakdown of the VAT, please speak to...").
   const sentence = c => c.length > 70 || (c.split(" ").length > 9 && /[.!?]$/.test(c));
 
@@ -313,7 +316,8 @@ export function itemsFromCells(text) {
   let best = [];
   for (let i = 0; i < cells.length; i++) {
     let mode = null;
-    if (qtyAt(i) != null && nameAt(next(i)) && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "qty";
+    const firstPrice = k => { const p = priceAt(k) || (nameAt(k) && cells[k].length <= 30 ? priceAt(next(k)) : null); return p && !p.negative; };
+    if (qtyAt(i) != null && nameAt(next(i)) && firstPrice(next(next(i)))) mode = "qty";
     else if (nameAt(i) && qtyAt(next(i)) != null && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "name";
     if (!mode) continue;
     const run = read(i, mode);

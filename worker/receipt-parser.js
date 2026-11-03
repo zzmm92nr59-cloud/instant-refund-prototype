@@ -299,8 +299,8 @@ function fromText(text, refDate) {
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   const totalMatch =
-    text.match(/\b(?:order\s+)?total(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
-    text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+    text.match(/\b(?:order\s+)?total(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -346,21 +346,22 @@ function fromText(text, refDate) {
   if (!items.length) {
     const rows = text.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
     for (let i = 0; i < rows.length; i++) {
-      const head = rows[i].match(/^(\p{L}[^£|]{1,100}?)\s*[×x]\s?(\d{1,2})$/u);
-      if (!head || /total|subtotal|delivery|shipping|discount/i.test(head[1])) continue;
+      const head = rows[i].match(/^([\p{L}\d][^£|]{1,100}?)\s*[×x]\s?(\d{1,2})$/u);
+      if (!head || !/\p{L}{2}/u.test(head[1]) || /total|subtotal|delivery|shipping|discount/i.test(head[1])) continue;
       let price = null, variant = null;
       for (let j = i + 1; j < Math.min(rows.length, i + 4) && price == null; j++) {
         const pm = rows[j].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
         if (pm) price = money(pm[1]);
         else if (!variant && rows[j].length <= 60 && !/[×]|£/.test(rows[j]) && /\//.test(rows[j])) variant = rows[j];
         else if (!variant && rows[j].length <= 40 && /^(size|colou?r|style)\b/i.test(rows[j])) variant = rows[j];
+        else if (!variant && /^\d+(?:\.\d+)?\s?(?:ml|cl|l|g|kg|oz)$/i.test(rows[j])) variant = rows[j];   // "100ml"
       }
       if (price != null) items.push({ name: head[1].trim(), qty: Number(head[2]), pricePence: price, lineTotal: true, ...(variant ? { variant } : {}) });
     }
   }
   // (Lines that are only money words, such as "You've saved £30.89", are not items: they don't stop the table being read.)
   if (!cleanItems(items).length) items.splice(0, items.length, ...itemsFromCells(text));
-  const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+  const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   return {
     method: "text",
