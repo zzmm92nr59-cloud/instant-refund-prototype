@@ -77,6 +77,9 @@ t("shops that used to land in Other", () => {
   assert.equal(c("Meta", "email.meta.com").category, "digital");
   // "Meta" counts only as the whole name, not as one word in another company's.
   assert.equal(c("Meta Materials Ltd", "metamaterials.test").category, "other");
+  assert.equal(c("Greene King", "app.greeneking.co.uk").category, "food");
+  assert.equal(c("Bows and Whistles", "bowsandwhistles.co.uk").category, "home");
+  assert.equal(c("PayLink Mobile", "paylinkmobile.test").category, "travel");
 });
 t("game web shops: each receipt keeps the game it names, with no web-shop logo", () => {
   const cards = [{ retailer: { name: "Example Quest", domain: "appcharge.com" } }, { retailer: { name: "Example Quest", domain: "appcharge.com" } },

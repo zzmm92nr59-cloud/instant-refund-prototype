@@ -24,12 +24,12 @@ const SHOP_LIST = {
     "deliveroo justeat ubereats boltfood wolt gousto hellofresh mindfulchef simplycook abelandcole riverford oddbox milkandmore getir gorillas zapp toogoodtogo " +
     "beer52 virginwines majestic majesticwine laithwaites nakedwines thewhiskyexchange whiskyexchange masterofmalt " +
     "honestburgers dishoom nandos wagamama fiveguys mcdonalds kfc burgerking dominos papajohns pizzahut pizzaexpress francomanca " +
-    "pandamami gordonramsayrestaurants gordonramsay hawksmoor flatiron bao padella " +
+    "pandamami gordonramsayrestaurants gordonramsay hawksmoor flatiron bao padella greeneking stonegate stonegatepubs " +
     "wetherspoon jdwetherspoon wetherspoons leon itsu wasabi yosushi tortilla chipotle krispykreme hotelchocolat thorntons lindt cadbury graze huel myprotein bulk grenade",
   travel: "uber bolt freenow addisonlee gett trainline tfl nationalrail lner avanti avantiwestcoast gwr southeastern southernrailway thameslink " +
     "northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar " +
     "megabus nationalexpress flixbus stagecoach firstbus arriva lime voi tier santandercycles zipcar hertz avis europcar sixt getaround " +
-    "ringgo justpark paybyphone ncp heathrowexpress gatwickexpress stanstedexpress poferries dfds stenaline brittanyferries calmac redfunnel wightlink " +
+    "ringgo justpark paybyphone paylink paylinkmobile ncp heathrowexpress gatwickexpress stanstedexpress poferries dfds stenaline brittanyferries calmac redfunnel wightlink " +
     "ryanair easyjet britishairways ba jet2 jet2holidays wizzair virginatlantic emirates qatarairways klm airfrance lufthansa tui loganair aerlingus " +
     "vueling iberia norwegian turkishairlines bookingcom booking airbnb expedia hotelscom hotels trivago premierinn travelodge hilton marriott ihg " +
     "holidayinn accor ibis novotel citizenm skyscanner kayak lastminute onthebeach loveholidays haystravel trailfinders sykescottages hoseasons " +
@@ -57,7 +57,7 @@ const SHOP_LIST = {
     "cotswoldco swoon thewhitecompany whitecompany sohohome heals conranshop coxandcox rockettstgeorge grahamandgreen emmasleep simbasleep evesleep otty " +
     "silentnight dreams bensonsforbeds mattressonline bedkingdom crocus thompsonmorgan suttons vanmeuwen primrose gardeningexpress patch " +
     "beardsanddaisies hortology bloomandwild interflora yankeecandle neom petsathome zooplus jollyes tails butternutbox lilyskitchen " +
-    "tempur sharkninja ninjakitchen karaca eflorist myeflorist greatbeanbags nkuku denelli homary",
+    "tempur sharkninja ninjakitchen karaca eflorist myeflorist greatbeanbags nkuku denelli homary bowsandwhistles",
   fashion: "rains lululemon zara hm handm asos next uniqlo nike adidas puma newbalance primark boohoo boohooman prettylittlething missguided shein gap " +
     "levi levis ralphlauren thenorthface northface patagonia jdsports sportsdirect schuh office officeshoes riverisland topshop topman mango cos " +
     "cosstores arket otherstories andotherstories weekday monki massimodutti pullandbear pullbear bershka stradivarius reiss allsaints tedbaker " +
