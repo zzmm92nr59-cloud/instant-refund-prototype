@@ -48,6 +48,8 @@ jobs:
         run: node scripts/test-wallet-fresh-ui.mjs
       - name: Test the look (light and dark, colourful tiles, glass tab bar with the next return)
         run: node scripts/test-look-ui.mjs
+      - name: Test speed (one request per thing, tabs reuse what was just loaded, the catalogue waits for Discover)
+        run: node scripts/test-speed-ui.mjs
       - name: Test receipt groups (every receipt, header, filters, months, rows)
         run: node scripts/test-receipts-cat-ui.mjs
       - name: Test returns from the wallet (order number and email to copy, the shop's page, then the QR code)

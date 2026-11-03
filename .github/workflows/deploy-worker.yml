@@ -90,6 +90,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
+          # Wrangler 4 understands the placement setting in wrangler.toml (running the Worker next to the database).
+          wranglerVersion: "4"
           command: deploy
 
       # GitHub Actions secrets do not automatically become Worker runtime secrets.
