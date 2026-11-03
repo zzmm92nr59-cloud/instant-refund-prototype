@@ -69,4 +69,13 @@ t("a shop's own name says what it is when Relay doesn't know it", () => {
   assert.equal(c("Northwest Beds", "beds.test").category, "home");
   assert.equal(c("Smith's Pharmacy", "smithspharmacy.test").category, "beauty");
 });
+t("shops that used to land in Other", () => {
+  assert.equal(c("Homary", "homary.com").category, "home");
+  assert.equal(c("Hollywood Bowl London at The O2", "hollywoodbowl.co.uk").category, "experiences");
+  assert.equal(c("Panda Mami", null).category, "food");
+  assert.equal(c("Clare Champion", "clarechampion.ie").category, "digital");
+  assert.equal(c("Meta", "email.meta.com").category, "digital");
+  // "Meta" counts only as the whole name, not as one word in another company's.
+  assert.equal(c("Meta Materials Ltd", "metamaterials.test").category, "other");
+});
 console.log(`\n${n} category tests passed`);

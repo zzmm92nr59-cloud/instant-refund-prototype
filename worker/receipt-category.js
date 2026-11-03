@@ -16,13 +16,15 @@ const SHOP_LIST = {
   experiences: "eventim ticketmaster seetickets axs dice todaytix londontheatredirect atgtickets lwtheatres nimaxtheatres delfontmackintosh " +
     "eventbrite skiddle fatsoma ticketswap stubhub viagogo gigantic ticketline virginexperiencedays buyagift redletterdays experiencedays " +
     "odeon cineworld myvue vue picturehouses everymancinema curzon showcasecinemas altontowers thorpepark legoland chessington merlinentertainments " +
-    "londoneye madametussauds sealife wonderdays tripadvisor getyourguide viator klook headout",
+    "londoneye madametussauds sealife wonderdays tripadvisor getyourguide viator klook headout hollywoodbowl tenpin puttshack flightclub " +
+    "boomcricket topgolf clipnclimb gravity trampolinepark escaperoom",
   food: "nespresso lavazza illy pactcoffee pact taylorsofharrogate bettys yorkshiretea twinings whittard teapigs clipperteas " +
     "starbucks costa costacoffee caffenero nero pret pretamanger greggs gails joeandthejuice blankstreet " +
     "tesco sainsburys asda morrisons waitrose ocado lidl aldi iceland coop cooperative spar budgens londis nisa costco amazonfresh " +
     "deliveroo justeat ubereats boltfood wolt gousto hellofresh mindfulchef simplycook abelandcole riverford oddbox milkandmore getir gorillas zapp toogoodtogo " +
     "beer52 virginwines majestic majesticwine laithwaites nakedwines thewhiskyexchange whiskyexchange masterofmalt " +
     "honestburgers dishoom nandos wagamama fiveguys mcdonalds kfc burgerking dominos papajohns pizzahut pizzaexpress francomanca " +
+    "pandamami gordonramsayrestaurants gordonramsay hawksmoor flatiron bao padella " +
     "wetherspoon jdwetherspoon wetherspoons leon itsu wasabi yosushi tortilla chipotle krispykreme hotelchocolat thorntons lindt cadbury graze huel myprotein bulk grenade",
   travel: "uber bolt freenow addisonlee gett trainline tfl nationalrail lner avanti avantiwestcoast gwr southeastern southernrailway thameslink " +
     "northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar " +
@@ -38,7 +40,7 @@ const SHOP_LIST = {
     "lycamobile lyca giffgaff voxi smarty lebara tescomobile ee o2 vodafone three virginmedia bt sky nowtv plusnet talktalk hyperoptic " +
     "communityfibre idmobile deezer tidal nytimes thetimes theguardian economist ft medium strava headspace calm tinder hinge bumble linkedin " +
     "grammarly 1password nordaccount elevenlabs nordvpn expressvpn surfshark proton protonmail zoom slack figma paramountplus britbox discoveryplus dazn crunchyroll " +
-    "wix squarespace godaddy namecheap",
+    "wix squarespace godaddy namecheap clarechampion meta metaquest oculus",
   electronics: "samsung currys ao aocom dell lenovo hp sony bose dyson gopro nintendo playstation oneplus xiaomi huawei anker belkin logitech " +
     "razer corsair scan overclockers ebuyer cex webuy backmarket musicmagpie sonos jbl bangolufsen garmin fitbit ring panasonic lg tcl hisense " +
     "canon nikon fujifilm wexphoto jessops richersounds raspberrypi pimoroni thepihut game googlestore laptopsdirect appliancesdirect novatech cclonline " +
@@ -55,7 +57,7 @@ const SHOP_LIST = {
     "cotswoldco swoon thewhitecompany whitecompany sohohome heals conranshop coxandcox rockettstgeorge grahamandgreen emmasleep simbasleep evesleep otty " +
     "silentnight dreams bensonsforbeds mattressonline bedkingdom crocus thompsonmorgan suttons vanmeuwen primrose gardeningexpress patch " +
     "beardsanddaisies hortology bloomandwild interflora yankeecandle neom petsathome zooplus jollyes tails butternutbox lilyskitchen " +
-    "tempur sharkninja ninjakitchen karaca eflorist myeflorist greatbeanbags nkuku denelli",
+    "tempur sharkninja ninjakitchen karaca eflorist myeflorist greatbeanbags nkuku denelli homary",
   fashion: "rains lululemon zara hm handm asos next uniqlo nike adidas puma newbalance primark boohoo boohooman prettylittlething missguided shein gap " +
     "levi levis ralphlauren thenorthface northface patagonia jdsports sportsdirect schuh office officeshoes riverisland topshop topman mango cos " +
     "cosstores arket otherstories andotherstories weekday monki massimodutti pullandbear pullbear bershka stradivarius reiss allsaints tedbaker " +
@@ -75,7 +77,7 @@ const SHOP_LIST = {
 const WHOLE_ONLY = new Set(("next very office gap cos mango arket weekday whistles jigsaw hobbs monsoon joules seasalt boden liberty vans ugg " +
   "coach pandora quiz coast oasis warehouse rab blacks columbia hunter boots game scan ring ao hp lg bolt lime tier ba ee o2 three bt sky calm " +
   "ft made sofa dreams patch tails bm bq diy booking hotels hm ms costa nero bulk leon iceland spar tortilla wasabi haven ibis avis steam " +
-  "claude kindle notion medium proton discord zoom slack tidal hinge strava office").split(" "));
+  "claude kindle notion medium proton discord zoom slack tidal hinge strava office meta gravity").split(" "));
 // Shops that sell a bit of everything: what was bought decides, and the shop's usual group is only used when the items don't say.
 const MIXED = new Set(("amazon amazonfresh ebay argos very johnlewis tesco asda sainsburys marksspencer marksandspencer ms selfridges harrods tkmaxx " +
   "temu aliexpress etsy notonthehighstreet costco bm bmstores wilko homebargains therange next debenhams houseoffraser qvc groupon wowcher " +
