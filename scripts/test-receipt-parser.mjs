@@ -620,4 +620,16 @@ t("Shopify-style: a product name that starts with a number ('260 - Inspired by .
   const r = parseReceiptEmail(`From: Example Scents <shop@examplescents.test>\nSubject: Order #1042 confirmed\nContent-Type: text/plain\n\nThank you for your purchase!\nOrder summary\n260 - Inspired by Example For Her × 1\n100ml\n£24.85\nSubtotal\n£24.85\nTotal\n£24.85\n`);
   assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence, i.variant]), [["260 - Inspired by Example For Her", 1, 2485, "100ml"]]);
 });
+t("pay-later email: the shop it paid is the shop, and what's left to pay is not an item", () => {
+  const html = `<p>Payment received for Example Athletica</p><p>Your payment of £39.33 was successful.</p>
+<table><tr><td>Summary</td></tr><tr><td>Example Athletica</td></tr><tr><td>Merchant order reference</td><td>EA05027025</td></tr>
+<tr><td>Order placed</td><td>19 November 2025</td></tr><tr><td>Paid</td><td>£39.33</td></tr><tr><td>Left to pay</td><td>£78.67</td></tr>
+<tr><td>Order details</td></tr><tr><td>Define Jacket *Example</td><td>£118.00</td></tr><tr><td>Delivery</td><td>£0.00</td></tr><tr><td>Total</td><td>£118.00</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("Klarna <noreply@klarna.co.uk>", "Payment received for Example Athletica", "Wed, 19 Nov 2025 10:00:00 +0000", html));
+  assert.equal(r.ok, true);
+  assert.equal(r.retailer.name, "Example Athletica");
+  assert.equal(r.retailer.via, "klarna.co.uk");
+  assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["Define Jacket *Example", 11800]]);
+  assert.equal(r.totalPence, 11800);
+});
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);

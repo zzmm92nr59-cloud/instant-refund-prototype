@@ -69,7 +69,8 @@ const OUTLOOK_FULL_REV = 1;
 // 6: "1 x Name" rows, "Total amount", the journey of a travel booking, the game behind a game web shop's receipt.
 // 7: totals a line below their word, names over two cells, labels between a row's values, names starting with a number.
 // 8: the game named in a game web shop's HTML even when its plain-text part leads with the shop's support line.
-const READER_FULL_REV = 8;
+// 9: the shop behind a pay-later, voucher or ticket platform's email (Klarna, GiftPro, Toggle, Ventrata).
+const READER_FULL_REV = 9;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -88,7 +89,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 24;
+const PARSER_VERSION = 25;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped

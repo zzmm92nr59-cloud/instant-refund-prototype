@@ -86,4 +86,9 @@ t("game web shops: each receipt keeps the game it names, with no web-shop logo",
   assert.equal(logoDomainFor({ name: "Appcharge", domain: "appcharge.com" }), "appcharge.com");
   assert.equal(c("Example Quest", "appcharge.com", ["2,200 Coins"]).category, "digital");
 });
+t("shops behind voucher and ticket platforms get their own logo, not the platform's", () => {
+  assert.equal(logoDomainFor({ name: "Gordon Ramsay Restaurants", domain: null, via: "giftpro.co.uk" }), "gordonramsayrestaurants.com");
+  assert.equal(logoDomainFor({ name: "Uber Boat by Thames Clippers", domain: null, via: "ventrata.com" }), "thamesclippers.com");
+  assert.equal(logoDomainFor({ name: "lululemon", domain: null, via: "klarna.co.uk" }), "lululemon.com");
+});
 console.log(`\n${n} category tests passed`);
