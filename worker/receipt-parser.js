@@ -9,7 +9,7 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
-import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia } from "./receipt-reader.js";
+import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
@@ -163,6 +163,7 @@ function decodeEntities(text) {
 }
 function htmlToText(html) {
   return decodeEntities(html
+    .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -225,7 +226,7 @@ function fromJsonLd(html) {
         method: "json_ld",
         retailerName: order.seller?.name ?? null,
         orderRef: String(order.orderNumber),
-        orderDate: order.orderDate ? String(order.orderDate).slice(0, 10) : null,
+        orderDate: order.orderDate ? parseDate(String(order.orderDate).slice(0, 40)) : null,
         currency: order.priceCurrency || order.acceptedOffer?.[0]?.priceCurrency || null,
         totalPence: money(order.price),
         items,
@@ -238,21 +239,43 @@ function fromJsonLd(html) {
 // ---- Method 2: reading the text -------------------------------------------
 const MONTHS = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
 
+// A real calendar day as YYYY-MM-DD, or null ("2025-29-07" is not one).
+function ymdOf(y, mo, d) {
+  const t = new Date(Date.UTC(y, mo - 1, d));
+  return y >= 1990 && y <= 2100 && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d
+    ? `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}` : null;
+}
+// "05/06/2025" is 5 June in the UK and 6 May in the US; "07/29/2025" can only be 29 July. When both readings are real
+// days, the one nearest the email's own date (and not after it) wins, and day-first when that doesn't settle it.
+function slashDate(a, b, y, refDate) {
+  const uk = ymdOf(y, b, a), us = ymdOf(y, a, b);
+  if (!uk || !us || uk === us) return uk || us;
+  const ref = refDate instanceof Date && !Number.isNaN(refDate.getTime()) ? refDate.getTime() + 86400000 : null;
+  if (ref == null) return uk;
+  const gap = (v) => { const t = Date.parse(v + "T00:00:00Z"); return t > ref ? Infinity : ref - t; };
+  return gap(us) < gap(uk) ? us : uk;
+}
+
 export function parseDate(text, refDate) {
-  let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})(?!\d)/);
+  if (m && ymdOf(+m[1], +m[2], +m[3])) return `${m[1]}-${m[2]}-${m[3]}`;
   m = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
   if (m) {
     const mi = MONTHS.indexOf(m[2].toLowerCase());
-    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    const v = mi >= 0 ? ymdOf(+m[3], mi + 1, +m[1]) : null;
+    if (v) return v;
   }
   m = text.match(/\b([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/);
   if (m) {
     const mi = MONTHS.indexOf(m[1].toLowerCase());
-    if (mi >= 0) return `${m[3]}-${String(mi + 1).padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+    const v = mi >= 0 ? ymdOf(+m[3], mi + 1, +m[2]) : null;
+    if (v) return v;
   }
-  m = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/); // UK day-first
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  m = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+  if (m) { const v = slashDate(+m[1], +m[2], +m[3], refDate); if (v) return v; }
+  // "Order Date: 27/05/24": a two-figure year only straight after a date label (sizes such as "8/10/12" are not dates).
+  m = text.match(/\bdate\s*[:|]?\s*\|?\s*(\d{1,2})\/(\d{1,2})\/(\d{2})\b/i);
+  if (m) { const v = slashDate(+m[1], +m[2], 2000 + +m[3], refDate); if (v) return v; }
   // "Placed on Fri 9 Oct": no year in the text, so take it from the email's own date.
   m = text.match(/\b(?:placed|ordered)\s+on\s+(?:[A-Za-z]{3,9},?\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})/i);
   if (m && refDate instanceof Date && !Number.isNaN(refDate.getTime())) {
@@ -260,7 +283,8 @@ export function parseDate(text, refDate) {
     if (mi >= 0) {
       let year = refDate.getUTCFullYear();
       if (new Date(Date.UTC(year, mi, Number(m[1]))) > new Date(refDate.getTime() + 86400000)) year -= 1;
-      return `${year}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+      const v = ymdOf(year, mi + 1, +m[1]);
+      if (v) return v;
     }
   }
   return null;
@@ -273,9 +297,10 @@ function fromText(text, refDate) {
     text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
 
+  // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   const totalMatch =
-    text.match(/\b(?:order\s+)?total(?:\s+paid)?\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
-    text.match(/\bamount\s+paid\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+    text.match(/\b(?:order\s+)?total(?:\s+paid)?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -333,7 +358,8 @@ function fromText(text, refDate) {
       if (price != null) items.push({ name: head[1].trim(), qty: Number(head[2]), pricePence: price, lineTotal: true, ...(variant ? { variant } : {}) });
     }
   }
-  const sub = text.match(/\bsubtotal\s*[:|]?\s*£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+  if (!items.length) items.push(...itemsFromCells(text));
+  const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   return {
     method: "text",
@@ -431,7 +457,7 @@ function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
   const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s);
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -515,6 +541,8 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   return out;
 }
 
+const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -536,6 +564,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
   }
 
+  // A notice that the payment didn't go through is not a receipt ("we couldn't charge your account for your order").
+  if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
+    return { ok: false, reason: "payment_problem", source: "shopper_email" };
+  }
   const ld = html ? fromJsonLd(html) : null;
   const refDate = headers.date ? new Date(headers.date) : null;
   let txt = fromText(text, refDate);
@@ -583,10 +615,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const score = checks.reduce((a, b) => a + b, 0);
   // Item prices should not add up to more than the total (delivery/discounts can make them differ).
   // (A discount can take the total below the item prices, so the subtotal also counts.)
-  const ceiling = Math.max(result.totalPence ?? 0, txt.subtotalPence ?? 0);
+  // Money taken off ("Promotion applied -£12.00", "Offer discount -£22.26") also lets the items come to more than was paid.
+  const moneyOff = [...text.matchAll(/(?:^|[\s|(:])[-−]£\s?(\d{1,4}(?:,\d{3})*\.\d{2})/g)].reduce((n, m) => n + (money(m[1]) || 0), 0);
+  const ceiling = Math.max(result.totalPence ?? 0, txt.subtotalPence ?? 0) + moneyOff;
   const consistent = result.totalPence == null || !result.items.length || itemSum <= ceiling + 1;
   result.confidence = score >= 5 && consistent ? "high" : score >= 3 && consistent ? "medium" : "low";
   result.needsShopperConfirmation = result.confidence !== "high";
+  if (result.orderDate && !/^\d{4}-\d{2}-\d{2}$/.test(result.orderDate)) result.orderDate = null;
   // No date in the text: the day the shop sent the email is the best guess (used for sorting and display, never for confidence).
   if (!result.orderDate && refDate && !Number.isNaN(refDate.getTime())) { result.orderDate = isoDate(refDate); result.orderDateFrom = "email"; }
   return result;

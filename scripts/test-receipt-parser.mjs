@@ -446,3 +446,99 @@ t("promo emails are not receipts, order emails still are", () => {
   const saleWithRef = `From: Shop <hello@shop.test>\nSubject: Your order AB12345 is confirmed - sale items included\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: AB12345\nOrder total £31.00\n1 x Blue jumper £31.00\n`;
   assert.equal(parseReceiptEmail(saleWithRef).ok, true);
 });
+
+// ---- Item tables read as cells (layouts modelled on real order-and-pay, takeaway, fast-food and supermarket emails;
+// every pub, shop, item and number here is invented) ----
+const htmlMail = (from, subject, date, html) => `From: ${from}\r\nSubject: ${subject}\r\nDate: ${date}\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${html}`.replace(/\r?\n/g, "\r\n");
+const cellRow = (...cells) => "<tr>" + cells.map(c => `<td>\r\n${c}\r\n</td>`).join("") + "</tr>";
+
+t("pub order-and-pay: quantity, name and price cells, money off and VAT under them", () => {
+  const html = `<table>${cellRow("Order Id: 7700112233")}${cellRow("Order Date: Monday, August 25, 2025")}${cellRow("Table Number: 12")}</table>
+<table>${cellRow("Qty", "Description", "Amount")}${cellRow("2", "Example Pale Ale (Pint)", "£9.60")}${cellRow("1", "Cola (Half)", "£1.45")}
+${cellRow("1", "Promotion Applied", "-£2.00")}${cellRow("VAT (20%)", "£1.51")}</table>
+<table>${cellRow("Payment Type", "Apple Pay")}${cellRow("Order Total", "£9.05")}</table><p>Thank you for your order</p>`;
+  const r = parseReceiptEmail(htmlMail("The Example Arms <orders@examplearms.test>", "Thank you for your order", "Mon, 25 Aug 2025 14:46:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Example Pale Ale (Pint)", 2, 960], ["Cola (Half)", 1, 145]]);
+  assert.equal(r.totalPence, 905);
+  assert.equal(r.orderDate, "2025-08-25");
+  assert.notEqual(r.confidence, "low", "the money off explains why the items come to more than the total");
+});
+
+t("takeaway app: extras under an item, a meal deal's parts and their extra price", () => {
+  const html = `<p>Your order's been received</p><table>
+<tr><td>1</td><td>Garlic dip</td></tr><tr><td></td><td>£0.80</td></tr>
+<tr><td>1</td><td>Chicken Burger - Regular</td></tr><tr><td>£8.50</td></tr>
+<tr><td>+</td><td>No Salad</td></tr><tr><td></td><td>+</td><td>Mayonnaise</td></tr>
+<tr><td>1</td><td>Two Pizza Deal</td></tr><tr><td>£25.00</td></tr>
+<tr><td></td><td>Veggie Feast Pizza</td></tr><tr><td></td><td>+</td></tr><tr><td>Stuffed Crust</td></tr><tr><td></td><td>£3.00</td></tr>
+<tr><td></td><td>Pepperoni Pizza</td></tr><tr><td></td><td>+</td><td>Thin Base</td></tr>
+<tr><td>Subtotal:</td><td>£37.30</td></tr><tr><td>Offer discount:</td><td>-£10.00</td></tr><tr><td>Delivery:</td><td>£1.99</td></tr>
+<tr><td>Total:</td><td>£29.29</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("Example Eats <orders@exampleeats.test>", "Your order's been received", "Sat, 01 Nov 2025 19:02:00 +0000", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Garlic dip", 1, 80], ["Chicken Burger - Regular", 1, 850], ["Two Pizza Deal", 1, 2800]]);
+  assert.equal(r.items[1].variant, "No Salad, Mayonnaise");
+  assert.equal(r.items[2].variant, "Veggie Feast Pizza, Stuffed Crust, Pepperoni Pizza, Thin Base");
+  assert.equal(r.totalPence, 2929);
+});
+
+t("supermarket order: name, quantity and price, with unit prices and notes in between", () => {
+  const rows = [["Example Coconut Water 1L", 2, "£5.00", "£2.50/unit"], ["Kitchen Roll 2 Pack", 1, "£3.25", "£3.25/unit"], ["Sweet Potatoes 1kg", 2, "£2.40", "£1.20/unit"]];
+  const html = `<p>Estimated total</p><p>£10.65*</p><p>Groceries</p><p>(5 items)</p><p>Items</p><p>Quantity</p><p>Qty</p><p>Price</p>`
+    + rows.map(([n, q, p, u]) => `<p>${n}</p><p>${q}</p><p>${p}</p><p>${u}</p><p>Substitution allowed</p>`).join("")
+    + `<p>Bag charge</p><p>£0.00</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Grocer <orders@examplegrocer.test>", "Order confirmation - Example Grocer", "Thu, 22 Oct 2026 09:00:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Example Coconut Water 1L", 2, 500], ["Kitchen Roll 2 Pack", 1, 325], ["Sweet Potatoes 1kg", 2, 240]]);
+  assert.equal(r.totalPence, 1065);
+});
+
+t("fast food: a deal's headline gives way to the item under it; 'Total (including VAT)'; a two-figure year", () => {
+  const html = `<p>Here's the receipt for your order</p><table><tr><td>Order Date:</td><td>27/05/24 14:46</td></tr></table>
+<table><tr><td>Qty</td><td>Item Detail</td><td>Item Cost</td></tr>
+<tr><td>2</td><td>Medium Fries</td><td>£3.40</td></tr>
+<tr><td>1</td><td>£1.99 for an Example Burger!</td></tr><tr><td>Make it a Monday! Get an Example Burger for just £1.99!</td></tr>
+<tr><td>1</td><td>Example Burger</td><td>£1.99</td></tr>
+<tr><td>1</td><td>Free Cookie</td></tr><tr><td>1</td><td>Free Cookie</td><td>£0.00</td></tr>
+<tr><td>VAT:</td><td>£0.90</td></tr><tr><td>Total (including VAT):</td><td>£5.39</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("Example Burgers <receipts@exampleburgers.test>", "Your receipt", "Mon, 27 May 2024 14:50:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Medium Fries", 2, 340], ["Example Burger", 1, 199], ["Free Cookie", 1, 0]]);
+  assert.equal(r.totalPence, 539);
+  assert.equal(r.orderDate, "2024-05-27");
+});
+
+t("a table with no headings: quantity, name and price rows", () => {
+  const html = `<p>Here is your receipt:</p><p>Order Placed:</p><p>22/05/2026</p><p>11:45</p>
+<p>1</p><p>| Pork Burrito</p><p>| £9.45</p><p>1</p><p>| Large Upgrade</p><p>| £1.00</p><p>1</p><p>| Lime Soda</p><p>| £2.00</p><p>Total</p><p>£12.45</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Cantina <hello@examplecantina.test>", "Your Example Cantina receipt", "Fri, 22 May 2026 11:50:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["Pork Burrito", 945], ["Large Upgrade", 100], ["Lime Soda", 200]]);
+  assert.equal(r.orderDate, "2026-05-22");
+});
+
+t("dates: month-first when it can only be month-first, the reading nearest the email's date when both could be", () => {
+  const mk = (when, sent) => `From: Example Beds <orders@examplebeds.test>\nSubject: Your order confirmation\nDate: ${sent}\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: EB-1001\nOrder date: ${when}\nPillow - £59.00\nOrder total: £59.00\n`;
+  assert.equal(parseReceiptEmail(mk("07/29/2025", "Tue, 29 Jul 2025 10:00:00 +0000")).orderDate, "2025-07-29", "US order of a date with no 29th month");
+  assert.equal(parseReceiptEmail(mk("05/06/2025", "Thu, 05 Jun 2025 10:00:00 +0000")).orderDate, "2025-06-05", "day-first when the email was sent in June");
+  assert.equal(parseReceiptEmail(mk("05/06/2025", "Tue, 06 May 2025 10:00:00 +0000")).orderDate, "2025-05-06", "month-first when the email was sent in May");
+  assert.equal(parseReceiptEmail(mk("31/31/2025", "Tue, 06 May 2025 10:00:00 +0000")).orderDate, "2025-05-06", "not a real day: the email's own date");
+});
+
+t("'Order total (includes tax and delivery)' is the total", () => {
+  const r = parseReceiptEmail(`From: Example Marketplace <payments@examplemarket.test>\nSubject: Payment plan created for your order\nContent-Type: text/plain\n\nThank you for your order 123-4567890-1234567.\nOrder # 123-4567890-1234567\nOrder total (includes tax and delivery)\n£68.38\n`);
+  assert.equal(r.ok, true);
+  assert.equal(r.totalPence, 6838);
+  assert.equal(r.orderRef, "123-4567890-1234567");
+});
+
+t("a notice that a payment didn't go through is not a receipt", () => {
+  const notice = `From: Example Marketplace <payments@examplemarket.test>\nSubject: Important Notice: Your Example Order #D01-1234567-1234567\nContent-Type: text/plain\n\nDue to a problem with the payment method you provided, we couldn't charge your account for your order (#D01-1234567-1234567).\nWe may attempt to reprocess payment for your order in a few days.\nOrder #D01-1234567-1234567\n`;
+  assert.equal(parseReceiptEmail(notice).ok, false);
+  assert.equal(parseReceiptEmail(notice).reason, "payment_problem");
+  // A real order whose email only offers a link to change the payment method stays a receipt.
+  const plan = `From: Example Marketplace <payments@examplemarket.test>\nSubject: Your order confirmation\nContent-Type: text/plain\n\nThanks for your order!\nOrder number: EM-555\nKettle - £30.00\nOrder total: £30.00\nUpdate payment method\n`;
+  assert.equal(parseReceiptEmail(plan).ok, true);
+});
+console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);
