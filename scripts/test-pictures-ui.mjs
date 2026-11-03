@@ -61,12 +61,12 @@ await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: "jess@example.com", expiresAt: Date.now() + 864e5 })));
 await page.reload();
 await page.evaluate(() => window.go("receipts"));
-await page.locator(".rl-cats button, .rl-cats [role=button]").first().waitFor();
+await page.locator(".rl-tiles .rl-tile:not(.rl-year)").first().waitFor();
 // Open every group and read each row's picture.
 const seen = {};
-const groups = await page.locator(".rl-cats").getByRole("button").allInnerTexts();
+const groups = await page.locator(".rl-tiles .rl-tile:not(.rl-year)").allInnerTexts();
 for (let g = 0; g < groups.length; g++) {
-  await page.locator(".rl-cats").getByRole("button").nth(g).click();
+  await page.locator(".rl-tiles .rl-tile:not(.rl-year)").nth(g).click();
   await page.locator(".rl-rr").first().waitFor();
   await page.waitForTimeout(700);
   for (const row of await page.locator(".rl-rr").all()) {
@@ -95,11 +95,11 @@ assert.ok(!logoAsks.includes("gmail.com"), "a forwarded receipt never asks for G
 assert.equal(seen["LNER on board service"].src, bundledFile("lner.co.uk") || seen["LNER on board service"].src, "a shop with no address of its own uses its known address for the logo");
 console.log("ok - photo, then logo, then a drawing of the item, shop or kind of shop; no initials; no logo asked for a mailbox");
 // The drawing draws itself in and moves; with reduced motion it simply appears.
-await page.locator(".rl-cats").getByRole("button", { name: /Fashion/ }).click();
+await page.locator(".rl-tiles").getByRole("button", { name: /Fashion/ }).click();
 const shoe = page.locator('.rl-rr-pic[data-ill="shoe"] svg path').first();
 assert.notEqual(await shoe.evaluate(e => getComputedStyle(e).animationName), "none");
 await page.emulateMedia({ reducedMotion: "reduce" });
-await page.getByRole("button", { name: "All groups" }).click(); await page.locator(".rl-cats").getByRole("button", { name: /Fashion/ }).click();
+await page.getByRole("button", { name: "All groups" }).click(); await page.locator(".rl-tiles").getByRole("button", { name: /Fashion/ }).click();
 assert.equal(await page.locator('.rl-rr-pic[data-ill="shoe"] svg path').first().evaluate(e => getComputedStyle(e).animationName), "none", "no movement when the phone asks for less motion");
 await page.emulateMedia({ reducedMotion: "no-preference" });
 console.log("ok - drawings animate, and stay still for reduced motion");

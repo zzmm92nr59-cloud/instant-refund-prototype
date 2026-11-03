@@ -95,11 +95,11 @@ await page.getByText(/Found or updated 1 receipt/).waitFor();
 assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.mailbox")), "outlook", "every screen now names Outlook");
 await page.screenshot({ path: "/tmp/shots/one-step-receipts.png" });
-// Group tiles use drawn icons, not emoji.
-const tile = page.locator(".rl-cat-ico").first();
+// Group tiles use drawn pictures (or a photo of something bought), not emoji.
+const tile = page.locator(".rl-tile:not(.rl-year)").first();
 await tile.waitFor();
-assert.equal(await page.locator(".rl-cat-ico svg").count() >= 1, true);
-const cardText = await page.locator(".rl-cats").innerText();
+assert.equal(await page.locator(".rl-tile .rl-tile-art svg, .rl-tile .rl-tile-pic").count() >= 1, true);
+const cardText = await page.locator(".rl-tiles").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
 // A missing shop can be searched for straight from the Receipts page.
 await page.getByRole("button", { name: "Missing a receipt? Search Outlook for it" }).click();
