@@ -20,9 +20,9 @@
   },
   "marksandspencer.com": {
    "file": "marksandspencer.com.png",
-   "from": "https://icons.duckduckgo.com/ip3/marksandspencer.com.ico",
-   "px": 32,
-   "bytes": 1361
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/be/2e/f2/be2ef296-4f2b-8913-743d-efe16c43e304/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 7205
   },
   "coop.co.uk": {
    "file": "coop.co.uk.png",
@@ -626,9 +626,9 @@
   },
   "thebodyshop.com": {
    "file": "thebodyshop.com.png",
-   "from": "https://www.thebodyshop.com/cdn/shop/files/tbs-favicon-32x32.png?crop=center&height=192&v=1727868854&width=192",
-   "px": 32,
-   "bytes": 1430
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/f0/6c/3e/f06c3eb6-fb39-fe9d-6712-753281499944/AppIcon-0-0-1x_U007emarketing-0-2-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 3707
   },
   "kikocosmetics.com": {
    "file": "kikocosmetics.com.svg",
@@ -3533,6 +3533,21 @@
    "from": "https://www.gordonramsayrestaurants.com/mysite/img/grr/android-chrome-192x192.png",
    "px": 192,
    "bytes": 2984
+  },
+  "glossier.com": {
+   "file": "glossier.com.png",
+   "px": 32,
+   "bytes": 2275
+  },
+  "poundland.co.uk": {
+   "file": "poundland.co.uk.png",
+   "px": 32,
+   "bytes": 2257
+  },
+  "hamleys.com": {
+   "file": "hamleys.com.png",
+   "px": 32,
+   "bytes": 699
   }
  },
  "misses": [
@@ -3581,20 +3596,8 @@
     "https://www.google.com/s2/favicons?domain=thejointldn.com&sz=256 http 404",
     "https://icons.duckduckgo.com/ip3/thejointldn.com.ico http 404"
    ]
-  },
-  {
-   "domain": "hamleys.com",
-   "tried": []
-  },
-  {
-   "domain": "poundland.co.uk",
-   "tried": []
-  },
-  {
-   "domain": "glossier.com",
-   "tried": []
   }
  ],
  "total": 616,
- "found": 589
+ "found": 592
 }
