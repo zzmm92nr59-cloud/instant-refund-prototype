@@ -3303,6 +3303,28 @@
  },
  "misses": [
   {
+   "domain": "superdrug.com",
+   "tried": [
+    "https://superdrug.com/apple-touch-icon.png http 403",
+    "https://www.superdrug.com/apple-touch-icon.png http 403",
+    "https://superdrug.com/favicon.ico http 403",
+    "https://www.superdrug.com/favicon.ico http 403",
+    "https://www.google.com/s2/favicons?domain=superdrug.com&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/superdrug.com.ico 16px"
+   ]
+  },
+  {
+   "domain": "sainsburys.co.uk",
+   "tried": [
+    "https://sainsburys.co.uk/apple-touch-icon.png http 403",
+    "https://www.sainsburys.co.uk/apple-touch-icon.png http 403",
+    "https://sainsburys.co.uk/favicon.ico http 403",
+    "https://www.sainsburys.co.uk/favicon.ico http 403",
+    "https://www.google.com/s2/favicons?domain=sainsburys.co.uk&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/sainsburys.co.uk.ico 16px"
+   ]
+  },
+  {
    "domain": "elemis.com",
    "tried": [
     "https://elemis.com/apple-touch-icon.png http 404",
@@ -3325,26 +3347,14 @@
    ]
   },
   {
-   "domain": "schuh.co.uk",
+   "domain": "crewclothing.co.uk",
    "tried": [
-    "https://icons.duckduckgo.com/ip3/schuh.co.uk.ico 16px"
-   ]
-  },
-  {
-   "domain": "ebay.co.uk",
-   "tried": [
-    "https://icons.duckduckgo.com/ip3/ebay.co.uk.ico 16px"
-   ]
-  },
-  {
-   "domain": "superdrug.com",
-   "tried": [
-    "https://superdrug.com/apple-touch-icon.png http 403",
-    "https://www.superdrug.com/apple-touch-icon.png http 403",
-    "https://superdrug.com/favicon.ico http 403",
-    "https://www.superdrug.com/favicon.ico http 403",
-    "https://www.google.com/s2/favicons?domain=superdrug.com&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/superdrug.com.ico 16px"
+    "https://www.crewclothing.co.uk/favicon.ico 24px",
+    "https://crewclothing.co.uk/apple-touch-icon.png http 404",
+    "https://www.crewclothing.co.uk/apple-touch-icon.png http 404",
+    "https://crewclothing.co.uk/favicon.ico 24px",
+    "https://www.google.com/s2/favicons?domain=crewclothing.co.uk&sz=256 24px",
+    "https://icons.duckduckgo.com/ip3/crewclothing.co.uk.ico 24px"
    ]
   },
   {
@@ -3359,6 +3369,18 @@
    ]
   },
   {
+   "domain": "schuh.co.uk",
+   "tried": [
+    "https://icons.duckduckgo.com/ip3/schuh.co.uk.ico 16px"
+   ]
+  },
+  {
+   "domain": "ebay.co.uk",
+   "tried": [
+    "https://icons.duckduckgo.com/ip3/ebay.co.uk.ico 16px"
+   ]
+  },
+  {
    "domain": "quizclothing.co.uk",
    "tried": [
     "https://quizclothing.co.uk/apple-touch-icon.png http 404",
@@ -3370,36 +3392,14 @@
    ]
   },
   {
-   "domain": "crewclothing.co.uk",
+   "domain": "therange.co.uk",
    "tried": [
-    "https://www.crewclothing.co.uk/favicon.ico 24px",
-    "https://crewclothing.co.uk/apple-touch-icon.png http 404",
-    "https://www.crewclothing.co.uk/apple-touch-icon.png http 404",
-    "https://crewclothing.co.uk/favicon.ico 24px",
-    "https://www.google.com/s2/favicons?domain=crewclothing.co.uk&sz=256 24px",
-    "https://icons.duckduckgo.com/ip3/crewclothing.co.uk.ico 24px"
-   ]
-  },
-  {
-   "domain": "sainsburys.co.uk",
-   "tried": [
-    "https://sainsburys.co.uk/apple-touch-icon.png http 403",
-    "https://www.sainsburys.co.uk/apple-touch-icon.png http 403",
-    "https://sainsburys.co.uk/favicon.ico http 403",
-    "https://www.sainsburys.co.uk/favicon.ico http 403",
-    "https://www.google.com/s2/favicons?domain=sainsburys.co.uk&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/sainsburys.co.uk.ico 16px"
-   ]
-  },
-  {
-   "domain": "thetoyshop.com",
-   "tried": [
-    "https://thetoyshop.com/apple-touch-icon.png http 403",
-    "https://www.thetoyshop.com/apple-touch-icon.png http 403",
-    "https://thetoyshop.com/favicon.ico http 403",
-    "https://www.thetoyshop.com/favicon.ico http 403",
-    "https://www.google.com/s2/favicons?domain=thetoyshop.com&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/thetoyshop.com.ico 16px"
+    "https://therange.co.uk/apple-touch-icon.png http 403",
+    "https://www.therange.co.uk/apple-touch-icon.png http 403",
+    "https://therange.co.uk/favicon.ico http 403",
+    "https://www.therange.co.uk/favicon.ico http 403",
+    "https://www.google.com/s2/favicons?domain=therange.co.uk&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/therange.co.uk.ico 16px"
    ]
   },
   {
@@ -3414,6 +3414,17 @@
    ]
   },
   {
+   "domain": "thetoyshop.com",
+   "tried": [
+    "https://thetoyshop.com/apple-touch-icon.png http 403",
+    "https://www.thetoyshop.com/apple-touch-icon.png http 403",
+    "https://thetoyshop.com/favicon.ico http 403",
+    "https://www.thetoyshop.com/favicon.ico http 403",
+    "https://www.google.com/s2/favicons?domain=thetoyshop.com&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/thetoyshop.com.ico 16px"
+   ]
+  },
+  {
    "domain": "carphonewarehouse.com",
    "tried": [
     "https://carphonewarehouse.com/apple-touch-icon.png http 403",
@@ -3425,36 +3436,25 @@
    ]
   },
   {
-   "domain": "therange.co.uk",
+   "domain": "go-outdoors.co.uk",
    "tried": [
-    "https://therange.co.uk/apple-touch-icon.png http 403",
-    "https://www.therange.co.uk/apple-touch-icon.png http 403",
-    "https://therange.co.uk/favicon.ico http 403",
-    "https://www.therange.co.uk/favicon.ico http 403",
-    "https://www.google.com/s2/favicons?domain=therange.co.uk&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/therange.co.uk.ico http 404"
+    "https://go-outdoors.co.uk/apple-touch-icon.png TypeError",
+    "https://www.go-outdoors.co.uk/apple-touch-icon.png TypeError",
+    "https://go-outdoors.co.uk/favicon.ico TypeError",
+    "https://www.go-outdoors.co.uk/favicon.ico TypeError",
+    "https://www.google.com/s2/favicons?domain=go-outdoors.co.uk&sz=256 http 404",
+    "https://icons.duckduckgo.com/ip3/go-outdoors.co.uk.ico http 404"
    ]
   },
   {
-   "domain": "leon.co",
+   "domain": "lecreuset.co.uk",
    "tried": [
-    "https://leon.co/assets/images/favicon.ico 16px",
-    "https://leon.co/apple-touch-icon.png http 404",
-    "https://www.leon.co/apple-touch-icon.png http 404",
-    "https://leon.co/favicon.ico http 404",
-    "https://www.leon.co/favicon.ico http 404",
-    "https://www.google.com/s2/favicons?domain=leon.co&sz=256 16px"
-   ]
-  },
-  {
-   "domain": "vodafone.co.uk",
-   "tried": [
-    "https://vodafone.co.uk/apple-touch-icon.png http 404",
-    "https://www.vodafone.co.uk/apple-touch-icon.png http 404",
-    "https://vodafone.co.uk/favicon.ico 16px",
-    "https://www.vodafone.co.uk/favicon.ico 16px",
-    "https://www.google.com/s2/favicons?domain=vodafone.co.uk&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/vodafone.co.uk.ico 16px"
+    "https://www.lecreuset.co.uk/on/demandware.static/Sites-LCUK-Site/-/default/dw5f652990/images/favicon.ico 16px",
+    "https://lecreuset.co.uk/apple-touch-icon.png http 410",
+    "https://www.lecreuset.co.uk/apple-touch-icon.png http 410",
+    "https://lecreuset.co.uk/favicon.ico 16px",
+    "https://www.lecreuset.co.uk/favicon.ico 16px",
+    "https://www.google.com/s2/favicons?domain=lecreuset.co.uk&sz=256 16px"
    ]
   },
   {
@@ -3469,14 +3469,47 @@
    ]
   },
   {
-   "domain": "lecreuset.co.uk",
+   "domain": "leon.co",
    "tried": [
-    "https://www.lecreuset.co.uk/on/demandware.static/Sites-LCUK-Site/-/default/dw5f652990/images/favicon.ico 16px",
-    "https://lecreuset.co.uk/apple-touch-icon.png http 410",
-    "https://www.lecreuset.co.uk/apple-touch-icon.png http 410",
-    "https://lecreuset.co.uk/favicon.ico 16px",
-    "https://www.lecreuset.co.uk/favicon.ico 16px",
-    "https://www.google.com/s2/favicons?domain=lecreuset.co.uk&sz=256 16px"
+    "https://leon.co/assets/images/favicon.ico 16px",
+    "https://leon.co/apple-touch-icon.png http 404",
+    "https://www.leon.co/apple-touch-icon.png http 404",
+    "https://leon.co/favicon.ico http 404",
+    "https://www.leon.co/favicon.ico http 404",
+    "https://www.google.com/s2/favicons?domain=leon.co&sz=256 16px"
+   ]
+  },
+  {
+   "domain": "tacobell.co.uk",
+   "tried": [
+    "https://www.tacobell.co.uk/wp-content/themes/tacobell/favicon.ico 16px",
+    "https://tacobell.co.uk/apple-touch-icon.png TypeError",
+    "https://www.tacobell.co.uk/apple-touch-icon.png not a picture",
+    "https://tacobell.co.uk/favicon.ico TypeError",
+    "https://www.tacobell.co.uk/favicon.ico not a picture",
+    "https://www.google.com/s2/favicons?domain=tacobell.co.uk&sz=256 16px"
+   ]
+  },
+  {
+   "domain": "vodafone.co.uk",
+   "tried": [
+    "https://vodafone.co.uk/apple-touch-icon.png http 404",
+    "https://www.vodafone.co.uk/apple-touch-icon.png http 404",
+    "https://vodafone.co.uk/favicon.ico 16px",
+    "https://www.vodafone.co.uk/favicon.ico 16px",
+    "https://www.google.com/s2/favicons?domain=vodafone.co.uk&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/vodafone.co.uk.ico 16px"
+   ]
+  },
+  {
+   "domain": "iguanas.co.uk",
+   "tried": [
+    "https://www.iguanas.co.uk/favicon.ico 16px",
+    "https://iguanas.co.uk/apple-touch-icon.png http 404",
+    "https://www.iguanas.co.uk/apple-touch-icon.png http 404",
+    "https://iguanas.co.uk/favicon.ico 16px",
+    "https://www.google.com/s2/favicons?domain=iguanas.co.uk&sz=256 16px",
+    "https://icons.duckduckgo.com/ip3/iguanas.co.uk.ico 16px"
    ]
   },
   {
@@ -3502,28 +3535,6 @@
    ]
   },
   {
-   "domain": "tacobell.co.uk",
-   "tried": [
-    "https://www.tacobell.co.uk/wp-content/themes/tacobell/favicon.ico 16px",
-    "https://tacobell.co.uk/apple-touch-icon.png TypeError",
-    "https://www.tacobell.co.uk/apple-touch-icon.png not a picture",
-    "https://tacobell.co.uk/favicon.ico TypeError",
-    "https://www.tacobell.co.uk/favicon.ico not a picture",
-    "https://www.google.com/s2/favicons?domain=tacobell.co.uk&sz=256 16px"
-   ]
-  },
-  {
-   "domain": "go-outdoors.co.uk",
-   "tried": [
-    "https://go-outdoors.co.uk/apple-touch-icon.png TypeError",
-    "https://www.go-outdoors.co.uk/apple-touch-icon.png TypeError",
-    "https://go-outdoors.co.uk/favicon.ico TypeError",
-    "https://www.go-outdoors.co.uk/favicon.ico TypeError",
-    "https://www.google.com/s2/favicons?domain=go-outdoors.co.uk&sz=256 http 404",
-    "https://icons.duckduckgo.com/ip3/go-outdoors.co.uk.ico http 404"
-   ]
-  },
-  {
    "domain": "qatarairways.com",
    "tried": [
     "https://qatarairways.com/apple-touch-icon.png http 403",
@@ -3543,17 +3554,6 @@
     "https://www.english-heritage.org.uk/favicon.ico 16px",
     "https://www.google.com/s2/favicons?domain=english-heritage.org.uk&sz=256 16px",
     "https://icons.duckduckgo.com/ip3/english-heritage.org.uk.ico 16px"
-   ]
-  },
-  {
-   "domain": "iguanas.co.uk",
-   "tried": [
-    "https://www.iguanas.co.uk/favicon.ico 16px",
-    "https://iguanas.co.uk/apple-touch-icon.png http 404",
-    "https://www.iguanas.co.uk/apple-touch-icon.png http 404",
-    "https://iguanas.co.uk/favicon.ico 16px",
-    "https://www.google.com/s2/favicons?domain=iguanas.co.uk&sz=256 16px",
-    "https://icons.duckduckgo.com/ip3/iguanas.co.uk.ico 16px"
    ]
   },
   {
