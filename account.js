@@ -94,8 +94,12 @@
       .then(function (b) { return b && /^image\//.test(b.type) ? URL.createObjectURL(b) : null; }).catch(function () { return null; });
   }
   function deadlineOf(x) {
-    return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) ||
-      (x.returnBy && x.returnable !== false && x.returnBy.date) || null;
+    // A food order can still hold something that goes back on its own (a kettle in the weekly shop): its date counts too.
+    var open = x.returnable !== false || Boolean(x.returnableItems && x.returnableItems.length);
+    var by = open && x.returnBy && x.returnBy.date;
+    // A date Relay worked out itself (counted from the order date) says nothing for sure once it has passed.
+    if (by && x.returnBy.estimate && by < new Date().toISOString().slice(0, 10)) by = null;
+    return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) || by || null;
   }
   // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
   // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
@@ -1809,7 +1813,10 @@
       if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel →", style: "font-weight:600" }));
       card.appendChild(dl);
     }
-    if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
+    var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
+    if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
+      style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
+    else if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
     var left = daysLeft(deadlineOf(x));
     if (left !== null) {
       var pill = left < 0 ? ["Deadline passed", "#ece8dd", "#5b6475"] : left === 0 ? ["Return today", "#fde0dd", "#b3261e"] :
@@ -1831,18 +1838,26 @@
     if (x.id && mailRef(x) && openOriginal) {
       card.appendChild(el("button", { className: "rl-btn ghost", text: "View original receipt", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openOriginal(x.id); } }));
     }
-    var legal = x.returnBy && x.returnable !== false && x.returnBy.basis === "uk_law" ? x.returnBy.date : null;
+    var by = x.returnBy && deadlineOf(x) === x.returnBy.date ? x.returnBy : null;
+    var legal = by && by.basis === "uk_law" ? by.date : null;
     var rt = x.returns || (legal ? {} : null);
+    var longDay = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }); };
     if (rt) {
       var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
       rb.appendChild(el("b", { text: "Returns", style: "display:block;margin-bottom:4px" }));
       var line = function (t) { rb.appendChild(el("span", { text: t, style: "display:block;margin-top:2px" })); };
       if (rt.deadline) line("Return by " + new Date(rt.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }));
-      else if (rt.windowDays) line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery (check your delivery date)" : ""));
+      else if (rt.windowDays) {
+        line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery" + (by ? "" : " (check your delivery date)") : ""));
+        if (by && by.basis === "window") rb.appendChild(el("span", { style: "display:block;margin-top:2px;font-weight:600",
+          text: by.from === "delivery" ? "That's until " + longDay(by.date) + ", counting from when it was delivered." : "Go by " + longDay(by.date) + " to be safe: that's " + rt.windowDays + " days from the order date." }));
+      }
       else if (legal) {
-        rb.appendChild(el("span", { text: "Tell " + who + " by " + new Date(legal + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }) + " if you want to send it back",
+        rb.appendChild(el("span", { text: "Tell " + who + " by " + longDay(legal) + " if you want to send it back",
           style: "display:block;margin-top:2px;font-weight:600" }));
-        rb.appendChild(el("span", { text: "The email doesn't give a return window, so this is the least UK law allows for online orders: 14 days from delivery. " + who + " may allow longer.",
+        rb.appendChild(el("span", { text: by.from === "order"
+          ? "The email doesn't give a return window. For online orders UK law allows at least 14 days from delivery, so Relay counts 14 days from the order date to be safe. " + who + " may allow longer."
+          : "The email doesn't give a return window, so this is the least UK law allows for online orders: 14 days from delivery. " + who + " may allow longer.",
           style: "display:block;margin-top:2px;font-size:13px;opacity:.8" }));
       }
       if (rt.address) line("Send to: " + rt.address);
@@ -1850,9 +1865,10 @@
       if (rt.qrMentioned) line("This email mentions a QR code. Tap “View original receipt” to see it.");
       else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Tap “View original receipt” to see it.");
       if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
-        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return with " + who + " →", style: "display:block;margin-top:6px;font-weight:600" }));
+        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return with " + who, style: "display:flex;align-items:center;min-height:44px;margin-top:2px;font-weight:600" }));
       }
-      rb.appendChild(el("span", { text: "From your order email.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
+      // (Only when the email did say something: a date Relay worked out itself is explained above instead.)
+      if (x.returns) rb.appendChild(el("span", { text: "From your order email.", style: "display:block;margin-top:6px;opacity:.75;font-size:13px" }));
       card.appendChild(rb);
     }
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);
@@ -4003,13 +4019,18 @@
         items.push({ deadline: new Date(Date.parse(o.orderedAt) + 7 * 864e5).toISOString().slice(0, 10), node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
       }); });
       orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
-        if (x.returnable === false || isCarrier(x)) return;
+        if (isCarrier(x)) return;
+        // A food order: only the things in it that can go back on their own (a kettle or a jumper in the weekly shop).
+        var only = x.returnable === false ? (x.returnableItems || []) : null;
+        if (only && !only.length) return;
         var dl = deadlineOf(x), onWay = freshDelivery(x);
         if (!((dl && dl >= today) || (onWay && !dl))) return;
-        var parts = emailItems(x), anyMarked = parts.some(function (p) { return p.returning; });
+        var parts = emailItems(x);
+        if (only) parts = parts.filter(function (p) { return only.indexOf(p.index) >= 0; });
+        var anyMarked = parts.some(function (p) { return p.returning; });
         // A return is under way but Relay doesn't know which items: the Returns page asks, and nothing shows here meanwhile.
         if (x.returnProgress && !anyMarked) return;
-        if (parts.length > 1) parts.forEach(function (p) { if (!p.returning) items.push({ deadline: dl, node: function () { return emailCard(x, { item: p.index, markable: true, changed: refresh }); } }); });
+        if (parts.length > 1 || only) parts.forEach(function (p) { if (!p.returning) items.push({ deadline: dl, node: function () { return emailCard(x, { item: p.index, markable: true, changed: refresh }); } }); });
         else if (!anyMarked) items.push({ deadline: dl, node: function () { return emailCard(x, { markable: true, changed: refresh }); } });
       });
       items.sort(function (a, b) { return (a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1; });
@@ -4295,14 +4316,17 @@
       if (!document.body.contains(host)) return;
       var today = new Date().toISOString().slice(0, 10), best = null;
       (rows || []).forEach(function (x) {
-        if (!x || x.kind === "return_instructions" || x.returnable === false || isCarrier(x) || x.returnProgress) return;
+        if (!x || x.kind === "return_instructions" || isCarrier(x) || x.returnProgress) return;
+        if (x.returnable === false && !(x.returnableItems || []).length) return;
         var dl = deadlineOf(x); if (!dl || dl < today) return;
         var d = daysLeft(dl); if (d === null || d > 14) return;
         if (!best || dl < best.dl) best = { x: x, dl: dl, d: d };
       });
       host.textContent = "";
       if (!best) { host.hidden = true; return; }
-      var x = best.x, who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop", item = headlineItem(x);
+      var x = best.x, who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
+      // (From a food order, the thing in it that can go back, not the bananas.)
+      var item = x.returnable === false ? (x.items || [])[x.returnableItems[0]] : headlineItem(x);
       var pic = el("span", { className: "rl-next-pic" }); receiptPic(pic, x, 28, 30);
       var day = new Date(best.dl + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
       host.appendChild(el("button", { type: "button", className: "rl-next", ariaLabel: "Next return: " + (item ? item.name : who) + ", back to " + who + " by " + day,
