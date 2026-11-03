@@ -2774,7 +2774,7 @@
     phoneRow.style.display = "none"; secRows.push(phoneRow);
     var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
     secRows.push(twoRow);
-    secRows.push(accRow("devices", "Devices", "Sign out your other phones and computers", function () { page("Devices", devicesPage); }));
+    secRows.push(accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); }));
     var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
     cardRow.style.display = "none"; secRows.push(cardRow);
     sheet.appendChild(accGroup("Sign-in & security", secRows));
