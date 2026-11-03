@@ -275,6 +275,9 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
 // Once the look-back period is done, the earlier years the shopper added for Wrapped are read again too, newest first
 // (most of a long-time shopper's receipts are in those years, and otherwise they would keep the older reader's mistakes).
 const CATCH_UP_MAILBOXES = 2;
+// A catch-up round reads twice what a round the app waits for does (that one has to answer quickly): a long-time shopper's
+// look-back period and earlier years come to several thousand emails, and nobody is waiting on this round's reply.
+const CATCH_UP_FETCH = 80, CATCH_UP_BUDGET = 240;
 export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
   if (!env.RELAY_DB) return { checked: 0 };
   await ensureGmailTables(env.RELAY_DB);
@@ -290,16 +293,16 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
   let calls = 0;
   const out = [];
   for (const r of rows) {
-    if (calls > CALL_BUDGET - 12) continue;
+    if (calls > CATCH_UP_BUDGET - 12) continue;
     const recent = needsFullRead(r.lastScanAt, r.provider, r.fullRev);
     if (!recent && !r.staleYear) continue;
     let back, year = null;
     try {
-      if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN });
+      if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH });
       else {
         year = r.staleYear;
         const h = await env.RELAY_DB.prepare("SELECT cursor FROM gmail_history_years WHERE shopper_id = ? AND year = ?").bind(r.id, year).first();
-        back = await scan(env, r.id, fetchImpl, now, cursorFor(h && h.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN, year });
+        back = await scan(env, r.id, fetchImpl, now, cursorFor(h && h.cursor) || "", false, { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH, year });
       }
     } catch (e) { back = { status: 500, body: {} }; }
     calls += back.calls || 3;
