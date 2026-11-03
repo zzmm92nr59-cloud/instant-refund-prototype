@@ -1485,7 +1485,7 @@
         var named = (row.items || []).filter(function (i) { return i.name; });
         var names = named.map(function (i) { return i.name + (i.variant && named.length === 1 ? " · " + i.variant : ""); }).join(", ");
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
-        var title = named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
+        var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
         var sub = [named.length ? who : ref, row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt";
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
@@ -3178,10 +3178,21 @@
     return el("div", { className: "rl-po-status " + (d !== null && d <= 3 ? "urgent" : "wait"), text: txt });
   }
   var label = function (t) { return String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); };
+  // The item a receipt's card is named after: one of the receipt's own kind (a supermarket shop is named after its food,
+  // not its kitchen roll), the one that cost the most, so an order of a denim jacket and a loaf is "Denim Jacket + 1 more".
+  // Without prices, the first of them.
+  function headlineItem(x) {
+    var items = (x.items || []).filter(function (i) { return i && i.name; });
+    if (!items.length) return null;
+    var cost = function (i) { return Number.isInteger(i.pricePence) ? i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1) : -1; };
+    var own = items.filter(function (i) { return !i.category || i.category === x.category; });
+    var pool = own.length ? own : items;
+    return pool.reduce(function (best, i) { return cost(i) > cost(best) ? i : best; }, pool[0]);
+  }
   function receiptTitle(x) {
     var items = (x.items || []).filter(function (i) { return i.name; });
     if (!items.length) return "Order from " + ((x.retailer && x.retailer.name) || "this shop");
-    return items[0].name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
+    return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
   }
   // A purchase found in an email receipt: the shop handles the return, so Relay links to it and shows the deadline and parcel.
   function emailCard(x, opts) {
@@ -3193,7 +3204,7 @@
     receiptPic(img, x, 36, 44);
     // One item of a multi-item order gets its own card (opts.item is its position on the receipt).
     var one = opts.item != null ? (x.items || [])[opts.item] : null;
-    var first = one || (x.items || [])[0] || {};
+    var first = one || headlineItem(x) || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
     var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
     card.appendChild(el("div", { className: "rl-po-top" }, [img, el("div", { className: "rl-po-info" }, [

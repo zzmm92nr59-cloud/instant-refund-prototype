@@ -19,7 +19,10 @@ const receipts = [
   // Ordered 4 days ago and on its way: shown, with its delivery line.
   { id: "33333333-3333-4333-8333-333333333333", status: "pending", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderDate: day(-4), totalPence: 8500, currency: "GBP", items: [{ name: "Court Classic Trainers", qty: 1, pricePence: 8500 }], returnable: true, returns: {}, delivery: ship() },
   // A deadline ahead (and an old delivery line, which isn't shown).
-  { id: "44444444-4444-4444-8444-444444444444", status: "pending", kind: "receipt", retailer: { name: "Amazon.co.uk", domain: "amazon.co.uk" }, orderDate: day(-40), totalPence: 2599, currency: "GBP", items: [{ name: "Desk Lamp", qty: 1, pricePence: 2599 }], returnable: true, returns: { deadline: day(10) }, delivery: ship(null, { status: "due", at: day(-36) }) }
+  { id: "44444444-4444-4444-8444-444444444444", status: "pending", kind: "receipt", retailer: { name: "Amazon.co.uk", domain: "amazon.co.uk" }, orderDate: day(-40), totalPence: 2599, currency: "GBP", items: [{ name: "Desk Lamp", qty: 1, pricePence: 2599 }], returnable: true, returns: { deadline: day(10) }, delivery: ship(null, { status: "due", at: day(-36) }) },
+  // An older supermarket order that was mostly a jacket: its card is named after the jacket, not the loaf listed first.
+  { id: "55555555-5555-4555-8555-555555555555", status: "pending", kind: "receipt", retailer: { name: "Tesco", domain: "tesco.com" }, orderDate: day(-200), totalPence: 2650, currency: "GBP", category: "fashion",
+    items: [{ name: "Finest Sourdough", qty: 1, pricePence: 150, category: "food", categorySure: false }, { name: "F&F Denim Jacket", qty: 1, pricePence: 2500, category: "fashion", categorySure: true }], returnable: true, returns: {} },
 ];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -67,7 +70,10 @@ await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 await page.waitForTimeout(800);
 const r = await page.locator("#view").innerText();
 assert.ok(!/On its way · Royal Mail[\s\S]*Red Dragon|Red Dragon[\s\S]{0,200}On its way/.test(r), "no stale delivery line in Receipts");
-console.log("ok - receipts keep old orders without an out-of-date delivery line");
+await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await page.locator("#view").getByText("F&F Denim Jacket + 1 more").waitFor();
+assert.ok(!/Finest Sourdough \+ 1 more/.test(await page.locator("#view").innerText()), "a card is named after the costliest thing of the receipt's own kind, not the first line");
+console.log("ok - receipts keep old orders without an out-of-date delivery line; each card is named after its main thing");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS wallet freshness: only what can still go back, no delivery companies as shops, logos when there's no photo");
 await browser.close(); server.close();
