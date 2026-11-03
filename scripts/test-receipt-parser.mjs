@@ -581,5 +581,7 @@ t("game web shop: the game named at the top is the shop, and the game currency i
   assert.equal(r.retailer.domain, "appcharge.com", "the web shop's address stays, so the receipt is still filed as a digital purchase");
   assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["2,200 Coins", 159]]);
   assert.equal(r.totalPence, 159);
+  // The same when the web shop signs the email with its own name.
+  assert.equal(parseReceiptEmail(htmlMail("Appcharge <no-reply@appcharge.com>", "Purchase Confirmation #123-456-789", "Sat, 31 Oct 2026 13:16:00 +0000", html)).retailer.name, "Example Quest");
 });
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);

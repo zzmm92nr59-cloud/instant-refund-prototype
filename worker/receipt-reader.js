@@ -116,7 +116,8 @@ export function rankShop(clues) {
   if (c.titleName) add(c.titleName, 6, shopDomain);
   if (c.forwardedName) add(c.forwardedName, 7, c.forwardedDomain);
   // A payment company sending under its own name ("Dojo" from dojo.tech) says nothing about the shop.
-  const viaName = c.senderName && isVia(c.senderDomain) && nameFitsDomain(cleanShopName(c.senderName) || "", c.senderDomain);
+  // (Nor does a game's web shop sending under its own name, when the receipt names the game.)
+  const viaName = c.senderName && (isVia(c.senderDomain) || c.titleName) && nameFitsDomain(cleanShopName(c.senderName) || "", c.senderDomain);
   if (c.senderName && !c.personal && !viaName) add(c.senderName, looksLikePerson(cleanShopName(c.senderName) || "", senderDomain || c.linkDomain) ? 1 : 5, senderDomain);
   for (const n of c.bodyNames || []) add(n, 3, null);
   if (shopDomain) {
