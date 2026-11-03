@@ -338,6 +338,59 @@ assert.ok(JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts")
   sqlite.prepare("DELETE FROM receipt_images").run();
 }
 
+// 11e. Pasting an order email in: read like one from the inbox (a mail app's copy has the sender and subject as plain lines,
+// and they are read as such), kept in Receipts, the email itself never kept, the same email kept once, private to the shopper
+// who pasted it (an inbox doesn't have to be connected), and no more than 30 an hour.
+{
+  const paste = (email, token = alice) => post("/relay/my/receipts/add-pasted", token, { email });
+  const copied = "Your Kestrel Outdoor order is confirmed\nInbox\nKestrel Outdoor <orders@kestreloutdoor.test>\nto me\n3 Nov 2026, 09:14\nThanks for your order, Sam!\nOrder number: KO-55120\nTrail runner shoes - Qty 1 - £89.00\nOrder total: £89.00\nReturns accepted within 30 days.\nPRIVATE-BODY-MARKER-PASTE\n";
+  assert.equal((await call("/relay/my/receipts/add-pasted", { method: "POST", body: { email: copied } })).status, 401, "signed-in shoppers only");
+  assert.equal((await paste("Order total: £5")).status, 400, "too short to be an email");
+  assert.equal((await paste("x".repeat(300001))).status, 400, "too long");
+  assert.equal((await post("/relay/my/receipts/add-pasted", alice, { email: 42 })).status, 400, "text only");
+  const p1 = await (await paste(copied)).json();
+  assert.ok(p1.ok && p1.kind === "receipt" && p1.store === "Kestrel Outdoor" && p1.orderRef === "KO-55120" && p1.totalPence === 8900 && p1.orderDate === "2026-11-03" && p1.again === false, JSON.stringify(p1));
+  assert.deepEqual(p1.items.map(i => [i.name, i.qty, i.pricePence]), [["Trail runner shoes", 1, 8900]]);
+  const p2 = await (await paste("\n  " + copied.replace(/\n/g, "\r\n") + "  ")).json();
+  assert.ok(p2.ok && p2.again === true && p2.id === p1.id, "the same email pasted again is kept once: " + JSON.stringify(p2));
+  const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.filter(x => x.orderRef === "KO-55120");
+  assert.equal(mine.length, 1, "one card");
+  assert.equal(mine[0].retailer.name, "Kestrel Outdoor"); assert.equal(mine[0].refundEligible, false, "a pasted email never makes a purchase refund-eligible");
+  assert.ok(!mine[0].gmailId && !mine[0].outlookId, "no link to an inbox for a pasted email");
+  assert.ok(!(await (await call("/relay/my/receipts", { token: bob })).json()).receipts.some(x => x.orderRef === "KO-55120"), "only the shopper who pasted it sees it");
+  assert.ok(!JSON.stringify(sqlite.prepare("SELECT details FROM captured_receipts").all()).includes("PRIVATE-BODY-MARKER-PASTE"), "the email's text isn't kept");
+  // Something that isn't an order, a delivery or a return: nothing is kept.
+  const n0 = sqlite.prepare("SELECT COUNT(*) AS n FROM captured_receipts").get().n;
+  const no = await (await paste("From: Shop <news@shop.test>\nSubject: 50% off this weekend\n\nJumpers from £19.99, this weekend only. Unsubscribe any time.")).json();
+  assert.deepEqual(no, { ok: false, reason: "not_recognised" });
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM captured_receipts").get().n, n0, "nothing kept for an email that isn't an order");
+  // Dismissed, then pasted again on purpose: it comes back.
+  assert.equal((await post("/relay/my/receipts/" + p1.id + "/dismiss", alice, {})).status, 200);
+  assert.ok(!(await (await call("/relay/my/receipts", { token: alice })).json()).receipts.some(x => x.orderRef === "KO-55120"), "dismissed");
+  const p3 = await (await paste(copied)).json();
+  assert.ok(p3.ok && p3.id === p1.id && p3.again === false, "pasting it again brings it back");
+  assert.ok((await (await call("/relay/my/receipts", { token: alice })).json()).receipts.some(x => x.orderRef === "KO-55120"), "back in Receipts");
+  // A forwarded email: the day the shop sent it stands in for the order date when the email gives none.
+  const fw = await (await paste("---------- Forwarded message ---------\nFrom: Kestrel Outdoor <orders@kestreloutdoor.test>\nDate: Mon, 2 Nov 2026 at 10:00\nSubject: Your order confirmation #KO-55121\nTo: <sam@example.com>\n\nOrder number: KO-55121\nWool socks - Qty 2 - £24.00\nOrder total: £24.00\n")).json();
+  assert.ok(fw.ok && fw.store === "Kestrel Outdoor" && fw.orderRef === "KO-55121" && fw.orderDate === "2026-11-02", JSON.stringify(fw));
+  // Bob has no inbox connected (and never agreed to email reading): he can still add one himself, and it is his alone.
+  const pb = await (await paste(copied.replace(/KO-55120/g, "KO-66001"), bob)).json();
+  assert.ok(pb.ok && pb.orderRef === "KO-66001", JSON.stringify(pb));
+  assert.ok((await (await call("/relay/my/receipts", { token: bob })).json()).receipts.some(x => x.orderRef === "KO-66001"));
+  assert.ok(!(await (await call("/relay/my/receipts", { token: alice })).json()).receipts.some(x => x.orderRef === "KO-66001"), "not Alice's");
+  // At most 30 an hour (Alice has pasted 2 different emails so far).
+  const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email = ?").get("alice@example.com").id;
+  for (let i = 0; i < 28; i++) sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?, ?, ?, 'pending', ?, ?)")
+    .run("paste-fill-" + i, aliceId, "paste-fill-" + i, JSON.stringify({ kind: "receipt", pasted: true, retailer: { name: "Filler" } }), clock - 60000);
+  assert.equal((await paste(copied.replace(/KO-55120/g, "KO-77001"))).status, 429, "the 31st in an hour waits");
+  assert.equal((await paste(copied.replace(/KO-55120/g, "KO-77001"), bob)).status, 200, "the limit is each shopper's own");
+  sqlite.prepare("UPDATE captured_receipts SET created_at = ? WHERE id LIKE 'paste-fill-%'").run(clock - 3600001);
+  assert.equal((await paste(copied.replace(/KO-55120/g, "KO-77002"))).status, 200, "an hour later it's fine again");
+  // tidy up so later sections see the original receipts
+  sqlite.prepare("DELETE FROM captured_receipts WHERE json_extract(details, '$.pasted') = 1").run();
+  console.log("ok - a pasted email: read like one from the inbox, kept once, its text never kept, the shopper's alone, 30 an hour");
+}
+
 // 11b. "View original receipt": fetched live, cleaned, owner-only, needs consent, nothing stored.
 {
   const mine = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.orderRef === "EO-1");

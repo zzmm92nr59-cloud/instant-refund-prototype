@@ -383,6 +383,29 @@
     ".rl-search{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 0 16px;padding:0 14px;border-radius:12px;background:var(--rl-fill);color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input{all:unset;flex:1;min-width:0;min-height:44px;font-size:17px;color:var(--rl-text)}.rl-search input::placeholder{color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input::-webkit-search-cancel-button{-webkit-appearance:none}" +
+    // Add a receipt: search the inbox as you type, paste an email in one tap, or forward it.
+    ".rl-ar-lead{margin:0 0 14px;font-size:15px;line-height:1.4;color:var(--rl-text2)}.rl-ar .rl-search{margin:0 0 10px}.rl-ar .rl-msg:empty{display:none}" +
+    ".rl-ar-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}" +
+    ".rl-ar-chip{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;font-weight:600}" +
+    ".rl-ar-chip:focus-visible,.rl-ar-add:focus-visible,.rl-ar-copy:focus-visible,.rl-find-link:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-ar-status{margin:8px 2px 4px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-ar-status:empty{display:none}" +
+    ".rl-ar-row{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 0}.rl-ar-row+.rl-ar-row{border-top:1px solid var(--rl-line)}" +
+    ".rl-ar-row.rl-skel{min-height:64px;margin:6px 0;border-radius:12px;border:0}" +
+    ".rl-ar-ini{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;font-size:17px;font-weight:700}" +
+    ".rl-ar-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}" +
+    ".rl-ar-t b{font-size:15px;font-weight:600;line-height:1.3;color:var(--rl-text);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
+    ".rl-ar-t span{font-size:13px;line-height:1.35;color:var(--rl-text2);overflow-wrap:anywhere}.rl-ar-t .rl-ar-note{color:var(--rl-accent);font-weight:600}.rl-ar-note:empty{display:none}" +
+    ".rl-ar-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;min-height:44px;min-width:72px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#c7f567;color:#101828;font-size:15px;font-weight:700}" +
+    ".rl-ar-add:disabled{cursor:default}.rl-ar-add.done{background:var(--rl-fill);color:var(--rl-text2)}" +
+    ".rl-ar-h{margin:28px 2px 4px;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text)}" +
+    ".rl-ar-help{margin:0 2px 12px;font-size:15px;line-height:1.4;color:var(--rl-text2)}" +
+    ".rl-ar-box{display:block;box-sizing:border-box;width:100%;min-height:120px;margin:10px 0 0;padding:12px 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px;line-height:1.4;resize:vertical}.rl-ar-box[hidden]{display:none}" +
+    ".rl-ar-done{display:flex;flex-direction:column;gap:4px;margin:12px 0 0;padding:16px 18px;border-radius:16px;background:var(--rl-accent-bg,rgba(61,107,0,.12));color:var(--rl-text)}" +
+    ".rl-ar-done b{font-size:17px;font-weight:700;overflow-wrap:anywhere}.rl-ar-done span{font-size:15px;line-height:1.4;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".rl-ar-fwd{display:flex;flex-direction:column;gap:4px;margin:28px 0 0;padding:16px 18px;border-radius:16px;background:var(--rl-fill);color:var(--rl-text)}" +
+    ".rl-ar-fwd b{font-size:17px;font-weight:700}.rl-ar-fwd span{font-size:15px;line-height:1.4;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".rl-ar-copy{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;max-width:100%;min-height:44px;margin-top:8px;padding:10px 16px;border-radius:999px;background:var(--rl-bg);border:1px solid var(--rl-line);color:var(--rl-text);font-size:15px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}" +
+    ".rl-find-link{all:unset;box-sizing:border-box;cursor:pointer;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:underline;text-underline-offset:3px;text-align:center}" +
     ".rl-recstat{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 0;font-size:13px;color:var(--rl-text2)}" +
     ".rl-recstat .rl-po-secondary{background:var(--rl-fill);color:var(--rl-text);border-color:transparent}" +
     ".rl-recstat .rl-msg{color:var(--rl-text2)}" +
@@ -1736,31 +1759,6 @@
     render();
   }
   function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + (cur === "GBP" || !cur ? "£" : cur + " ") + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
-  function receiptView(sheet, back) {
-    var box = el("textarea", { placeholder: "Paste the whole order-confirmation email here (including the From and Subject lines if you can)", rows: 7, maxLength: 200000,
-      style: "width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid var(--rl-line);border-radius:16px;font-size:14px;margin-bottom:12px;font-family:inherit" });
-    var out = el("div"), msg = el("div", { className: "rl-msg" });
-    var go = el("button", { className: "rl-btn", text: "Read this receipt" });
-    go.onclick = function () {
-      go.disabled = true; out.textContent = ""; say(msg, "Reading…");
-      api("/relay/my/receipts/parse", { method: "POST", body: { email: box.value } }).then(function (r) {
-        go.disabled = false;
-        if (r.status === 401) { save(null); close(); return; }
-        if (!r.ok || !r.body.receipt) return say(msg, "Paste the full email text and try again.", true);
-        var x = r.body.receipt;
-        if (!x.ok) return say(msg, "This doesn't look like an order confirmation, so Relay didn't read it.", true);
-        say(msg, x.needsShopperConfirmation ? "Please check these details, some may be missing or wrong." : "Here's what Relay found. Please check it.");
-        var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
-        var rows = [["Store", who], ["Order", x.orderRef || "not found"], ["Date", x.orderDate || "not found"],
-          ["Total", x.totalPence == null ? "not found" : money(x.totalPence, x.currency)]];
-        rows.forEach(function (p) { out.appendChild(el("div", { className: "rl-order" }, [el("span", { text: p[0] }), el("b", { text: p[1] })])); });
-        (x.items || []).forEach(function (i) { out.appendChild(el("div", { className: "rl-order" }, [el("b", { text: i.qty + " × " + i.name }), el("span", { text: i.pricePence == null ? "" : money(i.pricePence, x.currency) })])); });
-        out.appendChild(el("p", { text: "This is read from the email you pasted and isn't saved yet. Because it comes from you rather than the store, it can't start an automatic refund." }));
-      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
-    };
-    [el("h2", { text: "Add a receipt" }), el("p", { text: "Paste an order-confirmation email from any store. Relay reads the details on this device's request and doesn't keep the email." }), box, go, msg, out,
-      el("button", { className: "rl-btn ghost", text: "Back", onclick: back })].forEach(function (n) { sheet.appendChild(n); });
-  }
   function consentView(sheet, email, c) {
     var msg = el("div", { className: "rl-msg" });
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
@@ -1795,7 +1793,7 @@
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
-      el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (x.orderDate ? " · " + x.orderDate : "") })]);
+      el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? " · " + shortDate(x.orderDate + "T12:00:00Z") : "") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
     if (!slim && x.hasImage && x.id) {
       var ph = el("img", { alt: "", style: "float:right;width:64px;height:64px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:var(--rl-fill)" });
@@ -1929,6 +1927,29 @@
       api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} rememberMailbox({ connected: false }); done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
     });
   }
+  // Without a connected inbox, the Receipts page still lets the shopper add a receipt themselves, and lists the ones they added.
+  function addedByHand(box) {
+    box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Or add a receipt yourself",
+      onclick: function () { open(function (sheet) { addReceiptView(sheet, close); }); } }));
+    var holder = el("div"); box.appendChild(holder);
+    function draw(rows) {
+      holder.textContent = "";
+      rows = (rows || []).slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); });
+      if (!rows.length) return;
+      holder.appendChild(el("h3", { className: "rl-ar-h", text: "Receipts you added" }));
+      rows.forEach(function (row) { holder.appendChild(receiptCard(row, load, false)); });
+    }
+    function load() {
+      if (memo.receipts) draw(memo.receipts.rows);
+      api("/relay/my/receipts?all=1").then(function (x) {
+        if (!x.ok || !box.isConnected) return;
+        var rows = (x.body && x.body.receipts) || [];
+        memo.receipts = { rows: rows, sig: JSON.stringify(rows), at: Date.now() }; diskWrite("receipts", rows);
+        draw(rows);
+      }, function () {});
+    }
+    load();
+  }
   function gmailSection(box, c, msg, onPage) {
     box.textContent = "";
     if (!onPage) box.appendChild(el("h2", { text: "Your receipts", style: "font-size:18px;margin-top:8px" }));
@@ -1964,6 +1985,7 @@
         if (c.gmailAvailable) box.appendChild(connectBtn("Connect Gmail", null, /^https:\/\/accounts\.google\.com\//, "Gmail"));
         if (c.outlookAvailable) box.appendChild(connectBtn("Connect Outlook", "microsoft", /^https:\/\/login\.microsoftonline\.com\//, "Outlook"));
         if (c.outlookAvailable) box.appendChild(el("p", { text: "Outlook works with Outlook.com, Hotmail and Live addresses.", style: "font-size:13px;opacity:.75;margin-top:8px" }));
+        if (onPage) addedByHand(box);
         return;
       }
       var MB = r.body.provider === "microsoft" ? "Outlook" : "Gmail", owner = MB === "Outlook" ? "Microsoft" : "Google";
@@ -2267,15 +2289,14 @@
         box.appendChild(list);
         box.appendChild(el("div", { className: "rl-recstat" }, [status, scanBtn]));
         // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
-        box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Missing a receipt? Search " + MB + " for it",
-          style: "all:unset;cursor:pointer;box-sizing:border-box;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:underline;text-underline-offset:3px",
-          onclick: function () { open(function (sheet) { findView(sheet, close); }); } }));
+        box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Missing a receipt? Add it",
+          onclick: function () { open(function (sheet) { addReceiptView(sheet, close); }); } }));
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
       if (!onPage) {
         if (lastScan) box.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email (slower)", onclick: function () { doScan(true); } }));
-        if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Can't find a receipt? Search " + MB + " for it", onclick: function () { openFind(); } }));
+        if (openFind) box.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
         box.appendChild(el("button", { className: "rl-btn ghost", text: "Disconnect " + MB + " and delete captured receipts", onclick: function () { disconnectGmail(function () { gmailSection(box, c, msg, onPage); }, msg); } }));
       }
       if (window.__relayAutoFull) { window.__relayAutoFull = false; window.__relayAutoScan = false; doScan(true); }
@@ -2322,45 +2343,166 @@
     }).catch(function () { note.textContent = "Couldn't reach Relay."; });
   }
 
-  // ---- Find a missing receipt: search the shopper's mailbox by store name, pick the right email, add it ----
+  // ---- Add a receipt: find it in the inbox as you type, paste it in one tap, or forward it ----
+  // Relay reads only the email the shopper picks or pastes, and keeps only the details it reads from it, never the email.
   var openFind = null;
-  function findView(sheet, onBack) {
-    var input = el("input", { type: "search", placeholder: "Store name, e.g. lululemon", style: "margin-top:8px" });
-    var MB = mailName();
-    var go = el("button", { className: "rl-btn", text: "Search my " + MB });
-    var msg = el("div", { className: "rl-msg" }), out = el("div");
-    [el("h2", { text: "Find a missing receipt" }),
-     el("p", { text: "Search your " + MB + " for a store, then pick the order confirmation email. Relay only reads the one you pick.", style: "font-size:14px;opacity:.8" }),
-     input, go, msg, out, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
-    function search() {
+  var SEARCH_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4.5 4.5"/></svg>';
+  function shortDay(d) { return /^\d{4}-\d{2}-\d{2}/.test(d || "") ? new Date(d.slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; }
+  // The shops this shopper buys from most (from the receipts already on this device), for one-tap searches.
+  function usualShops() {
+    var rows = (memo.receipts && memo.receipts.rows) || [], n = {}, since = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+    rows.forEach(function (x) {
+      var who = x && x.retailer && x.retailer.name;
+      if (!who || who === "Forwarded receipt" || x.kind !== "receipt" || String(x.orderDate || "") < since) return;
+      n[who] = (n[who] || 0) + 1;
+    });
+    var top = Object.keys(n).sort(function (a, b) { return n[b] - n[a] || (a < b ? -1 : 1); }).slice(0, 6);
+    return top.length >= 3 ? top : top.concat(["Amazon", "ASOS", "Argos", "Apple", "Zara", "Nike"].filter(function (k) { return top.indexOf(k) === -1; })).slice(0, 6);
+  }
+  function addReceiptView(host, onBack, opts) {
+    opts = opts || {};
+    var wrap = el("div", { className: "rl-ar" });
+    if (!opts.inPage) wrap.appendChild(el("h2", { text: "Add a receipt" }));
+    var lead = el("p", { className: "rl-ar-lead", text: "Relay brings your receipts in by itself. Missing one? Find it here." });
+    wrap.appendChild(lead);
+    var inbox = el("div"), pasted = el("div"), fwd = el("div");
+    [inbox, pasted, fwd].forEach(function (n) { wrap.appendChild(n); });
+    if (onBack) wrap.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Back", style: "margin-top:18px", onclick: onBack }));
+    host.appendChild(wrap);
+    inbox.appendChild(el("div", { className: "rl-skel", style: "min-height:48px;border-radius:12px" }));
+    var unsure = function () { inbox.textContent = ""; inbox.appendChild(el("p", { className: "rl-ar-help", text: "Couldn't reach your inbox just now. You can still paste the email below." })); };
+    cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      if (!g.ok) return unsure();
+      inbox.textContent = "";
+      if (g.body && g.body.connected) { searchPart(inbox, g.body); forwardPart(fwd, g.body); }
+      else { lead.remove(); connectPart(inbox); }
+    }, unsure);
+    pastePart(pasted);
+  }
+  // Search the inbox as you type: a pause in typing (or a tap on a shop) searches, and only the newest search is shown.
+  function searchPart(host, g) {
+    var MB = g.provider === "microsoft" ? "Outlook" : "Gmail";
+    var mag = el("span"); mag.innerHTML = SEARCH_ICON;
+    var input = el("input", { type: "search", id: "rl-ar-q", placeholder: "Search your " + MB, autocomplete: "off" });
+    input.setAttribute("aria-label", "Search " + MB + " for a receipt"); input.setAttribute("enterkeyhint", "search");
+    host.appendChild(el("label", { className: "rl-search rl-ar-q" }, [mag, input]));
+    var chips = el("div", { className: "rl-ar-chips" });
+    usualShops().forEach(function (name) {
+      chips.appendChild(el("button", { type: "button", className: "rl-ar-chip", text: name, onclick: function () { input.value = name; last = ""; run(0); } }));
+    });
+    host.appendChild(chips);
+    var status = el("p", { className: "rl-ar-status" }); status.setAttribute("role", "status");
+    var list = el("div", { className: "rl-ar-list" });
+    host.appendChild(status); host.appendChild(list);
+    var seq = 0, timer = null, last = "";
+    function run(wait) { clearTimeout(timer); timer = setTimeout(go, wait); }
+    function go() {
       var q = input.value.trim();
-      if (q.length < 2) return say(msg, "Type at least 2 letters of the store name.", true);
-      go.disabled = true; out.textContent = ""; say(msg, "Searching…");
+      if (q === last) return;
+      last = q;
+      var mine = ++seq;
+      list.textContent = "";
+      if (q.length < 2) { status.textContent = ""; return; }
+      status.textContent = "Searching " + MB + "…";
+      for (var k = 0; k < 3; k++) list.appendChild(el("div", { className: "rl-ar-row rl-skel" }));
       api("/relay/my/gmail/find", { method: "POST", body: { query: q } }).then(function (r) {
-        go.disabled = false;
-        if (!r.ok) return say(msg, r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs to be reconnected first." : r.status === 409 ? "Connect your email first." : "Couldn't search " + MB + " right now. Try again.", true);
-        var list = (r.body && r.body.results) || [];
-        say(msg, list.length ? "Tap Add on the order confirmation." : "Nothing found for that name. Try a shorter name.");
-        list.forEach(function (x) {
-          var add = el("button", { className: "rl-btn", text: x.added ? "Added" : "Add", disabled: !!x.added, style: "margin-top:8px;padding:9px 14px;font-size:14px" });
-          add.onclick = function () {
-            add.disabled = true; add.textContent = "Adding…";
-            api("/relay/my/gmail/add", { method: "POST", body: { messageId: x.id } }).then(function (a) {
-              if (a.ok && a.body && a.body.ok) { add.textContent = "Added"; say(msg, "Added" + (a.body.store ? " " + a.body.store : "") + (a.body.orderRef ? " · " + a.body.orderRef : "") + ". Go back to see it in your purchases."); return; }
-              add.disabled = false; add.textContent = "Add";
-              if (a.ok && a.body && a.body.reason === "not_recognised") {
-                var sg = a.body.signals || {};
-                say(msg, "Relay couldn't read that email as an order or a return. (Subject looked like an order: " + (sg.subject ? "yes" : "no") + ", order details found: " + (sg.body ? "yes" : "no") + ".) Try another one.", true);
-              } else say(msg, "Couldn't add that email. Try again.", true);
-            }).catch(function () { add.disabled = false; add.textContent = "Add"; say(msg, "Couldn't reach Relay.", true); });
-          };
-          out.appendChild(el("div", { className: "rl-order" }, [el("b", { text: x.subject || "(no subject)" }),
-            el("span", { text: (x.from || "") + (x.date ? " · " + x.date : "") }), add]));
-        });
-      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay.", true); });
+        if (mine !== seq) return;
+        list.textContent = "";
+        if (!r.ok) {
+          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs reconnecting first: open Profile, then Email connection."
+            : r.status === 409 ? "Connect your email first: open Profile, then Email connection." : "Couldn't search " + MB + " just now. Try again in a moment.";
+          return;
+        }
+        var rows = (r.body && r.body.results) || [];
+        status.textContent = rows.length ? "Tap Add on the order email." : "Nothing in " + MB + " for “" + q + "”. Try the shop's name or the order number.";
+        rows.forEach(function (x) { list.appendChild(resultRow(x)); });
+      }, function () { if (mine === seq) { list.textContent = ""; status.textContent = "Couldn't reach Relay. Check your connection."; } });
     }
-    go.onclick = search;
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter") search(); });
+    input.addEventListener("input", function () { run(450); });
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); last = ""; run(0); } });
+  }
+  function resultRow(x) {
+    var who = String(x.from || "").trim() || "Email";
+    var add = el("button", { type: "button", className: "rl-ar-add" + (x.added ? " done" : ""), text: x.added ? "Added" : "Add", disabled: Boolean(x.added) });
+    add.setAttribute("aria-label", (x.added ? "Already added: " : "Add ") + (x.subject || who));
+    var note = el("span", { className: "rl-ar-note" });
+    add.onclick = function () {
+      if (add.disabled) return;
+      add.disabled = true; add.textContent = "Adding…";
+      api("/relay/my/gmail/add", { method: "POST", body: { messageId: x.id } }).then(function (a) {
+        if (a.ok && a.body && a.body.ok) {
+          add.textContent = "Added"; add.classList.add("done"); memo.receipts = null;
+          note.textContent = a.body.kind === "receipt" ? "In your Receipts now." : "Added to the order it belongs to.";
+          return;
+        }
+        add.disabled = false; add.textContent = "Add";
+        note.textContent = a.ok && a.body && a.body.reason === "not_recognised" ? "That one isn't an order, delivery or return email." : "Couldn't add it. Try again.";
+      }, function () { add.disabled = false; add.textContent = "Add"; note.textContent = "Couldn't reach Relay. Check your connection."; });
+    };
+    var colours = ["#E0446E", "#D47B1F", "#4F72E0", "#2E9E5B", "#B455C9", "#6662D9", "#14918A"];
+    var ini = el("span", { className: "rl-ar-ini", text: who.charAt(0).toUpperCase(), style: "background:" + colours[who.charCodeAt(0) % colours.length] });
+    ini.setAttribute("aria-hidden", "true");
+    return el("div", { className: "rl-ar-row" }, [ini,
+      el("span", { className: "rl-ar-t" }, [el("b", { text: x.subject || "(no subject)" }), el("span", { text: [who, shortDay(x.date)].filter(Boolean).join(" · ") }), note]), add]);
+  }
+  // Paste: one tap reads what was copied (the phone asks first), and the receipt goes straight into Receipts.
+  function pastePart(host) {
+    host.appendChild(el("h3", { className: "rl-ar-h", text: "Or paste the email" }));
+    host.appendChild(el("p", { className: "rl-ar-help", text: "In your mail app, open the order email, choose Select All, then Copy. Then tap Paste." }));
+    // Where the phone won't let Relay read what was copied, a box to paste into appears instead (and Paste becomes Add it).
+    var box = el("textarea", { className: "rl-ar-box", rows: 5, maxLength: 250000, placeholder: "Press and hold here, then tap Paste" });
+    box.setAttribute("aria-label", "The order email"); box.hidden = true;
+    var btn = el("button", { type: "button", className: "rl-btn", text: "Paste", style: "margin-top:10px" });
+    var msg = el("div", { className: "rl-msg" }), out = el("div"), busy = false;
+    function label() { btn.disabled = busy; btn.textContent = busy ? "Reading…" : box.hidden ? "Paste" : "Add it"; }
+    function read(text) {
+      if (busy) return;
+      text = String(text || "");
+      if (text.trim().length < 40) return say(msg, "That's too short to be an order email. Copy the whole email (Select All, then Copy) and try again.", true);
+      busy = true; label(); out.textContent = ""; say(msg, "");
+      api("/relay/my/receipts/add-pasted", { method: "POST", body: { email: text } }).then(function (r) {
+        busy = false; label();
+        if (r.status === 401) { save(null); close(); return; }
+        if (r.status === 429) return say(msg, "That's a lot of receipts in one go. Try again in an hour.", true);
+        if (!r.ok) return say(msg, "Couldn't add that. Check your connection and try again.", true);
+        if (!r.body.ok) return say(msg, "That doesn't look like an order, delivery or return email. Copy the whole email and try again.", true);
+        memo.receipts = null; box.value = ""; box.hidden = true; label();
+        out.appendChild(addedCard(r.body));
+      }, function () { busy = false; label(); say(msg, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    function byHand() { box.hidden = false; label(); say(msg, ""); try { box.focus(); } catch (e) {} }
+    btn.onclick = function () {
+      if (busy) return;
+      if (!box.hidden) return read(box.value);
+      try { if (navigator.clipboard && navigator.clipboard.readText) { navigator.clipboard.readText().then(function (t) { if (t && t.trim()) read(t); else byHand(); }, byHand); return; } } catch (e) {}
+      byHand();
+    };
+    box.addEventListener("paste", function (e) {
+      var t = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData("text/plain") : "";
+      if (t && t.trim()) { e.preventDefault(); box.value = t; read(t); return; }
+      setTimeout(function () { read(box.value); }, 0);
+    });
+    [box, btn, msg, out].forEach(function (n) { host.appendChild(n); });
+  }
+  function addedCard(b) {
+    var card = el("div", { className: "rl-ar-done" }, [el("b", { text: (b.again ? "Already in your receipts: " : "Added: ") + (b.store || "your receipt") }),
+      el("span", { text: [b.orderRef ? "Order " + b.orderRef : null, shortDay(b.orderDate), b.totalPence != null ? money(b.totalPence, b.currency) : null].filter(Boolean).join(" · ") || "Check its details in Receipts." })]);
+    (b.items || []).slice(0, 3).forEach(function (i) { if (i && i.name) card.appendChild(el("span", { text: (i.qty > 1 ? i.qty + " × " : "") + i.name })); });
+    if (window.go) card.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "See it in Receipts", style: "margin-top:8px", onclick: function () { close(); window.go("receipts"); } }));
+    return card;
+  }
+  // For a receipt in another inbox: forward it to the inbox Relay reads (each person's own, so it lands in their account).
+  function forwardPart(host, g) {
+    if (!g.email) return;
+    var copy = el("button", { type: "button", className: "rl-ar-copy", text: "Copy " + g.email });
+    copy.onclick = function () { copyText(g.email).then(function (ok) { copy.textContent = ok ? "Copied" : "Select it to copy"; }); };
+    host.appendChild(el("div", { className: "rl-ar-fwd" }, [el("b", { text: "In another inbox?" }),
+      el("span", { text: "Forward it to " + g.email + ". Relay will pick it up, or search for it above to add it now." }), copy]));
+  }
+  function connectPart(host) {
+    host.appendChild(el("div", { className: "rl-ar-fwd" }, [el("b", { text: "Let Relay find them for you" }),
+      el("span", { text: "Connect the email you shop with and Relay brings your receipts in by itself." }),
+      el("button", { type: "button", className: "rl-btn", text: "Connect your email", style: "margin-top:6px", onclick: function () { close(); if (window.go) window.go("receipts"); } })]));
   }
 
   // ---- Swap & resell (v1: matches members; no payments or postage through Relay yet) ----
@@ -2689,7 +2831,7 @@
   }
   var HELP = [
     ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
-    ["A receipt is missing. What can I do?", "Open Profile, then Email connection, and choose Find a missing receipt to search your inbox for that store. You can also paste a receipt in, or run a full re-scan."],
+    ["A receipt is missing. What can I do?", "Open Profile and choose Add a missing receipt. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
     ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
@@ -2715,7 +2857,7 @@
     }
     // Screens that bring their own heading and Back button.
     function screen(view) { sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {} view(sheet); }
-    openFind = function () { screen(function (sh) { findView(sh, home); }); };
+    openFind = function () { page("Add a receipt", function (b) { addReceiptView(b, null, { inPage: true }); }); };
     openOriginal = function (id) { screen(function (sh) { originalView(sh, id, home); }); };
     openResale = function (rid) { screen(function (sh) { resaleView(sh, home, rid); }); };
     function editHere() { screen(function (sh) { profileView(sh, home); }); }
@@ -2738,7 +2880,7 @@
 
     // Receipts
     var mailRow = accRow("mail", "Email connection", "Checking…", function () { page("Email connection", mailPage); });
-    var receiptRows = [mailRow, accRow("paste", "Add a receipt by pasting it", "", function () { screen(function (sh) { receiptView(sh, home); }); })];
+    var receiptRows = [mailRow, accRow("paste", "Add a missing receipt", "Search your inbox or paste an email", function () { openFind(); })];
     var ordersRow = accRow("bag", "Shop orders", "", function () { page("Shop orders", ordersPage); }); ordersRow.style.display = "none";
     receiptRows.push(ordersRow);
     if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "", function () { openResale(); }));
@@ -2826,7 +2968,7 @@
       b.appendChild(el("p", { text: on ? "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." : "Connect the email you shop with, Gmail or Outlook, and Relay brings your receipts in for you." }));
       b.appendChild(el("button", { className: "rl-btn", text: on ? "Open my receipts" : "Connect your email", onclick: function () { close(); window.go("receipts"); } }));
       if (on) {
-        b.appendChild(el("button", { className: "rl-btn ghost", text: "Find a missing receipt", onclick: function () { openFind(); } }));
+        b.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
         b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
         b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
         b.appendChild(el("button", { className: "rl-btn ghost rl-red", text: "Disconnect " + mailName(), onclick: function () { disconnectGmail(home, note); } }));
@@ -3009,7 +3151,7 @@
       return;
     }
     pageLaunchers = function () {
-      openFind = function () { open(function (sh) { findView(sh, function () { close(); mountReceipts(host); }); }); };
+      openFind = function () { open(function (sh) { addReceiptView(sh, function () { close(); mountReceipts(host); }); }); };
       openOriginal = function (id) { open(function (sh) { originalView(sh, id, close); }); };
       openResale = function (rid) { open(function (sh) { resaleView(sh, close, rid); }); };
     };

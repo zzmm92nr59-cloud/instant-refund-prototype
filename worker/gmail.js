@@ -520,6 +520,33 @@ async function logoFor(env, fetchImpl, domain, now) {
 
 // Reads one email and decides what it is. Only extracted fields are kept; the email text is dropped.
 // "ref" says where the email lives so it can be opened again: { gmailId } or { outlookId }.
+// What a mail app copies (Select All, then Copy) has the subject, the sender and the date as plain lines at the top rather
+// than as headers. They are made headers again, so a pasted email is read like one from the inbox (the shop comes from the
+// sender). A forwarded email keeps its text; the date the shop sent it is used when the email itself gives none, as the
+// scan does with an email's own date. The email's source (it starts with its headers) is read as it is.
+const MAIL_APP_LABELS = /^(inbox|primary|updates|promotions|social|important|starred|sent|all mail|archive|focused|other|to me)$/i;
+const HEADER_LINE = /^(from|subject|date|to|cc|received|delivered-to|return-path|message-id|mime-version|content-type|reply-to|dkim-signature|arc-[a-z-]+|x-[a-z0-9-]+)\s*:/i;
+function mailDate(s, now) {
+  const t = String(s || "").replace(/\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?\b,?/gi, " ").replace(/\bat\b/gi, " ").replace(/\s+/g, " ").trim();
+  if (t.length < 6 || t.length > 60 || !/\d{4}/.test(t)) return null;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) || d.getTime() > now + 86400000 || d.getUTCFullYear() < 2000 ? null : d;
+}
+export function pastedAsEmail(text, now = Date.now()) {
+  const t = String(text || "").replace(/\r\n?/g, "\n").replace(/^\s+/, "");
+  const lines = t.split("\n"), top = lines.slice(0, 12);
+  if (HEADER_LINE.test(lines[0])) return t;
+  if (top.some(l => /^\s*(from|subject)\s*:/i.test(l))) {
+    const m = top.map(l => /^\s*(?:date|sent)\s*:\s*(.+?)\s*$/i.exec(l)).find(Boolean), d = m && mailDate(m[1], now);
+    return d ? "Date: " + d.toUTCString() + "\n\n" + t : t;
+  }
+  const i = top.findIndex(l => /^\s*[^<>@\n]{0,80}<[^<>\s@]+@[^<>\s@]+\.[^<>\s@]+>\s*$/.test(l));
+  if (i === -1) return t;
+  const subject = lines.slice(0, i).map(l => l.trim()).filter(l => l && !MAIL_APP_LABELS.test(l))[0] || "";
+  const d = lines.slice(i + 1, i + 4).map(l => mailDate(l, now)).find(Boolean);
+  return "From: " + lines[i].trim() + "\n" + (subject ? "Subject: " + subject.slice(0, 200) + "\n" : "") + (d ? "Date: " + d.toUTCString() + "\n" : "") + "\n" + lines.slice(i + 1).join("\n");
+}
+
 function classify(rawText, ref, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
@@ -959,23 +986,24 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
     if (!l.ok) return null;
     return ((await l.json().catch(() => ({}))).messages || []).map(m => m && m.id).filter(id => typeof id === "string" && GMAIL_ID.test(id));
   };
-  const first = await listIds(q + ' subject:(order OR receipt OR confirmation OR "thanks for your" OR return OR "QR code" OR shipping OR delivered OR invoice) -category:promotions');
-  const rest = await listIds(q);
+  // Both lists and every email's subject line are asked for side by side: the app searches as the shopper types.
+  const [first, rest] = await Promise.all([
+    listIds(q + ' subject:(order OR receipt OR confirmation OR "thanks for your" OR return OR "QR code" OR shipping OR delivered OR invoice) -category:promotions'),
+    listIds(q)]);
   if (first === null && rest === null) return { status: 502, body: { error: "gmail_unavailable" } };
   const ids = [...new Set([...(first || []), ...(rest || [])])].slice(0, 15);
-  const results = [];
-  for (const id of ids) {
+  const results = (await Promise.all(ids.map(async (id) => {
     const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: auth });
-    if (!r.ok) continue;
+    if (!r.ok) return null;
     const j = await r.json().catch(() => ({}));
     const h = n => ((j.payload && j.payload.headers || []).find(x => String(x.name).toLowerCase() === n) || {}).value || "";
     const from = h("from").replace(/<[^>]*>/g, "").replace(/["']/g, "").trim() || (/@([\w.-]+)/.exec(h("from")) || [])[1] || "";
     const ref = await sha256Hex("gmail:" + id);
     const have = await env.RELAY_DB.prepare("SELECT status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
-    results.push({ id, subject: h("subject").slice(0, 120), from: from.slice(0, 60),
+    return { id, subject: h("subject").slice(0, 120), from: from.slice(0, 60),
       date: j.internalDate ? new Date(Number(j.internalDate)).toISOString().slice(0, 10) : null,
-      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) });
-  }
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) };
+  }))).filter(Boolean);
   return { status: 200, body: { results } };
 }
 
@@ -989,16 +1017,15 @@ async function findOutlook(env, shopperId, fetchImpl, auth, q) {
   const found = ((await l.json().catch(() => ({}))).value || []).filter(m => m && typeof m.id === "string" && OUTLOOK_ID.test(m.id) && !skipped.has(m.parentFolderId));
   const looks = m => looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address);
   const ordered = [...found.filter(looks), ...found.filter(m => !looks(m))].slice(0, 15);
-  const results = [];
-  for (const m of ordered) {
+  const results = await Promise.all(ordered.map(async (m) => {
     const mid = typeof m.internetMessageId === "string" ? m.internetMessageId.trim() : "";
     const ref = await sha256Hex("outlook:" + (mid && mid.length <= 400 ? mid : m.id));
     const have = await env.RELAY_DB.prepare("SELECT status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
     const who = m.from && m.from.emailAddress || {};
-    results.push({ id: m.id, subject: String(m.subject || "").slice(0, 120), from: String(who.name || who.address || "").replace(/["']/g, "").trim().slice(0, 60),
+    return { id: m.id, subject: String(m.subject || "").slice(0, 120), from: String(who.name || who.address || "").replace(/["']/g, "").trim().slice(0, 60),
       date: typeof m.receivedDateTime === "string" ? m.receivedDateTime.slice(0, 10) : null,
-      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) });
-  }
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) };
+  }));
   return { status: 200, body: { results } };
 }
 
@@ -1581,6 +1608,31 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (!token) return json({ error: "gmail_reconnect_needed" }, 401, cors);
     const r = outlook ? await buildOriginalOutlook(opts.fetchImpl, token, mid) : await buildOriginal(opts.fetchImpl, token, mid);
     return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
+  }
+  // A receipt the shopper pasted in (an order email from any inbox): read like a scanned one and kept in Receipts. Only the
+  // details read from it are kept, never the email itself. The same email pasted twice is kept once.
+  if (path === "/relay/my/receipts/add-pasted" && m === "POST") {
+    const raw = await request.text().catch(() => "");
+    let body = null;
+    if (raw.length <= 300000) { try { body = JSON.parse(raw); } catch { body = null; } }
+    const text = body && typeof body.email === "string" ? body.email : "";
+    if (text.trim().length < 40 || text.length > 250000) return json({ error: "invalid_receipt" }, 400, cors);
+    await ensureGmailTables(env.RELAY_DB);
+    const recent = await env.RELAY_DB.prepare(
+      "SELECT COUNT(*) AS n FROM captured_receipts WHERE shopper_id = ? AND created_at > ? AND json_extract(details, '$.pasted') = 1").bind(shopper.id, opts.now - 3600000).first();
+    if ((recent?.n || 0) >= 30) return json({ error: "too_many_requests" }, 429, cors);
+    const { details, status } = classify(pastedAsEmail(text, opts.now), { pasted: true }, true);
+    if (status === "not_receipt" || !details || details.kind === "not_receipt") return json({ ok: false, reason: "not_recognised" }, 200, cors);
+    const ref = await sha256Hex("pasted:" + text.replace(/\s+/g, " ").trim());
+    const seen = await env.RELAY_DB.prepare("SELECT id, status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopper.id, ref).first();
+    let id = seen ? seen.id : crypto.randomUUID();
+    if (seen) await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = 'pending' WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(details), seen.id, shopper.id).run();
+    else await env.RELAY_DB.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+      .bind(id, shopper.id, ref, "pending", JSON.stringify(details), opts.now).run();
+    const r = details.retailer || {};
+    return json({ ok: true, id, again: Boolean(seen && seen.status !== "dismissed"), kind: details.kind, store: r.name || r.domain || null, orderRef: details.orderRef || null,
+      orderDate: details.orderDate || null, totalPence: details.totalPence == null ? null : details.totalPence, currency: details.currency || null,
+      items: (details.items || []).slice(0, 10).map(i => ({ name: i.name, qty: i.qty, pricePence: i.pricePence == null ? null : i.pricePence })) }, 200, cors);
   }
   const act = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/(confirm|dismiss)$/.exec(path);
   if (act && m === "POST") {
