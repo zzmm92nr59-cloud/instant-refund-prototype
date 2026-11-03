@@ -92,7 +92,10 @@ const googleCopy = domain => "https://www.google.com/s2/favicons?domain=" + doma
 const duckCopy = domain => "https://icons.duckduckgo.com/ip3/" + domain + ".ico";
 let duckStandIn = null;
 async function candidates(domain) {
-  if (overrides[domain] === "google") return [googleCopy(domain)];
+  const how = overrides[domain];
+  if (how === "google") return [googleCopy(domain), duckCopy(domain)];
+  if (how === "duck") return [duckCopy(domain)];
+  if (typeof how === "string" && how.startsWith("https://")) return [how];
   const page = await fromHomePage(domain);
   page.sort((a, b) => b.says - a.says);
   const list = [...page.slice(0, 6).map(x => x.u),
@@ -104,7 +107,7 @@ async function candidates(domain) {
 const score = (p, k) => Math.min(p, 512) + (k === "png" || k === "svg" ? 40 : k === "ico" ? 0 : 20);
 const existing = file => { for (const e of ["png", "svg", "ico", "jpg", "webp", "gif"]) if (fs.existsSync("logos/" + file + "." + e)) return e; return null; };
 let report = { hits: {}, misses: [] };
-try { const old = JSON.parse(fs.readFileSync("logos/_report.json", "utf8")); if (old && old.hits) report.hits = old.hits; } catch {}
+try { const old = JSON.parse(fs.readFileSync("logos/_report.json", "utf8")); if (old && old.hits) report.hits = old.hits; if (old && Array.isArray(old.misses)) report.misses = old.misses; } catch {}
 // Logos already saved by an earlier run are measured, so a new one only replaces them when it is sharper.
 for (const d of stores) { const e = existing(d); if (e && (!report.hits[d] || !report.hits[d].px)) { const b = fs.readFileSync("logos/" + d + "." + e); report.hits[d] = { ...(report.hits[d] || {}), file: d + "." + e, px: px(b, kind(b)) || null, bytes: b.length }; } }
 for (const [d, how] of Object.entries(overrides)) {
@@ -132,13 +135,15 @@ async function worker() {
       if (!best || s > best.s) best = { s, b: r.b, k, p, u };
       if (p >= 180 && (k === "png" || k === "svg")) break;   // sharp enough: no need to look further
     }
-    const had = existing(d), oldPx = report.hits[d] && report.hits[d].px, forced = overrides[d] === "google";
-    if (best && (best.p >= 48 || !had) && (forced || !had || !oldPx || best.p >= oldPx)) {
+    const had = existing(d), oldPx = report.hits[d] && report.hits[d].px, forced = Boolean(overrides[d]) && overrides[d] !== "drop";
+    if (best && (best.p >= 48 || !had || forced) && (forced || !had || !oldPx || best.p >= oldPx)) {
       if (had && had !== best.k) fs.unlinkSync("logos/" + d + "." + had);
       fs.writeFileSync("logos/" + d + "." + best.k, best.b);
       report.hits[d] = { file: d + "." + best.k, from: best.u, px: best.p, bytes: best.b.length };
       report.misses = report.misses.filter(m => m.domain !== d);
-    } else if (!had) {
+    } else if (!had || forced) {
+      // A logo checked by eye as wrong or too poor is removed when nothing better turns up.
+      if (had) { fs.unlinkSync("logos/" + d + "." + had); delete report.hits[d]; }
       report.misses = report.misses.filter(m => m.domain !== d).concat({ domain: d, tried: why.slice(0, 6) });
     }
   }
