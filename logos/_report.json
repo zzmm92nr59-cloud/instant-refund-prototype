@@ -482,9 +482,9 @@
   },
   "graze.com": {
    "file": "graze.com.png",
-   "from": "https://www.graze.com/cdn/shop/files/Sheep_Marque-10_21cbfe6d-7a6e-4f73-b137-7caf6eb27394.png?crop=center&height=32&v=1785490339&width=32",
-   "px": 32,
-   "bytes": 1858
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c9/b9/08/c9b908c8-b216-59a2-ea57-6e832551151d/appicon-1x_U007emarketing-0-8-0-85-220-0.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 10052
   },
   "hellofresh.co.uk": {
    "file": "hellofresh.co.uk.png",
@@ -641,12 +641,6 @@
    "from": "https://www.maccosmetics.co.uk/cdn/shop/files/mac-favicon.png?crop=center&height=32&v=1788434700&width=32",
    "px": 32,
    "bytes": 299
-  },
-  "glossier.com": {
-   "file": "glossier.com.png",
-   "from": "https://www.glossier.com/cdn/shop/files/favicon-dark_32x32.webp?v=1681821732",
-   "px": 32,
-   "bytes": 2275
   },
   "lush.com": {
    "file": "lush.com.png",
@@ -1782,12 +1776,6 @@
    "px": 144,
    "bytes": 2290
   },
-  "poundland.co.uk": {
-   "file": "poundland.co.uk.png",
-   "from": "https://www.poundland.co.uk/cdn/shop/files/Poundland_Favicon.webp?crop=center&height=32&v=1776850334&width=32",
-   "px": 32,
-   "bytes": 2257
-  },
   "bmstores.co.uk": {
    "file": "bmstores.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=bmstores.co.uk&sz=256",
@@ -1814,9 +1802,9 @@
   },
   "lakeland.co.uk": {
    "file": "lakeland.co.uk.png",
-   "from": "https://www.lakeland.co.uk/cdn/shop/files/lakeland-favicon.png?crop=center&height=32&v=1782488235&width=32",
-   "px": 32,
-   "bytes": 335
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/fd/41/79/fd417931-498b-95dd-98a4-5ac33647c825/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 13163
   },
   "dfs.co.uk": {
    "file": "dfs.co.uk.png",
@@ -2052,12 +2040,6 @@
    "px": 180,
    "bytes": 1373
   },
-  "hamleys.com": {
-   "file": "hamleys.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=hamleys.com&sz=256",
-   "px": 32,
-   "bytes": 699
-  },
   "lego.com": {
    "file": "lego.com.png",
    "from": "https://lego.com/apple-touch-icon.png",
@@ -2132,9 +2114,9 @@
   },
   "three.co.uk": {
    "file": "three.co.uk.png",
-   "from": "https://www.google.com/s2/favicons?domain=three.co.uk&sz=256",
-   "px": 32,
-   "bytes": 1415
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/32/c0/8d/32c08d61-e40c-ef51-ac06-a943201248cd/AppIconServices-0-0-1x_U007emarketing-0-8-0-0-GLES2_U002c0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 4488
   },
   "sky.com": {
    "file": "sky.com.png",
@@ -2168,9 +2150,9 @@
   },
   "idmobile.co.uk": {
    "file": "idmobile.co.uk.png",
-   "from": "https://www.google.com/s2/favicons?domain=idmobile.co.uk&sz=256",
-   "px": 32,
-   "bytes": 510
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/bc/0f/e0/bc0fe0f6-409f-ec04-32e9-c1dc2599b771/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 12249
   },
   "voxi.co.uk": {
    "file": "voxi.co.uk.png",
@@ -2216,9 +2198,9 @@
   },
   "tescomobile.com": {
    "file": "tescomobile.com.png",
-   "from": "https://www.tescomobile.com/media/favicon/default/favicon-32x32.png",
-   "px": 32,
-   "bytes": 409
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a1/56/be/a156bec7-7a60-f64e-fdcb-6926e8f74ee4/AppIcon-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 18676
   },
   "bose.co.uk": {
    "file": "bose.co.uk.png",
@@ -2234,9 +2216,9 @@
   },
   "ring.com": {
    "file": "ring.com.png",
-   "from": "https://d39xvdj9d5ntm1.cloudfront.net/common/favicon-605ec58ef7e8147586a0ee2c895f5af4.png",
-   "px": 32,
-   "bytes": 1675
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/71/5e/e0/715ee0ef-ef20-b36f-8547-1d0a939b8ad8/AppIcon-NH-0-0-1x_U007epad-0-1-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 16613
   },
   "mcdonalds.com": {
    "file": "mcdonalds.com.png",
@@ -2384,9 +2366,9 @@
   },
   "krispykreme.co.uk": {
    "file": "krispykreme.co.uk.png",
-   "from": "https://www.krispykreme.co.uk/media/favicon/default/favicon-32x32.png",
-   "px": 32,
-   "bytes": 1054
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/88/2e/9c/882e9c9e-48d9-07ee-a76c-cd6229459e61/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 4919
   },
   "tgifridays.co.uk": {
    "file": "tgifridays.co.uk.png",
@@ -2504,9 +2486,9 @@
   },
   "eurostar.com": {
    "file": "eurostar.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=eurostar.com&sz=256",
-   "px": 32,
-   "bytes": 1251
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/4c/fe/6c/4cfe6ccb-3086-07d1-1ea0-7acb2c1eedd3/AppIcon-0-0-1x_U007emarketing-0-6-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 18609
   },
   "nationalexpress.com": {
    "file": "nationalexpress.com.svg",
@@ -2768,9 +2750,9 @@
   },
   "ticketmaster.co.uk": {
    "file": "ticketmaster.co.uk.png",
-   "from": "https://www.google.com/s2/favicons?domain=ticketmaster.co.uk&sz=256",
-   "px": 32,
-   "bytes": 381
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/b6/1c/09/b61c097d-c719-f0a7-9062-d602b89e8161/AppIcon-0-0-1x_U007epad-0-1-0-sRGB-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 19996
   },
   "eventbrite.co.uk": {
    "file": "eventbrite.co.uk.png",
@@ -3020,9 +3002,9 @@
   },
   "dropbox.com": {
    "file": "dropbox.com.png",
-   "from": "https://www.google.com/s2/favicons?domain=dropbox.com&sz=256",
-   "px": 32,
-   "bytes": 1379
+   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/94/2b/ca/942bcaba-f8db-9467-f3c9-10f6f35267a3/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg",
+   "px": 192,
+   "bytes": 14731
   },
   "canva.com": {
    "file": "canva.com.png",
@@ -3540,12 +3522,6 @@
    "px": 180,
    "bytes": 1251
   },
-  "coachinginngroup.co.uk": {
-   "file": "coachinginngroup.co.uk.png",
-   "from": "https://coachinginngroup.co.uk/wp-content/uploads/2025/09/brand-header.png",
-   "px": 192,
-   "bytes": 10937
-  },
   "thamesclippers.com": {
    "file": "thamesclippers.com.svg",
    "from": "https://www.thamesclippers.com/safari-pinned-tab.svg",
@@ -3605,8 +3581,20 @@
     "https://www.google.com/s2/favicons?domain=thejointldn.com&sz=256 http 404",
     "https://icons.duckduckgo.com/ip3/thejointldn.com.ico http 404"
    ]
+  },
+  {
+   "domain": "hamleys.com",
+   "tried": []
+  },
+  {
+   "domain": "poundland.co.uk",
+   "tried": []
+  },
+  {
+   "domain": "glossier.com",
+   "tried": []
   }
  ],
  "total": 616,
- "found": 593
+ "found": 589
 }
