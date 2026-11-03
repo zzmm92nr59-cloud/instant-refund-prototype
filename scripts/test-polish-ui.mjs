@@ -105,14 +105,17 @@ assert.equal(await page.locator(".rl-story .sum").evaluate(n => getComputedStyle
 await page.keyboard.press("Escape");
 console.log("ok - the Wrapped story uses flat colours from Relay's palette");
 
-// One colour scheme, a press effect on buttons, and the keyboard space is tracked for sheets.
-assert.equal(await page.evaluate(() => document.querySelector('meta[name="color-scheme"]').content), "only light");
-assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), "light only");
+// A real dark theme that follows the phone (this browser asks for dark), a press effect on buttons, and the keyboard
+// space is tracked for sheets.
+assert.equal(await page.evaluate(() => document.querySelector('meta[name="color-scheme"]').content), "light dark");
+assert.deepEqual(await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.body).color]), ["rgb(0, 0, 0)", "rgb(255, 255, 255)"],
+  "in dark mode the page is black with white text");
+assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#foot")).backdropFilter !== "none"), true, "the tab bar is frosted glass");
 assert.ok(await page.evaluate(() => [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => /button:active/.test(r.selectorText || "") && /scale/.test(r.cssText)); } catch { return false; } })), "buttons shrink a little when pressed");
 assert.match(await page.locator("#foot button").first().evaluate(b => getComputedStyle(b).transitionProperty), /transform/);
 assert.match(await page.evaluate(() => document.querySelector('meta[name="viewport"]').content), /interactive-widget=resizes-content/);
 assert.ok(await page.evaluate(() => [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => /--rl-kb/.test(r.cssText)); } catch { return false; } })), "sheets make room for the keyboard");
-console.log("ok - light colour scheme declared, press effect on buttons, sheets make room for the keyboard");
+console.log("ok - follows the phone's light or dark setting, press effect on buttons, sheets make room for the keyboard");
 
 // A double tap on Watch price watches it once (it doesn't watch then unwatch).
 await page.evaluate(() => window.go("discover"));

@@ -16,7 +16,7 @@ for(const file of files){
  assert.doesNotMatch(el('view').innerHTML+el('side').innerHTML,/demo|sandbox|simulat|fictional|test/i);
  // Four tabs for shoppers, Home first. Market is for testing only; Wallet lives inside Home; Radar is Price alerts in Discover.
  assert.deepEqual([...el('side').innerHTML.matchAll(/go\('([a-z]+)'\)/g)].map(m=>m[1]),['profile','receipts','discover','me']);
- for(const tab of ['profile','receipts','discover','me']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp('active[^>]*go\\(\''+tab));assert.ok(el('view').innerHTML.length>100)}
+ for(const tab of ['profile','receipts','discover','me']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp('active[^>]*go\\(\''+tab));if(tab==='receipts')assert.match(el('view').innerHTML,/<h1 class="title">Receipts<\/h1><div id="receiptsPage">/,'Receipts is a title over the page account.js fills (browser tests cover what it shows)');else assert.ok(el('view').innerHTML.length>100)}
  sandbox.go('wallet');assert.equal(sandbox.page,'profile','the wallet opens on Home');
  sandbox.go('radar');assert.match(el('view').innerHTML,/Price alerts/);assert.match(el('side').innerHTML,/active[^>]*go\('discover/,'Price alerts sits inside Discover');
  // Testing tools add the Market tab back.
