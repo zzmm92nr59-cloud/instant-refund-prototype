@@ -1,20 +1,32 @@
 name: Fetch store logos
-on: workflow_dispatch
+# Builds Relay's logo inventory (see scripts/fetch-logos.mjs) on GitHub's servers, which can reach shops' websites, and
+# commits the logos to the branch it was run on. "only" fetches just the listed shops again (comma-separated domains).
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: "Only these shops (comma-separated domains); empty for every shop"
+        required: false
+        default: ""
 permissions:
   contents: write
 jobs:
   logos:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node scripts/fetch-logos.mjs | tee logos-summary.txt
-      - name: Save logos to a branch
+      - name: Fetch logos
+        env:
+          ONLY: ${{ github.event.inputs.only }}
+        run: node scripts/fetch-logos.mjs | tee logos-summary.txt
+      - name: Save the logos on this branch
         run: |
           git config user.name "relay-logo-bot"
           git config user.email "relay-logo-bot@users.noreply.github.com"
-          git checkout -b store-logos
           git add logos
-          git commit -m "Add UK store logos"
-          git push --force origin store-logos
+          if git diff --cached --quiet; then echo "No logo changes"; exit 0; fi
+          git commit -m "Logo inventory: $(head -1 logos-summary.txt)"
+          git push origin HEAD:${{ github.ref_name }}
