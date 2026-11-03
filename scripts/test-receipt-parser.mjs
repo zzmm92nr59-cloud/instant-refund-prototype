@@ -485,7 +485,7 @@ t("takeaway app: extras under an item, a meal deal's parts and their extra price
 
 t("supermarket order: name, quantity and price, with unit prices and notes in between", () => {
   const rows = [["Example Coconut Water 1L", 2, "£5.00", "£2.50/unit"], ["Kitchen Roll 2 Pack", 1, "£3.25", "£3.25/unit"], ["Sweet Potatoes 1kg", 2, "£2.40", "£1.20/unit"]];
-  const html = `<p>Estimated total</p><p>£10.65*</p><p>Groceries</p><p>(5 items)</p><p>Items</p><p>Quantity</p><p>Qty</p><p>Price</p>`
+  const html = `<p>Estimated total</p><p>£10.65*</p><p>You've saved £3.10</p><p>Groceries</p><p>(5 items)</p><p>Items</p><p>Quantity</p><p>Qty</p><p>Price</p>`
     + rows.map(([n, q, p, u]) => `<p>${n}</p><p>${q}</p><p>${p}</p><p>${u}</p><p>Substitution allowed</p>`).join("")
     + `<p>Bag charge</p><p>£0.00</p>`;
   const r = parseReceiptEmail(htmlMail("Example Grocer <orders@examplegrocer.test>", "Order confirmation - Example Grocer", "Thu, 22 Oct 2026 09:00:00 +0100", html));

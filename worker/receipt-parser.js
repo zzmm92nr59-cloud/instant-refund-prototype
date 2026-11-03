@@ -358,7 +358,8 @@ function fromText(text, refDate) {
       if (price != null) items.push({ name: head[1].trim(), qty: Number(head[2]), pricePence: price, lineTotal: true, ...(variant ? { variant } : {}) });
     }
   }
-  if (!items.length) items.push(...itemsFromCells(text));
+  // (Lines that are only money words, such as "You've saved £30.89", are not items: they don't stop the table being read.)
+  if (!cleanItems(items).length) items.splice(0, items.length, ...itemsFromCells(text));
   const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,2}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   return {
