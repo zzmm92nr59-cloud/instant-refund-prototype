@@ -3,7 +3,6 @@
  "hawksmoor.com": "drop",
  "poferries.com": "google",
  "clarins.co.uk": "google",
- "marksandspencer.com": "duck",
  "ebay.co.uk": "appstore:eBay|eBay",
  "schuh.co.uk": "drop",
  "ea.com": "drop",
@@ -59,7 +58,6 @@
  "boden.com": "https://www.boden.com/cdn/shop/files/boden-favicon.png?crop=center&height=192&v=1739807956&width=192",
  "dyson.co.uk": "appstore:MyDyson|Dyson",
  "harrods.com": "appstore:Harrods|Harrods",
- "thebodyshop.com": "https://www.thebodyshop.com/cdn/shop/files/tbs-favicon-32x32.png?crop=center&height=192&v=1727868854&width=192",
  "underarmour.co.uk": "appstore:Under Armour|Under Armour",
  "gousto.co.uk": "appstore:Gousto|Gousto",
  "hellofresh.co.uk": "appstore:HelloFresh|HelloFresh",
@@ -70,7 +68,6 @@
  "tiffany.co.uk": "drop",
  "tvbedsnorthwest.co.uk": "drop",
  "coachinginngroup.co.uk": "drop",
- "glossier.com": "appstore:Glossier|Glossier",
  "krispykreme.co.uk": "appstore:Krispy Kreme UK|Krispy Kreme",
  "eurostar.com": "appstore:Eurostar|Eurostar",
  "ticketmaster.co.uk": "appstore:Ticketmaster UK|Ticketmaster",
@@ -78,9 +75,5 @@
  "ring.com": "appstore:Ring Always Home|Ring",
  "three.co.uk": "appstore:Three UK|Hutchison",
  "tescomobile.com": "appstore:Tesco Mobile|Tesco Mobile",
- "idmobile.co.uk": "appstore:iD Mobile|iD Mobile",
- "lakeland.co.uk": "appstore:Lakeland|Lakeland",
- "graze.com": "appstore:graze|graze",
- "poundland.co.uk": "appstore:Poundland|Poundland",
- "hamleys.com": "appstore:Hamleys|Hamleys"
+ "graze.com": "appstore:graze|graze"
 }
