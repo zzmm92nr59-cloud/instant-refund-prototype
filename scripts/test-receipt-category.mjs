@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind } from "../worker/receipt-category.js";
 import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
@@ -93,5 +93,15 @@ t("shops behind voucher and ticket platforms get their own logo, not the platfor
   assert.equal(logoDomainFor({ name: "Gordon Ramsay Restaurants", domain: null, via: "giftpro.co.uk" }), "gordonramsayrestaurants.com");
   assert.equal(logoDomainFor({ name: "Uber Boat by Thames Clippers", domain: null, via: "ventrata.com" }), "thamesclippers.com");
   assert.equal(logoDomainFor({ name: "lululemon", domain: null, via: "klarna.co.uk" }), "lululemon.com");
+});
+t("a supermarket basket stays Food & drink, however much kitchen roll is in it", () => {
+  const basket = ["Refuse Sacks", "Super Absorbent Kitchen Towels", "Antibacterial Kitchen Spray", "Antiperspirant Extra Fresh", "Broccoli Florets 900g", "Bottled Spring Water 4x2L"];
+  assert.equal(c("Sainsbury's", "sainsburys.co.uk", basket).category, "food");
+  assert.equal(c("Sainsbury's", "sainsburys.co.uk", basket).returnable, false);
+  // A supermarket's clothing range is still clothes.
+  assert.equal(c("Tesco", "tesco.com", ["F&F Denim Jacket", "F&F Slim Jeans"]).category, "fashion");
+  assert.equal(itemKind("Super Absorbent Kitchen Towels"), "home");
+  assert.equal(itemKind("Greek Yoghurt 950g"), "food");
+  assert.equal(itemKind("Highland Venison Grillsteaks"), null, "a name that doesn't say");
 });
 console.log(`\n${n} category tests passed`);

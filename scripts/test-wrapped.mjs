@@ -83,4 +83,10 @@ assert.deepEqual(empty.chapters, []);
 const foodYear = buildWrapped([1, 2, 3, 4, 5].map(i => ({ kind: "order", retailer: R("Greggs", "greggs.co.uk"), orderDate: "2026-02-0" + i, totalPence: 700, currency: "GBP", category: "food", items: [{ name: "Sausage roll" }] })), 2026, Date.UTC(2026, 11, 31));
 assert.deepEqual(foodYear.chapters[0].fact, { kind: "perWeek", pence: Math.round(3500 / 52), orders: 5 });
 assert.deepEqual(foodYear.chapters[0].topItem, { name: "Sausage roll", times: 5 });
+// A supermarket's food chapter: kitchen roll in every basket is not its top item; the yoghurt in three of them is.
+const shop = [1, 2, 3, 4].map(i => ({ kind: "order", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-03-0" + i, totalPence: 4000 + i, currency: "GBP", category: "food",
+  items: [{ name: "Super Absorbent Kitchen Towels" }, { name: "Antiperspirant Extra Fresh" }, ...(i < 4 ? [{ name: "Greek Yoghurt 950g" }] : [])] }));
+const groceries = buildWrapped(shop, 2026, Date.UTC(2026, 11, 31));
+assert.deepEqual(groceries.chapters.find(c => c.category === "food").topItem, { name: "Greek Yoghurt 950g", times: 3 });
+assert.equal(groceries.topItem.name, "Super Absorbent Kitchen Towels", "the whole year's list still counts everything bought");
 console.log("PASS wrapped: totals, duplicates, other years, unreadable amounts and returns are handled honestly; one Wrapped per kind of shopping");
