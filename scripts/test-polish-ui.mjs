@@ -34,6 +34,13 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/shopify/catalogue") return j({ published: true, products: [{ product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify:kick:variant:1", sku: "shopify:kick:variant:1", priceMinor: 8500, currency: "GBP", quantity: 4, storeName: "Kick Lane", provider: "shopify" }] });
   return j({});
 });
+// Counts the sound the story makes: each audio context made, and whether it's been closed again.
+await ctx.addInitScript(() => {
+  const Real = window.AudioContext; if (!Real) return;
+  window.__audio = [];
+  window.AudioContext = function (...a) { const c = new Real(...a); window.__audio.push(c); return c; };
+  window.AudioContext.prototype = Real.prototype;
+});
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e })), EMAIL);
@@ -102,8 +109,28 @@ const slideBgs = [];
 for (let k = 0; k < 14; k++) { await page.waitForTimeout(250); slideBgs.push(await page.locator(".rl-story-frame").evaluate(f => getComputedStyle(f).backgroundColor)); if (await page.getByRole("button", { name: "Watch again" }).count()) break; await page.keyboard.press("ArrowRight"); }
 assert.ok(!slideBgs.some(c => /rgb\((48, 37, 93|91, 33, 182|30, 27, 75)\)/.test(c)), "no purple slides: " + slideBgs.join(" "));
 assert.equal(await page.locator(".rl-story .sum").evaluate(n => getComputedStyle(n).backgroundImage), "none", "the summary card is a flat colour");
+// The soundtrack: made by the app, on from the tap that opened the story, a 44px speaker button turns it off (remembered),
+// and closing the story stops it.
+assert.equal(await page.evaluate(() => window.__audio.length), 1, "the story makes its own music");
+assert.equal(await page.evaluate(() => window.__audio[0].state), "running");
+const snd = page.getByRole("button", { name: "Turn the music off" });
+assert.ok((await snd.boundingBox()).height >= 44 && (await page.getByRole("button", { name: "Close" }).last().boundingBox()).height >= 44, "44px speaker and close buttons");
+await snd.click();
+await page.getByRole("button", { name: "Turn the music on" }).waitFor();
+assert.equal(await page.evaluate(() => localStorage.getItem("relay.storySound.v1")), "off");
+await page.waitForTimeout(600);
+assert.equal(await page.evaluate(() => window.__audio[0].state), "closed", "turned off, the music stops");
 await page.keyboard.press("Escape");
-console.log("ok - the Wrapped story uses flat colours from Relay's palette");
+await page.getByRole("button", { name: /Play your 2026 story/ }).click();
+await page.locator(".rl-story-frame").waitFor(); await page.waitForTimeout(300);
+assert.equal(await page.evaluate(() => window.__audio.length), 1, "off stays off next time");
+await page.getByRole("button", { name: "Turn the music on" }).click();
+await page.waitForTimeout(300);
+assert.equal(await page.evaluate(() => window.__audio.length), 2); assert.equal(await page.evaluate(() => window.__audio[1].state), "running");
+await page.keyboard.press("Escape"); await page.waitForTimeout(600);
+assert.equal(await page.evaluate(() => window.__audio[1].state), "closed", "closing the story stops the music");
+assert.equal(await page.evaluate(() => localStorage.getItem("relay.storySound.v1")), "on");
+console.log("ok - the Wrapped story uses flat colours from Relay's palette, with its own music (off is remembered, closing stops it)");
 
 // A real dark theme that follows the phone (this browser asks for dark), a press effect on buttons, and the keyboard
 // space is tracked for sheets.
