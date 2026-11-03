@@ -35,4 +35,11 @@ const pre = await ask("/relay/my/receipts", { "access-control-request-method": "
 assert.match(pre.headers.get("access-control-allow-headers") || "", /X-D1-Bookmark/i, "the browser is allowed to send the bookmark");
 assert.equal(pre.headers.get("access-control-max-age"), "86400", "and remembers that for a while");
 assert.equal(opened.length, 3, "the browser's 'may I?' check opens no database session");
+// A session that can't run Relay's batches is left out, and the request still works.
+const before = opened.length;
+const partial = { RELAY_DB: { withSession() { opened.push("partial"); return { prepare: fakeDb.withSession().prepare, getBookmark: () => "x" }; },
+  prepare: () => ({ bind: () => ({ first: async () => null, all: async () => ({ results: [] }), run: async () => ({}) }) }), batch: async () => [] }, AUTH_SECRET: env.AUTH_SECRET, RESEND_API_KEY: "fake" };
+r = await worker.fetch(new Request("https://w.test/relay/auth/providers", { headers: { origin: "https://zzmm92nr59-cloud.github.io" } }), partial, ctx);
+assert.equal(r.status, 200); assert.equal(r.headers.get("x-d1-bookmark"), null, "no session, no bookmark");
+assert.ok(opened.length > before);
 console.log("PASS D1 sessions: one session per request, started from the app's bookmark, answered with the new one (FAKE D1 binding)");

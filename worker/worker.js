@@ -7970,7 +7970,10 @@ export default {
     const db = env.RELAY_DB;
     if (!db || typeof db.withSession !== "function" || request.method === "OPTIONS") return relayWorker.relayFetch(request, env, ctx);
     const mark = request.headers.get("x-d1-bookmark");
-    const session = db.withSession(mark && BOOKMARK.test(mark) ? mark : "first-unconstrained");
+    let session = null;
+    try { session = db.withSession(mark && BOOKMARK.test(mark) ? mark : "first-unconstrained"); } catch { session = null; }
+    // Relay's code uses prepare and batch; a session without both is left out rather than risk a broken request.
+    if (!session || typeof session.prepare !== "function" || typeof session.batch !== "function") return relayWorker.relayFetch(request, env, ctx);
     const res = await relayWorker.relayFetch(request, { ...env, RELAY_DB: session }, ctx);
     let b = null;
     try { b = session.getBookmark(); } catch { b = null; }
