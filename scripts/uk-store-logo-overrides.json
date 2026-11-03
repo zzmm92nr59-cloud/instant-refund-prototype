@@ -1,0 +1,8 @@
+{
+ "_note": "Shops whose own website icon is wrong or poor, found by checking the contact sheets (scripts/logo-sheet.mjs). google: use Google's copy of the shop's icon instead; drop: keep no logo (the app looks one up live, or draws one).",
+ "hawksmoor.com": "google", "poferries.com": "google", "clarins.co.uk": "google", "marksandspencer.com": "google",
+ "ebay.co.uk": "google", "schuh.co.uk": "google", "ea.com": "google", "harveynichols.com": "google", "sofa.com": "google", "tails.com": "google",
+ "ernestjones.co.uk": "google", "hsamuel.co.uk": "google", "tedbaker.com": "google", "theinkeylist.com": "google",
+ "net-a-porter.com": "google", "notonthehighstreet.com": "google", "bolt.eu": "google",
+ "lipsy.co.uk": "drop", "russellandbromley.co.uk": "drop", "wiggle.com": "drop"
+}

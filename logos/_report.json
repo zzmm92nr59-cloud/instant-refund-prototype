@@ -31,16 +31,16 @@
    "bytes": 6792
   },
   "boots.com": {
-   "file": "boots.com.ico",
+   "file": "boots.com.png",
    "from": "https://boots.com/favicon.ico",
-   "bytes": 169662,
+   "bytes": 5358,
    "px": 192
   },
   "iceland.co.uk": {
    "file": "iceland.co.uk.png",
    "from": "https://www.iceland.co.uk/mobify/bundle/2075/static/img/global/favicon-512x512.png",
-   "px": 512,
-   "bytes": 8891
+   "px": 192,
+   "bytes": 5658
   },
   "amazon.co.uk": {
    "file": "amazon.co.uk.png",
@@ -57,8 +57,8 @@
   "debenhams.com": {
    "file": "debenhams.com.png",
    "from": "https://www.debenhams.com/build/_assets/ios-icon-GFZ4NYHL.png",
-   "px": 1024,
-   "bytes": 24488
+   "px": 192,
+   "bytes": 4369
   },
   "selfridges.com": {
    "file": "selfridges.com.png",
@@ -73,16 +73,16 @@
    "bytes": 975
   },
   "ebay.co.uk": {
-   "file": "ebay.co.uk.ico",
+   "file": "ebay.co.uk.png",
    "from": "https://ebay.co.uk/favicon.ico",
-   "bytes": 1150,
+   "bytes": 171,
    "px": 16
   },
   "prettylittlething.com": {
    "file": "prettylittlething.com.png",
    "from": "https://www.prettylittlething.com/build/_assets/ios-icon-74M4SHIO.png",
-   "px": 512,
-   "bytes": 7232
+   "px": 192,
+   "bytes": 11757
   },
   "missguided.co.uk": {
    "file": "missguided.co.uk.png",
@@ -109,16 +109,16 @@
    "bytes": 662
   },
   "primark.com": {
-   "file": "primark.com.ico",
+   "file": "primark.com.png",
    "from": "https://primark.com/favicon.ico",
-   "bytes": 2238,
+   "bytes": 421,
    "px": 32
   },
   "matalan.co.uk": {
    "file": "matalan.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=matalan.co.uk&sz=256",
-   "px": 256,
-   "bytes": 12775
+   "px": 192,
+   "bytes": 8592
   },
   "peacocks.co.uk": {
    "file": "peacocks.co.uk.svg",
@@ -129,14 +129,14 @@
   "dorothyperkins.com": {
    "file": "dorothyperkins.com.png",
    "from": "https://www.dorothyperkins.com/build/_assets/ios-icon-DLBKRINK.png",
-   "px": 1024,
-   "bytes": 19969
+   "px": 192,
+   "bytes": 4799
   },
   "burton.co.uk": {
    "file": "burton.co.uk.png",
    "from": "https://www.burton.co.uk/build/_assets/ios-icon-AUXY4OQE.png",
-   "px": 1024,
-   "bytes": 44726
+   "px": 192,
+   "bytes": 14861
   },
   "bonmarche.co.uk": {
    "file": "bonmarche.co.uk.png",
@@ -147,8 +147,8 @@
   "wallis.co.uk": {
    "file": "wallis.co.uk.png",
    "from": "https://www.wallis.co.uk/build/_assets/ios-icon-F4OSAX6Z.png",
-   "px": 1024,
-   "bytes": 31817
+   "px": 192,
+   "bytes": 7528
   },
   "nike.com": {
    "file": "nike.com.png",
@@ -169,10 +169,10 @@
    "px": 16
   },
   "office.co.uk": {
-   "file": "office.co.uk.jpg",
+   "file": "office.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=office.co.uk&sz=256",
    "px": 144,
-   "bytes": 3064
+   "bytes": 14604
   },
   "drmartens.com": {
    "file": "drmartens.com.svg",
@@ -199,16 +199,16 @@
    "bytes": 1459
   },
   "ikea.com": {
-   "file": "ikea.com.jpg",
+   "file": "ikea.com.png",
    "from": "https://ikea.com/apple-touch-icon.png",
    "px": 180,
-   "bytes": 3872
+   "bytes": 15574
   },
   "dunelm.com": {
    "file": "dunelm.com.png",
    "from": "https://assets.dunelm.com/icon-512x512.png",
-   "px": 512,
-   "bytes": 49025
+   "px": 192,
+   "bytes": 10024
   },
   "wayfair.co.uk": {
    "file": "wayfair.co.uk.png",
@@ -231,14 +231,14 @@
   "toolstation.com": {
    "file": "toolstation.com.png",
    "from": "https://www.toolstation.com/icon/favicon-196-x-196.png",
-   "px": 196,
-   "bytes": 13691
+   "px": 192,
+   "bytes": 18918
   },
   "sofology.co.uk": {
-   "file": "sofology.co.uk.ico",
+   "file": "sofology.co.uk.png",
    "from": "https://www.sofology.co.uk/favicon.ico",
-   "px": 256,
-   "bytes": 6076
+   "px": 192,
+   "bytes": 9622
   },
   "furniturevillage.co.uk": {
    "file": "furniturevillage.co.uk.png",
@@ -253,9 +253,9 @@
    "bytes": 3641
   },
   "dreams.co.uk": {
-   "file": "dreams.co.uk.ico",
+   "file": "dreams.co.uk.png",
    "from": "https://dreams.co.uk/favicon.ico",
-   "bytes": 15086,
+   "bytes": 1220,
    "px": 48
   },
   "apple.com": {
@@ -289,9 +289,10 @@
    "bytes": 2188
   },
   "hughes.co.uk": {
-   "file": "hughes.co.uk.ico",
+   "file": "hughes.co.uk.png",
    "from": "https://cdn6.hughes.co.uk/media/a7/3f/9f/1716287512/favicon.ico",
-   "bytes": 7406
+   "bytes": 543,
+   "px": 48
   },
   "jessops.com": {
    "file": "jessops.com.png",
@@ -302,8 +303,8 @@
   "smythstoys.com": {
    "file": "smythstoys.com.png",
    "from": "https://smythstoys.com/apple-touch-icon.png",
-   "px": 200,
-   "bytes": 2704
+   "px": 192,
+   "bytes": 12755
   },
   "game.co.uk": {
    "file": "game.co.uk.png",
@@ -356,8 +357,8 @@
   "ubereats.com": {
    "file": "ubereats.com.png",
    "from": "https://www.ubereats.com/_static/9d965730ecb40206.png",
-   "bytes": 51268,
-   "px": 512
+   "bytes": 14095,
+   "px": 192
   },
   "pret.co.uk": {
    "file": "pret.co.uk.svg",
@@ -380,8 +381,8 @@
   "costa.co.uk": {
    "file": "costa.co.uk.png",
    "from": "https://www.costa.co.uk/favicon.png",
-   "bytes": 15530,
-   "px": 512
+   "bytes": 9250,
+   "px": 192
   },
   "nationalrail.co.uk": {
    "file": "nationalrail.co.uk.svg",
@@ -408,9 +409,9 @@
    "bytes": 2177
   },
   "easyjet.com": {
-   "file": "easyjet.com.ico",
+   "file": "easyjet.com.png",
    "from": "https://www.easyjet.com/favicon.ico",
-   "bytes": 3262,
+   "bytes": 513,
    "px": 32
   },
   "ryanair.com": {
@@ -459,7 +460,7 @@
    "file": "riverford.co.uk.png",
    "from": "https://media.riverford.co.uk/images/android-icon-192x192.png",
    "px": 192,
-   "bytes": 50428
+   "bytes": 7981
   },
   "mindfulchef.com": {
    "file": "mindfulchef.com.png",
@@ -482,8 +483,8 @@
   "hotelchocolat.com": {
    "file": "hotelchocolat.com.png",
    "from": "https://www.hotelchocolat.com/mobify/bundle/3043/static/img/global/app-icon-512.png",
-   "px": 512,
-   "bytes": 15101
+   "px": 192,
+   "bytes": 7526
   },
   "simplycook.com": {
    "file": "simplycook.com.png",
@@ -510,28 +511,28 @@
    "bytes": 3169
   },
   "abelandcole.co.uk": {
-   "file": "abelandcole.co.uk.jpg",
+   "file": "abelandcole.co.uk.png",
    "from": "https://www.abelandcole.co.uk/icon1.jpg?icon1.1wvpcfete72n7.jpg",
    "px": 192,
-   "bytes": 16292
+   "bytes": 6405
   },
   "fortnumandmason.com": {
-   "file": "fortnumandmason.com.jpg",
+   "file": "fortnumandmason.com.png",
    "from": "https://www.fortnumandmason.com/assets/favicon-D8Cjhjlf.ico",
    "px": 32,
-   "bytes": 1539
+   "bytes": 1853
   },
   "lindt.co.uk": {
    "file": "lindt.co.uk.png",
    "from": "https://lindt.co.uk/favicon.ico",
-   "px": 234,
-   "bytes": 18557
+   "px": 192,
+   "bytes": 19899
   },
   "bettys.co.uk": {
    "file": "bettys.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=bettys.co.uk&sz=256",
-   "px": 224,
-   "bytes": 6971
+   "px": 192,
+   "bytes": 6119
   },
   "pactcoffee.com": {
    "file": "pactcoffee.com.png",
@@ -540,16 +541,16 @@
    "bytes": 11479
   },
   "majestic.co.uk": {
-   "file": "majestic.co.uk.jpg",
+   "file": "majestic.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=majestic.co.uk&sz=256",
    "px": 180,
-   "bytes": 6965
+   "bytes": 10851
   },
   "thorntons.co.uk": {
    "file": "thorntons.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=thorntons.co.uk&sz=256",
-   "px": 256,
-   "bytes": 33887
+   "px": 192,
+   "bytes": 7607
   },
   "brewdog.com": {
    "file": "brewdog.com.svg",
@@ -614,8 +615,8 @@
   "hollandandbarrett.com": {
    "file": "hollandandbarrett.com.png",
    "from": "https://dam.hollandandbarrettimages.co.uk/design-system/_raw/6788cf6e-b35c-45b8-abde-1af321f2cda1/icon-512x512.webp",
-   "px": 512,
-   "bytes": 8408
+   "px": 192,
+   "bytes": 9563
   },
   "lookfantastic.com": {
    "file": "lookfantastic.com.png",
@@ -680,14 +681,14 @@
   "theproteinworks.com": {
    "file": "theproteinworks.com.png",
    "from": "https://img.theproteinworks.com/v7/_media/files/android-chrome-512x512_.png",
-   "px": 512,
-   "bytes": 3169
+   "px": 192,
+   "bytes": 9298
   },
   "pharmacy2u.co.uk": {
    "file": "pharmacy2u.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=pharmacy2u.co.uk&sz=256",
-   "px": 256,
-   "bytes": 4620
+   "px": 192,
+   "bytes": 3541
   },
   "chemist4u.com": {
    "file": "chemist4u.com.png",
@@ -696,10 +697,10 @@
    "bytes": 15855
   },
   "theordinary.com": {
-   "file": "theordinary.com.ico",
+   "file": "theordinary.com.png",
    "from": "https://theordinary.com/favicon.ico",
-   "px": 256,
-   "bytes": 101309
+   "px": 192,
+   "bytes": 5933
   },
   "myprotein.com": {
    "file": "myprotein.com.png",
@@ -756,10 +757,10 @@
    "bytes": 1853
   },
   "jomalone.co.uk": {
-   "file": "jomalone.co.uk.jpg",
+   "file": "jomalone.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=jomalone.co.uk&sz=256",
    "px": 180,
-   "bytes": 4753
+   "bytes": 6013
   },
   "boohooman.com": {
    "file": "boohooman.com.png",
@@ -770,8 +771,8 @@
   "theinkeylist.com": {
    "file": "theinkeylist.com.png",
    "from": "https://pwa.lightifyme.com/progressify/inkey-list/icon-512.png",
-   "px": 512,
-   "bytes": 5663
+   "px": 192,
+   "bytes": 6589
   },
   "neomwellbeing.com": {
    "file": "neomwellbeing.com.png",
@@ -812,14 +813,14 @@
   "mango.com": {
    "file": "mango.com.png",
    "from": "https://www.google.com/s2/favicons?domain=mango.com&sz=256",
-   "px": 256,
-   "bytes": 1949
+   "px": 192,
+   "bytes": 4834
   },
   "tkmaxx.com": {
    "file": "tkmaxx.com.png",
    "from": "https://www.google.com/s2/favicons?domain=tkmaxx.com&sz=256",
-   "px": 256,
-   "bytes": 3669
+   "px": 192,
+   "bytes": 17313
   },
   "pullandbear.com": {
    "file": "pullandbear.com.png",
@@ -842,20 +843,20 @@
   "stories.com": {
    "file": "stories.com.png",
    "from": "https://www.google.com/s2/favicons?domain=stories.com&sz=256",
-   "px": 256,
-   "bytes": 3248
+   "px": 192,
+   "bytes": 11908
   },
   "cos.com": {
-   "file": "cos.com.jpg",
+   "file": "cos.com.png",
    "from": "https://www.google.com/s2/favicons?domain=cos.com&sz=256",
-   "px": 256,
-   "bytes": 2712
+   "px": 192,
+   "bytes": 9554
   },
   "weekday.com": {
-   "file": "weekday.com.jpg",
+   "file": "weekday.com.png",
    "from": "https://www.google.com/s2/favicons?domain=weekday.com&sz=256",
-   "px": 256,
-   "bytes": 3813
+   "px": 192,
+   "bytes": 12157
   },
   "stradivarius.com": {
    "file": "stradivarius.com.png",
@@ -878,8 +879,8 @@
   "whistles.com": {
    "file": "whistles.com.png",
    "from": "https://www.whistles.com/on/demandware.static/Sites-WH-UK-Site/-/default/dwcb3e6ba5/images/favicons/favicon-512x512.png",
-   "px": 512,
-   "bytes": 2310
+   "px": 192,
+   "bytes": 5513
   },
   "karenmillen.com": {
    "file": "karenmillen.com.png",
@@ -890,8 +891,8 @@
   "coastfashion.com": {
    "file": "coastfashion.com.png",
    "from": "https://www.coastfashion.com/build/_assets/ios-icon-4P246SHV.png",
-   "px": 1024,
-   "bytes": 28737
+   "px": 192,
+   "bytes": 7076
   },
   "tedbaker.com": {
    "file": "tedbaker.com.png",
@@ -908,8 +909,8 @@
   "oasis-stores.com": {
    "file": "oasis-stores.com.png",
    "from": "https://www.oasisfashion.com/build/_assets/ios-icon-V7O46Z6R.png",
-   "px": 1024,
-   "bytes": 20807
+   "px": 192,
+   "bytes": 8974
   },
   "phase-eight.com": {
    "file": "phase-eight.com.png",
@@ -920,8 +921,8 @@
   "warehousefashion.com": {
    "file": "warehousefashion.com.png",
    "from": "https://www.warehousefashion.com/build/_assets/ios-icon-Y7BINTAS.png",
-   "px": 1024,
-   "bytes": 28461
+   "px": 192,
+   "bytes": 5191
   },
   "fatface.com": {
    "file": "fatface.com.png",
@@ -962,14 +963,14 @@
   "monsoon.co.uk": {
    "file": "monsoon.co.uk.png",
    "from": "https://www.monsoon.co.uk/on/demandware.static/Sites-monsoon-uk-Site/-/default/dw0c916afc/images/favicons/favicon-228.png",
-   "px": 228,
-   "bytes": 11340
+   "px": 192,
+   "bytes": 14977
   },
   "mintvelvet.co.uk": {
-   "file": "mintvelvet.co.uk.jpg",
+   "file": "mintvelvet.co.uk.png",
    "from": "https://mintvelvet.com/cdn/shop/files/site-logo_5b1e6b70-60c7-42f3-9f1d-ce5ab503317e.jpg?height=1000&v=1787163171&width=1000",
-   "px": 1000,
-   "bytes": 18691
+   "px": 192,
+   "bytes": 5803
   },
   "seasaltcornwall.com": {
    "file": "seasaltcornwall.com.png",
@@ -980,14 +981,14 @@
   "accessorize.com": {
    "file": "accessorize.com.png",
    "from": "https://www.accessorize.com/on/demandware.static/Sites-accessorize-uk-Site/-/default/dw58560562/images/favicons/favicon-228.png",
-   "px": 228,
-   "bytes": 6653
+   "px": 192,
+   "bytes": 9864
   },
   "hollisterco.com": {
    "file": "hollisterco.com.png",
    "from": "https://www.google.com/s2/favicons?domain=hollisterco.com&sz=256",
-   "px": 196,
-   "bytes": 2877
+   "px": 192,
+   "bytes": 7565
   },
   "levi.com": {
    "file": "levi.com.png",
@@ -998,14 +999,14 @@
   "abercrombie.com": {
    "file": "abercrombie.com.png",
    "from": "https://www.google.com/s2/favicons?domain=abercrombie.com&sz=256",
-   "px": 196,
-   "bytes": 1988
+   "px": 192,
+   "bytes": 10337
   },
   "burberry.com": {
    "file": "burberry.com.png",
    "from": "https://www.burberry.com/nrws/common/favicon/1024x1024.png",
-   "px": 1024,
-   "bytes": 58688
+   "px": 192,
+   "bytes": 5164
   },
   "superdry.com": {
    "file": "superdry.com.png",
@@ -1022,20 +1023,20 @@
   "ralphlauren.co.uk": {
    "file": "ralphlauren.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=ralphlauren.co.uk&sz=256",
-   "px": 256,
-   "bytes": 24348
+   "px": 192,
+   "bytes": 16665
   },
   "tommy.com": {
    "file": "tommy.com.png",
    "from": "https://www.google.com/s2/favicons?domain=tommy.com&sz=256",
-   "px": 256,
-   "bytes": 326
+   "px": 192,
+   "bytes": 1144
   },
   "lacoste.com": {
    "file": "lacoste.com.png",
    "from": "https://www.google.com/s2/favicons?domain=lacoste.com&sz=256",
-   "px": 256,
-   "bytes": 2423
+   "px": 192,
+   "bytes": 13620
   },
   "fredperry.com": {
    "file": "fredperry.com.png",
@@ -1052,8 +1053,8 @@
   "barbour.com": {
    "file": "barbour.com.png",
    "from": "https://www.barbour.com/on/demandware.static/Sites-barbour-us-Site/-/default/dwaf30694c/images/favicons/favicon-240x240.png",
-   "px": 240,
-   "bytes": 1105
+   "px": 192,
+   "bytes": 5393
   },
   "ctshirts.com": {
    "file": "ctshirts.com.svg",
@@ -1064,8 +1065,8 @@
   "jackjones.com": {
    "file": "jackjones.com.png",
    "from": "https://www.jackjones.com/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 28978
+   "px": 192,
+   "bytes": 8684
   },
   "tmlewin.com": {
    "file": "tmlewin.com.svg",
@@ -1076,8 +1077,8 @@
   "endclothing.com": {
    "file": "endclothing.com.png",
    "from": "https://www.endclothing.com/cdn/shop/files/end-favicon.png?crop=center&height=194&v=1766424987&width=194",
-   "px": 194,
-   "bytes": 727
+   "px": 192,
+   "bytes": 3512
   },
   "moss.co.uk": {
    "file": "moss.co.uk.png",
@@ -1088,14 +1089,14 @@
   "mytheresa.com": {
    "file": "mytheresa.com.png",
    "from": "https://www.mytheresa.com/krea/logo/myt-logo-512.png",
-   "px": 512,
-   "bytes": 11907
+   "px": 192,
+   "bytes": 7572
   },
   "net-a-porter.com": {
    "file": "net-a-porter.com.png",
    "from": "https://net-a-porter.com/apple-touch-icon.png",
    "px": 180,
-   "bytes": 28497
+   "bytes": 8873
   },
   "mrporter.com": {
    "file": "mrporter.com.png",
@@ -1124,8 +1125,8 @@
   "temu.com": {
    "file": "temu.com.png",
    "from": "https://aimg.kwcdn.com/upload_aimg/web/c9653751-0a91-46f1-806a-b639dd32931b.png.slim.png",
-   "px": 512,
-   "bytes": 4701
+   "px": 192,
+   "bytes": 10920
   },
   "vinted.co.uk": {
    "file": "vinted.co.uk.png",
@@ -1154,8 +1155,8 @@
   "sweatybetty.com": {
    "file": "sweatybetty.com.png",
    "from": "https://www.sweatybetty.com/mobify/bundle/6764/static/img/global/favicon-512x512.png",
-   "px": 512,
-   "bytes": 9192
+   "px": 192,
+   "bytes": 6228
   },
   "rains.com": {
    "file": "rains.com.png",
@@ -1172,14 +1173,14 @@
   "regatta.com": {
    "file": "regatta.com.png",
    "from": "https://www.regatta.com/assets/device-icons/rg/android-icon-512x512.png",
-   "px": 512,
-   "bytes": 21557
+   "px": 192,
+   "bytes": 15278
   },
   "craghoppers.com": {
    "file": "craghoppers.com.png",
    "from": "https://www.craghoppers.com/assets/device-icons/ch/android-icon-512x512.png",
-   "px": 512,
-   "bytes": 22092
+   "px": 192,
+   "bytes": 16034
   },
   "farfetch.com": {
    "file": "farfetch.com.png",
@@ -1262,8 +1263,8 @@
   "calvinklein.co.uk": {
    "file": "calvinklein.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=calvinklein.co.uk&sz=256",
-   "px": 256,
-   "bytes": 3971
+   "px": 192,
+   "bytes": 7856
   },
   "inthestyle.com": {
    "file": "inthestyle.com.png",
@@ -1280,20 +1281,20 @@
   "flannels.com": {
    "file": "flannels.com.png",
    "from": "https://www.google.com/s2/favicons?domain=flannels.com&sz=256",
-   "px": 256,
-   "bytes": 409
+   "px": 192,
+   "bytes": 928
   },
   "ohpolly.com": {
    "file": "ohpolly.com.png",
    "from": "https://www.ohpolly.com/cdn/shop/files/OP-favicon-196x196.png?crop=center&height=194&v=1782834654&width=194",
-   "px": 194,
-   "bytes": 21569
+   "px": 192,
+   "bytes": 5607
   },
   "evans.co.uk": {
    "file": "evans.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=evans.co.uk&sz=256",
-   "px": 256,
-   "bytes": 2613
+   "px": 192,
+   "bytes": 8892
   },
   "lipsy.co.uk": {
    "file": "lipsy.co.uk.png",
@@ -1322,8 +1323,8 @@
   "beaverbrooks.co.uk": {
    "file": "beaverbrooks.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=beaverbrooks.co.uk&sz=256",
-   "px": 256,
-   "bytes": 3050
+   "px": 192,
+   "bytes": 8385
   },
   "ernestjones.co.uk": {
    "file": "ernestjones.co.uk.png",
@@ -1340,8 +1341,8 @@
   "astridandmiyu.com": {
    "file": "astridandmiyu.com.png",
    "from": "https://www.astridandmiyu.com/cdn/shop/files/194x194_Text_194x194.png?v=1764777574",
-   "px": 194,
-   "bytes": 18499
+   "px": 192,
+   "bytes": 14656
   },
   "hsamuel.co.uk": {
    "file": "hsamuel.co.uk.png",
@@ -1388,8 +1389,8 @@
   "puma.com": {
    "file": "puma.com.png",
    "from": "https://us.puma.com/assets/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 7789
+   "px": 192,
+   "bytes": 6530
   },
   "newbalance.co.uk": {
    "file": "newbalance.co.uk.png",
@@ -1412,8 +1413,8 @@
   "asics.com": {
    "file": "asics.com.png",
    "from": "https://www.google.com/s2/favicons?domain=asics.com&sz=256",
-   "px": 256,
-   "bytes": 2385
+   "px": 192,
+   "bytes": 12183
   },
   "thenorthface.co.uk": {
    "file": "thenorthface.co.uk.png",
@@ -1430,8 +1431,8 @@
   "footlocker.co.uk": {
    "file": "footlocker.co.uk.png",
    "from": "https://www.footlocker.co.uk/images/FLEU/icon-512.png",
-   "px": 512,
-   "bytes": 40190
+   "px": 192,
+   "bytes": 17840
   },
   "size.co.uk": {
    "file": "size.co.uk.png",
@@ -1449,7 +1450,7 @@
    "file": "kurtgeiger.com.png",
    "from": "https://www.google.com/s2/favicons?domain=kurtgeiger.com&sz=256",
    "px": 180,
-   "bytes": 38641
+   "bytes": 9405
   },
   "dunelondon.com": {
    "file": "dunelondon.com.svg",
@@ -1496,8 +1497,8 @@
   "crocs.co.uk": {
    "file": "crocs.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=crocs.co.uk&sz=256",
-   "px": 256,
-   "bytes": 2176
+   "px": 192,
+   "bytes": 6307
   },
   "hunterboots.com": {
    "file": "hunterboots.com.png",
@@ -1544,8 +1545,8 @@
   "castore.com": {
    "file": "castore.com.png",
    "from": "https://www.google.com/s2/favicons?domain=castore.com&sz=256",
-   "px": 194,
-   "bytes": 11567
+   "px": 192,
+   "bytes": 18460
   },
   "decathlon.co.uk": {
    "file": "decathlon.co.uk.png",
@@ -1568,8 +1569,8 @@
   "halfords.com": {
    "file": "halfords.com.png",
    "from": "https://www.halfords.com/mobify/bundle/290/static/ico/favicon-196x196.png",
-   "px": 196,
-   "bytes": 592
+   "px": 192,
+   "bytes": 3154
   },
   "johnlewis.com": {
    "file": "johnlewis.com.svg",
@@ -1590,10 +1591,10 @@
    "bytes": 730
   },
   "reebok.co.uk": {
-   "file": "reebok.co.uk.jpg",
+   "file": "reebok.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=reebok.co.uk&sz=256",
    "px": 32,
-   "bytes": 612
+   "bytes": 1412
   },
   "fenwick.co.uk": {
    "file": "fenwick.co.uk.png",
@@ -1617,13 +1618,13 @@
    "file": "notonthehighstreet.com.png",
    "from": "https://notonthehighstreet.com/apple-touch-icon.png",
    "px": 180,
-   "bytes": 61829
+   "bytes": 13894
   },
   "moonpig.com": {
    "file": "moonpig.com.png",
    "from": "https://moonpig.com/apple-touch-icon.png",
-   "px": 256,
-   "bytes": 4214
+   "px": 192,
+   "bytes": 10326
   },
   "funkypigeon.com": {
    "file": "funkypigeon.com.png",
@@ -1634,8 +1635,8 @@
   "sportsdirect.com": {
    "file": "sportsdirect.com.png",
    "from": "https://www.google.com/s2/favicons?domain=sportsdirect.com&sz=256",
-   "px": 256,
-   "bytes": 350
+   "px": 192,
+   "bytes": 1081
   },
   "cardfactory.co.uk": {
    "file": "cardfactory.co.uk.svg",
@@ -1662,10 +1663,10 @@
    "bytes": 5874
   },
   "foyles.co.uk": {
-   "file": "foyles.co.uk.jpg",
+   "file": "foyles.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=foyles.co.uk&sz=256",
    "px": 180,
-   "bytes": 2290
+   "bytes": 8072
   },
   "worldofbooks.com": {
    "file": "worldofbooks.com.svg",
@@ -1694,8 +1695,8 @@
   "interflora.co.uk": {
    "file": "interflora.co.uk.png",
    "from": "https://media.interflora.co.uk/i/interflora/favicon-512x512",
-   "px": 512,
-   "bytes": 68814
+   "px": 192,
+   "bytes": 17116
   },
   "bloomandwild.com": {
    "file": "bloomandwild.com.png",
@@ -1749,13 +1750,13 @@
    "file": "aliexpress.com.png",
    "from": "https://www.google.com/s2/favicons?domain=aliexpress.com&sz=256",
    "px": 192,
-   "bytes": 24734
+   "bytes": 5407
   },
   "onbuy.com": {
    "file": "onbuy.com.png",
    "from": "https://www.google.com/s2/favicons?domain=onbuy.com&sz=256",
-   "px": 196,
-   "bytes": 5159
+   "px": 192,
+   "bytes": 8473
   },
   "fruugo.co.uk": {
    "file": "fruugo.co.uk.png",
@@ -1766,8 +1767,8 @@
   "mandmdirect.com": {
    "file": "mandmdirect.com.png",
    "from": "https://www.google.com/s2/favicons?domain=mandmdirect.com&sz=256",
-   "px": 256,
-   "bytes": 1890
+   "px": 192,
+   "bytes": 5635
   },
   "wiggle.com": {
    "file": "wiggle.com.png",
@@ -1808,8 +1809,8 @@
   "theworks.co.uk": {
    "file": "theworks.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=theworks.co.uk&sz=256",
-   "px": 196,
-   "bytes": 9761
+   "px": 192,
+   "bytes": 16273
   },
   "wilko.com": {
    "file": "wilko.com.png",
@@ -1818,10 +1819,10 @@
    "bytes": 2290
   },
   "poundland.co.uk": {
-   "file": "poundland.co.uk.jpg",
+   "file": "poundland.co.uk.png",
    "from": "https://www.poundland.co.uk/cdn/shop/files/Poundland_Favicon.webp?crop=center&height=32&v=1776850334&width=32",
    "px": 32,
-   "bytes": 1598
+   "bytes": 2257
   },
   "bmstores.co.uk": {
    "file": "bmstores.co.uk.png",
@@ -1869,7 +1870,7 @@
    "file": "diy.com.png",
    "from": "https://diy.com/apple-touch-icon.png",
    "px": 180,
-   "bytes": 21315
+   "bytes": 15768
   },
   "oakfurnitureland.co.uk": {
    "file": "oakfurnitureland.co.uk.png",
@@ -1880,14 +1881,14 @@
   "silentnight.co.uk": {
    "file": "silentnight.co.uk.png",
    "from": "https://www.silentnight.co.uk/media/favicon/stores/1/logo_1.png",
-   "px": 216,
-   "bytes": 31602
+   "px": 192,
+   "bytes": 6148
   },
   "harveynichols.com": {
-   "file": "harveynichols.com.jpg",
+   "file": "harveynichols.com.png",
    "from": "https://www.google.com/s2/favicons?domain=harveynichols.com&sz=256",
-   "px": 256,
-   "bytes": 2781
+   "px": 192,
+   "bytes": 10485
   },
   "homesense.com": {
    "file": "homesense.com.svg",
@@ -1898,8 +1899,8 @@
   "houseoffraser.co.uk": {
    "file": "houseoffraser.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=houseoffraser.co.uk&sz=256",
-   "px": 256,
-   "bytes": 1046
+   "px": 192,
+   "bytes": 2966
   },
   "cotswoldco.com": {
    "file": "cotswoldco.com.png",
@@ -1928,8 +1929,8 @@
   "sharkclean.co.uk": {
    "file": "sharkclean.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=sharkclean.co.uk&sz=256",
-   "px": 196,
-   "bytes": 1936
+   "px": 192,
+   "bytes": 8033
   },
   "loaf.com": {
    "file": "loaf.com.png",
@@ -1952,8 +1953,8 @@
   "ninjakitchen.co.uk": {
    "file": "ninjakitchen.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=ninjakitchen.co.uk&sz=256",
-   "px": 196,
-   "bytes": 1936
+   "px": 192,
+   "bytes": 8033
   },
   "josephjoseph.com": {
    "file": "josephjoseph.com.png",
@@ -1976,8 +1977,8 @@
   "yankeecandle.co.uk": {
    "file": "yankeecandle.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=yankeecandle.co.uk&sz=256",
-   "px": 196,
-   "bytes": 7635
+   "px": 192,
+   "bytes": 10079
   },
   "dobbies.com": {
    "file": "dobbies.com.png",
@@ -1994,8 +1995,8 @@
   "primrose.co.uk": {
    "file": "primrose.co.uk.png",
    "from": "https://img.crocdn.co.uk/images/affiliates/primrose/assets/favicon/favicon.png",
-   "px": 295,
-   "bytes": 20325
+   "px": 192,
+   "bytes": 4593
   },
   "crocus.co.uk": {
    "file": "crocus.co.uk.svg",
@@ -2018,14 +2019,14 @@
   "swooneditions.com": {
    "file": "swooneditions.com.png",
    "from": "https://www.swooneditions.com/static/icons/512.png",
-   "px": 512,
-   "bytes": 24001
+   "px": 192,
+   "bytes": 10752
   },
   "cultfurniture.com": {
    "file": "cultfurniture.com.png",
    "from": "https://www.google.com/s2/favicons?domain=cultfurniture.com&sz=256",
-   "px": 194,
-   "bytes": 1439
+   "px": 192,
+   "bytes": 8723
   },
   "sofa.com": {
    "file": "sofa.com.png",
@@ -2036,8 +2037,8 @@
   "currys.co.uk": {
    "file": "currys.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=currys.co.uk&sz=256",
-   "px": 196,
-   "bytes": 8479
+   "px": 192,
+   "bytes": 14309
   },
   "coxandcox.co.uk": {
    "file": "coxandcox.co.uk.png",
@@ -2064,10 +2065,10 @@
    "bytes": 1619
   },
   "scan.co.uk": {
-   "file": "scan.co.uk.jpg",
+   "file": "scan.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=scan.co.uk&sz=256",
    "px": 180,
-   "bytes": 4736
+   "bytes": 4518
   },
   "victorianplumbing.co.uk": {
    "file": "victorianplumbing.co.uk.png",
@@ -2120,26 +2121,26 @@
   "xbox.com": {
    "file": "xbox.com.png",
    "from": "https://cms-assets.xboxservices.com/assets/73/60/73601350-03f6-4fe5-a213-bce56aefff33.png?n=android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 120081
+   "px": 192,
+   "bytes": 7833
   },
   "nintendo.com": {
    "file": "nintendo.com.png",
    "from": "https://assets.nintendo.com/image/upload/ncom/icons/fav-icons/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 16770
+   "px": 192,
+   "bytes": 10504
   },
   "playstation.com": {
-   "file": "playstation.com.webp",
+   "file": "playstation.com.png",
    "from": "https://gmedia.playstation.com/is/image/SIEPDC/ps-logo-favicon?$icon-196-196--t$",
-   "px": 400,
-   "bytes": 7962
+   "px": 192,
+   "bytes": 11654
   },
   "steampowered.com": {
    "file": "steampowered.com.png",
    "from": "https://www.google.com/s2/favicons?domain=steampowered.com&sz=256",
-   "px": 256,
-   "bytes": 21117
+   "px": 192,
+   "bytes": 19282
   },
   "epicgames.com": {
    "file": "epicgames.com.png",
@@ -2198,8 +2199,8 @@
   "virginmedia.com": {
    "file": "virginmedia.com.png",
    "from": "https://storyblok.cdn.vmo2digital.co.uk/f/253875/192x192/5d09d0d2df/virgin-media-fav.png/m/196x196",
-   "px": 196,
-   "bytes": 20940
+   "px": 192,
+   "bytes": 4017
   },
   "o2.co.uk": {
    "file": "o2.co.uk.png",
@@ -2210,8 +2211,8 @@
   "smarty.co.uk": {
    "file": "smarty.co.uk.png",
    "from": "https://smarty.co.uk/apple-touch-icon.png",
-   "px": 256,
-   "bytes": 4883
+   "px": 192,
+   "bytes": 9752
   },
   "idmobile.co.uk": {
    "file": "idmobile.co.uk.png",
@@ -2222,8 +2223,8 @@
   "voxi.co.uk": {
    "file": "voxi.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=voxi.co.uk&sz=256",
-   "px": 256,
-   "bytes": 2114
+   "px": 192,
+   "bytes": 9364
   },
   "plusnet.com": {
    "file": "plusnet.com.png",
@@ -2234,14 +2235,14 @@
   "talktalk.co.uk": {
    "file": "talktalk.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=talktalk.co.uk&sz=256",
-   "px": 256,
-   "bytes": 6001
+   "px": 192,
+   "bytes": 5948
   },
   "lycamobile.co.uk": {
    "file": "lycamobile.co.uk.png",
    "from": "https://www.lycamobile.co.uk/favicon.ico",
-   "px": 200,
-   "bytes": 2955
+   "px": 192,
+   "bytes": 5982
   },
   "lebara.co.uk": {
    "file": "lebara.co.uk.png",
@@ -2270,8 +2271,8 @@
   "bose.co.uk": {
    "file": "bose.co.uk.png",
    "from": "https://www.bose.co.uk/on/demandware.static/Sites-Bose_UK-Site/-/default/dw0222b61a/images/apple-touch-icon.png",
-   "px": 512,
-   "bytes": 16696
+   "px": 192,
+   "bytes": 4553
   },
   "sonos.com": {
    "file": "sonos.com.png",
@@ -2310,10 +2311,10 @@
    "bytes": 3980
   },
   "dominos.co.uk": {
-   "file": "dominos.co.uk.jpg",
+   "file": "dominos.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=dominos.co.uk&sz=256",
    "px": 100,
-   "bytes": 2580
+   "bytes": 17592
   },
   "papajohns.co.uk": {
    "file": "papajohns.co.uk.png",
@@ -2330,8 +2331,8 @@
   "zizzi.co.uk": {
    "file": "zizzi.co.uk.png",
    "from": "https://cdn.sanity.io/images/ysupxjc9/production/94f4457773446d4b16bdf42b32928faa84bd9d8d-1080x1080.png",
-   "px": 1080,
-   "bytes": 62027
+   "px": 192,
+   "bytes": 10504
   },
   "wagamama.com": {
    "file": "wagamama.com.png",
@@ -2340,10 +2341,10 @@
    "bytes": 1206
   },
   "thewhitecompany.com": {
-   "file": "thewhitecompany.com.ico",
+   "file": "thewhitecompany.com.png",
    "from": "https://www.thewhitecompany.com/favicon.ico",
    "px": 96,
-   "bytes": 38078
+   "bytes": 3461
   },
   "harvester.co.uk": {
    "file": "harvester.co.uk.png",
@@ -2360,14 +2361,14 @@
   "prezzo.co.uk": {
    "file": "prezzo.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=prezzo.co.uk&sz=256",
-   "px": 256,
-   "bytes": 1809
+   "px": 192,
+   "bytes": 4377
   },
   "jdwetherspoon.com": {
    "file": "jdwetherspoon.com.png",
    "from": "https://www.jdwetherspoon.com/wp-content/uploads/2024/02/wetherspoon_favicon_400-300x300.png",
-   "px": 300,
-   "bytes": 1800
+   "px": 192,
+   "bytes": 5453
   },
   "caffenero.com": {
    "file": "caffenero.com.png",
@@ -2378,20 +2379,20 @@
   "itsu.com": {
    "file": "itsu.com.png",
    "from": "https://www.itsu.com/_nuxt/icons/icon_512x512.420c4f.png",
-   "px": 512,
-   "bytes": 38649
+   "px": 192,
+   "bytes": 5828
   },
   "tortilla.co.uk": {
    "file": "tortilla.co.uk.png",
    "from": "https://www.tortilla.co.uk/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 11364
+   "px": 192,
+   "bytes": 2114
   },
   "chipotle.co.uk": {
    "file": "chipotle.co.uk.png",
    "from": "https://www.chipotle.co.uk/etc.clientlibs/cmgaemacs/clientlibs/clientlib-base/resources/icon-192x192.png",
    "px": 192,
-   "bytes": 24069
+   "bytes": 6486
   },
   "fiveguys.co.uk": {
    "file": "fiveguys.co.uk.svg",
@@ -2450,8 +2451,8 @@
   "caferouge.com": {
    "file": "caferouge.com.png",
    "from": "https://www.caferouge.com/_nuxt/icons/icon_512x512.e1b4d5.png",
-   "px": 512,
-   "bytes": 37708
+   "px": 192,
+   "bytes": 14004
   },
   "bellaitalia.co.uk": {
    "file": "bellaitalia.co.uk.png",
@@ -2462,8 +2463,8 @@
   "turtlebay.co.uk": {
    "file": "turtlebay.co.uk.png",
    "from": "https://turtlebay.co.uk/assets/images/favicon.png",
-   "px": 396,
-   "bytes": 18264
+   "px": 192,
+   "bytes": 10435
   },
   "yosushi.com": {
    "file": "yosushi.com.png",
@@ -2484,10 +2485,10 @@
    "bytes": 421
   },
   "francomanca.co.uk": {
-   "file": "francomanca.co.uk.jpg",
+   "file": "francomanca.co.uk.png",
    "from": "https://www.francomanca.co.uk/wp-content/uploads/2023/08/cropped-FrancoManca_Logo_Mark_RGB-192x192.jpg",
    "px": 192,
-   "bytes": 6267
+   "bytes": 4984
   },
   "allbarone.co.uk": {
    "file": "allbarone.co.uk.png",
@@ -2510,8 +2511,8 @@
   "gwr.com": {
    "file": "gwr.com.png",
    "from": "https://www.google.com/s2/favicons?domain=gwr.com&sz=256",
-   "px": 194,
-   "bytes": 5995
+   "px": 192,
+   "bytes": 10973
   },
   "crosscountrytrains.co.uk": {
    "file": "crosscountrytrains.co.uk.png",
@@ -2526,28 +2527,28 @@
    "bytes": 7381
   },
   "southernrailway.com": {
-   "file": "southernrailway.com.jpg",
+   "file": "southernrailway.com.png",
    "from": "https://www.google.com/s2/favicons?domain=southernrailway.com&sz=256",
    "px": 152,
-   "bytes": 1782
+   "bytes": 5514
   },
   "thameslinkrailway.com": {
-   "file": "thameslinkrailway.com.jpg",
+   "file": "thameslinkrailway.com.png",
    "from": "https://www.google.com/s2/favicons?domain=thameslinkrailway.com&sz=256",
    "px": 152,
-   "bytes": 2343
+   "bytes": 7737
   },
   "scotrail.co.uk": {
-   "file": "scotrail.co.uk.jpg",
+   "file": "scotrail.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=scotrail.co.uk&sz=256",
    "px": 180,
-   "bytes": 3503
+   "bytes": 6328
   },
   "tfl.gov.uk": {
    "file": "tfl.gov.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=tfl.gov.uk&sz=256",
-   "px": 256,
-   "bytes": 2181
+   "px": 192,
+   "bytes": 8455
   },
   "southwesternrailway.com": {
    "file": "southwesternrailway.com.png",
@@ -2606,8 +2607,8 @@
   "wizzair.com": {
    "file": "wizzair.com.png",
    "from": "https://www.google.com/s2/favicons?domain=wizzair.com&sz=256",
-   "px": 256,
-   "bytes": 5046
+   "px": 192,
+   "bytes": 4702
   },
   "virginatlantic.com": {
    "file": "virginatlantic.com.svg",
@@ -2618,8 +2619,8 @@
   "loganair.co.uk": {
    "file": "loganair.co.uk.png",
    "from": "https://www.loganair.co.uk/favicons/logo-512x512.png",
-   "px": 512,
-   "bytes": 4295
+   "px": 192,
+   "bytes": 11654
   },
   "aerlingus.com": {
    "file": "aerlingus.com.png",
@@ -2642,8 +2643,8 @@
   "pizzahut.co.uk": {
    "file": "pizzahut.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=pizzahut.co.uk&sz=256",
-   "px": 256,
-   "bytes": 4884
+   "px": 192,
+   "bytes": 4515
   },
   "expedia.co.uk": {
    "file": "expedia.co.uk.png",
@@ -2652,16 +2653,16 @@
    "bytes": 987
   },
   "lastminute.com": {
-   "file": "lastminute.com.jpg",
+   "file": "lastminute.com.png",
    "from": "https://www.google.com/s2/favicons?domain=lastminute.com&sz=256",
    "px": 192,
-   "bytes": 3060
+   "bytes": 8442
   },
   "travelodge.co.uk": {
    "file": "travelodge.co.uk.png",
    "from": "https://www.travelodge.co.uk/nw/assets/img/manifest/leisure/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 36679
+   "px": 192,
+   "bytes": 6083
   },
   "ihg.com": {
    "file": "ihg.com.png",
@@ -2714,8 +2715,8 @@
   "holidayextras.co.uk": {
    "file": "holidayextras.co.uk.png",
    "from": "https://dmy0b9oeprz0f.cloudfront.net/holidayextras.co.uk/favicon/196/recent.jpg",
-   "px": 196,
-   "bytes": 8670
+   "px": 192,
+   "bytes": 19655
   },
   "justpark.com": {
    "file": "justpark.com.svg",
@@ -2726,8 +2727,8 @@
   "paybyphone.co.uk": {
    "file": "paybyphone.co.uk.png",
    "from": "https://cdn.prod.website-files.com/62cbdc623e439846a123d49c/69825db417f667ec06fe2e93_PBP-Webclip.png",
-   "px": 256,
-   "bytes": 5201
+   "px": 192,
+   "bytes": 9593
   },
   "ringgo.co.uk": {
    "file": "ringgo.co.uk.png",
@@ -2738,8 +2739,8 @@
   "hertz.co.uk": {
    "file": "hertz.co.uk.png",
    "from": "https://www.hertz.co.uk/etc.clientlibs/vulcan-aem/clientlibs/clientlib-react/resources/hertz/favicon-196x196.png",
-   "px": 196,
-   "bytes": 25489
+   "px": 192,
+   "bytes": 2527
   },
   "avis.co.uk": {
    "file": "avis.co.uk.png",
@@ -2756,8 +2757,8 @@
   "europcar.co.uk": {
    "file": "europcar.co.uk.png",
    "from": "https://static.europcar.com/_nuxt/icons/icon_512x512.8e91c7.png",
-   "px": 512,
-   "bytes": 5954
+   "px": 192,
+   "bytes": 3676
   },
   "zipcar.co.uk": {
    "file": "zipcar.co.uk.png",
@@ -2774,8 +2775,8 @@
   "sixt.co.uk": {
    "file": "sixt.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=sixt.co.uk&sz=256",
-   "px": 256,
-   "bytes": 2312
+   "px": 192,
+   "bytes": 7376
   },
   "kwik-fit.com": {
    "file": "kwik-fit.com.png",
@@ -2786,8 +2787,8 @@
   "dfds.com": {
    "file": "dfds.com.png",
    "from": "https://www.dfds.com/unified-assets/locales/default/favicons/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 15166
+   "px": 192,
+   "bytes": 8374
   },
   "stenaline.co.uk": {
    "file": "stenaline.co.uk.png",
@@ -2808,10 +2809,10 @@
    "bytes": 4890
   },
   "brittany-ferries.co.uk": {
-   "file": "brittany-ferries.co.uk.jpg",
+   "file": "brittany-ferries.co.uk.png",
    "from": "https://www.brittany-ferries.co.uk/assets/launcher/icon-512x512.jpg",
-   "px": 512,
-   "bytes": 7326
+   "px": 192,
+   "bytes": 12851
   },
   "axs.com": {
    "file": "axs.com.png",
@@ -2828,8 +2829,8 @@
   "eventbrite.co.uk": {
    "file": "eventbrite.co.uk.png",
    "from": "https://cdn.evbstatic.com/s3-build/perm_001/317aa1/django/images/favicons/favicon-194x194.png",
-   "px": 194,
-   "bytes": 3152
+   "px": 192,
+   "bytes": 8414
   },
   "seetickets.com": {
    "file": "seetickets.com.png",
@@ -2874,10 +2875,10 @@
    "bytes": 1247
   },
   "myvue.com": {
-   "file": "myvue.com.jpg",
+   "file": "myvue.com.png",
    "from": "https://www.google.com/s2/favicons?domain=myvue.com&sz=256",
    "px": 152,
-   "bytes": 3091
+   "bytes": 14402
   },
   "klm.com": {
    "file": "klm.com.png",
@@ -2912,20 +2913,20 @@
   "legoland.co.uk": {
    "file": "legoland.co.uk.png",
    "from": "https://www.legoland.co.uk/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 35713
+   "px": 192,
+   "bytes": 14934
   },
   "altontowers.com": {
    "file": "altontowers.com.png",
    "from": "https://www.altontowers.com/android-chrome-192x192.png",
    "px": 192,
-   "bytes": 62682
+   "bytes": 15523
   },
   "thorpepark.com": {
    "file": "thorpepark.com.png",
    "from": "https://thorpepark.com/android-chrome-512x512.png",
-   "px": 512,
-   "bytes": 36033
+   "px": 192,
+   "bytes": 10356
   },
   "puregym.com": {
    "file": "puregym.com.png",
@@ -2948,8 +2949,8 @@
   "virginactive.co.uk": {
    "file": "virginactive.co.uk.png",
    "from": "https://www.virginactive.co.uk/ResourcePackages/virgin_active/assets/favicon/favicon-196x196.png",
-   "px": 196,
-   "bytes": 12088
+   "px": 192,
+   "bytes": 15107
   },
   "classpass.com": {
    "file": "classpass.com.png",
@@ -2961,7 +2962,7 @@
    "file": "nuffieldhealth.com.png",
    "from": "https://www.nuffieldhealth.com/android-chrome-192x192.png",
    "px": 192,
-   "bytes": 20098
+   "bytes": 5110
   },
   "davidlloyd.co.uk": {
    "file": "davidlloyd.co.uk.svg",
@@ -3002,8 +3003,8 @@
   "spotify.com": {
    "file": "spotify.com.png",
    "from": "https://open.spotifycdn.com/cdn/images/icons/Spotify_1024.31b25879.png",
-   "px": 1024,
-   "bytes": 47149
+   "px": 192,
+   "bytes": 15335
   },
   "virginexperiencedays.co.uk": {
    "file": "virginexperiencedays.co.uk.png",
@@ -3056,20 +3057,20 @@
   "primevideo.com": {
    "file": "primevideo.com.png",
    "from": "https://m.media-amazon.com/images/G/01/digital/video/DVUI/favicons/favicon-196x196.png",
-   "px": 196,
-   "bytes": 1858
+   "px": 192,
+   "bytes": 9060
   },
   "nowtv.com": {
    "file": "nowtv.com.png",
    "from": "https://www.google.com/s2/favicons?domain=nowtv.com&sz=256",
    "px": 180,
-   "bytes": 21249
+   "bytes": 3977
   },
   "notion.so": {
    "file": "notion.so.png",
    "from": "https://www.notion.com/front-static/logo-ios.png",
-   "px": 512,
-   "bytes": 8078
+   "px": 192,
+   "bytes": 8625
   },
   "dropbox.com": {
    "file": "dropbox.com.png",
@@ -3080,14 +3081,14 @@
   "canva.com": {
    "file": "canva.com.png",
    "from": "https://www.google.com/s2/favicons?domain=canva.com&sz=256",
-   "px": 193,
-   "bytes": 26675
+   "px": 192,
+   "bytes": 5268
   },
   "duolingo.com": {
    "file": "duolingo.com.png",
    "from": "https://d35aaqx5ub95lt.cloudfront.net/images/pwa-icon-circle-512.png",
-   "px": 512,
-   "bytes": 36194
+   "px": 192,
+   "bytes": 17517
   },
   "strava.com": {
    "file": "strava.com.png",
@@ -3110,8 +3111,8 @@
   "calm.com": {
    "file": "calm.com.png",
    "from": "https://www.google.com/s2/favicons?domain=calm.com&sz=256",
-   "px": 256,
-   "bytes": 5489
+   "px": 192,
+   "bytes": 9733
   },
   "twitch.tv": {
    "file": "twitch.tv.png",
@@ -3128,8 +3129,8 @@
   "discord.com": {
    "file": "discord.com.png",
    "from": "https://www.google.com/s2/favicons?domain=discord.com&sz=256",
-   "px": 256,
-   "bytes": 9471
+   "px": 192,
+   "bytes": 13958
   },
   "roblox.com": {
    "file": "roblox.com.png",
@@ -3140,8 +3141,8 @@
   "deezer.com": {
    "file": "deezer.com.png",
    "from": "https://cdn-files.dzcdn.net/cache/images/common/favicon/favicon-240x240.bb3a6a29ad16a77f10cb.png",
-   "px": 240,
-   "bytes": 5096
+   "px": 192,
+   "bytes": 10030
   },
   "economist.com": {
    "file": "economist.com.png",
@@ -3170,8 +3171,8 @@
   "ea.com": {
    "file": "ea.com.png",
    "from": "https://www.google.com/s2/favicons?domain=ea.com&sz=256",
-   "px": 256,
-   "bytes": 1920
+   "px": 192,
+   "bytes": 4234
   },
   "surfshark.com": {
    "file": "surfshark.com.png",
@@ -3182,8 +3183,8 @@
   "expressvpn.com": {
    "file": "expressvpn.com.png",
    "from": "https://www.expressvpn.com/wp-ws/themes/expressvpn/assets/images/android-chrome-256x256.png",
-   "px": 256,
-   "bytes": 4341
+   "px": 192,
+   "bytes": 7250
   },
   "nordvpn.com": {
    "file": "nordvpn.com.png",
@@ -3194,8 +3195,8 @@
   "ft.com": {
    "file": "ft.com.png",
    "from": "https://www.google.com/s2/favicons?domain=ft.com&sz=256",
-   "px": 256,
-   "bytes": 1709
+   "px": 192,
+   "bytes": 5489
   },
   "1password.com": {
    "file": "1password.com.svg",
@@ -3218,8 +3219,8 @@
   "paramountplus.com": {
    "file": "paramountplus.com.png",
    "from": "https://www.google.com/s2/favicons?domain=paramountplus.com&sz=256",
-   "px": 256,
-   "bytes": 1834
+   "px": 192,
+   "bytes": 7069
   },
   "linkedin.com": {
    "file": "linkedin.com.png",
@@ -3242,26 +3243,26 @@
   "dazn.com": {
    "file": "dazn.com.png",
    "from": "https://www.google.com/s2/favicons?domain=dazn.com&sz=256",
-   "px": 256,
-   "bytes": 2904
+   "px": 192,
+   "bytes": 10449
   },
   "hinge.co": {
    "file": "hinge.co.png",
    "from": "https://hinge.co/images/icons-512.png",
-   "px": 512,
-   "bytes": 45370
+   "px": 192,
+   "bytes": 7484
   },
   "tinder.com": {
-   "file": "tinder.com.jpg",
+   "file": "tinder.com.png",
    "from": "https://www.google.com/s2/favicons?domain=tinder.com&sz=256",
    "px": 180,
-   "bytes": 2642
+   "bytes": 11286
   },
   "hotels.com": {
    "file": "hotels.com.png",
    "from": "https://www.google.com/s2/favicons?domain=hotels.com&sz=256",
-   "px": 256,
-   "bytes": 1981
+   "px": 192,
+   "bytes": 5140
   },
   "myfitnesspal.com": {
    "file": "myfitnesspal.com.svg",
@@ -3278,8 +3279,8 @@
   "butternutbox.com": {
    "file": "butternutbox.com.png",
    "from": "https://www.google.com/s2/favicons?domain=butternutbox.com&sz=256",
-   "px": 256,
-   "bytes": 2057
+   "px": 192,
+   "bytes": 5576
   },
   "jollyes.co.uk": {
    "file": "jollyes.co.uk.png",
@@ -3309,13 +3310,13 @@
    "file": "pets-corner.co.uk.png",
    "from": "https://www.google.com/s2/favicons?domain=pets-corner.co.uk&sz=256",
    "px": 192,
-   "bytes": 24194
+   "bytes": 6564
   },
   "premierinn.com": {
-   "file": "premierinn.com.jpg",
+   "file": "premierinn.com.png",
    "from": "https://www.google.com/s2/favicons?domain=premierinn.com&sz=256",
-   "px": 228,
-   "bytes": 5525
+   "px": 192,
+   "bytes": 7201
   },
   "itv.com": {
    "file": "itv.com.png",

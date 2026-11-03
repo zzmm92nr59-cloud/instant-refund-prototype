@@ -22,6 +22,10 @@ jobs:
         env:
           ONLY: ${{ github.event.inputs.only }}
         run: node scripts/fetch-logos.mjs | tee logos-summary.txt
+      - name: Make every logo a small PNG (SVGs stay)
+        run: |
+          pip install --quiet pillow
+          python3 scripts/optimise-logos.py
       - name: Save the logos on this branch
         run: |
           git config user.name "relay-logo-bot"

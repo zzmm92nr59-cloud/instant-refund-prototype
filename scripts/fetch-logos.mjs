@@ -10,7 +10,10 @@
 // sharper one is found. logos/_report.json lists every shop with where its logo came from and its size, and every miss.
 import fs from "node:fs";
 const stores = JSON.parse(fs.readFileSync(new URL("./uk-stores.json", import.meta.url), "utf8"));
-const only = process.env.ONLY ? new Set(process.env.ONLY.split(",")) : null;
+const only = process.env.ONLY ? new Set(process.env.ONLY.split(",").map(x => x.trim()).filter(Boolean)) : null;
+// Shops checked by eye whose own icon is wrong or poor (scripts/uk-store-logo-overrides.json): "google" uses Google's copy
+// even when the site's is bigger; "drop" keeps no logo for that shop.
+const overrides = (() => { try { return JSON.parse(fs.readFileSync(new URL("./uk-store-logo-overrides.json", import.meta.url), "utf8")); } catch { return {}; } })();
 fs.mkdirSync("logos", { recursive: true });
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 RelayLogoFetcher/2.0";
 const MAX_BYTES = 150000;
@@ -83,13 +86,15 @@ async function fromHomePage(domain) {
   }
   return out;
 }
+const googleCopy = domain => "https://www.google.com/s2/favicons?domain=" + domain + "&sz=256";
 async function candidates(domain) {
+  if (overrides[domain] === "google") return [googleCopy(domain)];
   const page = await fromHomePage(domain);
   page.sort((a, b) => b.says - a.says);
   const list = [...page.slice(0, 6).map(x => x.u),
     "https://" + domain + "/apple-touch-icon.png", "https://www." + domain + "/apple-touch-icon.png",
     "https://" + domain + "/favicon.ico", "https://www." + domain + "/favicon.ico",
-    "https://www.google.com/s2/favicons?domain=" + domain + "&sz=256"];
+    googleCopy(domain)];
   return [...new Set(list)];
 }
 const score = (p, k) => Math.min(p, 512) + (k === "png" || k === "svg" ? 40 : k === "ico" ? 0 : 20);
@@ -98,7 +103,12 @@ let report = { hits: {}, misses: [] };
 try { const old = JSON.parse(fs.readFileSync("logos/_report.json", "utf8")); if (old && old.hits) report.hits = old.hits; } catch {}
 // Logos already saved by an earlier run are measured, so a new one only replaces them when it is sharper.
 for (const d of stores) { const e = existing(d); if (e && (!report.hits[d] || !report.hits[d].px)) { const b = fs.readFileSync("logos/" + d + "." + e); report.hits[d] = { ...(report.hits[d] || {}), file: d + "." + e, px: px(b, kind(b)) || null, bytes: b.length }; } }
-const todo = stores.filter(d => !only || only.has(d));
+for (const [d, how] of Object.entries(overrides)) {
+  if (how !== "drop") continue;
+  const e = existing(d); if (e) fs.unlinkSync("logos/" + d + "." + e);
+  delete report.hits[d];
+}
+const todo = stores.filter(d => (!only || only.has(d)) && overrides[d] !== "drop");
 let next = 0;
 async function worker() {
   while (next < todo.length) {
@@ -117,8 +127,8 @@ async function worker() {
       if (!best || s > best.s) best = { s, b: r.b, k, p, u };
       if (p >= 180 && (k === "png" || k === "svg")) break;   // sharp enough: no need to look further
     }
-    const had = existing(d), oldPx = report.hits[d] && report.hits[d].px;
-    if (best && (best.p >= 48 || !had) && (!had || !oldPx || best.p >= oldPx)) {
+    const had = existing(d), oldPx = report.hits[d] && report.hits[d].px, forced = overrides[d] === "google";
+    if (best && (best.p >= 48 || !had) && (forced || !had || !oldPx || best.p >= oldPx)) {
       if (had && had !== best.k) fs.unlinkSync("logos/" + d + "." + had);
       fs.writeFileSync("logos/" + d + "." + best.k, best.b);
       report.hits[d] = { file: d + "." + best.k, from: best.u, px: best.p, bytes: best.b.length };
@@ -131,7 +141,7 @@ async function worker() {
 await Promise.all(Array.from({ length: 8 }, worker));
 // Shops no longer on the list are dropped from the report (their files stay until removed by hand).
 report.total = stores.length; report.found = stores.filter(d => existing(d)).length;
-report.misses = report.misses.filter(m => stores.includes(m.domain) && !existing(m.domain));
+report.misses = report.misses.filter(m => stores.includes(m.domain) && !existing(m.domain) && overrides[m.domain] !== "drop");
 fs.writeFileSync("logos/_report.json", JSON.stringify(report, null, 1));
 const small = Object.entries(report.hits).filter(([d, h]) => stores.includes(d) && h.px && h.px < 64).map(([d, h]) => d + " " + h.px + "px");
 console.log("found " + report.found + " of " + report.total);
