@@ -160,3 +160,29 @@ sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
 sqlite.prepare("UPDATE shopper_consents SET withdrawn_at = ?").run(clock);
 assert.equal((await catchUpFullReads(env, clock + 180000, fetchImpl)).checked, 0, "no reading after permission is withdrawn");
 console.log(`ok - a mailbox read by an older reader catches up in ${minutes} minutes, quietly, and only with permission`);
+
+// 8. A newer reader that arrives part-way through a re-read starts again from the newest mail. (It used to carry on from
+//    where the older re-read had got to, mark the mailbox as done at the end, and leave the newest mail with the older reader.)
+sqlite.prepare("UPDATE shopper_consents SET withdrawn_at = NULL").run();
+sqlite.prepare("UPDATE captured_receipts SET details = json_set(details, '$.parserVersion', 1)").run();
+// Where the older re-read had got to, saved the way the previous version saved it (just the day).
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 1, auto_cursor = ?").run(ymd(clock - 20 * DAY));
+const listedBefore = [];
+const watching = async (url, init) => { const w = /before:(\d{4}\/\d{2}\/\d{2})/.exec(decodeURIComponent(String(url))); if (w && String(url).includes("/messages?")) listedBefore.push(w[1]); return fetchImpl(url, init); };
+minutes = 0;
+while (stale() > 0 && minutes < 30) { clock += 60 * 1000; await catchUpFullReads(env, clock, watching); minutes++; }
+assert.equal(stale(), 0, "the newest mail is read again too, not only what was older than the old place");
+assert.equal(listedBefore[0], ymd(clock + DAY - (minutes - 1) * 60 * 1000), "the re-read starts from the newest mail");
+// Part-way through, the place is saved with the read it belongs to, and the next minute carries on from it.
+sqlite.prepare("UPDATE captured_receipts SET details = json_set(details, '$.parserVersion', 1)").run();
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 1, auto_cursor = NULL").run();
+listedBefore.length = 0;
+clock += 60 * 1000; await catchUpFullReads(env, clock, watching);
+const saved = sqlite.prepare("SELECT auto_cursor AS c FROM gmail_connections").get().c;
+assert.match(saved, /^\d+@\d{4}\/\d{2}\/\d{2}$/, "the saved place says which read it belongs to: " + saved);
+const firstRound = listedBefore.length;
+clock += 60 * 1000; await catchUpFullReads(env, clock, watching);
+assert.equal(listedBefore[firstRound], saved.split("@")[1], "the next minute carries on from the saved place");
+while (stale() > 0 && minutes < 60) { clock += 60 * 1000; await catchUpFullReads(env, clock, watching); minutes++; }
+assert.equal(stale(), 0);
+console.log("ok - a newer reader arriving part-way through a re-read starts again from the newest mail; within one read, each minute carries on");

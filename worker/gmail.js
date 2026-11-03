@@ -248,7 +248,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
     try { recent = await scan(env, r.id, fetchImpl, now, "", false, { recent: true, sinceMs: since, budget: CALL_BUDGET - calls, maxFetch: AUTO_MAX_FETCH }); }
     catch (e) { recent = { status: 500, body: { error: String(e && e.message || e).slice(0, 80) } }; }
     passes++; calls += recent.calls || 3;
-    let cursor = r.cursor || null;
+    let cursor = cursorFor(r.cursor);
     // 2. The first full read (or a full read again, see OUTLOOK_FULL_REV), a little more each run, until it reaches the start of the look-back period.
     if (needsFullRead(r.lastScanAt, r.provider, r.fullRev) && recent.status === 200 && !recent.body.more && passes < AUTO_PASSES_PER_RUN && calls < CALL_BUDGET - 12) {
       let back;
@@ -258,7 +258,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
       if (back.status === 200) cursor = back.body.more ? back.body.cursor : null;
     }
     // Moved to the back of the queue whatever happened, so one shopper's problem never blocks the rest.
-    await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_at = ?, auto_cursor = ? WHERE shopper_id = ?").bind(now, cursor, r.id).run();
+    await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_at = ?, auto_cursor = ? WHERE shopper_id = ?").bind(now, savedCursor(cursor), r.id).run();
     out.push({ status: recent.status, added: recent.body && recent.body.added || 0, updated: recent.body && recent.body.updated || 0, more: Boolean(recent.body && recent.body.more) });
   }
   return { checked: out.length, results: out };
@@ -284,15 +284,24 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
   for (const r of rows) {
     if (!needsFullRead(r.lastScanAt, r.provider, r.fullRev) || calls > CALL_BUDGET - 12) continue;
     let back;
-    try { back = await scan(env, r.id, fetchImpl, now, r.cursor || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN }); }
+    try { back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN }); }
     catch (e) { back = { status: 500, body: {} }; }
     calls += back.calls || 3;
     // Where to carry on from next minute (the 15-minute check uses the same place, so the two never go over the same ground).
-    if (back.status === 200) await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_cursor = ? WHERE shopper_id = ?").bind(back.body.more ? back.body.cursor : null, r.id).run();
+    if (back.status === 200) await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_cursor = ? WHERE shopper_id = ?").bind(savedCursor(back.body.more ? back.body.cursor : null), r.id).run();
     out.push({ status: back.status, read: back.body && (back.body.added || 0) + (back.body.updated || 0), more: Boolean(back.body && back.body.more) });
   }
   return { checked: out.length, results: out };
 }
+
+// The place a background read of the whole look-back period has got to is saved with the read it belongs to ("5@2025/07/20").
+// A place saved during an older read is not used: a new reader always starts again from the newest mail, otherwise the
+// mail between the newest and that place would be left as the older reader saw it.
+function cursorFor(saved) {
+  const m = /^(\d+)@(\d{4}\/\d{2}\/\d{2})$/.exec(saved || "");
+  return m && Number(m[1]) === FULL_REV ? m[2] : null;
+}
+function savedCursor(cursor) { return cursor ? FULL_REV + "@" + cursor : null; }
 
 // Whether the mailbox still needs its whole look-back period read: never finished, or an Outlook mailbox read before
 // the fix in OUTLOOK_FULL_REV.
