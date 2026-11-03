@@ -289,6 +289,10 @@
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid #101828;text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:#fff;color:#101828}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
+    "button.rl-po-primary,button.rl-po-secondary{font:inherit;font-weight:700;font-size:14px}.rl-po-primary:active,.rl-po-secondary:active,.rl-rg-row:active{transform:scale(.97)}" +
+    ".rl-rg-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid #e7e1d2;border-radius:14px;background:#fff;font:inherit;text-align:left;cursor:pointer;color:#101828}" +
+    ".rl-rg-l{flex:none;width:104px;font-size:13px;color:#667085}.rl-rg-row b{flex:1;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:#3f5a17}" +
+    ".rl-rg-next{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:#eef7df;color:#24360c;font-size:14px;line-height:1.45}" +
     ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:7px 18px;border-radius:999px;border:1px solid #d9d3c4;font-weight:800;font-size:14px;background:#fff;color:#101828}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:8px 17px;border-radius:999px;background:#f2f4ec;color:#263513;font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
     ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:#101828;color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}@media(max-width:520px){.rl-wr-cover{padding:24px 22px}}" +
     ".rl-wr-play{all:unset;cursor:pointer;box-sizing:border-box;display:inline-flex;align-items:center;min-height:52px;background:#c7f567;color:#16210a;font-weight:900;padding:0 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
@@ -1744,11 +1748,11 @@
 
   // ---- View original receipt: fetched live from Gmail or Outlook when opened; nothing is stored ----
   var openOriginal = null;
-  function originalView(sheet, receiptId, onBack) {
+  function originalView(sheet, receiptId, onBack, title) {
     var msg = el("div", { className: "rl-msg" });
     var body = el("div");
     var MB = mailName();
-    [el("h2", { text: "Original receipt" }), el("p", { text: "Loading it from your " + MB + "…", style: "opacity:.7" }), body, msg,
+    [el("h2", { text: title || "Original receipt" }), el("p", { text: "Loading it from your " + MB + "…", style: "opacity:.7" }), body, msg,
       el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
@@ -3183,8 +3187,15 @@
     if (opts.extra) opts.extra(card);
     var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
-    if (opts.actions !== false && portal && /^https:\/\//.test(portal))
-      actions.appendChild(el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", text: "Return on " + (who.length <= 16 ? who + "'s site" : "the shop's site") + " ↗" }));
+    if (portal && !/^https:\/\//.test(portal)) portal = null;
+    // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
+    // through the shop's own returns page with the order number and email ready to copy.
+    var rp = x.returnPlan;
+    if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
+      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
+        open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
+    else if (opts.actions !== false && portal)
+      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sheet) { returnGuide(sheet, x, who, portal); }); } }));
     actions.appendChild(el("button", { className: "rl-po-secondary", text: "Details", style: portal && opts.actions !== false ? "flex:0 0 96px" : "", onclick: function () {
       open(function (sheet) {
         sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
@@ -3194,9 +3205,7 @@
       });
     } }));
     card.appendChild(actions);
-    // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
-    if (opts.actions !== false && portal && /^https:\/\//.test(portal))
-      card.appendChild(el("div", { text: "Opens the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run this page.", style: "font-size:12px;color:#667085;margin-top:8px;line-height:1.4" }));
+
     // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
     if (opts.markable && x.id) {
       var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
@@ -3206,6 +3215,48 @@
           markItems(x, idxs, opts.markable === "undo" ? null : "returning").then(function (ok) { if (ok && opts.changed) opts.changed(); else { b.disabled = false; b.textContent = "Couldn't save. Try again"; } }); } }));
     }
     return card;
+  }
+  // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
+  function copyText(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacyCopy(text); }); } catch (e) {}
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text) {
+    var t = el("textarea", { style: "position:fixed;top:-100px;opacity:0" }); t.value = text; document.body.appendChild(t); t.select();
+    var ok = false; try { ok = document.execCommand("copy"); } catch (e) {} t.remove(); return ok;
+  }
+  // A return through the shop's own returns page, made quick: the order number and email the page asks for, one tap to copy
+  // each; the page opens with the order number already copied; and once the shop emails the QR code or label, it shows on
+  // the card. Relay doesn't submit the return itself: the shop's page does that.
+  function returnGuide(sheet, x, who, portal) {
+    sheet.appendChild(el("h2", { text: "Return to " + who, style: "margin:0 0 6px" }));
+    var dl = deadlineOf(x);
+    if (dl) sheet.appendChild(deadlineChip(dl, x.returnBy && dl === x.returnBy.date ? "Return by at least " : "Send it back by "));
+    sheet.appendChild(el("p", { text: who + "'s returns page asks for these. Tap one to copy it.", style: "margin:14px 0 10px;color:#475467;font-size:15px;line-height:1.45" }));
+    var rows = el("div");
+    var copyRow = function (label, value) {
+      var c = el("span", { className: "rl-rg-c", text: "Copy" });
+      var b = el("button", { type: "button", className: "rl-rg-row" }, [el("span", { className: "rl-rg-l", text: label }), el("b", { text: value }), c]);
+      b.setAttribute("aria-label", "Copy your " + label.toLowerCase() + ", " + value);
+      b.onclick = function () { copyText(value).then(function (ok) { c.textContent = ok ? "Copied" : "Select it to copy"; }); };
+      return b;
+    };
+    if (x.orderRef) rows.appendChild(copyRow("Order number", String(x.orderRef)));
+    sheet.appendChild(rows);
+    // The address the shop sent the order to (a Hide My Email address, say), else the inbox Relay reads.
+    if (x.sentTo) rows.appendChild(copyRow("Email address", String(x.sentTo)));
+    else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      var addr = g && g.ok && g.body && (g.body.email || g.body.googleEmail);
+      if (addr && document.body.contains(rows)) rows.appendChild(copyRow("Email address", String(addr)));
+    }, function () {});
+    var go = el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", style: "display:block;margin-top:14px;box-sizing:border-box",
+      text: x.orderRef ? "Copy order number and open " + who : "Open " + who + "'s returns page" });
+    go.onclick = function () { if (x.orderRef) copyText(String(x.orderRef)); };
+    sheet.appendChild(go);
+    // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
+    sheet.appendChild(el("p", { text: "This is the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run the page.", style: "margin:8px 0 0;font-size:13px;color:#667085;line-height:1.4" }));
+    sheet.appendChild(el("p", { className: "rl-rg-next", text: "What happens next: " + who + " emails you a return QR code or label. Relay shows it on this card, then follows the parcel back and shows when the refund comes through." }));
+    sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:12px", onclick: close }));
   }
   function markItems(x, idxs, status) {
     return api("/relay/my/receipts/" + x.id + "/items", { method: "POST", body: { items: idxs.map(function (i) { return { index: i, status: status }; }) } })
