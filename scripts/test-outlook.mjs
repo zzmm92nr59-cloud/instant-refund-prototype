@@ -52,6 +52,9 @@ let box = [
   { id: "AQMkADAwATM0MDAAMS1-receipt2", mid: "<ol-2@mail.exampleoutfitters.test>", fromName: "Example Outfitters", from: "orders@exampleoutfitters.test", subject: "We've got it, Jess!", at: clock - 40 * DAY, body: receipt(2) },
   { id: "AQMkADAwATM0MDAAMS1-friend", mid: "<friend@outlook.com>", fromName: "Sam", from: "sam@outlook.com", subject: "Dinner on Friday?", at: clock - 41 * DAY, body: "See you there PRIVATE-BODY-MARKER-friend" },
   { id: "AQMkADAwATM0MDAAMS1-receipt4==", mid: "<ol-4@mail.exampleoutfitters.test>", fromName: "Example Outfitters", from: "hello@exampleoutfitters.test", subject: "Thanks for your order", at: clock - 100 * DAY, html: htmlReceipt },
+  // A fake "order" in Junk Email and a receipt the shopper deleted: Gmail never lists Spam or Bin, so neither is Outlook's.
+  { id: "AQMkADAwATM0MDAAMS1-junk", mid: "<junk-1@scam.test>", fromName: "Parcel Team", from: "orders@scam.test", subject: "Your order confirmation #SC-1", at: clock - 5 * DAY, body: receipt(91), folder: "JUNK-FOLDER" },
+  { id: "AQMkADAwATM0MDAAMS1-deleted", mid: "<ol-9@mail.exampleoutfitters.test>", fromName: "Example Outfitters", from: "hello@exampleoutfitters.test", subject: "Your order confirmation #OL-9", at: clock - 6 * DAY, body: receipt(9), folder: "DELETED-FOLDER" },
 ];
 const graphCalls = [], tokenCalls = [];
 let msRefreshOk = true, refreshIssued = 0;
@@ -100,19 +103,22 @@ const fetchImpl = async (url, init = {}) => {
     if (u.pathname === "/v1.0/me/messages" && u.searchParams.get("$search")) {
       const q = u.searchParams.get("$search").replace(/^"|"$/g, "").toLowerCase();
       const hits = [...box, ...hiddenBox].filter(m => (m.subject + " " + m.fromName + " " + m.from).toLowerCase().includes(q)).sort((a, b) => b.at - a.at);
-      return Response.json({ value: hits.map(m => ({ id: m.id, internetMessageId: m.mid, subject: m.subject, from: { emailAddress: { name: m.fromName, address: m.from } }, receivedDateTime: iso(m.at) })) });
+      return Response.json({ value: hits.map(m => ({ id: m.id, internetMessageId: m.mid, subject: m.subject, from: { emailAddress: { name: m.fromName, address: m.from } }, receivedDateTime: iso(m.at), parentFolderId: m.folder || "INBOX-FOLDER" })) });
     }
     if (u.pathname === "/v1.0/me/messages") {
       const f = /^receivedDateTime ge (\S+) and receivedDateTime lt (\S+)$/.exec(u.searchParams.get("$filter") || "");
       assert.ok(f, "Outlook is listed one date window at a time");
       assert.equal(u.searchParams.get("$orderby"), "receivedDateTime desc");
-      assert.equal(u.searchParams.get("$select"), "id,internetMessageId,subject,from,receivedDateTime", "only subject and sender are listed, never the body");
+      assert.equal(u.searchParams.get("$select"), "id,internetMessageId,subject,from,receivedDateTime,parentFolderId", "only subject, sender and folder are listed, never the body");
       const lo = Date.parse(f[1]), hi = Date.parse(f[2]), top = Number(u.searchParams.get("$top")), skip = Number(u.searchParams.get("$skip") || 0);
       const inWin = box.filter(m => m.at >= lo && m.at < hi).sort((a, b) => b.at - a.at);
       const page = inWin.slice(skip, skip + top);
       const next = skip + top < inWin.length ? (() => { const n = new URL(url); n.searchParams.set("$skip", String(skip + top)); return n.toString(); })() : undefined;
-      return Response.json({ value: page.map(m => ({ id: m.id, internetMessageId: m.mid, subject: m.subject, from: { emailAddress: { name: m.fromName, address: m.from } }, receivedDateTime: iso(m.at) })), ...(next ? { "@odata.nextLink": next } : {}) });
+      return Response.json({ value: page.map(m => ({ id: m.id, internetMessageId: m.mid, subject: m.subject, from: { emailAddress: { name: m.fromName, address: m.from } }, receivedDateTime: iso(m.at), parentFolderId: m.folder || "INBOX-FOLDER" })), ...(next ? { "@odata.nextLink": next } : {}) });
     }
+    // Which folders are Junk Email and Deleted Items (Relay leaves those out, as Gmail leaves out Spam and Bin).
+    if (u.pathname === "/v1.0/me/mailFolders/junkemail") return Response.json({ id: "JUNK-FOLDER" });
+    if (u.pathname === "/v1.0/me/mailFolders/deleteditems") return Response.json({ id: "DELETED-FOLDER" });
     const raw = /^\/v1\.0\/me\/messages\/([^/]+)\/\$value$/.exec(u.pathname);
     if (raw) {
       const m = [...box, ...hiddenBox].find(x => x.id === decodeURIComponent(raw[1]));
@@ -126,7 +132,9 @@ const fetchImpl = async (url, init = {}) => {
 const hiddenBox = [
   { id: "AQMkADAwATM0MDAAMS1-lulu77", mid: "<lulu-77@e.lululemon.test>", fromName: "lululemon", from: "hello@e.lululemon.test", subject: "Thanks for your lululemon order", at: clock - 420 * DAY,
     body: "Thanks for your Order, Jess!\nItems Purchased\nDefine Jacket\nNulu\n1 x 074897 / Size US 8\n£118.00\nOrder Total\n£118.00\nOrder Id: #UK04002516\nOrder Date\nNovember 19, 2025\nPRIVATE-BODY-MARKER-77\n" },
-  { id: "AQMkADAwATM0MDAAMS1-lulu78", mid: "<lulu-78@e.lululemon.test>", fromName: "lululemon", from: "news@e.lululemon.test", subject: "New arrivals at lululemon", at: clock - 410 * DAY, body: "New jackets this week." }
+  { id: "AQMkADAwATM0MDAAMS1-lulu78", mid: "<lulu-78@e.lululemon.test>", fromName: "lululemon", from: "news@e.lululemon.test", subject: "New arrivals at lululemon", at: clock - 410 * DAY, body: "New jackets this week." },
+  // Newer than the real one, but in Junk Email: Find leaves it out.
+  { id: "AQMkADAwATM0MDAAMS1-lulujunk", mid: "<lulu-junk@scam.test>", fromName: "lululemon", from: "orders@lululemon-outlet.test", subject: "Your lululemon order is waiting", at: clock - 30 * DAY, body: receipt(92), folder: "JUNK-FOLDER" }
 ];
 
 const call = (path, { method = "GET", body, token, ip = "1.1.1.1", e = env } = {}) =>
@@ -305,6 +313,7 @@ console.log("ok - View original receipt works for Outlook emails, cleaned and wi
 // ---- 7. Find a missing receipt in Outlook, add it by hand; it is never added twice ----
 let f = await (await post("/relay/my/gmail/find", jessToken, { query: "lululemon" })).json();
 assert.equal(f.results[0].subject, "Thanks for your lululemon order", "order emails first");
+assert.ok(!f.results.some(x => x.id.endsWith("lulujunk")), "Find leaves out Junk Email, as Gmail's search leaves out Spam");
 assert.equal(f.results[0].added, false);
 let a = await (await post("/relay/my/gmail/add", jessToken, { messageId: f.results[0].id })).json();
 assert.equal(a.ok, true); assert.equal(a.orderRef, "UK04002516");

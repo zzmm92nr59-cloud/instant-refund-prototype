@@ -1,0 +1,51 @@
+name: Email reading (Gmail and Outlook)
+# Every change to how emails are read is tested on both kinds of mailbox before it's merged, and Gmail and Outlook must
+# give the same receipts (see scripts/test-mail-parity.mjs).
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'scripts/test-mail-parity.mjs'
+      - 'scripts/test-gmail*.mjs'
+      - 'scripts/test-outlook*.mjs'
+      - 'scripts/test-receipt-*.mjs'
+      - 'scripts/test-wrapped.mjs'
+      - '.github/workflows/mail-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - 'scripts/test-mail-parity.mjs'
+      - 'scripts/test-gmail*.mjs'
+      - 'scripts/test-outlook*.mjs'
+      - 'scripts/test-receipt-*.mjs'
+      - 'scripts/test-wrapped.mjs'
+      - '.github/workflows/mail-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mail:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Reading receipts (items, shop names, groups, forwarded emails)
+        run: |
+          node scripts/test-receipt-parser.mjs
+          node scripts/test-receipt-reader.mjs
+          node scripts/test-receipt-category.mjs
+          node scripts/test-wrapped.mjs
+      - name: Gmail
+        run: |
+          node scripts/test-gmail.mjs
+          node scripts/test-gmail-auto.mjs
+      - name: Outlook
+        run: |
+          node scripts/test-outlook.mjs
+          node scripts/test-outlook-throttle.mjs
+      - name: Gmail and Outlook give the same receipts, cards and Wrapped
+        run: node scripts/test-mail-parity.mjs

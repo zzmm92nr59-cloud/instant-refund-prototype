@@ -241,8 +241,8 @@ export function shopDisplayName(retailer) {
   const via = isVia(r.domain);
   const raw = String(r.name || "").trim();
   if (raw) {
-    // "Anthropic Ireland, Limited" → "Anthropic"; "Acme UK Ltd." → "Acme"
-    const short = raw.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim() || raw;
+    // "Anthropic Ireland, Limited" → "Anthropic"; "Anthropic, PBC" → "Anthropic"; "Acme UK Ltd." → "Acme"
+    const short = raw.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|pbc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim() || raw;
     // "Swarovski Customer Service GB" → "Swarovski"; "Groupon 🎄" → "Groupon".
     const clean = cleanShopName(short);
     const known = clean && KNOWN_NAMES[letters(clean)];
