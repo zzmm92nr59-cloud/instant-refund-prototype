@@ -24,7 +24,9 @@ export const PASSKEY_TABLE_SQL = [
 ];
 
 export function passkeyDeleteStatements(db, shopperId) {
-  return [db.prepare("DELETE FROM auth_passkeys WHERE shopper_id = ?").bind(shopperId)];
+  return [db.prepare("DELETE FROM auth_passkeys WHERE shopper_id = ?").bind(shopperId),
+    // Sign-in challenges not yet used or cleared away also name the shopper.
+    db.prepare("DELETE FROM auth_webauthn_challenges WHERE shopper_id = ?").bind(shopperId)];
 }
 
 const b64u = bytes => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

@@ -28,6 +28,11 @@ export async function sq(env, path, init = {}, f = (...a) => fetch(...a)) {
   return body;
 }
 
+// What account deletion removes: the test orders a shopper made with the testing tool.
+export async function squareOrderDeleteStatements(db, shopperId) {
+  await ensureSquareOrderTables(db);
+  return [db.prepare("DELETE FROM square_test_orders WHERE shopper_id = ?").bind(shopperId)];
+}
 export function ensureSquareOrderTables(db) {
   return ensureOnce(db, "square-orders", async () => {
     await db.prepare("CREATE TABLE IF NOT EXISTS square_email_checks (order_id TEXT PRIMARY KEY, checked_at INTEGER NOT NULL, found INTEGER NOT NULL)").run();

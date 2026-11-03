@@ -10,6 +10,7 @@ on:
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
+      - 'scripts/test-delete-account.mjs'
       - '.github/workflows/mail-tests.yml'
   push:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
+      - 'scripts/test-delete-account.mjs'
       - '.github/workflows/mail-tests.yml'
   workflow_dispatch:
 permissions:
@@ -44,6 +46,7 @@ jobs:
           node scripts/test-gmail.mjs
           node scripts/test-gmail-auto.mjs
           node scripts/test-gmail-busy.mjs
+          node scripts/test-delete-account.mjs
       - name: Outlook
         run: |
           node scripts/test-outlook.mjs

@@ -68,10 +68,11 @@ export async function suggestionStatement(env, scope, orderId, facts, store, now
 }
 
 // Statements removing a shopper's remembered cards and suggestions (account deletion).
-export async function instoreDeleteStatements(db, eHash) {
+export async function instoreDeleteStatements(db, eHash, shopperId) {
   await ensureInstoreTables(db);
   return [db.prepare("DELETE FROM square_card_anchors WHERE email_hash = ?").bind(eHash),
-    db.prepare("DELETE FROM square_instore_suggestions WHERE email_hash = ?").bind(eHash)];
+    db.prepare("DELETE FROM square_instore_suggestions WHERE email_hash = ?").bind(eHash),
+    ...(shopperId ? [db.prepare("DELETE FROM square_claim_attempts WHERE shopper_id = ?").bind(shopperId)] : [])];
 }
 
 const label = (env) => env.SQUARE_DEFAULT_LABEL || "Relay Demo Store";

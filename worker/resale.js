@@ -71,7 +71,8 @@ async function ensureResaleTablesRun(db) {
 const MY_REQUESTS = "(SELECT q.id FROM resale_requests q WHERE q.asker_id = ? UNION SELECT q.id FROM resale_requests q JOIN resale_listings l ON l.id = q.listing_id WHERE l.seller_id = ?)";
 export function resaleDeleteStatements(db, shopperId) {
   return [
-    db.prepare("DELETE FROM resale_messages WHERE request_id IN " + MY_REQUESTS).bind(shopperId, shopperId),
+    // (Their own messages go even from a conversation whose request is already gone.)
+    db.prepare("DELETE FROM resale_messages WHERE sender_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_reports WHERE reporter_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?) OR offered_listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_listings WHERE seller_id = ?").bind(shopperId)
