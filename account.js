@@ -440,7 +440,7 @@
     ".rl-btn.rl-prov{background:var(--rl-card);color:var(--rl-text);border:1.5px solid var(--rl-text);margin-top:10px}.rl-btn.rl-prov:first-child{margin-top:0}" +
     ".rl-jr .rl-btn+.rl-btn{margin-top:10px}" +
     ".rl-sheet p.rl-jnote{font-size:13.5px;color:var(--rl-text2);margin:10px 2px 0}" +
-    ".rl-sheet p.rl-jlegal{font-size:13px;color:var(--rl-text2);margin:22px 2px 0;text-align:center}.rl-jlegal a{color:var(--rl-accent);font-weight:700;display:inline-block;line-height:20px;padding:12px 2px;margin:-12px 0}" +
+    ".rl-sheet p.rl-jlegal{font-size:13px;color:var(--rl-text2);margin:22px 2px 0;text-align:center}.rl-jlegal a{color:var(--rl-accent);font-weight:700;display:inline-block;line-height:20px;padding:12px 0;margin:-12px 0}" +
     ".rl-jhint{margin-top:14px}.rl-jhint p{font-size:14px!important;color:var(--rl-text2)!important;margin:0 0 4px!important}" +
     ".rl-jlabel{display:block;font-weight:700;font-size:14px;margin:4px 0 6px;color:var(--rl-text)}" +
     // Codes: a big, even 6-digit box; two-step methods as small cards; recovery codes in a box that selects in one tap.
@@ -456,6 +456,50 @@
     ".rl-jscan b{display:block;font-size:17px}.rl-jscan span{display:block;font-size:13.5px;color:#c9d0df}" +
     ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#c7f567;border-radius:99px;transition:width .6s ease}" +
     "@media(prefers-reduced-motion:reduce){.rl-jbar i,.rl-dots span{transition:none}}" +
+    // Full pages: every step of signing in and getting started fills the screen, in a column, instead of a sheet over the app.
+    ".rl-back:has(>.rl-jr){background:var(--rl-bg);align-items:stretch;justify-content:stretch}" +
+    ".rl-back:has(>.rl-jr)>.rl-sheet{max-width:none;width:100%;height:100%;min-height:100%;max-height:none;border-radius:0;box-shadow:none;background:var(--rl-bg);padding:env(safe-area-inset-top) max(18px,calc((100% - 480px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--rl-kb,0px))}" +
+    ".rl-back:has(>.rl-jr) .rl-jtop{margin:0 -8px;padding:6px 0;background:var(--rl-bg);-webkit-backdrop-filter:none;backdrop-filter:none}" +
+    // The sign-in page.
+    ".rl-jlogo{display:block;width:56px;height:56px;border-radius:15px;margin:22px 0 20px}.rl-signin h2.rl-jh{font-size:32px}" +
+    ".rl-choices{display:grid;gap:10px;margin:6px 0 4px}" +
+    ".rl-choice,.rl-textbtn{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;font:inherit;cursor:pointer;text-align:center;transition:transform .12s,background-color .12s,opacity .12s}" +
+    ".rl-choice{min-height:54px;padding:0 18px;border-radius:16px;background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);font-size:17px;font-weight:600}.rl-choice:active{transform:scale(.98);background:var(--rl-fill)}" +
+    ".rl-textbtn{min-height:48px;margin-top:6px;color:var(--rl-accent);font-size:16px;font-weight:600}.rl-textbtn:active{opacity:.55}" +
+    ".rl-choice:focus-visible,.rl-textbtn:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    // The welcome story: full-bleed colour, one slide at a time, the way in always at the bottom.
+    ".rl-welcome{position:fixed;inset:0;z-index:9998;display:flex;justify-content:center;color:#fff;background:#101828;transition:background-color .5s ease;user-select:none;-webkit-user-select:none;cursor:pointer;overflow:hidden}.rl-welcome:focus{outline:none}" +
+    "body.rl-welcoming{overflow:hidden}" +
+    ".rl-wcol{width:100%;max-width:480px;box-sizing:border-box;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom))}" +
+    ".rl-wbars{display:flex;gap:4px}.rl-wbars div{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.3);overflow:hidden}.rl-wbars i{display:block;height:100%;width:0;background:#fff}" +
+    ".rl-wbars .done i{width:100%}.rl-wbars .now i{animation:rlbar linear forwards}.rl-welcome.held .rl-wbars .now i{animation-play-state:paused}.rl-welcome.last .rl-wbars .now i{animation:none;width:100%}" +
+    ".rl-wbrand{display:flex;align-items:center;gap:10px;margin:18px 0 0}.rl-wbrand img{width:34px;height:34px;border-radius:10px;box-shadow:0 0 0 1px rgba(255,255,255,.18)}.rl-wbrand b{font-size:22px;font-weight:800;letter-spacing:-.01em}" +
+    ".rl-wstage{flex:1;display:flex;align-items:center;min-height:0;padding:12px 0}.rl-wslide{width:100%}" +
+    ".rl-wslide h1{font-family:var(--rl-sys);font-size:clamp(30px,10.3vw,40px);line-height:1.04;font-weight:800;letter-spacing:-.025em;margin:28px 0 10px;color:#fff}" +
+    ".rl-wslide p{font-size:19px;line-height:1.35;font-weight:700;margin:0;color:#fff;max-width:30ch}" +
+    ".rl-wact{display:grid;gap:10px;margin-top:8px}" +
+    ".rl-wgo,.rl-whave{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 14px;text-align:center;font:inherit;cursor:pointer;transition:transform .12s,opacity .12s}" +
+    ".rl-wgo{min-height:56px;border-radius:999px;background:#fff;color:#101828;font-size:18px;font-weight:700}.rl-wgo:active{transform:scale(.97)}" +
+    ".rl-whave{min-height:52px;border-radius:999px;border:1.5px solid rgba(255,255,255,.55);background:rgba(0,0,0,.14);color:#fff;font-size:clamp(15px,4.4vw,17px);font-weight:700}.rl-whave:active{transform:scale(.97);background:rgba(0,0,0,.24)}" +
+    ".rl-wgo:focus-visible,.rl-whave:focus-visible{outline:2px solid #fff;outline-offset:3px}" +
+    // Its pictures: cards drawn the way Relay shows your own, for made-up shops.
+    ".rl-wart{display:grid;gap:10px;max-width:340px;min-height:300px;align-content:end}" +
+    ".rl-wcard{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:4px 12px;background:#fff;color:#101828;border-radius:18px;padding:12px 14px;box-shadow:0 12px 30px rgba(0,0,0,.2)}" +
+    ".rl-wini{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px}" +
+    ".rl-wcard-t{min-width:0}.rl-wcard-t b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-wcard-t span{display:block;font-size:13px;color:#4b5563}.rl-wprice{font-size:16px}" +
+    ".rl-wart-receipts .rl-wcard:nth-child(1){rotate:-3deg}.rl-wart-receipts .rl-wcard:nth-child(2){rotate:2deg;translate:14px 0}.rl-wart-receipts .rl-wcard:nth-child(3){rotate:-1.5deg;translate:-4px 0}" +
+    ".rl-wpill{justify-self:start;background:#c7f567;color:#16210a;border-radius:999px;padding:8px 14px;font-weight:800;font-size:14px;margin-top:4px}" +
+    ".rl-wnote{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.92);border-radius:18px;padding:10px 14px 10px 10px;font-weight:700;font-size:15px;color:#101828;box-shadow:0 8px 24px rgba(0,0,0,.14);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}.rl-wnote img{width:26px;height:26px;border-radius:7px;flex:none}" +
+    ".rl-wdue{grid-column:1/-1;margin-top:8px}.rl-wtrack{height:8px;border-radius:99px;background:#f3dde5;overflow:hidden}.rl-wtrack i{display:block;height:100%;width:78%;background:#E0446E;border-radius:99px}.rl-wdue span{display:block;margin-top:6px;font-size:13px;font-weight:700;color:#a61e47}" +
+    ".rl-wdrop{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;margin-top:4px}.rl-wdrop b{font-size:30px;letter-spacing:-.02em}.rl-wdrop s{color:#4b5563;font-size:16px}.rl-wdrop span{margin-left:auto;background:#c7f567;color:#16210a;border-radius:999px;padding:5px 10px;font-weight:800;font-size:13px}" +
+    ".rl-wyear{font-size:15px;font-weight:800}.rl-wtiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+    ".rl-wtile{border-radius:18px;padding:14px;min-height:84px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18)}.rl-wtile span{font-size:14px;font-weight:700}.rl-wtile b{font-size:22px;letter-spacing:-.01em}" +
+    // One reveal per slide.
+    ".rl-wslide>*,.rl-wart>*{animation:rlup .55s cubic-bezier(.2,.8,.2,1) both}.rl-wslide>h1{animation-delay:.12s}.rl-wslide>p{animation-delay:.22s}" +
+    ".rl-wart>*:nth-child(2){animation-delay:.08s}.rl-wart>*:nth-child(3){animation-delay:.16s}.rl-wart>*:nth-child(4){animation-delay:.24s}" +
+    "@media(max-height:720px){.rl-wslide h1{font-size:clamp(28px,9vw,34px);margin-top:18px}.rl-wart{gap:8px;min-height:262px}.rl-wcard{padding:10px 12px}.rl-wbrand{margin-top:12px}}" +
+    "@media(max-height:650px){.rl-wart{zoom:.8}}@media(max-height:590px){.rl-wart{display:none}.rl-wslide h1{margin-top:0}}" +
+    "@media(prefers-reduced-motion:reduce){.rl-wslide>*,.rl-wart>*{animation:none}.rl-welcome{transition:none}.rl-wbars .now i{animation:none;width:100%}}" +
     // A group's page: header, filters, receipts by month.
     ".rl-cat-back{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:4px;padding:0 10px 0 0;border-radius:10px;font-weight:600;font-size:17px;color:var(--rl-accent)}.rl-cat-back-i{font-size:22px;line-height:1;margin-top:-2px}" +
     ".rl-cat-back:active{opacity:.6}.rl-cat-back:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
@@ -691,10 +735,12 @@
   function ask(message, yesLabel, onYes) { askBox(message, yesLabel, false, onYes); }
   function askText(message, yesLabel, onText) { askBox(message, yesLabel, true, onText); }
   var back = null;
-  function close() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
+  function dismiss() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
+  // Closing the last page while signed out goes back to the welcome story (and carries it on from where it paused).
+  function close() { dismiss(); if (!load()) mountWelcome(); }
   var pageLaunchers = null;
   function open(build) {
-    close();
+    dismiss();
     var sheet = el("div", { className: "rl-sheet", role: "dialog" });
     back = el("div", { className: "rl-back" }, [sheet]);
     back.addEventListener("click", function (e) { if (e.target === back) close(); });
@@ -765,17 +811,139 @@
   }
 
   // Step 1, signed out: welcome, and how to continue.
-  function signedOutView(sheet) {
+  // ---- Welcome: for anyone signed out, a short story about Relay (four slides on Relay's own colours), then a clean
+  // sign-in page. Every step of signing in and getting started is a full page, not a sheet over the app. ----
+  var WELCOME = [
+    { bg: "#101828", art: "receipts", title: "Every receipt, in one place.", sub: "Relay finds them in your Gmail or Outlook. No scanning, no typing." },
+    { bg: "#E0446E", art: "deadline", title: "Never miss a return.", sub: "Every deadline counts down, with a nudge before it's too late." },
+    { bg: "#4F72E0", art: "price", title: "Catch the price drop.", sub: "Watch what you want. Relay tells you when it's cheaper." },
+    { bg: "#6662D9", art: "wrapped", title: "Your year, wrapped.", sub: "See where your money went, shop by shop." }];
+  // The pictures: made-up shops and things, drawn the way Relay shows your own.
+  function welcomeArt(kind) {
+    var art = el("div", { className: "rl-wart rl-wart-" + kind });
+    art.setAttribute("aria-hidden", "true");
+    var card = function (initial, colour, name, shop, price, extra) {
+      return el("div", { className: "rl-wcard" }, [el("span", { className: "rl-wini", text: initial, style: "background:" + colour }),
+        el("span", { className: "rl-wcard-t" }, [el("b", { text: name }), el("span", { text: shop })]), el("b", { className: "rl-wprice", text: price })].concat(extra || []));
+    };
+    var note = function (text) { return el("div", { className: "rl-wnote" }, [el("img", { src: "icons/icon-192.png", alt: "" }), el("span", { text: text })]); };
+    if (kind === "receipts") {
+      art.appendChild(card("K", "#E0446E", "Court Classic Trainers", "Kick Lane", "£85"));
+      art.appendChild(card("C", "#D47B1F", "Burr Coffee Grinder", "Crema & Co", "£129"));
+      art.appendChild(card("S", "#2E9E5B", "Linen Shirt", "Studio North", "£45"));
+      art.appendChild(el("span", { className: "rl-wpill", text: "3 receipts found" }));
+    } else if (kind === "deadline") {
+      var due = new Date(Date.now() + 3 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      art.appendChild(note("Return the Wool Coat by " + due));
+      var c = card("H", "#101828", "Wool Coat", "Harlow & Co", "£120");
+      c.appendChild(el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "3 days left to return" })]));
+      art.appendChild(c);
+    } else if (kind === "price") {
+      art.appendChild(note("Price drop on Wireless Earbuds"));
+      var p = card("V", "#4F72E0", "Wireless Earbuds", "Voltline", "");
+      p.appendChild(el("div", { className: "rl-wdrop" }, [el("b", { text: "£59" }), el("s", { text: "£79" }), el("span", { text: "£20 less" })]));
+      art.appendChild(p);
+    } else {
+      var grid = el("div", { className: "rl-wtiles" });
+      [["Fashion", "£1,240", "#E0446E"], ["Food & drink", "£860", "#D47B1F"], ["Electronics", "£540", "#4F72E0"], ["Home", "£310", "#2E9E5B"]].forEach(function (t) {
+        grid.appendChild(el("div", { className: "rl-wtile", style: "background:" + t[2] }, [el("span", { text: t[0] }), el("b", { text: t[1] })]));
+      });
+      art.appendChild(el("b", { className: "rl-wyear", text: "Your " + new Date().getFullYear() }));
+      art.appendChild(grid);
+    }
+    return art;
+  }
+  function welcomeWanted() {
+    return !load() && !/[?&](demo|testing|testtools)=1(&|$)/.test(location.search) && !/(?:^|[#&])(signin|gsignin|msignin|gmail|outlook)=/.test(location.hash || "");
+  }
+  // The story's controls while it's on screen: paused while a sign-in page covers it, carried on when that page closes.
+  var welcomeCtl = null;
+  function mountWelcome() {
+    if (document.querySelector(".rl-welcome")) { if (welcomeCtl && !document.querySelector(".rl-back")) welcomeCtl.resume(); return; }
+    if (!welcomeWanted()) return;
+    // i: the slide showing. The timer moves on after DUR; holding (or a sign-in page on top) freezes it and the bar
+    // together, and letting go carries on with the time that was left, so the bar and the slide change stay in step.
+    var i = 0, timer = null, left = 0, t0 = 0, downAt = 0, pressing = false, DUR = 5000, calm = false, LAST = WELCOME.length - 1;
+    try { calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+    var root = el("div", { className: "rl-welcome" });
+    root.setAttribute("role", "dialog"); root.setAttribute("aria-label", "Welcome to Relay"); root.setAttribute("aria-modal", "true");
+    root.tabIndex = -1; // focus sits on the story itself (no ring), so the arrow keys and a screen reader start here
+    var col = el("div", { className: "rl-wcol" });
+    var bars = el("div", { className: "rl-wbars" });
+    WELCOME.forEach(function () { bars.appendChild(el("div", {}, [el("i")])); });
+    var brand = el("div", { className: "rl-wbrand" }, [el("img", { src: "icons/icon-192.png", alt: "" }), el("b", { text: "Relay" })]);
+    var stage = el("div", { className: "rl-wstage" });
+    function arm(ms) { clearTimeout(timer); timer = null; if (calm || i >= LAST) return; left = ms; t0 = Date.now(); timer = setTimeout(function () { timer = null; show(i + 1); }, ms); }
+    function freeze() { if (timer) { clearTimeout(timer); timer = null; left = Math.max(0, left - (Date.now() - t0)); } root.classList.add("held"); }
+    function thaw() { root.classList.remove("held"); if (!timer && !calm && i < LAST) arm(left); }
+    var start = el("button", { type: "button", className: "rl-wgo", text: "Get started", onclick: function () { freeze(); open(function (s) { signedOutView(s); }); } });
+    var have = el("button", { type: "button", className: "rl-whave", text: "I already have an account", onclick: function () { freeze(); open(function (s) { signedOutView(s, { returning: true }); }); } });
+    col.appendChild(bars); col.appendChild(brand); col.appendChild(stage); col.appendChild(el("div", { className: "rl-wact" }, [start, have]));
+    root.appendChild(col);
+    function show(n) {
+      i = Math.max(0, Math.min(LAST, n));
+      var s = WELCOME[i];
+      root.style.background = s.bg;
+      Array.prototype.forEach.call(bars.children, function (b, k) {
+        b.className = k < i ? "done" : k === i ? "now" : "";
+        if (k === i) { var bar = el("i"); bar.style.animationDuration = DUR + "ms"; b.replaceChild(bar, b.firstChild); } // a new bar starts from empty
+      });
+      stage.textContent = "";
+      var slide = el("div", { className: "rl-wslide" }, [welcomeArt(s.art), el("h1", { text: s.title }), el("p", { text: s.sub })]);
+      slide.setAttribute("aria-label", "Slide " + (i + 1) + " of " + WELCOME.length);
+      stage.appendChild(slide);
+      root.classList.toggle("last", i === LAST);
+      root.classList.remove("held");
+      arm(DUR);
+    }
+    // Tap the left third to go back, anywhere else to go on; press and hold to pause (letting go doesn't skip ahead).
+    root.addEventListener("click", function (e) {
+      if (e.target.closest("button") || Date.now() - downAt > 400) return;
+      var r = root.getBoundingClientRect();
+      show(e.clientX - r.left < r.width / 3 ? i - 1 : i + 1);
+    });
+    root.addEventListener("pointerdown", function (e) { if (e.target.closest("button")) return; downAt = Date.now(); pressing = true; freeze(); });
+    var letGo = function () { if (!pressing) return; pressing = false; thaw(); };
+    root.addEventListener("pointerup", letGo); root.addEventListener("pointercancel", letGo);
+    var onKey = function (e) {
+      if (document.querySelector(".rl-back") || (e.target && e.target.closest && e.target.closest("input,textarea,select"))) return;
+      if (e.key === "ArrowRight") show(i + 1); else if (e.key === "ArrowLeft") show(i - 1);
+    };
+    document.addEventListener("keydown", onKey);
+    var focusStory = function () { try { root.focus({ preventScroll: true }); } catch (e) {} };
+    welcomeCtl = {
+      resume: function () { thaw(); focusStory(); },
+      stop: function () { clearTimeout(timer); timer = null; document.removeEventListener("keydown", onKey); }
+    };
+    document.body.appendChild(root); document.body.classList.add("rl-welcoming");
+    show(0); focusStory();
+  }
+  function unmountWelcome() {
+    if (welcomeCtl) { welcomeCtl.stop(); welcomeCtl = null; }
+    var w = document.querySelector(".rl-welcome");
+    if (w) w.remove();
+    document.body.classList.remove("rl-welcoming");
+  }
+  // The sign-in page: Relay's icon, one heading, three equal ways in, Face ID quietly underneath, and the legal line.
+  // Signing in and creating an account are the same steps, so the heading just matches the button that led here.
+  function signedOutView(sheet, opts) {
+    opts = opts || {};
     signInExtra = {};
-    var body = jFrame(sheet, { kicker: "WELCOME TO RELAY", title: "Everything you buy, in one place.", sub: "Relay finds your receipts in your email, keeps track of return deadlines and tells you when prices drop. No password needed." });
+    var fromWelcome = Boolean(document.querySelector(".rl-welcome"));
+    var body = jFrame(sheet, { back: fromWelcome ? close : null, noClose: fromWelcome,
+      title: opts.returning ? "Welcome back" : "Create your account",
+      sub: opts.returning ? "Sign in the way you did last time. No password needed." : "Use the email you shop with. No password needed." });
+    sheet.classList.add("rl-signin");
+    body.insertBefore(el("img", { className: "rl-jlogo", src: "icons/icon-192.png", alt: "Relay" }), body.firstChild);
     var msg = el("div", { className: "rl-msg" });
-    var gBtn = el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with Google", onclick: function () { providerStep(sheet, "google"); } });
-    var mBtn = el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with Microsoft", onclick: function () { providerStep(sheet, "microsoft"); } });
-    var mHint = el("p", { className: "rl-jnote", text: "Microsoft works with Outlook, Hotmail and Live addresses." });
-    gBtn.style.display = mBtn.style.display = mHint.style.display = "none";
-    var eBtn = el("button", { type: "button", className: "rl-btn ghost", text: "Continue with email", onclick: function () { emailStep(sheet); } });
-    [gBtn, mBtn, mHint, eBtn].forEach(function (n) { body.appendChild(n); });
-    if (passkeysSupported()) body.appendChild(passkeyButton(msg));
+    var choices = el("div", { className: "rl-choices" });
+    var gBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Google", onclick: function () { providerStep(sheet, "google"); } });
+    var mBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Microsoft", onclick: function () { providerStep(sheet, "microsoft"); } });
+    gBtn.style.display = mBtn.style.display = "none";
+    var eBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with email", onclick: function () { emailStep(sheet); } });
+    [gBtn, mBtn, eBtn].forEach(function (n) { choices.appendChild(n); });
+    body.appendChild(choices);
+    if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; body.appendChild(pk); }
     body.appendChild(msg);
     var legal = el("p", { className: "rl-jlegal" });
     legal.appendChild(document.createTextNode("By continuing you agree to Relay's "));
@@ -787,7 +955,7 @@
     signInProviders().then(function (p) {
       if (!document.body.contains(body)) return;
       if (p && p.google) gBtn.style.display = "";
-      if (p && p.microsoft) { mBtn.style.display = ""; mHint.style.display = ""; }
+      if (p && p.microsoft) mBtn.style.display = "";
       if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
     });
   }
@@ -4166,6 +4334,10 @@
       setTimeout(function () { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (x) {} }, 300);
     });
   }
-  function start() { keyboardWatch(); if (load()) keepStorage(); bind(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); }); }
+  function start() {
+    keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail();
+    window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); });
+    window.addEventListener("relay:session", function () { if (load()) unmountWelcome(); else mountWelcome(); });
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();

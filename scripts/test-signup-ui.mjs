@@ -1,5 +1,6 @@
 // Browser test: the sign-up journey. Stubbed Relay server, FAKE Google/Microsoft pages, made-up people.
-// Checks: Google (and Microsoft) sign in AND connect the inbox in one visit after the wording is agreed, so nobody signs in
+// Checks: a first visit opens on the welcome story (four slides; tap, hold or arrow keys; readable on every colour), then
+// a clean sign-in page with the three ways in, and Back returns to the story; Google (and Microsoft) sign in AND connect the inbox in one visit after the wording is agreed, so nobody signs in
 // twice; the scan starts at once and its count shows while the name is added; the name Google gave is offered, not saved
 // unasked; email sign-in with a Gmail address points to the one-step route; email-link people connect once and come back
 // to "You're all set"; someone already set up goes straight to Home; every step passes the polish rules.
@@ -70,14 +71,72 @@ const backFrom = async (host, hash) => {
   await page.goto(origin + "/index.html" + hash);
 };
 
-// 1. Google, one step: welcome → what Relay does → (Google once) → name, with the scan already counting → all set.
+// 0. A first visit opens on the welcome story: four short slides, then the way in.
 await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
-await sheet.getByRole("heading", { name: "Everything you buy, in one place." }).waitFor();
+const story = page.locator(".rl-welcome");
+const titleNow = () => story.locator("h1").innerText();
+const titleIs = t => story.locator("h1", { hasText: t }).waitFor({ timeout: 8000 });
+await titleIs("Every receipt, in one place.");
+assert.equal(await story.locator(".rl-wbars > div").count(), 4, "four slides, a bar for each");
+assert.equal(await page.evaluate(() => !!document.activeElement && document.activeElement.classList.contains("rl-welcome")), true, "focus starts on the story itself, so a screen reader and the arrow keys start there");
+// Each slide: readable on its colour, nothing tiny, both buttons a proper size.
+const storyPolish = () => page.evaluate(() => {
+  const rgb = c => c.match(/[\d.]+/g).map(Number);
+  const over = (fg, bg) => { const [r, g, b, a = 1] = rgb(fg), [R, G, B] = rgb(bg); return `rgb(${r * a + R * (1 - a)},${g * a + G * (1 - a)},${b * a + B * (1 - a)})`; };
+  const lum = c => { const f = v => (v /= 255) <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); const [r, g, b] = rgb(c); return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const root = document.querySelector(".rl-welcome"), bg = getComputedStyle(root).backgroundColor, out = { small: [], tiny: [], dim: [] };
+  for (const b of root.querySelectorAll("button")) if (b.getBoundingClientRect().height < 44) out.small.push(b.innerText);
+  for (const n of root.querySelectorAll("*")) {
+    if (![...n.childNodes].some(c => c.nodeType === 3 && c.textContent.trim())) continue;
+    if (parseFloat(getComputedStyle(n).fontSize) < 13) out.tiny.push(n.textContent.trim());
+  }
+  // Headline, line under it (19px bold: large text, 3:1) and the second button's words (4.5:1) against the slide's colour.
+  for (const [sel, min] of [[".rl-wslide h1", 3], [".rl-wslide p", 3], [".rl-wbrand b", 3], [".rl-whave", 4.5]]) {
+    const n = root.querySelector(sel), s = getComputedStyle(n), back = over(s.backgroundColor, bg), r = ratio(s.color, back);
+    if (r < min) out.dim.push(sel + " " + r.toFixed(2));
+  }
+  return out;
+});
+for (let k = 0; k < 4; k++) {
+  if (k) await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(650); // the colour change has finished
+  assert.deepEqual(await storyPolish(), { small: [], tiny: [], dim: [] }, "slide " + (k + 1) + ": " + await titleNow());
+  await page.screenshot({ path: "/tmp/shots/signup-0-story-" + (k + 1) + ".png" });
+}
+assert.equal(await titleNow(), "Your year, wrapped.", "the arrow keys move through the slides");
+// Tapping the left third goes back, anywhere else goes on.
+const vp = page.viewportSize();
+await page.mouse.click(vp.width * 0.1, vp.height * 0.4); await titleIs("Catch the price drop.");
+await page.mouse.click(vp.width * 0.1, vp.height * 0.4); await titleIs("Never miss a return.");
+await page.mouse.click(vp.width * 0.8, vp.height * 0.4); await titleIs("Catch the price drop.");
+// Holding pauses it, and letting go doesn't skip a slide; left alone, it moves on by itself.
+await page.mouse.move(vp.width * 0.8, vp.height * 0.4); await page.mouse.down(); await page.waitForTimeout(800);
+assert.equal(await story.evaluate(n => n.classList.contains("held")), true, "holding pauses the story");
+await page.mouse.up(); await page.waitForTimeout(200);
+assert.equal(await titleNow(), "Catch the price drop.", "letting go after a hold stays on the slide");
+await titleIs("Your year, wrapped."); // within a few seconds, by itself
+console.log("ok - the welcome story: four slides by tap, hold or arrow keys, moving on by itself, readable on every colour");
+
+// 1. Google, one step: the story → "Get started" → the sign-in page → (Google once) → name, with the scan counting → all set.
+await story.getByRole("button", { name: "Get started" }).click();
+await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.getByRole("button", { name: "Continue with Google" }).waitFor();
 assert.ok(await sheet.getByRole("button", { name: "Continue with Microsoft" }).isVisible());
+assert.ok(await sheet.getByRole("button", { name: "Continue with email" }).isVisible());
 assert.ok(await sheet.getByRole("link", { name: "Terms of use" }).count() && await sheet.getByRole("link", { name: "Privacy policy" }).count(), "terms and privacy linked before anything is agreed");
-await polished("welcome"); await page.screenshot({ path: "/tmp/shots/signup-1-welcome.png" });
+assert.equal(await sheet.getByRole("button", { name: "Close" }).count(), 0, "from the story, the way out is Back");
+await polished("sign-in page"); await page.screenshot({ path: "/tmp/shots/signup-1-signin.png" });
+// Back returns to the story; "I already have an account" opens the same three ways in, worded for coming back.
+await sheet.getByRole("button", { name: "Back" }).click();
+await story.getByRole("button", { name: "I already have an account" }).click();
+await sheet.getByRole("heading", { name: "Welcome back" }).waitFor();
+await sheet.getByRole("button", { name: "Continue with email" }).waitFor();
+await polished("sign-in page, coming back");
+await sheet.getByRole("button", { name: "Back" }).click();
+assert.equal(await sheet.count(), 0);
+await story.getByRole("button", { name: "Get started" }).click();
+await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.getByRole("button", { name: "Continue with Google" }).click();
 await sheet.getByRole("heading", { name: "Sign in and bring in your receipts" }).waitFor();
 await sheet.getByText(CONSENT.text[1]).waitFor();
@@ -103,6 +162,7 @@ assert.equal(st.connects, 0, "no second visit to Google to connect Gmail");
 assert.equal(st.consentPosts, 0, "the agreement made before Google isn't asked for again");
 assert.ok(st.scanCalls >= 3, "the scan ran from the start");
 assert.equal((await page.locator(".avatar").first().textContent()).trim(), "JT", "both initials straight away");
+assert.equal(await story.count(), 0, "signed in: the welcome story has gone");
 await polished("all set"); await page.screenshot({ path: "/tmp/shots/signup-4-done.png" });
 await sheet.getByRole("button", { name: "See my receipts" }).click();
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
@@ -123,7 +183,7 @@ console.log("ok - someone already set up lands on Home");
 // (agreeing there), and coming back from Google lands on "You're all set".
 await page.evaluate(() => localStorage.clear()); reset({ email: "sam.new@gmail.com" });
 await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
+await page.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("button", { name: "Continue with email" }).click();
 await page.locator("#rl-signin-email").fill("sam.new@gmail.com");
 await sheet.getByText(/Using Gmail\? Continue with Google instead/).waitFor();
@@ -162,7 +222,7 @@ console.log("ok - email sign-in: Gmail users are pointed to the one-step route; 
 // 4. Microsoft, one step, and "Later" for the name: never asked again on this device.
 await page.evaluate(() => localStorage.clear()); reset({ email: "amy@outlook.com" });
 await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
+await page.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("button", { name: "Continue with Microsoft" }).click();
 st.verify = { mailConnected: "microsoft", outlookConnected: true };
 st.onVerify = { connected: true, provider: "microsoft", accepted: true };
@@ -184,7 +244,7 @@ console.log("ok - Microsoft: one step too; a skipped name isn't asked again");
 // 5. "Just sign in" for people who already use Relay: no agreement sent, no inbox requested.
 await page.evaluate(() => localStorage.clear()); reset();
 await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
+await page.getByRole("button", { name: "I already have an account" }).click();
 await sheet.getByRole("button", { name: "Continue with Google" }).click();
 await sheet.getByRole("button", { name: "Just sign in for now" }).click();
 await page.waitForURL(/accounts\.google\.com/);
@@ -192,5 +252,5 @@ assert.equal(st.starts[0].consentVersion, undefined, "identity only");
 console.log("ok - 'Just sign in for now' asks Google for nothing but who you are");
 
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS sign-up journey: one visit to Google or Microsoft, scan from the start, name step, email route, returning people skip it");
+console.log("PASS sign-up journey: the welcome story and sign-in page, one visit to Google or Microsoft, scan from the start, name step, email route, returning people skip it");
 await browser.close(); server.close();

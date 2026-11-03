@@ -139,9 +139,9 @@ await page.getByRole("button", { name: "Confirm number" }).click();
 await page.getByText("That code isn't right, or it has expired.").waitFor();
 assert.equal(await page.locator("#rl-phone-code").inputValue(), "", "cleared for the next try");
 await paste("#rl-phone-code", TEXT("123456"));
+await page.getByText("Number confirmed.").waitFor(); // (waiting on this, not "number ending 123", which the code step already says)
 await page.getByText("Number ending 123").waitFor();
 assert.deepEqual(st.confirms, ["99999", "123456"], "pasting the whole text sends just the code, by itself");
-await page.getByText("Number confirmed.").waitFor();
 await page.getByRole("button", { name: "Text me a code when I sign in" }).waitFor();
 await polished("phone: confirmed"); await shot("confirmed");
 console.log("ok - adding a number: UK mobiles only, a texted code (pasted whole, it keeps just the code and sends itself), a wait before another text");
@@ -180,7 +180,7 @@ console.log("ok - codes by text: switched on with a code texted now, recovery co
 // 4. Signing in with codes by text: "Check your phone", the code texted at once, finished by the texted code.
 reset({ ending: "123", twoStep: true, left: 8 });
 await page.evaluate(() => localStorage.clear()); await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
+await page.getByRole("button", { name: "I already have an account" }).click();
 await page.getByRole("button", { name: "Continue with email" }).click();
 await page.locator("#rl-signin-email").fill(EMAIL);
 await page.getByRole("button", { name: "Email me a sign-in link" }).click();
@@ -205,7 +205,7 @@ console.log("ok - signing in: 'Check your phone', the code texted once, straight
 // 5. With the authenticator app: "Enter your code", and a recovery code if the phone is lost.
 reset({ ending: "123", twoStep: false, app: true, left: 8, methods: ["app"] });
 await page.evaluate(() => localStorage.clear()); await page.goto(origin + "/index.html");
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
+await page.getByRole("button", { name: "I already have an account" }).click();
 await page.getByRole("button", { name: "Continue with email" }).click();
 await page.locator("#rl-signin-email").fill(EMAIL);
 await page.getByRole("button", { name: "Email me a sign-in link" }).click();

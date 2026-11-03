@@ -51,15 +51,18 @@ const viewText = () => page.locator("#view").innerText();
 const tabs = () => page.locator(page.viewportSize().width < 760 ? "#foot button" : "#side button").allInnerTexts();
 const lit = () => page.locator("#foot button.active").innerText();
 
-// 1. A new visitor: Home first, welcoming them; four tabs; nothing that reads like a test build.
+// 1. A new visitor: the welcome story first, then a clean sign-in page; four tabs behind; nothing that reads like a test build.
 await page.goto(origin + "/index.html");
-await page.getByRole("heading", { name: "Welcome to Relay" }).waitFor();
+const story = page.locator(".rl-welcome");
+await story.getByRole("heading", { name: "Every receipt, in one place." }).waitFor();
 assert.deepEqual((await tabs()).map(t => t.trim()), ["Home", "Receipts", "Discover", "Profile"]);
-assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES);
-await page.getByRole("button", { name: "Sign in or create an account" }).click();
-await page.locator(".rl-sheet").waitFor();
-await page.keyboard.press("Escape").catch(() => {});
-console.log("ok - a new visitor lands on Home with a welcome and four tabs");
+for (let k = 0; k < 4; k++) { assert.doesNotMatch(await story.innerText(), SHOPPER_NEVER_SEES, "slide " + (k + 1)); await page.keyboard.press("ArrowRight"); }
+await story.getByRole("button", { name: "Get started" }).click();
+await page.locator(".rl-sheet").getByRole("heading", { name: "Create your account" }).waitFor();
+assert.doesNotMatch(await page.locator(".rl-sheet").innerText(), SHOPPER_NEVER_SEES);
+await page.locator(".rl-sheet").getByRole("button", { name: "Back" }).click();
+await story.getByRole("button", { name: "Get started" }).waitFor();
+console.log("ok - a new visitor sees the welcome story, then a clean sign-in page");
 
 // 2. Signed in: Home has the person, their wallet and price alerts.
 await page.evaluate(e => {
@@ -198,12 +201,13 @@ await p2.goto(origin + "/index.html");
 await p2.locator("#homeHello", { hasText: "Jess" }).waitFor();
 await p2.locator(".avatar").click();
 await p2.getByRole("button", { name: "Sign out" }).click();
-await p2.getByRole("heading", { name: "Welcome to Relay" }).waitFor();
+await p2.locator(".rl-welcome").getByRole("heading", { name: "Every receipt, in one place." }).waitFor();
 await p2.goto(origin + "/index.html#signin=" + "L".repeat(43));
 await p2.locator("#homeHello", { hasText: "Jess" }).waitFor();
 await p2.waitForTimeout(800);
 assert.equal(await p2.locator(".rl-sheet").count(), 0, "already set up (name, email connected): straight to Home, no sign-up steps");
-console.log("ok - signing out shows the welcome screen, signing in by email link shows Home, without reloading");
+assert.equal(await p2.locator(".rl-welcome").count(), 0, "signed in: the story has gone");
+console.log("ok - signing out shows the welcome story, signing in by email link shows Home, without reloading");
 
 // 10. The ?testing=1 tools keep their Wallet tab.
 await p2.goto(origin + "/index.html?testing=1");
