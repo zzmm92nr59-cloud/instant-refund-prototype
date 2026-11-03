@@ -146,6 +146,8 @@ assert.doesNotMatch(sheet, /Swap & resell|TEST MODE|Card for swaps|No purchases 
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
 // Someone who saved a card during a test-mode swap can always find it again to remove it (labelled as test mode).
 cardSaved = true;
+// The card was saved away from this screen, so the app learns about it the next time it opens (reads are reused for a minute).
+await page.reload();
 await page.locator(".avatar").click();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByRole("button", { name: "Remove card" }).waitFor();
