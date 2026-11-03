@@ -87,6 +87,10 @@ async function fromHomePage(domain) {
   return out;
 }
 const googleCopy = domain => "https://www.google.com/s2/favicons?domain=" + domain + "&sz=256";
+// DuckDuckGo's copy is the shop's own favicon.ico, which often holds a 32px or 48px picture Google doesn't have. For a site
+// it doesn't know it sends a stand-in picture, which is recognised and skipped.
+const duckCopy = domain => "https://icons.duckduckgo.com/ip3/" + domain + ".ico";
+let duckStandIn = null;
 async function candidates(domain) {
   if (overrides[domain] === "google") return [googleCopy(domain)];
   const page = await fromHomePage(domain);
@@ -94,7 +98,7 @@ async function candidates(domain) {
   const list = [...page.slice(0, 6).map(x => x.u),
     "https://" + domain + "/apple-touch-icon.png", "https://www." + domain + "/apple-touch-icon.png",
     "https://" + domain + "/favicon.ico", "https://www." + domain + "/favicon.ico",
-    googleCopy(domain)];
+    googleCopy(domain), duckCopy(domain)];
   return [...new Set(list)];
 }
 const score = (p, k) => Math.min(p, 512) + (k === "png" || k === "svg" ? 40 : k === "ico" ? 0 : 20);
@@ -120,6 +124,7 @@ async function worker() {
       if (r.status >= 400) { why.push(u + " http " + r.status); continue; }
       const k = kind(r.b);
       if (!k) { why.push(u + " not a picture"); continue; }
+      if (u.startsWith("https://icons.duckduckgo.com/") && duckStandIn && r.b.equals(duckStandIn)) { why.push(u + " stand-in"); continue; }
       if (r.b.length > MAX_BYTES) { why.push(u + " too big"); continue; }
       const p = px(r.b, k);
       if (!p || p < 32) { why.push(u + " " + (p || "?") + "px"); continue; }
@@ -138,6 +143,7 @@ async function worker() {
     }
   }
 }
+{ const r = await grab(duckCopy("no-such-shop-" + Date.now() + ".co.uk")); duckStandIn = r.b && r.status < 400 ? r.b : null; }
 await Promise.all(Array.from({ length: 8 }, worker));
 // Shops no longer on the list are dropped from the report (their files stay until removed by hand).
 report.total = stores.length; report.found = stores.filter(d => existing(d)).length;
