@@ -329,7 +329,12 @@ const nameFits = (name, domain) => { const n = letters(name), b = domainBase(dom
 // Web addresses of well-known shops that often email through a payment or ordering company, so the email itself doesn't
 // carry the shop's own address. Used only to find the shop's logo; anything not listed gets a drawing in the app instead.
 const SHOP_DOMAINS = {
-  mcdonalds: "mcdonalds.com", tortilla: "tortilla.co.uk", anthropic: "anthropic.com", elevenlabs: "elevenlabs.io", lner: "lner.co.uk",
+  mcdonalds: "mcdonalds.com", tortilla: "tortilla.co.uk", gordonramsayrestaurants: "gordonramsayrestaurants.com", gordonramsay: "gordonramsayrestaurants.com",
+  uberboat: "thamesclippers.com", thamesclippers: "thamesclippers.com", coachinginngroup: "coachinginngroup.co.uk",
+  // Shops people often pay for with Klarna, Clearpay or PayPal, whose emails then come from the payment company.
+  lululemon: "lululemon.com", asos: "asos.com", zara: "zara.com", nike: "nike.com", adidas: "adidas.co.uk", jdsports: "jdsports.co.uk",
+  boohoo: "boohoo.com", prettylittlething: "prettylittlething.com", schuh: "schuh.co.uk", footlocker: "footlocker.co.uk", endclothing: "endclothing.com",
+  newlook: "newlook.com", riverisland: "riverisland.com", sportsdirect: "sportsdirect.com", gymshark: "gymshark.com", hm: "hm.com", anthropic: "anthropic.com", elevenlabs: "elevenlabs.io", lner: "lner.co.uk",
   tedbaker: "tedbaker.com", pret: "pret.co.uk", pretamanger: "pret.co.uk", leon: "leon.co", wagamama: "wagamama.com", nandos: "nandos.co.uk",
   fiveguys: "fiveguys.co.uk", itsu: "itsu.com", wasabi: "wasabi.uk.com", costa: "costa.co.uk", costacoffee: "costa.co.uk", starbucks: "starbucks.co.uk",
   caffenero: "caffenero.com", greggs: "greggs.co.uk", gails: "gailsbread.co.uk", dishoom: "dishoom.com", honestburgers: "honestburgers.co.uk",

@@ -6,7 +6,7 @@
 // ---- Who sent it on the shop's behalf ---------------------------------------------------------------------------------
 // Payment, ordering and email companies that send receipts for other businesses. Their name and web address say nothing
 // about the shop, so they never count as the shop (the shop's own name in the email does).
-export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com)$/i;
+export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|klarna\.(com|co\.uk)|giftpro\.co\.uk|mytoggle\.io|ventrata\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com)$/i;
 export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCase());
 
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
@@ -144,12 +144,14 @@ export function shopNamesInText(text, subject) {
     /\bthanks?(?: you)? for (?:shopping|ordering|your (?:order|purchase)) (?:with|from|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,\n]|$)/g,
     /\b(?:your|an?) (?:order|receipt|purchase) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,\n]| has| is|$)/g,
     /\breceipt from ([A-Z][\w&'’. -]{1,38}?)(?:[.!,\n]|$)/g,
+    // A pay-later or payment company's email names the shop it paid: "Payment received for lululemon".
+    /\bpayment (?:received |made |sent )?(?:for|to) (\p{L}[\w&'’. -]{1,38}?)(?:[.!,\n]|$)/giu,
     /©\s*(?:\d{4}\s*(?:[-–]\s*\d{4}\s*)?)?([A-Z][\w&'’. -]{1,38}?)(?:\s*(?:ltd|limited|plc|llc|inc)\.?)?(?:[.,|\n]|\s+all rights|$)/gi,
   ]) for (const m of body.matchAll(re)) grab(m[1]);
   const s = String(subject || "");
   const sm = s.match(/\b(?:your|an?) ([A-Z][\w&'’.-]{1,25}(?: [A-Z][\w&'’.-]{1,20}){0,2}) (?:order|receipt)\b/) || s.match(/\b(?:order|receipt) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,]|$| #| -)/);
   if (sm) grab(sm[1]);
-  return out.filter((n) => !/^(the|your|our|this|us|you|an?|order|receipt|all rights)$/i.test(n)).slice(0, 6);
+  return out.filter((n) => !/^(the|your|our|this|us|you|an?|order|receipt|all rights)$/i.test(n) && !/^(your|our|this|an?) /i.test(n) && !/^the (order|payment|amount|total|items?|balance)\b/i.test(n)).slice(0, 6);
 }
 
 // A forwarded email names the shop that sent the original: "From: lululemon <orders@e.lululemon.com>". Each email app
@@ -197,7 +199,7 @@ export function mainLinkDomain(html) {
 // Lines that sit where an item would but are not things that were bought: how it was paid, money saved or refunded,
 // labels from the receipt's table, and anything carrying a card number.
 const PAYMENT = /\b(visa|mastercard|master card|amex|american express|maestro|debit card|credit card|apple ?pay|google ?pay|samsung pay|paypal|klarna|clearpay|laybuy|afterpay|card ending|card number|card payment|payment method|paid (?:with|by|using)|contactless|chip (?:and|&) pin)\b/i;
-const MONEY_WORDS = /^(?:you(?:'|’)?ve saved|you(?:'|’)?ve save|you saved|you save|savings?|total savings|was|now|rrp|refund|item refund|refunded|refund amount|credit(?=\s*(?:applied|balance|note|used|:|$))|store credit|account credit|vouchers?|gift ?cards?(?: balance)?|e-?gift balance|promos?(?: applied)?|promo(?:tion(?:al)?)? (?:code|discount)|discount(?: code)?|coupon|offers?(?: applied)?|tip|gratuity|service charge|bag charge|carrier bag|delivery(?: charge| fee)?|postage(?: (?:and|&) packing)?|shipping|subtotal|sub total|total|vat|tax|balance|amount(?: due| paid)?|deposit|change|cashback|points|nectar|clubcard)\b/i;
+const MONEY_WORDS = /^(?:left to pay|amount left|still to pay|you(?:'|’)?ve saved|you(?:'|’)?ve save|you saved|you save|savings?|total savings|was|now|rrp|refund|item refund|refunded|refund amount|credit(?=\s*(?:applied|balance|note|used|:|$))|store credit|account credit|vouchers?|gift ?cards?(?: balance)?|e-?gift balance|promos?(?: applied)?|promo(?:tion(?:al)?)? (?:code|discount)|discount(?: code)?|coupon|offers?(?: applied)?|tip|gratuity|service charge|bag charge|carrier bag|delivery(?: charge| fee)?|postage(?: (?:and|&) packing)?|shipping|subtotal|sub total|total|vat|tax|balance|amount(?: due| paid)?|deposit|change|cashback|points|nectar|clubcard)\b/i;
 const LABEL_ONLY = /^(?:from|to|card|item|items|product|products|qty|quantity|price|unit price|each|description|summary|order|order summary|order details|details|name|size|colou?r|sku|ref|reference|date|time|status|ordered|dispatched|delivered|sold by|seller|item no|article|style|code)(?:\s*[:#]?\s*\d+)?(?:\s+(?:price|qty|quantity|each|total|item|items))*\s*$/i;
 const CARD_DIGITS = /\d{4,}[*•xX]{3,}|[*•]{3,}\s?\d{2,}|\b(?:x{3,}|\*{3,})\d{3,4}\b/;
 // Partner offers some shops list with the order ("10% off sitewide at Ninja!", "Free SimplyCook box",
