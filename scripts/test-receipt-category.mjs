@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey, shopDisplayName } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor } from "../worker/receipt-category.js";
 import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
@@ -77,5 +77,13 @@ t("shops that used to land in Other", () => {
   assert.equal(c("Meta", "email.meta.com").category, "digital");
   // "Meta" counts only as the whole name, not as one word in another company's.
   assert.equal(c("Meta Materials Ltd", "metamaterials.test").category, "other");
+});
+t("game web shops: each receipt keeps the game it names, with no web-shop logo", () => {
+  const cards = [{ retailer: { name: "Example Quest", domain: "appcharge.com" } }, { retailer: { name: "Example Quest", domain: "appcharge.com" } },
+    { retailer: { name: "Other Game", domain: "appcharge.com" } }, { retailer: { name: "Appcharge", domain: "appcharge.com" } }];
+  assert.equal(agreedShopNames(cards).has("appcharge.com"), false, "no one name for every game sold through it");
+  assert.equal(logoDomainFor({ name: "Example Quest", domain: "appcharge.com" }), null);
+  assert.equal(logoDomainFor({ name: "Appcharge", domain: "appcharge.com" }), "appcharge.com");
+  assert.equal(c("Example Quest", "appcharge.com", ["2,200 Coins"]).category, "digital");
 });
 console.log(`\n${n} category tests passed`);

@@ -4,7 +4,7 @@
 // How the guess is made: every clue adds points to a group (a shop Relay knows 6, each item 3, words in the shop's name
 // or web address 2, a shop that sells everything 1.5, weak item words such as colours and flavours 1), and the group
 // with the most points wins. Nothing scores: Other.
-import { cleanShopName, isVia, looksLikePerson, nameFromDomain, domainBase as readerBase } from "./receipt-reader.js";
+import { cleanShopName, isVia, looksLikePerson, nameFromDomain, domainBase as readerBase, GAME_SHOP } from "./receipt-reader.js";
 export const CATEGORIES = {
   fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden",
   beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other",
@@ -311,7 +311,8 @@ export function agreedShopNames(cards) {
   const votes = new Map();
   for (const c of cards || []) {
     const r = (c && c.retailer) || {}, d = String(r.domain || "").toLowerCase().replace(/["'<>]/g, "");
-    if (!d || isVia(d) || PERSONAL_MAIL.test(d)) continue;
+    // (A game web shop sells for many games: each receipt keeps the game it names.)
+    if (!d || isVia(d) || PERSONAL_MAIL.test(d) || GAME_SHOP.test(d)) continue;
     const shown = shopDisplayName(r);
     if (!shown) continue;
     const raw = cleanShopName(r.name);
@@ -343,6 +344,8 @@ const nameWords = (s) => String(s || "").toLowerCase().normalize("NFKD").replace
 export function logoDomainFor(retailer) {
   const r = retailer || {};
   const d = String(r.domain || "").toLowerCase().replace(/[^a-z0-9.-]/g, "");
+  // A game web shop's logo is not the game's: the app draws one instead.
+  if (d && GAME_SHOP.test(d) && r.name && !/appcharge|xsolla/i.test(r.name)) return null;
   if (d && !isVia(d) && !PERSONAL_MAIL.test(d)) return d;
   // A forwarded receipt carries a person's name, not a shop's: no logo from it.
   if (PERSONAL_MAIL.test(d)) return null;
