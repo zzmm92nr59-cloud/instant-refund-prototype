@@ -17,7 +17,9 @@ const receipts = [
 ];
 const shopProducts = [
   { product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify-v-1", priceMinor: 8500, currency: "GBP", quantity: 4, storeName: "Kick Lane", shopDomain: "kick-lane.myshopify.com" },
-  { product: "Canvas Tote", variation: "Natural", catalogueId: "shopify-v-2", priceMinor: 2400, currency: "GBP", quantity: 30, storeName: "Kick Lane", shopDomain: "kick-lane.myshopify.com" }
+  { product: "Canvas Tote", variation: "Natural", catalogueId: "shopify-v-2", priceMinor: 2400, currency: "GBP", quantity: 30, storeName: "Kick Lane", shopDomain: "kick-lane.myshopify.com" },
+  // Another size of the same trainers: one card per product, with its sizes on the product page.
+  { product: "Court Classic Trainers", variation: "White / UK 9", catalogueId: "shopify-v-3", priceMinor: 8500, currency: "GBP", quantity: 0, storeName: "Kick Lane", shopDomain: "kick-lane.myshopify.com" }
 ];
 const sandboxProducts = [{ product: "Sandbox Hoodie", variation: "M", sku: "DEMO-SBX-1", priceMinor: 4000, currency: "GBP", storeName: "Relay Ltd test shop", provider: "square_sandbox", quantity: 3 }];
 let cardSaved = false;
@@ -88,17 +90,25 @@ await page.locator('[data-card-select="shopify-v-1"]').waitFor();
 t = await viewText();
 assert.doesNotMatch(t, SHOPPER_NEVER_SEES);
 assert.ok(!t.includes("Sandbox Hoodie") && !t.includes("Retro High Trainers"), "no sandbox or made-up products");
-assert.equal(await page.locator("[data-card-select]").count(), 2);
+assert.equal(await page.locator("[data-card-select]").count(), 2, "one card per product, not one per size");
+assert.equal(await page.locator('#view img[src*="unsplash"]').count(), 0, "no stock photos: the shop's own picture or a drawing");
+assert.equal(await page.locator('[data-card-select="shopify-v-1"] .rl-ill').count(), 1, "a product with no photo gets a drawing of what it is");
+// Signed in with picks switched off: an invitation to turn them on, saying what they use.
+await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
 assert.match(await page.locator('[data-card-select="shopify-v-1"]').innerText(), /KICK LANE|Kick Lane/i);
 assert.match(await page.locator('[data-card-select="shopify-v-1"]').innerText(), /Only 4 left/);
 await page.locator('[data-card-select="shopify-v-1"]').click();
 await page.getByRole("heading", { name: "Court Classic Trainers" }).waitFor();
 assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES);
+// Every size is on the product page; one that's run out says so.
+await page.getByRole("button", { name: "White / UK 8", exact: true }).waitFor();
+await page.getByRole("button", { name: "White / UK 9 Sold out" }).waitFor();
 await page.getByRole("button", { name: "Watch price", exact: true }).click();
 await page.getByRole("button", { name: "Watching · tap to stop" }).waitFor();
 await page.screenshot({ path: "/tmp/shots/launch-product.png" });
 await page.getByRole("button", { name: "Back", exact: true }).click();
-await page.locator('[data-watch="shopify-v-1"]', { hasText: "Watching" }).waitFor();
+await page.locator('[data-watch="shopify-v-1"][aria-pressed="true"]').waitFor();
+assert.equal(await page.locator('[data-card-select] [data-watch]').count(), 0, "the watch button sits beside the card, never a button inside a button");
 // Searching for something that isn't there says so plainly.
 await page.locator("#query").fill("zzz");
 await page.getByText("Nothing matches that").waitFor();

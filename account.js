@@ -208,6 +208,32 @@
     box.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 28) + '" height="' + (px || 28) + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
       ILL[key].replace(/<(path|rect|circle)\b/g, '<$1 pathLength="1"') + "</svg>";
   }
+  // The kind of shopping a thing belongs to, from its drawing: used by Discover to sort products into kinds.
+  var ILL_KIND = { shoe: "fashion", jacket: "fashion", dress: "fashion", trousers: "fashion", tshirt: "fashion", gem: "fashion", bag: "fashion",
+    phone: "electronics", headphones: "electronics", gamepad: "electronics", laptop: "electronics", plug: "electronics",
+    bed: "home", sofa: "home", lamp: "home", candle: "home", flower: "home", pan: "home", wrench: "home", paw: "pets",
+    perfume: "beauty", lipstick: "beauty", jar: "beauty", pill: "beauty", shaker: "beauty",
+    cup: "food", pint: "food", wine: "food", pizza: "food", burger: "food", bowl: "food", cake: "food", basket: "food", delivery: "food" };
+  // A drawing as markup, for pages built as text (Discover). Same drawings, colours and movement as on receipts.
+  function drawingHtml(key, category, px) {
+    var c = CAT_ICONS[category] || CAT_ICONS.other;
+    if (!ILL[key]) key = "shop";
+    return '<span class="rl-ill ill-' + key + '" data-ill="' + key + '" aria-hidden="true" style="background:' + c[0] + ";color:" + c[1] + '"><svg viewBox="0 0 24 24" width="' + (px || 48) + '" height="' + (px || 48) +
+      '" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + ILL[key].replace(/<(path|rect|circle)\b/g, '<$1 pathLength="1"') + "</svg></span>";
+  }
+  // What the shopper spent this year by kind of shopping (the same figures as Wrapped), for Discover's picks.
+  function spendProfile() {
+    var s = load();
+    if (!s || !s.token) return Promise.resolve(null);
+    var year = new Date().getFullYear();
+    return cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
+      if (!r.ok || !r.body || !r.body.receipts) return null;
+      var w = r.body, total = (w.industries || []).reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
+      return { year: year, total: total,
+        kinds: (w.industries || []).filter(function (k) { return k.spentPence > 0; }).map(function (k) { return { category: k.category, label: k.label, spentPence: k.spentPence, share: total ? k.spentPence / total : 0 }; }),
+        shops: (w.topShops || []).map(function (t) { return t.name; }) };
+    }, function () { return null; });
+  }
   // Where the shop's logo comes from (the server says; older saved lists only have the shop's address).
   function logoDom(x) { var r = (x && x.retailer) || {}; return r.logoDomain !== undefined ? r.logoDomain : r.domain; }
   // A receipt's picture: the item's own photo when Relay checked it's of the item, else the shop's logo, else a drawing.
@@ -2268,7 +2294,7 @@
     }
     function deletePage(b) {
       var note = el("div", { className: "rl-msg" });
-      b.appendChild(el("p", { text: "This removes your sign-in, your email connection, every receipt Relay captured, your profile, price alerts, passkeys, two-step sign-in and any saved card. If you connected Gmail, Relay also cancels its access at Google." }));
+      b.appendChild(el("p", { text: "This removes your sign-in, your email connection, every receipt Relay captured, your profile, price alerts, passkeys, two-step sign-in and any saved card. If you connected Gmail, Relay also cancels its access at Google. If you connected Outlook, Relay deletes its access, and you can also remove Relay from your Microsoft account's app permissions." }));
       b.appendChild(el("p", { text: "Records of returns and swaps you made through Relay are kept, because the shops involved rely on them. Deleting can't be undone." }));
       var d = el("button", { className: "rl-btn rl-danger", text: "Delete my account" });
       d.onclick = function () {
@@ -3528,7 +3554,8 @@
     }
     draw();
   }
-  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate }, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
+  window.RelayAccount = { open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
+    of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
