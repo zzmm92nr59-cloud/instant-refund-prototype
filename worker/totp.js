@@ -3,6 +3,7 @@
 // The app secret is stored encrypted (AES-GCM, key derived from AUTH_SECRET). Recovery codes are stored only as hashes and
 // work whichever way the codes arrive. Passkey (Face ID) sign-in already proves the person, so it never asks for this step.
 import { textConfigured, issueTextCode, useTextCode, confirmedPhone, confirmNumberWithCode, textResponse, clientHashOf } from "./phone.js";
+import { tellShopper } from "./security-mail.js";
 const enc = new TextEncoder();
 const STEP_SECONDS = 30;
 const PENDING_TTL_MS = 10 * 60 * 1000;
@@ -114,7 +115,7 @@ async function checkCode(env, shopperId, input, now, texted) {
     if (!(await twoStepOn(env, shopperId))) return false;
     const used = await env.RELAY_DB.prepare("UPDATE auth_totp_recovery SET used_at = ? WHERE code_hash = ? AND shopper_id = ? AND used_at IS NULL RETURNING code_hash")
       .bind(now, await recoveryHash(shopperId, text), shopperId).first();
-    return Boolean(used);
+    return used ? "recovery" : false; // (truthy: a recovery code worked; callers can tell it apart)
   }
   return false;
 }
@@ -168,12 +169,19 @@ export async function handleTotpAuthRoute(path, method, request, env, cors, o, h
     .bind(await sha256Hex(token), now, MAX_PENDING_TRIES).first();
   if (!pending) return h.json({ error: "sign_in_expired" }, 400, cors);
   if (await tooManyFails(env, pending.shopper_id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
-  if (!(await checkCode(env, pending.shopper_id, body.code, now, ["signin", await sha256Hex(token)]))) { await recordFail(env, pending.shopper_id, now); return fail(); }
+  const how = await checkCode(env, pending.shopper_id, body.code, now, ["signin", await sha256Hex(token)]);
+  if (!how) { await recordFail(env, pending.shopper_id, now); return fail(); }
   const claimed = await env.RELAY_DB.prepare("UPDATE auth_2fa_pending SET used_at = ? WHERE token_hash = ? AND used_at IS NULL RETURNING shopper_id").bind(now, await sha256Hex(token)).first();
   if (!claimed) return h.json({ error: "sign_in_expired" }, 400, cors);
   const s = await env.RELAY_DB.prepare("SELECT email FROM shoppers WHERE id = ?").bind(pending.shopper_id).first();
   if (!s) return fail();
-  return h.startSession(env, s.email, now, cors, { skipSecondStep: true });
+  const started = await h.startSession(env, s.email, now, cors, { skipSecondStep: true });
+  // A recovery code is the way in when the phone is lost, or the way a thief who has the codes gets in: the shopper hears either way.
+  if (how === "recovery") {
+    const left = (await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_totp_recovery WHERE shopper_id = ? AND used_at IS NULL").bind(pending.shopper_id).first())?.n || 0;
+    await tellShopper(env, o, s.email, "recovery_used", { left });
+  }
+  return started;
 }
 
 // Signed in: status, set up, switch on, switch off.
@@ -219,13 +227,20 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
       if (on.text) return h.json({ error: "already_enabled" }, 400, cors);
       if (on.app) return h.json({ error: "app_on" }, 409, cors);
       const managed = await useTextCode(env, shopper.id, "manage", "manage:" + shopper.id, code, now);
+      let ending = null;
       if (managed) {
-        const set = await env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 1, two_step_at = ? WHERE shopper_id = ? RETURNING shopper_id").bind(now, shopper.id).first();
+        const set = await env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 1, two_step_at = ? WHERE shopper_id = ? RETURNING phone_end").bind(now, shopper.id).first();
         if (!set) return h.json({ error: "no_phone" }, 400, cors);
-      } else if (!(await confirmNumberWithCode(env, shopper.id, code, now, { twoStep: true }))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
+        ending = set.phone_end;
+      } else {
+        const added = await confirmNumberWithCode(env, shopper.id, code, now, { twoStep: true });
+        if (!added) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
+        ending = added.ending;
+      }
       // The first way on comes with recovery codes, shown once.
       const fresh = await newRecoveryCodes();
       await env.RELAY_DB.batch(fresh.statements);
+      await tellShopper(env, o, shopper.email, "text_on", { ending });
       return h.json({ ok: true, recoveryCodes: fresh.codes }, 200, cors);
     }
     if (b && b.on === false) {
@@ -235,6 +250,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
         env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 0, two_step_at = NULL WHERE shopper_id = ?").bind(shopper.id),
         env.RELAY_DB.prepare("DELETE FROM auth_totp_recovery WHERE shopper_id = ?").bind(shopper.id)
       ]);
+      await tellShopper(env, o, shopper.email, "text_off", {});
       return h.json({ ok: true }, 200, cors);
     }
     return h.json({ error: "invalid_request" }, 400, cors);
@@ -265,6 +281,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
     const fresh = await newRecoveryCodes();
     await env.RELAY_DB.batch([...fresh.statements,
       env.RELAY_DB.prepare("UPDATE auth_totp SET enabled = 1, enabled_at = ?, last_step = ? WHERE shopper_id = ?").bind(now, step, shopper.id)]);
+    await tellShopper(env, o, shopper.email, "app_on", {});
     return h.json({ ok: true, recoveryCodes: fresh.codes }, 200, cors); // shown once; only hashes are kept
   }
 
@@ -273,6 +290,7 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
     if (await tooManyFails(env, shopper.id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
     if (!(await checkCode(env, shopper.id, code, now))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
     await env.RELAY_DB.batch(totpDeleteStatements(env.RELAY_DB, shopper.id));
+    await tellShopper(env, o, shopper.email, "app_off", {});
     return h.json({ ok: true }, 200, cors);
   }
   return null;

@@ -7,6 +7,7 @@
 //  * Only the PUBLIC key is stored. The signature is checked against it on every sign-in.
 //  * A passkey signs in the shopper it was registered for. No shopper ID is ever taken from the client.
 //  * Attestation is "none": we do not claim to know what kind of authenticator it is.
+import { tellShopper } from "./security-mail.js";
 const enc = new TextEncoder();
 const HOUR_MS = 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -226,14 +227,17 @@ export async function handlePasskeyShopperRoute(path, method, request, env, cors
       const name = String(body.name || "").replace(/[^\p{L}\p{N} .'-]/gu, "").trim().slice(0, 40) || "This device";
       await env.RELAY_DB.prepare("INSERT INTO auth_passkeys (credential_id,shopper_id,public_key,sign_count,name,created_at) VALUES (?,?,?,?,?,?)")
         .bind(id, shopper.id, b64u(pub), ad.signCount, name, now).run();
+      await tellShopper(env, o, shopper.email, "passkey_added", { name });
       return h.json({ ok: true, name }, 200, cors);
     } catch { return fail(); }
   }
   if (path === "/relay/my/passkeys/remove" && method === "POST") {
     const body = await h.readJson(request, 4000);
     const id = body && typeof body.id === "string" ? body.id : "";
-    const gone = await env.RELAY_DB.prepare("DELETE FROM auth_passkeys WHERE credential_id = ? AND shopper_id = ? RETURNING credential_id").bind(id, shopper.id).first();
-    return gone ? h.json({ ok: true }, 200, cors) : h.json({ error: "not_found" }, 404, cors);
+    const gone = await env.RELAY_DB.prepare("DELETE FROM auth_passkeys WHERE credential_id = ? AND shopper_id = ? RETURNING credential_id, name").bind(id, shopper.id).first();
+    if (!gone) return h.json({ error: "not_found" }, 404, cors);
+    await tellShopper(env, o, shopper.email, "passkey_removed", { name: gone.name || null });
+    return h.json({ ok: true }, 200, cors);
   }
   return null;
 }

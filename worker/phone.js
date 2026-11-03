@@ -19,6 +19,7 @@
 //    straight from the notification (and only on Relay's own site).
 //  * Texts go through Twilio only when its secrets are set. Without them nothing pretends to send: the routes say texts
 //    aren't available and the app doesn't offer them.
+import { tellShopper } from "./security-mail.js";
 const enc = new TextEncoder();
 const DEFAULT_APP_URL = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
 const CODE_TTL_MS = 10 * 60 * 1000;
@@ -241,11 +242,13 @@ export async function handlePhoneRoute(path, method, request, env, cors, o, h, s
     if (row && row.two_step) return h.json({ error: "two_step_on" }, 409, cors);
     const done = await confirmNumberWithCode(env, shopper.id, body && body.code, now);
     if (!done) return h.json({ error: "invalid_or_expired_code" }, 400, cors);
+    await tellShopper(env, o, shopper.email, "phone_added", { ending: done.ending });
     return h.json({ ok: true, ending: done.ending }, 200, cors);
   }
   if (path === "/relay/my/phone/remove") {
     if (row && row.two_step) return h.json({ error: "two_step_on" }, 409, cors);
     await db.batch(phoneDeleteStatements(db, shopper.id));
+    if (row && row.phone_end) await tellShopper(env, o, shopper.email, "phone_removed", { ending: row.phone_end });
     return h.json({ ok: true }, 200, cors);
   }
   return null;

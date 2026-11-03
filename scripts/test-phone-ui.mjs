@@ -49,6 +49,7 @@ await ctx.route("https://**/*", async route => {
   }
   if (p === "/relay/my/phone/confirm") { const b = body(); st.confirms.push(b.code); if (b.code !== "123456") return j({ error: "invalid_or_expired_code" }, 400); st.ending = st.pendingEnding; return j({ ok: true, ending: st.ending }); }
   if (p === "/relay/my/phone/remove") { if (st.twoStep) return j({ error: "two_step_on" }, 409); st.ending = null; return j({ ok: true }); }
+  if (p === "/relay/my/devices/sign-out-others") { st.signedOutOthers = (st.signedOutOthers || 0) + 1; return j({ ok: true, count: 2 }); }
   if (p === "/relay/my/2fa" && m === "GET") return j({ enabled: st.twoStep || st.app, app: st.app, text: st.twoStep, phoneEnding: st.ending, textAvailable: st.available, recoveryCodesLeft: st.twoStep || st.app ? st.left : 0 });
   if (p === "/relay/my/2fa/text/send") { st.sends++; return st.ending ? j({ ok: true, ending: st.ending, resendIn: 30 }) : j({ error: "no_phone" }, 400); }
   if (p === "/relay/my/2fa/text") {
@@ -247,6 +248,21 @@ await page.getByRole("button", { name: "Remove number" }).last().click();
 await page.getByText("Number removed.").waitFor();
 await page.locator("#rl-phone").waitFor();
 console.log("ok - turning it off takes a code; then the number can be removed");
+
+// 7. Devices: sign out every other phone and computer in one tap; this one stays signed in.
+reset({});
+await signedInAt();
+await openRow("Devices");
+await page.getByText("Signs Relay out on every other phone, tablet and computer, including ones that are lost or shared. You stay signed in here.").waitFor();
+await page.getByText(/Relay emails you whenever how you sign in changes/).waitFor();
+await polished("devices");
+await page.getByRole("button", { name: "Sign out other devices" }).dblclick();
+await page.getByText("2 other devices were signed out. Only this one is signed in now.").waitFor();
+assert.equal(st.signedOutOthers, 1, "a double tap signs out once");
+assert.equal(await page.locator("button.rl-btn", { hasText: /^Done$/ }).isDisabled(), true, "and the button can't be pressed again");
+assert.ok(await page.evaluate(() => Boolean(localStorage.getItem("relay.session.v1"))), "this device is still signed in");
+await polished("devices: done"); await shot("devices");
+console.log("ok - Devices: other phones and computers signed out in one tap (once, even on a double tap); this one stays in");
 
 assert.deepEqual(errors, []);
 await browser.close(); server.close();
