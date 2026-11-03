@@ -84,9 +84,11 @@ export default {
       "Content-Type": "application/json",
     };
 
+    // The browser asks before every signed-in request. Telling it the answer holds for a day (browsers keep it up to two
+    // hours) saves a round trip on nearly every request.
     if (request.method === "OPTIONS") {
       return new Response(null, {
-        headers: corsHeaders,
+        headers: { ...corsHeaders, "Access-Control-Max-Age": "86400" },
       });
     }
 

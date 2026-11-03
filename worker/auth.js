@@ -131,14 +131,16 @@ export async function sessionShopper(request, env, now = Date.now()) {
   const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header);
   if (!match || !env.RELAY_DB) return null;
   const row = await env.RELAY_DB.prepare(
-    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash
+    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash, a.expires_at AS expiresAt
      FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id
      WHERE a.session_hash = ? AND a.expires_at > ?`).bind(await sha256Hex(match[1]), now).first();
   if (!row) return null;
-  // Keep a regularly used session alive so the shopper isn't asked to sign in again.
-  await env.RELAY_DB.prepare(
-    "UPDATE auth_sessions SET expires_at = ? WHERE session_hash = ? AND expires_at < ?")
-    .bind(now + SESSION_TTL_MS, row.sessionHash, now + SESSION_RENEW_WITHIN_MS).run();
+  // Keep a regularly used session alive so the shopper isn't asked to sign in again. Only when it's due (about once a
+  // month), so an ordinary request makes one trip to the database, not two.
+  if (row.expiresAt < now + SESSION_RENEW_WITHIN_MS)
+    await env.RELAY_DB.prepare("UPDATE auth_sessions SET expires_at = ? WHERE session_hash = ? AND expires_at < ?")
+      .bind(now + SESSION_TTL_MS, row.sessionHash, now + SESSION_RENEW_WITHIN_MS).run();
+  delete row.expiresAt;
   return row;
 }
 

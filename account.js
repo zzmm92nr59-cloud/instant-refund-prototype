@@ -44,15 +44,32 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
+  // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
+  // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
+  // them all, so nothing out of date shows after an edit. fresh: true asks Relay regardless.
+  var READ_REUSE_MS = 60 * 1000, reads = {};
   function api(path, opts) {
     opts = opts || {};
-    var s = load(), headers = { "Content-Type": "application/json" };
+    var method = opts.method || "GET", s = load(), headers = {};
+    // Reads carry no body, so they don't say it's JSON (one less reason for the browser to ask first).
+    if (method !== "GET") { headers["Content-Type"] = "application/json"; reads = {}; }
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
-    return fetch(API + path, { method: opts.method || "GET", headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); });
+    var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
+    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < READ_REUSE_MS)) return hit.answer.then(copyAnswer);
+    var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; }); });
+    if (key) {
+      var entry = { answer: answer, waiting: true, at: 0 };
+      reads[key] = entry;
+      answer.then(function (r) { entry.waiting = false; entry.at = Date.now(); if (!r.ok && reads[key] === entry) delete reads[key]; },
+        function () { if (reads[key] === entry) delete reads[key]; });
+    }
+    return answer.then(copyAnswer);
   }
+  // Each caller gets its own copy, so one screen changing what it was given can't change another's.
+  function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j }; }
   // Fetches a signed-in image and returns a local address for it (or null).
   function apiBlob(path) {
     // Pictures and logos are fetched once per visit, not every time a list is redrawn.
