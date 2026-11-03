@@ -181,7 +181,7 @@ console.log("ok - watches come back from the account when this device lost them"
 assert.ok(await page.evaluate(() => !!localStorage.getItem("relay.cache.v1")));
 await page.locator(".avatar").click();
 await page.getByRole("button", { name: "Sign out" }).click();
-await page.getByRole("heading", { name: "Welcome to Relay" }).waitFor();
+await page.locator(".rl-welcome").getByRole("button", { name: "Get started" }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.cache.v1")), null, "nothing of the account left on the device");
 console.log("ok - signing out removes the receipts kept on this device");
 
