@@ -64,7 +64,8 @@ const OUTLOOK_FULL_REV = 1;
 // Raised when the receipt reader improves enough that every mailbox should be read once more in the background
 // (only emails read by an older reader are opened again). 2: shop, item and group ranking. 3: forwarded receipts from
 // every email app (Outlook's, Apple Mail's, Yahoo's as well as Gmail's), Microsoft's Safe Links, and text in other character sets.
-const READER_FULL_REV = 3;
+// 4: the address each order was sent to, for starting returns.
+const READER_FULL_REV = 4;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -83,7 +84,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 19;
+const PARSER_VERSION = 20;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -516,7 +517,7 @@ function classify(rawText, ref, lenient = false) {
     details = {
       kind: "receipt", ...ref,
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, orderDateFrom: receipt.orderDateFrom || null, currency: receipt.currency,
-      totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence,
+      totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence, sentTo: receipt.sentTo || null,
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };

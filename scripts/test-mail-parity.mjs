@@ -53,7 +53,7 @@ const mails = [
       "Returns accepted within 30 days of delivery.", "Thanks for shopping with Northwind Trainers."]) },
   { key: "stripe", fromName: "Anthropic, PBC", from: "invoice+statements+acct_1abc@stripe.com", subject: "Your receipt from Anthropic, PBC #2734-1234", days: 40,
     html: p(["Receipt from Anthropic, PBC", "Receipt #2734-1234", "Date paid " + longDate(at(40)), "Claude Pro - Qty 1 - &pound;18.00", "Total &pound;18.00", "Amount paid &pound;18.00"]) },
-  { key: "hide-my-email", fromName: "ASOS", from: "info_at_asos_com_ab12cd@privaterelay.appleid.com", subject: "Thanks for your order", days: 25,
+  { key: "hide-my-email", fromName: "ASOS", from: "info_at_asos_com_ab12cd@privaterelay.appleid.com", to: "quiet_fox_12@privaterelay.appleid.com", subject: "Thanks for your order", days: 25,
     text: "Thanks for your order!\nOrder No.: 987654321\nOrder date: " + longDate(at(25)) + "\nOversized T-Shirt - Qty 1 - £14.00\nDelivery £4.50\nTotal: £18.50\nFree returns within 28 days.\n" },
   // Forwarded from another mailbox, by Outlook (rule, From/Sent/To/Subject) and by Gmail (as HTML, with &lt; &gt; round the address).
   { key: "fw-outlook", fromName: "Sam Tester", from: "sam.tester@hotmail.co.uk", subject: "FW: Your Ted Baker order", days: 15,
@@ -91,7 +91,7 @@ const dateHeader = m => new Date(at(m.days)).toUTCString().replace("GMT", "+0000
 // Gmail: the email exactly as the shop sent it (quoted-printable UTF-8 parts).
 function asSent(m) {
   const head = [`From: ${ascii(m.fromName) ? '"' + m.fromName + '"' : qWord(m.fromName)} <${m.from}>`,
-    `Subject: ${ascii(m.subject) ? m.subject : qWord(m.subject)}`, `Date: ${dateHeader(m)}`, `Message-ID: <${m.key}@mail.shop.test>`, "MIME-Version: 1.0"];
+    `Subject: ${ascii(m.subject) ? m.subject : qWord(m.subject)}`, `To: ${m.to || '"Sam Tester" <sam.tester@example.com>'}`, `Date: ${dateHeader(m)}`, `Message-ID: <${m.key}@mail.shop.test>`, "MIME-Version: 1.0"];
   const parts = [];
   if (m.text) parts.push(`Content-Type: text/plain; charset="UTF-8"${CRLF}Content-Transfer-Encoding: quoted-printable${CRLF}${CRLF}${qp(m.text)}`);
   if (m.html) parts.push(`Content-Type: text/html; charset="UTF-8"${CRLF}Content-Transfer-Encoding: quoted-printable${CRLF}${CRLF}${qp(m.html)}`);
@@ -106,7 +106,7 @@ const safe = url => "https://eur02.safelinks.protection.outlook.com/?url=" + enc
 function asExchange(m) {
   const cs = m.charset || "utf-8", enc = s => Buffer.from(s, cs === "windows-1252" ? "latin1" : "utf8");
   const head = ["Received: from AM9PR01MB1234.eurprd01.prod.exchangelabs.com (2603:10a6:20b::12) by DB9PR02MB5678.eurprd02.prod.outlook.com with HTTPS; " + dateHeader(m),
-    `From: ${encWord(m.fromName)}${CRLF}\t<${m.from}>`, `To: "Sam Tester" <sam.tester@outlook.com>`, `Subject: ${encWord(m.subject)}`, `Thread-Topic: ${m.subject.replace(/[^\x20-\x7e]/g, "?")}`,
+    `From: ${encWord(m.fromName)}${CRLF}\t<${m.from}>`, `To: ${m.to ? m.to.replace(/^"?([^"<]+?)"?\s*</, (x, n) => encWord(n.trim()) + " <") : encWord("Sam Tester") + " <sam.tester@example.com>"}`, `Subject: ${encWord(m.subject)}`, `Thread-Topic: ${m.subject.replace(/[^\x20-\x7e]/g, "?")}`,
     "Thread-Index: AQHbLx2f3kQyN0ZqRUWm8w0TQxXl6A==", `Date: ${dateHeader(m)}`, `Message-ID: <${m.key}@mail.shop.test>`, "Accept-Language: en-GB, en-US", "Content-Language: en-GB",
     "X-MS-Has-Attach:", "X-MS-TNEF-Correlator:", "X-MS-Exchange-Organization-SCL: 1", "X-Microsoft-Antispam: BCL:0;", "MIME-Version: 1.0"];
   const parts = [];
@@ -208,6 +208,8 @@ assert.equal(lulu.delivery && lulu.delivery.status, "delivered", "Royal Mail's e
 assert.equal(lulu.returnPlan && lulu.returnPlan.returnId, "RT-5551234", "the return email is attached to its order");
 assert.equal(shop(gCards, "1042").retailer.name, "Northwind Trainers", "a Shopify shop is named, not Shopify");
 assert.equal(shop(gCards, "987654321").retailer.name, "ASOS", "Apple's Hide My Email address isn't the shop");
+assert.equal(shop(gCards, "987654321").sentTo, "quiet_fox_12@privaterelay.appleid.com", "the address the shop knows, for returns");
+assert.equal(lulu.sentTo, "sam.tester@example.com");
 assert.equal(shop(gCards, "TB-55123").retailer.name, "Ted Baker", "a receipt forwarded by Outlook names the shop");
 assert.equal(shop(gCards, "TB-55123").retailer.logoDomain, "tedbaker.com", "and its logo comes from the shop, not from Hotmail");
 assert.equal(shop(gCards, "C01234567890").retailer.name, "Nike", "a receipt forwarded by Gmail as HTML names the shop");

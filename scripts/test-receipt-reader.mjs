@@ -170,4 +170,12 @@ t("emails read the same whatever the mail service did to them", () => {
   assert.equal(b.totalPence, 9000, "a base64 part is read in its own character set");
 });
 
+t("the address the order was sent to is kept for returns (the shop's page asks for it)", () => {
+  const mail = (to) => `From: Rains <orders@rains.test>\r\nTo: ${to}\r\nSubject: Thank you for your order\r\nContent-Type: text/plain\r\n\r\nThank you for your order\nOrder number: RA-1\nLong Jacket - Qty 1 - £110.00\nOrder total: £110.00\n`;
+  assert.equal(parseReceiptEmail(mail("quiet_fox_12@privaterelay.appleid.com")).sentTo, "quiet_fox_12@privaterelay.appleid.com", "a Hide My Email address");
+  assert.equal(parseReceiptEmail(mail('"Sam Tester" <Sam.Tester@Outlook.com>')).sentTo, "sam.tester@outlook.com");
+  assert.equal(parseReceiptEmail(mail("orders@rains.test, sam@example.com")).sentTo, "sam@example.com", "never the shop's own address");
+  assert.equal(parseReceiptEmail(mail("undisclosed-recipients:;")).sentTo, null);
+});
+
 console.log(`\nPASS receipt reader: ${n} checks`);

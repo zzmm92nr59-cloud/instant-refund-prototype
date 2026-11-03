@@ -9,7 +9,7 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
-import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain } from "./receipt-reader.js";
+import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
@@ -480,6 +480,21 @@ export function appleItems(text) {
   return items;
 }
 
+// The address the shop sent the order to: what its returns page asks for. Often the inbox Relay reads, but not always (a
+// Hide My Email address, an alias, an old address that forwards). It is the shopper's own address, kept only for returns.
+function sentToOf(headers, sender) {
+  for (const m of String(headers.to || "").slice(0, 2000).matchAll(/([A-Za-z0-9._%+'-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63})+)/g)) {
+    const a = m[1].toLowerCase();
+    // Not the shop's own address (an email sent "to" the shop with the shopper in Bcc), nor a placeholder. (A Hide My Email
+    // or personal sender shares its domain with the shopper's own address, so that rule doesn't apply to them.)
+    const shopDomain = sender && sender.domain && !isVia(sender.domain) && !PERSONAL_MAIL.test(sender.domain) ? sender.domain : null;
+    if (shopDomain && a.endsWith("@" + shopDomain)) continue;
+    if (/^(undisclosed|no-?reply|recipients?)[@.]/.test(a)) continue;
+    return a.slice(0, 254);
+  }
+  return null;
+}
+
 // The shop, ranked from every clue in the email (see receipt-reader.js).
 function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   const domain = sender?.domain || null;
@@ -554,6 +569,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length, nothingFound: true } };
   }
   result.returns = extractReturns(text, html, result.orderDate);
+  result.sentTo = sentToOf(headers, sender);
   result.shipment = shipmentOf(subject, text);
 
   const itemSum = result.items.reduce((n, i) => n + (i.pricePence ?? 0) * (i.lineTotal ? 1 : i.qty || 1), 0);
