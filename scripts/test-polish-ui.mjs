@@ -30,6 +30,7 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/wrapped") return j(W);
   if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: state.serverWatches, stores: [], allShops: false });
   if (p === "/relay/auth/logout") return j({ ok: true });
+  if (p === "/relay/my/export") { state.exports = (state.exports || 0) + 1; await new Promise(r => setTimeout(r, 300)); return j({ about: "Everything Relay keeps about you", account: { email: EMAIL }, receipts: receipts.map(r => ({ id: r.id, retailer: r.retailer })) }); }
   if (p === "/relay/shopify/catalogue") return j({ published: true, products: [{ product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify:kick:variant:1", sku: "shopify:kick:variant:1", priceMinor: 8500, currency: "GBP", quantity: 4, storeName: "Kick Lane", provider: "shopify" }] });
   return j({});
 });
@@ -64,7 +65,7 @@ for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
   assert.deepEqual(m.purple, [], pg + ": no purple");
 }
 await page.locator(".avatar").click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
-for (const sub of [null, "Email connection", "Email permission", "Delete my account", "Help", "Two-step sign-in"]) {
+for (const sub of [null, "Email connection", "Email permission", "Download my data", "Delete my account", "Help", "Two-step sign-in"]) {
   if (sub) { await page.locator(".rl-arow", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
   const m = await measure(), where = "Profile" + (sub ? " > " + sub : "");
   assert.deepEqual(m.small, [], where + ": everything tappable is at least 44px tall");
@@ -73,6 +74,17 @@ for (const sub of [null, "Email connection", "Email permission", "Delete my acco
   assert.deepEqual(m.purple, [], where + ": no purple");
   if (sub) await page.getByRole("button", { name: "Back to Profile" }).click();
 }
+// Download my data: one file with the shopper's data, made once however fast the button is tapped twice.
+await page.locator(".rl-arow", { hasText: "Download my data" }).first().click();
+const dlBtn = page.locator(".rl-sheet, #mePage").getByRole("button", { name: "Download my data" }).last();
+const [dl] = await Promise.all([page.waitForEvent("download"), dlBtn.click(), dlBtn.click({ force: true }).catch(() => {})]);
+assert.match(dl.suggestedFilename(), /^relay-my-data-\d{4}-\d{2}-\d{2}\.json$/);
+const saved = JSON.parse(await (await import("node:fs/promises")).readFile(await dl.path(), "utf8"));
+assert.equal(saved.account.email, EMAIL); assert.equal(saved.receipts.length, 2);
+await page.getByText("Your file is downloading.").waitFor();
+assert.equal(state.exports, 1, "a second tap while it's preparing doesn't make a second file");
+await page.getByRole("button", { name: "Back to Profile" }).click();
+console.log("ok - Download my data gives one file with the shopper's data, once per tap");
 // The legal pages are real pages, reachable from the Account page.
 for (const [label, heading] of [["Terms of use", "Terms of use"], ["Privacy policy", "Privacy policy"]]) {
   const href = await page.locator(".rl-arow", { hasText: label }).getAttribute("href");

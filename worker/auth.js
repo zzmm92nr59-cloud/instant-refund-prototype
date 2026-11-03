@@ -16,6 +16,7 @@ import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
+import { handleExportRoute } from "./export.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
@@ -584,6 +585,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       ]);
       return json({ ok: true }, 200, cors);
     }
+    // "Download my data": a copy of everything Relay keeps about the shopper.
+    const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
+    if (exportResponse) return exportResponse;
     const profileResponse = await handleProfileRoute(request, env, url, cors, shopper, o);
     if (profileResponse) return profileResponse;
     const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);

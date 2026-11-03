@@ -2105,6 +2105,7 @@
     card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
     shield: '<path d="M12 3.5 19 6v5.5c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6Z"/><path d="m9 12 2 2 4-4"/>',
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
+    download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
     doc: '<path d="M7 3.5h7l4 4v13H7Z"/><path d="M14 3.5v4h4M10 12h5M10 16h5"/>',
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5M12 17h.01"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
@@ -2152,6 +2153,7 @@
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
     ["How do I stop Relay reading my email?", "Open Account, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
+    ["How do I get a copy of my data?", "Open Account, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
     ["How do I delete my account?", "Open Account, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
@@ -2241,6 +2243,7 @@
     // Privacy & data
     sheet.appendChild(accGroup("Privacy & data", [
       accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); }),
+      accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
       accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })]));
 
     // Help & legal
@@ -2300,9 +2303,30 @@
       };
       b.appendChild(w); b.appendChild(note);
     }
+    // A copy of everything Relay keeps about the shopper, as one file (their right to a copy of their data).
+    function exportPage(b) {
+      var note = el("div", { className: "rl-msg" });
+      b.appendChild(el("p", { text: "Get a copy of everything Relay keeps about you: your account, the receipts it found, your alerts, returns, swaps and settings. It comes as one file you can open in any text editor, or take to another service." }));
+      b.appendChild(el("p", { className: "rl-anote", text: "The emails themselves stay in your inbox. The keys to your inbox, sign-in codes and card numbers are never in the file." }));
+      var d = el("button", { className: "rl-btn", text: "Download my data" });
+      d.onclick = function () {
+        if (d.disabled) return;
+        d.disabled = true; d.textContent = "Preparing your file…"; say(note, "");
+        api("/relay/my/export").then(function (r) {
+          if (!r.ok || !r.body) { say(note, "Couldn't prepare your file. Try again in a moment.", true); return; }
+          var url = URL.createObjectURL(new Blob([JSON.stringify(r.body, null, 2)], { type: "application/json" }));
+          var a = el("a", { href: url }); a.setAttribute("download", "relay-my-data-" + new Date().toISOString().slice(0, 10) + ".json");
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+          say(note, "Your file is downloading. Keep it somewhere safe: it has your receipts in it.");
+        }).catch(function () { say(note, "Couldn't reach Relay. Check your connection.", true); })
+          .finally(function () { d.disabled = false; d.textContent = "Download my data"; });
+      };
+      b.appendChild(d); b.appendChild(note);
+    }
     function deletePage(b) {
       var note = el("div", { className: "rl-msg" });
-      b.appendChild(el("p", { text: "This removes your sign-in, your email connection, every receipt Relay captured, your profile, price alerts, passkeys, two-step sign-in and any saved card. If you connected Gmail, Relay also cancels its access at Google. If you connected Outlook, Relay deletes its access, and you can also remove Relay from your Microsoft account's app permissions." }));
+      b.appendChild(el("p", { text: "This removes your sign-in, your email connection, every receipt Relay captured, your profile, price alerts, passkeys, two-step sign-in, any saved card, and your swap and sell listings and messages. If you connected Gmail, Relay also cancels its access at Google. If you connected Outlook, Relay deletes its access, and you can also remove Relay from your Microsoft account's app permissions." }));
       b.appendChild(el("p", { text: "Records of returns and swaps you made through Relay are kept, because the shops involved rely on them. Deleting can't be undone." }));
       var d = el("button", { className: "rl-btn rl-danger", text: "Delete my account" });
       d.onclick = function () {
