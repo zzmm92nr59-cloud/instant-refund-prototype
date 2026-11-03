@@ -27,7 +27,16 @@ const receipts = [
   R("Great Bean Bags", "greatbeanbags.com", "greatbeanbags.com", ["Chocolate Brown"], "home"),
   R("Premier Inn", "premierinn.com", "premierinn.com", [], "travel"),
   R("lululemon", "e.lululemon.com", "e.lululemon.com", ["Align Pant"], "fashion", { hasImage: true }),
+  // A shop that isn't in Relay's own logo inventory: its logo comes from Relay's server (looked up once, then kept).
+  R("Corner Deli", "cornerdeli.co.uk", "cornerdeli.co.uk", ["Sourdough loaf"], "food"),
+  // Sent from another of a shop's addresses: the logo Relay keeps for that shop (just-eat.com is Just Eat's just-eat.co.uk).
+  R("Just Eat", "just-eat.com", "just-eat.com", [], "food"),
 ];
+// Relay's own logo inventory (account.js, built from logos/): a shop in it shows that logo, without asking the server.
+const ACC = await readFile("account.js", "utf8");
+const BUNDLED = JSON.parse(/var STORE_LOGOS = (\{.*?\});/.exec(ACC)[1]), ALIASES = JSON.parse(/var LOGO_ALIASES = (\{.*?\});/.exec(ACC)[1]);
+const on = (d, k) => d === k || d.endsWith("." + k);
+const bundledFile = d => { if (!d) return null; const a = Object.keys(ALIASES).find(k => on(d, k)), k = a ? ALIASES[a] : Object.keys(BUNDLED).find(k => on(d, k)); return k && BUNDLED[k] ? "logos/" + k + "." + BUNDLED[k] : null; };
 const expect = { "Kick Lane": "shoe", "Sainsbury's": "basket", "The Scent Reserve": "perfume", "Clare Champion": "newspaper", "TV Beds North West": "bed", "LNER on board service": "train",
   "Anthropic": "cloud", "Forwarded receipt": "jacket", "Bows and Whistles": "shop", "Disney Store": "tshirt", "Oak Furniture Land": "sofa", "Great Bean Bags": "sofa", "Premier Inn": "key" };
 const logoAsks = [];
@@ -38,7 +47,7 @@ await ctx.route("https://**/*", async route => {
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!p.startsWith("/relay/")) return route.abort();
-  if (p.startsWith("/relay/my/logo/")) { const d = decodeURIComponent(p.slice(15)); logoAsks.push(d); return d === "jdwetherspoon.co.uk" ? route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG }) : route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" }); }
+  if (p.startsWith("/relay/my/logo/")) { const d = decodeURIComponent(p.slice(15)); logoAsks.push(d); return d === "cornerdeli.co.uk" ? route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG }) : route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" }); }
   if (/^\/relay\/my\/receipts\/[0-9a-f-]{36}\/image$/.test(p)) return route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: "jess@example.com", lastScanAt: Date.now() });
@@ -64,17 +73,26 @@ for (let g = 0; g < groups.length; g++) {
     const shop = (await row.locator(".rl-rr-mid span").innerText()).split(" · ")[0];
     const title = await row.locator(".rl-rr-mid b").innerText();
     const pic = row.locator(".rl-rr-pic");
-    const info = { ill: await pic.getAttribute("data-ill"), logo: await pic.locator("img.rl-logo-img").count(), photo: await pic.evaluate(n => n.classList.contains("rl-has-photo")), text: (await pic.innerText()).trim() };
+    const info = { ill: await pic.getAttribute("data-ill"), logo: await pic.locator("img.rl-logo-img").count(), photo: await pic.evaluate(n => n.classList.contains("rl-has-photo")), text: (await pic.innerText()).trim(),
+      src: (await pic.locator("img.rl-logo-img").count()) ? await pic.locator("img.rl-logo-img").first().getAttribute("src") : null };
     seen[title] = info; if (!/^Order /.test(shop)) seen[shop] = info;
   }
   await page.getByRole("button", { name: "All groups" }).click();
 }
-for (const [shop, key] of Object.entries(expect)) assert.equal(seen[shop] && seen[shop].ill, key, shop + " is drawn as " + key + ": " + JSON.stringify(seen[shop]));
-assert.equal(seen["J D Wetherspoon"].logo, 1, "a shop with a logo shows its logo"); assert.equal(seen["J D Wetherspoon"].ill, null);
+const logoOf = Object.fromEntries(receipts.map(r => [r.retailer.name, r.retailer.logoDomain]));
+for (const [shop, key] of Object.entries(expect)) {
+  const file = bundledFile(logoOf[shop]);
+  if (file) assert.equal(seen[shop] && seen[shop].src, file, shop + " shows the logo Relay keeps: " + JSON.stringify(seen[shop]));
+  else assert.equal(seen[shop] && seen[shop].ill, key, shop + " is drawn as " + key + ": " + JSON.stringify(seen[shop]));
+}
+assert.equal(seen["J D Wetherspoon"].src, "logos/jdwetherspoon.com.png", "another of a shop's addresses uses the logo Relay keeps"); assert.equal(seen["J D Wetherspoon"].ill, null);
+assert.equal(seen["Just Eat"].src, "logos/just-eat.co.uk." + BUNDLED["just-eat.co.uk"]);
+assert.equal(seen["Corner Deli"].logo, 1, "a shop outside the inventory gets its logo from Relay's server"); assert.match(seen["Corner Deli"].src, /^blob:/);
+assert.ok(logoAsks.includes("cornerdeli.co.uk") && !logoAsks.some(d => bundledFile(d)), "the server is only asked about shops Relay doesn't keep a logo for");
 assert.equal(seen["lululemon"].photo, true, "a checked photo of the item wins");
 assert.ok(Object.values(seen).every(x => x.text === ""), "no initials anywhere");
 assert.ok(!logoAsks.includes("gmail.com"), "a forwarded receipt never asks for Gmail's logo");
-assert.ok(logoAsks.includes("lner.co.uk"), "a shop with no address of its own uses its known address for the logo");
+assert.equal(seen["LNER on board service"].src, bundledFile("lner.co.uk") || seen["LNER on board service"].src, "a shop with no address of its own uses its known address for the logo");
 console.log("ok - photo, then logo, then a drawing of the item, shop or kind of shop; no initials; no logo asked for a mailbox");
 // The drawing draws itself in and moves; with reduced motion it simply appears.
 await page.locator(".rl-cats").getByRole("button", { name: /Fashion/ }).click();

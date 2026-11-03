@@ -91,8 +91,21 @@ const googleCopy = domain => "https://www.google.com/s2/favicons?domain=" + doma
 // it doesn't know it sends a stand-in picture, which is recognised and skipped.
 const duckCopy = domain => "https://icons.duckduckgo.com/ip3/" + domain + ".ico";
 let duckStandIn = null;
+// A big shop whose website icons are too small to use (Sainsbury's, Subway...): the icon of its own app in Apple's App
+// Store, which is its square logo made for small screens. "appstore:<search>|<word the app or its maker must have>".
+async function appStoreIcon(spec) {
+  const [term, must] = spec.split("|");
+  const r = await grab("https://itunes.apple.com/search?" + new URLSearchParams({ term, country: "gb", entity: "software", limit: "15" }), "application/json");
+  if (!r.b || r.status >= 400) return null;
+  let j; try { j = JSON.parse(r.b.toString("utf8")); } catch { return null; }
+  const want = String(must || term).toLowerCase();
+  const hit = (j.results || []).find(a => [a.sellerName, a.artistName].some(x => String(x || "").toLowerCase().includes(want)))
+    || (j.results || []).find(a => String(a.trackName || "").toLowerCase().includes(want));
+  return hit ? hit.artworkUrl512 || hit.artworkUrl100 || null : null;
+}
 async function candidates(domain) {
   const how = overrides[domain];
+  if (typeof how === "string" && how.startsWith("appstore:")) { const u = await appStoreIcon(how.slice(9)); return u ? [u] : []; }
   if (how === "google") return [googleCopy(domain), duckCopy(domain)];
   if (how === "duck") return [duckCopy(domain)];
   if (typeof how === "string" && how.startsWith("https://")) return [how];
