@@ -1,0 +1,35 @@
+<svg
+  viewBox="0 0 35 35"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .background {
+        fill: #fafaff;
+      }
+      .border {
+        stroke: #0f0f14;
+      }
+      .letter {
+        fill: #0f0f14;
+      }
+    }
+  </style>
+  <rect class="background" width="34.5757" height="34.5757" fill="#0f0f14" />
+  <rect
+    class="border"
+    x="0.538717"
+    y="0.538717"
+    width="33.4983"
+    height="33.4983"
+    stroke-width="1.07743"
+    stroke="#fafaff"
+  />
+  <path
+    class="letter"
+    d="M26 6.42432H8V11.0241H14.7194V29.4243H19.2806V11.0251H26V6.42432Z"
+    fill="#fafaff"
+  />
+</svg>
+
