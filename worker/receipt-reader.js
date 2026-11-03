@@ -258,7 +258,7 @@ export function itemsFromCells(text) {
   const priceAt = i => { const m = CELL_PRICE.exec(cells[i] || ""); return m ? { pence: pennies(m[2]), negative: Boolean(m[1]) } : null; };
   const nameAt = i => { const c = cells[i]; return Boolean(c) && c.length <= 120 && /\p{L}{2}/u.test(c) && !CELL_HEAD.test(c) && !CELL_END.test(c) && !CELL_AFTER.test(c) && !CELL_NOTE.test(c) && !priceAt(i); };
   // The next cell that counts (unit prices and notes are passed over).
-  const next = i => { let j = i + 1; while (j < cells.length && CELL_NOTE.test(cells[j])) j++; return j; };
+  const next = i => { let j = i + 1; while (j < cells.length && (CELL_NOTE.test(cells[j]) || CELL_HEAD.test(cells[j]))) j++; return j; };
   // A sentence is the end of a table, not a name ("If you require a breakdown of the VAT, please speak to...").
   const sentence = c => c.length > 70 || (c.split(" ").length > 9 && /[.!?]$/.test(c));
 
@@ -313,7 +313,8 @@ export function itemsFromCells(text) {
   let best = [];
   for (let i = 0; i < cells.length; i++) {
     let mode = null;
-    if (qtyAt(i) != null && nameAt(next(i)) && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "qty";
+    const firstPrice = k => { const p = priceAt(k) || (nameAt(k) && cells[k].length <= 30 ? priceAt(next(k)) : null); return p && !p.negative; };
+    if (qtyAt(i) != null && nameAt(next(i)) && firstPrice(next(next(i)))) mode = "qty";
     else if (nameAt(i) && qtyAt(next(i)) != null && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "name";
     if (!mode) continue;
     const run = read(i, mode);

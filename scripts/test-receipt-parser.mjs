@@ -584,4 +584,33 @@ t("game web shop: the game named at the top is the shop, and the game currency i
   // The same when the web shop signs the email with its own name.
   assert.equal(parseReceiptEmail(htmlMail("Appcharge <no-reply@appcharge.com>", "Purchase Confirmation #123-456-789", "Sat, 31 Oct 2026 13:16:00 +0000", html)).retailer.name, "Example Quest");
 });
+t("takeaway: 'Total:' and its amount on separate lines with column edges between", () => {
+  const html = `<table><tr><td>1</td><td>Chicken Wrap</td><td>£7.00</td></tr></table>
+<table><tr><td>Subtotal:</td></tr><tr><td>£7.00</td></tr><tr><td>Service fee 11% (min £0.99 max £2.99):</td></tr><tr><td>£0.99</td></tr>
+<tr><td>Delivery:</td></tr><tr><td>£0.99</td></tr><tr><td>Total:</td></tr><tr><td>£8.98</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("Example Eats <orders@exampleeats.test>", "Your order's been received", "Mon, 15 Sep 2025 19:02:00 +0100", html));
+  assert.equal(r.totalPence, 898);
+  assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["Chicken Wrap", 700]]);
+});
+
+t("pub order-and-pay: a name split over two cells ('Guinness' then '(Pint)')", () => {
+  const html = `<table><tr><td>Qty</td><td>Description</td><td>Amount</td></tr>
+<tr><td>1</td><td>Example Stout<br>(Pint)</td><td>£2.99</td></tr><tr><td>1</td><td>Coffee - free refills<br>(Cup)</td><td>£1.25</td></tr>
+<tr><td>VAT (20.00%)</td><td>£0.71</td></tr><tr><td>Order Total</td><td>£4.24</td></tr></table>`;
+  const r = parseReceiptEmail(htmlMail("The Example Arms <orders@examplearms.test>", "Thank you for your order", "Mon, 04 Mar 2024 14:18:00 +0000", html));
+  assert.deepEqual(r.items.map(i => [i.name, i.pricePence, i.variant]), [["Example Stout", 299, "(Pint)"], ["Coffee - free refills", 125, "(Cup)"]]);
+});
+
+t("shop order: labels between a row's values ('Quantity', 'Price')", () => {
+  const html = `<p>Thank you for your order</p><p>Order Details</p>
+<p>Example Whey Protein - 1kg - Vanilla</p><p>Quantity</p><p>1</p><p>Price</p><p>£24.99</p>
+<p>Example Shaker</p><p>Quantity</p><p>2</p><p>Price</p><p>£6.00</p><p>Subtotal</p><p>£30.99</p><p>Order Total</p><p>£30.99</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Nutrition <orders@examplenutrition.test>", "Your order confirmation", "Mon, 04 Mar 2024 14:18:00 +0000", html));
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Example Whey Protein - 1kg - Vanilla", 1, 2499], ["Example Shaker", 2, 600]]);
+});
+
+t("Shopify-style: a product name that starts with a number ('260 - Inspired by ... × 1')", () => {
+  const r = parseReceiptEmail(`From: Example Scents <shop@examplescents.test>\nSubject: Order #1042 confirmed\nContent-Type: text/plain\n\nThank you for your purchase!\nOrder summary\n260 - Inspired by Example For Her × 1\n100ml\n£24.85\nSubtotal\n£24.85\nTotal\n£24.85\n`);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence, i.variant]), [["260 - Inspired by Example For Her", 1, 2485, "100ml"]]);
+});
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);
