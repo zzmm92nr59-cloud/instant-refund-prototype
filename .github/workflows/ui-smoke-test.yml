@@ -44,6 +44,8 @@ jobs:
         run: node scripts/test-pictures-ui.mjs
       - name: Test the sign-up journey (one visit to Google or Microsoft, scan from the start)
         run: node scripts/test-signup-ui.mjs
+      - name: Test phone numbers and sign-in codes by text (paste from the notification, recovery codes)
+        run: node scripts/test-phone-ui.mjs
       - name: Test the wallet only shows what can still go back, with shop logos
         run: node scripts/test-wallet-fresh-ui.mjs
       - name: Test the look (light and dark, colourful tiles, glass tab bar with the next return)

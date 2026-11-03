@@ -414,6 +414,15 @@
     ".rl-sheet p.rl-jlegal{font-size:13px;color:var(--rl-text2);margin:22px 2px 0;text-align:center}.rl-jlegal a{color:var(--rl-accent);font-weight:700;display:inline-block;line-height:20px;padding:12px 2px;margin:-12px 0}" +
     ".rl-jhint{margin-top:14px}.rl-jhint p{font-size:14px!important;color:var(--rl-text2)!important;margin:0 0 4px!important}" +
     ".rl-jlabel{display:block;font-weight:700;font-size:14px;margin:4px 0 6px;color:var(--rl-text)}" +
+    // Codes: a big, even 6-digit box; two-step methods as small cards; recovery codes in a box that selects in one tap.
+    "input.rl-field{display:block;width:100%;box-sizing:border-box;min-height:52px;padding:14px 16px;border:1px solid var(--rl-line);border-radius:16px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text);margin:0 0 12px}" +
+    ".rl-asub input.rl-field{background:var(--rl-sheet)}input.rl-field:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    "input.rl-code{font-size:24px;letter-spacing:.3em;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}input.rl-code::placeholder{letter-spacing:normal;font-weight:400;font-size:16px}" +
+    ".rl-2s{border:1px solid var(--rl-line);border-radius:16px;padding:14px;margin:0 0 12px;background:var(--rl-sheet)}" +
+    ".rl-2s-h{display:flex;align-items:center;gap:10px;margin:0 0 6px;color:var(--rl-text)}.rl-2s-h b{flex:1;min-width:0;font-size:16px}" +
+    ".rl-2s-st{flex:none;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text2)}.rl-2s-st.on{background:var(--rl-accent-bg);color:var(--rl-accent)}" +
+    ".rl-sheet .rl-2s p{font-size:14px;margin:0 0 12px}.rl-2s .rl-btn.ghost{margin-top:0}" +
+    ".rl-codes{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;line-height:1.9;white-space:pre-line;word-break:break-all;-webkit-user-select:all;user-select:all;border:1px solid var(--rl-line);border-radius:14px;padding:10px 14px;margin:0 0 12px;background:var(--rl-sheet);color:var(--rl-text)}" +
     ".rl-jscan{background:#101828;color:#fff;border-radius:18px;padding:16px;margin:0 0 18px}.rl-jscan-t{display:flex;gap:12px;align-items:center}.rl-jscan .rl-jic{color:#c7f567;width:36px;height:36px;border-radius:10px;background:rgba(199,245,103,.12)}" +
     ".rl-jscan b{display:block;font-size:17px}.rl-jscan span{display:block;font-size:13.5px;color:#c9d0df}" +
     ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#c7f567;border-radius:99px;transition:width .6s ease}" +
@@ -665,7 +674,11 @@
   }
   var errors = { invalid_email: "That doesn't look like an email address.", too_many_requests: "Too many attempts. Please try again later.",
     sign_in_not_configured: "Sign-in isn't switched on yet.", email_send_failed: "We couldn't send the email. Please try again.",
-    no_deadline: "There's no return deadline to remind you about.", deadline_passed: "That deadline has already passed.", consent_required: "Please agree to the permission step first.", invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address.", invalid_code: "That code isn't right. Check your authenticator app, or type a recovery code.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
+    no_deadline: "There's no return deadline to remind you about.", deadline_passed: "That deadline has already passed.", consent_required: "Please agree to the permission step first.", invalid_or_expired_code: "That code is wrong or has expired. Check it, or request a new one.", invalid_or_expired_link: "That sign-in link has expired or was already used. Request a new one.", origin_not_allowed: "Sign-in isn't available from this address.", invalid_code: "That code isn't right. Check it and try again.",
+    phone_invalid: "That isn't a UK mobile number. Type it like 07700 900123.", sms_not_configured: "Relay can't send texts right now. Please try again later.",
+    sms_send_failed: "The text didn't send. Check the number and try again.", wait: "A code is on its way. You can ask for another in a few seconds.",
+    two_step_on: "Sign-in codes go to this number. Turn off codes by text under Two-step sign-in first.", no_phone: "Add your phone number first.",
+    already_enabled: "That's already on.", not_enabled: "That's already off.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
 
   // ---- Getting started: one journey from "Welcome" to "You're all set" ----
@@ -821,20 +834,19 @@
   }
   function codeStep(sheet, email) {
     var body = jFrame(sheet, { back: function () { emailStep(sheet, email); }, title: "Check your inbox", sub: "We sent a sign-in link to " + email + ". Open it on this device, or type the 6-digit code from the same email. It works once, for 15 minutes." });
-    var codeIn = el("input", { type: "text", id: "rl-signin-code", placeholder: "6-digit code", autocomplete: "one-time-code", inputMode: "numeric", maxLength: 7 });
-    codeIn.setAttribute("aria-label", "6-digit code");
+    var codeIn = codeBox("rl-signin-code", "6-digit code", function () { codeGo.click(); });
     var msg = el("div", { className: "rl-msg" });
     var codeGo = el("button", { type: "button", className: "rl-btn", text: "Continue" });
     codeGo.onclick = function () {
+      if (codeGo.disabled) return;
       codeGo.disabled = true; say(msg, "Checking…");
       api("/relay/auth/verify-code", { method: "POST", body: { email: email, code: codeIn.value } }).then(function (r) {
         codeGo.disabled = false;
-        if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
-        if (r.body.needsSecondStep) return secondStepView(sheet, r.body.pendingToken);
+        if (!r.ok) { codeIn.value = ""; return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true); }
+        if (r.body.needsSecondStep) return secondStepView(sheet, r.body);
         signedIn(r.body);
       }).catch(function () { codeGo.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
-    codeIn.addEventListener("keydown", function (e) { if (e.key === "Enter") codeGo.click(); });
     [codeIn, codeGo, msg, el("button", { type: "button", className: "rl-btn ghost", text: "Use a different email", onclick: function () { emailStep(sheet); } })].forEach(function (n) { body.appendChild(n); });
     setTimeout(function () { try { codeIn.focus(); } catch (e) {} }, 50);
   }
@@ -1182,51 +1194,312 @@
     refresh();
   }
 
-  // ---- Authenticator-app 2-step ----
-  function secondStepView(sheet, pendingToken) {
-    sheet.textContent = "";
-    var input = el("input", { type: "text", placeholder: "6-digit code or recovery code", autocomplete: "one-time-code", maxLength: 20 });
-    var msg = el("div", { className: "rl-msg" });
-    var go = el("button", { className: "rl-btn", text: "Confirm" });
-    go.onclick = function () {
-      go.disabled = true; say(msg, "Checking…");
-      api("/relay/auth/2fa/verify", { method: "POST", body: { pendingToken: pendingToken, code: input.value } }).then(function (r) {
-        go.disabled = false;
-        if (!r.ok) return say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
-        signedIn(r.body);
-      }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
-    };
-    [el("h2", { text: "One more step" }),
-     el("p", { text: "Open your authenticator app and type the 6-digit code for Relay. Lost your phone? Type one of your saved recovery codes instead." }),
-     input, go, msg, el("button", { className: "rl-btn ghost", text: "Cancel", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+  // ---- Codes: by email, by text, from an authenticator app ----
+  // A box for a 6-digit code. Phones offer the code from the text or email notification just above the keyboard
+  // (one-time-code); pasting the whole message keeps just the code; six digits and it's sent by itself.
+  // With recovery, it also takes a recovery code (letters and digits), so nothing is stripped out.
+  function codeBox(id, label, onFull, recovery) {
+    var input = el("input", { type: "text", id: id, className: recovery ? "rl-field" : "rl-field rl-code", placeholder: recovery ? "6-digit code or recovery code" : "6-digit code",
+      autocomplete: "one-time-code", inputMode: recovery ? "text" : "numeric", maxLength: recovery ? 20 : 7 });
+    if (!recovery) input.setAttribute("pattern", "[0-9]*");
+    input.setAttribute("aria-label", label || "6-digit code"); input.setAttribute("autocapitalize", "none"); input.setAttribute("spellcheck", "false"); input.setAttribute("enterkeyhint", "done");
+    var full = function () { if (onFull && /^\d{6}$/.test(input.value)) onFull(); };
+    input.addEventListener("paste", function (e) {
+      var t = ""; try { t = (e.clipboardData || window.clipboardData).getData("text") || ""; } catch (x) {}
+      var m = /(?:^|\D)(\d{3})[ -]?(\d{3})(?!\d)/.exec(t);
+      if (m) { e.preventDefault(); input.value = m[1] + m[2]; full(); }
+    });
+    input.addEventListener("input", function () {
+      if (!recovery) { var d = input.value.replace(/\D/g, "").slice(0, 6); if (d !== input.value) input.value = d; }
+      full();
+    });
+    if (onFull) input.addEventListener("keydown", function (e) { if (e.key === "Enter") onFull(); });
+    return input;
   }
-  function twoStepSection(box) {
-    var body = el("div"), note = el("div", { className: "rl-msg" });
-    box.appendChild(el("h2", { text: "Two-step sign-in", style: "font-size:18px;margin-top:8px" }));
-    box.appendChild(body); box.appendChild(note);
-    function codeInput(ph) { return el("input", { type: "text", placeholder: ph, autocomplete: "one-time-code", maxLength: 20 }); }
-    function render() {
+  // Android's Chrome can hand over the code from the text itself (the text's last line names Relay's site). One wait at a
+  // time: a new code box, or a code accepted, ends the last one.
+  var otpWait = null;
+  function readTextCode(input, onCode) {
+    stopReadingText();
+    if (!("OTPCredential" in window) || !navigator.credentials || !window.AbortController) return;
+    var ac = new AbortController(); otpWait = ac;
+    navigator.credentials.get({ otp: { transport: ["sms"] }, signal: ac.signal }).then(function (otp) {
+      if (otpWait === ac) otpWait = null;
+      if (otp && /^\d{6}$/.test(otp.code || "") && document.body.contains(input)) { input.value = otp.code; onCode(); }
+    }).catch(function () {});
+  }
+  function stopReadingText() { if (otpWait) { try { otpWait.abort(); } catch (e) {} otpWait = null; } }
+  // "Text me a new code": greyed out and counting down until another text can be sent.
+  function againButton(label, onclick) {
+    var b = el("button", { type: "button", className: "rl-btn ghost", text: label, onclick: onclick }), timer = null, seen = false;
+    b.wait = function (secs) {
+      clearInterval(timer); var left = Math.max(1, Math.round(Number(secs) || 30));
+      var tick = function () {
+        if (b.isConnected) seen = true; else if (seen) return clearInterval(timer);
+        if (left <= 0) { clearInterval(timer); b.disabled = false; b.textContent = label; return; }
+        b.disabled = true; b.textContent = label + " (" + left + "s)"; left--;
+      };
+      tick(); timer = setInterval(tick, 1000);
+    };
+    return b;
+  }
+  // Asks Relay to text a code. Resolves with the answer ({ ending, resendIn }) or null after saying what went wrong.
+  function textCode(path, body, msg, again) {
+    if (again) again.disabled = true;
+    return api(path, { method: "POST", body: body || {} }).then(function (r) {
+      if (r.ok) { if (again) again.wait(r.body.resendIn); return r.body; }
+      if (again) { if (r.body && r.body.error === "wait") again.wait(r.body.retryAfter); else again.disabled = false; }
+      say(msg, errors[r.body && r.body.error] || "The text didn't send. Please try again.", true);
+      return null;
+    }, function () { if (again) again.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); return null; });
+  }
+  function recoveryCodesCard(box, codes, then) {
+    box.appendChild(el("p", { text: "Save these recovery codes somewhere safe, like a password manager. If you lose your phone, each one gets you in once. You won't see them again." }));
+    box.appendChild(el("div", { className: "rl-codes", text: codes.join("\n") }));
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      var copy = el("button", { type: "button", className: "rl-btn ghost", text: "Copy codes" });
+      copy.onclick = function () { navigator.clipboard.writeText(codes.join("\n")).then(function () { copy.textContent = "Copied"; }, function () {}); };
+      box.appendChild(copy);
+    }
+    box.appendChild(el("button", { type: "button", className: "rl-btn", text: "I've saved them", style: "margin-top:10px", onclick: then }));
+  }
+
+  // Signing in, step two: the code texted to the phone (sent straight away), from the authenticator app, or a recovery code.
+  function secondStepView(sheet, info) {
+    if (typeof info === "string") info = { pendingToken: info };
+    var methods = info.methods && info.methods.length ? info.methods : ["app"], pending = info.pendingToken, ending = info.phoneEnding || "";
+    var mode = methods[0], textSent = false, waitUntil = 0;
+    function draw() {
+      var text = mode === "text", app = mode === "app", recovery = mode === "recovery";
+      var body = jFrame(sheet, {
+        title: text ? "Check your phone" : app ? "Enter your code" : "Use a recovery code",
+        sub: text ? "Relay texts a 6-digit code to your number ending " + ending + ". It works once, for 10 minutes."
+          : app ? "Open your authenticator app and type the 6-digit code for Relay."
+          : "Type one of the recovery codes you saved when you turned on two-step sign-in. Each one works once." });
+      sheet.setAttribute("aria-label", "Two-step sign-in");
+      var msg = el("div", { className: "rl-msg" }), busy = false, input;
+      if (recovery) {
+        input = el("input", { type: "text", id: "rl-2s-code", className: "rl-field", placeholder: "Recovery code", autocomplete: "off", maxLength: 20 });
+        input.setAttribute("aria-label", "Recovery code"); input.setAttribute("autocapitalize", "none"); input.setAttribute("spellcheck", "false");
+        input.addEventListener("keydown", function (e) { if (e.key === "Enter") go(); });
+      } else input = codeBox("rl-2s-code", "6-digit code", function () { go(); });
+      var confirm = el("button", { type: "button", className: "rl-btn", text: "Confirm", onclick: function () { go(); } });
+      function go() {
+        if (busy) return;
+        var v = input.value.trim();
+        if (!v) return say(msg, recovery ? "Type one of your recovery codes." : "Type the 6-digit code.", true);
+        busy = true; confirm.disabled = true; say(msg, "Checking…");
+        api("/relay/auth/2fa/verify", { method: "POST", body: { pendingToken: pending, code: v } }).then(function (r) {
+          busy = false; confirm.disabled = false;
+          if (r.ok) { stopReadingText(); return signedIn(r.body); }
+          var e = r.body && r.body.error;
+          say(msg, e === "invalid_code" ? (recovery ? "That recovery code isn't right, or it's already been used." : "That code isn't right. Check it and try again.") : errors[e] || "Something went wrong. Please try again.", true);
+          if (!recovery) input.value = "";
+          try { input.focus(); } catch (x) {}
+        }).catch(function () { busy = false; confirm.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      [input, confirm, msg].forEach(function (n) { body.appendChild(n); });
+      if (text) {
+        var again = againButton("Text me a new code", function () { send(); });
+        var send = function () {
+          say(msg, "");
+          textCode("/relay/auth/2fa/text", { pendingToken: pending }, msg, again).then(function (b) {
+            if (!b) return;
+            textSent = true; waitUntil = Date.now() + (b.resendIn || 30) * 1000; ending = b.ending || ending;
+            readTextCode(input, go);
+          });
+        };
+        body.appendChild(again);
+        if (!textSent) send();
+        else { if (waitUntil > Date.now()) again.wait((waitUntil - Date.now()) / 1000); readTextCode(input, go); }
+      }
+      methods.forEach(function (m) {
+        if (m === mode) return;
+        body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: m === "text" ? "Text me a code instead" : "Use my authenticator app instead", onclick: function () { mode = m; draw(); } }));
+      });
+      body.appendChild(recovery ? el("button", { type: "button", className: "rl-btn ghost", text: methods[0] === "text" ? "Back to the texted code" : "Back to the app code", onclick: function () { mode = methods[0]; draw(); } })
+        : el("button", { type: "button", className: "rl-btn ghost", text: "Use a recovery code", onclick: function () { mode = "recovery"; draw(); } }));
+      setTimeout(function () { try { input.focus(); } catch (x) {} }, 50);
+    }
+    draw();
+  }
+
+  // Typing a mobile number, then the code texted to it. opts.confirm(code) replaces the usual confirm (the two-step page
+  // uses it to confirm the number and switch codes by text on in one go); opts.onDone(answer) runs once it's confirmed.
+  function numberStep(body, note, opts) {
+    body.textContent = ""; say(note, "");
+    body.appendChild(el("p", { text: opts.intro || "Relay texts a code to check it's yours. UK mobile numbers only for now." }));
+    var input = el("input", { type: "tel", id: "rl-phone", className: "rl-field", placeholder: "07700 900123", autocomplete: "tel", inputMode: "tel", maxLength: 24, value: opts.typed || "" });
+    var send = el("button", { type: "button", className: "rl-btn", text: "Text me a code" });
+    send.onclick = function () {
+      if (send.disabled) return;
+      var v = input.value.trim();
+      if (!v) { say(note, "Type your mobile number.", true); return; }
+      send.disabled = true; say(note, "Sending a text…");
+      textCode("/relay/my/phone/start", { phone: v }, note, null).then(function (b) { send.disabled = false; if (b) { say(note, ""); codeStep(v, b.ending); } });
+    };
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.click(); });
+    [el("label", { htmlFor: "rl-phone", className: "rl-jlabel", text: "Mobile number" }), input, send].forEach(function (n) { body.appendChild(n); });
+    if (opts.onCancel) body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: opts.onCancel }));
+    setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+    function codeStep(number, ending) {
       body.textContent = "";
+      body.appendChild(el("p", { text: "We've texted a 6-digit code to your number ending " + ending + ". It works once, for 10 minutes." }));
+      var busy = false, box = codeBox("rl-phone-code", "6-digit code", function () { go(); });
+      var ok = el("button", { type: "button", className: "rl-btn", text: opts.confirmLabel || "Confirm number", onclick: function () { go(); } });
+      var again = againButton("Text me a new code", function () {
+        say(note, "");
+        textCode("/relay/my/phone/start", { phone: number }, note, again).then(function (b) { if (b) { say(note, "Another code is on its way."); readTextCode(box, go); } });
+      });
+      function go() {
+        if (busy) return;
+        if (!box.value) { say(note, "Type the 6-digit code.", true); return; }
+        busy = true; ok.disabled = true; say(note, "Checking…");
+        (opts.confirm ? opts.confirm(box.value) : api("/relay/my/phone/confirm", { method: "POST", body: { code: box.value } })).then(function (r) {
+          busy = false; ok.disabled = false;
+          if (r.ok) { stopReadingText(); say(note, ""); return opts.onDone(r.body); }
+          var e = r.body && r.body.error;
+          say(note, e === "invalid_code" || e === "invalid_or_expired_code" ? "That code isn't right, or it has expired. Check the text, or ask for a new code." : errors[e] || "Something went wrong. Please try again.", true);
+          box.value = ""; try { box.focus(); } catch (x) {}
+        }).catch(function () { busy = false; ok.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      [box, ok, again, el("button", { type: "button", className: "rl-btn ghost", text: "Use a different number", onclick: function () { numberStep(body, note, Object.assign({}, opts, { typed: number })); } })]
+        .forEach(function (n) { body.appendChild(n); });
+      again.wait(30); readTextCode(box, go);
+      setTimeout(function () { try { box.focus(); } catch (e) {} }, 50);
+    }
+  }
+  // A code texted now to the number already on the account (or, when switching something off, an app or recovery code).
+  function codeOnly(body, note, intro, label, confirm, onDone, onCancel, recovery) {
+    body.textContent = ""; say(note, "");
+    body.appendChild(el("p", { text: intro }));
+    var busy = false, box = codeBox("rl-2s-manage", "Code", function () { go(); }, recovery);
+    var ok = el("button", { type: "button", className: "rl-btn", text: label, onclick: function () { go(); } });
+    var again = againButton("Text me a new code", function () { send(); });
+    function send() { say(note, ""); textCode("/relay/my/2fa/text/send", {}, note, again).then(function (b) { if (b) readTextCode(box, go); }); }
+    function go() {
+      if (busy) return;
+      if (!box.value.trim()) { say(note, "Type the code.", true); return; }
+      busy = true; ok.disabled = true; say(note, "Checking…");
+      confirm(box.value.trim()).then(function (r) {
+        busy = false; ok.disabled = false;
+        if (r.ok) { stopReadingText(); say(note, ""); return onDone(r.body); }
+        say(note, r.body && r.body.error === "invalid_code" ? "That code isn't right. Check it and try again." : errors[r.body && r.body.error] || "Something went wrong. Please try again.", true);
+        box.value = ""; try { box.focus(); } catch (x) {}
+      }).catch(function () { busy = false; ok.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    [box, ok, again, el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: onCancel })].forEach(function (n) { body.appendChild(n); });
+    send();
+    setTimeout(function () { try { box.focus(); } catch (e) {} }, 50);
+  }
+
+  // Account → Phone number: a mobile number, confirmed by a texted code, for sign-in codes.
+  function phoneSection(box, openTwoStep) {
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    box.appendChild(body); box.appendChild(note);
+    function draw(done) {
+      body.textContent = ""; say(note, done || "");
+      body.appendChild(el("div", { className: "rl-skel", style: "min-height:96px;border-radius:16px" }));
+      api("/relay/my/phone").then(function (r) {
+        body.textContent = "";
+        if (!r.ok) return say(note, "Couldn't load your number. Check your connection and try again.", true);
+        var p = r.body;
+        if (p.ending) return confirmed(p);
+        if (!p.available) return body.appendChild(el("p", { text: "Relay can't send texts yet. This is where you'll add your number when it can." }));
+        numberStep(body, note, { onDone: function () { draw("Number confirmed."); } });
+        if (done) say(note, done);
+      }).catch(function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    function confirmed(p) {
+      body.appendChild(el("div", { className: "rl-2s" }, [
+        el("div", { className: "rl-2s-h" }, [accIc("phone"), el("b", { text: "Number ending " + p.ending }), el("span", { className: "rl-2s-st on", text: "Confirmed" })]),
+        el("p", { text: p.twoStep ? "Relay texts a code to this number each time you sign in with an email link, Google or Microsoft." : "Used only for sign-in codes. Never for marketing, and never shown to anyone." })]));
+      if (p.twoStep) {
+        body.appendChild(el("p", { className: "rl-jnote", text: "To change or remove this number, turn off codes by text under Two-step sign-in first." }));
+        if (openTwoStep) body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Go to Two-step sign-in", onclick: openTwoStep }));
+        return;
+      }
+      if (openTwoStep) body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Text me a code when I sign in", onclick: openTwoStep }));
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Change number", onclick: function () { numberStep(body, note, { onDone: function () { draw("Number changed."); }, onCancel: function () { draw(); } }); } }));
+      var rm = el("button", { type: "button", className: "rl-btn ghost", text: "Remove number" });
+      rm.onclick = function () {
+        ask("Remove your number ending " + p.ending + "?", "Remove number", function () {
+          rm.disabled = true;
+          api("/relay/my/phone/remove", { method: "POST", body: {} }).then(function (x) {
+            rm.disabled = false;
+            if (x.ok) draw("Number removed."); else say(note, errors[x.body && x.body.error] || "Couldn't remove it. Try again.", true);
+          }).catch(function () { rm.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+        });
+      };
+      body.appendChild(rm);
+    }
+    draw();
+  }
+
+  // Account → Two-step sign-in: a code as well as the email link, Google or Microsoft. By text, from an app, or both.
+  function twoStepSection(box) {
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    box.appendChild(body); box.appendChild(note);
+    function render(done) {
+      body.textContent = ""; say(note, done || "");
+      body.appendChild(el("div", { className: "rl-skel", style: "min-height:150px;border-radius:16px" }));
       api("/relay/my/2fa").then(function (r) {
-        if (!r.ok) return;
-        if (!r.body.enabled) {
-          body.appendChild(el("p", { text: "Add an authenticator app (Google Authenticator, 1Password, Authy…) so signing in by email or Google also needs a code. Face ID sign-in is not affected." }));
-          body.appendChild(el("button", { className: "rl-btn ghost", text: "Set up authenticator app", onclick: setup }));
-        } else {
-          var left = r.body.recoveryCodesLeft;
-          body.appendChild(el("p", { text: "On. " + left + " recovery code" + (left === 1 ? "" : "s") + " left." + (left <= 2 ? " You're running low, so turn this off and on again to get a fresh set." : "") }));
-          var off = codeInput("App code or recovery code");
-          var offBtn = el("button", { className: "rl-btn ghost", text: "Turn off two-step sign-in" });
-          offBtn.onclick = function () {
-            offBtn.disabled = true;
-            api("/relay/my/2fa/disable", { method: "POST", body: { code: off.value } }).then(function (x) {
-              offBtn.disabled = false;
-              if (x.ok) { say(note, "Two-step sign-in is off."); render(); } else say(note, errors[x.body.error] || "Couldn't turn it off. Try again.", true);
-            }).catch(function () { offBtn.disabled = false; say(note, "Couldn't reach Relay.", true); });
-          };
-          body.appendChild(off); body.appendChild(offBtn);
+        body.textContent = "";
+        if (!r.ok) return say(note, "Couldn't load your settings. Check your connection and try again.", true);
+        var s = r.body;
+        body.appendChild(el("p", { text: "With this on, signing in with an email link, Google or Microsoft also asks for a code. Face ID sign-in doesn't need one." }));
+        if (s.textAvailable || s.text) body.appendChild(textCard(s));
+        body.appendChild(appCard(s));
+        if (s.enabled) {
+          var left = s.recoveryCodesLeft;
+          body.appendChild(el("p", { className: "rl-jnote", text: left + " recovery code" + (left === 1 ? "" : "s") + " left." + (left <= 2 ? " You're running low: turn two-step sign-in off and on again for a fresh set." : "") }));
         }
-      }).catch(function () {});
+      }).catch(function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    function card(icon, title, on, line) {
+      return el("div", { className: "rl-2s" }, [el("div", { className: "rl-2s-h" }, [accIc(icon), el("b", { text: title }), el("span", { className: "rl-2s-st" + (on ? " on" : ""), text: on ? "On" : "Off" })]), el("p", { text: line })]);
+    }
+    var turnOn = function (code) { return api("/relay/my/2fa/text", { method: "POST", body: { on: true, code: code } }); };
+    function textOnDone(b) {
+      if (!b.recoveryCodes) return render("Codes by text are on.");
+      body.textContent = "";
+      body.appendChild(el("p", { text: "Codes by text are on.", style: "color:var(--rl-text);font-weight:700" }));
+      recoveryCodesCard(body, b.recoveryCodes, function () { render(); });
+    }
+    function textCard(s) {
+      var c = card("phone", "Text message", s.text, s.text ? "Codes go to your number ending " + s.phoneEnding + "."
+        : s.phoneEnding ? "Text a code to your number ending " + s.phoneEnding + " each time you sign in." : "Text a code to your mobile each time you sign in.");
+      if (s.text) c.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Turn off codes by text", onclick: function () {
+        codeOnly(body, note, "To turn this off, type the code we've just texted to your number ending " + s.phoneEnding + ". No phone? Type a recovery code" + (s.app ? " or an app code" : "") + " instead.", "Turn off",
+          function (code) { return api("/relay/my/2fa/text", { method: "POST", body: { on: false, code: code } }); }, function () { render("Codes by text are off."); }, function () { render(); }, true);
+      } }));
+      else c.appendChild(el("button", { type: "button", className: "rl-btn", text: "Turn on codes by text", onclick: function () {
+        if (!s.phoneEnding) return numberStep(body, note, { intro: "Which mobile should the codes go to? Relay texts a code now to check it's yours. UK mobile numbers only for now.", confirm: turnOn, confirmLabel: "Turn on", onDone: textOnDone, onCancel: function () { render(); } });
+        codeOnly(body, note, "We've texted a 6-digit code to your number ending " + s.phoneEnding + ". Type it to turn this on.", "Turn on", turnOn, textOnDone, function () { render(); });
+      } }));
+      return c;
+    }
+    function appCard(s) {
+      var c = card("lock", "Authenticator app", s.app, s.app ? "Codes come from your authenticator app." : "Use an app like Google Authenticator, 1Password or Authy for the code.");
+      c.appendChild(s.app ? el("button", { type: "button", className: "rl-btn ghost", text: "Turn off the app", onclick: appOff })
+        : el("button", { type: "button", className: "rl-btn" + (s.text ? " ghost" : ""), text: "Set up authenticator app", onclick: setup }));
+      return c;
+    }
+    function appOff() {
+      body.textContent = ""; say(note, "");
+      body.appendChild(el("p", { text: "To turn off the authenticator app, type a code from it, or one of your recovery codes." }));
+      var busy = false, off = codeBox("rl-2s-off", "App code or recovery code", function () { go(); }, true);
+      var btn = el("button", { type: "button", className: "rl-btn", text: "Turn off the app", onclick: function () { go(); } });
+      function go() {
+        if (busy || !off.value.trim()) return;
+        busy = true; btn.disabled = true; say(note, "Checking…");
+        api("/relay/my/2fa/disable", { method: "POST", body: { code: off.value.trim() } }).then(function (x) {
+          busy = false; btn.disabled = false;
+          if (x.ok) return render("The authenticator app is off.");
+          say(note, x.body && x.body.error === "invalid_code" ? "That code isn't right. Check your app, or type a recovery code." : errors[x.body && x.body.error] || "Couldn't turn it off. Try again.", true);
+        }).catch(function () { busy = false; btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      [off, btn, el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: function () { render(); } })].forEach(function (n) { body.appendChild(n); });
     }
     function setup() {
       say(note, "");
@@ -1234,26 +1507,23 @@
         if (!r.ok) return say(note, "Couldn't start setup. Try again.", true);
         body.textContent = "";
         body.appendChild(el("p", { text: "1. In your authenticator app, add a new account and enter this key (or tap the link on your phone):" }));
-        body.appendChild(el("div", { className: "rl-order", style: "font-family:monospace;font-size:16px;word-break:break-all;user-select:all", text: r.body.secret }));
-        if (/^otpauth:\/\//.test(r.body.otpauthUrl || "")) body.appendChild(el("a", { href: r.body.otpauthUrl, text: "Open in authenticator app", style: "display:block;margin:0 0 12px;color:var(--rl-text)" }));
+        body.appendChild(el("div", { className: "rl-codes", text: r.body.secret }));
+        if (/^otpauth:\/\//.test(r.body.otpauthUrl || "")) body.appendChild(el("a", { href: r.body.otpauthUrl, className: "rl-btn ghost", text: "Open in authenticator app", style: "box-sizing:border-box;text-align:center;text-decoration:none;margin:0 0 12px" }));
         body.appendChild(el("p", { text: "2. Type the 6-digit code it shows:" }));
-        var c = codeInput("6-digit code");
-        var on = el("button", { className: "rl-btn", text: "Turn on" });
+        var busy = false, c = codeBox("rl-2s-app", "6-digit code from the app", function () { on.click(); });
+        var on = el("button", { type: "button", className: "rl-btn", text: "Turn on" });
         on.onclick = function () {
-          on.disabled = true;
+          if (busy) return; busy = true; on.disabled = true; say(note, "Checking…");
           api("/relay/my/2fa/enable", { method: "POST", body: { code: c.value } }).then(function (x) {
-            on.disabled = false;
-            if (!x.ok) return say(note, errors[x.body.error] || "Couldn't turn it on. Try again.", true);
+            busy = false; on.disabled = false;
+            if (!x.ok) { c.value = ""; return say(note, x.body && x.body.error === "invalid_code" ? "That code isn't right. Check your app and try again." : errors[x.body && x.body.error] || "Couldn't turn it on. Try again.", true); }
             body.textContent = ""; say(note, "");
-            body.appendChild(el("p", { text: "Two-step sign-in is on. Save these recovery codes somewhere safe, like a password manager. Each works once if you lose your phone. You won't see them again." }));
-            body.appendChild(el("div", { className: "rl-order", style: "font-family:monospace;font-size:16px;line-height:1.8;user-select:all", text: (x.body.recoveryCodes || []).join("\n") }));
-            body.lastChild.style.whiteSpace = "pre-line";
-            body.appendChild(el("button", { className: "rl-btn", text: "I've saved them", onclick: render }));
-          }).catch(function () { on.disabled = false; say(note, "Couldn't reach Relay.", true); });
+            body.appendChild(el("p", { text: "The authenticator app is on.", style: "color:var(--rl-text);font-weight:700" }));
+            recoveryCodesCard(body, x.body.recoveryCodes || [], function () { render(); });
+          }).catch(function () { busy = false; on.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
         };
-        body.appendChild(c); body.appendChild(on);
-        body.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: render }));
-      }).catch(function () { say(note, "Couldn't reach Relay.", true); });
+        [c, on, el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: function () { render(); } })].forEach(function (n) { body.appendChild(n); });
+      }).catch(function () { say(note, "Couldn't reach Relay. Check your connection.", true); });
     }
     render();
   }
@@ -2150,6 +2420,7 @@
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+    phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>',
     card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
     shield: '<path d="M12 3.5 19 6v5.5c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6Z"/><path d="m9 12 2 2 4-4"/>',
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
@@ -2197,12 +2468,13 @@
   }
   var HELP = [
     ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
-    ["A receipt is missing. What can I do?", "Open Account, then Email connection, and choose Find a missing receipt to search your inbox for that store. You can also paste a receipt in, or run a full re-scan."],
+    ["A receipt is missing. What can I do?", "Open Profile, then Email connection, and choose Find a missing receipt to search your inbox for that store. You can also paste a receipt in, or run a full re-scan."],
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
-    ["How do I stop Relay reading my email?", "Open Account, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
-    ["How do I get a copy of my data?", "Open Account, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
-    ["How do I delete my account?", "Open Account, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
+    ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
+    ["How do I get a copy of my data?", "Open Profile, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
+    ["How do I make signing in safer?", "Open Profile, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
+    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
   function signedInView(sheet, email, notice, c) {
@@ -2276,12 +2548,23 @@
     // Sign-in & security
     var secRows = [];
     if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
-    var twoRow = accRow("lock", "Two-step sign-in", "", function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); });
+    var openTwoStep = function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); };
+    // Shown once Relay can send texts (or when a number is already on the account).
+    var phoneRow = accRow("phone", "Phone number", "", function () { page("Phone number", function (b) { phoneSection(b, openTwoStep); }); });
+    phoneRow.style.display = "none"; secRows.push(phoneRow);
+    var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
     secRows.push(twoRow);
     var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
     cardRow.style.display = "none"; secRows.push(cardRow);
     sheet.appendChild(accGroup("Sign-in & security", secRows));
-    api("/relay/my/2fa").then(function (r) { if (r.ok && r.body) twoRow.setDetail(r.body.enabled ? "On" : "Off"); }).catch(function () {});
+    api("/relay/my/2fa").then(function (r) {
+      if (!r.ok || !r.body) return;
+      var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
+    }).catch(function () {});
+    api("/relay/my/phone").then(function (r) {
+      if (!r.ok || !r.body || !(r.body.available || r.body.ending)) return;
+      phoneRow.style.display = ""; phoneRow.setDetail(r.body.ending ? "Ending " + r.body.ending : "Add one for sign-in codes");
+    }).catch(function () {});
     api("/relay/my/card").then(function (r) {
       if (!r.ok || !r.body || !r.body.enabled) return;
       if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
@@ -2439,7 +2722,7 @@
         sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
         sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
       // Signed in (and, through Google or Microsoft, the inbox connected and its first scan started): on to what's still needed.
-      if (r.body.needsSecondStep) { signInExtra = { mailConnected: r.body.mailConnected, outlookConnected: r.body.outlookConnected, suggestedName: r.body.suggestedName }; return open(function (sheet) { secondStepView(sheet, r.body.pendingToken); }); }
+      if (r.body.needsSecondStep) { signInExtra = { mailConnected: r.body.mailConnected, outlookConnected: r.body.outlookConnected, suggestedName: r.body.suggestedName }; return open(function (sheet) { secondStepView(sheet, r.body); }); }
       signedIn(r.body);
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
   }

@@ -85,7 +85,7 @@ assert.ok(mine.receipts.length >= 1 && mine.signIn.passkeys.length >= 1 && mine.
 assert.ok(!text.includes(S.id) && !text.includes(S.email), "nothing of another shopper's");
 const SECRETS = ["gmail_connections-token_data", "gmail_connections-token_iv", "auth_sessions-session_hash", "auth_totp-secret_enc", "auth_passkeys-public_key",
   "auth_passkeys-credential_id", "relay_cards-payment_method_id", "relay_cards-customer_id", "relay_swap_payments-payment_intent", "relay_return_labels-label", "relay_return_labels-qr",
-  "auth_totp_recovery-", "auth_login_tokens-", "gmail_oauth_states-"];
+  "auth_totp_recovery-", "auth_login_tokens-", "gmail_oauth_states-", "auth_phone-phone_enc", "auth_sms_codes-"];
 for (const sec of SECRETS) assert.ok(!text.includes(sec), "no secret in the file: " + sec);
 assert.equal((await call("/relay/my/export", {})).status, 401, "only for the signed-in shopper");
 console.log("ok - Download my data: everything of theirs, nothing of anyone else's, no keys, sessions, two-step secret or payment references");

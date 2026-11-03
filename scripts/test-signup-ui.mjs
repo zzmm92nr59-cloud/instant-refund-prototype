@@ -130,11 +130,14 @@ await sheet.getByText(/Using Gmail\? Continue with Google instead/).waitFor();
 await polished("email"); await page.screenshot({ path: "/tmp/shots/signup-email.png" });
 await sheet.getByRole("button", { name: "Email me a sign-in link" }).click();
 await sheet.getByRole("heading", { name: "Check your inbox" }).waitFor();
+// The code box: phones offer the code from the email's notification (one-time-code), six digits go by themselves, and
+// pasting the whole subject line keeps just the code.
+assert.equal(await page.locator("#rl-signin-code").evaluate(el => el.autocomplete + " " + el.inputMode), "one-time-code numeric");
 await page.locator("#rl-signin-code").fill("000000");
-await sheet.getByRole("button", { name: "Continue" }).click();
 await sheet.getByText("That code is wrong or has expired").waitFor();
-await page.locator("#rl-signin-code").fill("123456");
-await sheet.getByRole("button", { name: "Continue" }).click();
+assert.equal(await page.locator("#rl-signin-code").inputValue(), "", "a wrong code is cleared for the next try");
+await page.locator("#rl-signin-code").evaluate((el, t) => { const dt = new DataTransfer(); dt.setData("text/plain", t); el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); },
+  "123456 is your Relay sign-in code");
 await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
 assert.equal(await page.locator("#rl-onboard-name").inputValue(), "", "nothing offered without Google");
 assert.equal(await sheet.locator(".rl-jscan").count(), 0, "no scan before an inbox is connected");
