@@ -53,7 +53,9 @@
   // Relay answers from the nearest copy of its database and hands back a bookmark with each answer. Sending the newest one
   // back means no answer is ever older than one already seen, so a change just made always shows. It's only sent once
   // Relay has given one (a server that doesn't give them wouldn't expect it).
-  var bookmark = null;
+  // Kept on the device too, so reopening the app straight after signing in can't land on a copy that hasn't caught up.
+  var BOOKMARK_KEY = "relay.bookmark.v1", bookmark = null;
+  try { bookmark = localStorage.getItem(BOOKMARK_KEY) || null; if (bookmark && !/^[0-9A-Za-z._:-]{8,160}$/.test(bookmark)) bookmark = null; } catch (e) {}
   function api(path, opts) {
     opts = opts || {};
     var method = opts.method || "GET", s = load(), headers = {};
@@ -66,7 +68,7 @@
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
         var b = r.headers && r.headers.get && r.headers.get("x-d1-bookmark");
-        if (b && /^[0-9A-Za-z._:-]{8,160}$/.test(b) && (!bookmark || b > bookmark)) bookmark = b;
+        if (b && /^[0-9A-Za-z._:-]{8,160}$/.test(b) && (!bookmark || b > bookmark)) { bookmark = b; try { localStorage.setItem(BOOKMARK_KEY, b); } catch (e) {} }
         return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
       });
     if (key) {
