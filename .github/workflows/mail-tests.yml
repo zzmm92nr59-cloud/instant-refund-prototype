@@ -43,6 +43,7 @@ jobs:
         run: |
           node scripts/test-gmail.mjs
           node scripts/test-gmail-auto.mjs
+          node scripts/test-gmail-busy.mjs
       - name: Outlook
         run: |
           node scripts/test-outlook.mjs

@@ -575,7 +575,8 @@ function gmailMailbox(fetchImpl, token) {
         pageToken = typeof data.nextPageToken === "string" && /^[A-Za-z0-9_=-]{1,300}$/.test(data.nextPageToken) ? data.nextPageToken : "";
         if (!pageToken) break;
       }
-      return { entries, incomplete };
+      // More emails in this window than one listing takes (4 pages of 100): the window is read again in shorter pieces.
+      return { entries, incomplete, overflow: Boolean(pageToken) && !incomplete };
     },
     // The email as text; GONE if it no longer exists; null if Gmail couldn't give it just now (tried again later).
     async read(id) {
@@ -680,13 +681,16 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   const limitDay = yr ? yr + "/01/01" : ymd(sinceLast);
   const top = yr ? (yr + 1) + "/01/01" : ymd(now + DAY_MS);
   let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= top && cursorIn > limitDay ? cursorIn : top;
-  let incomplete = false, windows = 0, outOfBudget = false;
+  let incomplete = false, windows = 0, outOfBudget = false, span = WINDOW_DAYS;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
     if (calls + 4 > budget) { outOfBudget = true; break; }
-    const afterD = ymd(fromYmd(before) - WINDOW_DAYS * DAY_MS);
+    const afterD = ymd(fromYmd(before) - span * DAY_MS);
     incomplete = false;
     const listed = await box.list(afterD, before, () => calls + 4 <= budget);
     if (listed.failed) { if (windows === 0) return { status: 502, body: { error: "gmail_unavailable" } }; incomplete = true; break; }
+    // A busy month has more emails than one listing takes: the oldest of them used to be skipped. The same stretch is
+    // listed again in half the days until it fits (a single day is read as far as it goes).
+    if (listed.overflow && span > 1) { span = Math.max(1, Math.floor(span / 2)); continue; }
     if (listed.incomplete) incomplete = true;
     const ids = listed.entries.map(e => e.id);
     // Lookups are done in groups to stay under the database's per-query limit.
@@ -788,6 +792,8 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
       const next = ymd(fromYmd(listed.moreBefore) + DAY_MS);
       before = next < before ? next : listed.moreBefore < before ? listed.moreBefore : afterD;
     } else before = afterD;
+    // A quieter stretch goes back to longer windows.
+    if (span < WINDOW_DAYS && listed.entries.length < 150) span = Math.min(WINDOW_DAYS, span * 2);
     if (fetched >= maxFetch) break;
   }
   const more = incomplete || outOfBudget || before > limitDay;
