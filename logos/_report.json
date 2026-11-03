@@ -626,9 +626,9 @@
   },
   "thebodyshop.com": {
    "file": "thebodyshop.com.png",
-   "from": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/f0/6c/3e/f06c3eb6-fb39-fe9d-6712-753281499944/AppIcon-0-0-1x_U007emarketing-0-2-0-85-220.png/512x512bb.jpg",
-   "px": 192,
-   "bytes": 3707
+   "from": "https://www.thebodyshop.com/cdn/shop/files/tbs-favicon-32x32.png?crop=center&height=192&v=1727868854&width=192",
+   "px": 32,
+   "bytes": 1430
   },
   "kikocosmetics.com": {
    "file": "kikocosmetics.com.svg",
