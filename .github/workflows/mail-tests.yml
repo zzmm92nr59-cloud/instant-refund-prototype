@@ -11,6 +11,7 @@ on:
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-delete-account.mjs'
+      - 'scripts/test-more-inboxes.mjs'
       - '.github/workflows/mail-tests.yml'
   push:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-delete-account.mjs'
+      - 'scripts/test-more-inboxes.mjs'
       - '.github/workflows/mail-tests.yml'
   workflow_dispatch:
 permissions:
@@ -47,6 +49,8 @@ jobs:
           node scripts/test-gmail-auto.mjs
           node scripts/test-gmail-busy.mjs
           node scripts/test-delete-account.mjs
+      - name: More than one inbox (Gmail and Outlook together)
+        run: node scripts/test-more-inboxes.mjs
       - name: Outlook
         run: |
           node scripts/test-outlook.mjs

@@ -117,7 +117,8 @@ const q = page.locator("#rl-ar-q");
 await q.waitFor();
 assert.equal(await q.getAttribute("placeholder"), "Search your Gmail");
 assert.deepEqual(await page.locator(".rl-ar-chip").allInnerTexts(), ["Kestrel Outdoor", "Harlow & Co", "Fernway Books"], "the shops this shopper buys from most");
-await view.getByText("Forward it to " + EMAIL + ". Relay will pick it up, or search for it above to add it now.").waitFor();
+await view.getByText("Add that inbox to Relay as well, or forward the email to " + EMAIL + ".").waitFor();
+await view.getByRole("button", { name: "Add a Gmail inbox" }).waitFor();
 await polished("page");
 console.log("ok - Profile's Add a missing receipt opens one page: search, the shopper's own shops, paste, forward");
 

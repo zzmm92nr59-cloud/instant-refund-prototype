@@ -23,7 +23,7 @@ import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanN
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
-import { ensureGmailTables, gmailDeleteStatements, revokeMailbox, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
+import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 import { tellShopper } from "./security-mail.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
@@ -580,7 +580,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       await ensureProfileTable(env.RELAY_DB);
       await forgetCard(env, shopper.id, o).catch(() => {});
       // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
-      await ensureGmailTables(env.RELAY_DB).then(() => revokeMailbox(env, shopper.id, o.fetchImpl)).catch(() => {});
+      await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
       await env.RELAY_DB.batch([
         ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
         ...profileDeleteStatements(env.RELAY_DB, shopper.id),

@@ -45,6 +45,21 @@ export const OUTLOOK_SCOPE = "offline_access https://graph.microsoft.com/Mail.Re
 const OUTLOOK_ID = /^[A-Za-z0-9_=+\/-]{16,512}$/;
 const GMAIL_ID = /^[A-Za-z0-9]{6,40}$/;
 const STATE_TTL_MS = 10 * 60 * 1000;
+// More than one inbox: the first is kept under the shopper's own id, each other one under "<id>~<n>" (n from 2 to
+// MAX_INBOXES) in the same tables, so the first inbox works exactly as before. Receipts from every inbox are kept under the
+// shopper, with the inbox's number in details.mailbox (none for the first inbox and for receipts pasted in by hand).
+export const MAX_INBOXES = 5;
+export const ownerOf = (boxId) => String(boxId).split("~")[0];
+export const slotOf = (boxId) => { const m = /~(\d{1,2})$/.exec(String(boxId)); return m ? Number(m[1]) : null; };
+export const boxIdOf = (shopperId, slot) => (Number.isInteger(slot) && slot > 1 && slot <= MAX_INBOXES ? shopperId + "~" + slot : shopperId);
+// SQL for the shopper an inbox row belongs to (its own id for the first inbox).
+const OWNER_SQL = (col) => `(CASE WHEN instr(${col}, '~') > 0 THEN substr(${col}, 1, instr(${col}, '~') - 1) ELSE ${col} END)`;
+// The rows of every inbox a shopper has connected, the first one first.
+export async function inboxesOf(db, shopperId) {
+  const r = await db.prepare("SELECT * FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ? ORDER BY CASE WHEN shopper_id = ? THEN 0 ELSE 1 END, shopper_id")
+    .bind(shopperId, shopperId + "~%", shopperId).all();
+  return (r.results || []).filter(x => x.shopper_id === shopperId || (String(x.shopper_id).startsWith(shopperId + "~") && slotOf(x.shopper_id)));
+}
 // A Worker invocation can only make so many outside calls, so one scan reads a limited number
 // of new emails and says if there are more. The app keeps asking until it is told there are none.
 // Cloudflare's Workers Paid plan allows 1,000 outside calls and 1,000 database calls per request, so a round reads up to
@@ -216,11 +231,11 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
-    db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
-    db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
-    db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId),
-    db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
+    db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
+    db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM shopper_consents WHERE shopper_id = ?").bind(shopperId)
   ];
 }
@@ -243,7 +258,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
   await ensureAutoColumns(env.RELAY_DB);
   const rows = ((await env.RELAY_DB.prepare(
     `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
-     WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+     WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
      ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION).all()).results || []);
   let passes = 0, calls = 0;
@@ -291,7 +306,7 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
     `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev,
        (${staleYear}) AS staleYear FROM gmail_connections g
      WHERE (COALESCE(g.full_rev, 0) < ? OR (${staleYear}) IS NOT NULL)
-       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
      ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(READER_FULL_REV, FULL_REV, READER_FULL_REV, CONSENT_VERSION, CATCH_UP_MAILBOXES).all()).results || []);
   let calls = 0;
@@ -402,7 +417,59 @@ export async function revokeMailbox(env, shopperId, fetchImpl) {
   return { row, revoked };
 }
 
+// Cancels Relay's access to each of the shopper's other inboxes too (account deletion and withdrawing permission).
+export async function revokeAllMailboxes(env, shopperId, fetchImpl) {
+  const first = await revokeMailbox(env, shopperId, fetchImpl);
+  for (const x of (await inboxesOf(env.RELAY_DB, shopperId)).filter(x => x.shopper_id !== shopperId)) await revokeMailbox(env, x.shopper_id, fetchImpl).catch(() => null);
+  return first;
+}
+// The receipts read from one inbox (slot null: the first inbox), and what hangs off them: photos, reminders, which items
+// are going back, and any listing made from them. Receipts pasted in by hand belong to no inbox and are kept.
+function inboxReceiptDeletes(db, shopperId, slot) {
+  const pick = slot ? "json_extract(details, '$.mailbox') = ?" : "json_extract(details, '$.mailbox') IS NULL AND json_extract(details, '$.pasted') IS NULL";
+  const args = slot ? [shopperId, slot] : [shopperId];
+  const ids = `SELECT id FROM captured_receipts WHERE shopper_id = ? AND ${pick}`;
+  return [
+    db.prepare(`UPDATE resale_requests SET status = 'declined' WHERE status = 'pending' AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ? AND receipt_id IN (${ids}))`).bind(shopperId, ...args),
+    db.prepare(`UPDATE resale_requests SET status = 'closed' WHERE status = 'accepted' AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ? AND receipt_id IN (${ids}))`).bind(shopperId, ...args),
+    db.prepare(`UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched') AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_images WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM return_reminders WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_item_marks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM captured_receipts WHERE shopper_id = ? AND ${pick}`).bind(...args)];
+}
+// Disconnects one of the other inboxes: Relay's access is cancelled at Google (Microsoft has no such call) and its key
+// deleted, and the receipts read from that inbox go. The shopper's other inboxes and receipts stay as they are.
+async function disconnectInbox(env, shopperId, slot, fetchImpl) {
+  const boxId = boxIdOf(shopperId, slot);
+  const { row, revoked } = await revokeMailbox(env, boxId, fetchImpl);
+  if (!row) return { deleted: false };
+  const db = env.RELAY_DB;
+  await db.batch([...inboxReceiptDeletes(db, shopperId, slot),
+    db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(boxId),
+    db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(boxId),
+    db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(boxId),
+    db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ?").bind(boxId)]);
+  return { deleted: true, revokedAtGoogle: revoked, provider: row.provider === "microsoft" ? "microsoft" : "google" };
+}
 async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
+  const db = env.RELAY_DB, others = (await inboxesOf(db, shopperId)).filter(x => x.shopper_id !== shopperId);
+  if (!withdraw) {
+    // The first inbox goes and the others stay: the next one takes its place, with its receipts and how far it has read.
+    const { row, revoked } = await revokeMailbox(env, shopperId, fetchImpl);
+    const next = others[0], moves = next ? [
+      db.prepare("UPDATE gmail_connections SET shopper_id = ? WHERE shopper_id = ?").bind(shopperId, next.shopper_id),
+      db.prepare("UPDATE mail_scan_jobs SET shopper_id = ? WHERE shopper_id = ?").bind(shopperId, next.shopper_id),
+      db.prepare("UPDATE gmail_history_years SET shopper_id = ? WHERE shopper_id = ?").bind(shopperId, next.shopper_id),
+      db.prepare("UPDATE captured_receipts SET details = json_remove(details, '$.mailbox') WHERE shopper_id = ? AND json_extract(details, '$.mailbox') = ?").bind(shopperId, slotOf(next.shopper_id))] : [];
+    await db.batch([...inboxReceiptDeletes(db, shopperId, null),
+      db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
+      db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId),
+      db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId), ...moves]);
+    return { deleted: true, revokedAtGoogle: revoked, provider: row && row.provider === "microsoft" ? "microsoft" : "google", ...(next ? { nowFirst: next.google_email || null } : {}) };
+  }
+  // Withdrawing permission: every inbox, and everything read from them.
+  for (const x of others) await revokeMailbox(env, x.shopper_id, fetchImpl).catch(() => null);
   const { row, revoked } = await revokeMailbox(env, shopperId, fetchImpl);
   const statements = [
     // Listings are made from captured receipts, so they come down with them.
@@ -414,8 +481,9 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
-    env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ?").bind(shopperId),
-    env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ?").bind(shopperId)
+    env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
+    env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
+    env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
   ];
   if (withdraw) statements.push(env.RELAY_DB.prepare(
     "UPDATE shopper_consents SET withdrawn_at = ? WHERE shopper_id = ? AND withdrawn_at IS NULL").bind(Date.now(), shopperId));
@@ -696,15 +764,17 @@ function messageIdOf(rawText) {
   return m ? m[1].trim() : null;
 }
 
-async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
+async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
+  // boxId is the inbox (the shopper's id for their first one); what it finds is kept under the shopper.
+  const shopperId = ownerOf(boxId), slot = slotOf(boxId), mark = slot ? { mailbox: slot } : {};
   // Every outside call is counted so a round never runs past the plan's per-request limit.
   let calls = 0;
   const fetchImpl = (...a) => { calls++; return fetchImplIn(...a); };
   const budget = o.budget || CALL_BUDGET, maxFetch = o.maxFetch || MAX_FETCH_PER_SCAN;
   const row = await env.RELAY_DB.prepare(
-    "SELECT token_iv, token_data, last_scan_at, provider, full_rev FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
+    "SELECT token_iv, token_data, last_scan_at, provider, full_rev FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
-  const token = await mailToken(env, shopperId, row, fetchImpl);
+  const token = await mailToken(env, boxId, row, fetchImpl);
   if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
   const box = row.provider === "microsoft" ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token);
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
@@ -770,7 +840,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
           writes.push(env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
             .bind(JSON.stringify({ ...prevDetails, readTries: tries, ...(giveUp ? { parserVersion: PARSER_VERSION } : {}) }), shopperId, ref));
         } else {
-          const placeholder = JSON.stringify({ kind: "not_receipt", unread: true, readTries: tries, parserVersion: giveUp ? PARSER_VERSION : 0 });
+          const placeholder = JSON.stringify({ kind: "not_receipt", unread: true, readTries: tries, parserVersion: giveUp ? PARSER_VERSION : 0, ...mark });
           writes.push(seen
             ? env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?").bind(placeholder, shopperId, ref)
             : env.RELAY_DB.prepare("INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
@@ -780,7 +850,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
         continue;
       }
       const cls = classify(rawText, box.ref(listed.entries[i]));
-      const details = cls.details, status = cls.status;
+      const details = slot ? { ...cls.details, mailbox: slot } : cls.details, status = cls.status;
       let imageToStore = null;
       if (status === "not_receipt") ignored++;
       // One small product photo per receipt, fetched at most once.
@@ -833,11 +903,11 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   }
   const more = incomplete || outOfBudget || before > limitDay;
   if (yr) {
-    if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev, cursor) VALUES (?,?,?,?,NULL) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at, rev = excluded.rev, cursor = NULL").bind(shopperId, yr, now, READER_FULL_REV).run();
+    if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev, cursor) VALUES (?,?,?,?,NULL) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at, rev = excluded.rev, cursor = NULL").bind(boxId, yr, now, READER_FULL_REV).run();
   } else if (!more && !o.recent) {
     // A finished read of the whole look-back period also records which full read it was (see OUTLOOK_FULL_REV).
-    if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, FULL_REV, shopperId).run();
-    else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, shopperId).run();
+    if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, FULL_REV, boxId).run();
+    else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, boxId).run();
   }
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
@@ -916,6 +986,15 @@ async function appScanRound(env, shopperId, fetchImpl, now, { full = false, smal
   const r = await runScanJobRound(env, job, fetchImpl, now, { small });
   return { status: r.status, body: { ...r.body, job: jobView(await jobOf(env, shopperId)) } };
 }
+// When the shopper checks for new receipts, their other inboxes are checked as well, as jobs Relay carries on by itself
+// (each one at most every few minutes, however often the app asks).
+async function checkOtherInboxes(env, shopperId, now, full) {
+  for (const x of (await inboxesOf(env.RELAY_DB, shopperId)).filter(x => x.shopper_id !== shopperId)) {
+    const j = await jobOf(env, x.shopper_id);
+    if (j && (j.state === "running" || now - (j.finished_at || j.updated_at || 0) < 5 * 60 * 1000)) continue;
+    await startScanJob(env, x.shopper_id, now, { full });
+  }
+}
 // The scheduled worker's part: jobs the app isn't driving are carried on, a few rounds a run, until they are done.
 export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => fetch(...a), o = {}) {
   if (!env.RELAY_DB) return { jobs: 0, rounds: 0 };
@@ -925,7 +1004,7 @@ export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => f
   const rows = ((await env.RELAY_DB.prepare(
     `SELECT j.shopper_id AS id FROM mail_scan_jobs j
      WHERE j.state = 'running' AND (j.lease_until IS NULL OR j.lease_until < ?) AND (j.app_at IS NULL OR j.app_at < ?)
-       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = j.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("j.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
      ORDER BY j.updated_at LIMIT 5`).bind(now, now - JOB_APP_MS, CONSENT_VERSION).all()).results || []);
   let rounds = 0, finished = 0, notified = 0;
   for (const row of rows) {
@@ -944,7 +1023,7 @@ export async function runScanJobs(env, now = Date.now(), fetchImpl = (...a) => f
     const done = await jobOf(env, row.id);
     if (done && done.state === "done" && done.finished_at === now && done.background > 0) {
       finished++;
-      if (done.added > 0) notified += await tellScanDone(env, row.id, done.added, { now, fetchImpl: o.pushFetch });
+      if (done.added > 0) notified += await tellScanDone(env, ownerOf(row.id), done.added, { now, fetchImpl: o.pushFetch });
     }
   }
   return { jobs: rows.length, rounds, finished, notified };
@@ -973,13 +1052,14 @@ async function tokenFor(env, shopperId, fetchImpl) {
 }
 
 // Nothing here is stored: the list is for the shopper to choose from.
-async function findEmails(env, shopperId, fetchImpl, rawQuery) {
+async function findEmails(env, boxId, fetchImpl, rawQuery, max = 15) {
+  const shopperId = ownerOf(boxId), mark = slotOf(boxId) ? { mailbox: slotOf(boxId) } : {};
   const q = String(rawQuery || "").replace(/[^\p{L}\p{N} .'&-]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 40);
   if (q.length < 2) return { status: 400, body: { error: "query_too_short" } };
-  const t = await tokenFor(env, shopperId, fetchImpl);
+  const t = await tokenFor(env, boxId, fetchImpl);
   if (!t.token) return t;
   const auth = { Authorization: "Bearer " + t.token };
-  if (t.provider === "microsoft") return findOutlook(env, shopperId, fetchImpl, auth, q);
+  if (t.provider === "microsoft") return findOutlook(env, shopperId, fetchImpl, auth, q, max, mark);
   // Order, shipping and return emails first (a shop's marketing and payment-plan emails otherwise bury them), then anything else.
   const listIds = async query => {
     const l = await fetchImpl("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=" + encodeURIComponent(query), { headers: auth });
@@ -991,7 +1071,7 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
     listIds(q + ' subject:(order OR receipt OR confirmation OR "thanks for your" OR return OR "QR code" OR shipping OR delivered OR invoice) -category:promotions'),
     listIds(q)]);
   if (first === null && rest === null) return { status: 502, body: { error: "gmail_unavailable" } };
-  const ids = [...new Set([...(first || []), ...(rest || [])])].slice(0, 15);
+  const ids = [...new Set([...(first || []), ...(rest || [])])].slice(0, max);
   const results = (await Promise.all(ids.map(async (id) => {
     const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`, { headers: auth });
     if (!r.ok) return null;
@@ -1002,13 +1082,13 @@ async function findEmails(env, shopperId, fetchImpl, rawQuery) {
     const have = await env.RELAY_DB.prepare("SELECT status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopperId, ref).first();
     return { id, subject: h("subject").slice(0, 120), from: from.slice(0, 60),
       date: j.internalDate ? new Date(Number(j.internalDate)).toISOString().slice(0, 10) : null,
-      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) };
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)), ...mark };
   }))).filter(Boolean);
   return { status: 200, body: { results } };
 }
 
 // Outlook's own search, newest first; order-type emails are put at the top of the list.
-async function findOutlook(env, shopperId, fetchImpl, auth, q) {
+async function findOutlook(env, shopperId, fetchImpl, auth, q, max = 15, mark = {}) {
   const [l, skipped] = await Promise.all([
     fetchImpl(GRAPH + "/me/messages?$search=" + encodeURIComponent('"' + q + '"') + "&$top=25&$select=" + OUTLOOK_SELECT, { headers: auth }),
     outlookSkippedFolders(fetchImpl, auth)]);
@@ -1016,7 +1096,7 @@ async function findOutlook(env, shopperId, fetchImpl, auth, q) {
   // Junk and Deleted Items are left out, as Gmail's search leaves out Spam and Bin.
   const found = ((await l.json().catch(() => ({}))).value || []).filter(m => m && typeof m.id === "string" && OUTLOOK_ID.test(m.id) && !skipped.has(m.parentFolderId));
   const looks = m => looksLikeShopping(m.subject, m.from && m.from.emailAddress && m.from.emailAddress.address);
-  const ordered = [...found.filter(looks), ...found.filter(m => !looks(m))].slice(0, 15);
+  const ordered = [...found.filter(looks), ...found.filter(m => !looks(m))].slice(0, max);
   const results = await Promise.all(ordered.map(async (m) => {
     const mid = typeof m.internetMessageId === "string" ? m.internetMessageId.trim() : "";
     const ref = await sha256Hex("outlook:" + (mid && mid.length <= 400 ? mid : m.id));
@@ -1024,14 +1104,15 @@ async function findOutlook(env, shopperId, fetchImpl, auth, q) {
     const who = m.from && m.from.emailAddress || {};
     return { id: m.id, subject: String(m.subject || "").slice(0, 120), from: String(who.name || who.address || "").replace(/["']/g, "").trim().slice(0, 60),
       date: typeof m.receivedDateTime === "string" ? m.receivedDateTime.slice(0, 10) : null,
-      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)) };
+      added: Boolean(have && !["not_receipt", "dismissed"].includes(have.status)), ...mark };
   }));
   return { status: 200, body: { results } };
 }
 
-async function addEmail(env, shopperId, fetchImpl, now, messageId) {
+async function addEmail(env, boxId, fetchImpl, now, messageId) {
+  const shopperId = ownerOf(boxId), mark = slotOf(boxId) ? { mailbox: slotOf(boxId) } : {};
   if (typeof messageId !== "string" || !(GMAIL_ID.test(messageId) || OUTLOOK_ID.test(messageId))) return { status: 400, body: { error: "invalid_message" } };
-  const t = await tokenFor(env, shopperId, fetchImpl);
+  const t = await tokenFor(env, boxId, fetchImpl);
   if (!t.token) return t;
   const outlook = t.provider === "microsoft";
   if (outlook ? !OUTLOOK_ID.test(messageId) : !GMAIL_ID.test(messageId)) return { status: 400, body: { error: "invalid_message" } };
@@ -1047,7 +1128,7 @@ async function addEmail(env, shopperId, fetchImpl, now, messageId) {
     if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
     rawText = new TextDecoder().decode(unb64url(raw));
   }
-  const { details, status } = classify(rawText, outlook ? { outlookId: messageId } : { gmailId: messageId }, true);
+  const { details, status } = classify(rawText, outlook ? { outlookId: messageId, ...mark } : { gmailId: messageId, ...mark }, true);
   if (status === "not_receipt") {
     // Say which checks failed (no email content), so a missed layout can be fixed.
     const why = parseReceiptEmail(rawText, { lenient: true }).signals || null;
@@ -1381,7 +1462,7 @@ export async function handleGmailCallback(request, env, url, opts) {
     `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider IS NULL AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
     .bind(opts.now, await sha256Hex(state), opts.now).first();
   if (!claimed) return back("failed");
-  if (!(await hasConsent(env.RELAY_DB, claimed.shopper_id))) return back("consent_needed");
+  if (!(await hasConsent(env.RELAY_DB, ownerOf(claimed.shopper_id)))) return back("consent_needed");
   const res = await opts.fetchImpl("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -1398,12 +1479,20 @@ export async function handleGmailCallback(request, env, url, opts) {
       { headers: { Authorization: "Bearer " + tokens.access_token } });
     if (p.ok) googleEmail = (await p.json()).emailAddress || null;
   } catch { googleEmail = null; }
+  if (await inboxTaken(env, claimed.shopper_id, null, googleEmail)) return back("already_connected");
   await saveConnection(env, claimed.shopper_id, null, googleEmail, tokens.refresh_token, opts.now);
-  return back("connected");
+  return back(slotOf(claimed.shopper_id) ? "added" : "connected");
+}
+// Whether this address is already another of the shopper's inboxes (an inbox is only ever read once).
+async function inboxTaken(env, boxId, provider, address) {
+  if (!address) return false;
+  const want = String(address).toLowerCase(), outlook = provider === "microsoft";
+  return (await inboxesOf(env.RELAY_DB, ownerOf(boxId))).some(x => x.shopper_id !== boxId && String(x.google_email || "").toLowerCase() === want && (x.provider === "microsoft") === outlook);
 }
 
-// One mailbox per shopper: connecting one replaces the other (receipts already captured stay until the shopper disconnects).
-// A different mailbox is read from the start; the same mailbox connected again (a new sign-in) carries on where it was.
+// One mailbox per place (boxId: the shopper's first inbox, or one of their others): connecting a different account in the
+// same place replaces it (receipts already captured stay until the shopper disconnects). A different mailbox is read from
+// the start; the same mailbox connected again (a new sign-in) carries on where it was.
 export async function saveConnection(env, shopperId, provider, address, refreshToken, now) {
   const enc = await encrypt(env, refreshToken);
   await ensureGmailTables(env.RELAY_DB);
@@ -1445,7 +1534,7 @@ export async function handleOutlookCallback(request, env, url, opts) {
     `UPDATE gmail_oauth_states SET used_at = ? WHERE state_hash = ? AND provider = 'microsoft' AND used_at IS NULL AND expires_at > ? RETURNING shopper_id`)
     .bind(opts.now, await sha256Hex(state), opts.now).first();
   if (!claimed) return back("failed");
-  if (!(await hasConsent(env.RELAY_DB, claimed.shopper_id))) return back("consent_needed");
+  if (!(await hasConsent(env.RELAY_DB, ownerOf(claimed.shopper_id)))) return back("consent_needed");
   let tokens = null;
   try {
     const res = await opts.fetchImpl(MS_AUTH + "/token", {
@@ -1465,8 +1554,9 @@ export async function handleOutlookCallback(request, env, url, opts) {
     const p = await opts.fetchImpl(GRAPH + "/me?$select=mail,userPrincipalName", { headers: { Authorization: "Bearer " + tokens.access_token } });
     if (p.ok) { const me = await p.json(); address = (typeof me.mail === "string" && me.mail) || (typeof me.userPrincipalName === "string" && me.userPrincipalName) || null; }
   } catch { address = null; }
+  if (await inboxTaken(env, claimed.shopper_id, "microsoft", address)) return back("already_connected");
   await saveConnection(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null, tokens.refresh_token, opts.now);
-  return back("connected");
+  return back(slotOf(claimed.shopper_id) ? "added" : "connected");
 }
 
 // Routes for a signed-in shopper. Returns a Response, or null if the path is not ours.
@@ -1495,21 +1585,33 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const outlook = Boolean(cb && cb.provider === "microsoft");
     if (outlook ? !outlookConfigured(env) : !gmailConfigured(env)) return json({ error: "gmail_not_configured" }, 503, cors);
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    let boxId = shopper.id;
+    const another = Boolean(cb && cb.another === true);
+    if (another) {
+      const have = await inboxesOf(env.RELAY_DB, shopper.id);
+      if (!have.some(x => x.shopper_id === shopper.id)) boxId = shopper.id;   // no first inbox yet: this one is the first
+      else {
+        const taken = new Set(have.map(x => slotOf(x.shopper_id)).filter(Boolean));
+        let slot = 2; while (taken.has(slot) && slot <= MAX_INBOXES) slot++;
+        if (slot > MAX_INBOXES) return json({ error: "too_many_inboxes", max: MAX_INBOXES }, 409, cors);
+        boxId = boxIdOf(shopper.id, slot);
+      }
+    }
     const state = randomToken();
     await env.RELAY_DB.prepare("DELETE FROM gmail_oauth_states WHERE expires_at <= ?").bind(opts.now).run();
     await env.RELAY_DB.prepare(
       "INSERT INTO gmail_oauth_states (state_hash,shopper_id,created_at,expires_at,provider) VALUES (?,?,?,?,?)")
-      .bind(await sha256Hex(state), shopper.id, opts.now, opts.now + STATE_TTL_MS, outlook ? "microsoft" : null).run();
+      .bind(await sha256Hex(state), boxId, opts.now, opts.now + STATE_TTL_MS, outlook ? "microsoft" : null).run();
     if (outlook) {
       const ms = new URLSearchParams({
         client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
-        scope: OUTLOOK_SCOPE, state, prompt: "select_account", login_hint: shopper.email
+        scope: OUTLOOK_SCOPE, state, prompt: "select_account", ...(another ? {} : { login_hint: shopper.email })
       });
       return json({ url: MS_AUTH + "/authorize?" + ms }, 200, cors);
     }
     const params = new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri(env, url), response_type: "code", scope: SCOPE,
-      access_type: "offline", prompt: "consent", include_granted_scopes: "false", state, login_hint: shopper.email
+      access_type: "offline", prompt: another ? "consent select_account" : "consent", include_granted_scopes: "false", state, ...(another ? {} : { login_hint: shopper.email })
     });
     return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
   }
@@ -1520,7 +1622,13 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
         connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
     // A scan in progress (or just finished), so the app can show it carrying on after the shopper comes back.
     const scanJob = c ? jobView(await jobOf(env, shopper.id)) : null;
-    return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}) }, 200, cors);
+    // Other inboxes, each with how its reading is going.
+    const others = c ? await Promise.all((await inboxesOf(env.RELAY_DB, shopper.id)).filter(x => x.shopper_id !== shopper.id).map(async x => {
+      const j = jobView(await jobOf(env, x.shopper_id));
+      return { mailbox: slotOf(x.shopper_id), provider: x.provider === "microsoft" ? "microsoft" : "google", email: x.google_email,
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, ...(j ? { scan: j } : {}) };
+    })) : [];
+    return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}), others, maxInboxes: MAX_INBOXES }, 200, cors);
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
@@ -1534,6 +1642,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       const r = want
         ? await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", false, { ...(sb && sb.small === true ? { maxFetch: 2 } : {}), year: want })
         : await appScanRound(env, shopper.id, opts.fetchImpl, opts.now, { full: Boolean(sb && sb.full === true), small: Boolean(sb && sb.small === true), busyWaitMs: opts.busyWaitMs ?? 3000 });
+      if (!want) await checkOtherInboxes(env, shopper.id, opts.now, Boolean(sb && sb.full === true));
       return json(r.body, r.status, cors);
     } catch (e) {
       // A round that hits a limit still answers, so the app can wait a moment and carry on from where it was.
@@ -1549,16 +1658,33 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/gmail/find" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const fb = await request.json().catch(() => ({}));
-    const r = await findEmails(env, shopper.id, opts.fetchImpl, fb && fb.query);
-    return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
+    const boxes = await inboxesOf(env.RELAY_DB, shopper.id);
+    if (boxes.length <= 1) {
+      const r = await findEmails(env, shopper.id, opts.fetchImpl, fb && fb.query);
+      return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
+    }
+    const each = await Promise.all(boxes.map(b => findEmails(env, b.shopper_id, opts.fetchImpl, fb && fb.query, 10).then(r => ({ r, b }), () => ({ r: { status: 502, body: { error: "gmail_unavailable" } }, b }))));
+    const good = each.filter(x => x.r.status === 200);
+    if (!good.length) return json(each[0].r.body, each[0].r.status, { ...cors, "Cache-Control": "no-store" });
+    const lists = good.map(x => (x.r.body.results || []).map(res => ({ ...res, inbox: x.b.google_email || null })));
+    const results = [];
+    for (let i = 0; lists.some(l => i < l.length); i++) lists.forEach(l => { if (i < l.length) results.push(l[i]); });
+    const problems = each.filter(x => x.r.status !== 200).map(x => ({ mailbox: slotOf(x.b.shopper_id), inbox: x.b.google_email || null, error: (x.r.body && x.r.body.error) || "gmail_unavailable" }));
+    return json({ results, ...(problems.length ? { problems } : {}) }, 200, { ...cors, "Cache-Control": "no-store" });
   }
   if (path === "/relay/my/gmail/add" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
     const ab = await request.json().catch(() => ({}));
-    const r = await addEmail(env, shopper.id, opts.fetchImpl, opts.now, ab && ab.messageId);
+    const r = await addEmail(env, boxIdOf(shopper.id, ab && Number(ab.mailbox)), opts.fetchImpl, opts.now, ab && ab.messageId);
     return json(r.body, r.status, cors);
   }
   if (path === "/relay/my/gmail/disconnect" && m === "POST") {
+    const db = await request.json().catch(() => ({}));
+    const slot = db && Number(db.mailbox);
+    if (Number.isInteger(slot) && slot > 1) {
+      if (slot > MAX_INBOXES) return json({ error: "not_found" }, 404, cors);
+      return json({ ok: true, ...(await disconnectInbox(env, shopper.id, slot, opts.fetchImpl)) }, 200, cors);
+    }
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: false })) }, 200, cors);
   }
   if (path === "/relay/my/wrapped" && m === "GET") {
@@ -1597,14 +1723,15 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       "SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ?").bind(orig[1], shopper.id).first();
     if (!rec) return json({ error: "not_found" }, 404, cors);
     const d = JSON.parse(rec.details);
+    const fromBox = boxIdOf(shopper.id, Number(d.mailbox));
     const conn = await env.RELAY_DB.prepare(
-      "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first();
+      "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(fromBox).first();
     if (!conn) return json({ error: "gmail_not_connected" }, 409, cors);
     // An email can only be opened from the mailbox it came from.
     const outlook = conn.provider === "microsoft";
     const mid = outlook ? d.outlookId : d.gmailId;
     if (typeof mid !== "string" || !(outlook ? OUTLOOK_ID : GMAIL_ID).test(mid)) return json({ error: "email_not_found" }, 404, cors);
-    const token = await mailToken(env, shopper.id, conn, opts.fetchImpl);
+    const token = await mailToken(env, fromBox, conn, opts.fetchImpl);
     if (!token) return json({ error: "gmail_reconnect_needed" }, 401, cors);
     const r = outlook ? await buildOriginalOutlook(opts.fetchImpl, token, mid) : await buildOriginal(opts.fetchImpl, token, mid);
     return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });

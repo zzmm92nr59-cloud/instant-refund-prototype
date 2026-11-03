@@ -416,6 +416,13 @@
     ".rl-ar-fwd{display:flex;flex-direction:column;gap:4px;margin:28px 0 0;padding:16px 18px;border-radius:16px;background:var(--rl-fill);color:var(--rl-text)}" +
     ".rl-ar-fwd b{font-size:17px;font-weight:700}.rl-ar-fwd span{font-size:15px;line-height:1.4;color:var(--rl-text2);overflow-wrap:anywhere}" +
     ".rl-ar-copy{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;max-width:100%;min-height:44px;margin-top:8px;padding:10px 16px;border-radius:999px;background:var(--rl-bg);border:1px solid var(--rl-line);color:var(--rl-text);font-size:15px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}" +
+    ".rl-ar-adds{display:flex;flex-wrap:wrap;gap:8px}.rl-ar-addbtn{display:inline-flex;align-items:center;gap:6px}.rl-ar-addbtn .rl-jic{color:inherit;margin:0}.rl-ar-fwd .rl-ar-adds:not(:empty)+.rl-ar-copy{margin-top:8px}" +
+    // The Email connection page: one row per inbox.
+    ".rl-ibx{margin:4px 0 6px}.rl-ibx-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0 2px}.rl-ibx-row+.rl-ibx-row{border-top:1px solid var(--rl-line)}" +
+    ".rl-ibx-ic{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;margin:0}.rl-ibx-ic.g{background:#E0446E}.rl-ibx-ic.ms{background:#4F72E0}" +
+    ".rl-ibx-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:1px}.rl-ibx-t b{font-size:16px;font-weight:600;color:var(--rl-text);overflow-wrap:anywhere}.rl-ibx-t span{font-size:13px;line-height:1.35;color:var(--rl-text2)}" +
+    ".rl-ibx-off{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;min-height:44px;padding:0;color:var(--rl-danger);font-size:15px;font-weight:700}.rl-ibx-off:active{opacity:.6}.rl-ibx-off:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    ".rl-ibx-adds{display:grid;gap:10px;margin:8px 0 4px}.rl-ibx-addbtn{display:flex!important;align-items:center;justify-content:center;gap:8px;margin-top:0!important}.rl-ibx-addbtn .rl-jic{color:inherit;margin:0}" +
     ".rl-find-link{all:unset;box-sizing:border-box;cursor:pointer;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:underline;text-underline-offset:3px;text-align:center}" +
     ".rl-recstat{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 0;font-size:13px;color:var(--rl-text2)}" +
     ".rl-recstat .rl-po-secondary{background:var(--rl-fill);color:var(--rl-text);border-color:transparent}" +
@@ -822,7 +829,8 @@
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     back: '<path d="m15 6-6 6 6 6"/>',
-    ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'
+    ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>'
   };
   function jIc(n, px) {
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
@@ -1969,8 +1977,45 @@
   }
   function disconnectGmail(done, msg) {
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
-      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) { if (x.ok) { memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} rememberMailbox({ connected: false }); done(); } else say(msg, "Couldn't disconnect. Try again.", true); });
+      api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) {
+        if (!x.ok) return say(msg, "Couldn't disconnect. Try again.", true);
+        memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {}
+        if (x.body && x.body.nowFirst !== undefined) cachedGet("gmail", "/relay/my/gmail").then(function () { done(); }, done);
+        else { rememberMailbox({ connected: false }); done(); }
+      });
     });
+  }
+  // Another inbox: Google's or Microsoft's own account picker, then back to Relay, which reads it in the background.
+  function addAnotherInbox(provider, btn, note) {
+    if (btn.disabled) return;
+    var outlook = provider === "microsoft", name = outlook ? "Outlook" : "Gmail";
+    btn.disabled = true;
+    api("/relay/my/gmail/connect", { method: "POST", body: outlook ? { provider: "microsoft", another: true } : { another: true } }).then(function (x) {
+      var host = outlook ? /^https:\/\/login\.microsoftonline\.com\// : /^https:\/\/accounts\.google\.com\//;
+      if (x.ok && x.body && host.test(x.body.url || "")) { try { sessionStorage.setItem("relay.addingInbox", "1"); } catch (e) {} location.href = x.body.url; return; }
+      btn.disabled = false;
+      say(note, x.body && x.body.error === "too_many_inboxes" ? "Relay can read up to " + (x.body.max || 5) + " inboxes for one account." : "Couldn't start adding " + name + ". Please try again.", true);
+    }, function () { btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+  }
+  // The buttons for adding another inbox: one per kind of inbox Relay can read.
+  function addInboxButtons(host, note, cls) {
+    cachedGet("consent", "/relay/my/consent").then(function (r) {
+      var c = (r.ok && r.body) || {};
+      [["google", "Add a Gmail inbox", c.gmailAvailable], ["microsoft", "Add an Outlook inbox", c.outlookAvailable]].forEach(function (k) {
+        if (!k[2]) return;
+        var b = el("button", { type: "button", className: cls || "rl-btn ghost rl-ibx-addbtn" }, [jIc("plus", 18), el("span", { text: k[1] })]);
+        b.onclick = function () { addAnotherInbox(k[0], b, note); };
+        host.appendChild(b);
+      });
+    }, function () {});
+  }
+  function inboxName(provider) { return provider === "microsoft" ? "Outlook" : "Gmail"; }
+  function inboxWhen(x) {
+    if (x.scan && x.scan.state === "running") return "Reading… " + (x.scan.found || 0) + " found so far";
+    var t = Math.max(x.lastScanAt || 0, x.autoAt || 0);
+    if (!t) return "Reading for the first time";
+    var d = new Date(t);
+    return "Checked " + (d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
   }
   // Without a connected inbox, the Receipts page still lets the shopper add a receipt themselves, and lists the ones they added.
   function addedByHand(box) {
@@ -2041,7 +2086,8 @@
       var autoAt = r.body.autoAt ? new Date(r.body.autoAt) : null;
       var checked = autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
       var when = function (d) { return d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
-      status.textContent = onPage ? MB + " connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
+      var nInbox = 1 + ((r.body.others || []).length);
+      status.textContent = onPage ? (nInbox > 1 ? nInbox + " inboxes" : MB) + " connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
         : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
       if (onPage) { scanBtn.className = "rl-po-secondary"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
       var query = "";
@@ -2426,7 +2472,7 @@
   }
   // Search the inbox as you type: a pause in typing (or a tap on a shop) searches, and only the newest search is shown.
   function searchPart(host, g) {
-    var MB = g.provider === "microsoft" ? "Outlook" : "Gmail";
+    var many = (g.others || []).length > 0, MB = many ? "inboxes" : g.provider === "microsoft" ? "Outlook" : "Gmail";
     var mag = el("span"); mag.innerHTML = SEARCH_ICON;
     var input = el("input", { type: "search", id: "rl-ar-q", placeholder: "Search your " + MB, autocomplete: "off" });
     input.setAttribute("aria-label", "Search " + MB + " for a receipt"); input.setAttribute("enterkeyhint", "search");
@@ -2460,13 +2506,14 @@
         }
         var rows = (r.body && r.body.results) || [];
         status.textContent = rows.length ? "Tap Add on the order email." : "Nothing in " + MB + " for “" + q + "”. Try the shop's name or the order number.";
-        rows.forEach(function (x) { list.appendChild(resultRow(x)); });
+        rows.forEach(function (x) { list.appendChild(resultRow(x, many)); });
+        (r.body.problems || []).forEach(function (p) { list.appendChild(el("p", { className: "rl-ar-status", text: "Couldn't search " + (p.inbox || "one inbox") + " just now." })); });
       }, function () { if (mine === seq) { list.textContent = ""; status.textContent = "Couldn't reach Relay. Check your connection."; } });
     }
     input.addEventListener("input", function () { run(450); });
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); last = ""; run(0); } });
   }
-  function resultRow(x) {
+  function resultRow(x, many) {
     var who = String(x.from || "").trim() || "Email";
     var add = el("button", { type: "button", className: "rl-ar-add" + (x.added ? " done" : ""), text: x.added ? "Added" : "Add", disabled: Boolean(x.added) });
     add.setAttribute("aria-label", (x.added ? "Already added: " : "Add ") + (x.subject || who));
@@ -2474,7 +2521,7 @@
     add.onclick = function () {
       if (add.disabled) return;
       add.disabled = true; add.textContent = "Adding…";
-      api("/relay/my/gmail/add", { method: "POST", body: { messageId: x.id } }).then(function (a) {
+      api("/relay/my/gmail/add", { method: "POST", body: x.mailbox ? { messageId: x.id, mailbox: x.mailbox } : { messageId: x.id } }).then(function (a) {
         if (a.ok && a.body && a.body.ok) {
           add.textContent = "Added"; add.classList.add("done"); memo.receipts = null;
           note.textContent = a.body.kind === "receipt" ? "In your Receipts now." : "Added to the order it belongs to.";
@@ -2488,7 +2535,8 @@
     var ini = el("span", { className: "rl-ar-ini", text: who.charAt(0).toUpperCase(), style: "background:" + colours[who.charCodeAt(0) % colours.length] });
     ini.setAttribute("aria-hidden", "true");
     return el("div", { className: "rl-ar-row" }, [ini,
-      el("span", { className: "rl-ar-t" }, [el("b", { text: x.subject || "(no subject)" }), el("span", { text: [who, shortDay(x.date)].filter(Boolean).join(" · ") }), note]), add]);
+      el("span", { className: "rl-ar-t" }, [el("b", { text: x.subject || "(no subject)" }), el("span", { text: [who, shortDay(x.date)].filter(Boolean).join(" · ") }),
+        many && x.inbox ? el("span", { text: "In " + x.inbox }) : null, note].filter(Boolean)), add]);
   }
   // Paste: one tap reads what was copied (the phone asks first), and the receipt goes straight into Receipts.
   function pastePart(host) {
@@ -2541,8 +2589,12 @@
     if (!g.email) return;
     var copy = el("button", { type: "button", className: "rl-ar-copy", text: "Copy " + g.email });
     copy.onclick = function () { copyText(g.email).then(function (ok) { copy.textContent = ok ? "Copied" : "Select it to copy"; }); };
+    var adds = el("div", { className: "rl-ar-adds" }), note = el("div", { className: "rl-msg" });
+    var full = 1 + (g.others || []).length >= (g.maxInboxes || 5);
     host.appendChild(el("div", { className: "rl-ar-fwd" }, [el("b", { text: "In another inbox?" }),
-      el("span", { text: "Forward it to " + g.email + ". Relay will pick it up, or search for it above to add it now." }), copy]));
+      el("span", { text: full ? "Forward the email to " + g.email + ". Relay will pick it up, or search for it above to add it now."
+        : "Add that inbox to Relay as well, or forward the email to " + g.email + "." }), adds, copy, note]));
+    if (!full) addInboxButtons(adds, note, "rl-ar-copy rl-ar-addbtn");
   }
   function connectPart(host) {
     host.appendChild(el("div", { className: "rl-ar-fwd" }, [el("b", { text: "Let Relay find them for you" }),
@@ -2876,6 +2928,7 @@
   }
   var HELP = [
     ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
+    ["I shop with more than one email address. Can Relay read them all?", "Yes. Open Profile, then Email connection, and add a Gmail or Outlook inbox. Relay reads up to five and puts all their receipts together. Disconnecting one deletes only the receipts it brought in."],
     ["A receipt is missing. What can I do?", "Open Profile and choose Add a missing receipt. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
@@ -2934,7 +2987,8 @@
     api("/relay/my/gmail").then(function (g) {
       if (g.ok) rememberMailbox(g.body);
       mailState = g.ok && g.body ? g.body : null;
-      mailRow.setDetail(!mailState ? "" : mailState.connected ? mailName() + " · connected" : "Not connected yet");
+      var more = mailState && (mailState.others || []).length;
+      mailRow.setDetail(!mailState ? "" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " · connected" : "Not connected yet");
     }).catch(function () { mailRow.setDetail(""); });
     var orders = [];
     api("/relay/my/purchases").then(function (r) {
@@ -3010,16 +3064,47 @@
       if (!window.go) return gmailSection(b, c || {}, msg);
       var note = el("div", { className: "rl-msg" });
       var on = mailState && mailState.connected;
-      b.appendChild(el("p", { text: on ? "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." : "Connect the email you shop with, Gmail or Outlook, and Relay brings your receipts in for you." }));
-      b.appendChild(el("button", { className: "rl-btn", text: on ? "Open my receipts" : "Connect your email", onclick: function () { close(); window.go("receipts"); } }));
-      if (on) {
-        b.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
-        b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
-        b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
-        b.appendChild(el("button", { className: "rl-btn ghost rl-red", text: "Disconnect " + mailName(), onclick: function () { disconnectGmail(home, note); } }));
-        b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting deletes every receipt Relay captured from this inbox." }));
+      if (!on) {
+        b.appendChild(el("p", { text: "Connect the email you shop with, Gmail or Outlook, and Relay brings your receipts in for you." }));
+        b.appendChild(el("button", { className: "rl-btn", text: "Connect your email", onclick: function () { close(); window.go("receipts"); } }));
+        b.appendChild(note);
+        return;
       }
+      var boxes = [{ mailbox: null, provider: mailState.provider, email: mailState.email, lastScanAt: mailState.lastScanAt, autoAt: mailState.autoAt, scan: mailState.scan }].concat(mailState.others || []);
+      b.appendChild(el("p", { text: boxes.length > 1 ? "Relay reads these inboxes in read-only mode and puts all their receipts together." : "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." }));
+      var list = el("div", { className: "rl-ibx" });
+      boxes.forEach(function (x, i) {
+        var off = el("button", { type: "button", className: "rl-ibx-off", text: "Disconnect" });
+        off.setAttribute("aria-label", "Disconnect " + (x.email || inboxName(x.provider)));
+        off.onclick = function () { disconnectInbox(x, i === 0 ? boxes[1] : null); };
+        var ic = jIc("mail", 20); ic.className = "rl-ibx-ic " + (x.provider === "microsoft" ? "ms" : "g");
+        list.appendChild(el("div", { className: "rl-ibx-row" }, [ic, el("div", { className: "rl-ibx-t" }, [el("b", { text: x.email || inboxName(x.provider) }),
+          el("span", { text: [inboxName(x.provider), boxes.length > 1 && i === 0 ? "main inbox" : null, inboxWhen(x)].filter(Boolean).join(" · ") }), off])]));
+      });
+      b.appendChild(list);
+      var adds = el("div", { className: "rl-ibx-adds" });
+      if (boxes.length < (mailState.maxInboxes || 5)) {
+        b.appendChild(el("p", { className: "rl-anote", text: "Shop with more than one email address? Add the others and Relay reads them all." }));
+        b.appendChild(adds); addInboxButtons(adds, note);
+      } else b.appendChild(el("p", { className: "rl-anote", text: "That's the most inboxes Relay can read for one account." }));
       b.appendChild(note);
+      b.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", style: "margin-top:18px", onclick: function () { close(); window.go("receipts"); } }));
+      b.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
+      b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
+      b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
+      b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay." }));
+      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Email connection", mailPage); }); }
+      function disconnectInbox(x, next) {
+        if (!x.mailbox && !next) return disconnectGmail(again, note);
+        var who = x.email || inboxName(x.provider);
+        ask("Disconnect " + who + " and delete the receipts Relay captured from it?" + (next ? " " + (next.email || inboxName(next.provider)) + " becomes your main inbox." : ""), "Disconnect and delete", function () {
+          api("/relay/my/gmail/disconnect", { method: "POST", body: x.mailbox ? { mailbox: x.mailbox } : {} }).then(function (r) {
+            if (!r.ok) return say(note, "Couldn't disconnect " + who + ". Try again.", true);
+            memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {}
+            again();
+          }, function () { say(note, "Couldn't reach Relay. Check your connection.", true); });
+        });
+      }
     }
     // Lost a phone, or signed in on a shared computer: sign Relay out everywhere else in one tap (this device stays in).
     function devicesPage(b) {
@@ -3156,11 +3241,16 @@
   // What to say when Google or Microsoft sends the shopper back after "Connect Gmail" / "Connect Outlook".
   function mailNote(result, name) {
     var notes = { connected: [name + " connected. Scanning for receipts…", false], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
-      failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true] };
+      failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true],
+      added: [name + " inbox added. Relay is reading it now, and its receipts appear here in a few minutes.", false], already_connected: ["That inbox is already connected to Relay.", false] };
+    // Adding another inbox that didn't go ahead: the inboxes already connected carry on as they were.
+    var adding = false; try { adding = sessionStorage.getItem("relay.addingInbox") === "1"; sessionStorage.removeItem("relay.addingInbox"); } catch (e) {}
+    if (adding && result === "denied") return { text: "No inbox was added. Your other inboxes carry on as before.", bad: false };
+    if (adding && result === "failed") return { text: "Couldn't add that inbox. Please try again.", bad: true };
     return { text: notes[result][0], bad: notes[result][1] };
   }
   function completeGmail() {
-    var m = /(?:^|[#&])(gmail|outlook)=(connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
+    var m = /(?:^|[#&])(gmail|outlook)=(connected|added|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);

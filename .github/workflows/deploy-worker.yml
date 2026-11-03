@@ -42,6 +42,7 @@ jobs:
           node scripts/test-receipt-reader.mjs
           node scripts/test-wrapped.mjs
           node scripts/test-gmail.mjs
+          node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs
           node scripts/test-mail-parity.mjs
