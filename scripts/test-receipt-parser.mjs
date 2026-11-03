@@ -601,10 +601,12 @@ t("pub order-and-pay: a name split over two cells ('Guinness' then '(Pint)')", (
   assert.deepEqual(r.items.map(i => [i.name, i.pricePence, i.variant]), [["Example Stout", 299, "(Pint)"], ["Coffee - free refills", 125, "(Cup)"]]);
 });
 
-t("shop order: labels between a row's values ('Quantity', 'Price')", () => {
+t("shop order: labels between a row's values ('Quantity', 'Price'); partner offers are not items", () => {
   const html = `<p>Thank you for your order</p><p>Order Details</p>
 <p>Example Whey Protein - 1kg - Vanilla</p><p>Quantity</p><p>1</p><p>Price</p><p>£24.99</p>
-<p>Example Shaker</p><p>Quantity</p><p>2</p><p>Price</p><p>£6.00</p><p>Subtotal</p><p>£30.99</p><p>Order Total</p><p>£30.99</p>`;
+<p>Example Shaker</p><p>Quantity</p><p>2</p><p>Price</p><p>£6.00</p>
+<p>10% off sitewide at Example Kitchen!</p><p>Quantity</p><p>1</p><p>Price</p><p>£1.00</p><p>Free Example Recipe box</p><p>Quantity</p><p>1</p><p>Price</p><p>£10.00</p>
+<p>Example Music Unlimited – Get 3 months free</p><p>Quantity</p><p>1</p><p>Price</p><p>£5.00</p><p>Subtotal</p><p>£30.99</p><p>Order Total</p><p>£30.99</p>`;
   const r = parseReceiptEmail(htmlMail("Example Nutrition <orders@examplenutrition.test>", "Your order confirmation", "Mon, 04 Mar 2024 14:18:00 +0000", html));
   assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Example Whey Protein - 1kg - Vanilla", 1, 2499], ["Example Shaker", 2, 600]]);
 });
