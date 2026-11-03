@@ -48,6 +48,8 @@ jobs:
         run: node scripts/test-phone-ui.mjs
       - name: Test the wallet only shows what can still go back, with shop logos
         run: node scripts/test-wallet-fresh-ui.mjs
+      - name: Test return dates (a kettle in the weekly shop, safe dates when the email gives none)
+        run: node scripts/test-return-dates-ui.mjs
       - name: Test the look (light and dark, colourful tiles, glass tab bar with the next return)
         run: node scripts/test-look-ui.mjs
       - name: Test speed (one request per thing, tabs reuse what was just loaded, the catalogue waits for Discover)

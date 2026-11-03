@@ -17,7 +17,7 @@ import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliv
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
-import { categorise, itemCategories, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
@@ -1147,12 +1147,33 @@ export function attachDeliveries(orders, deliveries) {
     best.trackUrl = trackingLink(best.carrier, best.trackingNumber);
     o.delivery = best;
     // When the email gives no return deadline, show the least UK law allows for online orders: 14 days after delivery to tell the shop.
+    // When it gives a window that starts at delivery ("within 28 days of delivery"), count it from the day it arrived.
     const r = o.returns || {};
     if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays) {
       const d = new Date(Date.parse(best.at) + 14 * 86400000);
       if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "uk_law" };
+    } else if (best.status === "delivered" && best.at && !r.deadline && r.windowFrom === "delivery" && Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365) {
+      const d = new Date(Date.parse(best.at) + r.windowDays * 86400000);
+      if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "window", from: "delivery" };
     }
   }
+}
+
+// When the emails give no return date, the earliest one that is safe to go by, counted from the order date (the parcel can
+// only arrive after it): the window the email gives ("30 days to return", without saying from when), or, for an online
+// order (one with an order number) that Relay has no parcel news for, the least UK law allows: 14 days. Marked `estimate`
+// so the app says how it was worked out. Only a date still to come is given: one that's passed says nothing for sure.
+export function estimateReturnBy(o, today) {
+  const r = (o && o.returns) || {};
+  if (!o || o.returnBy || r.deadline || !/^\d{4}-\d{2}-\d{2}$/.test(o.orderDate || "") || o.orderDate > today) return null;
+  const windowDays = Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365 ? r.windowDays : null;
+  const days = windowDays || (o.orderRef && !o.delivery ? 14 : null);
+  if (!days) return null;
+  const d = new Date(o.orderDate + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + days);
+  const date = d.toISOString().slice(0, 10);
+  return date >= today ? { date, basis: windowDays ? "window" : "uk_law", from: "order", estimate: true } : null;
 }
 
 // Where a return has got to: the return parcel (carrier emails about its tracking number) and the shop's own
@@ -1277,6 +1298,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   };
   lap("prepMs");
   const recentDay = new Date(Date.now() - RECENT_ORDER_DAYS * DAY_MS).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
   // One name per shop across all receipts from the same address (see agreedShopNames).
   const agreed = agreedShopNames(cards);
   return cards.filter(c => {
@@ -1306,10 +1328,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
     // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
     const kinds = itemCategories(c, learned);
+    // A food order can still hold things that go back on their own (a kettle in the weekly shop): those items are marked.
+    const keep = group.returnable === false && group.category === "food" ? returnableItems(c, kinds) : [];
     const items = (c.items || []).map((it, i) => (it && typeof it.name === "string" && it.name
-      ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure) } : it));
+      ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure), ...(keep.includes(i) ? { returnable: true } : {}) } : it));
+    // A return date Relay can safely go by when the emails don't give one (only for what can go back).
+    const guess = group.returnable || keep.length ? estimateReturnBy(c, today) : null;
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
-    return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k };
+    return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
+      ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}) };
   });
 }
 

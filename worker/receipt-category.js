@@ -323,6 +323,40 @@ export function itemKind(name) {
   for (const [c, re] of ITEM_RULES) if (re.test(n)) return c;
   return null;
 }
+// 4. Things in a food or supermarket order that can usually go back on their own (a kettle, a jumper or headphones in the
+// weekly shop, a pair of shorts from a sports-nutrition shop) while the food can't. Only items whose own name says what they
+// are (`sure`), that last rather than get used up (not kitchen roll, cleaning things, batteries, bulbs, ink, bags or plants),
+// that cost £5 or more each when the receipt prices them, and never from a café, restaurant, pub or takeaway (whose
+// "chicken strips basket" is a meal). Returns their positions in card.items.
+const EATERY = new Set(("starbucks costa costacoffee caffenero nero pret pretamanger greggs gails joeandthejuice blankstreet deliveroo justeat ubereats " +
+  "boltfood wolt honestburgers dishoom nandos wagamama fiveguys mcdonalds kfc burgerking dominos papajohns pizzahut pizzaexpress francomanca " +
+  "pandamami gordonramsayrestaurants gordonramsay hawksmoor flatiron bao padella greeneking stonegate stonegatepubs wetherspoon jdwetherspoon " +
+  "wetherspoons leon itsu wasabi yosushi tortilla chipotle krispykreme").split(" "));
+const EATERY_NAME = /\b(pub|tavern|inn|arms|restaurant|cafe|café|coffee house|bakery|patisserie|takeaway|pizza|pizzeria|burgers?|sushi|ramen|curry|grill|deli|bistro|brasserie|diner|eatery|noodles?|dumplings?|bubble tea|kebabs?|chippy|fish (and|&) chips|bar)\b/i;
+const USED_UP = /\b(kitchen (rolls?|towels?|paper)|paper towels?|toilet (rolls?|tissue|paper)|tissues?|napkins?|serviettes?|wipes|foil|cling ?film|baking (paper|parchment)|greaseproof|(sandwich|freezer|food|bin|refuse|rubbish) (bags|liners|sacks)|bin liners|bin bags|bags? for life|carrier bags?|plastic bags?|paper bags?|bag charge|dishwasher|laundry|washing (up|liquid|powder|capsules?|pods?|gel)|fabric (conditioner|softener)|detergent|bleach|cleaners?|cleaning|disinfectant|(surface|kitchen|bathroom|toilet|antibacterial|multi-?surface) (spray|gel)|sponges?|scourers?|dish ?cloths?|cloths|air fresheners?|polish|batter(y|ies)|light ?bulbs?|bulbs?|ink|toner|cartridges?|candles?|matches|charcoal|lighters?|(dog|cat|puppy|kitten|pet|bird) (food|biscuits|treats|pouches|chews)|litter|seeds|compost|soil|plants?|flowers?|bouquets?|refills?|pods?|capsules?)\b/i;
+const LASTS = /\b(kettles?|toasters?|blenders?|mixers?|food processors?|coffee (machines?|makers?|grinders?)|espresso machines?|grinders?|frothers?|microwaves?|air fryers?|slow cookers?|pressure cookers?|rice cookers?|irons?|ironing boards?|vacuums?|hoovers?|fans?|heaters?|dehumidifiers?|lamps?|mugs?|cups|glass(es)?|tumblers?|flasks?|carafes?|cafeti[eè]res?|french press|teapots?|jugs?|plates?|bowls?|dinner sets?|cutlery|knives|knife|pans?|saucepans?|woks?|casserole dish(es)?|cookware|bakeware|baking (trays?|tins?|dish(es)?)|(cake|roasting|loaf) tins?|chopping boards?|utensils?|whisks?|graters?|colanders?|sieves?|storage (boxes|box|containers?|jars?|sets?)|lunch ?box(es)?|bread bins?|duvets?|duvet covers?|pillows?|pillowcases?|cushions?|throws?|blankets?|bedding|bed ?sheets?|towels?|bath mats?|tea ?towels?|oven gloves?|aprons?|curtains?|rugs?|mirrors?|(photo |picture )?frames?|vases?|clocks?|baskets?|hangers?|airers?|drying racks?|pedal bins?|chairs?|tables?|desks?|stools?|shelv(es|ing)|wardrobes?|beds?|mattress(es)?|sofas?|tool ?(kits?|sets?|box(es)?)|drills?|toys?)\b/i;
+const KITCHEN_KIT = ITEM_RULES[0][1], STRONG_FOOD = ITEM_RULES[1][1];
+export function returnableItems(card, kinds) {
+  card = card || {};
+  const { shop } = shopClues(card), r = card.retailer || {};
+  if ((shop && EATERY.has(shop.key)) || EATERY_NAME.test([spaced(shopDisplayName(r)), spaced(r.name)].filter(Boolean).join(" "))) return [];
+  kinds = kinds || itemCategories(card);
+  const out = [];
+  (card.items || []).forEach((it, i) => {
+    const k = kinds[i], name = nameOf(it);
+    if (!k || !k.sure || !name || USED_UP.test(name)) return;
+    if (k.category === "home" ? !LASTS.test(name) : k.category !== "fashion" && k.category !== "electronics") return;
+    // A dish named like a thing ("onion rings", "chicken strips basket") is food. Kitchen kit named after food ("coffee
+    // grinder", "bread bin", "cake tin") still counts.
+    if (STRONG_FOOD.test(name) || (k.category === "home" && !KITCHEN_KIT.test(name) && WEAK_FOOD.test(name))) return;
+    if (Number.isInteger(it.pricePence)) {
+      const each = it.lineTotal && Number(it.qty) > 1 ? it.pricePence / Number(it.qty) : it.pricePence;
+      if (each < 500) return;
+    }
+    out.push(i);
+  });
+  return out;
+}
 function finish(category, items, noReturn, grocer) {
   // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned (not from a supermarket).
   const returnable = noReturn ? false : category === "food" ? !grocer && APPLIANCE.test(items || "") : category !== "digital" && category !== "travel" && category !== "experiences";

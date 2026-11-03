@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind, itemCategories, categoryShares } from "../worker/receipt-category.js";
+import { categorise, storeKey, shopDisplayName, agreedShopNames, logoDomainFor, itemKind, itemCategories, categoryShares, returnableItems } from "../worker/receipt-category.js";
 import { squareShopName } from "../worker/square-env.js";
 const c = (name, domain, items = []) => categorise({ retailer: { name, domain }, items: items.map(n => ({ name: n })) });
 let n = 0; const t = (m, f) => { f(); n++; console.log("ok -", m); };
@@ -157,5 +157,38 @@ t("a receipt's money splits by what each item is, only when every item is priced
   assert.equal(categoryShares({ ...weekly, totalPence: 600 }), null, "prices nowhere near the total (a misread price): no split");
   assert.equal(categoryShares(priced("Zara", "zara.com", [["Coat", 5990], ["Scarf", 1990]], 7980)), null, "one kind of thing: nothing to split");
   assert.equal(categoryShares({ ...weekly, totalPence: null }), null);
+});
+// Things in a food order that go back on their own (made-up items).
+t("a kettle, a jumper and a cable in the weekly shop can go back; the food, kitchen roll, bags and batteries can't", () => {
+  const shop = { retailer: { name: "Tesco", domain: "tesco.com" }, items: [
+    { name: "Bananas Loose", pricePence: 80 }, { name: "Glass Kettle 1.7L", pricePence: 2500 }, { name: "F&F Navy Jumper", pricePence: 1400 },
+    { name: "Soft Toilet Rolls 9 Pack", pricePence: 650 }, { name: "Carrier Bag", pricePence: 10 }, { name: "AA Batteries 4 Pack", pricePence: 600 },
+    { name: "USB-C Charging Cable", pricePence: 900 }, { name: "Super Absorbent Kitchen Towel", pricePence: 400 }, { name: "Non Bio Laundry Pods x30", pricePence: 1200 },
+    { name: "Tea Towels Pack of 3", pricePence: 487 }, { name: "Scented Candle", pricePence: 800 }, { name: "Basil Plant", pricePence: 150 }] };
+  const g = categorise(shop);
+  assert.equal(g.category, "food"); assert.equal(g.returnable, false);
+  assert.deepEqual(returnableItems(shop).map(i => shop.items[i].name), ["Glass Kettle 1.7L", "F&F Navy Jumper", "USB-C Charging Cable"]);
+});
+t("a price for several counts each one, and an unpriced item whose name is clear still counts", () => {
+  const shop = { retailer: { name: "Sainsbury's", domain: "sainsburys.co.uk" }, items: [
+    { name: "Ceramic Mugs", qty: 4, pricePence: 1200, lineTotal: true }, { name: "Cotton Socks 5 Pack", qty: 2, pricePence: 800, lineTotal: true }, { name: "Bath Towel" }] };
+  assert.deepEqual(returnableItems(shop).map(i => shop.items[i].name), ["Bath Towel"], "£3 a mug and £4 a pack are under £5 each");
+});
+t("household things that get used up never count, whatever they're called", () => {
+  for (const name of ["Antibacterial Surface Spray", "Bin Bags 40 Pack", "Dishwasher Tablets", "Light Bulb LED", "Printer Ink Cartridge", "Dog Food Pouches", "Kitchen Foil"]) {
+    assert.deepEqual(returnableItems({ retailer: { name: "Tesco", domain: "tesco.com" }, items: [{ name, pricePence: 999 }] }), [], name);
+  }
+});
+t("a meal is never something to return: nothing from a pub or restaurant, and dishes named like things are food", () => {
+  const pub = { retailer: { name: "J D Wetherspoon", domain: "jdwetherspoon.com" }, items: [{ name: "Southern-fried chicken strips basket", pricePence: 796 }] };
+  const local = { retailer: { name: "The Crown", domain: "thecrown.example" }, items: [{ name: "Chicken Strips Basket", pricePence: 950 }, { name: "Onion Rings", pricePence: 500 }] };
+  assert.deepEqual(returnableItems(pub), []); assert.deepEqual(returnableItems(local), []);
+});
+t("kitchen kit named after food still counts, and so do a sports-nutrition shop's shorts", () => {
+  const shop = { retailer: { name: "Sainsbury's", domain: "sainsburys.co.uk" }, items: [{ name: "Lidded Storage Set 9 piece", pricePence: 925 }, { name: "Coffee Grinder", pricePence: 1500 },
+    { name: "Bread Bin", pricePence: 1200 }, { name: "Chocolate Brown Jumper", pricePence: 1600 }, { name: "Chocolate Fudge Cake", pricePence: 600 }] };
+  assert.deepEqual(returnableItems(shop).map(i => shop.items[i].name), ["Lidded Storage Set 9 piece", "Coffee Grinder", "Bread Bin", "Chocolate Brown Jumper"]);
+  const gym = { retailer: { name: "Myprotein", domain: "myprotein.com" }, items: [{ name: "Impact Whey Protein 1kg", pricePence: 2999 }, { name: "Training Shorts - Black - L", pricePence: 1099 }] };
+  assert.deepEqual(returnableItems(gym), [1]);
 });
 console.log(`\n${n} category tests passed`);

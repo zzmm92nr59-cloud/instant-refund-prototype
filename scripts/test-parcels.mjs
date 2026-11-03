@@ -144,3 +144,21 @@ attachReturnProgress(card, [{ ...rd }], [{ kind: "return_update", ...u1 }, { kin
 assert.deepEqual(card[0].returnProgress, { trackingNumber: "JK000000777GB", carrier: "Royal Mail", trackUrl: "https://www.royalmail.com/track-your-item#/tracking-results/JK000000777GB",
   parcel: { status: "delivered", at: "2026-11-03", carrier: "Royal Mail" }, receivedAt: "2026-11-04", refundedAt: "2026-11-05", refundPence: 6900, currency: "GBP" });
 console.log("ok - return tracking: parcel delivered to the shop, return received, refund of £69.00 processed (from the shop's emails)");
+
+// 8. Return dates Relay can safely go by when the emails don't give one, counted from the order date (made-up orders).
+import { estimateReturnBy } from "../worker/gmail.js";
+const TODAY = "2026-11-03";
+const anOrder = (extra = {}) => ({ id: "o", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderRef: "KL-1", orderDate: "2026-11-01", items: [], ...extra });
+assert.deepEqual(estimateReturnBy(anOrder(), TODAY), { date: "2026-11-15", basis: "uk_law", from: "order", estimate: true }, "no return wording: 14 days from the order date");
+assert.deepEqual(estimateReturnBy(anOrder({ returns: { windowDays: 30, windowFrom: null } }), TODAY), { date: "2026-12-01", basis: "window", from: "order", estimate: true }, "'30 days to return': from the order date");
+assert.equal(estimateReturnBy(anOrder({ returns: { deadline: "2026-11-20" } }), TODAY), null, "the email's own date wins");
+assert.equal(estimateReturnBy(anOrder({ returnBy: { date: "2026-11-14", basis: "uk_law" } }), TODAY), null, "a delivered parcel's date wins");
+assert.equal(estimateReturnBy(anOrder({ delivery: { status: "due" } }), TODAY), null, "a parcel on its way: wait for it to arrive");
+assert.equal(estimateReturnBy(anOrder({ orderRef: null }), TODAY), null, "no order number (likely bought in a shop): no legal date");
+assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-10-01" }), TODAY), null, "a worked-out date that has passed isn't given");
+assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-12-01" }), TODAY), null, "an order date in the future is a misread");
+// A window that starts at delivery is counted from the day the parcel arrived.
+const w = [anOrder({ returns: { windowDays: 28, windowFrom: "delivery" }, shipment: { trackingNumber: "JK000000009GB", carrier: "Royal Mail", status: "shipped" } })];
+attachDeliveries(w, [{ kind: "delivery_update", status: "delivered", at: "2026-11-02", carrier: "Royal Mail", trackingNumber: "JK000000009GB" }]);
+assert.deepEqual(w[0].returnBy, { date: "2026-11-30", basis: "window", from: "delivery" });
+console.log("ok - safe return dates: 14 days (UK law) or the email's window, from the order date; a delivery-based window from the day it arrived");
