@@ -494,6 +494,20 @@ t("supermarket order: name, quantity and price, with unit prices and notes in be
   assert.equal(r.totalPence, 1065);
 });
 
+t("supermarket order: the order summary under the last item is not part of its price", () => {
+  const rows = [["Example Semi Skimmed Milk 2L", 1, "£1.65", "£0.83/unit"], ["Kitchen Roll 2 Pack", 2, "£6.50", "£3.25/unit"], ["Example Bananas Loose", 5, "£0.90", "£0.18/unit"]];
+  const html = `<p>Thanks for your order</p><p>Items</p><p>Quantity</p><p>Price</p>`
+    + rows.map(([n, q, p, u]) => `<p>${n}</p><p>${q}</p><p>${p}</p><p>${u}</p><p>Substitution allowed</p>`).join("")
+    + `<p>Our substitution promise</p><p>We are committed to delivering the exact products you order and when</p><p>a substitute is more expensive than your original choice, we issue</p>`
+    + `<p>Your order summary</p><p>Trolley cost</p><p>£9.05</p><p>Delivery cost</p><p>£1.50</p><p>Savings from coupons</p><p>£0.00</p>`
+    + `<p>Estimated total</p><p>£10.55*</p><p>* Your total is an estimate due to products sold by weight.</p>`;
+  const r = parseReceiptEmail(htmlMail("Example Grocer <orders@examplegrocer.test>", "Thanks for your order - 1234567890", "Thu, 22 Oct 2026 09:00:00 +0100", html));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Example Semi Skimmed Milk 2L", 1, 165], ["Kitchen Roll 2 Pack", 2, 650], ["Example Bananas Loose", 5, 90]],
+    "the last item keeps its own price; the trolley cost isn't added to it");
+  assert.equal(r.totalPence, 1055);
+});
+
 t("shop order: the option under a product's name is not its name", () => {
   const html = `<p>We've received your order #1050999</p><table><tr><td>Product</td><td>Quantity</td><td>Price</td></tr>
 <tr><td>Example Pen - Mango Ice<br>Flavour: Mango Ice</td><td>2</td><td>£ 1.98</td></tr>

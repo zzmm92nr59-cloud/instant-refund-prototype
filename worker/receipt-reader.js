@@ -239,7 +239,7 @@ const CELL_QTY = /^(?:x\s?)?(\d{1,2})(?:\s?x)?$/i;
 const CELL_PRICE = /^([-−–])?\s?£\s?(\d{1,4}(?:,\d{3})*\.\d{2})\s?\*?$/;
 // Unit prices and notes that sit inside a row: "£4.00/unit", "£1.20 each", "Substitution allowed".
 const CELL_NOTE = /^£\s?\d[\d,]*\.\d{2}\s*(?:\/|per\b|each\b|ea\b)|^(?:substitutions?\b|no substitut|substituted\b|nectar price|clubcard price|was\s£|save\s£|price per\b|view item\b|buy again\b|write a review\b)|^(?:item|sku|style|article|product|ref)\s?(?:#|no\.?|number|code)\s*:?\s*[\w-]{3,24}$/i;
-const CELL_END = /^(?:sub-?\s?total|total\b|order total|grand total|basket total|items? total|vat\b|tax\b|delivery\b|shipping\b|postage\b|service (?:fee|charge)|payment\b|discount|offer discount|promotion|you(?:'|’)?ve saved|you saved|savings\b|tip\b|bag (?:charge|levy)|carrier bag|credit\b|voucher|gift card|amount (?:paid|due)|paid\b|balance\b|estimated total|rewards?\b)/i;
+const CELL_END = /^(?:sub-?\s?total|total\b|order total|grand total|basket total|items? total|trolley (?:cost|total)|(?:your )?order summary|vat\b|tax\b|delivery\b|shipping\b|postage\b|service (?:fee|charge)|payment\b|discount|offer discount|promotion|you(?:'|’)?ve saved|you saved|savings\b|tip\b|bag (?:charge|levy)|carrier bag|credit\b|voucher|gift card|amount (?:paid|due)|paid\b|balance\b|estimated total|rewards?\b)/i;
 const CELL_HEAD = /^(?:qty|quantity|items?|item (?:detail|details|name|cost|price)|description|products?|price|amount|cost|each|unit price|line total)$/i;
 const CELL_PLUS = /^[+•]$/;
 const CELL_OPTION = /^(?:flavou?r|size|colou?r|style|variant|option|strength|fit|length|width|material|scent|shade|type)\s*:\s*\S/i;
@@ -280,6 +280,9 @@ export function itemsFromCells(text) {
       if (p) {
         if (!cur || !cur.name) break;          // a price with no item above it: the table is over
         if (p.negative) continue;             // money off is not an item (the totals say what was paid)
+        // In a name-first table an item's price ends its row: a price that comes after a line of text under the item is
+        // that line's (a supermarket's "Trolley cost £82.24" in the order summary under the last item), never the item's.
+        if (mode === "name" && cur.pence != null && cur.noted) continue;
         cur.pence = cur.pence == null ? p.pence : cur.pence + p.pence;
         continue;
       }
@@ -292,6 +295,7 @@ export function itemsFromCells(text) {
         else break;
         continue;
       }
+      if (mode === "name" && cur && cur.pence != null && /\p{L}{2}/u.test(c)) cur.noted = true;
       if (!nameAt(j)) continue;                // stray cells such as "@"
       if (mode === "qty") {
         if (!cur) break;
