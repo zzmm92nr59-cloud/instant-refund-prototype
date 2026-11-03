@@ -4,3 +4,4 @@ import './check-pwa.mjs';
 import './test-auth.mjs';
 import './test-receipt-parser.mjs';
 import './test-gmail.mjs';
+import './test-d1-session.mjs';

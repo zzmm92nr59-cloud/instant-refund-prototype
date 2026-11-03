@@ -49,7 +49,8 @@ function syncShopSoon(env, shop) {
 const GMAIL_CRON = "7,22,37,52 * * * *";
 // Every minute: scans shoppers started and then left the app for are carried on until they finish.
 const SCAN_JOBS_CRON = "* * * * *";
-export default {
+// The Worker's own handlers; the default export below wraps fetch in a database session.
+const relayWorker = {
   async scheduled(event, env, ctx) {
     // Every minute: scans the shopper started carry on, then mailboxes being read again with a better reader catch up
     // (not in the minutes the 15-minute mail check runs, so one mailbox is never read twice at once).
@@ -69,11 +70,11 @@ export default {
     ]);
     ctx.waitUntil(syncs.then(() => runPriceAlerts(env)).catch(() => {}));
   },
-  async fetch(request, env, ctx) {
+  async relayFetch(request, env, ctx) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-D1-Bookmark",
     };
 
     const squareHeaders = {
@@ -7957,4 +7958,29 @@ boot();
       }
     );
   },
+};
+
+// Reads go to the nearest copy of the database once D1 read replication is switched on (writes always reach the main copy,
+// in Eastern North America). The app hands back the bookmark from Relay's last answer, so it never sees older data than
+// it already has. Without read replication everything runs on the main copy, exactly as before.
+const BOOKMARK = /^[0-9A-Za-z._:-]{8,160}$/;
+export default {
+  scheduled: (event, env, ctx) => relayWorker.scheduled(event, env, ctx),
+  async fetch(request, env, ctx) {
+    const db = env.RELAY_DB;
+    if (!db || typeof db.withSession !== "function" || request.method === "OPTIONS") return relayWorker.relayFetch(request, env, ctx);
+    const mark = request.headers.get("x-d1-bookmark");
+    const session = db.withSession(mark && BOOKMARK.test(mark) ? mark : "first-unconstrained");
+    const res = await relayWorker.relayFetch(request, { ...env, RELAY_DB: session }, ctx);
+    let b = null;
+    try { b = session.getBookmark(); } catch { b = null; }
+    if (!b || !res || res.status === 101 || res.webSocket) return res;
+    const out = new Response(res.body, res);
+    out.headers.set("x-d1-bookmark", b);
+    if (out.headers.get("Access-Control-Allow-Origin")) {
+      const exp = out.headers.get("Access-Control-Expose-Headers");
+      out.headers.set("Access-Control-Expose-Headers", exp ? exp + ", x-d1-bookmark" : "x-d1-bookmark");
+    }
+    return out;
+  }
 };
