@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION, autoScanGmail } from "../worker/gmail.js";
+import { CONSENT_VERSION, autoScanGmail, catchUpFullReads } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -131,3 +131,32 @@ sqlite.prepare("DELETE FROM captured_receipts").run();
 const small = await (await post("/relay/my/gmail/scan", alice, { small: true })).json();
 assert.ok(small.added <= 2 && small.more === true, "small round reads at most 2 emails: " + small.added);
 console.log("ok - a retry asks for a small round (at most 2 emails)");
+
+async function scanAllOnce() { let c = "", more = true, n = 0; sqlite.prepare("DELETE FROM captured_receipts").run(); sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
+  while (more && n++ < 40) { const j = await (await post("/relay/my/gmail/scan", alice, c ? { cursor: c } : {})).json(); more = j.more; c = j.cursor; } }
+// 7. A mailbox read by an older reader is read again in the background, a round a minute, without any message to the
+//    shopper (the 15-minute check alone would take days for a busy mailbox). Gmail and Outlook use the same code.
+await scanAllOnce();
+sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
+sqlite.prepare("UPDATE captured_receipts SET details = json_set(details, '$.parserVersion', 1)").run();
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 1, auto_cursor = NULL, last_scan_at = ?").run(clock);
+const stale = () => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE json_extract(details, '$.parserVersion') = 1").get().n;
+assert.equal(stale(), 122);
+emails = [];
+let minutes = 0;
+while (stale() > 0 && minutes < 30) { clock += 60 * 1000; await catchUpFullReads(env, clock, fetchImpl); minutes++; }
+assert.equal(stale(), 0, "every email is read again with the new reader");
+assert.ok(minutes <= 5, "a busy mailbox catches up within minutes, not days: " + minutes + " minutes");
+for (let i = 0; i < 3; i++) { clock += 60 * 1000; await catchUpFullReads(env, clock, fetchImpl); }
+assert.ok(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f >= 3, "the mailbox is marked as read with this reader");
+assert.equal((await catchUpFullReads(env, clock + 60000, fetchImpl)).checked, 0, "and then left alone");
+assert.equal(emails.length, 0, "no email or message is sent for a re-read");
+assert.equal(count(), 122, "nothing is added twice");
+// Not while a scan the shopper started is running (it reads everything itself), and never without permission.
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 1").run();
+sqlite.prepare("UPDATE mail_scan_jobs SET state = 'running'").run();
+assert.equal((await catchUpFullReads(env, clock + 120000, fetchImpl)).checked, 0, "a running scan is left to finish");
+sqlite.prepare("UPDATE mail_scan_jobs SET state = 'done'").run();
+sqlite.prepare("UPDATE shopper_consents SET withdrawn_at = ?").run(clock);
+assert.equal((await catchUpFullReads(env, clock + 180000, fetchImpl)).checked, 0, "no reading after permission is withdrawn");
+console.log(`ok - a mailbox read by an older reader catches up in ${minutes} minutes, quietly, and only with permission`);

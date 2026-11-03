@@ -263,6 +263,36 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
   return { checked: out.length, results: out };
 }
 
+// A mailbox being read again with a better reader (see READER_FULL_REV), or never read to the end, catches up every minute,
+// one round at a time, with no message to the shopper: the 15-minute check alone reads only a few dozen emails an hour, so a
+// busy mailbox would take days. Gmail and Outlook alike. Not while a scan the shopper started is running (that reads
+// everything itself), and the scheduler leaves out the minutes the 15-minute check runs, so a mailbox is never read twice at once.
+const CATCH_UP_MAILBOXES = 2;
+export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
+  if (!env.RELAY_DB) return { checked: 0 };
+  await ensureGmailTables(env.RELAY_DB);
+  await ensureAutoColumns(env.RELAY_DB);
+  const rows = ((await env.RELAY_DB.prepare(
+    `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
+     WHERE COALESCE(g.full_rev, 0) < ?
+       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(FULL_REV, CONSENT_VERSION, CATCH_UP_MAILBOXES).all()).results || []);
+  let calls = 0;
+  const out = [];
+  for (const r of rows) {
+    if (!needsFullRead(r.lastScanAt, r.provider, r.fullRev) || calls > CALL_BUDGET - 12) continue;
+    let back;
+    try { back = await scan(env, r.id, fetchImpl, now, r.cursor || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN }); }
+    catch (e) { back = { status: 500, body: {} }; }
+    calls += back.calls || 3;
+    // Where to carry on from next minute (the 15-minute check uses the same place, so the two never go over the same ground).
+    if (back.status === 200) await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_cursor = ? WHERE shopper_id = ?").bind(back.body.more ? back.body.cursor : null, r.id).run();
+    out.push({ status: back.status, read: back.body && (back.body.added || 0) + (back.body.updated || 0), more: Boolean(back.body && back.body.more) });
+  }
+  return { checked: out.length, results: out };
+}
+
 // Whether the mailbox still needs its whole look-back period read: never finished, or an Outlook mailbox read before
 // the fix in OUTLOOK_FULL_REV.
 export function needsFullRead(lastScanAt, provider, fullRev) {

@@ -9,7 +9,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION, saveConnection } from "../worker/gmail.js";
+import { CONSENT_VERSION, saveConnection, catchUpFullReads } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -230,4 +230,17 @@ for (const y of years) {
   assert.deepEqual(ow, gw, "Wrapped " + y + " is the same from Outlook");
 }
 console.log("ok - Wrapped is the same from Gmail and Outlook");
+
+// ---- A better reader later: both mailboxes are read again in the background, quietly, and still agree ----
+sqlite.prepare("UPDATE captured_receipts SET details = json_set(details, '$.parserVersion', 1)").run();
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 1, auto_cursor = NULL").run();
+opened.gmail.length = 0; opened.outlook.length = 0; emails = [];
+for (let i = 1; i <= 6; i++) await catchUpFullReads(env, clock + i * 60000, fetchImpl);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE json_extract(details, '$.parserVersion') = 1").get().n, 0, "every email in both mailboxes is read again");
+assert.ok(opened.gmail.length >= 10 && opened.outlook.length >= 9, "from Gmail and from Outlook");
+assert.ok(!opened.outlook.includes("junk"), "Junk is still left out");
+assert.equal(emails.length, 0, "without sending anything");
+assert.deepEqual(await cards(gina), gCards, "Gmail's cards are unchanged by reading them again");
+assert.deepEqual(await cards(otto), oCards, "and Outlook's");
+console.log("ok - with a newer reader both mailboxes are read again in the background and still give the same cards");
 console.log("PASS Gmail and Outlook give the same receipts, cards and Wrapped (FAKE Google and Microsoft)");
