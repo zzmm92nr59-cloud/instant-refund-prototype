@@ -581,6 +581,11 @@ t("game web shop: the game named at the top is the shop, and the game currency i
   assert.equal(r.retailer.domain, "appcharge.com", "the web shop's address stays, so the receipt is still filed as a digital purchase");
   assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["2,200 Coins", 159]]);
   assert.equal(r.totalPence, 159);
+  // A plain-text part that leads with the web shop's support line and doesn't name the game: the HTML does.
+  const both = `From: no-reply <no-reply@appcharge.com>\r\nSubject: Purchase Confirmation #123-456-789\r\nDate: Sat, 31 Oct 2026 13:16:00 +0000\r\nContent-Type: multipart/alternative; boundary="b"\r\n\r\n--b\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nPurchase Confirmation\r\nFor questions or assistance,\r\ncontact Appcharge support\r\nReceipt Number: 123-456-789\r\nOrder ID: 6ae5ea283b95\r\nPayment Date: October 31, 2026\r\nTotal £1.59\r\n--b\r\nContent-Type: text/html; charset=utf-8\r\n\r\n${html}\r\n--b--\r\n`;
+  const rb = parseReceiptEmail(both);
+  assert.equal(rb.retailer.name, "Example Quest");
+  assert.deepEqual(rb.items.map(i => i.name), ["2,200 Coins"]);
   // The same when the web shop signs the email with its own name.
   assert.equal(parseReceiptEmail(htmlMail("Appcharge <no-reply@appcharge.com>", "Purchase Confirmation #123-456-789", "Sat, 31 Oct 2026 13:16:00 +0000", html)).retailer.name, "Example Quest");
 });
