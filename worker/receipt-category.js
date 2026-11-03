@@ -215,7 +215,22 @@ export function categorise(card, learned) {
   let best = null;
   for (const c of TIE_ORDER) if (score[c] && (!best || score[c] > score[best])) best = c;
   const shop = knownShop(card);
+  // A supermarket basket is groceries, even when kitchen roll, bin bags and shower gel outnumber what the reader can
+  // tell is food. Only an order that is mostly clothes or gadgets (a supermarket's clothing or tech range) is filed there.
+  if (shop && GROCER.has(shop.key) && best !== "food") {
+    const grocery = (score.food || 0) + (score.home || 0) + (score.beauty || 0), range = Math.max(score.fashion || 0, score.electronics || 0);
+    if (!(range > grocery)) best = "food";
+  }
   return finish(best || "other", items, noReturn, best === "food" && Boolean(shop && GROCER.has(shop.key)));
+}
+
+// What one thing bought is, from its name alone, when that is clear ("Kitchen Towels" is Home & garden, "Greek Yoghurt"
+// is Food & drink); null when the name doesn't say. Used to keep each Wrapped chapter's top items to that kind of thing.
+export function itemKind(name) {
+  const n = typeof name === "string" ? name : "";
+  if (!n) return null;
+  for (const [c, re] of ITEM_RULES) if (re.test(n)) return c;
+  return null;
 }
 function finish(category, items, noReturn, grocer) {
   // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned (not from a supermarket).

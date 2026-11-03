@@ -1,6 +1,6 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
-import { PERSONAL_MAIL, CATEGORIES } from "./receipt-category.js";
+import { PERSONAL_MAIL, CATEGORIES, itemKind } from "./receipt-category.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -101,8 +101,10 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   const years = [...yearCounts.entries()].sort((a, b) => b[0] - a[0]).map(([y, n]) => ({ year: y, receipts: n }));
   // The thing bought most often (by name), only when it really was a repeat.
   const itemsByName = new Map();
+  // In one kind's Wrapped, a thing that is plainly another kind (kitchen roll in a supermarket food shop) isn't its top item.
+  const otherKind = (n) => { if (!industry) return false; const k = itemKind(n); return Boolean(k) && k !== industry; };
   for (const c of mine) for (const it of (Array.isArray(c.items) ? c.items : [])) {
-    const n = it && typeof it.name === "string" ? it.name.trim() : ""; if (!n || n.length > 80) continue;
+    const n = it && typeof it.name === "string" ? it.name.trim() : ""; if (!n || n.length > 80 || otherKind(n)) continue;
     const k = n.toLowerCase(); const e = itemsByName.get(k) || { name: n, times: 0, shop: (c.retailer && c.retailer.name) || null }; e.times++; itemsByName.set(k, e);
   }
   const topItemE = [...itemsByName.values()].sort((a, b) => b.times - a.times)[0];
@@ -133,7 +135,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   for (const c of mine) {
     const here = new Set();
     for (const it of (c.items || [])) {
-      const n = itemName(it); if (!n) continue;
+      const n = itemName(it); if (!n || otherKind(n)) continue;
       const k = n.toLowerCase(); if (here.has(k)) continue; here.add(k);
       const e = itemStats.get(k) || { name: n, times: 0, spentPence: 0, shop: forwarded(c) ? null : shopName(c) };
       e.times++;
