@@ -407,7 +407,7 @@
     ".rl-ar-t b{font-size:15px;font-weight:600;line-height:1.3;color:var(--rl-text);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
     ".rl-ar-t span{font-size:13px;line-height:1.35;color:var(--rl-text2);overflow-wrap:anywhere}.rl-ar-t .rl-ar-note{color:var(--rl-accent);font-weight:600}.rl-ar-note:empty{display:none}" +
     ".rl-ar-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;min-height:44px;min-width:72px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#c7f567;color:#101828;font-size:15px;font-weight:700}" +
-    ".rl-ar-add:disabled{cursor:default}.rl-ar-add.done{background:var(--rl-fill);color:var(--rl-text2)}" +
+    ".rl-ar-add:disabled{cursor:default}.rl-ar-add.done{background:var(--rl-accent-bg);color:var(--rl-accent)}" +
     ".rl-ar-h{margin:28px 2px 4px;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text)}" +
     ".rl-ar-help{margin:0 2px 12px;font-size:15px;line-height:1.4;color:var(--rl-text2)}" +
     ".rl-ar-box{display:block;box-sizing:border-box;width:100%;min-height:120px;margin:10px 0 0;padding:12px 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px;line-height:1.4;resize:vertical}.rl-ar-box[hidden]{display:none}" +
@@ -2484,7 +2484,7 @@
         note.textContent = a.ok && a.body && a.body.reason === "not_recognised" ? "That one isn't an order, delivery or return email." : "Couldn't add it. Try again.";
       }, function () { add.disabled = false; add.textContent = "Add"; note.textContent = "Couldn't reach Relay. Check your connection."; });
     };
-    var colours = ["#E0446E", "#D47B1F", "#4F72E0", "#2E9E5B", "#B455C9", "#6662D9", "#14918A"];
+    var colours = ["#E0446E", "#D47B1F", "#4F72E0", "#2E9E5B", "#14918A", "#2B3A5C"];
     var ini = el("span", { className: "rl-ar-ini", text: who.charAt(0).toUpperCase(), style: "background:" + colours[who.charCodeAt(0) % colours.length] });
     ini.setAttribute("aria-hidden", "true");
     return el("div", { className: "rl-ar-row" }, [ini,
