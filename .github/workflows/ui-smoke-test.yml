@@ -48,5 +48,7 @@ jobs:
         run: node scripts/test-wallet-fresh-ui.mjs
       - name: Test receipt groups (every receipt, header, filters, months, rows)
         run: node scripts/test-receipts-cat-ui.mjs
+      - name: Test returns from the wallet (order number and email to copy, the shop's page, then the QR code)
+        run: node scripts/test-return-guide-ui.mjs
       - name: Test Outlook in the app (connect, scan, receipts, disconnect)
         run: node scripts/test-outlook-ui.mjs
