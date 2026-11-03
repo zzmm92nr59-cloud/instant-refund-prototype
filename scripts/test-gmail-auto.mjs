@@ -186,3 +186,31 @@ assert.equal(listedBefore[firstRound], saved.split("@")[1], "the next minute car
 while (stale() > 0 && minutes < 60) { clock += 60 * 1000; await catchUpFullReads(env, clock, watching); minutes++; }
 assert.equal(stale(), 0);
 console.log("ok - a newer reader arriving part-way through a re-read starts again from the newest mail; within one read, each minute carries on");
+
+// 9. Earlier years the shopper added for Wrapped are read again too, once the look-back period is done, newest year first.
+for (let i = 0; i < 30; i++) box["m" + (2400 + i)] = { raw: mail(2400 + i), day: "2024/" + String(1 + (i % 12)).padStart(2, "0") + "/1" + (i % 9) };
+for (let i = 0; i < 12; i++) box["m" + (2300 + i)] = { raw: mail(2300 + i), day: "2023/" + String(1 + i).padStart(2, "0") + "/05" };
+// The shopper adds 2024 and 2023 in Wrapped (the app reads each year a round at a time).
+for (const year of [2024, 2023]) { let c = "", more = true, n = 0; while (more && n++ < 40) { const j = await (await post("/relay/my/gmail/scan", alice, { year, ...(c ? { cursor: c } : {}) })).json(); more = j.more; c = j.cursor; } }
+const yearRows = () => sqlite.prepare("SELECT year, done_at AS d, rev, cursor FROM gmail_history_years ORDER BY year").all();
+assert.deepEqual(yearRows().map(y => [y.year, Boolean(y.d), y.rev]), [[2023, true, 5], [2024, true, 5]], "a finished year records the reader it was read with");
+const inYear = y => `json_extract(details, '$.orderRef') LIKE 'EO-${y}__'`;
+const staleIn = y => sqlite.prepare(`SELECT COUNT(*) n FROM captured_receipts WHERE ${inYear(y)} AND json_extract(details, '$.parserVersion') = 1`).get().n;
+// Then a better reader arrives: the recent mail and both years were read by the older one.
+sqlite.prepare("UPDATE captured_receipts SET details = json_set(details, '$.parserVersion', 1)").run();
+sqlite.prepare("UPDATE gmail_history_years SET rev = 4").run();
+sqlite.prepare("UPDATE gmail_connections SET full_rev = 4, auto_cursor = NULL").run();
+assert.equal(staleIn(24), 30); assert.equal(staleIn(23), 12);
+const order = [];
+for (let m = 0; m < 60 && (stale() > 0); m++) {
+  clock += 60 * 1000;
+  const r = await catchUpFullReads(env, clock, watching);
+  for (const x of r.results) order.push(x.year || "recent");
+}
+assert.equal(stale(), 0, "every email is read with the new reader, earlier years included");
+assert.equal(order.indexOf(2024) > order.lastIndexOf("recent"), true, "the look-back period first, then the earlier years");
+assert.equal(order.indexOf(2023) > order.lastIndexOf(2024), true, "newest year first");
+assert.deepEqual(yearRows().map(y => [y.year, y.rev, y.cursor]), [[2023, 5, null], [2024, 5, null]], "each year is marked as read with this reader");
+assert.equal((await catchUpFullReads(env, clock + 60000, fetchImpl)).checked, 0, "and then left alone");
+assert.equal(emails.length, 0, "no email or message is sent for a re-read");
+console.log("ok - earlier years added for Wrapped are read again by a newer reader once the recent mail is done, newest first");

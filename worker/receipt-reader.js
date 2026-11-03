@@ -220,3 +220,100 @@ export function cleanItem(item) {
 export function cleanItems(items) {
   return (Array.isArray(items) ? items : []).map(cleanItem).filter(Boolean);
 }
+
+// ---- Item tables read as cells ----------------------------------------------------------------------------------
+// Order-and-pay receipts from pubs and restaurants, takeaway apps, fast food and supermarket orders lay their items out
+// as table cells: a quantity, a name and a price, in whichever order the shop's columns go and however the email breaks
+// its lines. So the text is read as one stream of cells (a line break and a column edge both end a cell) and an item is
+// recognised by its shape: a quantity, then a name, then a price ("1 | Pepsi Max | £1.95"), or a name, then a quantity,
+// then a price ("Coconut Water 1L | 2 | £5.00"). Extras under an item ("+ No salad", the parts of a meal deal) belong to
+// the item above, and their prices are added to its price. The table ends at its totals (subtotal, VAT, delivery, payment).
+const CELL_QTY = /^(?:x\s?)?(\d{1,2})(?:\s?x)?$/i;
+const CELL_PRICE = /^([-−–])?\s?£\s?(\d{1,4}(?:,\d{3})*\.\d{2})\s?\*?$/;
+// Unit prices and notes that sit inside a row: "£4.00/unit", "£1.20 each", "Substitution allowed".
+const CELL_NOTE = /^£\s?\d[\d,]*\.\d{2}\s*(?:\/|per\b|each\b|ea\b)|^(?:substitutions?\b|no substitut|substituted\b|nectar price|clubcard price|was\s£|save\s£|price per\b|view item\b|buy again\b|write a review\b)/i;
+const CELL_END = /^(?:sub-?\s?total|total\b|order total|grand total|basket total|items? total|vat\b|tax\b|delivery\b|shipping\b|postage\b|service (?:fee|charge)|payment\b|discount|offer discount|promotion|you(?:'|’)?ve saved|you saved|savings\b|tip\b|bag (?:charge|levy)|carrier bag|credit\b|voucher|gift card|amount (?:paid|due)|paid\b|balance\b|estimated total|rewards?\b)/i;
+const CELL_HEAD = /^(?:qty|quantity|items?|item (?:detail|details|name|cost|price)|description|products?|price|amount|cost|each|unit price|line total)$/i;
+const CELL_PLUS = /^[+•]$/;
+const CELL_OPTION = /^(?:flavou?r|size|colou?r|style|variant|option|strength|fit|length|width|material|scent|shade|type)\s*:\s*\S/i;
+// What comes after a table when it has no totals of its own.
+const CELL_AFTER = /^(?:thank(?:s| you)\b|we hope\b|enjoy\b|need (?:help|to)\b|questions?\b|contact\b|track (?:your|my)\b|view (?:your|my|order)\b|download\b|manage (?:your|my)\b|get the app\b)/i;
+const pennies = s => Math.round(Number(String(s).replace(/,/g, "")) * 100);
+
+export function itemsFromCells(text) {
+  const cells = [];
+  for (const line of String(text || "").split(/\r\n|\r|\n/)) {
+    for (const raw of line.split("|")) {
+      const c = raw.replace(/[​-‍͏­⁠﻿]/g, "").replace(/\s+/g, " ").trim();
+      if (c) cells.push(c);
+    }
+    if (cells.length > 4000) break;
+  }
+  const qtyAt = i => { const m = CELL_QTY.exec(cells[i] || ""); return m && Number(m[1]) >= 1 ? Number(m[1]) : null; };
+  const priceAt = i => { const m = CELL_PRICE.exec(cells[i] || ""); return m ? { pence: pennies(m[2]), negative: Boolean(m[1]) } : null; };
+  const nameAt = i => { const c = cells[i]; return Boolean(c) && c.length <= 120 && /\p{L}{2}/u.test(c) && !CELL_HEAD.test(c) && !CELL_END.test(c) && !CELL_AFTER.test(c) && !CELL_NOTE.test(c) && !priceAt(i); };
+  // The next cell that counts (unit prices and notes are passed over).
+  const next = i => { let j = i + 1; while (j < cells.length && CELL_NOTE.test(cells[j])) j++; return j; };
+  // A sentence is the end of a table, not a name ("If you require a breakdown of the VAT, please speak to...").
+  const sentence = c => c.length > 70 || (c.split(" ").length > 9 && /[.!?]$/.test(c));
+
+  function read(start, mode) {
+    const rows = [];
+    let cur = null;
+    const done = () => { if (cur && cur.name && cur.pence != null) rows.push(cur); cur = null; };
+    let j = start;
+    for (; j < cells.length && rows.length < 80; j++) {
+      const c = cells[j];
+      if (CELL_END.test(c) || CELL_AFTER.test(c)) break;
+      if (CELL_NOTE.test(c) || CELL_HEAD.test(c) || CELL_PLUS.test(c)) continue;
+      const p = priceAt(j);
+      if (p) {
+        if (!cur || !cur.name) break;          // a price with no item above it: the table is over
+        if (p.negative) continue;             // money off is not an item (the totals say what was paid)
+        cur.pence = cur.pence == null ? p.pence : cur.pence + p.pence;
+        continue;
+      }
+      const q = qtyAt(j);
+      if (q != null) {
+        if (mode === "qty") {
+          if (!cur || cur.pence != null) { done(); cur = { qty: q, extras: [] }; }
+          // (a quantity before the item above has its price is a part of it: "1 x Chicken Big Mac" in a meal deal)
+        } else if (cur && cur.qty == null && cur.pence == null) cur.qty = q;
+        else break;
+        continue;
+      }
+      if (!nameAt(j)) continue;                // stray cells such as "@"
+      if (mode === "qty") {
+        if (!cur) break;
+        if (!cur.name) { if (sentence(c)) break; cur.name = c; }
+        else if (!sentence(c) && c !== cur.name && !cur.extras.includes(c)) cur.extras.push(c);
+        else if (sentence(c) && cur.pence != null) break;
+      } else if (qtyAt(next(j)) != null && priceAt(next(next(j)))) {
+        done();
+        // "Nerd Pen - Banana Ice | Flavour: Banana Ice | 2 | £1.98": the option under the product's name is not its name.
+        cur = CELL_OPTION.test(c) && j > 0 && nameAt(j - 1) && !CELL_OPTION.test(cells[j - 1]) ? { name: cells[j - 1], extras: [c] } : { name: c, extras: [] };
+      }
+      // (in a name-first table, any other name is a note under the item)
+    }
+    done();
+    return { end: j, items: rows.map(r => {
+      let name = r.name, extras = r.extras;
+      // A deal's headline ("£1.99 for a Chicken Big Mac!") is not the thing bought: the part under it is.
+      if (/£|!$/.test(name)) { const k = extras.findIndex(e => !/£|!$/.test(e)); if (k >= 0) { name = extras[k]; extras = extras.filter((_, i) => i !== k); } }
+      extras = extras.filter(e => !/£|!$/.test(e)).slice(0, 6);
+      return { name, qty: r.qty || 1, pricePence: r.pence, lineTotal: true, ...(extras.length ? { variant: extras.join(", ").slice(0, 120) } : {}) };
+    }) };
+  }
+
+  let best = [];
+  for (let i = 0; i < cells.length; i++) {
+    let mode = null;
+    if (qtyAt(i) != null && nameAt(next(i)) && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "qty";
+    else if (nameAt(i) && qtyAt(next(i)) != null && priceAt(next(next(i))) && !priceAt(next(next(i))).negative) mode = "name";
+    if (!mode) continue;
+    const run = read(i, mode);
+    if (run.items.length > best.length) best = run.items;
+    i = Math.max(i, run.end - 1);
+  }
+  return best;
+}
