@@ -3414,12 +3414,6 @@
    "px": 192,
    "bytes": 5009
   },
-  "admiralcasino.co.uk": {
-   "file": "admiralcasino.co.uk.svg",
-   "from": "https://admiralcasino-co-uk-cdn-static.gt-cdn.net/web_assets/aduk/assets/img/favicon/safari-pinned-tab.be7b4a89.svg",
-   "px": 512,
-   "bytes": 797
-  },
   "clarechampion.ie": {
    "file": "clarechampion.ie.png",
    "from": "https://www.google.com/s2/favicons?domain=clarechampion.ie&sz=256",
@@ -3449,18 +3443,6 @@
    "from": "https://www.google.com/s2/favicons?domain=homary.com&sz=256",
    "px": 32,
    "bytes": 486
-  },
-  "tiffany.co.uk": {
-   "file": "tiffany.co.uk.png",
-   "from": "https://www.google.com/s2/favicons?domain=tiffany.co.uk&sz=256",
-   "px": 192,
-   "bytes": 3724
-  },
-  "tvbedsnorthwest.co.uk": {
-   "file": "tvbedsnorthwest.co.uk.png",
-   "from": "https://tvbedsnorthwest.co.uk/cdn/shop/files/Copy_of_ORIGINAL_LOGO_-_DO_NOT_DELETE_250_x_150_px_1500_x_750_px.png?crop=center&height=32&v=1736883815&width=32",
-   "px": 32,
-   "bytes": 2874
   },
   "hollywoodbowl.co.uk": {
    "file": "hollywoodbowl.co.uk.png",
@@ -3534,12 +3516,6 @@
    "px": 192,
    "bytes": 10317
   },
-  "luminskin.com": {
-   "file": "luminskin.com.png",
-   "from": "https://www.luminskin.com/cdn/shop/files/Vector_535e9841-6dd9-49bc-a748-204a29d52a29.webp?crop=center&height=32&v=1676443716&width=32",
-   "px": 32,
-   "bytes": 1916
-  },
   "londontheatredirect.com": {
    "file": "londontheatredirect.com.png",
    "from": "https://www.londontheatredirect.com/lib/static/media/logo-ltd@512.png",
@@ -3563,6 +3539,24 @@
    "from": "https://www.google.com/s2/favicons?domain=eventim.co.uk&sz=256",
    "px": 180,
    "bytes": 1251
+  },
+  "coachinginngroup.co.uk": {
+   "file": "coachinginngroup.co.uk.png",
+   "from": "https://coachinginngroup.co.uk/wp-content/uploads/2025/09/brand-header.png",
+   "px": 192,
+   "bytes": 10937
+  },
+  "thamesclippers.com": {
+   "file": "thamesclippers.com.svg",
+   "from": "https://www.thamesclippers.com/safari-pinned-tab.svg",
+   "px": 512,
+   "bytes": 2016
+  },
+  "gordonramsayrestaurants.com": {
+   "file": "gordonramsayrestaurants.com.png",
+   "from": "https://www.gordonramsayrestaurants.com/mysite/img/grr/android-chrome-192x192.png",
+   "px": 192,
+   "bytes": 2984
   }
  },
  "misses": [
@@ -3613,6 +3607,6 @@
    ]
   }
  ],
- "total": 613,
- "found": 594
+ "total": 616,
+ "found": 593
 }
