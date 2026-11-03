@@ -535,7 +535,8 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     senderName: sender?.name ? fromName : null, senderDomain: domain, personal,
     bodyNames: shopNamesInText(text, subject),
     linkDomain: mainLinkDomain(html),
-    titleName: GAME_SHOP.test(domain || "") ? gameTitle(text) : null,
+    // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
+    titleName: GAME_SHOP.test(domain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
   });
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
@@ -600,7 +601,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
-  if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = gameItems(text).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
+  if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
   // A travel booking names the journey in its subject and nowhere as an item: the journey is what was bought.
   if (!result.items.length) {
     const j = JOURNEY.exec(subject || "");
