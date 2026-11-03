@@ -305,7 +305,7 @@ assert.ok(ob.html.includes("Order OL-4"));
 assert.ok(!/<script|onload=/i.test(ob.html), "scripts and handlers removed");
 assert.ok(ob.html.includes('src="data:image/png;base64,'), "the QR code inside the email is shown in place");
 assert.deepEqual(ob.links, [{ label: "Start a return", url: "https://shop.test/returns" }]);
-assert.equal((await call("/relay/my/receipts/" + r4.id + "/original", { token: jess.sessionToken.replace(/./, "Z") })).status, 401);
+assert.equal((await call("/relay/my/receipts/" + r4.id + "/original", { token: (jess.sessionToken[0] === "Z" ? "Y" : "Z") + jess.sessionToken.slice(1) })).status, 401);
 const parts = mimeParts(mime(box.find(m => m.id.endsWith("receipt4=="))));
 assert.equal(parts.images.length, 1); assert.equal(parts.images[0].cid, "qr1"); assert.equal(parts.html.length, 1);
 console.log("ok - View original receipt works for Outlook emails, cleaned and with their own pictures");

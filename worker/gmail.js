@@ -64,8 +64,9 @@ const OUTLOOK_FULL_REV = 1;
 // Raised when the receipt reader improves enough that every mailbox should be read once more in the background
 // (only emails read by an older reader are opened again). 2: shop, item and group ranking. 3: forwarded receipts from
 // every email app (Outlook's, Apple Mail's, Yahoo's as well as Gmail's), Microsoft's Safe Links, and text in other character sets.
-// 4: the address each order was sent to, for starting returns.
-const READER_FULL_REV = 4;
+// 4: the address each order was sent to, for starting returns. 5: items laid out as table cells (pubs, takeaways,
+// fast food, supermarkets), totals with a note in brackets, month-first dates, payment notices that aren't receipts.
+const READER_FULL_REV = 5;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -84,7 +85,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-const PARSER_VERSION = 20;
+const PARSER_VERSION = 21;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -192,7 +193,9 @@ async function ensureGmailTablesRun(db) {
   // Which kind of mailbox a connection (or a connection being started) is: NULL for Gmail, 'microsoft' for Outlook.
   // full_rev: which complete read of the look-back period the mailbox has had (see OUTLOOK_FULL_REV).
   for (const sql of ["ALTER TABLE gmail_connections ADD COLUMN provider TEXT", "ALTER TABLE gmail_oauth_states ADD COLUMN provider TEXT",
-    "ALTER TABLE gmail_connections ADD COLUMN full_rev INTEGER"]) {
+    "ALTER TABLE gmail_connections ADD COLUMN full_rev INTEGER",
+    // An earlier year's reader (see READER_FULL_REV) and where a background re-read of it has got to.
+    "ALTER TABLE gmail_history_years ADD COLUMN rev INTEGER", "ALTER TABLE gmail_history_years ADD COLUMN cursor TEXT"]) {
     try { await db.prepare(sql).run(); } catch { /* already there */ }
   }
   await ensureResaleTables(db);
@@ -268,28 +271,42 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
 // one round at a time, with no message to the shopper: the 15-minute check alone reads only a few dozen emails an hour, so a
 // busy mailbox would take days. Gmail and Outlook alike. Not while a scan the shopper started is running (that reads
 // everything itself), and the scheduler leaves out the minutes the 15-minute check runs, so a mailbox is never read twice at once.
+// Once the look-back period is done, the earlier years the shopper added for Wrapped are read again too, newest first
+// (most of a long-time shopper's receipts are in those years, and otherwise they would keep the older reader's mistakes).
 const CATCH_UP_MAILBOXES = 2;
 export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
   if (!env.RELAY_DB) return { checked: 0 };
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
+  const staleYear = `SELECT h.year FROM gmail_history_years h WHERE h.shopper_id = g.shopper_id AND h.done_at IS NOT NULL AND COALESCE(h.rev, 0) < ? ORDER BY h.year DESC LIMIT 1`;
   const rows = ((await env.RELAY_DB.prepare(
-    `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
-     WHERE COALESCE(g.full_rev, 0) < ?
+    `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev,
+       (${staleYear}) AS staleYear FROM gmail_connections g
+     WHERE (COALESCE(g.full_rev, 0) < ? OR (${staleYear}) IS NOT NULL)
        AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = g.shopper_id AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
-     ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(FULL_REV, CONSENT_VERSION, CATCH_UP_MAILBOXES).all()).results || []);
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(READER_FULL_REV, FULL_REV, READER_FULL_REV, CONSENT_VERSION, CATCH_UP_MAILBOXES).all()).results || []);
   let calls = 0;
   const out = [];
   for (const r of rows) {
-    if (!needsFullRead(r.lastScanAt, r.provider, r.fullRev) || calls > CALL_BUDGET - 12) continue;
-    let back;
-    try { back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN }); }
-    catch (e) { back = { status: 500, body: {} }; }
+    if (calls > CALL_BUDGET - 12) continue;
+    const recent = needsFullRead(r.lastScanAt, r.provider, r.fullRev);
+    if (!recent && !r.staleYear) continue;
+    let back, year = null;
+    try {
+      if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN });
+      else {
+        year = r.staleYear;
+        const h = await env.RELAY_DB.prepare("SELECT cursor FROM gmail_history_years WHERE shopper_id = ? AND year = ?").bind(r.id, year).first();
+        back = await scan(env, r.id, fetchImpl, now, cursorFor(h && h.cursor) || "", false, { budget: CALL_BUDGET - calls, maxFetch: MAX_FETCH_PER_SCAN, year });
+      }
+    } catch (e) { back = { status: 500, body: {} }; }
     calls += back.calls || 3;
     // Where to carry on from next minute (the 15-minute check uses the same place, so the two never go over the same ground).
-    if (back.status === 200) await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_cursor = ? WHERE shopper_id = ?").bind(savedCursor(back.body.more ? back.body.cursor : null), r.id).run();
-    out.push({ status: back.status, read: back.body && (back.body.added || 0) + (back.body.updated || 0), more: Boolean(back.body && back.body.more) });
+    // A finished year is marked with its reader by scan() itself.
+    if (back.status === 200 && !year) await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_cursor = ? WHERE shopper_id = ?").bind(savedCursor(back.body.more ? back.body.cursor : null), r.id).run();
+    if (back.status === 200 && year && back.body.more) await env.RELAY_DB.prepare("UPDATE gmail_history_years SET cursor = ? WHERE shopper_id = ? AND year = ?").bind(savedCursor(back.body.cursor), r.id, year).run();
+    out.push({ status: back.status, ...(year ? { year } : {}), read: back.body && (back.body.added || 0) + (back.body.updated || 0), more: Boolean(back.body && back.body.more) });
   }
   return { checked: out.length, results: out };
 }
@@ -781,7 +798,7 @@ async function scan(env, shopperId, fetchImplIn, now, cursorIn, full, o = {}) {
   }
   const more = incomplete || outOfBudget || before > limitDay;
   if (yr) {
-    if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at) VALUES (?,?,?) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at").bind(shopperId, yr, now).run();
+    if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev, cursor) VALUES (?,?,?,?,NULL) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at, rev = excluded.rev, cursor = NULL").bind(shopperId, yr, now, READER_FULL_REV).run();
   } else if (!more && !o.recent) {
     // A finished read of the whole look-back period also records which full read it was (see OUTLOOK_FULL_REV).
     if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, FULL_REV, shopperId).run();
