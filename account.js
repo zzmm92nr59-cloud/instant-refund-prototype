@@ -314,11 +314,22 @@
     ".rl-po-top{display:flex;gap:14px;align-items:flex-start}.rl-po-info{flex:1;min-width:0}" +
     ".rl-po-img{width:68px;height:68px;border-radius:16px;background:var(--rl-fill);flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:var(--rl-text2)}" +
     ".rl-po-img img{width:100%;height:100%;object-fit:cover}.rl-has-logo{background:var(--rl-card)!important;box-shadow:inset 0 0 0 1px #e7e1d2}.rl-po-img img.rl-logo-img{object-fit:contain}" +
-    ".rl-po-shop{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--rl-text2)}" +
+    ".rl-po-shop{font-size:13px;font-weight:700;color:var(--rl-text2)}" +
     ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:var(--rl-text)}.rl-po-meta{font-size:13px;color:var(--rl-text2)}" +
     ".rl-po-price{font-weight:800;font-size:17px;white-space:nowrap;color:var(--rl-text)}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-status.wait{background:var(--rl-fill);color:var(--rl-text2)}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
+    // Inside a card: tinted buttons rather than outlined ones, Details only as wide as its word beside another button.
+    ".rl-po .rl-po-secondary{background:rgba(120,120,128,.16);border-color:transparent;color:var(--rl-text)}.rl-po .rl-po-primary{border-color:#101828}" +
+    ".rl-po-actions>.rl-po-details:not(:only-child){flex:0 0 auto;padding:10px 18px}" +
+    ".rl-po .rl-po-mark{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-mark .rl-jic,.rl-po-marklink .rl-jic{color:inherit;margin:0}" +
+    ".rl-po-marklink{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--rl-accent);font-weight:700;font-size:15px}" +
+    ".rl-po-marklink:active{opacity:.6}.rl-po-marklink:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}.rl-po-marklink:disabled{opacity:.6}" +
+    ".rl-due{display:flex;flex-direction:column;gap:8px;padding:2px 2px 0}" +
+    ".rl-due-t{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:2px 10px;font-size:14px;line-height:1.35;color:var(--rl-text)}.rl-due-t b{font-weight:800;white-space:nowrap}" +
+    ".rl-due.ok .rl-due-t b{color:var(--rl-accent)}.rl-due.soon .rl-due-t b{color:var(--rl-warn)}.rl-due.urgent .rl-due-t b{color:var(--rl-danger)}" +
+    ".rl-due-bar{height:6px;border-radius:99px;background:rgba(120,120,128,.2);overflow:hidden}.rl-due-bar i{display:block;height:100%;border-radius:99px;background:#2E9E5B}" +
+    ".rl-due.soon .rl-due-bar i{background:#D47B1F}.rl-due.urgent .rl-due-bar i{background:#E0446E}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid var(--rl-text);text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:var(--rl-card);color:var(--rl-text)}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
     "button.rl-po-primary,button.rl-po-secondary{font:inherit;font-weight:700;font-size:14px}.rl-po-primary:active,.rl-po-secondary:active,.rl-rg-row:active{transform:scale(.97)}" +
@@ -487,13 +498,28 @@
     ".rl-back:has(>.rl-jr){background:var(--rl-bg);align-items:stretch;justify-content:stretch}" +
     ".rl-back:has(>.rl-jr)>.rl-sheet{max-width:none;width:100%;height:100%;min-height:100%;max-height:none;border-radius:0;box-shadow:none;background:var(--rl-bg);padding:env(safe-area-inset-top) max(18px,calc((100% - 480px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--rl-kb,0px))}" +
     ".rl-back:has(>.rl-jr) .rl-jtop{margin:0 -8px;padding:6px 0;background:var(--rl-bg);-webkit-backdrop-filter:none;backdrop-filter:none}" +
-    // The sign-in page.
-    ".rl-jlogo{display:block;width:56px;height:56px;border-radius:15px;margin:22px 0 20px}.rl-signin h2.rl-jh{font-size:32px}" +
+    // The sign-in page: Relay's navy whatever the phone's setting (as the welcome story), the name, a little wallet of
+    // receipts, white headline, three equal white buttons, Face ID in lime underneath, and the legal line.
     ".rl-choices{display:grid;gap:10px;margin:6px 0 4px}" +
-    ".rl-choice,.rl-textbtn{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;font:inherit;cursor:pointer;text-align:center;transition:transform .12s,background-color .12s,opacity .12s}" +
-    ".rl-choice{min-height:54px;padding:0 18px;border-radius:16px;background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);font-size:17px;font-weight:600}.rl-choice:active{transform:scale(.98);background:var(--rl-fill)}" +
-    ".rl-textbtn{min-height:48px;margin-top:6px;color:var(--rl-accent);font-size:16px;font-weight:600}.rl-textbtn:active{opacity:.55}" +
-    ".rl-choice:focus-visible,.rl-textbtn:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-choice,.rl-textbtn{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;cursor:pointer;text-align:center;transition:transform .12s,background-color .12s,opacity .12s}" +
+    ".rl-choice{min-height:54px;padding:0 18px;border-radius:999px;background:#fff;color:#101828;font-size:17px;font-weight:700}.rl-choice:active{transform:scale(.97);background:#dfe5f0}" +
+    ".rl-textbtn{min-height:48px;margin-top:8px;color:#c7f567;font-size:16px;font-weight:700}.rl-textbtn:active{opacity:.6}.rl-textbtn .rl-jic{color:inherit;margin:0}" +
+    ".rl-choice:focus-visible,.rl-textbtn:focus-visible{outline:2px solid #fff;outline-offset:3px}" +
+    ".rl-back:has(>.rl-signin),.rl-back>.rl-sheet.rl-signin{background:#101828;color:#fff}" +
+    ".rl-back>.rl-sheet.rl-signin{display:flex;flex-direction:column}.rl-signin .rl-jbody{flex:1;display:flex;flex-direction:column;padding-top:0}" +
+    ".rl-back:has(>.rl-signin) .rl-jtop{background:transparent}.rl-signin .rl-abtn{color:#fff}.rl-signin .rl-abtn .rl-jic{color:#fff}" +
+    ".rl-signin .rl-abtn:active{background:rgba(255,255,255,.12)}.rl-signin .rl-abtn:focus-visible{outline-color:#fff}.rl-signin .rl-wbrand{margin:6px 0 0}" +
+    ".rl-sheet.rl-signin h2.rl-jh{color:#fff;font-size:clamp(30px,9vw,36px);margin:0 0 8px}.rl-sheet.rl-signin p.rl-jsub{color:rgba(255,255,255,.8);font-size:17px;line-height:1.4;margin:0 0 22px}" +
+    ".rl-sheet.rl-signin p.rl-jlegal{color:rgba(255,255,255,.72);margin-top:18px}.rl-signin .rl-jlegal a{color:#c7f567}" +
+    ".rl-signin .rl-msg{color:#c7f567}.rl-signin .rl-msg.err{color:#ffb4ab}" +
+    ".rl-sart{flex:1;min-height:170px;display:flex;align-items:flex-end;justify-content:center;padding:18px 0 30px}" +
+    ".rl-sstack{position:relative;width:100%;max-width:340px;padding-top:30px}" +
+    ".rl-sback{position:absolute;height:64px;border-radius:18px}.rl-sback.b1{top:0;left:30px;right:30px;background:#E0446E}.rl-sback.b2{top:15px;left:15px;right:15px;background:#4F72E0}" +
+    ".rl-sfront{position:relative;box-shadow:0 16px 36px rgba(0,0,0,.35)}.rl-sfront .rl-wtrack{background:#e2f0e7}.rl-sfront .rl-wtrack i{width:22%;background:#2E9E5B}.rl-sfront .rl-wdue span{color:#1d6b3f}" +
+    ".rl-signin .rl-rise{animation:rlup .6s cubic-bezier(.2,.8,.2,1) both;animation-delay:var(--d,0s)}" +
+    ".rl-signin .rl-sback.b1{--d:.02s}.rl-signin .rl-sback.b2{--d:.07s}.rl-signin .rl-sfront{--d:.12s}" +
+    "@media(max-height:720px){.rl-sart{min-height:0;padding:10px 0 18px}.rl-sfront .rl-wdue{display:none}}@media(max-height:620px){.rl-sart{display:none}.rl-signin .rl-wbrand{margin-bottom:18px}}" +
+    "@media(prefers-reduced-motion:reduce){.rl-signin .rl-rise{animation:none}}" +
     // The welcome story: full-bleed colour, one slide at a time, the way in always at the bottom.
     ".rl-welcome{position:fixed;inset:0;z-index:9998;display:flex;justify-content:center;color:#fff;background:#101828;transition:background-color .5s ease;user-select:none;-webkit-user-select:none;cursor:pointer;overflow:hidden}.rl-welcome:focus{outline:none}" +
     "body.rl-welcoming{overflow:hidden}" +
@@ -795,7 +821,8 @@
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
-    back: '<path d="m15 6-6 6 6 6"/>'
+    back: '<path d="m15 6-6 6 6 6"/>',
+    ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'
   };
   function jIc(n, px) {
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
@@ -804,7 +831,7 @@
   }
   // The frame of every step: progress dots (when there is more than one step), Back or Close, then the step itself.
   function jFrame(sheet, o) {
-    sheet.textContent = ""; sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
+    sheet.textContent = ""; sheet.classList.remove("rl-signin"); sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
     try { sheet.scrollTop = 0; } catch (e) {}
     var top = el("div", { className: "rl-jtop" });
     top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
@@ -953,15 +980,18 @@
   }
   // The sign-in page: Relay's icon, one heading, three equal ways in, Face ID quietly underneath, and the legal line.
   // Signing in and creating an account are the same steps, so the heading just matches the button that led here.
+  var signInOpts = {}; // so Back from a later step returns to the same page ("Welcome back" stays "Welcome back")
   function signedOutView(sheet, opts) {
-    opts = opts || {};
+    opts = signInOpts = opts || {};
     signInExtra = {};
     var fromWelcome = Boolean(document.querySelector(".rl-welcome"));
     var body = jFrame(sheet, { back: fromWelcome ? close : null, noClose: fromWelcome,
       title: opts.returning ? "Welcome back" : "Create your account",
       sub: opts.returning ? "Sign in the way you did last time. No password needed." : "Use the email you shop with. No password needed." });
+    // On Relay's navy, as the welcome story ends: the name, a little wallet of receipts, then the ways in, rising in turn.
     sheet.classList.add("rl-signin");
-    body.insertBefore(el("img", { className: "rl-jlogo", src: "icons/icon-192.png", alt: "Relay" }), body.firstChild);
+    body.insertBefore(el("div", { className: "rl-wbrand rl-rise" }, [el("img", { src: "icons/icon-192.png", alt: "" }), el("b", { text: "Relay" })]), body.firstChild);
+    body.insertBefore(signInArt(), body.querySelector(".rl-jh"));
     var msg = el("div", { className: "rl-msg" });
     var choices = el("div", { className: "rl-choices" });
     var gBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Google", onclick: function () { providerStep(sheet, "google"); } });
@@ -970,7 +1000,7 @@
     var eBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with email", onclick: function () { emailStep(sheet); } });
     [gBtn, mBtn, eBtn].forEach(function (n) { choices.appendChild(n); });
     body.appendChild(choices);
-    if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; body.appendChild(pk); }
+    if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; pk.insertBefore(jIc("face", 22), pk.firstChild); body.appendChild(pk); }
     body.appendChild(msg);
     var legal = el("p", { className: "rl-jlegal" });
     legal.appendChild(document.createTextNode("By continuing you agree to Relay's "));
@@ -979,6 +1009,9 @@
     legal.appendChild(el("a", { href: "./privacy.html", text: "Privacy policy" }));
     legal.appendChild(document.createTextNode("."));
     body.appendChild(legal);
+    // Each part rises in a moment after the one above it (not at all where the phone asks for less motion).
+    var rise = [body.querySelector(".rl-jh"), body.querySelector(".rl-jsub"), choices, body.querySelector(".rl-textbtn"), legal];
+    rise.forEach(function (n, k) { if (n) { n.classList.add("rl-rise"); n.style.setProperty("--d", (0.18 + k * 0.06).toFixed(2) + "s"); } });
     signInProviders().then(function (p) {
       if (!document.body.contains(body)) return;
       if (p && p.google) gBtn.style.display = "";
@@ -986,10 +1019,22 @@
       if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
     });
   }
+  // The sign-in page's picture: Relay's wallet, with a receipt (a made-up shop) counting down to its return date.
+  function signInArt() {
+    var due = new Date(Date.now() + 12 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    var front = el("div", { className: "rl-wcard rl-sfront" }, [el("span", { className: "rl-wini", text: "K", style: "background:#D47B1F" }),
+      el("span", { className: "rl-wcard-t" }, [el("b", { text: "Court Classic Trainers" }), el("span", { text: "Kick Lane" })]), el("b", { className: "rl-wprice", text: "£85" }),
+      el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "Return by " + due + " · 12 days left" })])]);
+    var stack = el("div", { className: "rl-sstack" }, [el("div", { className: "rl-sback b1 rl-rise" }), el("div", { className: "rl-sback b2 rl-rise" }), front]);
+    front.classList.add("rl-rise");
+    var art = el("div", { className: "rl-sart" }, [stack]);
+    art.setAttribute("aria-hidden", "true");
+    return art;
+  }
   // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
   function providerStep(sheet, kind) {
     var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    var body = jFrame(sheet, { back: function () { signedOutView(sheet); }, of: 3, at: 1,
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: 3, at: 1,
       title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
     var points = el("div", { className: "rl-jcard" });
     [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
@@ -1029,7 +1074,7 @@
   }
   // Step 2 by email: a one-time link or code.
   function emailStep(sheet, typed) {
-    var body = jFrame(sheet, { back: function () { signedOutView(sheet); }, title: "Continue with email", sub: "We'll email you a link and a 6-digit code. No password." });
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, title: "Continue with email", sub: "We'll email you a link and a 6-digit code. No password." });
     var input = el("input", { type: "email", id: "rl-signin-email", placeholder: "you@example.com", autocomplete: "email", inputMode: "email", value: typed || "" });
     input.setAttribute("aria-label", "Your email address");
     var hint = el("div", { className: "rl-jhint" });
@@ -3956,7 +4001,7 @@
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info, el("div", { className: "rl-po-price", text: money(it.priceMinor, it.currency) })]));
     var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
     var shopName = o.store || "the shop";
-    if (deadline) card.appendChild(deadlineChip(deadline, "Swap or return by "));
+    if (deadline) card.appendChild(dueBar(deadline, "Swap or return by ", String(o.orderedAt || "").slice(0, 10)));
     if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
     else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
     var actions = el("div", { className: "rl-po-actions" });
@@ -3998,6 +4043,22 @@
     var by = x.returnBy && dl === x.returnBy.date ? x.returnBy : null;
     return !by ? plain : by.estimate ? "To be safe, return by " : by.basis === "uk_law" ? "Return by at least " : plain;
   }
+  // A card's return date as a countdown, the way the welcome story drew it: the date, the days left, and a bar that fills
+  // as the time to send it back runs out (green, then amber in the last week, then red in the last three days).
+  function dueBar(dl, lead, fromDay) {
+    var d = daysLeft(dl), day = new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+    var left = d === null || d < 0 ? "" : d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left";
+    var box = el("div", { className: "rl-due " + (d !== null && d <= 3 ? "urgent" : d !== null && d <= 7 ? "soon" : "ok") },
+      [el("div", { className: "rl-due-t" }, [el("span", { text: (lead || "Return by ") + day })].concat(left ? [el("b", { text: left })] : []))]);
+    var from = /^\d{4}-\d{2}-\d{2}/.test(fromDay || "") ? Date.parse(fromDay.slice(0, 10) + "T00:00:00Z") : NaN, total = (Date.parse(dl + "T00:00:00Z") - from) / 864e5;
+    if (d !== null && d >= 0 && total >= 1) {
+      var bar = el("div", { className: "rl-due-bar" }, [el("i", { style: "width:" + Math.round(Math.min(1, Math.max(0.05, 1 - d / total)) * 100) + "%" })]);
+      bar.setAttribute("aria-hidden", "true"); box.appendChild(bar);
+    }
+    return box;
+  }
+  // When a card's return time started: the delivery day when the date counts from delivery, otherwise the order day.
+  function dueFrom(x) { return x.returnBy && x.returnBy.from === "delivery" && x.delivery && x.delivery.at ? x.delivery.at : x.orderDate; }
   function deadlineChip(dl, lead) {
     var d = daysLeft(dl), day = new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
     var txt = (lead || "Return by ") + day + (d === null ? "" : d === 0 ? " · last day" : d === 1 ? " · 1 day left" : " · " + d + " days left");
@@ -4044,7 +4105,7 @@
         : dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? "Due " + (dv.at ? day(dv.at) : "today") : "On its way") + (dv.carrier ? " · " + dv.carrier : "") }));
     }
     var dl = deadlineOf(x);
-    if (opts.deadline !== false && dl) card.appendChild(deadlineChip(dl, deadlineLead(x, dl, "Return by ")));
+    if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
     if (opts.extra) opts.extra(card);
     var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
@@ -4057,24 +4118,31 @@
         open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
     else if (opts.actions !== false && portal)
       actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sheet) { returnGuide(sheet, x, who, portal); }); } }));
-    actions.appendChild(el("button", { className: "rl-po-secondary", text: "Details", style: portal && opts.actions !== false ? "flex:0 0 96px" : "", onclick: function () {
+    var hasMain = actions.childNodes.length > 0;
+    var details = el("button", { className: "rl-po-secondary rl-po-details", text: "Details", onclick: function () {
       open(function (sheet) {
         sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
         sheet.appendChild(receiptCard(x, function () {}, true));
         if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) sheet.appendChild(el("a", { className: "rl-btn ghost", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel", style: "display:block;text-align:center;text-decoration:none;margin-top:10px" }));
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
       });
-    } }));
-    card.appendChild(actions);
+    } });
 
     // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
     if (opts.markable && x.id) {
       var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
       if (!idxs.length) idxs = [0];
-      card.appendChild(el("button", { type: "button", className: "rl-link", text: opts.markable === "undo" ? "Not sending this back" : "I'm sending this back", style: "all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;line-height:44px;color:var(--rl-accent);font-weight:800;font-size:15px;margin-top:2px;display:inline-block;text-decoration:underline;text-underline-offset:3px",
-        onclick: function (e) { var b = e.currentTarget; b.disabled = true; b.textContent = "Saving…";
-          markItems(x, idxs, opts.markable === "undo" ? null : "returning").then(function (ok) { if (ok && opts.changed) opts.changed(); else { b.disabled = false; b.textContent = "Couldn't save. Try again"; } }); } }));
-    }
+      var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
+      var mark = el("button", { type: "button", className: hasMain ? "rl-po-marklink" : "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
+      mark.onclick = function () {
+        if (mark.disabled) return;
+        mark.disabled = true; words.textContent = "Saving…";
+        markItems(x, idxs, undo ? null : "returning").then(function (ok) {
+          if (ok && opts.changed) opts.changed(); else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
+      };
+      if (hasMain) { actions.appendChild(details); card.appendChild(actions); card.appendChild(mark); }
+      else { actions.appendChild(mark); actions.appendChild(details); card.appendChild(actions); }
+    } else { actions.appendChild(details); card.appendChild(actions); }
     return card;
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
@@ -4208,7 +4276,8 @@
       if (!items.length) grid.appendChild(el("div", { className: "rl-empty", style: "grid-column:1/-1" }, [el("h3", { text: "Nothing to return right now" }),
         el("p", { text: "Anything you can still return or swap shows up here. Everything you've bought is in Receipts." })]));
       items.forEach(function (i) { grid.appendChild(i.node()); });
-      foot.appendChild(el("div", { className: "rl-po-actions", style: "margin:14px 0 6px;max-width:520px" }, [
+      // On Home, Receipts and Returns & swaps are tiles under the wallet instead.
+      if (!opts.home) foot.appendChild(el("div", { className: "rl-po-actions", style: "margin:14px 0 6px;max-width:520px" }, [
         el("button", { className: "rl-po-secondary", text: "All receipts", onclick: function () { window.go && window.go("receipts"); } }),
         el("button", { className: "rl-po-secondary", text: "Returns & swaps", onclick: function () { window.go && window.go("returns"); } })]));
       var box = el("div", { style: "margin-top:10px" }); foot.appendChild(box); mountInstore(box, refresh, "box");

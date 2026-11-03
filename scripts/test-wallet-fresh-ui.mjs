@@ -50,7 +50,7 @@ await wallet.getByText("Court Classic Trainers").waitFor();
 await page.waitForTimeout(800);
 const text = await wallet.innerText();
 assert.ok(!/Red Dragon Darts/.test(text), "a year-old order that only ever said 'shipped' isn't in the wallet");
-assert.ok(!/Order from Royal Mail|ROYAL MAIL\n/.test(text), "a delivery company isn't shown as a shop: " + text.slice(0, 300));
+assert.ok(!/Order from Royal Mail|^Royal Mail$/im.test(text), "a delivery company isn't shown as a shop: " + text.slice(0, 300));
 assert.ok(/Desk Lamp/.test(text), "an order with a return deadline ahead is shown");
 assert.match(text, /2 items/);
 const cards = wallet.locator(".rl-po");

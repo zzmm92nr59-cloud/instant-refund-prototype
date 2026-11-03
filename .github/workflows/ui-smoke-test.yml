@@ -60,3 +60,7 @@ jobs:
         run: node scripts/test-return-guide-ui.mjs
       - name: Test Outlook in the app (connect, scan, receipts, disconnect)
         run: node scripts/test-outlook-ui.mjs
+      - name: Test adding a missing receipt (inbox search as you type, one-tap paste, forwarding, without an inbox)
+        run: node scripts/test-add-receipt-ui.mjs
+      - name: Test the sign-in page and Home (Relay's navy, return countdowns, colourful tiles)
+        run: node scripts/test-home-look-ui.mjs
