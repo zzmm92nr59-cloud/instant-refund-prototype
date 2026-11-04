@@ -179,9 +179,10 @@ export async function runPriceAlerts(env, o = {}) {
     const messages = list.slice(0, 10).map(x => ({
       title: "Price drop" + (x.w.store ? " at " + x.w.store : ""),
       body: x.w.product + (x.w.variant ? " · " + x.w.variant : "") + " is now " + priceText(x.now, x.currency) + " (was " + priceText(x.was, x.currency) + ")",
-      url: "./"
+      // Tapping it opens that product (or, without its code, the price alerts page).
+      url: x.w.sku ? "./#open=product&sku=" + encodeURIComponent(x.w.sku) : "./#open=alerts"
     }));
-    if (list.length > 10) messages.push({ title: (list.length - 10) + " more price drops", body: "Open Relay to see everything you watch.", url: "./" });
+    if (list.length > 10) messages.push({ title: (list.length - 10) + " more price drops", body: "Open Relay to see everything you watch.", url: "./#open=alerts" });
     for (const message of messages) {
       for (const s of subs) { try { const r = await sendPush(env, s, message, o); if (r.ok) sent++; } catch {} }
     }
@@ -230,7 +231,7 @@ export async function handlePushRoute(request, env, url, cors, shopper, o) {
     if (o.now - last < 15000) return json({ error: "slow_down" }, 429, cors);
     await db.prepare("UPDATE push_subscriptions SET last_test_at = ? WHERE shopper_id = ?").bind(o.now, shopper.id).run();
     let sent = 0, failed = 0, why = "";
-    for (const s of subs) { try { const r = await sendPush(env, s, { title: "Relay test alert", body: "If you can read this, price alerts will reach this device.", url: "./" }, o); if (r.ok) sent++; else { failed++; why = why || ("push service said " + r.status + (r.reason ? " " + r.reason : "")); } } catch (e) { failed++; why = why || ("could not send: " + String(e && e.message || e).slice(0, 80)); } }
+    for (const s of subs) { try { const r = await sendPush(env, s, { title: "Relay test alert", body: "If you can read this, price alerts will reach this device.", url: "./#open=alerts" }, o); if (r.ok) sent++; else { failed++; why = why || ("push service said " + r.status + (r.reason ? " " + r.reason : "")); } } catch (e) { failed++; why = why || ("could not send: " + String(e && e.message || e).slice(0, 80)); } }
     return json({ sent, failed, why }, 200, cors);
   }
   if (path === "/relay/my/alerts/watch" && m === "POST") {

@@ -146,7 +146,7 @@ async function sendOffer(env, shop, body, o) {
   const message = {
     title: "Offer from " + shop.store_label,
     body: v.product + (v.variant ? " · " + v.variant : "") + ": " + priceText(offer, v.currency) + " for Relay watchers (usually " + priceText(v.priceMinor, v.currency) + "). Ends " + endText + "." + (note ? " " + note : ""),
-    url: "./"
+    url: "./#open=product&sku=" + encodeURIComponent(sku)
   };
   let devices = 0;
   for (const id of shoppers) {

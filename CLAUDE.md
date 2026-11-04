@@ -21,4 +21,6 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 
 Also: index.html and relay-app-v2.html must stay identical. Bump VERSION in sw.js when the app shell changes.
 
+Gestures (relay-gestures.js): a new inner screen's Back button gets data-back, so the phone's back and the swipe in from the left edge use it; sheets from the bottom close by swiping down; pull to refresh works on a tab's own screen. Links into the app use #open=… (index.html openLink).
+
 Server (docs/SECURITY.md): a new route that takes a body needs its fields listed in worker/validate.js (unlisted routes take none), and a row in "Who can do what". Keys live only as Cloudflare secrets, never in code (scripts/check-secrets.mjs).

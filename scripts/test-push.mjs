@@ -86,7 +86,7 @@ assert.equal((await post("/relay/my/push/subscribe", bob, { endpoint: "https://w
 let r = await post("/relay/my/push/test", alice, {});
 assert.deepEqual(await r.json(), { sent: 1, failed: 0, why: "" });
 assert.equal(pushes.length, 1); assert.equal(pushes[0].url, "https://fcm.googleapis.com/fcm/send/alice-phone");
-assert.equal((await read(pa, pushes[0].body)).title, "Relay test alert");
+{ const t = await read(pa, pushes[0].body); assert.equal(t.title, "Relay test alert"); assert.equal(t.url, "./#open=alerts", "tapping the test opens price alerts"); }
 const auth = pushes[0].headers.Authorization, m = /^vapid t=([\w-]+)\.([\w-]+)\.([\w-]+), k=([\w-]+)$/.exec(auth);
 assert.ok(m, auth); assert.equal(m[4], k1);
 assert.equal(JSON.parse(new TextDecoder().decode(unb64u(m[2]))).aud, "https://fcm.googleapis.com");
@@ -113,6 +113,7 @@ setPrice("DEMO-JACKET", 3999); clock += 60000;
 c = await (await post("/relay/my/alerts/check", alice, {})).json();
 assert.equal(c.drops, 1); assert.equal(c.sent, 1);
 const note = await read(pa, pushes[0].body);
+assert.match(note.url, /^\.\/#open=product&sku=/, "tapping a price drop opens that product");
 assert.equal(note.title, "Price drop at Test Shop"); assert.equal(note.body, "Field Jacket · Cream is now £39.99 (was £50.00)");
 pushes = []; clock += 60000;
 assert.equal((await (await post("/relay/my/alerts/check", alice, {})).json()).drops, 0, "the same drop is never announced twice");
