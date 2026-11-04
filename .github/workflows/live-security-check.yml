@@ -1,0 +1,24 @@
+name: Live security check
+# After each deploy, checks the live server from outside: not-found answers, test routes off, sessions required, unexpected
+# fields refused, and rate limits answering 429 (scripts/check-live-security.mjs). It never signs in or sends anything.
+on:
+  workflow_run:
+    workflows: ["Deploy Relay Worker"]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Give the new version a moment to reach every Cloudflare location
+        run: sleep 20
+      - name: Check the live server's security measures
+        run: node scripts/check-live-security.mjs
