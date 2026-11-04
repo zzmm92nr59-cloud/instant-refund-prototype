@@ -10,6 +10,8 @@ SHOPIFY_SHOP_DOMAIN = "relay-ltd.myshopify.com"
 AWIN_PUBLISHER_ID = "3134429"
 # Relay's app registration with Microsoft (personal accounts only). The matching MICROSOFT_CLIENT_SECRET is a Cloudflare secret.
 MICROSOFT_CLIENT_ID = "08207e63-9ef5-4a9c-ba4d-528e35f4c92a"
+# The prototype's test-only endpoints (worker/legacy-routes.js). "on" only for a testing session, then back to "off".
+LEGACY_TEST_ROUTES = "off"
 
 [[d1_databases]]
 binding = "RELAY_DB"
@@ -23,6 +25,28 @@ migrations_dir = "migrations"
 # make things worse.
 [placement]
 mode = "smart"
+
+# Rate limits (worker/limits.js explains each). Cloudflare counts these per location, approximately; each namespace_id is
+# just a number naming that counter within Relay's Cloudflare account. Changing a limit here and deploying is all it takes.
+[[ratelimits]]
+name = "RL_IP"
+namespace_id = "7301"
+simple = { limit = 1200, period = 60 }
+
+[[ratelimits]]
+name = "RL_SIGNIN"
+namespace_id = "7302"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "RL_USER"
+namespace_id = "7303"
+simple = { limit = 600, period = 60 }
+
+[[ratelimits]]
+name = "RL_MAIL"
+namespace_id = "7304"
+simple = { limit = 60, period = 60 }
 
 [triggers]
 # Hourly: shops, price alerts, reminders. Every 15 minutes: new mail. Every minute: scans carried on after the shopper left the app.

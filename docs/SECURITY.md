@@ -1,0 +1,189 @@
+# Relay security
+
+How Relay's server (the Cloudflare Worker in `worker/`) decides who may do what, limits how often anyone can call it,
+checks everything sent to it, and keeps its keys. Each part names the code that does it and the test that proves it.
+Written for whoever works on Relay next, person or AI: keep it true when the code changes.
+
+## The ground rules
+
+- **No endpoint takes a shopper's id from the request.** Every `/relay/my/...` route works only on the shopper whose
+  session made the request. Someone else's receipt, order or listing looks exactly like one that doesn't exist (404).
+- **A purchase at a connected shop belongs to a shopper only when** the shop's order email, hashed with `AUTH_SECRET`,
+  equals the shopper's verified email hash (`worker/auth.js`). Nothing else grants it.
+- **Sessions are bearer tokens, not cookies.** 43 random characters; Relay stores only their SHA-256 hash. They last 90
+  days and are renewed while in use. Because no cookie carries them, another website can't make a signed-in request on a
+  shopper's behalf, which is why the API can answer any origin (`Access-Control-Allow-Origin: *`). A few account changes
+  (signing out other devices, phone number, two-step sign-in, passkeys) also check the request came from Relay's own app.
+- **Keys never reach the browser.** The app's files hold no keys; the server reads every key from Cloudflare secrets.
+- **Errors say what happened in a word, never why in detail.** Stripe's, Square's or a shop's own error text stays in
+  Relay's logs; the app gets a short code like `stripe_error` and shows its own plain-English message.
+
+## Who can do what
+
+### The callers
+
+| Caller | How Relay knows it's them |
+|---|---|
+| **Visitor** | Nothing: anyone on the internet. |
+| **Shopper** | A session token from signing in (email link or code, Google, Microsoft or a passkey, plus the second step if they turned it on). |
+| **Shopper, half-way through two-step sign-in** | A short-lived "pending" token that only finishes signing in. It is not a session. |
+| **Relay admin** | A signed-in shopper whose email is in `RELAY_ADMIN_EMAILS`. |
+| **Shop** | The shop's Relay key (`rk_...`), given when the shop connects with Square or Shopify (or opens Relay inside Shopify admin). Relay keeps only a keyed hash of it. |
+| **Shopify, Square** | Webhooks signed with the shared secret (HMAC); unsigned or wrongly signed ones are refused. |
+| **Relay's scheduled jobs** | Cloudflare's cron triggers. They aren't reachable over the web at all. |
+
+### What each caller can do
+
+"Own" means the caller's own records only. Blank means no access: the route answers "not signed in" (401), or "not
+found" (404) where even saying it exists would tell too much.
+
+| Resource | Visitor | Shopper | Relay admin | Shop | Shopify / Square | Scheduled jobs |
+|---|---|---|---|---|---|---|
+| Sign in, sign out | Start and finish sign-in | Sign out; sign out other devices | As a shopper | | | Tidy old text-message records |
+| Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
+| Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | | Read connected inboxes for new receipts (every 15 min) |
+| Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, reminders, open the original email | As a shopper | | | Return reminders |
+| Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed) | Catch up Square orders and refunds |
+| Card on file (Stripe) | | Own: add, remove. Relay keeps Stripe's reference, the brand, last 4 digits and expiry, never the card number | As a shopper | | | |
+| Price alerts and phone notifications | | Own: watch items or shops, choose alert mode, turn notifications on and off | As a shopper | Sends an offer to its own watchers, without learning who they are | Catalogue changes (signed) | Compare prices, send alerts |
+| Resale listings | Nothing | List items from own receipts; browse others' listings, shown only as "Member" | As a shopper | | | |
+| Resale requests and messages | | Only the two members in a conversation; report one | Reviews reported conversations, without seeing who the members are; dismiss, remove a listing, block a member | | | |
+| In-shop purchases (Square) | | Own: claim a card payment from a receipt; answer "is this yours?" | As a shopper | | | Suggest new in-shop payments to their owners |
+| Shop figures | | | | Own shop only: how many watch each item, offers sent, results. Counts under 3 show as "fewer than 3" | | |
+| Shop settings (payments, Royal Mail labels) | | | | Own shop only. The Royal Mail key is stored encrypted and never sent back | | |
+| Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
+| List of connected shops | Read names | Read | Read | | | |
+| Testing tools (`/relay/my/testing/...`) | | Sandbox test shop only: off when Square is live; 5 test orders a day | | | | |
+| Prototype test routes (`/relay/test-lab`, `/relay/live-test`, `/relay/ledger/...` and others) | Off: "not found" | Off | Off | Off | | |
+
+The prototype test routes are switched off by `worker/legacy-routes.js`. They take no sign-in and some place test payments
+on Relay's Square sandbox account. To use the "Existing API and verification tools" testing page again, set
+`LEGACY_TEST_ROUTES = "on"` under `[vars]` in `worker/wrangler.toml`, deploy, and set it back to `"off"` afterwards.
+
+**Proved by** `scripts/test-access-control.mjs`. It tries every route the server's code mentions as each kind of caller:
+no session, a made-up one, a malformed one, a shop's key, an admin route as a shopper, someone else's receipt, unsigned
+webhooks. Ownership of purchases, swaps, returns, resale and inboxes is also tested in `test-auth`, `test-exchange`,
+`test-square-orders`, `test-resale`, `test-resale-admin`, `test-more-inboxes` and `test-retailer`.
+
+## Rate limits
+
+`worker/limits.js`, checked for every request before any route runs. OWASP API4:2023, "Unrestricted Resource Consumption".
+
+| Allowance | Counted by | Per minute | Covers |
+|---|---|---|---|
+| Address | Network address (IPv6 by its /64 block) | 1,200 | Every request |
+| Sign-in | Network address | 30 | Sign-in, codes, passkeys, two-step, connecting Google, Microsoft, Square or Shopify |
+| Account | The credential: a shopper's session or a shop's key | 600 | Everything a signed-in shopper or shop does, except pictures |
+| Mailbox | The credential | 60 | Searching and adding from Gmail or Outlook, pasted emails, opening an original email |
+
+- Over a limit, Relay answers `429` with `{"error":"too_many_requests","retryAfterMs":...}` and a `Retry-After` header. The
+  app already shows plain English for it ("Too many attempts. Please try again later." on sign-in; elsewhere "Couldn't …
+  Please try again", and inbox reading backs off and carries on in the background).
+- Shopify's and Square's webhooks aren't limited (they're signed, and their senders retry in bursts). Nor is the
+  browser's preflight check.
+- Counting uses Cloudflare's Rate Limiting binding (`[[ratelimits]]` in `worker/wrangler.toml`), which counts per
+  Cloudflare location and is approximate by design. Without the binding, a counter in the Worker's memory stands in. If
+  counting fails, the request goes ahead rather than locking everyone out.
+- The tighter limits Relay already had stay on top: sign-in emails per email address and per network address, wrong codes, texts,
+  test notifications, price checks, resale requests and messages, shop offers, pasted receipts, test orders.
+- To change a limit: edit the number in `worker/wrangler.toml` (and `LIMITS` in `limits.js`, which the stand-in uses), then deploy.
+
+**Proved by** `scripts/test-validation.mjs`, part 4.
+
+## Input checks
+
+`worker/validate.js`. OWASP API3:2023 and API8:2023, and the Input Validation and Mass Assignment cheat sheets.
+
+- Every body Relay accepts is listed with exactly the fields it takes: type, longest length, range, list size, and the
+  allowed values where there's a fixed set.
+- **Unexpected fields are refused** (`400 {"error":"invalid_request","field":"..."}`). This also stops anyone setting a
+  field they shouldn't, such as a resale listing's title, which always comes from the receipt.
+- **Deny by default:** a route that isn't listed takes no fields at all.
+- Bodies are read only up to the route's size limit (8 KB unless it needs more: pasted emails 1 MB, a profile photo
+  300 KB). Bigger ones get `413` and, when the size is declared, aren't even read.
+- The body must be valid UTF-8 and one JSON object. Keys named `__proto__`, `constructor` or `prototype` are refused
+  anywhere (prototype pollution).
+- Text is cleaned: control characters are removed, and in text written for other people (names, notes, messages) so are
+  the invisible characters that flip which way text runs, which can disguise what a message says.
+- Addresses are checked too: very long paths or query strings, more than 60 parameters, or control characters are refused.
+- Signed-in routes are checked only after the session is known, so a request without one learns nothing beyond
+  "not signed in". Each route still makes its own checks after these (a real email address, a known category, the
+  shopper's own receipt) and gives its own specific error, as before.
+
+**Proved by** `scripts/test-validation.mjs`:
+1. the rules themselves;
+2. every route the server's code mentions refuses an unexpected field;
+3. every request the app made during the browser tests passes, recorded by `scripts/record-app-requests.mjs`;
+4. every field the app's code sends, found by reading `account.js` and the other pages, is one the server takes.
+
+So the checks can't quietly break the app.
+
+## Keys and secrets
+
+No key is written in the code. `scripts/check-secrets.mjs` runs on every pull request and fails if a key, token or
+private key appears in any file. Add `--history` to check every commit ever made. The repository is public: a key
+that's ever been pushed must be treated as leaked and rotated, even after it's deleted.
+
+Where each one lives:
+
+- **GitHub secret**: put into Cloudflare by `.github/workflows/deploy-worker.yml` on every deploy. To change it, update
+  the GitHub secret (Settings → Secrets and variables → Actions), then run the deploy workflow.
+- **Cloudflare secret**: set directly, with `npx wrangler secret put NAME` or in the Cloudflare dashboard under the
+  Worker's Settings → Variables and Secrets.
+
+| Key | What it's for | Where it lives | To rotate | What changes for people |
+|---|---|---|---|---|
+| `AUTH_SECRET` | Relay's master key (see below) | GitHub secret | Planned migration only (see below) | Lots, unless migrated |
+| `GOOGLE_CLIENT_SECRET` | Google sign-in and reading Gmail | GitHub secret | Google Cloud console → Credentials → the OAuth client → add a secret; update; deploy; disable the old one | Nothing |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft sign-in and reading Outlook | Cloudflare secret | Azure app registration → Certificates & secrets → new secret; `wrangler secret put`; delete the old one | Nothing. These expire (24 months at most), so note the date |
+| `RESEND_API_KEY` | Sending sign-in and security emails | GitHub secret | Resend → API keys → create; update; deploy; delete the old one | Nothing |
+| `STRIPE_SECRET_KEY` (and `STRIPE_PUBLISHABLE_KEY`) | Cards on file and swap payments | Cloudflare secret | Stripe dashboard → Developers → API keys → roll key (Stripe can keep the old one working for a while); `wrangler secret put` | Nothing |
+| `SQUARE_ACCESS_TOKEN`, `SQUARE_APPLICATION_SECRET`, `SQUARE_WEBHOOK_SIGNATURE_KEY` | Relay's own Square account, connecting Square shops, checking Square's webhooks | Cloudflare secrets (the sandbox seeding workflows keep their own copy of the access token as a GitHub secret) | Square Developer dashboard → the app → replace the token or secret, or the webhook's signature key; `wrangler secret put`; update the GitHub copy too | Nothing. Shops' own connections are separate |
+| `SHOPIFY_CLIENT_SECRET`, `SHOPIFY_WEBHOOK_SECRET` | Connecting Shopify shops, checking Shopify's webhooks | GitHub secrets | Shopify Partners → the app → rotate the secret; update; deploy | Nothing |
+| `SHOPIFY_APP_n_CLIENT_SECRET`, `SHOPIFY_STORE_n_...` | Pilot shops' own Shopify apps | Cloudflare secrets | The shop's admin → its app → rotate; `wrangler secret put` | Nothing |
+| `TWILIO_AUTH_TOKEN` (and `TWILIO_ACCOUNT_SID`) | Sign-in codes by text | GitHub secret | Twilio console → API keys & tokens → secondary token → promote; update; deploy | Nothing |
+| `PLAID_SECRET` | The bank-link demo in the testing tools (sandbox) | GitHub secret | Plaid dashboard → Keys → rotate; update; deploy | Nothing |
+| `AWIN_API_TOKEN` | Reading affiliate product feeds | Cloudflare secret | Awin → API credentials → new token; `wrangler secret put` | Nothing |
+| `CLOUDFLARE_API_TOKEN` | Lets GitHub deploy the Worker | GitHub secret | Cloudflare → My Profile → API Tokens → roll; update the GitHub secret | Nothing |
+
+### `AUTH_SECRET` is special
+
+It isn't used directly for anything outside Relay: Relay derives other keys from it. Each of these has its own label,
+so each derived key is different:
+
+- the email hashes that link a shopper to shops' orders, and card fingerprints for in-shop purchases;
+- the encryption of every stored Gmail and Outlook key, shop's Square and Shopify keys, Royal Mail key, phone number and
+  two-step sign-in secret;
+- the keyed hashes of shops' Relay keys;
+- the notification signing key;
+- the signatures that protect connecting Square and Shopify.
+
+Sessions don't depend on it: they're plain SHA-256 hashes of random tokens.
+
+Changing it on its own would cut every connected inbox and shop, stop authenticator-app and text codes working for
+two-step sign-in (recovery codes would still work), unlink shoppers from their orders, and stop notifications. So rotate it only if it may have leaked,
+and only with a migration that, while both the old and new keys are available:
+
+1. decrypts and re-encrypts every stored inbox, shop, Royal Mail, phone and two-step secret;
+2. recomputes the email hashes from shoppers' stored emails;
+3. issues every shop a new Relay key, since the old keys can't be recomputed from their hashes;
+4. asks shoppers to turn notifications on again.
+
+If it has leaked, do the migration at once. Until then, assume anyone holding it could decrypt a copy of the database
+(which they would also need).
+
+## Checking it all
+
+| Check | What it covers | Runs |
+|---|---|---|
+| `scripts/test-validation.mjs` | Input checks and rate limits, every route, the app's own requests | Every pull request and every deploy |
+| `scripts/test-access-control.mjs` | Who can do what | Every pull request and every deploy |
+| `scripts/check-secrets.mjs` | No keys in the repository | Every pull request and every deploy |
+| `scripts/record-app-requests.mjs` | Records what the app sends during the browser tests, then checks it against the rules | The browser tests on every pull request |
+
+## Not covered here
+
+- Cloudflare's dashboard, GitHub, and the accounts at Google, Microsoft, Stripe, Square, Shopify, Resend and Twilio.
+  Protect those with two-step sign-in. Anyone with Cloudflare access can read the database and set secrets.
+- Denial of service at a scale beyond these limits: Cloudflare's own protection handles that.
+- The Shopify embedded app page, which Shopify's admin frames and signs.

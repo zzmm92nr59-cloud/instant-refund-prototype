@@ -73,6 +73,13 @@ jobs:
           node scripts/test-resellable.mjs
           node --check worker/awin-feed.js
           node scripts/test-awin-feed.mjs
+          # Security: rate limits, input checks, who can do what, and no keys in the repository (docs/SECURITY.md).
+          node --check worker/limits.js
+          node --check worker/validate.js
+          node --check worker/legacy-routes.js
+          node scripts/test-validation.mjs
+          node scripts/test-access-control.mjs
+          node scripts/check-secrets.mjs
           # Load the whole Worker so a misspelt import fails here, not at deploy time.
           node --input-type=module -e "const m = await import('./worker/worker.js'); if (!m.default || !m.default.fetch || !m.default.scheduled) { console.error('worker.js did not load'); process.exit(1); }"
       - name: Apply catalogue and inventory schema

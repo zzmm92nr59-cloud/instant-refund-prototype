@@ -172,6 +172,6 @@ export async function handleCardRoute(request, env, url, cors, shopper, o = {}) 
     if (path === "/relay/my/card/setup" && request.method === "POST") return json(await startSetup(env, shopper, o), 200, cors);
     if (path === "/relay/my/card/confirm" && request.method === "POST") { const [s, b] = await confirmSetup(env, shopper, await request.json().catch(() => null), o); return json(b, s, cors); }
     if (path === "/relay/my/card/remove" && request.method === "POST") { const [s, b] = await removeCard(env, shopper, o); return json(b, s, cors); }
-  } catch (e) { return json({ error: "stripe_error", detail: String(e && e.message || e).slice(0, 160) }, 502, cors); }
+  } catch (e) { console.error("stripe_error", String(e && e.message || e).slice(0, 160)); return json({ error: "stripe_error" }, 502, cors); }
   return json({ error: "not_found" }, 404, cors);
 }

@@ -198,7 +198,7 @@ export async function handleInstoreRoute(request, env, url, cors, shopper, o = {
       return json(out, s, cors);
     }
   } catch (e) {
-    return json({ error: "square_unavailable", detail: String(e && e.message || e).slice(0, 120) }, 502, cors);
+    console.error("square_unavailable", String(e && e.message || e).slice(0, 120)); return json({ error: "square_unavailable" }, 502, cors);
   }
   return json({ error: "not_found" }, 404, cors);
 }

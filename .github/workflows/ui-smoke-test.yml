@@ -30,6 +30,10 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
+      - name: Record what the app sends to Relay's server during these tests
+        run: |
+          echo "RELAY_REQUEST_LOG=$RUNNER_TEMP/app-requests.jsonl" >> "$GITHUB_ENV"
+          echo "NODE_OPTIONS=--import=$GITHUB_WORKSPACE/scripts/record-app-requests.mjs" >> "$GITHUB_ENV"
       - name: Test purchase flows on desktop and mobile
         run: node scripts/ui-smoke-test.mjs
       - name: Test swaps with a price difference and saving a card (stand-in Stripe)
@@ -66,3 +70,5 @@ jobs:
         run: node scripts/test-home-look-ui.mjs
       - name: Test more than one inbox in the app (listed, added, removed one at a time, searched together)
         run: node scripts/test-inboxes-ui.mjs
+      - name: Check everything the app sent passes the server's input rules (worker/validate.js)
+        run: node scripts/test-validation.mjs

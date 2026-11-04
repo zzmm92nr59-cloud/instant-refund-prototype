@@ -83,7 +83,11 @@ assert.equal((await list(bob)).status, 404, "bob cannot list alice's receipt ite
 assert.equal((await list(alice, { handover: "collect" })).status, 400, "collection needs an area");
 assert.equal((await list(alice, { handover: "teleport", area: "SW11" })).status, 400);
 assert.equal((await list(alice, { handover: "collect", area: "my house" })).status, 400, "only a postcode area");
+// A title or shop sent with the listing is refused outright (fields the route doesn't take), so it can't be faked.
 let r = await list(alice, { title: "FAKE TITLE", store: "Gucci", handover: "either", area: "sw11 1aa" });
+assert.equal(r.status, 400, "fields the route doesn't take are refused");
+assert.deepEqual(await r.json(), { error: "invalid_request", field: "title" });
+r = await list(alice, { handover: "either", area: "sw11 1aa" });
 assert.equal(r.status, 200);
 const L1 = (await r.json()).id;
 const row = sqlite.prepare("SELECT * FROM resale_listings WHERE id = ?").get(L1);

@@ -8,6 +8,7 @@
 // What an offer does: sends a phone alert to the shoppers watching that item. It does not change the shop's price in Square
 // or Shopify and Relay does not take payment; the shop honours the offer price itself.
 import { ensureOnce } from "./once.js";
+import { checkBody } from "./validate.js";
 import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
 import { handleShopPayRoute } from "./shop-payments.js";
@@ -230,6 +231,10 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
   await ensureRetailerTables(env.RELAY_DB);
   const shop = await shopFromRequest(request, env, now);
   if (!shop) return json({ error: "not_signed_in" }, 401, cors);
+  // Strict checks on what the shop's dashboard sends (validate.js), once the shop's key is known.
+  const checked = await checkBody(request, path, cors);
+  if (checked.response) return checked.response;
+  request = checked.request;
   if (path === "/relay/retailer/demand" && request.method === "GET") return json(await shopDemand(env, shop, now), 200, cors);
   if (path === "/relay/retailer/results" && request.method === "GET") return json(await shopResults(env, shop), 200, cors);
   if (path === "/relay/retailer/offers" && request.method === "GET") return json({ store: shop.store_label, offers: await listOffers(env.RELAY_DB, shop, now) }, 200, cors);
