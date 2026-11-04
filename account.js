@@ -354,8 +354,8 @@
     ".rl-sheet>.rl-po-ship{margin:0 0 14px}.rl-dt-sub{margin:0 0 10px;color:var(--rl-text2);font-size:15px;line-height:1.4}" +
     ".rl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
     "@media(max-width:360px){.rl-po-img{width:80px;height:80px}}" +
-    // In dark mode a wallet card is Relay's navy (a near-black card on the black page read as a black box on black).
-    "@media(prefers-color-scheme:dark){.rl-po:not(.rl-skel){background:var(--navy,#171f44)}.rl-po .rl-po-secondary{background:rgba(255,255,255,.12)}.rl-po .rl-po-img,.rl-po .rl-po-img.rl-has-logo{background:rgba(255,255,255,.1)!important}}" +
+    // In dark mode cards are Relay's navy (the --rl-card token), so a wallet card's buttons and picture box are lighter on it.
+    "@media(prefers-color-scheme:dark){.rl-po .rl-po-secondary{background:rgba(255,255,255,.12)}.rl-po .rl-po-img,.rl-po .rl-po-img.rl-has-logo{background:rgba(255,255,255,.1)!important}}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-status.wait{background:var(--rl-fill);color:var(--rl-text2)}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     // Inside a card: tinted buttons rather than outlined ones, Details only as wide as its word beside another button.
