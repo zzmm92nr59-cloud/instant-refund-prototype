@@ -30,45 +30,45 @@ jobs:
         run: |
           npm install --no-save playwright
           npx playwright install --with-deps chromium
+      # Each browser test below runs with scripts/record-app-requests.mjs loaded, which writes down what the app sends to
+      # Relay's server; the last step checks all of it against the server's input rules.
       - name: Record what the app sends to Relay's server during these tests
-        run: |
-          echo "RELAY_REQUEST_LOG=$RUNNER_TEMP/app-requests.jsonl" >> "$GITHUB_ENV"
-          echo "NODE_OPTIONS=--import=$GITHUB_WORKSPACE/scripts/record-app-requests.mjs" >> "$GITHUB_ENV"
+        run: echo "RELAY_REQUEST_LOG=$RUNNER_TEMP/app-requests.jsonl" >> "$GITHUB_ENV"
       - name: Test purchase flows on desktop and mobile
-        run: node scripts/ui-smoke-test.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/ui-smoke-test.mjs
       - name: Test swaps with a price difference and saving a card (stand-in Stripe)
-        run: node scripts/test-swap-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-swap-ui.mjs
       - name: Test the app as shoppers see it at launch (four tabs, Profile with wallet, no test wording)
-        run: node scripts/test-launch-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-launch-ui.mjs
       - name: Test Wrapped for each kind of shopping, and the Discover style card
-        run: node scripts/test-style-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-style-ui.mjs
       - name: Test against the common "built in a hurry" tells (sizes, colours, double taps, caching, first visit)
-        run: node scripts/test-polish-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-polish-ui.mjs
       - name: Test that every receipt has a picture (photo, then logo, then a drawing of what it most likely is)
-        run: node scripts/test-pictures-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-pictures-ui.mjs
       - name: Test the sign-up journey (one visit to Google or Microsoft, scan from the start)
-        run: node scripts/test-signup-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-signup-ui.mjs
       - name: Test phone numbers and sign-in codes by text (paste from the notification, recovery codes)
-        run: node scripts/test-phone-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-ui.mjs
       - name: Test the wallet only shows what can still go back, with shop logos
-        run: node scripts/test-wallet-fresh-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-wallet-fresh-ui.mjs
       - name: Test return dates (a kettle in the weekly shop, safe dates when the email gives none)
-        run: node scripts/test-return-dates-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-return-dates-ui.mjs
       - name: Test the look (light and dark, colourful tiles, glass tab bar with the next return)
-        run: node scripts/test-look-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-look-ui.mjs
       - name: Test speed (one request per thing, tabs reuse what was just loaded, the catalogue waits for Discover)
-        run: node scripts/test-speed-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-speed-ui.mjs
       - name: Test receipt groups (every receipt, header, filters, months, rows)
-        run: node scripts/test-receipts-cat-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipts-cat-ui.mjs
       - name: Test returns from the wallet (order number and email to copy, the shop's page, then the QR code)
-        run: node scripts/test-return-guide-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-return-guide-ui.mjs
       - name: Test Outlook in the app (connect, scan, receipts, disconnect)
-        run: node scripts/test-outlook-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-outlook-ui.mjs
       - name: Test adding a missing receipt (inbox search as you type, one-tap paste, forwarding, without an inbox)
-        run: node scripts/test-add-receipt-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-add-receipt-ui.mjs
       - name: Test the sign-in page and Home (Relay's navy, return countdowns, colourful tiles)
-        run: node scripts/test-home-look-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-home-look-ui.mjs
       - name: Test more than one inbox in the app (listed, added, removed one at a time, searched together)
-        run: node scripts/test-inboxes-ui.mjs
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-inboxes-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

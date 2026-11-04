@@ -174,6 +174,9 @@ function probeRequest(path, token) {
     }
     assert.deepEqual([...new Set(problems)], [], "everything the app sent passes the server's rules");
     console.log("ok - the app: " + lines.length + " requests from " + new Set(lines.map(l => l.test)).size + " browser tests, " + posted.size + " different POST routes, all pass");
+  } else if (process.env.RELAY_REQUEST_LOG) {
+    // The browser tests were meant to record (CI sets RELAY_REQUEST_LOG), so nothing recorded means the recorder didn't run.
+    assert.fail("RELAY_REQUEST_LOG is set but nothing was recorded at " + log + ": run the browser tests with --import ./scripts/record-app-requests.mjs");
   } else console.log("skip - the app's own requests: no recording (run the browser tests with scripts/record-app-requests.mjs)");
 }
 // 3b. The app's code itself, for the requests no browser test makes: every api(...) and textCode(...) call that sends a
