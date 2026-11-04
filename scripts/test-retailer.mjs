@@ -120,6 +120,7 @@ assert.equal(o.shoppers, 5); assert.equal(o.devices, undefined, "the shop is nev
 assert.deepEqual(pushes.map(p => p.url.split("/").pop()).sort(), ["alice-id", "bob-id", "dan-id"]);
 const msg = await read(phones["alice-id"], pushes.find(p => p.url.endsWith("alice-id")).body);
 assert.equal(msg.title, "Offer from Zara");
+assert.match(msg.url, /^\.\/#open=product&sku=[^&]+$/, "tapping the alert opens that product");
 assert.match(msg.body, /^Knit Scarf · One size: £12\.99 for Relay watchers \(usually £17\.99\)\. Ends .+\. In store and online$/);
 
 // 6b. Shoppers see live offers on items they watch inside the app; nobody else sees them.

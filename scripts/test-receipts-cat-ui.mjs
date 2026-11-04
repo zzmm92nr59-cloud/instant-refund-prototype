@@ -1,7 +1,7 @@
 // Browser test: a receipt group's page. Stubbed Relay server, made-up account with 130 food receipts over two years plus
 // a fashion order with a return deadline ahead. Checks: the Receipts page asks for every receipt (not just 100); the
 // group's header says how many, how much and since when; filters for "Can still return" and each year; receipts are
-// in months, newest first, with each month's total; 40 at a time with "Show more"; a whole row opens its details;
+// in months, newest first, with each month's total; 40 at a time, the next 40 arriving before the end; a whole row opens its details;
 // search works; everything passes the polish rules (44px taps, no tiny text, no symbol icons).
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -65,8 +65,12 @@ const first = await months.first().innerText();
 assert.match(first, new RegExp(new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })), "newest month first: " + first);
 assert.match(first, /receipts? · £/, "with the month's total");
 assert.equal(await page.locator(".rl-rr").count(), 40, "40 at a time");
-await page.getByRole("button", { name: /^Show 40 more of 90$/ }).click();
+// The next 40 arrive by themselves before the end comes into view; the button stays for anyone who gets there first.
+await page.getByRole("button", { name: /^Show 40 more of 90$/ }).waitFor();
+await page.evaluate(() => { const b = document.querySelector(".rl-cat-more"); window.scrollTo(0, b.getBoundingClientRect().top + scrollY - innerHeight - 600); });
+await page.waitForFunction(() => document.querySelectorAll(".rl-rr").length === 80, null, { timeout: 5000 });
 assert.equal(await page.locator(".rl-rr").count(), 80);
+await page.evaluate(() => window.scrollTo(0, 0));
 const m = await measure(); assert.deepEqual(m, { small: [], tiny: [] }, "polish rules on the group page");
 await page.screenshot({ path: "/tmp/shots/cat-food.png" });
 // A whole row opens its details.

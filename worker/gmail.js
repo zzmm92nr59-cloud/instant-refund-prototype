@@ -1034,7 +1034,7 @@ async function tellScanDone(env, shopperId, found, o) {
   try {
     await ensurePushTables(env.RELAY_DB);
     for (const sub of await subsOf(env.RELAY_DB, shopperId)) {
-      try { if ((await sendPush(env, sub, { title: "Your receipts are ready", body: "Relay finished checking your email and found " + found + (found === 1 ? " purchase email." : " purchase emails."), url: "./" }, o)).ok) sent++; }
+      try { if ((await sendPush(env, sub, { title: "Your receipts are ready", body: "Relay finished checking your email and found " + found + (found === 1 ? " purchase email." : " purchase emails."), url: "./#open=receipts" }, o)).ok) sent++; }
       catch { /* one device failing never stops the rest */ }
     }
   } catch { /* no notifications set up: nothing to send */ }

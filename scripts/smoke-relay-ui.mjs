@@ -15,12 +15,13 @@ for(const file of files){
  assert.match(el('view').innerHTML,/Welcome to Relay/);
  assert.doesNotMatch(el('view').innerHTML+el('side').innerHTML,/demo|sandbox|simulat|fictional|test/i);
  // Four tabs for shoppers, Home first. Market is for testing only; Wallet lives inside Home; Radar is Price alerts in Discover.
- assert.deepEqual([...el('side').innerHTML.matchAll(/go\('([a-z]+)'\)/g)].map(m=>m[1]),['profile','receipts','discover','me']);
- for(const tab of ['profile','receipts','discover','me']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp('active[^>]*go\\(\''+tab));if(tab==='receipts')assert.match(el('view').innerHTML,/<h1 class="title">Receipts<\/h1><div id="receiptsPage">/,'Receipts is a title over the page account.js fills (browser tests cover what it shows)');else assert.ok(el('view').innerHTML.length>100)}
+ // The tabs go through tabTap (the tab you're on scrolls to its top; others open where you left them).
+assert.deepEqual([...el('side').innerHTML.matchAll(/tabTap\('([a-z]+)'\)/g)].map(m=>m[1]),['profile','receipts','discover','me']);
+ for(const tab of ['profile','receipts','discover','me']){sandbox.go(tab);assert.match(el('side').innerHTML,new RegExp('active[^>]*tabTap\\(\''+tab));if(tab==='receipts')assert.match(el('view').innerHTML,/<h1 class="title">Receipts<\/h1><div id="receiptsPage">/,'Receipts is a title over the page account.js fills (browser tests cover what it shows)');else assert.ok(el('view').innerHTML.length>100)}
  sandbox.go('wallet');assert.equal(sandbox.page,'profile','the wallet opens on Home');
- sandbox.go('radar');assert.match(el('view').innerHTML,/Price alerts/);assert.match(el('side').innerHTML,/active[^>]*go\('discover/,'Price alerts sits inside Discover');
+ sandbox.go('radar');assert.match(el('view').innerHTML,/Price alerts/);assert.match(el('side').innerHTML,/active[^>]*tabTap\('discover/,'Price alerts sits inside Discover');
  // Testing tools add the Market tab back.
- sandbox.localStorage.setItem('relay-testing-tools','1');sandbox.go('profile');assert.match(el('side').innerHTML,/go\('market'\)/);assert.match(el('view').innerHTML,/Testing tools/);
+ sandbox.localStorage.setItem('relay-testing-tools','1');sandbox.go('profile');assert.match(el('side').innerHTML,/tabTap\('market'\)/);assert.match(el('view').innerHTML,/Testing tools/);
  sandbox.localStorage.setItem('relay-testing-tools','0');sandbox.go('profile');assert.doesNotMatch(el('side').innerHTML,/market/);
  sandbox.startSample();sandbox.openPurchase('relay-sample-Ava-unit-0');assert.match(el('view').innerHTML,/INSTANT REFUND/);assert.match(el('view').innerHTML,/Swap item/);
  sandbox.page='refund';sandbox.render();assert.match(el('view').innerHTML,/refundReason/);

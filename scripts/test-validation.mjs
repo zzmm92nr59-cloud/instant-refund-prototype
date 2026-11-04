@@ -270,6 +270,17 @@ function probeRequest(path, token) {
       }
     }
   }
+  // Requests queued to be sent again later are written as { path: "/relay/…", body: { … } }.
+  for (const file of ["account.js"]) {
+    const src = readFileSync(file, "utf8");
+    for (let i = src.indexOf('{ path: "/relay/'); i !== -1; i = src.indexOf('{ path: "/relay/', i + 1)) {
+      const end = closing(src, i), job = objectsIn(src.slice(i, end + 1))[0] || {};
+      const path = (/^"([^"]+)"$/.exec((job.path || "").trim()) || [])[1], s = path && schemaFor(path);
+      if (!s) { problems.push(file + ": queues " + path + ", which has no rules"); continue; }
+      checked++;
+      for (const o of objectsIn(job.body || "")) checkFields(o, s, file + " " + path, problems);
+    }
+  }
   assert.deepEqual([...new Set(problems)], [], "every field the app's code sends is one the server takes");
   assert.ok(checked > 50, "found the app's requests (" + checked + ")");
   console.log("ok - the app's code: " + checked + " requests checked field by field (" + unknownBody + " build their body elsewhere and are covered by the browser tests)");

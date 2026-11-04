@@ -44,7 +44,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -65,12 +65,14 @@
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
     if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < READ_REUSE_MS)) return hit.answer.then(copyAnswer);
+    inflight++;
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
         var b = r.headers && r.headers.get && r.headers.get("x-d1-bookmark");
         if (b && /^[0-9A-Za-z._:-]{8,160}$/.test(b) && (!bookmark || b > bookmark)) { bookmark = b; try { localStorage.setItem(BOOKMARK_KEY, b); } catch (e) {} }
         return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
       });
+    answer.then(settled, settled);
     if (key) {
       var entry = { answer: answer, waiting: true, at: 0 };
       reads[key] = entry;
@@ -79,6 +81,22 @@
     }
     return answer.then(copyAnswer);
   }
+  // How many requests are on their way, so pull to refresh knows when the screen has its new copy.
+  var inflight = 0, idleWaiters = [];
+  function settled() { inflight = Math.max(0, inflight - 1); if (!inflight) setTimeout(function () { if (inflight) return; var w = idleWaiters; idleWaiters = []; w.forEach(function (f) { f(); }); }, 60); }
+  // Resolves once nothing has been on its way for a moment (screens ask in a chain), or after max ms.
+  function whenIdle(max) {
+    return new Promise(function (done) {
+      var finished = false, finish = function () { if (!finished) { finished = true; done(); } };
+      setTimeout(finish, max || 8000);
+      setTimeout(function () { if (!inflight) finish(); else idleWaiters.push(finish); }, 150);
+    });
+  }
+  // Pull to refresh: everything is asked for again. What's on screen (and the copy kept on this device) stays until the
+  // new answer arrives, so nothing goes blank.
+  function forget() { reads = {}; Object.keys(memo).forEach(function (k) { var e = memo[k]; if (e && typeof e === "object" && typeof e.at === "number") e.at = 0; }); }
+  // On Receipts, pulling down also checks the inbox now, as "Check now" does.
+  function checkInbox() { var b = document.querySelector("#receiptsPage .rl-check-now"); if (b && !b.disabled && b.offsetParent) b.click(); }
   // Each caller gets its own copy, so one screen changing what it was given can't change another's.
   function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j }; }
   // Fetches a signed-in image and returns a local address for it (or null).
@@ -299,6 +317,8 @@
   }
   var css = document.createElement("style");
   css.textContent = ".rl-back{position:fixed;inset:0;background:rgba(15,27,51,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999}" +
+    // Whatever is behind a sheet dims so the eye goes to the sheet; on a dark screen it has to dim further to show.
+    "@media (prefers-color-scheme: dark){.rl-back{background:rgba(0,0,0,.62)}}" +
     "@media(min-width:640px){.rl-back{align-items:center}}" +
     ".rl-sheet{background:var(--rl-sheet);width:100%;max-width:420px;border-radius:28px 28px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.18);max-height:88vh;overflow:auto;font-family:inherit;color:var(--rl-text)}" +
     "@media(min-width:640px){.rl-sheet{border-radius:28px}}" +
@@ -598,7 +618,7 @@
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
-    Object.keys(props || {}).forEach(function (k) { if (k === "text") n.textContent = props[k]; else n[k] = props[k]; });
+    Object.keys(props || {}).forEach(function (k) { if (k === "text") n.textContent = props[k]; else if (k.indexOf("data-") === 0) n.setAttribute(k, props[k]); else n[k] = props[k]; });
     (kids || []).forEach(function (c) { n.appendChild(c); });
     return n;
   }
@@ -816,6 +836,57 @@
     already_enabled: "That's already on.", not_enabled: "That's already off.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
+  // Unfinished writing is kept on this device, for this account only, until it's sent: leaving the screen, the app closing
+  // or a dropped connection doesn't lose it. Drafts go when sent, after a week, and on sign-out.
+  var DRAFTS_KEY = "relay.drafts.v1", DRAFT_MS = 7 * 864e5;
+  function draftsAll() {
+    var s = load(), d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "null"); } catch (e) { d = null; }
+    return d && s && d.email === s.email && d.items ? d : { email: s && s.email, items: {} };
+  }
+  function draftGet(key) { var x = draftsAll().items[key]; return x && Date.now() - x.at < DRAFT_MS ? x.v : ""; }
+  function draftSet(key, v) {
+    try {
+      var s = load(); if (!s || !s.email) return;
+      var d = draftsAll(); d.email = s.email;
+      if (!v || !String(v).trim()) delete d.items[key]; else d.items[key] = { v: String(v), at: Date.now() };
+      var t = JSON.stringify(d);
+      if (t.length < 600000) localStorage.setItem(DRAFTS_KEY, t);
+    } catch (e) { /* storage full or blocked: the draft just isn't kept */ }
+  }
+  // Comes back to y and stays there while the page fills in again (parts arrive a moment later), unless the person
+  // scrolls first.
+  var profileY = 0;
+  function scrollBackTo(y) {
+    if (!(y > 0)) return;
+    var moved = false, stop = function () { moved = true; }, until = Date.now() + 1500;
+    ["touchstart", "wheel", "keydown"].forEach(function (ev) { window.addEventListener(ev, stop, { once: true, passive: true }); });
+    (function again() {
+      if (moved) return;
+      var max = document.documentElement.scrollHeight - window.innerHeight, want = Math.min(y, Math.max(0, max));
+      if (Math.abs((window.scrollY || 0) - want) > 1) window.scrollTo(0, want);
+      if (Date.now() < until) setTimeout(again, 50);
+    })();
+  }
+  // A list shown part at a time brings in its next part before you reach the end (about two screens ahead), so scrolling
+  // doesn't stop at a "Show more" button. The button stays for anyone who gets there first, or without scrolling.
+  function loadAhead(btn) {
+    if (!("IntersectionObserver" in window)) return btn;
+    var io = new IntersectionObserver(function (seen) {
+      if (!seen.some(function (e) { return e.isIntersecting; })) return;
+      io.disconnect();
+      if (btn.isConnected && !btn.disabled) btn.click();
+    }, { rootMargin: "0px 0px 1200px 0px" });
+    io.observe(btn);
+    return btn;
+  }
+  // Keeps what's typed into an input as a draft and puts it back when the input appears again. Returns the restored text.
+  function keepDraft(input, key) {
+    var v = draftGet(key), t = 0;
+    if (v && !input.value) input.value = v;
+    input.addEventListener("input", function () { clearTimeout(t); t = setTimeout(function () { draftSet(key, input.value); }, 300); });
+    return v;
+  }
 
   // ---- Getting started: one journey from "Welcome" to "You're all set" ----
   // Google and Microsoft sign you in AND bring your email in, in one visit (after you've read what Relay does). An email
@@ -842,7 +913,7 @@
     sheet.textContent = ""; sheet.classList.remove("rl-signin"); sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
     try { sheet.scrollTop = 0; } catch (e) {}
     var top = el("div", { className: "rl-jtop" });
-    top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
+    top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", "data-back": "", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
     if (o.of > 1) {
       var dots = el("div", { className: "rl-dots" }); dots.setAttribute("role", "img"); dots.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
       for (var i = 1; i <= o.of; i++) dots.appendChild(el("span", { className: i < o.at ? "done" : i === o.at ? "on" : "" }));
@@ -2089,7 +2160,7 @@
       var nInbox = 1 + ((r.body.others || []).length);
       status.textContent = onPage ? (nInbox > 1 ? nInbox + " inboxes" : MB) + " connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
         : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
-      if (onPage) { scanBtn.className = "rl-po-secondary"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
+      if (onPage) { scanBtn.className = "rl-po-secondary rl-check-now"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });
       search.addEventListener("input", function () { var was = Boolean(query); query = search.value.trim().toLowerCase(); if (was !== Boolean(query)) drawList(); else applyFilter(); });
@@ -2160,7 +2231,7 @@
         var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
         var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
-        list.appendChild(el("button", { type: "button", className: "rl-cat-back", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, 0); } }, [el("span", { text: "\u2039", className: "rl-cat-back-i" }), el("span", { text: "All groups" })]));
+        list.appendChild(el("button", { type: "button", className: "rl-cat-back", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [el("span", { text: "\u2039", className: "rl-cat-back-i" }), el("span", { text: "All groups" })]));
         list.lastChild.firstChild.setAttribute("aria-hidden", "true");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
         var spent = GBP(rows);
@@ -2212,7 +2283,7 @@
             }
             card.appendChild(receiptRow(r));
           });
-          if (pick.length > shown) body.appendChild(el("button", { type: "button", className: "rl-po-secondary rl-cat-more", text: "Show " + Math.min(40, pick.length - shown) + " more of " + (pick.length - shown), onclick: function () { shown += 40; draw(); } }));
+          if (pick.length > shown) body.appendChild(loadAhead(el("button", { type: "button", className: "rl-po-secondary rl-cat-more", text: "Show " + Math.min(40, pick.length - shown) + " more of " + (pick.length - shown), onclick: function () { shown += 40; draw(); } })));
         }
         cq.addEventListener("input", function () { shown = 40; draw(); });
         draw();
@@ -2231,7 +2302,7 @@
         var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return (a === "other") - (b === "other") || na - nb || by[b].length - by[a].length; });
         if (memo.openCat === "shop" && shopRows.length) {
-          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All groups", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); } }));
+          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All groups", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
           list.appendChild(el("h3", { style: "font-size:20px;margin:14px 0 8px;color:var(--rl-text);display:flex;align-items:center;gap:10px" }, [catIcon("shop", 32), el("span", { text: "Shop orders (" + shopRows.length + ")" })]));
           list.lastChild.firstChild.style.background = "#101828";
           var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:15px;background:var(--rl-card);font-family:inherit" });
@@ -2247,7 +2318,8 @@
         }
         memo.openCat = null;
         var grid = el("div", { className: "rl-tiles" });
-        var open = function (k) { return function () { memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); }; };
+        // Opening a group starts at its top; coming back lands where the groups were.
+        var open = function (k) { return function () { memo.catY = window.scrollY || 0; memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); }; };
         // This year's Wrapped comes first, as soon as there's a receipt from this year.
         var year = new Date().getFullYear();
         if (rows.some(function (r) { return String(r.orderDate || "").slice(0, 4) === String(year); }))
@@ -2403,7 +2475,7 @@
     var body = el("div");
     var MB = mailName();
     [el("h2", { text: title || "Original receipt" }), el("p", { text: "Loading it from your " + MB + "…", style: "opacity:.7" }), body, msg,
-      el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+      el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
       if (!r.ok) {
@@ -2458,7 +2530,7 @@
     wrap.appendChild(lead);
     var inbox = el("div"), pasted = el("div"), fwd = el("div");
     [inbox, pasted, fwd].forEach(function (n) { wrap.appendChild(n); });
-    if (onBack) wrap.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Back", style: "margin-top:18px", onclick: onBack }));
+    if (onBack) wrap.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Back", "data-back": "", style: "margin-top:18px", onclick: onBack }));
     host.appendChild(wrap);
     inbox.appendChild(el("div", { className: "rl-skel", style: "min-height:48px;border-radius:12px" }));
     var unsure = function () { inbox.textContent = ""; inbox.appendChild(el("p", { className: "rl-ar-help", text: "Couldn't reach your inbox just now. You can still paste the email below." })); };
@@ -2559,7 +2631,7 @@
         if (r.status === 429) return say(msg, "That's a lot of receipts in one go. Try again in an hour.", true);
         if (!r.ok) return say(msg, "Couldn't add that. Check your connection and try again.", true);
         if (!r.body.ok) return say(msg, "That doesn't look like an order, delivery or return email. Copy the whole email and try again.", true);
-        memo.receipts = null; box.value = ""; box.hidden = true; label();
+        memo.receipts = null; box.value = ""; box.hidden = true; draftSet("paste", ""); label();
         out.appendChild(addedCard(r.body));
       }, function () { busy = false; label(); say(msg, "Couldn't reach Relay. Check your connection.", true); });
     }
@@ -2575,6 +2647,9 @@
       if (t && t.trim()) { e.preventDefault(); box.value = t; read(t); return; }
       setTimeout(function () { read(box.value); }, 0);
     });
+    // An email pasted (or typed) here last time and not added yet is still here.
+    if (keepDraft(box, "paste")) { box.hidden = false; label(); say(msg, "The email you pasted last time is still here. Tap Add it when you're ready."); }
+    box.addEventListener("paste", function () { setTimeout(function () { draftSet("paste", box.value); }, 0); });
     [box, btn, msg, out].forEach(function (n) { host.appendChild(n); });
   }
   function addedCard(b) {
@@ -2608,7 +2683,7 @@
     var list = el("div"), msg = el("div", { className: "rl-msg" });
     [el("h2", { text: "Reports to review" }),
      el("p", { text: "You see the conversation only, never who the members are. Dismiss, take the listing down, or block the member." }),
-     list, msg, el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
+     list, msg, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     function act(id, outcome, question) {
       if (question) return ask(question, "Yes, do it", function () { act(id, outcome, null); });
       api("/relay/my/admin/reports/" + id + "/review", { method: "POST", body: { outcome: outcome } }).then(function (r) {
@@ -2664,7 +2739,7 @@
       el("p", { text: "Collecting: meet somewhere public in daylight, check the item, then pay on the spot (cash, or a bank transfer you can see arrive).", style: "margin:8px 0 4px" }),
       el("p", { text: "Posting: Relay doesn't handle payments yet, so never pay a stranger in advance by bank transfer. Collection is the safe option for now.", style: "margin:4px 0" }),
       el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
-    [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
+    [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
     var timer = null, isOpen = false;
     function stop() { if (timer) { clearInterval(timer); timer = null; } }
     function load() {
@@ -2698,9 +2773,10 @@
       send.disabled = true;
       api("/relay/my/resale/requests/" + requestId + "/messages", { method: "POST", body: { body: t } }).then(function (r) {
         send.disabled = false;
-        if (r.ok) { input.value = ""; say(msg, ""); load(); } else say(msg, chatErrors[r.body && r.body.error] || "Couldn't send. Try again.", true);
+        if (r.ok) { input.value = ""; draftSet("msg:" + requestId, ""); say(msg, ""); load(); } else say(msg, chatErrors[r.body && r.body.error] || "Couldn't send. Try again.", true);
       });
     };
+    keepDraft(input, "msg:" + requestId);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.onclick(); });
     load(); timer = setInterval(load, 8000);
   }
@@ -2717,7 +2793,7 @@
     [onBack ? el("h2", { text: "Swap & resell" }) : null,
      onBack ? el("p", { text: "Passed your return window? Sell or swap with other Relay members. Relay puts you in touch, and you agree payment and postage between you." }) : null,
      tabs, body, msg,
-     onBack ? el("button", { className: "rl-btn ghost", text: "Back", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
+     onBack ? el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
     function fail(r) { tell(resaleErrors[r.body && r.body.error] || "Something went wrong. Please try again.", true); }
     function photo(card, id, has) {
@@ -2846,6 +2922,8 @@
         var size = el("input", { placeholder: "Size (optional)", maxLength: 20 });
         var price = el("input", { placeholder: "Asking price in £ (leave empty for open to offers)", inputMode: "decimal" });
         var note = el("input", { placeholder: "Note for buyers (optional, no contact details)", maxLength: 200 });
+        var dk = "listing:" + i.receiptId + ":" + i.itemIndex + ":";
+        keepDraft(size, dk + "size"); keepDraft(price, dk + "price"); keepDraft(note, dk + "note");
         var swap = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
         var hand = el("select", { style: "width:100%;margin:8px 0;padding:10px;border-radius:12px;border:1px solid var(--rl-line);font-size:15px" });
         [["either", "Collection or post"], ["collect", "Collection only"], ["post", "Post only"]].forEach(function (o) { hand.appendChild(el("option", { value: o[0], text: o[1] })); });
@@ -2859,7 +2937,7 @@
           if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return tell(resaleErrors.invalid_price, true); pence = Math.round(n * 100); }
           go.disabled = true;
           api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, agree: agree.checked, handover: hand.value, area: hand.value === "post" ? null : area.value.trim() || null } })
-            .then(function (r) { go.disabled = false; if (r.ok) { cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); });
+            .then(function (r) { go.disabled = false; if (r.ok) { ["size", "price", "note"].forEach(function (f) { draftSet(dk + f, ""); }); cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); });
         } });
         [cond, size, price, note, hand, area, areaNote,
          el("label", { style: "display:block;font-size:14px;margin:4px 0" }, [swap, document.createTextNode("I'm open to swaps")]),
@@ -2920,7 +2998,7 @@
     var inPage = sheet.classList.contains("rl-inpage"), home = inPage ? "Profile" : "Account";
     if (inPage && !onBack) return;
     var bar = el("div", { className: "rl-abar" }, [
-      onBack ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back to " + home, onclick: onBack }, [accIc("back", 20, "rl-ab-i"), el("span", { text: home })]) : el("span"),
+      onBack ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back to " + home, "data-back": "", onclick: onBack }, [accIc("back", 20, "rl-ab-i"), el("span", { text: home })]) : el("span"),
       el("b", { className: "rl-abar-t", text: onBack ? title : "" }),
       inPage ? el("span") : el("button", { type: "button", className: "rl-abtn done", text: "Done", onclick: close })]);
     sheet.appendChild(bar);
@@ -2945,10 +3023,13 @@
     sheet.setAttribute("aria-label", "Account");
     try { sheet.scrollTop = 0; } catch (e) {}
     var msg = el("div", { className: "rl-msg" });
-    function home() { signedInView(sheet, email, null, c); }
+    // On the Profile page, an inner page starts at its top and Back lands where Profile was.
+    function home() { signedInView(sheet, email, null, c); if (inPage) scrollBackTo(profileY); }
     // An inner page with the top bar. Each section keeps its own heading out of the way: the bar already names it.
     function page(title, build) {
+      if (inPage) profileY = window.scrollY || 0;
       sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {}
+      if (inPage) window.scrollTo(0, 0);
       accBar(sheet, title, home);
       var body = el("div", { className: "rl-asub" }); sheet.appendChild(body);
       build(body);
@@ -3859,14 +3940,31 @@
   function swReady() { return race(navigator.serviceWorker.ready, 10000, null).then(function (r) { if (!r) throw new Error("sw_not_ready"); return r; }); }
   function thisDevice() { return pushOk() ? race(swReady().then(function (r) { return r.pushManager.getSubscription(); }), 12000, null) : Promise.resolve(null); }
   function alertStatus() { memoDrop("alerts"); return race(cachedGet("alerts", "/relay/my/alerts/status").then(function (r) { return r.ok ? r.body : null; }), 20000, null); }
+  // Watching shows at once on the phone and is sent to Relay straight after. If Relay can't be reached (no signal, or busy
+  // for a moment), the change waits on this device and is sent again when the connection is back or Relay next opens, so
+  // a watch never quietly goes missing. The latest change to each item or shop is the one kept.
+  var PENDING_KEY = "relay.pending-watches.v1";
+  function pendingAll() { var s = load(); try { var a = JSON.parse(localStorage.getItem(PENDING_KEY) || "null"); return a && s && a.email === s.email && a.items ? a : { email: s && s.email, items: {} }; } catch (e) { return { items: {} }; } }
+  function pendingPut(key, job) { try { var a = pendingAll(); if (job) a.items[key] = job; else delete a.items[key]; if (Object.keys(a.items).length) localStorage.setItem(PENDING_KEY, JSON.stringify(a)); else localStorage.removeItem(PENDING_KEY); } catch (e) {} }
+  function sendWatchJob(key, job) {
+    pendingPut(key, job);
+    return api(job.path, { method: "POST", body: job.body }).then(function (r) {
+      // Sent, or refused for good (an item Relay no longer knows): either way it's done. Busy or offline: it waits.
+      if (r.ok || (r.status >= 400 && r.status < 500 && r.status !== 408 && r.status !== 429)) pendingPut(key, null);
+      return r;
+    }, function () { return { ok: false, status: 0, body: {} }; });
+  }
+  function retryWatches() { var s = load(); if (!s || !s.token) return; var a = pendingAll(); Object.keys(a.items).forEach(function (k) { sendWatchJob(k, a.items[k]); }); }
+  window.addEventListener("online", retryWatches);
+  setTimeout(retryWatches, 3000);
   function syncWatch(p, on) {
     var s = load(); if (!s || !s.token || !p || !p.sku) return Promise.resolve();
     memoDrop("alerts");
-    return api("/relay/my/alerts/watch", { method: "POST", body: on === false ? { sku: String(p.sku), on: false } : { sku: String(p.sku), product: p.product, variant: p.variation, store: p.store, priceMinor: Math.round(Number(p.priceMinor)) } }).catch(function () {});
+    return sendWatchJob("item:" + p.sku, { path: "/relay/my/alerts/watch", body: on === false ? { sku: String(p.sku), on: false } : { sku: String(p.sku), product: p.product, variant: p.variation, store: p.store, priceMinor: Math.round(Number(p.priceMinor)) } });
   }
   function syncStore(store, on, items) {
     memoDrop("alerts");
-    return api("/relay/my/alerts/store", { method: "POST", body: on === false ? { store: store, on: false } : { store: store, items: (items || []).map(function (p) { return { sku: String(p.sku), product: p.product, variant: p.variation, priceMinor: Math.round(Number(p.priceMinor)) }; }) } });
+    return sendWatchJob("shop:" + store, { path: "/relay/my/alerts/store", body: on === false ? { store: store, on: false } : { store: store, items: (items || []).map(function (p) { return { sku: String(p.sku), product: p.product, variant: p.variation, priceMinor: Math.round(Number(p.priceMinor)) }; }) } });
   }
   function enablePush() {
     if (!pushOk()) return Promise.resolve({ ok: false, reason: "unsupported" });
@@ -3994,7 +4092,7 @@
               }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
             }});
             inner2.appendChild(confirmBtn);
-            inner2.appendChild(el("button", { className: "rl-btn ghost", text: "← Back", style: "margin-top:8px", onclick: showReasonPicker }));
+            inner2.appendChild(el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", style: "margin-top:8px", onclick: showReasonPicker }));
             sheet.appendChild(inner2);
           }
         });
@@ -4675,6 +4773,8 @@
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
     storySong: storySong,
+    // Pull to refresh (relay-gestures.js through index.html): ask again for everything, know when it's in, check the inbox.
+    forget: forget, whenIdle: whenIdle, checkInbox: checkInbox,
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
