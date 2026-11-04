@@ -13,6 +13,7 @@
 import { isAdmin } from "./resale-admin.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { PARSER_VERSION } from "./gmail.js";
+import { chatAvailable } from "./support-chat.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
 const DAY = 864e5;
@@ -54,7 +55,7 @@ export async function relayHealth(env, me, now = Date.now()) {
 
   const [people, sessions, signIns, inboxes, inboxPeople, checked, jobs, jobErrors, emails, kinds, purchases, purchases7, versions, unread,
     learned, marks, gifts, giftShoppers, history, perDay, shops, mine, returns, swaps, payments, labels, shopify, shopifyTest, square, pushes, watches, codeFails,
-    fixes, fixReaders, fixShops, myFixes] = await Promise.all([
+    fixes, fixReaders, fixShops, myFixes, chat] = await Promise.all([
     one("SELECT COUNT(*) AS total, SUM(created_at >= ?) AS week, SUM(created_at >= ?) AS month FROM shoppers", d7, d30),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE expires_at > ?", now),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE created_at >= ?", d7),
@@ -93,7 +94,10 @@ export async function relayHealth(env, me, now = Date.now()) {
     one("SELECT COUNT(*) AS n, SUM(shop) AS shop, SUM(total) AS total, SUM(date) AS date, SUM(items) AS items, COUNT(DISTINCT shopper_id) AS people, SUM(updated_at >= ?) AS week FROM receipt_fixes", d7),
     all("SELECT COALESCE(reader, 0) AS v, COUNT(*) AS n FROM receipt_fixes GROUP BY v ORDER BY v DESC"),
     all("SELECT domain, COUNT(*) AS n FROM receipt_fixes WHERE domain IS NOT NULL GROUP BY domain"),
-    all("SELECT domain, COUNT(*) AS n FROM receipt_fixes WHERE shopper_id = ? GROUP BY domain", me.id)
+    all("SELECT domain, COUNT(*) AS n FROM receipt_fixes WHERE shopper_id = ? GROUP BY domain", me.id),
+    // The help chat keeps only counts per shopper per day (support-chat.js).
+    one("SELECT COALESCE(SUM(messages), 0) AS m, COALESCE(SUM(handoffs), 0) AS h, COUNT(DISTINCT shopper_id) AS people, COALESCE(SUM(CASE WHEN day = ? THEN messages END), 0) AS today FROM support_chat_usage WHERE day >= ?",
+      dates[13], dates[7])
   ]);
 
   // Fixes count against a shop only where the shop is already named (from enough people), or among the admin's own.
@@ -138,6 +142,7 @@ export async function relayHealth(env, me, now = Date.now()) {
     extras: { gifts: n(gifts.n), giftGivers: n(giftShoppers.n), earlierYearsRead: n(history.n),
       notificationDevices: n(pushes.n), notificationPeople: n(pushes.people), priceWatches: n(watches.n), watchers: n(watches.people) },
     shopsConnected: { shopify: n(shopify.n), shopifyTest: n(shopifyTest.n), square: n(square.n) },
-    security: { wrongCodesToday: n(codeFails.n) }
+    security: { wrongCodesToday: n(codeFails.n) },
+    helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) }
   };
 }

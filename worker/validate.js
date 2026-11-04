@@ -69,6 +69,9 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/gmail/add": { fields: { messageId: str(600), mailbox: int(1, 5) } },
   "/relay/my/gmail/disconnect": { fields: { mailbox: int(1, 5) } },
   "/relay/my/receipts/add-pasted": { limit: 1000 * KB, fields: { email: str(250000) } },
+  // The help chat: the conversation so far, as the app holds it (worker/support-chat.js checks it further).
+  "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },
+  "/relay/my/help/handoff": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },
   "/relay/my/receipts/parse": { limit: 1000 * KB, fields: { email: str(250000) } },
   // Price alerts and notifications.
   "/relay/my/push/subscribe": { fields: { endpoint: str(2048), keys: obj({ p256dh: str(256), auth: str(128) }) } },

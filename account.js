@@ -511,6 +511,24 @@
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
     ".rl-rev-l{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;box-sizing:border-box}.rl-rev-l+.rl-rev-l{border-top:1px solid var(--rl-line)}" +
+    // The help chat: the assistant's bubbles on the left, yours on the right, and the box to write in kept in view (above
+    // the floating tab bar on a phone, and above the keyboard while typing, when the tab bar steps aside).
+    ".rl-chat{display:flex;flex-direction:column;gap:12px;margin:6px 0 12px}.rl-chat-b{max-width:86%;display:flex;flex-direction:column;gap:4px}" +
+    ".rl-chat-b p{margin:0;padding:11px 14px;border-radius:18px;font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}" +
+    ".rl-chat-b.bot{align-self:flex-start}.rl-chat-b.bot p{background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);border-bottom-left-radius:6px}" +
+    ".rl-chat-b.me{align-self:flex-end}.rl-chat-b.me p{background:var(--rl-accent);color:var(--rl-bg);border-bottom-right-radius:6px}" +
+    ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;text-align:center}" +
+    ".rl-chat-who{font-size:13px;font-weight:600;color:var(--rl-text2);margin:0 4px}" +
+    ".rl-chat-typing{flex-direction:row;gap:6px;padding:6px 0}.rl-chat-typing .rl-skel{display:block;width:72px;height:16px;min-height:0;border-radius:999px}.rl-chat-typing .rl-skel+.rl-skel{width:44px}" +
+    ".rl-chat-chips{display:flex;flex-wrap:wrap;gap:8px}.rl-chat-chips button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;font-weight:600;transition:transform .12s}" +
+    ".rl-chat-chips button:active{transform:scale(.96)}.rl-chat-chips button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-chat-bar{position:sticky;bottom:12px;z-index:3;display:flex;align-items:flex-end;gap:8px;padding:8px;border-radius:26px;background:var(--rl-card);border:1px solid var(--rl-line);box-shadow:0 6px 20px rgba(0,0,0,.08)}" +
+    "@media(max-width:760px){.rl-chat-bar{bottom:calc(env(safe-area-inset-bottom) + 84px)}body.typing .rl-chat-bar{bottom:calc(8px + var(--rl-kb,0px))}}" +
+    ".rl-chat-in{flex:1;min-width:0;box-sizing:border-box;min-height:48px;max-height:140px;margin:0;padding:12px 14px;border:0;border-radius:20px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px;line-height:1.4;resize:none}" +
+    ".rl-chat-in::placeholder{color:var(--rl-text2)}.rl-chat-in:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-chat-send{all:unset;box-sizing:border-box;flex:none;width:48px;height:48px;border-radius:999px;display:grid;place-items:center;background:var(--rl-accent);color:var(--rl-bg);cursor:pointer;transition:transform .12s,opacity .12s}" +
+    ".rl-chat-send:active{transform:scale(.92)}.rl-chat-send:disabled{opacity:.5;cursor:default}.rl-chat-send:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-chat-send .rl-jic{margin:0;color:inherit}" +
+    ".rl-chat-person{margin-top:4px}" +
     // Relay health (admins only): headline numbers, a meter, a day-by-day chart, and rows of counts.
     ".rl-hp-lead{margin:0 2px 8px;font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-hp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 12px}" +
     ".rl-hp-when{font-size:13px;color:var(--rl-text2)}.rl-hp-again{flex:none!important;min-height:44px;padding:0 16px!important;font-size:15px!important}" +
@@ -1109,6 +1127,7 @@
     dot: '<circle cx="12" cy="12" r="4.5"/>',
     down: '<path d="m7 10 5 5 5-5"/>',
     x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+    send: '<path d="M4.5 12h14M13 6l6 6-6 6"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -3307,6 +3326,7 @@
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
     pulse: '<path d="M3 12.5h4l2.5-6.5 4.5 13 2.5-6.5H21"/>',
+    chat: '<path d="M5 5.5h14A1.5 1.5 0 0 1 20.5 7v9a1.5 1.5 0 0 1-1.5 1.5h-7l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 16V7A1.5 1.5 0 0 1 5 5.5Z"/>',
     out: '<path d="M14 4.5h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/>',
     chev: '<path d="m9 6 6 6-6 6"/>', back: '<path d="m15 6-6 6 6 6"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/>'
@@ -3467,8 +3487,17 @@
       accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
 
     // Help & legal
+    // The help chat: shown once Relay says it's on (an AI assistant), or that a person can be reached by email.
+    var chatRow = accRow("chat", "Chat with us", "Ask Relay's assistant, or a person", function () { page(chatRow._ai ? "Help chat" : "Contact us", chatPage); });
+    chatRow.style.display = "none";
+    (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; })).then(function (hc) {
+      if (!hc || !(hc.available || hc.handoff)) return;
+      chatRow._ai = Boolean(hc.available);
+      if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
+      chatRow.style.display = "";
+    });
     sheet.appendChild(accGroup("Help & legal", [
-      accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }),
+      accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
       accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
       accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
 
@@ -3749,7 +3778,9 @@
           row("Price watches", N(ex.priceWatches), ex.watchers ? plural(ex.watchers, "person", "people") : null),
           row("Shops on Shopify", N(sh.shopify), sh.shopifyTest ? N(sh.shopifyTest) + " of them test shops" : null),
           row("Shops on Square", N(sh.square)),
-          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))])]));
+          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))].concat(h.helpChat ? [
+          row("Help chat", h.helpChat.on ? "On" : "Off", h.helpChat.on ? null : "Comes on once the AI key is added in Cloudflare"),
+          row("Help chat messages this week", N(h.helpChat.messagesThisWeek), plural(h.helpChat.peopleThisWeek, "person", "people") + ", " + N(h.helpChat.handoffsThisWeek) + " asked for a person")] : []))]));
       }
       // Refresh always asks Relay again (an ordinary read can reuse one from the last minute).
       function load(fresh) {
@@ -3814,6 +3845,94 @@
         });
       };
       b.appendChild(d); b.appendChild(note);
+    }
+    // ---- The help chat (worker/support-chat.js): Relay's AI assistant, and "Talk to a person", which emails the chat to
+    // Relay's team. The conversation lives only on this screen (and this session): Relay keeps no copy. With the
+    // assistant off, it's a message to Relay's team. ----
+    function chatPage(b) {
+      var hc = memo.helpChat || {}, ai = Boolean(hc.available), log = memo.chatLog || (memo.chatLog = []);
+      var list = el("div", { className: "rl-chat", role: "log" });
+      list.setAttribute("aria-live", "polite");
+      var note = el("p", { className: "rl-msg" });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
+      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
+      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
+      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
+      var busy = false;
+      function bubble(t) {
+        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
+        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
+        if (who === "bot") n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
+        return n;
+      }
+      function draw() {
+        list.textContent = "";
+        list.appendChild(bubble({ role: "bot", text: ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
+        if (ai && !log.length) {
+          var chips = el("div", { className: "rl-chat-chips" });
+          ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"].forEach(function (q) {
+            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
+          });
+          list.appendChild(chips);
+        }
+        log.forEach(function (t) { list.appendChild(bubble(t)); });
+      }
+      function turns(extra) {
+        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
+        if (extra) out.push({ role: "user", text: extra });
+        return out.slice(-24);
+      }
+      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
+      function sendQuestion() {
+        var q = box.value.replace(/\s+$/, "").trim();
+        if (busy || !q) return;
+        if (!ai) return handoff();
+        say(note, "");
+        log.push({ role: "user", text: q }); box.value = ""; draftSet("help-chat", ""); fit();
+        draw();
+        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
+        typing.setAttribute("aria-label", "Relay's assistant is writing");
+        list.appendChild(typing); scrollEnd();
+        lock(true);
+        api("/relay/my/help/chat", { method: "POST", body: { messages: turns() } }).then(function (r) {
+          lock(false); typing.remove();
+          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
+          log.pop(); box.value = q; fit(); draw();
+          var e = r.body && r.body.error;
+          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
+            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
+            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
+        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      function handoff() {
+        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
+        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
+        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
+          lock(true); say(note, "");
+          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
+            lock(false);
+            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
+            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
+            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
+            draw(); scrollEnd();
+          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        });
+      }
+      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
+      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
+      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
+      send.onclick = sendQuestion;
+      person.onclick = handoff;
+      // A problem is said just above the box, so it's never hidden behind the tab bar.
+      b.appendChild(list);
+      b.appendChild(note);
+      b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
+      if (ai) b.appendChild(person);
+      b.appendChild(el("p", { className: "rl-anote", text: ai ? "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team."
+        : "Relay's team will see your message and your email address, so they can reply." }));
+      draw(); setTimeout(fit, 0);
     }
     function helpPage(b) {
       HELP.forEach(function (q) {
