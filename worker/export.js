@@ -58,6 +58,9 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       storeCategories: (await rows("SELECT store_key AS store, category, promo FROM receipt_learning WHERE shopper_id = ?", id))
         .map((l) => ({ store: l.store, category: l.category || null, justPromotions: Boolean(l.promo) })),
       itemsMarked: await rows("SELECT receipt_id AS receiptId, item_index AS item, status FROM receipt_item_marks WHERE shopper_id = ?", id),
+      // Receipts you said were (or weren't) a gift, and who for when you said.
+      gifts: (await rows("SELECT receipt_id AS receiptId, is_gift AS isGift, recipient, updated_at AS updatedAt FROM receipt_gifts WHERE shopper_id = ?", id))
+        .map((g) => ({ receiptId: g.receiptId, gift: Boolean(g.isGift), for: g.recipient || null, changedAt: iso(g.updatedAt) })),
       returnReminders: (await rows("SELECT receipt_id AS receiptId, title, deadline, remind_at AS remindAt, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?", id))
         .map((r) => ({ receiptId: r.receiptId, title: r.title, deadline: r.deadline, remindAt: iso(r.remindAt), sentAt: iso(r.sentAt) })),
     },

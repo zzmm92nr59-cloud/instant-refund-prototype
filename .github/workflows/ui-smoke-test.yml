@@ -74,5 +74,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-feel-ui.mjs
       - name: Test the sign-in for app reviewers (admin on and off, the reviewer's sign-in, Home, Receipts, Profile, Discover)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-review-ui.mjs
+      - name: Test gifts (tag a receipt, who it's for, the Gifts tile and page, untag, Wrapped's gifts slide)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-gifts-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

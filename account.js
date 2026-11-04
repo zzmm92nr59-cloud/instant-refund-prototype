@@ -416,6 +416,9 @@
     "@keyframes rlfly{0%{transform:translate(14px,100px) rotate(-62deg);opacity:0}10%{opacity:1}50%{transform:translate(92px,40px) rotate(-4deg)}90%{opacity:1}100%{transform:translate(170px,80px) rotate(40deg);opacity:0}}" +
     ".sc-digital .eq{fill:currentColor;stroke:none;transform-box:fill-box;transform-origin:bottom;animation:rleq .9s ease-in-out infinite alternate}.sc-digital .e2{animation-delay:.2s}.sc-digital .e3{animation-delay:.4s}.sc-digital .e4{animation-delay:.1s}.sc-digital .e5{animation-delay:.3s}@keyframes rleq{from{transform:scaleY(.25)}to{transform:scaleY(1)}}" +
     ".sc-experiences .tk{transform-box:fill-box;transform-origin:center;animation:rltk 3s ease-in-out infinite}.sc-experiences .k2{animation-delay:.5s}.sc-experiences .cut{stroke-dasharray:3 6}@keyframes rltk{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(4deg) translateY(-5px)}}" +
+    // Gifts: a present whose lid keeps lifting, with a few sparkles.
+    ".sc-gifts .lid{transform-origin:100px 62px;animation:rllid 3s ease-in-out infinite}.sc-gifts .tw{fill:currentColor;fill-opacity:.3;transform-box:fill-box;transform-origin:center;animation:rltwinkle 2s ease-in-out infinite}.sc-gifts .t2{animation-delay:.6s}.sc-gifts .t3{animation-delay:1.2s}" +
+    "@keyframes rllid{0%,50%,100%{transform:translateY(0) rotate(0)}64%{transform:translateY(-12px) rotate(-6deg)}78%{transform:translateY(-5px) rotate(4deg)}90%{transform:translateY(-1px) rotate(-1deg)}}" +
     "@media(prefers-reduced-motion:reduce){.rl-story-slide .scene *{animation:none!important}.rl-story-slide .stack i{animation:none;width:var(--w)}}" +
     ".rl-inpage .rl-ahead{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:14px 16px}.rl-inpage .rl-agroup:first-of-type{margin-top:18px}.rl-inpage .rl-wr-cover{margin-bottom:10px}" +
     ".rl-story-slide .badges{display:grid;gap:10px;margin-top:16px}.rl-story-slide .badges div{border:2px solid currentColor;border-radius:18px;padding:12px 14px;opacity:0;animation:rlup .5s forwards}.rl-story-slide .badges b{display:block;font-size:19px;color:var(--accent)}.rl-story-slide .badges small{font-size:13px;opacity:.85}" +
@@ -432,6 +435,7 @@
     ".rl-tile .rl-tile-pic{position:absolute;z-index:1;top:-16%;right:-20%;height:140%;width:auto;aspect-ratio:1;object-fit:cover;mix-blend-mode:multiply;filter:grayscale(1) contrast(1.2) brightness(1.04)}" +
     ".rl-tile .rl-tile-art{position:absolute;z-index:1;top:-14%;right:-12%;width:68%;height:auto;color:rgba(0,0,0,.2)}" +
     ".rl-tile .rl-tile-badge{position:absolute;left:10px;top:10px;z-index:2;font-size:13px;line-height:1;font-weight:700;padding:7px 10px;border-radius:999px;background:rgba(0,0,0,.3);color:#fff}" +
+    ".rl-tile.rl-gifts{color:#171f44}.rl-tile.rl-gifts .rl-tile-art{color:rgba(23,31,68,.2)}.rl-tile.rl-gifts .rl-tile-badge{background:rgba(23,31,68,.14);color:#171f44}" +
     ".rl-tile.rl-year{background:#fe81d1;color:#171f44}.rl-tile.rl-year .rl-year-n{position:absolute;left:11px;top:8px;z-index:1;font-size:clamp(44px,13.5vw,60px);line-height:1;font-weight:900;letter-spacing:-.06em;color:inherit}" +
     ".rl-search{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 0 16px;padding:0 14px;border-radius:12px;background:var(--rl-fill);color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input{all:unset;flex:1;min-width:0;min-height:44px;font-size:17px;color:var(--rl-text)}.rl-search input::placeholder{color:var(--rl-text2,rgba(60,60,67,.6))}" +
@@ -650,6 +654,20 @@
     ".rl-rc-group{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:12px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}" +
     ".rl-rc-pickw{position:relative;display:inline-flex;align-items:center}.rl-rc-pickw .rl-jic{position:absolute;right:0;pointer-events:none;margin:0;color:var(--rl-text2)}" +
     ".rl-rc-pick{appearance:none;-webkit-appearance:none;border:0;background:transparent;color:var(--rl-text);font:inherit;font-size:15px;font-weight:700;text-align:right;min-height:44px;padding:0 24px 0 8px;cursor:pointer}.rl-rc-pick:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    // A receipt that was a present: a switch (like the phone's own), then who it was for.
+    ".rl-rc-gift{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}" +
+    ".rl-rc-gift-l{display:inline-flex;align-items:center;gap:8px;min-width:0}.rl-rc-gift-l .rl-jic{flex:none;margin:0;color:var(--rl-text2)}" +
+    ".rl-sw{all:unset;box-sizing:border-box;flex:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:flex-end;min-width:60px;min-height:44px;-webkit-tap-highlight-color:transparent}" +
+    ".rl-sw i{position:relative;display:block;width:51px;height:31px;border-radius:999px;background:rgba(120,120,128,.32);transition:background .2s}" +
+    ".rl-sw i::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:999px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.22);transition:transform .22s cubic-bezier(.2,.8,.2,1),width .15s}" +
+    ".rl-sw[aria-checked=true] i{background:var(--rl-accent)}.rl-sw[aria-checked=true] i::after{transform:translateX(20px)}" +
+    ".rl-sw:active i::after{width:32px}.rl-sw[aria-checked=true]:active i::after{transform:translateX(15px)}" +
+    ".rl-sw:disabled{cursor:default;opacity:.55}.rl-sw:focus-visible i{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-rc-giftfor{display:flex;align-items:center;gap:8px;margin:0 0 4px}" +
+    ".rl-rc-giftfor input{flex:1;min-width:0;box-sizing:border-box;min-height:44px;margin:0;padding:0 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px}" +
+    ".rl-rc-giftfor input::placeholder{color:var(--rl-text2)}.rl-rc-giftfor input:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-rc-gift-note{margin:2px 0 6px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-rc-gift-note:empty{display:none}" +
+    ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#74ffed;color:#171f44;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
@@ -666,7 +684,11 @@
   // Receipt group icons: simple line drawings on a soft tile, one colour pair per group (no emoji, which look different on every phone).
   // Each kind of shopping's tile colour on the Receipts page.
   var TILE_COLOURS = { fashion: "#E0446E", food: "#D47B1F", electronics: "#4F72E0", home: "#2E9E5B", beauty: "#B455C9", travel: "#6662D9",
-    digital: "#14918A", experiences: "#E0612F", other: "#7A7F8C", shop: "#2B3A5C" };
+    digital: "#14918A", experiences: "#E0612F", other: "#7A7F8C", shop: "#2B3A5C",
+    // Gifts aren't a kind of shopping: the tile of what you bought for other people is Relay's own Aqua Jade, with navy text.
+    gifts: "#74FFED" };
+  // A wrapped present, for gifts (drawn lines, never an emoji).
+  var GIFT_PATH = '<rect x="3.5" y="8" width="17" height="4.5" rx="1.2"/><path d="M5 12.5v8h14v-8M12 8v12.5"/><path d="M12 8C10.6 5.2 7.6 4 6.8 5.6 6.1 7 8.4 8 12 8Zm0 0c1.4-2.8 4.4-4 5.2-2.4.7 1.4-1.6 2.4-5.2 2.4Z"/>';
   var CAT_ICONS = {
     fashion: ["#FCE7F3", "#9D174D", '<path d="M9 3.5 4 5.8 2.5 10l3.2 1.3L7 10v10.5h10V10l1.3 1.3 3.2-1.3L20 5.8 15 3.5c-.4 1.5-1.6 2.5-3 2.5s-2.6-1-3-2.5Z"/>'],
     electronics: ["#E0F2FE", "#075985", '<rect x="4.5" y="5" width="15" height="10.5" rx="1.5"/><path d="M2.5 19h19"/>'],
@@ -677,7 +699,8 @@
     experiences: ["#FFEDD5", "#9A3412", '<path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v2a2.5 2.5 0 0 0 0 5v2a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5v-2a2.5 2.5 0 0 0 0-5Z"/><path d="M14.5 6v12" stroke-dasharray="1.5 2"/>'],
     digital: ["#CCFBF1", "#115E59", '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M10 9.2v5.6l4.6-2.8Z"/>'],
     other: ["#F1F5F9", "#334155", '<path d="M6.5 3.5h11v17l-1.85-1.2-1.85 1.2-1.8-1.2-1.85 1.2-1.8-1.2-1.85 1.2Z"/><path d="M9.5 8h5M9.5 11.5h5M9.5 15h3"/>'],
-    shop: ["rgba(116,255,237,.16)", "#74ffed", '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>']
+    shop: ["rgba(116,255,237,.16)", "#74ffed", '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>'],
+    gifts: ["rgba(23,31,68,.1)", "#171f44", GIFT_PATH]
   };
   function catIcon(k, size) {
     var c = CAT_ICONS[k] || CAT_ICONS.other, px = size || 44;
@@ -960,7 +983,8 @@
     ext: '<path d="M14 4.5h5.5V10"/><path d="m19.5 4.5-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/>',
     parcel: '<path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 11.5v9"/>',
     dot: '<circle cx="12" cy="12" r="4.5"/>',
-    down: '<path d="m7 10 5 5 5-5"/>'
+    down: '<path d="m7 10 5 5 5-5"/>',
+    gift: GIFT_PATH
   };
   function jIc(n, px) {
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
@@ -2283,18 +2307,30 @@
         var names = named.map(function (i) { return i.name + (i.variant && named.length === 1 ? " · " + i.variant : ""); }).join(", ");
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
         var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
-        var sub = [named.length ? who : ref, row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt";
+        var subOf = function () { return [named.length ? who : ref, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
+          row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt"; };
+        var sub = subOf();
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
         btn.setAttribute("aria-expanded", "false");
         var thumb = el("span", { className: "rl-rr-pic" });
         thumb.setAttribute("aria-hidden", "true");
         receiptPic(thumb, row, 28, 32);
+        // A gift shows a small present on its picture (the picture itself may be replaced once it loads, so it sits beside it).
+        var picw = el("span", { className: "rl-rr-picw" }, [thumb]);
+        picw.setAttribute("aria-hidden", "true");
+        var giftMark = function () {
+          var had = picw.querySelector(".rl-rr-gift");
+          if (row.gift && !had) { var gm = jIc("gift", 14); gm.className = "rl-jic rl-rr-gift"; picw.appendChild(gm); }
+          else if (!row.gift && had) had.remove();
+        };
+        giftMark();
         var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
         var left = daysLeft(statedDeadline(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
-        btn.appendChild(thumb);
-        btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), el("span", { text: sub })]));
+        btn.appendChild(picw);
+        var subEl = el("span", { text: sub });
+        btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), subEl]));
         btn.appendChild(end);
         wrap.appendChild(btn);
         var detail = null;
@@ -2312,14 +2348,70 @@
             pick.disabled = true;
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
           detail.appendChild(el("label", { className: "rl-rc-group" }, [el("span", { text: row.categoryLearned ? "Group (as you taught Relay)" : "Group" }), el("span", { className: "rl-rc-pickw" }, [pick, jIc("down", 16)])]));
+          detail.appendChild(giftControl(row, function () { subEl.textContent = subOf(); giftMark(); find(); }));
           wrap.appendChild(detail); memo.openIds[row.id] = true; btn.setAttribute("aria-expanded", "true"); wrap.classList.add("open");
         };
-        var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names].filter(Boolean).join(" ").toLowerCase();
-        wrap.setAttribute("data-find", find);
+        // What the search box matches: the shop, the order number, what was bought, and who a gift was for.
+        var find = function () {
+          wrap.setAttribute("data-find", [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names,
+            row.gift ? "gift " + (row.gift.for || "") : null].filter(Boolean).join(" ").toLowerCase());
+        };
+        find();
         if (memo.openIds[row.id]) btn.onclick();
         return wrap;
       }
-      var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other" };
+      // "Bought as a gift": a switch, then who it was for (optional). Gifts get their own tile here and their own part of
+      // Wrapped, and are left out of what Relay works out about your own style. The row changes straight away; the list
+      // catches up the next time it loads, so nothing jumps while you're typing.
+      function giftControl(row, changed) {
+        var on = Boolean(row.gift), box = el("div", { className: "rl-rc-giftw" });
+        var sw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
+        sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Bought as a gift"); sw.setAttribute("aria-checked", on ? "true" : "false");
+        var note = el("p", { className: "rl-rc-gift-note" });
+        note.setAttribute("role", "status");
+        var forRow = null, input = null, saveBtn = null, busy = false;
+        var saved = function () { return (row.gift && row.gift.for) || ""; };
+        function drawFor() {
+          if (forRow) { forRow.remove(); forRow = null; input = saveBtn = null; }
+          if (!on) return;
+          input = el("input", { type: "text", maxLength: 40, value: saved(), placeholder: "Who's it for? (optional)", autocomplete: "off", enterKeyHint: "done" });
+          input.setAttribute("aria-label", "Who it's for");
+          saveBtn = el("button", { type: "button", className: "rl-pill", text: "Save", disabled: true });
+          input.addEventListener("input", function () { saveBtn.disabled = busy || input.value.replace(/\s+/g, " ").trim() === saved(); });
+          input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); if (!saveBtn.disabled) saveBtn.click(); } });
+          saveBtn.onclick = function () { var who = input.value.replace(/\s+/g, " ").trim(); send(true, who, who ? "Saved. It's a gift for " + who + "." : "Saved."); };
+          forRow = el("div", { className: "rl-rc-giftfor" }, [input, saveBtn]);
+          box.insertBefore(forRow, note);
+        }
+        function lock(yes) { busy = yes; sw.disabled = yes; if (input) input.disabled = yes; if (saveBtn) saveBtn.disabled = yes || (input && input.value.replace(/\s+/g, " ").trim() === saved()); }
+        function send(gift, who, done) {
+          if (busy) return;
+          lock(true); note.textContent = "";
+          var undo = function (msg) { sw.setAttribute("aria-checked", on ? "true" : "false"); lock(false); note.textContent = msg; };
+          api("/relay/my/receipts/" + row.id + "/gift", { method: "POST", body: gift ? (who ? { gift: true, for: who } : { gift: true }) : { gift: false } }).then(function (r) {
+            if (!r.ok) return undo(r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : "Couldn't save that. Please try again.");
+            var typing = on && gift;
+            on = gift; row.gift = gift ? { for: who || null } : null;
+            sw.setAttribute("aria-checked", on ? "true" : "false");
+            lock(false);
+            if (!typing) drawFor();
+            else if (saveBtn) saveBtn.disabled = true;
+            note.textContent = done;
+            memoDrop("wrapped"); changed();
+          }, function () { undo("Couldn't reach Relay. Check your connection and try again."); });
+        }
+        sw.onclick = function () {
+          if (busy) return;
+          var next = !on;
+          sw.setAttribute("aria-checked", next ? "true" : "false");
+          send(next, "", next ? "Marked as a gift. Add who it's for if you like." : "Not a gift any more.");
+        };
+        box.appendChild(el("div", { className: "rl-rc-gift" }, [el("span", { className: "rl-rc-gift-l" }, [jIc("gift", 18), el("span", { text: "Bought as a gift" })]), sw]));
+        box.appendChild(note);
+        drawFor();
+        return box;
+      }
+      var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other", gifts: "Gifts" };
       // One group's page: a header in the group's colour with what's in it, filters, then receipts by month (newest first)
       // with each month's total. Long groups show 40 at a time.
       var GBP = function (rs) { return rs.reduce(function (n, r) { return n + (Number.isInteger(r.totalPence) && (!r.currency || r.currency === "GBP") ? r.totalPence : 0); }, 0); };
@@ -2333,16 +2425,24 @@
         list.lastChild.firstChild.setAttribute("aria-hidden", "true");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
         var spent = GBP(rows);
-        var hero = el("div", { className: "rl-cat-hero", style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) + ";color:#fff" }, [catIcon(k, 52),
+        var isGifts = k === "gifts", ink = isGifts ? "#171f44" : "#fff", noun = function (n) { return n + (isGifts ? (n === 1 ? " gift" : " gifts") : (n === 1 ? " receipt" : " receipts")); };
+        var hero = el("div", { className: "rl-cat-hero", style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) + ";color:" + ink }, [catIcon(k, 52),
           el("div", { className: "rl-cat-hero-t" }, [el("h3", { text: groupNames[k] }),
-            el("span", { text: [rows.length + (rows.length === 1 ? " receipt" : " receipts"), spent ? money(spent, "GBP") + " spent" : null, oldest ? "since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null].filter(Boolean).join(" · ") })])]);
-        hero.firstChild.style.background = "rgba(255,255,255,.2)"; hero.firstChild.style.color = "#fff";
+            el("span", { text: [noun(rows.length), spent ? money(spent, "GBP") + " spent" : null, oldest ? "since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null].filter(Boolean).join(" · ") })])]);
+        hero.firstChild.style.background = isGifts ? "rgba(23,31,68,.1)" : "rgba(255,255,255,.2)"; hero.firstChild.style.color = ink;
         list.appendChild(hero);
-        if (rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
+        if (!isGifts && rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
         // Filters: all, what can still go back (when there is any), and each year.
         var filters = [["all", "All"]];
         if (rows.some(canReturn)) filters.push(["return", "Can still return"]);
         if (years.length > 1) years.forEach(function (y) { filters.push([y, y]); });
+        // Gifts: one filter per person they were for (as the shopper typed it), most gifts first.
+        if (isGifts) {
+          var forWho = {};
+          rows.forEach(function (r) { var w = r.gift && r.gift.for; if (w) { var key = w.toLowerCase(); (forWho[key] = forWho[key] || { name: w, n: 0 }).n++; } });
+          var whoList = Object.keys(forWho).map(function (key) { return forWho[key]; }).sort(function (a, b) { return b.n - a.n || a.name.localeCompare(b.name); });
+          if (whoList.length > 1 || (whoList.length === 1 && whoList[0].n < rows.length)) whoList.slice(0, 8).forEach(function (p) { filters.push(["for:" + p.name.toLowerCase(), p.name]); });
+        }
         var f = memo.catFilter && filters.some(function (x) { return x[0] === memo.catFilter; }) ? memo.catFilter : "all";
         var chips = el("div", { className: "rl-cat-chips", role: "group" });
         chips.setAttribute("aria-label", "Show");
@@ -2363,9 +2463,10 @@
           var pick = rows.filter(function (r) {
             if (f === "return" && !canReturn(r)) return false;
             if (/^\d{4}$/.test(f) && String(r.orderDate || "").slice(0, 4) !== f) return false;
+            if (f.indexOf("for:") === 0 && String((r.gift && r.gift.for) || "").toLowerCase() !== f.slice(4)) return false;
             if (!q) return true;
             var names = (r.items || []).map(function (i) { return i.name; }).join(" ");
-            return [r.retailer && r.retailer.name, r.retailer && r.retailer.domain, r.orderRef, names].filter(Boolean).join(" ").toLowerCase().indexOf(q) !== -1;
+            return [r.retailer && r.retailer.name, r.retailer && r.retailer.domain, r.orderRef, names, r.gift && r.gift.for].filter(Boolean).join(" ").toLowerCase().indexOf(q) !== -1;
           });
           body.textContent = "";
           if (!pick.length) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: q ? "Nothing matches that search" : "Nothing here" }), el("p", { text: q ? "Try a shop name, an item or an order number." : "Try another filter." })])); return; }
@@ -2376,7 +2477,7 @@
               month = m;
               var inMonth = pick.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
               body.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
-                el("span", { text: inMonth.length + (inMonth.length === 1 ? " receipt" : " receipts") + (tot ? " · " + money(tot, "GBP") : "") })]));
+                el("span", { text: noun(inMonth.length) + (tot ? " · " + money(tot, "GBP") : "") })]));
               card = el("div", { className: "rl-cat-list" }); body.appendChild(card);
             }
             card.appendChild(receiptRow(r));
@@ -2410,6 +2511,9 @@
           list.appendChild(sq); list.appendChild(sh);
           return;
         }
+        // Gifts aren't a group of their own: each stays in its group too, and they're also gathered under one tile.
+        var giftRows = sorted.filter(function (r) { return r.gift; });
+        if (memo.openCat === "gifts" && giftRows.length) { drawCategory("gifts", giftRows); return; }
         if (memo.openCat && by[memo.openCat]) {
           drawCategory(memo.openCat, by[memo.openCat]);
           return;
@@ -2423,6 +2527,11 @@
         if (rows.some(function (r) { return String(r.orderDate || "").slice(0, 4) === String(year); }))
           grid.appendChild(el("button", { type: "button", className: "rl-tile rl-year", ariaLabel: "Your " + year + " Wrapped", onclick: function () { if (window.go) window.go("wrapped"); } },
             [el("span", { className: "rl-year-n", text: String(year) }), el("b", { text: "Wrapped" })]));
+        if (giftRows.length) {
+          var giftPic = giftRows.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
+            .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
+          grid.appendChild(tile("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), giftPic, 0, open("gifts")));
+        }
         if (shopRows.length) grid.appendChild(tile("shop", "Shop orders", shopRows.length + " item" + (shopRows.length === 1 ? "" : "s"), null, 0, open("shop")));
         keys.forEach(function (k) {
           var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length;
@@ -2436,7 +2545,7 @@
       // One kind of shopping as a tile: its colour, a tinted photo of something bought there (or its drawing), its name, and
       // how many return deadlines are coming up.
       function tile(k, name, count, photo, soon, onclick) {
-        var t = el("button", { type: "button", className: "rl-tile", ariaLabel: name + ", " + count + (soon ? ", " + soon + " due soon" : ""), onclick: onclick,
+        var t = el("button", { type: "button", className: "rl-tile" + (k === "gifts" ? " rl-gifts" : ""), ariaLabel: name + ", " + count + (soon ? ", " + soon + " due soon" : ""), onclick: onclick,
           style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
         var art = el("span", { className: "rl-tile-art" });
@@ -3602,7 +3711,8 @@
         card.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below." : "Once Relay has found your receipts, your year's story appears here." }));
       } else {
         card.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
-        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " · " : "") + w.receipts + (w.receipts === 1 ? " receipt" : " receipts") + ((w.chapters || []).length ? " · " + w.chapters.length + (w.chapters.length === 1 ? " chapter" : " chapters") : "") }));
+        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " · " : "") + w.receipts + (w.receipts === 1 ? " receipt" : " receipts") + ((w.chapters || []).length ? " · " + w.chapters.length + (w.chapters.length === 1 ? " chapter" : " chapters") : "") +
+          (w.gifts && w.gifts.count ? " · " + w.gifts.count + (w.gifts.count === 1 ? " gift" : " gifts") : "") }));
         var dots = el("div", { className: "rl-wr-dots" });
         var tot = (w.industries || []).reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
         if (tot) (w.industries || []).forEach(function (k) { var pct = k.spentPence / tot * 100; if (pct >= 0.5) dots.appendChild(el("i", { title: (KIND[k.category] || KIND.other).label, style: "flex:" + pct.toFixed(1) + ";background:" + (KIND[k.category] || KIND.other).bar })); });
@@ -3715,7 +3825,12 @@
       scene: '<rect x="40" y="20" width="120" height="78" rx="14"/><path class="fill" d="M90 44v30l26-15Z"/><rect class="eq e1" x="56" y="106" width="10" height="20" rx="3"/><rect class="eq e2" x="76" y="106" width="10" height="20" rx="3"/><rect class="eq e3" x="96" y="106" width="10" height="20" rx="3"/><rect class="eq e4" x="116" y="106" width="10" height="20" rx="3"/><rect class="eq e5" x="136" y="106" width="10" height="20" rx="3"/>' },
     experiences: { label: "Tickets & experiences", bg: "#9a3412", fg: "#fff", accent: "#fed7aa", bar: "#fb923c", go: "Your go-to for days out", repeat: "Booked most",
       scene: '<g class="tk k1"><path class="fill" d="M30 40h80v14a8 8 0 0 0 0 16v14H30V70a8 8 0 0 0 0-16Z"/><path class="cut" d="M88 40v44"/></g><g class="tk k2"><path class="fill" d="M90 56h80v14a8 8 0 0 0 0 16v14H90V86a8 8 0 0 0 0-16Z"/><path class="cut" d="M148 56v44"/></g>' },
-    other: { label: "Other", bar: "#94a3b8" }
+    other: { label: "Other", bar: "#94a3b8" },
+    // Not a kind of shopping (never a chapter): the scene for the gifts slide.
+    gifts: { label: "Gifts", gift: true,
+      scene: '<path class="tw t1" d="M36 30c1.2 6 3.8 8.8 10 10-6.2 1.2-8.8 4-10 10-1.2-6-3.8-8.8-10-10 6.2-1.2 8.8-4 10-10Z"/><path class="tw t2" d="M166 24c1 5 3 7 8 8-5 1-7 3-8 8-1-5-3-7-8-8 5-1 7-3 8-8Z"/><path class="tw t3" d="M170 88c.9 4.4 2.6 6.1 7 7-4.4.9-6.1 2.6-7 7-.9-4.4-2.6-6.1-7-7 4.4-.9 6.1-2.6 7-7Z"/>' +
+        '<rect class="fill" x="58" y="62" width="84" height="60" rx="5"/><path d="M100 62v60"/>' +
+        '<g class="lid"><rect class="fill" x="50" y="46" width="100" height="16" rx="4"/><path d="M100 46v16"/><path d="M100 46c-6-14-26-20-29-10-2 7 12 10 29 10Zm0 0c6-14 26-20 29-10 2 7-12 10-29 10Z"/></g>' }
   };
   function scene(kind) {
     var box = el("div", { className: "scene sc-" + kind });
@@ -3822,6 +3937,31 @@
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.biggest.totalPence, gbp, 1100);
       b.appendChild(el("p", { text: (w.biggest.item ? w.biggest.item + ", " : "") + "at " + w.biggest.shop + (w.biggest.date ? " on " + longDate(w.biggest.date) : "") + "." }));
       if (w.biggest.photoId) b.appendChild(photoGrid([{ id: w.biggest.photoId, item: w.biggest.item, shop: w.biggest.shop }], "ph"));
+    } });
+    // For everyone else: the receipts the shopper tagged as presents, and who for (only names they typed themselves).
+    var gf = w.gifts, many = function (n, one, more) { return n + " " + (n === 1 ? one : more); };
+    if (gf && gf.count) S.push({ bg: "#fe81d1", fg: "#171f44", accent: "#171f44", build: function (b) {
+      b.appendChild(el("div", { className: "k", text: "FOR EVERYONE ELSE" }));
+      b.appendChild(scene("gifts"));
+      if (gf.withTotal) { var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, gf.spentPence, gbp, 1100); }
+      else b.appendChild(el("div", { className: "big", text: many(gf.count, "gift", "gifts") }));
+      // "For 3 people" only when every gift says who it was for.
+      var ppl = gf.people || [], allNamed = gf.named === gf.count && ppl.length > 0;
+      var sub = [gf.withTotal ? "on " + many(gf.count, "gift", "gifts") : null, allNamed ? "for " + (ppl.length === 1 ? ppl[0].name : ppl.length + " people") : null,
+        gf.share ? gf.share + "% of your spending" : null].filter(Boolean).join(" · ");
+      if (sub) b.appendChild(el("p", { text: sub }));
+      if (gf.withTotal < gf.count) b.appendChild(el("p", { className: "fine", text: "Added up from " + gf.withTotal + " of " + many(gf.count, "gift", "gifts") + ". The others had no amount Relay could read." }));
+      var lines = el("div", { className: "facts" }), top = ppl[0], big = (gf.list || [])[0];
+      if (top && top.gifts >= 2 && (ppl.length === 1 || top.gifts > ppl[1].gifts) && !(allNamed && ppl.length === 1))
+        lines.appendChild(el("div", {}, [el("span", { text: "Most went to" }), el("b", { text: top.name + " · " + many(top.gifts, "gift", "gifts") })]));
+      if (big && big.totalPence && gf.count > 1) lines.appendChild(el("div", {}, [el("span", { text: "Biggest gift" }), el("b", { text: (big.item || big.shop || "A gift") + (big.for ? " for " + big.for : "") + " · " + gbp(big.totalPence) })]));
+      if (gf.busiestMonth) lines.appendChild(el("div", {}, [el("span", { text: "Most giving month" }), el("b", { text: MONTH_FULL[gf.busiestMonth] || gf.busiestMonth })]));
+      if (lines.childNodes.length) b.appendChild(lines);
+    } });
+    var giftPhotos = gf ? (gf.list || []).filter(function (x) { return x.photoId; }).slice(0, 4).map(function (x) { return { id: x.photoId, item: x.item, more: x.more, shop: x.shop }; }) : [];
+    if (giftPhotos.length) S.push({ bg: "#171f44", fg: "#fff", accent: "#74ffed", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: giftPhotos.length === 1 ? "Something you gave" : "Some things you gave" }));
+      b.appendChild(photoGrid(giftPhotos, "ph"));
     } });
     var bd = w.badges || [];
     if (bd.length) S.push({ bg: "#74ffed", fg: "#171f44", accent: "#171f44", build: function (b) {

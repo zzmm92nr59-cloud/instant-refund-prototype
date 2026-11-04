@@ -109,7 +109,8 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   }
   byMonth.forEach(m => delete m._i);
   const busiest = byMonth.slice().sort((a, b) => b.receipts - a.receipts)[0];
-  const biggest = gbp.slice().sort((a, b) => b.totalPence - a.totalPence)[0];
+  // Your biggest treat is for you: a present for someone else isn't one (it has its own place under gifts).
+  const biggest = gbp.filter(c => !c.gift).sort((a, b) => b.totalPence - a.totalPence)[0];
   // In one kind's Wrapped, a thing that is plainly another kind (kitchen roll in a supermarket shop that couldn't be split
   // by price) isn't one of its things.
   const otherKind = (it, c) => {
@@ -153,9 +154,10 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     .map(c => ({ id: c.id, shop: shopName(c), item: itemName((c.items || [])[0]), more: Math.max(0, (c.items || []).length - 1), date: whenOf(c) }));
   // Things (not food, travel or apps) for the style slide: the app works the style out from these, on the device.
   const things = [];
-  // Each item by what it is, so a jacket from a supermarket counts and the bread in the same order doesn't.
+  // Each item by what it is, so a jacket from a supermarket counts and the bread in the same order doesn't. A present for
+  // someone else says nothing about your own style, so gifts are left out.
   for (const c of mine) {
-    if (forwarded(c)) continue;
+    if (forwarded(c) || c.gift) continue;
     for (const it of (c.items || [])) { const n = itemName(it); if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
   }
   // ---- The Spotify-style parts, each counted straight from the receipts. ----
@@ -203,6 +205,37 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   }
   const subscriptions = [...subs.values()].filter(e => e.months.size >= 3).sort((a, b) => b.months.size - a.months.size || b.spentPence - a.spentPence).slice(0, 5)
     .map(e => ({ name: e.name, months: e.months.size, spentPence: e.spentPence, item: e.item }));
+  // Gifts: receipts the shopper said were presents for someone else. They still count in the year's spending (the money
+  // was spent), and here on their own: how many, what they cost, who they were for (only names the shopper typed).
+  const giftCards = mine.filter(c => c.gift && c.part !== "share");
+  const giftGbp = giftCards.filter(c => gbp.includes(c));
+  const giftSpent = giftGbp.reduce((n, c) => n + c.totalPence, 0);
+  const people = new Map();
+  for (const c of giftCards) {
+    const who = typeof c.gift.for === "string" ? c.gift.for.replace(/\s+/g, " ").trim() : "";
+    if (!who) continue;
+    const e = people.get(who.toLowerCase()) || { name: who, gifts: 0, spentPence: 0 };
+    e.gifts++; if (gbp.includes(c)) e.spentPence += c.totalPence;
+    people.set(who.toLowerCase(), e);
+  }
+  const giftMonths = MONTHS.map(() => 0);
+  for (const c of giftCards) { const i = Number(whenOf(c).slice(5, 7)) - 1; if (i >= 0 && i < 12) giftMonths[i]++; }
+  const giftPeak = Math.max(0, ...giftMonths);
+  const gifts = giftCards.length ? {
+    count: giftCards.length, spentPence: giftSpent, withTotal: giftGbp.length,
+    share: spentPence > 0 && giftSpent > 0 ? Math.max(1, Math.round(giftSpent / spentPence * 100)) : null,
+    // How many say who they were for, so the app never says "for 2 people" when some gifts don't say.
+    named: giftCards.filter(c => typeof c.gift.for === "string" && c.gift.for.trim()).length,
+    people: [...people.values()].sort((a, b) => b.gifts - a.gifts || b.spentPence - a.spentPence).slice(0, 5),
+    // The month most of them were bought in, only when it really stood out (two or more, and more than any other month).
+    busiestMonth: giftPeak >= 2 && giftMonths.filter(n => n === giftPeak).length === 1 ? MONTHS[giftMonths.indexOf(giftPeak)] : null,
+    list: giftCards.slice().sort((a, b) => (b.totalPence || 0) - (a.totalPence || 0) || whenOf(b).localeCompare(whenOf(a))).slice(0, 6).map(c => {
+      const named = (c.items || []).filter(itemName);
+      return { item: named.length ? itemName(named[0]) : null, more: Math.max(0, named.length - 1), shop: forwarded(c) ? null : shopName(c),
+        for: typeof c.gift.for === "string" && c.gift.for.trim() ? c.gift.for.trim() : null, totalPence: gbp.includes(c) ? c.totalPence : null, date: whenOf(c),
+        photoId: c.hasImage && c.id && THINGS.has(c.category || "other") && !forwarded(c) ? c.id : null };
+    })
+  } : null;
   // Badges (like Spotify's identity cards): only ones the receipts prove, each with the reason.
   const badges = [];
   if (topShopShare && topShopShare >= 30 && top) badges.push({ label: "Loyal to " + top.name, why: topShopShare + "% of your spending" + on + " went there." });
@@ -212,6 +245,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   if (subscriptions.length >= 3) badges.push({ label: "Subscriber", why: subscriptions.length + " things you paid for month after month." });
   if (streak >= 6) badges.push({ label: "Never Missed a Month", why: "You bought something " + streak + " months in a row." });
   if (mine.some(c => (c.items || []).length >= 5)) badges.push({ label: "Big Basket", why: "At least one order with 5 or more things in it." });
+  if (giftCards.length >= 3) badges.push({ label: "The Gift Giver", why: giftCards.length + " of your orders were presents for someone else." });
   // One chapter per kind of shopping for the year's single story: its share of the year, where it went, what it was, and
   // one fun number of its own. Every figure is counted from the receipts, like the rest.
   // A kind gets its own chapter when some receipt was mostly that kind, or its things turned up in at least three
@@ -241,7 +275,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     busiestMonth: busiest && busiest.receipts ? busiest.month : null,
     biggest: biggest ? { shop: shopName(biggest), totalPence: biggest.totalPence, date: whenOf(biggest), item: (biggest.items || []).length === 1 ? itemName(biggest.items[0]) : null,
       photoId: biggest.hasImage && biggest.id && THINGS.has(biggest.category || "other") ? biggest.id : null } : null,
-    firstBuy, photos, things, topItems, yearList, topBuys, shoppingTime, sprint, subscriptions, badges,
+    firstBuy, photos, things, topItems, yearList, topBuys, shoppingTime, sprint, subscriptions, badges, gifts,
     returnsStarted: withReturn, personality,
     note: "Based on the receipts and order emails Relay found. In-store card purchases without an email receipt aren't included."
   };
