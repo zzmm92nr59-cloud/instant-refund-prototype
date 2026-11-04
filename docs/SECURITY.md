@@ -28,6 +28,7 @@ Written for whoever works on Relay next, person or AI: keep it true when the cod
 | **Shopper** | A session token from signing in (email link or code, Google, Microsoft or a passkey, plus the second step if they turned it on). |
 | **Shopper, half-way through two-step sign-in** | A short-lived "pending" token that only finishes signing in. It is not a session. |
 | **Relay admin** | A signed-in shopper whose email is in `RELAY_ADMIN_EMAILS`. |
+| **App reviewer** | A shopper signed in with the reviewer sign-in (below): a made-up address and a code that stays the same while it's on. |
 | **Shop** | The shop's Relay key (`rk_...`), given when the shop connects with Square or Shopify (or opens Relay inside Shopify admin). Relay keeps only a keyed hash of it. |
 | **Shopify, Square** | Webhooks signed with the shared secret (HMAC); unsigned or wrongly signed ones are refused. |
 | **Relay's scheduled jobs** | Cloudflare's cron triggers. They aren't reachable over the web at all. |
@@ -53,8 +54,12 @@ found" (404) where even saying it exists would tell too much.
 | Shop settings (payments, Royal Mail labels) | | | | Own shop only. The Royal Mail key is stored encrypted and never sent back | | |
 | Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
 | List of connected shops | Read names | Read | Read | | | |
+| Reviewer sign-in (`/relay/my/admin/review-account`) | | | Turn on (a new address and code), see the address and code, turn off (deletes the account) | | | |
 | Testing tools (`/relay/my/testing/...`) | | Sandbox test shop only: off when Square is live; 5 test orders a day | | | | |
 | Prototype test routes (`/relay/test-lab`, `/relay/live-test`, `/relay/ledger/...` and others) | Off: "not found" | Off | Off | Off | | |
+
+The **app reviewer** can do what any shopper can, on its own account, except attach anything personal: connecting an
+inbox, adding a passkey, two-step sign-in, a phone number or a card answer `403 {"error":"not_for_review_account"}`.
 
 The prototype test routes are switched off by `worker/legacy-routes.js`. They take no sign-in and some place test payments
 on Relay's Square sandbox account. To use the "Existing API and verification tools" testing page again, set
@@ -64,6 +69,24 @@ on Relay's Square sandbox account. To use the "Existing API and verification too
 no session, a made-up one, a malformed one, a shop's key, an admin route as a shopper, someone else's receipt, unsigned
 webhooks. Ownership of purchases, swaps, returns, resale and inboxes is also tested in `test-auth`, `test-exchange`,
 `test-square-orders`, `test-resale`, `test-resale-admin`, `test-more-inboxes` and `test-retailer`.
+
+## The reviewer sign-in
+
+`worker/review-account.js`. Shopify asks for a test account its reviewers can sign in to without an emailed code
+(App Store requirement 4.5.5). It's off until a Relay admin turns it on in the app (Profile, Team).
+
+- Turning it on makes a random address at `example.com`, a domain set aside for examples that can't receive email, so it
+  can never be a real person's. Requesting a code for it sends nothing.
+- Its 6-digit code is HMAC-SHA256 of the address with `AUTH_SECRET`, so it isn't stored, isn't in the repository and
+  changes with the address. Only an admin can see it.
+- It signs in through the ordinary code route and its limits (5 wrong codes per 15 minutes), plus at most 20 wrong codes
+  a day, since the code doesn't change. The address isn't published anywhere: it goes only in the App Store submission.
+- Several people share the account, so nothing personal can be attached to it (see above). Orders placed at a shop with
+  that address show up for it, as for any shopper.
+- Turning it off deletes the account and everything in it, as "Delete my account" does, signing it out everywhere.
+  Turning it on again makes a new address, code and account.
+
+**Proved by** `scripts/test-review-account.mjs`.
 
 ## Rate limits
 
@@ -156,7 +179,8 @@ so each derived key is different:
   two-step sign-in secret;
 - the keyed hashes of shops' Relay keys;
 - the notification signing key;
-- the signatures that protect connecting Square and Shopify.
+- the signatures that protect connecting Square and Shopify;
+- the reviewer sign-in's code (a new secret means a new code: update the App Store submission).
 
 Sessions don't depend on it: they're plain SHA-256 hashes of random tokens.
 
@@ -178,6 +202,7 @@ If it has leaked, do the migration at once. Until then, assume anyone holding it
 |---|---|---|
 | `scripts/test-validation.mjs` | Input checks and rate limits, every route, the app's own requests | Every pull request and every deploy |
 | `scripts/test-access-control.mjs` | Who can do what | Every pull request and every deploy |
+| `scripts/test-review-account.mjs` | The reviewer sign-in | Pull requests that change sign-in, and every deploy |
 | `scripts/check-secrets.mjs` | No keys in the repository | Every pull request and every deploy |
 | `scripts/record-app-requests.mjs` | Records what the app sends during the browser tests, then checks it against the rules | The browser tests on every pull request |
 | `scripts/check-live-security.mjs` | The live server from outside: not-found answers, test routes off, sessions required, unexpected fields refused, a real 429 from Cloudflare's rate limiter | After every deploy (`live-security-check.yml`) |
