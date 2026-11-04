@@ -119,6 +119,16 @@
     if (by && x.returnBy.estimate && by < new Date().toISOString().slice(0, 10)) by = null;
     return (x.returnPlan && x.returnPlan.deadline) || (x.kind === "return_instructions" && x.deadline) || (x.returns && x.returns.deadline) || by || null;
   }
+  // A return date the shop itself gave: a date in its email, or its window counted from the day the parcel arrived. Only
+  // these are shown as deadlines (a countdown, "10 days left", the strip above the tab bar, a card's bar). A date Relay
+  // works out when the email says nothing (UK law's 14 days, or a window counted from the order date) is the least the
+  // shopper can count on, not the shop's deadline, so it is never shown as one: deadlineOf() keeps using it only to know
+  // what can still surely go back.
+  function statedDeadline(x) {
+    var dl = deadlineOf(x);
+    var by = dl && x.returnBy && x.returnBy.date === dl ? x.returnBy : null;
+    return by && (by.estimate || by.basis === "uk_law") ? null : dl;
+  }
   // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
   // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
   // onMiss runs when the shop has no logo Relay can show (no address, none found, or the picture won't load).
@@ -344,6 +354,8 @@
     ".rl-sheet>.rl-po-ship{margin:0 0 14px}.rl-dt-sub{margin:0 0 10px;color:var(--rl-text2);font-size:15px;line-height:1.4}" +
     ".rl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
     "@media(max-width:360px){.rl-po-img{width:80px;height:80px}}" +
+    // In dark mode a wallet card is Relay's navy (a near-black card on the black page read as a black box on black).
+    "@media(prefers-color-scheme:dark){.rl-po:not(.rl-skel){background:var(--navy,#171f44)}.rl-po .rl-po-secondary{background:rgba(255,255,255,.12)}.rl-po .rl-po-img,.rl-po .rl-po-img.rl-has-logo{background:rgba(255,255,255,.1)!important}}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-status.wait{background:var(--rl-fill);color:var(--rl-text2)}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     // Inside a card: tinted buttons rather than outlined ones, Details only as wide as its word beside another button.
@@ -988,7 +1000,7 @@
   // sign-in page. Every step of signing in and getting started is a full page, not a sheet over the app. ----
   var WELCOME = [
     { bg: "#171f44", art: "receipts", title: "Every receipt, in one place.", sub: "Relay finds them in your Gmail or Outlook. No scanning, no typing." },
-    { bg: "#E0446E", art: "deadline", title: "Never miss a return.", sub: "Every deadline counts down, with a nudge before it's too late." },
+    { bg: "#E0446E", art: "deadline", title: "Never miss a return.", sub: "Shops' return dates count down, with a reminder if you want one." },
     { bg: "#4F72E0", art: "price", title: "Catch the price drop.", sub: "Watch what you want. Relay tells you when it's cheaper." },
     { bg: "#6662D9", art: "wrapped", title: "Your year, wrapped.", sub: "See where your money went, shop by shop." }];
   // The pictures: made-up shops and things, drawn the way Relay shows your own.
@@ -1980,7 +1992,7 @@
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
     else if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
-    var left = daysLeft(deadlineOf(x));
+    var left = daysLeft(statedDeadline(x));
     var leftText = left === null ? "" : left < 0 ? "Deadline passed" : left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left";
     var leftTone = left === null ? "" : left < 0 ? "past" : left <= 2 ? "red" : left <= 7 ? "amber" : "green";
     // When to return it, in two lines: the date to go by, then why that date (and whose words they are).
@@ -1989,17 +2001,23 @@
     var rt = x.returns || (legal ? {} : null) || {};
     var day = function (d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
     var head = null, why = null;
+    // Only the shop's own words make a deadline. When its email gives none, Relay says so, and gives the legal minimum as
+    // what it is (with a date only when the delivery day is known), never as the shop's deadline.
     if (rt.deadline) { head = "Return by " + day(rt.deadline); why = "The date in " + who + "'s email."; }
-    else if (rt.windowDays && by && by.basis === "window") {
+    else if (rt.windowDays && by && by.basis === "window" && by.from === "delivery" && !by.estimate) {
       head = "Return by " + day(by.date);
-      why = by.from === "delivery" ? rt.windowDays + " days from delivery, as " + who + "'s email says." : "To be safe, " + rt.windowDays + " days from your order. " + who + "'s email gives " + rt.windowDays + " days.";
+      why = rt.windowDays + " days from delivery, as " + who + "'s email says.";
     } else if (rt.windowDays) {
-      head = rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery" : "");
-      why = "As " + who + "'s email says." + (rt.windowFrom === "delivery" ? " Count from the day it arrived." : "");
+      head = rt.windowDays + " days to return";
+      why = rt.windowFrom === "delivery" ? "From the day it arrives, " + who + "'s email says." + (by ? " Even counting from your order, that's until at least " + day(by.date) + "." : "")
+        : who + "'s email doesn't say from when." + (by ? " Counting from your order, that's until at least " + day(by.date) + "." : "");
     } else if (legal) {
-      head = "Return by " + day(legal);
-      why = by.from === "order" ? "To be safe, 14 days from your order. UK law gives at least 14 days from delivery, and " + who + " may give longer."
-        : "14 days from delivery, the least UK law gives. " + who + " may give longer.";
+      // The legal minimum's date only beside the delivery it counts from, so the two can't disagree on screen.
+      var arrived = dv && dv.status === "delivered" && dv.at && !by.estimate && by.from !== "order" ? dv.at : null;
+      head = "No return date in " + who + "'s email";
+      why = "By UK law you have at least 14 days from delivery to change your mind about most online orders" +
+        (arrived ? ": it arrived " + day(arrived) + ", so until at least " + day(legal) + "." : ". Relay adds the date once it arrives.") +
+        " " + who + " may give longer.";
     }
     var portal = rt.portalUrl && /^https:\/\//.test(rt.portalUrl) ? rt.portalUrl : null;
     if (head || rt.address || portal) {
@@ -2242,7 +2260,7 @@
         thumb.setAttribute("aria-hidden", "true");
         receiptPic(thumb, row, 28, 32);
         var end = el("span", { className: "rl-rr-end" }, [el("b", { text: row.totalPence == null ? "" : money(row.totalPence, row.currency) })]);
-        var left = daysLeft(deadlineOf(row));
+        var left = daysLeft(statedDeadline(row));
         if (left !== null && left >= 0) end.appendChild(el("span", { className: "rl-rr-chip " + (left <= 2 ? "red" : left <= 7 ? "amber" : "green"), text: left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left" }));
         btn.appendChild(thumb);
         btn.appendChild(el("span", { className: "rl-rr-mid" }, [el("b", { text: title }), el("span", { text: sub })]));
@@ -2376,7 +2394,7 @@
             [el("span", { className: "rl-year-n", text: String(year) }), el("b", { text: "Wrapped" })]));
         if (shopRows.length) grid.appendChild(tile("shop", "Shop orders", shopRows.length + " item" + (shopRows.length === 1 ? "" : "s"), null, 0, open("shop")));
         keys.forEach(function (k) {
-          var soon = by[k].filter(function (r) { var d = daysLeft(deadlineOf(r)); return d !== null && d >= 0 && d <= 7; }).length;
+          var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length;
           // The tile's picture: the newest photo of something bought in this group (only a receipt's own item photo).
           var photo = by[k].slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
             .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
@@ -4345,7 +4363,7 @@
     var dv = x.delivery;
     if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) info.appendChild(shipLine(dv));
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
-    var dl = deadlineOf(x);
+    var dl = statedDeadline(x);
     if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
     if (opts.extra) opts.extra(card);
     var actions = el("div", { className: "rl-po-actions" });
@@ -4403,7 +4421,7 @@
   // the card. Relay doesn't submit the return itself: the shop's page does that.
   function returnGuide(sheet, x, who, portal) {
     sheet.appendChild(el("h2", { text: "Return to " + who, style: "margin:0 0 6px" }));
-    var dl = deadlineOf(x);
+    var dl = statedDeadline(x);
     if (dl) sheet.appendChild(deadlineChip(dl, deadlineLead(x, dl, "Send it back by ")));
     sheet.appendChild(el("p", { text: who + "'s returns page asks for these. Tap one to copy it.", style: "margin:14px 0 10px;color:var(--rl-text2);font-size:15px;line-height:1.45" }));
     var rows = el("div");
@@ -4800,7 +4818,7 @@
       (rows || []).forEach(function (x) {
         if (!x || x.kind === "return_instructions" || isCarrier(x) || x.returnProgress) return;
         if (x.returnable === false && !(x.returnableItems || []).length) return;
-        var dl = deadlineOf(x); if (!dl || dl < today) return;
+        var dl = statedDeadline(x); if (!dl || dl < today) return;
         var d = daysLeft(dl); if (d === null || d > 14) return;
         if (!best || dl < best.dl) best = { x: x, dl: dl, d: d };
       });
