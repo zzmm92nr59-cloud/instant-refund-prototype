@@ -16,6 +16,7 @@
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
+import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
@@ -1441,10 +1442,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const items = (c.items || []).map((it, i) => (it && typeof it.name === "string" && it.name
       ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure), ...(keep.includes(i) ? { returnable: true } : {}) } : it));
     // A return date Relay can safely go by when the emails don't give one (only for what can go back).
-    const guess = group.returnable || keep.length ? estimateReturnBy(c, today) : null;
+    // When the emails give no return date or window at all: the shop's own published returns policy, if Relay has read it
+    // (return-policies.js). It gives the least the shopper can count on for most items, and replaces UK law's 14 days.
+    const said = c.returns && (c.returns.deadline || c.returns.windowDays);
+    const policy = (group.returnable || keep.length) && !said ? policyFor(retailer, c.currency) : null;
+    const byPolicy = policy ? policyReturnBy(c, policy, today) : null;
+    const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy(c, today) : null);
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
     return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
-      ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}) };
+      ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}), ...(policy ? { returnPolicy: policyForApp(policy) } : {}) };
   });
 }
 

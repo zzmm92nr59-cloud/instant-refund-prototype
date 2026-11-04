@@ -3,7 +3,9 @@
 // the kettle can; when an email says nothing about returns, Relay never shows a date it worked out as a deadline (no
 // countdown, no "back by" strip): the page says the email gives no date and what UK law guarantees; "30 days to return"
 // with no start date says so, with the least it can be counted from the order; a worked-out date that has passed isn't
-// shown as "Deadline passed"; a plain food order stays out of the wallet. Every new line passes the polish rules in light and dark.
+// shown as "Deadline passed"; a plain food order stays out of the wallet; when Relay has read the shop's own returns policy,
+// the page gives it for most items, the least that means for this order (never a countdown) and a link to the policy.
+// Every new line passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
@@ -36,6 +38,17 @@ const receipts = [
   { id: "66666666-6666-4666-8666-666666666666", status: "pending", kind: "receipt", retailer: { name: "Fernway", domain: "fernway.example" }, orderRef: "FW-7", orderDate: day(-6),
     totalPence: 3900, currency: "GBP", category: "home", categoryLabel: "Home & garden", returnable: true, items: [{ name: "Desk Lamp", qty: 1, pricePence: 3900, category: "home", categorySure: true }],
     delivery: { status: "delivered", at: day(-2), carrier: "Evri" }, returns: null, returnBy: { date: day(12), basis: "uk_law" } },
+  // The email says nothing, but Relay has read the shop's returns policy (an invented shop): 30 days from delivery for
+  // most items, and it arrived three days ago.
+  { id: "77777777-7777-4777-8777-777777777777", status: "pending", kind: "receipt", retailer: { name: "Moorvale", domain: "moorvale.example" }, orderRef: "MV-3", orderDate: day(-6),
+    totalPence: 5500, currency: "GBP", category: "fashion", categoryLabel: "Fashion", returnable: true, items: [{ name: "Cord Trousers", qty: 1, pricePence: 5500, category: "fashion", categorySure: true }],
+    delivery: { status: "delivered", at: day(-3), carrier: "Evri" }, returns: null, returnBy: { date: day(27), basis: "policy", from: "delivery", estimate: true },
+    returnPolicy: { shop: "Moorvale", days: 30, from: "delivery", most: true, url: "https://moorvale.example/help/returns", checked: day(-1) } },
+  // The same, for a policy counted from when it's sent: at least 30 days from the order.
+  { id: "88888888-8888-4888-8888-888888888888", status: "pending", kind: "receipt", retailer: { name: "Pellow", domain: "pellow.example" }, orderRef: "PW-4", orderDate: day(-4),
+    totalPence: 2600, currency: "GBP", category: "fashion", categoryLabel: "Fashion", returnable: true, items: [{ name: "Silk Scarf", qty: 1, pricePence: 2600, category: "fashion", categorySure: true }],
+    returns: null, returnBy: { date: day(26), basis: "policy", from: "order", estimate: true },
+    returnPolicy: { shop: "Pellow", days: 30, from: "dispatch", most: true, url: "https://pellow.example/returns", checked: day(-1) } },
   // A food order with nothing that goes back.
   { id: "55555555-5555-4555-8555-555555555555", status: "pending", kind: "receipt", retailer: { name: "Tesco", domain: "tesco.com" }, orderRef: "T-1002", orderDate: day(-1),
     totalPence: 260, currency: "GBP", category: "food", categoryLabel: "Food & drink", returnable: false, notReturnableReason: "Food and drink usually can't be returned.",
@@ -93,9 +106,9 @@ const wallet = page.locator("#walletPage");
 await wallet.getByText("Glass Kettle 1.7L").waitFor();
 await page.waitForTimeout(600);
 const text = await wallet.innerText();
-for (const thing of ["Court Classic Trainers", "Linen Shirt", "Desk Lamp"]) assert.ok(text.includes(thing), thing + " is in the wallet");
+for (const thing of ["Court Classic Trainers", "Linen Shirt", "Desk Lamp", "Cord Trousers", "Silk Scarf"]) assert.ok(text.includes(thing), thing + " is in the wallet");
 for (const thing of ["Bananas", "Kitchen Roll", "Semi Skimmed Milk", "Wool Coat"]) assert.ok(!text.includes(thing), thing + " isn't in the wallet");
-assert.match(text, /4 items/);
+assert.match(text, /6 items/);
 const kettle = wallet.locator(".rl-po").filter({ hasText: "Glass Kettle 1.7L" });
 assert.match(await kettle.innerText(), /1 of 3 in this order/);
 assert.ok(!/return by|days? left/i.test(await kettle.innerText()), "a date Relay worked out isn't shown as a deadline: " + await kettle.innerText());
@@ -135,6 +148,25 @@ await sheet.getByText("No return date in Fernway's email", { exact: true }).wait
 await sheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders: it arrived " + wdDay(day(-2)) + ", so until at least " + wdDay(day(12)) + ". Fernway may give longer.").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - each page says what the email gives: no date (and what UK law guarantees, dated only from a known delivery), or its 30 days and the least that means");
+
+// 4c. The trousers: the shop's own policy, dated from the delivery as the least it allows for most items, with its link.
+const trousers = wallet.locator(".rl-po").filter({ hasText: "Cord Trousers" });
+assert.ok(!/return by|days? left/i.test(await trousers.innerText()), "a policy is never a countdown: " + await trousers.innerText());
+await trousers.getByRole("button", { name: "Details" }).click();
+await sheet.getByText("30 days to return most items", { exact: true }).waitFor();
+await sheet.getByText("Moorvale's returns policy gives 30 days from delivery for most items. It arrived " + wdDay(day(-3)) + ", so that's until at least " + wdDay(day(27)) + ".").waitFor();
+const policyLink = sheet.getByRole("link", { name: "Read Moorvale's returns policy" });
+assert.equal(await policyLink.getAttribute("href"), "https://moorvale.example/help/returns");
+assert.equal(await policyLink.getAttribute("target"), "_blank");
+assert.ok(!/days? left|Return by|No return date|UK law/.test(await sheet.innerText()), "the policy replaces the legal wording, with no countdown");
+await polished("policy order page");
+await sheet.getByRole("button", { name: "Close" }).click();
+// 4d. The scarf: a policy counted from when it's sent, so the least it can be is counted from the order.
+await wallet.locator(".rl-po").filter({ hasText: "Silk Scarf" }).getByRole("button", { name: "Details" }).click();
+await sheet.getByText("Pellow's returns policy gives 30 days from when it's sent for most items. Counting from your order, that's until at least " + wdDay(day(26)) + ".").waitFor();
+await sheet.getByRole("link", { name: "Read Pellow's returns policy" }).waitFor();
+await sheet.getByRole("button", { name: "Close" }).click();
+console.log("ok - with the shop's own policy: what it gives for most items, the least that means for this order, and a link to it");
 
 // 5. Receipts: the coat whose worked-out date passed shows no 'Deadline passed'; the food group shows the kettle order's countdown.
 await page.evaluate(() => window.go("receipts"));

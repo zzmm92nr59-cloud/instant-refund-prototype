@@ -32,6 +32,7 @@ jobs:
           node --check worker/retailer.js
           node --check worker/shopify-connect.js
           node --check worker/shopify-embedded.js
+          node --check worker/return-policies.js
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
@@ -42,6 +43,7 @@ jobs:
           node scripts/test-receipt-reader.mjs
           node scripts/test-wrapped.mjs
           node scripts/test-gmail.mjs
+          node scripts/test-return-policies.mjs
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs
