@@ -78,5 +78,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-gifts-ui.mjs
       - name: Test the Relay health page (admins only, numbers, chart and table, plain words)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-health-ui.mjs
+      - name: Test Fix this receipt (from the details or 'Is this right?', plain-English checks, changes only, undo)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-fix-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

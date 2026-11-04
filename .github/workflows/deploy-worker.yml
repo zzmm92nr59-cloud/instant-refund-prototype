@@ -48,6 +48,7 @@ jobs:
           node scripts/test-return-policies.mjs
           node scripts/test-gifts.mjs
           node scripts/test-health.mjs
+          node scripts/test-receipt-fixes.mjs
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs

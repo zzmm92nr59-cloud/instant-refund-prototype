@@ -43,7 +43,7 @@ found" (404) where even saying it exists would tell too much.
 | Sign in, sign out | Start and finish sign-in | Sign out; sign out other devices | As a shopper | | | Tidy old text-message records |
 | Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
 | Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | | Read connected inboxes for new receipts (every 15 min) |
-| Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, tag as a gift (and who for), reminders, open the original email | As a shopper | | | Return reminders |
+| Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, tag as a gift (and who for), fix what was read wrong, reminders, open the original email | As a shopper | | | Return reminders |
 | Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed), and asks for erasure | Catch up Square orders and refunds; erase a shop's orders 30 days after it removed Relay if Shopify's erase request never came |
 | Card on file (Stripe) | | Own: add, remove. Relay keeps Stripe's reference, the brand, last 4 digits and expiry, never the card number | As a shopper | | | |
 | Price alerts and phone notifications | | Own: watch items or shops, choose alert mode, turn notifications on and off | As a shopper | Sends an offer to its own watchers, without learning who they are | Catalogue changes (signed) | Compare prices, send alerts |

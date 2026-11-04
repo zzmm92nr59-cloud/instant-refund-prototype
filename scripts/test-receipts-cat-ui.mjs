@@ -113,7 +113,7 @@ assert.equal(await hat.getByText("Is this right?").count(), 1);
 assert.deepEqual((await measure()).small, [], "everything in the opened receipt is a proper size to tap");
 await hat.getByRole("button", { name: "No" }).click();
 const why = page.locator(".rl-back .rl-sheet[role=alertdialog]");
-assert.deepEqual(await why.locator("button").allInnerTexts(), ["It's not mine", "It's just a promotion", "Cancel"]);
+assert.deepEqual(await why.locator("button").allInnerTexts(), ["Some details are wrong", "It's not mine", "It's just a promotion", "Cancel"]);
 await why.getByRole("button", { name: "It's just a promotion" }).click();
 await page.waitForTimeout(300);
 assert.deepEqual(posted, [["88888888-8888-4888-8888-888888888888/dismiss", { reason: "promo" }]], "No, then 'just a promotion' removes it and says why");

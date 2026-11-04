@@ -692,6 +692,18 @@
     ".rl-rc-giftfor input{flex:1;min-width:0;box-sizing:border-box;min-height:44px;margin:0;padding:0 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px}" +
     ".rl-rc-giftfor input::placeholder{color:var(--rl-text2)}.rl-rc-giftfor input:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-rc-gift-note{margin:2px 0 6px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-rc-gift-note:empty{display:none}" +
+    // "Fix this receipt": the row under the gift switch, and the sheet itself.
+    ".rl-rc-fix{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:4px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}.rl-rc-fix .rl-pill{flex:none;padding:0 16px}" +
+    ".rl-fix h2{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--rl-text)}.rl-fix-lead{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-fix-f{display:flex;flex-direction:column;gap:6px;margin:0 0 12px;min-width:0}.rl-fix-f>span:first-child,.rl-fix-h{font-size:13px;font-weight:700;color:var(--rl-text2)}" +
+    ".rl-fix input{box-sizing:border-box;width:100%;min-width:0;min-height:48px;margin:0;padding:0 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px}" +
+    ".rl-fix input::placeholder{color:var(--rl-text2)}.rl-fix input:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-fix-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}" +
+    ".rl-fix-money{position:relative;display:block;min-width:0}.rl-fix-money i{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:16px;color:var(--rl-text2);pointer-events:none}.rl-fix-money input{padding-left:30px}" +
+    ".rl-fix-items{margin:2px 0 8px}.rl-fix-h{display:block;margin:0 0 8px}.rl-fix-item{display:grid;grid-template-columns:minmax(0,1fr) 96px 44px;gap:8px;align-items:center;margin:0 0 8px}" +
+    ".rl-fix-x{all:unset;box-sizing:border-box;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;color:var(--rl-text2);cursor:pointer}.rl-fix-x:active{background:var(--rl-fill)}.rl-fix-x:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px}" +
+    ".rl-fix-add{all:unset;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;font-weight:700;color:var(--rl-accent)}.rl-fix-add:active{opacity:.6}.rl-fix-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    ".rl-fix .rl-jic{margin:0}.rl-fix-x .rl-jic{color:inherit}" +
     ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#74ffed;color:#171f44;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
@@ -916,6 +928,93 @@
     card.querySelector("button").focus();
   }
   function askText(message, yesLabel, onText) { askBox(message, yesLabel, true, onText); }
+  // "Fix this receipt": the shop, total, date and items as Relay read them, to correct. Only what changed is sent; the
+  // shopper's words then show instead of what was read (worker/gmail.js), and which parts were wrong is counted for the
+  // Relay health page. "Go back to what Relay read" undoes it. done() runs after a save or an undo.
+  function fixSheet(x, done) {
+    var gbp = !x.currency || x.currency === "GBP", sym = gbp ? "£" : x.currency;
+    var shopNow = (x.retailer && (x.retailer.name || x.retailer.domain)) || "";
+    var today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+    var toMoney = function (p) { return Number.isInteger(p) ? (p / 100).toFixed(2) : ""; };
+    var readMoney = function (v) { var t = String(v || "").replace(/[£,\s]/g, ""); if (!t) return null; return /^\d{1,7}(\.\d{1,2})?$/.test(t) ? Math.round(parseFloat(t) * 100) : NaN; };
+    var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "Fix this receipt" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    var field = function (label, input, extra) { return el("label", { className: "rl-fix-f" + (extra || "") }, [el("span", { text: label }), input]); };
+    var money = function (input) { return el("span", { className: "rl-fix-money" }, [el("i", { text: sym }), input]); };
+    var shop = el("input", { type: "text", value: shopNow, maxLength: 80, autocomplete: "off", enterKeyHint: "next" });
+    var total = el("input", { type: "text", inputMode: "decimal", value: toMoney(x.totalPence), placeholder: "0.00", autocomplete: "off", enterKeyHint: "next" });
+    var date = el("input", { type: "date", value: /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? x.orderDate : "", max: today, min: "2000-01-01" });
+    total.setAttribute("aria-label", "Total in " + (gbp ? "pounds" : x.currency));
+    card.appendChild(el("h2", { text: "Fix this receipt" }));
+    card.appendChild(el("p", { className: "rl-fix-lead", text: "Change anything Relay got wrong. It's fixed for you straight away, and it helps Relay read emails like this better." }));
+    card.appendChild(field("Shop", shop));
+    card.appendChild(el("div", { className: "rl-fix-2" }, [field("Total", money(total)), field("Date", date)]));
+    var list = el("div", { className: "rl-fix-list" });
+    var itemsBox = el("div", { className: "rl-fix-items" }, [el("span", { className: "rl-fix-h", text: "What you bought" }), list]);
+    var was = (x.items || []).filter(function (i) { return i && i.name; }).map(function (i) { return { name: i.name, qty: i.qty || 1, pricePence: Number.isInteger(i.pricePence) ? i.pricePence : null }; });
+    function line(it) {
+      var name = el("input", { type: "text", value: it ? it.name : "", maxLength: 120, placeholder: "Item", autocomplete: "off" });
+      var price = el("input", { type: "text", inputMode: "decimal", value: it ? toMoney(it.pricePence) : "", placeholder: "Price", autocomplete: "off" });
+      var x2 = el("button", { type: "button", className: "rl-fix-x" }, [jIc("x", 18)]);
+      var row = el("div", { className: "rl-fix-item" }, [name, money(price), x2]);
+      row._qty = it ? it.qty : 1;
+      x2.onclick = function () { row.remove(); number(); };
+      list.appendChild(row); number();
+      return name;
+    }
+    function number() { Array.prototype.forEach.call(list.children, function (r, i) { var ins = r.querySelectorAll("input"); ins[0].setAttribute("aria-label", "Item " + (i + 1)); ins[1].setAttribute("aria-label", "Price of item " + (i + 1)); r.querySelector("button").setAttribute("aria-label", "Remove item " + (i + 1)); }); }
+    was.forEach(line);
+    var add = el("button", { type: "button", className: "rl-fix-add" }, [jIc("plus", 18), el("span", { text: "Add an item" })]);
+    add.onclick = function () { line(null).focus(); };
+    itemsBox.appendChild(add);
+    card.appendChild(itemsBox);
+    var note = el("p", { className: "rl-msg" });
+    note.setAttribute("role", "status");
+    var save = el("button", { type: "button", className: "rl-btn", text: "Save" });
+    card.appendChild(note); card.appendChild(save);
+    var busy = false;
+    function send(body, after) {
+      if (busy) return;
+      busy = true; save.disabled = true; if (undo) undo.disabled = true; say(note, "");
+      api("/relay/my/receipts/" + x.id + "/fix", { method: "POST", body: body }).then(function (r) {
+        busy = false; save.disabled = false; if (undo) undo.disabled = false;
+        if (!r.ok) return say(note, r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : "Couldn't save that. Check what you typed and try again.", true);
+        shut(); after(); if (done) done();
+      }, function () { busy = false; save.disabled = false; if (undo) undo.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    save.onclick = function () {
+      var body = {}, s1 = shop.value.replace(/\s+/g, " ").trim(), t = readMoney(total.value);
+      if (!s1) return say(note, "Give the shop a name.", true);
+      if (s1 !== shopNow) body.shop = s1;
+      if (Number.isNaN(t)) return say(note, "Type the total like 12.99.", true);
+      if (t !== null && t !== x.totalPence) body.totalPence = t;
+      if (date.value && date.value !== x.orderDate) { if (date.value > today || date.value < "2000-01-01") return say(note, "Pick a date that's today or earlier.", true); body.orderDate = date.value; }
+      var items = [], bad = false;
+      Array.prototype.forEach.call(list.children, function (r) {
+        var ins = r.querySelectorAll("input"), n = ins[0].value.replace(/\s+/g, " ").trim(), p = readMoney(ins[1].value);
+        if (!n) return; if (Number.isNaN(p)) { bad = true; return; }
+        items.push({ name: n, qty: r._qty || 1, pricePence: p });
+      });
+      if (bad) return say(note, "Type each price like 4.50, or leave it empty.", true);
+      var same = items.length === was.length && items.every(function (it, i) { return it.name === was[i].name && it.pricePence === was[i].pricePence; });
+      if (!same) body.items = items.map(function (it) { return it.pricePence === null ? { name: it.name, qty: it.qty } : it; });
+      if (!Object.keys(body).length) return say(note, "Nothing has changed yet.", true);
+      send(body, function () {});
+    };
+    var undo = null;
+    if (x.fixed) {
+      undo = el("button", { type: "button", className: "rl-btn ghost", text: "Go back to what Relay read" });
+      undo.onclick = function () { send({ undo: true }, function () {}); };
+      card.appendChild(undo);
+    }
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    shop.focus();
+  }
   var back = null;
   function dismiss() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
   // Closing the last page while signed out goes back to the welcome story (and carries it on from where it paused).
@@ -1009,6 +1108,7 @@
     parcel: '<path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 11.5v9"/>',
     dot: '<circle cx="12" cy="12" r="4.5"/>',
     down: '<path d="m7 10 5 5 5-5"/>',
+    x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -2177,6 +2277,7 @@
     yes.onclick = function () { post("confirm", {}, "confirm", "Thanks. Marked as right."); };
     no.onclick = function () {
       chooseBox("What's wrong with this receipt?", [
+        ["Some details are wrong", function () { fixSheet(x, function () { refresh("fix"); }); }],
         ["It's not mine", function () { post("dismiss", {}, "dismiss", "Removed. It won't come back."); }],
         ["It's just a promotion", function () { post("dismiss", { reason: "promo" }, "dismiss", "Removed. Relay will skip emails like it."); }]]);
     };
@@ -2374,6 +2475,11 @@
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
           detail.appendChild(el("label", { className: "rl-rc-group" }, [el("span", { text: row.categoryLearned ? "Group (as you taught Relay)" : "Group" }), el("span", { className: "rl-rc-pickw" }, [pick, jIc("down", 16)])]));
           detail.appendChild(giftControl(row, function () { subEl.textContent = subOf(); giftMark(); find(); }));
+          // Anything read wrong: fix it here (and say what was fixed, once it has been).
+          var fx = row.fixed || null, fixedParts = fx ? [fx.shop && "shop", fx.total && "total", fx.date && "date", fx.items && "items"].filter(Boolean) : [];
+          var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
+          detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
+            el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function () { say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
           wrap.appendChild(detail); memo.openIds[row.id] = true; btn.setAttribute("aria-expanded", "true"); wrap.classList.add("open");
         };
         // What the search box matches: the shop, the order number, what was bought, and who a gift was for.
@@ -3566,7 +3672,7 @@
       // One shop's problems as small labels; "Nothing to fix" when there are none.
       function chips(s) {
         var c = el("div", { className: "rl-hp-chips" }), any = false;
-        [[s.dismissed, "removed as not theirs"], [s.noTotal, "no total"], [s.low, "low confidence"], [s.pasted, "added by hand"], [s.noItems, "no items"]].forEach(function (x) {
+        [[s.fixed, "fixed by the shopper"], [s.dismissed, "removed as not theirs"], [s.noTotal, "no total"], [s.low, "low confidence"], [s.pasted, "added by hand"], [s.noItems, "no items"]].forEach(function (x) {
           if (x[0]) { any = true; c.appendChild(el("i", { text: N(x[0]) + " " + x[1] })); }
         });
         if (!any) c.appendChild(el("i", { className: "ok", text: "Nothing to fix" }));
@@ -3607,6 +3713,10 @@
             row("Confirmed by shoppers", N(pu.confirmed), pu.receipts ? pct(pu.confirmed, pu.receipts) + "% of purchases" : null),
             row("Removed as not theirs", N(pu.dismissed), pu.receipts ? pct(pu.dismissed, pu.receipts) + "% of purchases" : null),
             row("Added by hand", N(pu.pasted), "Receipts Relay missed"),
+            (function () {
+              var fx = rd.fixedByShoppers || { receipts: 0 }, parts = [[fx.shop, "shop"], [fx.total, "total"], [fx.date, "date"], [fx.items, "items"]].filter(function (x) { return x[0]; });
+              return row("Fixed by shoppers", N(fx.receipts), parts.length ? parts.map(function (x) { return x[1] + " " + N(x[0]); }).join(", ") : "Receipts shoppers corrected");
+            })(),
             row("No total found", N(pu.noTotal)),
             row("No items found", N(pu.noItems)),
             row("Groups changed by shoppers", N(rd.shoppersTaught.groupsChanged), rd.shoppersTaught.shopsMarkedPromotions ? N(rd.shoppersTaught.shopsMarkedPromotions) + " shops marked as just promotions" : null),
