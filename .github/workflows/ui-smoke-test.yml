@@ -72,5 +72,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-inboxes-ui.mjs
       - name: Test phone gestures (back, edge swipe, pull to refresh, tabs, scroll memory, sheets, links, drafts)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-feel-ui.mjs
+      - name: Test the sign-in for app reviewers (admin on and off, the reviewer's sign-in, Home, Receipts, Profile, Discover)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-review-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

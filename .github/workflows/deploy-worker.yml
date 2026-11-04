@@ -29,6 +29,7 @@ jobs:
           node --check worker/phone.js
           node --check worker/security-mail.js
           node --check worker/resale-admin.js
+          node --check worker/review-account.js
           node --check worker/retailer.js
           node --check worker/shopify-connect.js
           node --check worker/shopify-embedded.js
@@ -36,6 +37,7 @@ jobs:
           node scripts/test-shopify-multi-store.mjs
           node scripts/test-shopify-token-exchange.mjs
           node scripts/test-auth.mjs
+          node scripts/test-review-account.mjs
           node scripts/test-security-mail.mjs
           node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs

@@ -6,6 +6,9 @@
   // The shopper's name and photo, kept on this device so the avatar shows straight away (the server copy is the real one).
   var PROFILE_KEY = "relay.profile";
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
+  // The shared account for app reviewers (worker/review-account.js): no inbox or sign-in settings can be added to it, so
+  // the app leaves those out and explains what to do instead.
+  function isReview() { var s = load(); return Boolean(s && s.token && s.review); }
   // Ask the browser not to clear Relay's saved sign-in when it tidies up storage.
   function keepStorage() { try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {} }
   // Keeps what the app has already loaded so moving between tabs is instant. It lives in memory only and is wiped on sign-out.
@@ -503,6 +506,9 @@
     ".rl-asub{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:18px 16px;margin-top:8px}" +
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
+    ".rl-rev-l{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;box-sizing:border-box}.rl-rev-l+.rl-rev-l{border-top:1px solid var(--rl-line)}" +
+    ".rl-rev-l .rl-arow-t b{font-size:13px;font-weight:700;color:var(--rl-text2)}.rl-rev-v{font-size:17px;font-weight:700;color:var(--rl-text);word-break:break-all}" +
+    ".rl-rev-code{letter-spacing:.14em}.rl-rev-l .rl-po-secondary{flex:0 0 auto;min-width:84px}" +
     ".rl-full .rl-msg:empty{display:none}.rl-full>h2:first-child{margin-top:24px}" +
     ".rl-btn.rl-red{color:var(--rl-danger)}.rl-btn.rl-danger{background:#b3261e;color:#fff}" +
     ".rl-faq{border-top:1px solid var(--rl-line)}.rl-faq:first-child{border-top:0}.rl-faq summary{cursor:pointer;min-height:48px;display:flex;align-items:center;font-weight:700;font-size:16px;color:var(--rl-text);list-style:none;padding:6px 0}" +
@@ -882,6 +888,7 @@
     sms_send_failed: "The text didn't send. Check the number and try again.", wait: "A code is on its way. You can ask for another in a few seconds.",
     two_step_on: "Sign-in codes go to this number. Turn off codes by text under Two-step sign-in first.", no_phone: "Add your phone number first.",
     already_enabled: "That's already on.", not_enabled: "That's already off.",
+    not_for_review_account: "This account is for reviewing Relay, so that can't be added to it.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
   // Unfinished writing is kept on this device, for this account only, until it's sent: leaving the screen, the app closing
@@ -1229,7 +1236,7 @@
       go.disabled = true; say(msg, "Sending…");
       api("/relay/auth/request", { method: "POST", body: { email: input.value } }).then(function (r) {
         go.disabled = false;
-        if (r.ok) return codeStep(sheet, input.value.trim());
+        if (r.ok) return codeStep(sheet, input.value.trim(), Boolean(r.body && r.body.review === true));
         say(msg, errors[r.body.error] || "Something went wrong. Please try again.", true);
       }).catch(function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection.", true); });
     };
@@ -1238,8 +1245,10 @@
     showHint();
     setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
   }
-  function codeStep(sheet, email) {
-    var body = jFrame(sheet, { back: function () { emailStep(sheet, email); }, title: "Check your inbox", sub: "We sent a sign-in link to " + email + ". Open it on this device, or type the 6-digit code from the same email. It works once, for 15 minutes." });
+  function codeStep(sheet, email, review) {
+    // The reviewer sign-in sends no email (nobody can receive mail at its address): its code is in the review instructions.
+    var body = jFrame(sheet, { back: function () { emailStep(sheet, email); }, title: review ? "Enter your code" : "Check your inbox",
+      sub: review ? "Type the 6-digit code from Relay's instructions for reviewers. No email is sent to this address." : "We sent a sign-in link to " + email + ". Open it on this device, or type the 6-digit code from the same email. It works once, for 15 minutes." });
     var codeIn = codeBox("rl-signin-code", "6-digit code", function () { codeGo.click(); });
     var msg = el("div", { className: "rl-msg" });
     var codeGo = el("button", { type: "button", className: "rl-btn", text: "Continue" });
@@ -1259,8 +1268,10 @@
   // Every way of signing in ends here: keep the session, then carry on with what's still needed.
   var signInExtra = {};
   function signedIn(b) {
-    save({ token: b.sessionToken, email: b.email, expiresAt: b.expiresAt });
+    save({ token: b.sessionToken, email: b.email, expiresAt: b.expiresAt, review: b.reviewAccount === true || undefined });
     keepStorage(); paintAvatars(); loadProfile();
+    // Discover includes test shops for the reviewer account (their own development store), so it's read again.
+    if (b.reviewAccount === true && window.catalogAsked && typeof window.loadCatalog === "function") { try { window.loadCatalog(); } catch (e) {} }
     var extra = Object.assign({}, signInExtra, b); signInExtra = {};
     if (extra.mailConnected || extra.outlookConnected) {
       rememberMailbox({ connected: true, provider: extra.mailConnected === "google" ? "google" : "microsoft" });
@@ -1286,7 +1297,7 @@
         var st = { email: email, consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null };
         var steps = [];
         if (!p.name && !fl.nameSkipped) steps.push("name");
-        if (!st.connected && !fl.mailLater) steps.push("mail");
+        if (!st.connected && !fl.mailLater && !isReview()) steps.push("mail");
         if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
         steps.push("done");
         runJourney(sheet, st, steps, 0);
@@ -1416,10 +1427,12 @@
     var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
     var body3 = jFrame(sheet, { of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
       kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
-      sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app." : "You can connect your email any time from Account, under Receipts." });
+      sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app."
+        : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time from Account, under Receipts." });
     if (st.connected) body3.appendChild(scanCard(sheet, st));
     var tips = el("div", { className: "rl-jcard" });
-    [["check", "Return deadlines from your receipts, counted down for you"], ["eye", "Price drops on things you watch, sent to your phone"]].forEach(function (x) { tips.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+    (isReview() ? [["check", "Swap a size or colour before the shop sends your order"], ["eye", "Price drops on things you watch, sent to your phone"]]
+      : [["check", "Return deadlines from your receipts, counted down for you"], ["eye", "Price drops on things you watch, sent to your phone"]]).forEach(function (x) { tips.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
     body3.appendChild(tips);
     if (st.connected) {
       body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "See my receipts", onclick: function () { leave(); if (window.go) { window.__relayAutoScan = true; window.go("receipts"); } } }));
@@ -1966,7 +1979,8 @@
       sheet.textContent = "";
       if (r.status === 401) { save(null); close(); return; }
       if (!r.ok) { sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); return; }
-      if (!r.body.accepted) return consentView(sheet, email, r.body);
+      // The reviewer account never reads an inbox, so there's nothing for it to agree to.
+      if (!r.body.accepted && !isReview()) return consentView(sheet, email, r.body);
       signedInView(sheet, email, notice, r.body);
     }).catch(function () { sheet.textContent = ""; sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
@@ -3038,6 +3052,7 @@
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9.5 4V3h5v1M9.5 10h5M9.5 14h5"/>',
     bag: '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M16.5 6.5l2.5 2.5M14 9l2 2"/>',
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
@@ -3138,13 +3153,16 @@
     sheet.appendChild(head); sheet.appendChild(msg);
     drawHead(); profileWatchers.push(drawHead); loadProfile();
     // On the Profile page, this year's Wrapped comes first.
-    if (inPage) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
+    // The reviewer account (isReview) can't have an inbox or sign-in settings, so those rows, and Wrapped (made from inbox
+    // receipts), are left out for it.
+    var review = isReview();
+    if (inPage && !review) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
     if (notice) say(msg, notice.text, notice.bad);
 
     // Receipts
     var mailRow = accRow("mail", "Email connection", "Checking…", function () { page("Email connection", mailPage); });
-    var receiptRows = [mailRow, accRow("paste", "Add a missing receipt", "Search your inbox or paste an email", function () { openFind(); })];
-    var ordersRow = accRow("bag", "Shop orders", "", function () { page("Shop orders", ordersPage); }); ordersRow.style.display = "none";
+    var receiptRows = review ? [] : [mailRow, accRow("paste", "Add a missing receipt", "Search your inbox or paste an email", function () { openFind(); })];
+    var ordersRow = accRow("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
     receiptRows.push(ordersRow);
     if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "", function () { openResale(); }));
     sheet.appendChild(accGroup("Receipts", receiptRows));
@@ -3181,10 +3199,12 @@
     phoneRow.style.display = "none"; secRows.push(phoneRow);
     var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
     secRows.push(twoRow);
-    secRows.push(accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); }));
+    var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
+    secRows.push(devicesRow);
     var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
     cardRow.style.display = "none"; secRows.push(cardRow);
-    sheet.appendChild(accGroup("Sign-in & security", secRows));
+    sheet.appendChild(accGroup("Sign-in & security", review ? [devicesRow] : secRows));
+    if (review) sheet.appendChild(el("p", { className: "rl-anote", text: "This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it." }));
     api("/relay/my/2fa").then(function (r) {
       if (!r.ok || !r.body) return;
       var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
@@ -3200,10 +3220,10 @@
     }).catch(function () {});
 
     // Privacy & data
-    sheet.appendChild(accGroup("Privacy & data", [
-      accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); }),
+    sheet.appendChild(accGroup("Privacy & data", (review ? [] : [
+      accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
       accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
-      accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })]));
+      accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
 
     // Help & legal
     sheet.appendChild(accGroup("Help & legal", [
@@ -3215,7 +3235,9 @@
     var abox = el("div"); sheet.appendChild(abox);
     api("/relay/my/admin/me").then(function (r) {
       if (!r.ok || !r.body || r.body.admin !== true) return;
-      abox.appendChild(accGroup("Team", [accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); })]));
+      var revRow = accRow("key", "Sign-in for app reviewers", "", function () { page("Sign-in for app reviewers", reviewerPage); });
+      abox.appendChild(accGroup("Team", [accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
+      api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
 
     var outBtn = el("button", { type: "button", className: "rl-aout", text: "Sign out" });
@@ -3291,11 +3313,54 @@
     }
     function ordersPage(b) {
       b.appendChild(el("p", { text: "Orders the shop itself confirmed to Relay." }));
+      if (!orders.length) b.appendChild(el("p", { className: "rl-anote", text: "None yet. An order shows up here when a shop that uses Relay confirms one placed with " + email + "." }));
       orders.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
         b.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
           el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
       });
+    }
+    // The sign-in for Shopify's reviewers (worker/review-account.js): turn it on, copy the address and code into the App
+    // Store submission's testing instructions, and turn it off when the review is over.
+    function reviewerPage(b) {
+      var note = el("div", { className: "rl-msg" }), box = el("div");
+      b.appendChild(box); b.appendChild(note);
+      box.appendChild(el("div", { className: "rl-skel", style: "min-height:150px;border-radius:18px" }));
+      function line(label, value, cls) {
+        var copy = el("button", { type: "button", className: "rl-po-secondary", text: "Copy", ariaLabel: "Copy the " + label.toLowerCase() });
+        copy.onclick = function () { copyText(value).then(function (ok) { copy.textContent = ok ? "Copied" : "Copy"; if (!ok) say(note, "Couldn't copy. Press and hold it to copy it yourself.", true); }); };
+        return el("div", { className: "rl-rev-l" }, [el("span", { className: "rl-arow-t" }, [el("b", { text: label }), el("span", { className: "rl-rev-v" + (cls ? " " + cls : ""), text: value })]), copy]);
+      }
+      function set(on, btn) {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        api("/relay/my/admin/review-account", { method: "POST", body: { on: on } }).then(function (r) {
+          btn.disabled = false;
+          if (!r.ok || !r.body) return say(note, "That didn't work. Try again.", true);
+          draw(r.body);
+          say(note, on ? "On. Copy the email and code into the testing instructions." : "Off. The account and everything in it are deleted.");
+        }).catch(function () { btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      function draw(st) {
+        box.textContent = ""; say(note, "");
+        if (!st.on) {
+          box.appendChild(el("p", { text: "Shopify's reviewers need an account they can sign in to without an emailed code. This makes one: a made-up email address and a 6-digit code that stays the same until you turn it off." }));
+          var on = el("button", { type: "button", className: "rl-btn", text: "Turn on" });
+          on.onclick = function () { set(true, on); };
+          box.appendChild(on);
+          return;
+        }
+        box.appendChild(el("p", { text: "Put these in the testing instructions when you submit Relay. No email goes to this address, so anyone with the code can sign in: share it only with Shopify." }));
+        box.appendChild(el("div", { className: "rl-acard" }, [line("Email", st.email), line("Code", st.code, "rl-rev-code")]));
+        box.appendChild(el("p", { className: "rl-anote", text: "The account can't connect an inbox or add a passkey, two-step sign-in, a phone number or a card. Turning it off deletes it and everything in it; turning it on again makes a new address and code." }));
+        var off = el("button", { type: "button", className: "rl-btn ghost rl-red", text: "Turn off" });
+        off.onclick = function () { ask("Turn off the sign-in for reviewers? Its account and everything in it are deleted, and the address and code stop working.", "Turn off", function () { set(false, off); }); };
+        box.appendChild(off);
+      }
+      api("/relay/my/admin/review-account").then(function (r) {
+        if (!r.ok || !r.body) { box.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
+        draw(r.body);
+      }).catch(function () { box.textContent = ""; say(note, "Couldn't reach Relay. Check your connection.", true); });
     }
     function permissionPage(b) {
       var note = el("div", { className: "rl-msg" });
@@ -3456,6 +3521,13 @@
       openResale = function (rid) { open(function (sh) { resaleView(sh, close, rid); }); };
     };
     pageLaunchers();
+    // The reviewer account reads no inbox: say where its orders are instead.
+    if (isReview()) {
+      host.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Your orders are on Home" }),
+        el("p", { text: "This account is for reviewing Relay, so it doesn't read an inbox. Orders you place at shops that use Relay, with " + (s.email || "its email") + ", show up on Home." }),
+        el("button", { className: "rl-po-primary", text: "Go to Home", style: "max-width:220px", onclick: function () { if (window.go) window.go("profile"); } })]));
+      return;
+    }
     if (memo.receipts) { var sk0 = el("div", { className: "rl-cats" }); for (var k0 = 0; k0 < 4; k0++) sk0.appendChild(el("div", { className: "rl-po rl-skel", style: "min-height:150px;margin:0" })); host.appendChild(sk0); }
     else host.appendChild(el("div", { className: "rl-skel", style: "min-height:150px;border-radius:22px" }));
     cachedGet("consent", "/relay/my/consent").then(function (r) {
@@ -4515,7 +4587,10 @@
     var foot = el("div"); host.appendChild(foot);
     // A new shopper with no email connected yet: the first thing they see is how to bring their receipts in.
     var start = el("div"); host.insertBefore(start, head);
-    cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+    if (isReview()) start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #a9f2e8;background:var(--rl-accent-bg)" }, [
+      el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
+      el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
+    else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
       if (!g.ok || !g.body || g.body.connected || !document.body.contains(start)) return;
       start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #a9f2e8;background:var(--rl-accent-bg)" }, [
         el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
@@ -4860,7 +4935,7 @@
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)
     cachedGet("nextUp", "/relay/my/receipts").then(function (r) { if (r.ok && r.body) draw(r.body.receipts || []); }, function () {});
   }
-  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
+  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
     storySong: storySong,
