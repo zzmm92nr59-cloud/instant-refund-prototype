@@ -19,8 +19,8 @@ const shortDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { d
 const receipt = (id, shop, item, pence, ago, extra) => ({ id, status: "pending", kind: "receipt", retailer: { name: shop, domain: null }, orderRef: "R-" + id.slice(0, 4), orderDate: day(-ago), totalPence: pence, currency: "GBP",
   category: "fashion", returnable: true, items: [{ name: item, qty: 1, pricePence: pence, category: "fashion" }], returns: null, ...extra });
 const receipts = [
-  // A date Relay worked out (14 days from the order, 2 days ago): 12 days left, a safe date.
-  receipt("11111111-1111-4111-8111-111111111111", "Kick Lane", "Court Classic Trainers", 8500, 2, { returnBy: { date: day(12), basis: "uk_law", from: "order", estimate: true } }),
+  // The shop's own date, 12 days away: plenty of time (green).
+  receipt("11111111-1111-4111-8111-111111111111", "Kick Lane", "Court Classic Trainers", 8500, 2, { returns: { deadline: day(12) } }),
   // The shop's own date, 2 days away: urgent.
   receipt("22222222-2222-4222-8222-222222222222", "Glow Lab", "Vitamin C Serum", 2400, 26, { returns: { windowDays: 28, deadline: day(2) } }),
   // Six days left, and the shop has a returns page: Start return is the main button.
@@ -138,7 +138,7 @@ await wallet.getByText("Court Classic Trainers").waitFor();
 await page.waitForTimeout(500);
 const card = name => wallet.locator(".rl-po", { hasText: name });
 const due = name => card(name).locator(".rl-due");
-assert.match(await due("Court Classic Trainers").innerText(), new RegExp("^To be safe, return by " + shortDay(day(12)) + "\\s+12 days left$"));
+assert.match(await due("Court Classic Trainers").innerText(), new RegExp("^Return by " + shortDay(day(12)) + "\\s+12 days left$"));
 assert.equal(await due("Court Classic Trainers").getAttribute("class"), "rl-due ok");
 const width = name => due(name).locator(".rl-due-bar i").evaluate(n => n.style.width);
 assert.equal(await width("Court Classic Trainers"), "14%", "2 days of 14 gone");
@@ -160,10 +160,14 @@ assert.match(await nf.locator(".rl-po-meta").innerText(), /^UK 8 · /, "with a p
 assert.equal(await nf.locator(".rl-sr").textContent(), "Flow Flared Pant", "the item's name is still there for screen readers");
 assert.equal(await nf.locator(".rl-po-ship").innerText(), "On its way with Royal Mail");
 assert.equal(await nf.locator(".rl-po-ship svg").count(), 1, "with a drawn parcel, not a symbol");
-assert.match(await due("Flow Flared Pant").innerText(), new RegExp("^Return by " + shortDay(day(10)) + "\\s+10 days left$"), "UK law's date reads plainly");
+assert.equal(await nf.locator(".rl-due").count(), 0, "a date Relay worked out (UK law's minimum) is never shown as a countdown");
 await nf.getByRole("button", { name: "Details" }).click();
 const dsheet = page.locator(".rl-sheet");
 assert.match(await dsheet.locator(".rl-dt-sub").innerText(), /^Flow Flared Pant, UK 8 · £69\.00/, "Details names what was bought");
+await dsheet.getByText("No return date in Northfold's email", { exact: true }).waitFor();
+// (Still on its way, so no date even though the server counted one from a delivery: the screen never contradicts itself.)
+await dsheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders. Relay adds the date once it arrives. Northfold may give longer.").waitFor();
+assert.ok(!/days? left/.test(await dsheet.innerText()), "no countdown in Details either");
 await dsheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - wallet cards count down with a bar (green, amber, red); I'm sending this back sits beside Details, or under Start return; a photo card is headed with the shop's name");
 
