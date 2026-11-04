@@ -23,13 +23,13 @@
   css.textContent =
     // The pull-to-refresh disc: Relay's drawn icons on a card, no spinner (CLAUDE.md rule 7).
     ".rl-ptr{position:fixed;left:50%;top:calc(env(safe-area-inset-top) - 44px);z-index:9000;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;" +
-    "background:var(--rl-card,#fff);color:var(--rl-text,#101828);box-shadow:0 6px 20px rgba(16,24,40,.18);transform:translate(-50%,0);opacity:0;pointer-events:none}" +
+    "background:var(--rl-card,#fff);color:var(--rl-text,#171f44);box-shadow:0 6px 20px rgba(23,31,68,.18);transform:translate(-50%,0);opacity:0;pointer-events:none}" +
     ".rl-ptr.on{opacity:1}.rl-ptr svg{transition:transform .15s ease}.rl-ptr.ready svg{transform:rotate(180deg)}" +
     ".rl-ptr.busy svg{transform:none;animation:rl-ptr-breathe 1.2s ease-in-out infinite}.rl-ptr.settle{transition:transform .22s ease,opacity .22s ease}" +
     "@keyframes rl-ptr-breathe{50%{opacity:.45}}" +
     "@media (prefers-reduced-motion: reduce){.rl-ptr.busy svg{animation:none}.rl-ptr.settle{transition:none}}" +
     // While a screen is swiped away, a soft shadow along its left edge shows it's lifting off.
-    "html.rl-swiping{overflow-x:hidden}.rl-swipe-edge{box-shadow:-12px 0 24px rgba(16,24,40,.18)}" +
+    "html.rl-swiping{overflow-x:hidden}.rl-swipe-edge{box-shadow:-12px 0 24px rgba(23,31,68,.18)}" +
     // Sheets from the bottom carry a grabber: the sign they can be pulled down. (Full-screen steps and desktop dialogs don't.)
     ".rl-back>.rl-sheet:not(.rl-jr){position:relative}" +
     ".rl-back>.rl-sheet:not(.rl-jr)::before{content:'';position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--rl-line,#d0d5dd);z-index:3}" +

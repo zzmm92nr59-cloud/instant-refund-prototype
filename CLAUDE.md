@@ -3,7 +3,7 @@
 Relay is a consumer app. Every screen must look and behave like a finished product, not a prototype.
 Check new work against these before shipping (scripts/test-polish-ui.mjs checks most of them automatically):
 
-1. No purple gradients. Flat colours only: Relay's navy #101828 and lime #c7f567, the light/dark colour tokens (--rl-bg, --rl-card, --rl-text… in index.html), and the category tile colours (TILE_COLOURS in account.js). The look follows Apple Music's: big bold titles in the phone's own font, colourful tiles, flat rounded cards, a floating glass tab bar.
+1. No purple gradients. Flat colours only: Relay's Midnight Abyss #171F44, Aqua Jade #74FFED and Baby Pink #FE81D1 (where aqua would be text or a line on white, the deeper teal #00756A), the light/dark colour tokens (--rl-bg, --rl-card, --rl-text… in index.html), and the category tile colours (TILE_COLOURS in account.js). The look follows Apple Music's: big bold titles in the phone's own font, colourful tiles, flat rounded cards, a floating glass tab bar.
 2. No excessive padding. Phone screens: 16–18px page edges, 16–22px inside cards.
 3. The keyboard never covers what someone is typing (sheets sit above it; focused fields scroll into view).
 4. Everything tappable is at least 44px tall.
