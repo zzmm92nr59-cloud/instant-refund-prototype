@@ -74,13 +74,15 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
 }
 // Admin routes: only Relay's admins; everyone else is told they don't exist.
 {
-  for (const [method, path, body] of [["GET", "/relay/my/admin/reports"], ["POST", "/relay/my/admin/reports/11111111-1111-4111-8111-111111111111/review", { outcome: "dismiss" }]]) {
+  for (const [method, path, body] of [["GET", "/relay/my/admin/reports"], ["POST", "/relay/my/admin/reports/11111111-1111-4111-8111-111111111111/review", { outcome: "dismiss" }],
+    ["GET", "/relay/my/admin/health"]]) {
     const res = await call(path, { method, auth: "Bearer " + alice, body });
     assert.equal(res.status, 404, method + " " + path + " is hidden from shoppers"); assert.deepEqual(await res.json(), { error: "not_found" });
   }
   assert.deepEqual(await (await call("/relay/my/admin/me", { auth: "Bearer " + alice })).json(), { admin: false });
   assert.equal((await call("/relay/my/admin/reports", { auth: "Bearer " + admin })).status, 200, "an admin can see reports");
-  console.log("ok - admins: report reviews hidden from shoppers (not found), open to Relay's admins");
+  assert.equal((await call("/relay/my/admin/health", { auth: "Bearer " + admin })).status, 200, "an admin can see Relay health");
+  console.log("ok - admins: report reviews and Relay health hidden from shoppers (not found), open to Relay's admins");
 }
 // Shops: each route needs that shop's own key.
 {

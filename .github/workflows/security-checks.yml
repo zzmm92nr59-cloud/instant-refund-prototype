@@ -22,3 +22,5 @@ jobs:
         run: node scripts/test-validation.mjs
       - name: Who can do what (visitors, shoppers, admins, shops, webhooks)
         run: node scripts/test-access-control.mjs
+      - name: Relay health shows counts only (admins only, shops named from 3 people)
+        run: node scripts/test-health.mjs

@@ -55,6 +55,7 @@ found" (404) where even saying it exists would tell too much.
 | Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
 | List of connected shops | Read names | Read | Read | | | |
 | Reviewer sign-in (`/relay/my/admin/review-account`) | | | Turn on (a new address and code), see the address and code, turn off (deletes the account) | | | |
+| Relay health (`/relay/my/admin/health`) | | | Read counts of how well emails are read and how the app is used: never anything from a single receipt; a shop is named only once 3 or more shoppers have receipts from it; the admin's own receipts by shop | | | |
 | Testing tools (`/relay/my/testing/...`) | | Sandbox test shop only: off when Square is live; 5 test orders a day | | | | |
 | Prototype test routes (`/relay/test-lab`, `/relay/live-test`, `/relay/ledger/...` and others) | Off: "not found" | Off | Off | Off | | |
 
