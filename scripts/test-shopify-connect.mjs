@@ -36,6 +36,8 @@ const shops = {
     { id: "gid://shopify/Product/1", title: "USB-C Charger", img: "https://cdn.shopify.com/s/files/charger.png", variants: [{ id: "gid://shopify/ProductVariant/11", title: "65W", sku: "CUSH-SAGE", price: "39.99", qty: 3 }] }] }
 };
 let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "", shopOrders = {};
+// Shops Shopify calls development (test) stores; one says so only through its plan's name, as Shopify has been seen to do.
+const devStores = new Set(), devByName = new Set();
 let tokenCalls = [], apiCalls = [], codeToShop = { "code-oak": "oak-thread.myshopify.com", "code-volt": "volt-tech.myshopify.com" }, grantScope = "read_products,read_inventory";
 globalThis.fetch = async (url, init = {}) => {
   url = String(url);
@@ -56,6 +58,7 @@ globalThis.fetch = async (url, init = {}) => {
   apiCalls.push({ shop, token });
   if (!/^(token|fresh)-/.test(token) && token !== "old-static-token") return json({ errors: "unauthorised" }, 401);
   const { query: q, variables } = JSON.parse(init.body);
+  if (/RelayShopPlan/.test(q)) return json({ data: { shop: { plan: { partnerDevelopment: devStores.has(shop), publicDisplayName: devStores.has(shop) || devByName.has(shop) ? "Development" : "Basic" } } } });
   if (/shop \{ name currencyCode \}/.test(q)) return json({ data: { shop: { name: shops[shop].name, currencyCode: currencies[shop] || "GBP" } } });
   if (/webhookSubscriptions\(/.test(q)) return json({ data: { webhookSubscriptions: { nodes: (hooks[shop] || []).map((h, i) => ({ id: "gid://shopify/WebhookSubscription/" + i, ...h })) } } });
   if (/webhookSubscriptionCreate/.test(q)) {
@@ -129,6 +132,19 @@ assert.match(lastProductQuery, /status:active/, "only products the shop has set 
 const items = sqlite.prepare("SELECT title, store_label, image_url FROM retailer_catalog_items WHERE provider LIKE 'shopify:%' ORDER BY title").all();
 assert.deepEqual(items.map(i => [i.title, i.store_label, i.image_url]), [["Linen Cushion", "Oak & Thread", "https://cdn.shopify.com/s/files/cushion.png"], ["Stoneware Mug", "Oak & Thread", null]]);
 assert.deepEqual((await shopifyShopsForDisplay(env)).map(s => [s.domain, s.label]), [["oak-thread.myshopify.com", "Oak & Thread"]]);
+// A test shop (a Shopify development store) is never shown to real shoppers, whichever way Shopify says it; Relay's testing
+// tools can ask for test shops too, each marked. A shop not yet checked counts as a test shop until it has been.
+assert.equal(sqlite.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = 'oak-thread.myshopify.com'").get().test_shop, 0);
+devStores.add("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "a development store's products aren't shown");
+assert.deepEqual((await shopifyShopsForDisplay(env, { includeTest: true })).map(s => [s.domain, s.test]), [["oak-thread.myshopify.com", true]]);
+devStores.delete("oak-thread.myshopify.com"); devByName.add("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "a plan called Development counts too");
+devByName.delete("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual((await shopifyShopsForDisplay(env)).map(s => s.domain), ["oak-thread.myshopify.com"], "shown again once Shopify says it's a real shop");
+sqlite.prepare("DELETE FROM shopify_shop_plan").run();
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "not checked yet: not shown");
+await syncAllShopify(env, { now });
 
 // 6. A second shop, started from its own Shopify admin (Shopify signs the link), goes straight to its dashboard.
 const launch = sign(new URLSearchParams({ embedded: "0", host: "dm9sdA", shop: "volt-tech.myshopify.com", timestamp: String(now / 1000) }));

@@ -291,7 +291,8 @@ const relayWorker = {
     // Publish only retailer-opted-in read-only products. Separate Shopify
     // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.
     if (url.pathname === "/relay/shopify/catalogue" && request.method === "GET") {
-      const stores = await shopifyShopsForDisplay(env);
+      // Real shoppers get real shops only; Relay's testing tools ask for test shops too (?test=1), each product marked.
+      const stores = await shopifyShopsForDisplay(env, { includeTest: url.searchParams.get("test") === "1" });
       if (!stores.length)
         return Response.json({products:[],published:false,publishedStoreCount:0},
           {headers:{...corsHeaders,"Cache-Control":"no-store"}});
@@ -314,7 +315,7 @@ const relayWorker = {
             .bind("shopify:" + store.domain).all();
           for (const row of rows.results || []) {
             products.push({...row, sku:row.catalogueId, provider:"shopify",
-              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate"});
+              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {})});
           }
         }
         return Response.json({products,published:true,publishedStoreCount:stores.length,
