@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import { handleShopifyConnect, listConnectedShopifyStores, syncAllShopify, shopifyShopsForDisplay, normaliseShop, shopifySigned } from "../worker/shopify-connect.js";
 import { handleRetailerRoute } from "../worker/retailer.js";
-import { receiveShopifyWebhook, backfillShopifyOrders } from "../worker/shopify-webhooks.js";
+import { receiveShopifyWebhook, backfillShopifyOrders, eraseRemovedShops } from "../worker/shopify-webhooks.js";
 import { emailHash } from "../worker/auth.js";
 import { ensurePushTables, priceText } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
@@ -254,6 +254,32 @@ assert.equal((await hook("volt-tech.myshopify.com", "shop/redact", { shop_id: 9 
 shops["oak-thread.myshopify.com"].products = shops["oak-thread.myshopify.com"].products.filter(p => p.title !== "Linen Cushion" && p.title !== "Stoneware Mug").concat([{ id: "gid://shopify/Product/3", title: "Wool Throw", img: null, variants: [{ id: "gid://shopify/ProductVariant/31", title: "Oat", sku: "THR", price: "45.00", qty: 2 }] }]);
 await syncAllShopify(env, { now });
 assert.deepEqual(sqlite.prepare("SELECT title FROM retailer_catalog_items WHERE provider = 'shopify:oak-thread.myshopify.com' ORDER BY title").all().map(r => r.title), ["Wool Throw"]);
+
+// 8b. The 30-day backstop (Shopify API terms 6.2.3): a shop removed over 30 days ago that Shopify's erase request missed
+// is erased; one removed recently, one already erased (Volt, above), and one that came back are left alone.
+{
+  const DAY = 86400000, conn = "shopify:oak-thread.myshopify.com";
+  const orders = () => sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = ?").get(conn).n;
+  const links = () => sqlite.prepare("SELECT COUNT(*) n FROM retailer_order_emails WHERE order_id IN (SELECT id FROM retailer_orders WHERE connection_id = ?)").get(conn).n;
+  assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", { ...paid, id: 7010, customer: { id: 77 } })).status, 200);
+  assert.ok(orders() > 0 && links() > 0);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 31 * DAY), { erased: 0 }, "nothing to do while every removed shop was erased by Shopify's request");
+  assert.equal((await hook("oak-thread.myshopify.com", "app/uninstalled", { id: 8 })).status, 200);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 5 * DAY), { erased: 0 }, "removed 5 days ago: Shopify's own request comes first");
+  assert.ok(orders() > 0, "its orders are still here");
+  // A removed shop that came back is left alone (Kite, made up for this check).
+  sqlite.prepare("INSERT INTO audit_events (id, actor_type, actor_id, event_type, subject_type, subject_id, metadata_json, created_at) VALUES (?,?,?,?,?,?,?,?)")
+    .run("t-kite", "system", "shopify_webhook", "shopify_app_uninstalled", "shopify_store", "kite-goods.myshopify.com", "{}", "2026-01-01 10:00:00");
+  sqlite.prepare("INSERT INTO shopify_shops (domain, label, access_iv, access_data, created_at, updated_at) VALUES (?,?,?,?,?,?)").run("kite-goods.myshopify.com", "Kite", "iv", "data", 1, 1);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 31 * DAY), { erased: 1 }, "Oak Thread, removed 31 days ago with no erase request, is erased");
+  assert.equal(orders(), 0, "its orders are deleted");
+  assert.equal(links(), 0, "and every link to a customer's email");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_catalog_items WHERE provider = ?").get(conn).n, 0);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopify_shops WHERE domain = 'kite-goods.myshopify.com'").get().n, 1, "the shop that came back is untouched");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM audit_events WHERE event_type = 'shopify_shop_erased' AND subject_id = 'oak-thread.myshopify.com'").get().n, 1, "the erase is recorded");
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 32 * DAY), { erased: 0 }, "once erased, it isn't erased again every hour");
+  console.log("ok - shops removed over 30 days ago that Shopify's erase request missed are erased, once; recent, erased and returning shops aren't");
+}
 
 // 9. Without the app's details on the server, nothing can connect, and says so.
 const bare = { ...env, SHOPIFY_CLIENT_SECRET: undefined };

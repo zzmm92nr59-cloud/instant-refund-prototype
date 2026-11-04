@@ -44,7 +44,7 @@ found" (404) where even saying it exists would tell too much.
 | Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
 | Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | | Read connected inboxes for new receipts (every 15 min) |
 | Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, reminders, open the original email | As a shopper | | | Return reminders |
-| Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed) | Catch up Square orders and refunds |
+| Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed), and asks for erasure | Catch up Square orders and refunds; erase a shop's orders 30 days after it removed Relay if Shopify's erase request never came |
 | Card on file (Stripe) | | Own: add, remove. Relay keeps Stripe's reference, the brand, last 4 digits and expiry, never the card number | As a shopper | | | |
 | Price alerts and phone notifications | | Own: watch items or shops, choose alert mode, turn notifications on and off | As a shopper | Sends an offer to its own watchers, without learning who they are | Catalogue changes (signed) | Compare prices, send alerts |
 | Resale listings | Nothing | List items from own receipts; browse others' listings, shown only as "Member" | As a shopper | | | |
@@ -195,6 +195,79 @@ and only with a migration that, while both the old and new keys are available:
 
 If it has leaked, do the migration at once. Until then, assume anyone holding it could decrypt a copy of the database
 (which they would also need).
+
+## When something goes wrong: the incident and data breach plan
+
+For anything that may have exposed, changed, lost or locked away people's data, or let someone in who shouldn't be. The
+person who runs Relay leads it, writes everything down as it happens, and follows these steps in order. When in doubt,
+treat it as a breach until it's shown not to be. Shops get the same promises in their terms (the draft is in the App
+Store submission pack).
+
+**What counts.** A personal data breach is any security incident that leads to personal data being destroyed, lost,
+changed, disclosed or accessed without permission, by accident or on purpose; losing access to it counts too. Signs:
+a key seen anywhere public (a commit, a screenshot, a chat); a sign-in nobody recognises on Cloudflare, GitHub, Shopify
+Partners, Google Cloud, Azure, Stripe, Resend or Twilio; a shopper seeing someone else's receipt or order; an alert or
+report from Shopify, a shop, a shopper or a researcher; unusual traffic in the Worker's logs.
+
+### 1. Stop it (straight away)
+
+- **A key may have leaked:** rotate it now, using the table in "Keys and secrets". For `AUTH_SECRET`, follow its own
+  section.
+- **A session may be in the wrong hands:** sign everyone out. Shoppers simply sign in again:
+  `npx wrangler d1 execute relay-purchase-ledger --remote --command "DELETE FROM auth_sessions"`.
+- **The Worker's own code is the problem:** roll back to the last good version (Cloudflare dashboard → Workers →
+  relay-square-api2 → Deployments, or `npx wrangler rollback`), then revert the commit so the next deploy doesn't bring it
+  back.
+- **Inbox keys may be exposed:** rotate `GOOGLE_CLIENT_SECRET` and `MICROSOFT_CLIENT_SECRET` and disable the old ones.
+  The stored keys are encrypted, and they can't be used without the app's own secret.
+- **A shop's Shopify key may be exposed:** the shop can remove Relay, which deletes it at once. Relay's own app secret is
+  rotated in Shopify Partners.
+- **Keep the evidence.** Don't delete logs or rows. Note the time, and the database's restore point from before it
+  started (`npx wrangler d1 time-travel info relay-purchase-ledger`).
+
+### 2. Work out what happened (within 24 hours)
+
+What data, whose, how many people, from when to when, and whether it has stopped. What Relay stores helps decide how
+serious it is:
+
+- order emails are only keyed hashes;
+- email bodies are never kept, only the receipt details read from them;
+- sessions are only hashes, so a copy of the database can't sign anyone in;
+- inbox keys, shops' keys, phone numbers and two-step secrets are encrypted with keys derived from `AUTH_SECRET`.
+
+A copy of the database alone exposes receipts, names, email addresses and orders. With `AUTH_SECRET` as well, it
+exposes everything encrypted too.
+
+### 3. Tell the people who must be told
+
+| Who | When | How |
+|---|---|---|
+| Shopify, if any shop's data from Shopify may be involved (products, orders, customers' details, keys) | At once, and no later than 24 hours after Relay becomes aware, even if it's only suspected (Shopify API terms, 6.2.10) | Shopify Support, by email; then answer their questions and keep them updated |
+| Each shop affected | Without undue delay, and no later than 48 hours after Relay becomes aware (the shop terms' promise) | Email to the shop's contact: what happened, what data, what Relay has done, what the shop should do |
+| The ICO | When the breach is likely to put people's rights and freedoms at risk: without undue delay, and no later than 72 hours after becoming aware. Later than that, give the reasons | ico.org.uk, "Report a breach" |
+| Shoppers affected | When it's likely to be a high risk to them: directly and without undue delay | An email from Relay in plain English: what happened, what data, what Relay is doing, what they can do (for example, change a password or watch for scam emails) |
+| Google or Microsoft | If inbox access or Relay's app at Google or Microsoft was involved | As their developer terms ask |
+
+Relay runs its own app for shoppers, so for shoppers' accounts Relay decides about telling the ICO. For the customer data
+Relay handles for a shop, the shop decides, and Relay gives it what it needs to. The UK rules on this are under review
+after the Data (Use and Access) Act 2025, so check the ICO's guidance each time.
+
+### 4. Fix it and recover
+
+Fix the cause, add a test that would have caught it, and deploy. Restore lost or damaged data from Time Travel (30 days
+back on Workers Paid; a restore replaces the whole database, so export what's changed since first). Check the fix from
+outside with `scripts/check-live-security.mjs`.
+
+### 5. Write it down
+
+Record every breach, even ones that didn't need reporting (the ICO expects this): when it was found, what happened, the
+data and people involved, what was done, who was told and when, and why anyone wasn't. Keep the record somewhere
+private, not in this repository: it's public.
+
+### 6. Practise
+
+Once a year, and after any big change, walk through a pretend incident with this plan (for example "`AUTH_SECRET`
+appeared in a public commit"). Fix whatever was slow or unclear.
 
 ## Checking it all
 

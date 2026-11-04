@@ -3,7 +3,7 @@ import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareRefunds } from "./square-orders.js";
 import { syncSquareCatalogue } from "./square-catalogue.js";
 import { getShopifyStores, ensureImageTable } from "./shopify.js";
-import { receiveShopifyWebhook, backfillShopifyOrders } from "./shopify-webhooks.js";
+import { receiveShopifyWebhook, backfillShopifyOrders, eraseRemovedShops } from "./shopify-webhooks.js";
 import { handleAuthRoute } from "./auth.js";
 import { tidyTexts } from "./phone.js";
 import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
@@ -66,6 +66,8 @@ const relayWorker = {
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
     ctx.waitUntil(tidyTexts(env).catch(() => {}));
+    // Shops that removed Relay over 30 days ago and that Shopify's erase request missed (Shopify API terms 6.2.3).
+    ctx.waitUntil(eraseRemovedShops(env).then(r => { if (r.erased) console.log("removed shops erased", JSON.stringify(r)); }).catch(() => {}));
     // Catalogues are refreshed first so price alerts compare against the newest prices.
     const syncs = Promise.allSettled([
       importHistoricalSquareOrders(env).then(() => syncSquareRefunds(env)).then(r => console.log("Square refunds checked", JSON.stringify(r))),

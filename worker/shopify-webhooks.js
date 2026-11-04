@@ -60,6 +60,36 @@ async function deleteOrders(db, connection, customerId) {
   return n;
 }
 
+// Shopify's API terms (6.2.3): a shop's data is deleted within 30 days of it removing Relay. Shopify's own erase request
+// (shop/redact, sent about 48 hours later) normally does that; this hourly check is the backstop for any shop it missed:
+// removed more than 30 days ago, not added back since, and not erased since. Orders tied to a swap or return made through
+// Relay stay (the shop relies on them), without the link to the customer's email, as for an erase request.
+export async function eraseRemovedShops(env, now = Date.now()) {
+  const db = env && env.RELAY_DB;
+  if (!db) return { erased: 0 };
+  const stamp = t => new Date(t).toISOString().replace("T", " ").slice(0, 19); // audit_events.created_at's format
+  let removed = [];
+  try {
+    removed = (await db.prepare(`SELECT subject_id AS shop, MAX(created_at) AS at FROM audit_events
+      WHERE event_type = 'shopify_app_uninstalled' GROUP BY subject_id HAVING MAX(created_at) < ?`).bind(stamp(now - 30 * 86400000)).all()).results || [];
+  } catch { return { erased: 0 }; }
+  let erased = 0;
+  for (const { shop, at } of removed) {
+    if (!DOMAIN.test(String(shop || ""))) continue;
+    try {
+      if (await db.prepare("SELECT 1 AS x FROM shopify_shops WHERE domain = ?").bind(shop).first()) continue; // added back
+      const done = await db.prepare(`SELECT 1 AS x FROM audit_events WHERE subject_id = ? AND created_at >= ?
+        AND (event_type = 'shopify_shop_erased' OR (event_type = 'shopify_privacy_request' AND metadata_json LIKE '%"shop/redact"%'))`).bind(shop, at).first();
+      if (done) continue;
+      await forgetShopifyShop(env, shop, { everything: true });
+      const deleted = await deleteOrders(db, "shopify:" + shop, null);
+      await audit(env, "shopify_shop_erased", shop, "backstop:" + at, { deleted, removedAt: at });
+      erased++;
+    } catch (e) { console.error("erasing a removed shop failed", String(e && e.message || e).slice(0, 120)); }
+  }
+  return { erased };
+}
+
 // o.onCatalogueChange(shop): called when a shop's products changed, to read that shop again in the background.
 export async function receiveShopifyWebhook(request, env, o = {}) {
   const shop = String(request.headers.get("x-shopify-shop-domain") || "").toLowerCase().trim();
