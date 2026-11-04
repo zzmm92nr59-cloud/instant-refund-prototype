@@ -891,7 +891,7 @@ let catalogReady=false;
 var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true;loadCatalog()}
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;try{
- const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue",10000);
+ const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()?"?test=1":""),10000);
  squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});
  try{
   const response=await squareAsk;

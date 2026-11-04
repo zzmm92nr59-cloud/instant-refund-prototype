@@ -200,6 +200,7 @@ export async function syncShopifyCatalogues(env, extraStores = [], opts = {}) {
   for (const store of stores) {
     try {
       const r = await syncStore(env, store);
+      await recordShopPlan(env, store);
       results.push({success:true, ...r});
       await recordSync(env, store.domain, {success:true, products:r.products, variants:r.variants, images:r.images});
     }
@@ -212,6 +213,26 @@ export async function syncShopifyCatalogues(env, extraStores = [], opts = {}) {
     }
   }
   return {configuredStores:results.length, results};
+}
+// Whether a shop is a test shop (a Shopify development store), checked on every catalogue read and kept, so Discover can
+// leave test shops' products out for real shoppers. Shopify's partnerDevelopment flag has been seen false on some
+// development stores whose plan reads "Development", so either counts. A failed check changes nothing.
+export async function ensureShopPlanTable(db) {
+  await db.prepare("CREATE TABLE IF NOT EXISTS shopify_shop_plan (domain TEXT PRIMARY KEY, test_shop INTEGER NOT NULL, plan TEXT, checked_at INTEGER NOT NULL)").run();
+}
+export function isTestPlan(plan) {
+  return Boolean(plan && (plan.partnerDevelopment === true || /develop/i.test(String(plan.publicDisplayName || ""))));
+}
+async function recordShopPlan(env, store, now = Date.now()) {
+  if (!env.RELAY_DB) return;
+  try {
+    const data = await query(store, "query RelayShopPlan { shop { plan { partnerDevelopment publicDisplayName } } }");
+    const plan = data && data.shop && data.shop.plan;
+    if (!plan) return;
+    await ensureShopPlanTable(env.RELAY_DB);
+    await env.RELAY_DB.prepare("INSERT OR REPLACE INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?,?,?,?)")
+      .bind(store.domain, isTestPlan(plan) ? 1 : 0, String(plan.publicDisplayName || "").slice(0, 60) || null, now).run();
+  } catch (e) { console.error("Shopify plan check failed for " + store.domain); }
 }
 // Backwards compatibility with earlier single-shop callers.
 export async function syncShopifyCatalogue(env) { return syncShopifyCatalogues(env); }
