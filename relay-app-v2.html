@@ -834,6 +834,8 @@ function wrappedView(){return '<h1 class="title">Wrapped</h1><div id="wrappedPag
 function bindWrappedFrame(){const f=$("wrappedFrame");if(!f||typeof f.addEventListener!=="function")return;const fit=()=>{try{const d=f.contentDocument;if(!d||!d.body)return;const h=Math.ceil(d.documentElement.getBoundingClientRect().height);if(h>300)f.style.height=h+"px"}catch(e){}};f.addEventListener("load",()=>{fit();try{const d=f.contentDocument;if(window.ResizeObserver&&d&&d.body)new ResizeObserver(fit).observe(d.body)}catch(e){}});fit();window.addEventListener("resize",fit)}
 // Test shop tools and sandbox labels: only for people testing Relay (Profile → Testing, or ?testing=1).
 function testTools(){try{return testing||localStorage.getItem("relay-testing-tools")==="1"}catch(e){return testing}}
+// The shared account for app reviewers (worker/review-account.js) sees test shops in Discover too: the reviewer's own store is one.
+function reviewAccount(){try{return !!(window.RelayAccount&&RelayAccount.isReview&&RelayAccount.isReview())}catch(e){return false}}
 function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}render()}
 // Signed in on this device? (Read straight from storage so the first screen doesn't wait for the account code.)
 function hasSession(){try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return !!(x&&x.token)}catch(e){return false}}
@@ -891,7 +893,7 @@ let catalogReady=false;
 var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true;loadCatalog()}
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;try{
- const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()?"?test=1":""),10000);
+ const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
  squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});
  try{
   const response=await squareAsk;
