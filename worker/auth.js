@@ -10,6 +10,7 @@
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { labelDeleteStatements } from "./royal-mail.js";
 import { checkBody } from "./validate.js";
+import { handleHealthRoute } from "./health.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
@@ -633,6 +634,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // The sign-in for app reviewers: Relay admins only.
     const reviewResponse = await handleReviewAdminRoute(path, request.method, request, env, cors, shopper, o, deleteShopper);
     if (reviewResponse) return reviewResponse;
+    // The Relay health page: counts of how well emails are read and how the app is used. Relay admins only.
+    const healthResponse = await handleHealthRoute(path, request.method, env, cors, shopper, o);
+    if (healthResponse) return healthResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;

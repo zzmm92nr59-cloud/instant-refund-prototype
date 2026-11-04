@@ -511,6 +511,31 @@
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
     ".rl-rev-l{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 14px;box-sizing:border-box}.rl-rev-l+.rl-rev-l{border-top:1px solid var(--rl-line)}" +
+    // Relay health (admins only): headline numbers, a meter, a day-by-day chart, and rows of counts.
+    ".rl-hp-lead{margin:0 2px 8px;font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-hp-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 12px}" +
+    ".rl-hp-when{font-size:13px;color:var(--rl-text2)}.rl-hp-again{flex:none!important;min-height:44px;padding:0 16px!important;font-size:15px!important}" +
+    ".rl-hp-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(min-width:640px){.rl-hp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
+    ".rl-hp-kpi{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:2px;min-width:0}" +
+    ".rl-hp-kpi span{font-size:13px;font-weight:600;color:var(--rl-text2)}.rl-hp-kpi b{font-size:30px;line-height:1.15;font-weight:800;letter-spacing:-.02em;color:var(--rl-text);overflow-wrap:anywhere}.rl-hp-kpi small{font-size:13px;line-height:1.35;color:var(--rl-text2)}" +
+    ".rl-hp-card{padding:16px 16px 6px}.rl-hp-sub{margin:0 0 10px;font-size:14px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-hp-mhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:15px;color:var(--rl-text)}.rl-hp-mhead span{font-size:22px;font-weight:800}" +
+    ".rl-hp-meter{height:10px;border-radius:999px;background:var(--rl-accent-bg);overflow:hidden;margin:8px 0}.rl-hp-meter i{display:block;height:100%;border-radius:999px;background:var(--rl-accent)}" +
+    ".rl-hp-chartw{margin:16px 0 4px}.rl-hp-chead{display:flex;flex-direction:column;gap:2px;font-size:15px;color:var(--rl-text)}.rl-hp-chead span{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-hp-plot{position:relative;margin-top:28px}.rl-hp-chart{display:flex;align-items:flex-end;gap:2px;height:120px;border-bottom:1px solid var(--rl-line)}" +
+    ".rl-hp-chart button{all:unset;box-sizing:border-box;flex:1;min-width:0;height:100%;display:flex;align-items:flex-end;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
+    ".rl-hp-chart i{display:block;width:100%;border-radius:4px 4px 0 0;background:var(--rl-accent)}.rl-hp-chart button:hover i,.rl-hp-chart button:focus-visible i{opacity:.75}" +
+    ".rl-hp-chart button:active i{opacity:.6}.rl-hp-chart button:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px;border-radius:4px}" +
+    ".rl-hp-tip{position:absolute;top:-6px;transform:translate(-50%,-100%);display:flex;flex-direction:column;gap:1px;padding:6px 10px;border-radius:10px;background:var(--rl-text);color:var(--rl-bg);font-size:13px;line-height:1.3;white-space:nowrap;pointer-events:none;z-index:2}" +
+    ".rl-hp-tip[hidden]{display:none}.rl-hp-axis{display:flex;justify-content:space-between;margin-top:6px;font-size:13px;color:var(--rl-text2)}" +
+    ".rl-hp-more{margin:8px 0 2px}.rl-hp-more summary{list-style:none;min-height:44px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;font-weight:700;color:var(--rl-accent)}" +
+    ".rl-hp-more summary::-webkit-details-marker{display:none}.rl-hp-more summary .rl-jic{transition:transform .2s}.rl-hp-more[open] summary .rl-jic{transform:rotate(180deg)}.rl-hp-more summary:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    ".rl-hp-table{width:100%;border-collapse:collapse;font-size:14px;color:var(--rl-text);margin:2px 0 10px}.rl-hp-table th,.rl-hp-table td{text-align:right;padding:7px 4px;border-top:1px solid var(--rl-line);font-variant-numeric:tabular-nums}" +
+    ".rl-hp-table th:first-child,.rl-hp-table td:first-child{text-align:left}.rl-hp-table th{font-size:13px;font-weight:700;color:var(--rl-text2);border-top:0}" +
+    ".rl-hp-rows{margin:6px 0 0}.rl-hp-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-top:1px solid var(--rl-line);font-size:15px;line-height:1.35;color:var(--rl-text)}" +
+    ".rl-hp-row>span{min-width:0}.rl-hp-row small{display:block;font-size:13px;color:var(--rl-text2);margin-top:2px}.rl-hp-row b{flex:none;font-weight:700;font-variant-numeric:tabular-nums}.rl-hp-card>.rl-hp-rows:first-child .rl-hp-row:first-child{border-top:0}" +
+    ".rl-hp-shops{margin:0 0 6px}.rl-hp-shop{padding:11px 0;border-top:1px solid var(--rl-line)}.rl-hp-shop:first-child{border-top:0}.rl-hp-shop b{display:block;font-size:15px;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".rl-hp-shop>span{display:block;font-size:13px;color:var(--rl-text2);margin-top:2px}.rl-hp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}" +
+    ".rl-hp-chips i{font-style:normal;font-size:13px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text)}.rl-hp-chips i.ok{background:var(--rl-accent-bg);color:var(--rl-accent)}" +
     ".rl-rev-l .rl-arow-t b{font-size:13px;font-weight:700;color:var(--rl-text2)}.rl-rev-v{font-size:17px;font-weight:700;color:var(--rl-text);word-break:break-all}" +
     ".rl-rev-code{letter-spacing:.14em}.rl-rev-l .rl-po-secondary{flex:0 0 auto;min-width:84px}" +
     ".rl-full .rl-msg:empty{display:none}.rl-full>h2:first-child{margin-top:24px}" +
@@ -3175,6 +3200,7 @@
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5M12 17h.01"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
+    pulse: '<path d="M3 12.5h4l2.5-6.5 4.5 13 2.5-6.5H21"/>',
     out: '<path d="M14 4.5h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/>',
     chev: '<path d="m9 6 6 6-6 6"/>', back: '<path d="m15 6-6 6 6 6"/>',
     ext: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10"/>'
@@ -3345,7 +3371,8 @@
     api("/relay/my/admin/me").then(function (r) {
       if (!r.ok || !r.body || r.body.admin !== true) return;
       var revRow = accRow("key", "Sign-in for app reviewers", "", function () { page("Sign-in for app reviewers", reviewerPage); });
-      abox.appendChild(accGroup("Team", [accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
+      abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
+        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
 
@@ -3470,6 +3497,164 @@
         if (!r.ok || !r.body) { box.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
         draw(r.body);
       }).catch(function () { box.textContent = ""; say(note, "Couldn't reach Relay. Check your connection.", true); });
+    }
+    // ---- Relay health (admins only): counts of how well emails are read and how the app is used. Never what one person
+    // bought: other people's receipts only as totals, and a shop only once 3 or more people have receipts from it
+    // (worker/health.js). The admin's own receipts are broken down by shop, for checking the reader while testing. ----
+    function healthPage(b) {
+      var note = el("div", { className: "rl-msg" }), box = el("div", { className: "rl-hp" });
+      var when = el("span", { className: "rl-hp-when" });
+      var again = el("button", { type: "button", className: "rl-po-secondary rl-hp-again", text: "Refresh" });
+      b.appendChild(el("p", { className: "rl-hp-lead", text: "Counts from everyone's receipts, never what one person bought. Shops are named once 3 or more people have receipts from them." }));
+      b.appendChild(el("div", { className: "rl-hp-top" }, [when, again]));
+      b.appendChild(note); b.appendChild(box);
+      var N = function (x) { return (Number(x) || 0).toLocaleString("en-GB"); };
+      var pct = function (a, t) { return t ? Math.round(a / t * 100) : 0; };
+      var plural = function (x, one, more) { return N(x) + " " + (Number(x) === 1 ? one : more); };
+      var stamp = function (iso) {
+        if (!iso) return "never";
+        var d = new Date(iso), t = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+        return d.toDateString() === new Date().toDateString() ? "today at " + t : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + " at " + t;
+      };
+      var group = function (title, kids) { return el("section", { className: "rl-agroup" }, [el("h3", { text: title }), el("div", { className: "rl-acard rl-hp-card" }, kids)]); };
+      var row = function (label, value, sub) { return el("div", { className: "rl-hp-row" }, [el("span", {}, [el("span", { text: label })].concat(sub ? [el("small", { text: sub })] : [])), el("b", { text: value })]); };
+      var words = function (k) { k = String(k || "unknown").replace(/_/g, " "); return k.charAt(0).toUpperCase() + k.slice(1); };
+      // Why a scan stopped, in plain words (the server gives a short code).
+      var SCAN_ERR = { gmail_reconnect_needed: "Inbox needs connecting again", gmail_not_connected: "Inbox was disconnected", gmail_unavailable: "Gmail or Outlook was busy, tried again later",
+        scan_busy: "A check was already running", too_many_requests: "Too many checks at once", consent_required: "Waiting for the shopper's permission", consent_version_mismatch: "Waiting for the shopper's permission" };
+      function skeleton() {
+        box.textContent = "";
+        var k = el("div", { className: "rl-hp-kpis" });
+        for (var i = 0; i < 4; i++) k.appendChild(el("div", { className: "rl-hp-kpi rl-skel", style: "min-height:96px" }));
+        box.appendChild(k);
+        box.appendChild(el("div", { className: "rl-skel", style: "min-height:260px;border-radius:18px;margin-top:22px" }));
+      }
+      // Receipts found each day, as columns. Tap or hover one for its numbers; the table underneath has them all.
+      function dayChart(days) {
+        var max = Math.max.apply(null, days.map(function (d) { return d.kept; }).concat([1]));
+        var wrap = el("div", { className: "rl-hp-chartw" }), tip = el("div", { className: "rl-hp-tip" });
+        tip.setAttribute("aria-hidden", "true"); tip.hidden = true;
+        var dname = function (d, o) { return new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); };
+        var chart = el("div", { className: "rl-hp-chart" });
+        chart.setAttribute("role", "group");
+        chart.setAttribute("aria-label", "Receipts found each day, last 14 days");
+        days.forEach(function (d) {
+          var label = dname(d.day, { weekday: "short", day: "numeric", month: "short" }) + ": " + plural(d.kept, "receipt", "receipts") + " found, " + plural(d.skipped, "other email", "other emails") + " skipped";
+          var col = el("button", { type: "button", ariaLabel: label }, [el("i", { style: "height:" + (d.kept ? Math.max(3, Math.round(d.kept / max * 100)) : 0) + "%" })]);
+          var show = function () {
+            tip.textContent = ""; tip.appendChild(el("b", { text: dname(d.day, { weekday: "short", day: "numeric", month: "short" }) }));
+            tip.appendChild(el("span", { text: plural(d.kept, "receipt", "receipts") + " · " + plural(d.skipped, "skipped", "skipped") }));
+            tip.hidden = false;
+            var x = col.offsetLeft + col.offsetWidth / 2, w = chart.offsetWidth;
+            tip.style.left = Math.max(70, Math.min(w - 70, x)) + "px";
+          };
+          col.addEventListener("mouseenter", show); col.addEventListener("focus", show); col.addEventListener("click", show);
+          col.addEventListener("mouseleave", function () { tip.hidden = true; }); col.addEventListener("blur", function () { tip.hidden = true; });
+          chart.appendChild(col);
+        });
+        wrap.appendChild(el("div", { className: "rl-hp-chead" }, [el("b", { text: "Receipts found each day" }), el("span", { text: "Most in a day: " + N(max === 1 && !days.some(function (d) { return d.kept; }) ? 0 : max) })]));
+        wrap.appendChild(el("div", { className: "rl-hp-plot" }, [chart, tip]));
+        wrap.appendChild(el("div", { className: "rl-hp-axis" }, [el("span", { text: dname(days[0].day, { day: "numeric", month: "short" }) }), el("span", { text: "Today" })]));
+        // The same numbers as a table.
+        var table = el("table", { className: "rl-hp-table" }, [el("thead", {}, [el("tr", {}, [el("th", { text: "Day" }), el("th", { text: "Receipts" }), el("th", { text: "Skipped" })])])]);
+        var tb = el("tbody"); days.slice().reverse().forEach(function (d) { tb.appendChild(el("tr", {}, [el("td", { text: dname(d.day, { weekday: "short", day: "numeric", month: "short" }) }), el("td", { text: N(d.kept) }), el("td", { text: N(d.skipped) })])); });
+        table.appendChild(tb);
+        var more = el("details", { className: "rl-hp-more" }, [el("summary", {}, [el("span", { text: "See the numbers" }), jIc("down", 18)]), table]);
+        wrap.appendChild(more);
+        return wrap;
+      }
+      // One shop's problems as small labels; "Nothing to fix" when there are none.
+      function chips(s) {
+        var c = el("div", { className: "rl-hp-chips" }), any = false;
+        [[s.dismissed, "removed as not theirs"], [s.noTotal, "no total"], [s.low, "low confidence"], [s.pasted, "added by hand"], [s.noItems, "no items"]].forEach(function (x) {
+          if (x[0]) { any = true; c.appendChild(el("i", { text: N(x[0]) + " " + x[1] })); }
+        });
+        if (!any) c.appendChild(el("i", { className: "ok", text: "Nothing to fix" }));
+        return c;
+      }
+      function shopList(list, withPeople) {
+        var l = el("div", { className: "rl-hp-shops" });
+        list.forEach(function (s) {
+          l.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: s.domain }),
+            el("span", { text: plural(s.receipts, "receipt", "receipts") + (withPeople ? " from " + plural(s.people, "person", "people") : "") + (s.receipts ? " · " + pct(s.high, s.receipts) + "% read confidently" : "") }), chips(s)]));
+        });
+        return l;
+      }
+      function draw(h) {
+        box.textContent = "";
+        when.textContent = "Updated " + stamp(h.generatedAt);
+        var rd = h.reading, pu = rd.purchases, wk = rd.purchasesThisWeek, ib = h.inboxes;
+        var k = el("div", { className: "rl-hp-kpis" });
+        [["Shoppers", N(h.people.shoppers), h.people.newThisWeek ? "+" + N(h.people.newThisWeek) + " this week" : "None new this week"],
+          ["Inboxes connected", N(ib.gmail + ib.outlook), plural(ib.checkedToday, "checked today", "checked today")],
+          ["Receipts this week", N(wk.receipts), "from " + plural(rd.emailsThisWeek, "email", "emails") + " read"],
+          ["Read confidently", pu.receipts ? pct(pu.high, pu.receipts) + "%" : "–", "of " + plural(pu.receipts, "purchase", "purchases")]].forEach(function (x) {
+          k.appendChild(el("div", { className: "rl-hp-kpi" }, [el("span", { text: x[0] }), el("b", { text: x[1] }), el("small", { text: x[2] })]));
+        });
+        box.appendChild(k);
+        // How well emails are read.
+        var conf = pct(pu.high, pu.receipts);
+        var meter = el("div", { className: "rl-hp-meter", role: "img", ariaLabel: conf + "% of purchases read confidently" }, [el("i", { style: "width:" + conf + "%" })]);
+        var older = (rd.byReader || []).filter(function (v) { return v.version && v.version < rd.readerVersion; }).reduce(function (n, v) { return n + v.emails; }, 0);
+        var current = (rd.byReader || []).filter(function (v) { return v.version === rd.readerVersion; }).reduce(function (n, v) { return n + v.emails; }, 0);
+        box.appendChild(group("Reading emails", [
+          el("div", { className: "rl-hp-mhead" }, [el("b", { text: "Read confidently" }), el("span", { text: conf + "%" })]), meter,
+          el("p", { className: "rl-hp-sub", text: "Relay asks the shopper to check the rest: " + N(pu.medium) + " with medium confidence, " + N(pu.low) + " with low." }),
+          dayChart(rd.days || []),
+          el("div", { className: "rl-hp-rows" }, [
+            row("Emails looked at", N(rd.emailsLookedAt), N(rd.notReceipts) + " weren't receipts, so only that was kept"),
+            row("Purchases found", N(pu.receipts)),
+            row("Confirmed by shoppers", N(pu.confirmed), pu.receipts ? pct(pu.confirmed, pu.receipts) + "% of purchases" : null),
+            row("Removed as not theirs", N(pu.dismissed), pu.receipts ? pct(pu.dismissed, pu.receipts) + "% of purchases" : null),
+            row("Added by hand", N(pu.pasted), "Receipts Relay missed"),
+            row("No total found", N(pu.noTotal)),
+            row("No items found", N(pu.noItems)),
+            row("Groups changed by shoppers", N(rd.shoppersTaught.groupsChanged), rd.shoppersTaught.shopsMarkedPromotions ? N(rd.shoppersTaught.shopsMarkedPromotions) + " shops marked as just promotions" : null),
+            row("Waiting to be read again", N(rd.waitingToBeRead), "Emails the inbox couldn't give yet"),
+            row("Reader version", String(rd.readerVersion), N(current) + " emails read by this version" + (older ? ", " + N(older) + " by older ones" : ""))])]));
+        box.appendChild(group("Shops read wrong most often", h.shops.length ? [shopList(h.shops, true)]
+          : [el("p", { className: "rl-hp-sub", text: "Shops appear here once " + h.minShoppersPerShop + " or more people have receipts from them. While you're testing, your own receipts are below." })]));
+        var mine = h.mine || { shops: [] };
+        box.appendChild(group("Your own receipts", [el("p", { className: "rl-hp-sub", text: plural(mine.receipts, "purchase", "purchases") + ", by shop, problems first" +
+          (mine.personalMail ? ". " + plural(mine.personalMail, "receipt was", "receipts were") + " forwarded from a personal address" : "") + "." })].concat(mine.shops.length ? [shopList(mine.shops, false)] : [])));
+        // Checking inboxes.
+        var sc = ib.scansThisWeek || {}, errs = {};
+        (ib.scanErrorsThisWeek || []).forEach(function (e) { var t = SCAN_ERR[e.error] || "Other problems"; errs[t] = (errs[t] || 0) + e.count; });
+        box.appendChild(group("Checking inboxes", [el("div", { className: "rl-hp-rows" }, [
+          row("Gmail", N(ib.gmail)), row("Outlook", N(ib.outlook)), row("People with an inbox", N(ib.shoppers)),
+          row("Checked in the last day", N(ib.checkedToday)), row("Not checked in the last day", N(ib.notCheckedToday)),
+          row("Last check", stamp(ib.lastChecked)), row("Connected this week", N(ib.newThisWeek)),
+          row("Scans this week", N((sc.done || 0) + (sc.failed || 0) + (sc.running || 0)), N(sc.done || 0) + " finished, " + N(sc.running || 0) + " still going, " + N(sc.failed || 0) + " stopped")]
+          .concat(Object.keys(errs).map(function (t) { return row(t, N(errs[t]), "This week"); })))]));
+        // Returns, swaps and the rest.
+        var rs = h.returnsAndSwaps, statusRows = function (o, what) { var ks = Object.keys(o || {}); return ks.length ? ks.map(function (s) { return row(what + ": " + words(s).toLowerCase(), N(o[s])); }) : [row(what, "0")]; };
+        var paid = (rs.payments || []).reduce(function (a, p) { a[p.test ? "test" : "live"] += p.count; return a; }, { test: 0, live: 0 });
+        box.appendChild(group("Returns and swaps", [el("div", { className: "rl-hp-rows" }, statusRows(rs.returns, "Returns").concat(statusRows(rs.swaps, "Swaps"))
+          .concat([row("Return labels made", N(rs.labels)), row("Swap payments", N(paid.test + paid.live), N(paid.live) + " live, " + N(paid.test) + " test")]))]));
+        var ex = h.extras, sh = h.shopsConnected;
+        box.appendChild(group("Everything else", [el("div", { className: "rl-hp-rows" }, [
+          row("Gifts tagged", N(ex.gifts), ex.giftGivers ? "by " + plural(ex.giftGivers, "person", "people") : null),
+          row("Earlier years read for Wrapped", N(ex.earlierYearsRead)),
+          row("Phones with notifications on", N(ex.notificationDevices), ex.notificationPeople ? plural(ex.notificationPeople, "person", "people") : null),
+          row("Price watches", N(ex.priceWatches), ex.watchers ? plural(ex.watchers, "person", "people") : null),
+          row("Shops on Shopify", N(sh.shopify), sh.shopifyTest ? N(sh.shopifyTest) + " of them test shops" : null),
+          row("Shops on Square", N(sh.square)),
+          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))])]));
+      }
+      // Refresh always asks Relay again (an ordinary read can reuse one from the last minute).
+      function load(fresh) {
+        if (again.disabled) return;
+        again.disabled = true; say(note, "");
+        api("/relay/my/admin/health", fresh ? { fresh: true } : undefined).then(function (r) {
+          again.disabled = false;
+          if (!b.isConnected) return;
+          if (!r.ok || !r.body || !r.body.reading) { if (!memo.health) box.textContent = ""; return say(note, "Couldn't load the numbers. Try again in a moment.", true); }
+          memo.health = r.body; draw(r.body);
+        }).catch(function () { again.disabled = false; if (!memo.health) box.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      again.onclick = function () { load(true); };
+      if (memo.health) draw(memo.health); else skeleton();
+      load(false);
     }
     function permissionPage(b) {
       var note = el("div", { className: "rl-msg" });
