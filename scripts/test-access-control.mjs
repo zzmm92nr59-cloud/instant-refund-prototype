@@ -103,18 +103,19 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)").run(id, aliceId, "m-1", "pending", JSON.stringify(details), now);
   const before = JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id));
   const tries = [["GET", "/original"], ["GET", "/image"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
-    ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }]];
+    ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }]];
   for (const [method, end, body] of tries) {
     const res = await call("/relay/my/receipts/" + id + end, { method, auth: "Bearer " + bob, body });
     assert.ok(res.status === 404 || res.status === 403, method + " " + end + " by someone else → " + res.status);
   }
   assert.equal(JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id)), before, "alice's receipt is untouched");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_gifts WHERE receipt_id = ?").get(id).n, 0, "and isn't tagged as a gift");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_fixes WHERE receipt_id = ?").get(id).n, 0, "or fixed");
   const list = await (await call("/relay/my/receipts", { auth: "Bearer " + bob })).json();
   assert.ok(!JSON.stringify(list).includes("KO-9"), "bob's list doesn't include alice's receipt");
   const own = await call("/relay/my/receipts/" + id + "/category", { method: "POST", auth: "Bearer " + alice, body: { category: "home" } });
   assert.equal(own.status, 200, "alice can change her own");
-  console.log("ok - shoppers' data: someone else's receipt can't be read, opened, confirmed, hidden, recategorised, marked, tagged as a gift or reminded about");
+  console.log("ok - shoppers' data: someone else's receipt can't be read, opened, confirmed, hidden, recategorised, marked, tagged as a gift, fixed or reminded about");
 }
 // Two-step sign-in's half-way token is not a session.
 {

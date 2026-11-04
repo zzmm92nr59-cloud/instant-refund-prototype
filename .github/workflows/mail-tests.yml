@@ -65,3 +65,5 @@ jobs:
         run: node scripts/test-return-policies.mjs
       - name: Gifts (tagging receipts, who for, Wrapped, own receipts only)
         run: node scripts/test-gifts.mjs
+      - name: Fix this receipt (shop, total, date, items; own receipts only; counted for Relay health)
+        run: node scripts/test-receipt-fixes.mjs

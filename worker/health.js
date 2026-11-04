@@ -49,11 +49,12 @@ export async function relayHealth(env, me, now = Date.now()) {
     SUM(json_extract(details, '$.pasted') IS NOT NULL) AS pasted`;
   const quality = (r) => ({ receipts: n(r.receipts), high: n(r.high), medium: n(r.medium), low: n(r.low), confirmed: n(r.confirmed), dismissed: n(r.dismissed),
     noTotal: n(r.noTotal), noItems: n(r.noItems), pasted: n(r.pasted) });
-  // A shop's problems: removed as not theirs, no total found, read with low confidence, added by hand.
-  const problems = (s) => s.dismissed + s.noTotal + s.low + s.pasted;
+  // A shop's problems: removed as not theirs, no total found, read with low confidence, added by hand, fixed by the shopper.
+  const problems = (s) => s.dismissed + s.noTotal + s.low + s.pasted + (s.fixed || 0);
 
   const [people, sessions, signIns, inboxes, inboxPeople, checked, jobs, jobErrors, emails, kinds, purchases, purchases7, versions, unread,
-    learned, marks, gifts, giftShoppers, history, perDay, shops, mine, returns, swaps, payments, labels, shopify, shopifyTest, square, pushes, watches, codeFails] = await Promise.all([
+    learned, marks, gifts, giftShoppers, history, perDay, shops, mine, returns, swaps, payments, labels, shopify, shopifyTest, square, pushes, watches, codeFails,
+    fixes, fixReaders, fixShops, myFixes] = await Promise.all([
     one("SELECT COUNT(*) AS total, SUM(created_at >= ?) AS week, SUM(created_at >= ?) AS month FROM shoppers", d7, d30),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE expires_at > ?", now),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE created_at >= ?", d7),
@@ -87,15 +88,23 @@ export async function relayHealth(env, me, now = Date.now()) {
     one("SELECT COUNT(*) AS n FROM square_merchants"),
     one("SELECT COUNT(*) AS n, COUNT(DISTINCT shopper_id) AS people FROM push_subscriptions"),
     one("SELECT COUNT(*) AS n, COUNT(DISTINCT shopper_id) AS people FROM price_watches"),
-    one("SELECT COUNT(*) AS n FROM auth_code_failures WHERE created_at >= ?", d1)
+    one("SELECT COUNT(*) AS n FROM auth_code_failures WHERE created_at >= ?", d1),
+    // "Fix this receipt": which parts shoppers corrected, which reader read them, and at which shops.
+    one("SELECT COUNT(*) AS n, SUM(shop) AS shop, SUM(total) AS total, SUM(date) AS date, SUM(items) AS items, COUNT(DISTINCT shopper_id) AS people, SUM(updated_at >= ?) AS week FROM receipt_fixes", d7),
+    all("SELECT COALESCE(reader, 0) AS v, COUNT(*) AS n FROM receipt_fixes GROUP BY v ORDER BY v DESC"),
+    all("SELECT domain, COUNT(*) AS n FROM receipt_fixes WHERE domain IS NOT NULL GROUP BY domain"),
+    all("SELECT domain, COUNT(*) AS n FROM receipt_fixes WHERE shopper_id = ? GROUP BY domain", me.id)
   ]);
 
-  const shopRow = (r) => ({ domain: r.domain, ...(r.people != null ? { people: n(r.people) } : {}), ...quality(r) });
+  // Fixes count against a shop only where the shop is already named (from enough people), or among the admin's own.
+  const fixedAt = (list) => new Map(list.map((r) => [r.domain, n(r.n)]));
+  const allFixed = fixedAt(fixShops), myFixed = fixedAt(myFixes);
+  const shopRow = (r, fixedMap) => ({ domain: r.domain, ...(r.people != null ? { people: n(r.people) } : {}), ...quality(r), fixed: fixedMap.get(r.domain) || 0 });
   const named = (r) => r.domain && !PERSONAL_MAIL.test(r.domain);
   const byProblems = (a, b) => problems(b) / Math.max(1, b.receipts) - problems(a) / Math.max(1, a.receipts) || b.receipts - a.receipts;
   const days = dates.map((day) => { const r = perDay.find((x) => x.d === day) || {}; return { day, kept: n(r.kept), skipped: n(r.skipped) }; });
   const byStatus = (rows) => Object.fromEntries(rows.map((r) => [r.status || "unknown", n(r.n)]));
-  const mineList = mine.map(shopRow);
+  const mineList = mine.map((r) => shopRow(r, myFixed));
   return {
     generatedAt: new Date(now).toISOString(),
     minShoppersPerShop: MIN_SHOPPERS_PER_SHOP,
@@ -115,10 +124,12 @@ export async function relayHealth(env, me, now = Date.now()) {
       waitingToBeRead: n(unread.n),
       shoppersTaught: { groupsChanged: n(learned.groups), shopsMarkedPromotions: n(learned.promos), people: n(learned.people) },
       itemsMarkedReturning: n(marks.n),
+      fixedByShoppers: { receipts: n(fixes.n), shop: n(fixes.shop), total: n(fixes.total), date: n(fixes.date), items: n(fixes.items), people: n(fixes.people),
+        thisWeek: n(fixes.week), byReader: fixReaders.map((r) => ({ version: n(r.v), receipts: n(r.n) })) },
       days
     },
     // Shops with the most problems for their size, among shops at least MIN_SHOPPERS_PER_SHOP shoppers bought from.
-    shops: shops.map(shopRow).filter(named).sort(byProblems).slice(0, 12),
+    shops: shops.map((r) => shopRow(r, allFixed)).filter(named).sort(byProblems).slice(0, 12),
     mine: { receipts: mineList.reduce((s, r) => s + r.receipts, 0), shops: mineList.filter(named).sort(byProblems).slice(0, 15),
       personalMail: mineList.filter((r) => r.domain && PERSONAL_MAIL.test(r.domain)).reduce((s, r) => s + r.receipts, 0),
       noShop: mineList.filter((r) => !r.domain).reduce((s, r) => s + r.receipts, 0) },
