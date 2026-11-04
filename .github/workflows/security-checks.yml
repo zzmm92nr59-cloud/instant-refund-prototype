@@ -24,3 +24,5 @@ jobs:
         run: node scripts/test-access-control.mjs
       - name: Relay health shows counts only (admins only, shops named from 3 people)
         run: node scripts/test-health.mjs
+      - name: Help chat (nothing from anyone's email goes to the AI company; limits; a person by email)
+        run: node scripts/test-support-chat.mjs

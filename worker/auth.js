@@ -11,6 +11,7 @@
 import { labelDeleteStatements } from "./royal-mail.js";
 import { checkBody } from "./validate.js";
 import { handleHealthRoute } from "./health.js";
+import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
@@ -540,6 +541,7 @@ async function listPurchases(env, shopper, orderId) {
 async function deleteShopper(env, shopper, o) {
   await ensurePushTables(env.RELAY_DB);
   await ensureProfileTable(env.RELAY_DB);
+  for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
   await forgetCard(env, shopper.id, o).catch(() => {});
   // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
   await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
@@ -547,6 +549,7 @@ async function deleteShopper(env, shopper, o) {
     ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
     ...profileDeleteStatements(env.RELAY_DB, shopper.id),
     ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
+    ...supportDeleteStatements(env.RELAY_DB, shopper.id),
     ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
     ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
     ...totpDeleteStatements(env.RELAY_DB, shopper.id),
@@ -637,6 +640,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // The Relay health page: counts of how well emails are read and how the app is used. Relay admins only.
     const healthResponse = await handleHealthRoute(path, request.method, env, cors, shopper, o);
     if (healthResponse) return healthResponse;
+    // The help chat (an AI assistant, and "Talk to a person"). Off until the ANTHROPIC_API_KEY secret is set.
+    const supportResponse = await handleSupportRoute(path, request.method, request, env, cors, shopper, o);
+    if (supportResponse) return supportResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;

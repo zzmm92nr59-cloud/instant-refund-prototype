@@ -55,6 +55,7 @@ found" (404) where even saying it exists would tell too much.
 | Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
 | List of connected shops | Read names | Read | Read | | | |
 | Reviewer sign-in (`/relay/my/admin/review-account`) | | | Turn on (a new address and code), see the address and code, turn off (deletes the account) | | | |
+| Help chat (`/relay/my/help/chat`, `/relay/my/help/handoff`) | | Own: ask the assistant (60 messages a day; 3,000 a day across everyone), send the chat to Relay's team (5 a day). Relay keeps no copy of the chat, only daily counts | As a shopper (300 messages a day) | | | |
 | Relay health (`/relay/my/admin/health`) | | | Read counts of how well emails are read and how the app is used: never anything from a single receipt; a shop is named only once 3 or more shoppers have receipts from it; the admin's own receipts by shop | | | |
 | Testing tools (`/relay/my/testing/...`) | | Sandbox test shop only: off when Square is live; 5 test orders a day | | | | |
 | Prototype test routes (`/relay/test-lab`, `/relay/live-test`, `/relay/ledger/...` and others) | Off: "not found" | Off | Off | Off | | |
@@ -168,6 +169,7 @@ Where each one lives:
 | `TWILIO_AUTH_TOKEN` (and `TWILIO_ACCOUNT_SID`) | Sign-in codes by text | GitHub secret | Twilio console → API keys & tokens → secondary token → promote; update; deploy | Nothing |
 | `PLAID_SECRET` | The bank-link demo in the testing tools (sandbox) | GitHub secret | Plaid dashboard → Keys → rotate; update; deploy | Nothing |
 | `AWIN_API_TOKEN` | Reading affiliate product feeds | Cloudflare secret | Awin → API credentials → new token; `wrangler secret put` | Nothing |
+| `ANTHROPIC_API_KEY` | The help chat's AI assistant (off until it's set) | Cloudflare secret | Claude Console → API keys → create a key; `wrangler secret put`; delete the old one | Nothing. Removing it turns the assistant off; "Contact us" by email still works |
 | `CLOUDFLARE_API_TOKEN` | Lets GitHub deploy the Worker | GitHub secret | Cloudflare → My Profile → API Tokens → roll; update the GitHub secret | Nothing |
 
 ### `AUTH_SECRET` is special

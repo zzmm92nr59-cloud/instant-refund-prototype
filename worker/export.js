@@ -67,6 +67,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       returnReminders: (await rows("SELECT receipt_id AS receiptId, title, deadline, remind_at AS remindAt, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?", id))
         .map((r) => ({ receiptId: r.receiptId, title: r.title, deadline: r.deadline, remindAt: iso(r.remindAt), sentAt: iso(r.sentAt) })),
     },
+    // The help chat keeps no conversations: only how many messages you sent each day, and whether you asked for a person.
+    helpChat: (await rows("SELECT day, messages, handoffs FROM support_chat_usage WHERE shopper_id = ? ORDER BY day", id)),
     alerts: {
       devicesWithNotifications: devices ? devices.n : 0,
       watchedProducts: (await rows("SELECT product, variant, store, baseline_minor AS priceWhenWatchedPence, last_seen_minor AS lastSeenPence, created_at AS createdAt FROM price_watches WHERE shopper_id = ?", id))

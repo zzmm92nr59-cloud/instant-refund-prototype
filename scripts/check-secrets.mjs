@@ -21,6 +21,7 @@ const PATTERNS = {
   "Google OAuth client secret": /\bGOCSPX-[A-Za-z0-9_-]{20,}/g,
   "Shopify token or secret": /\bshp(?:at|ss|ca|pa)_[a-fA-F0-9]{20,}/g,
   "Resend API key": /\bre_[A-Za-z0-9]{8,}_[A-Za-z0-9]{16,}/g,
+  "Anthropic API key": /\bsk-ant-[A-Za-z0-9_-]{20,}/g,
   "Twilio API key": /\bSK[0-9a-fA-F]{32}\b/g,
   "AWS access key": /\bAKIA[0-9A-Z]{16}\b/g,
   "GitHub token": /\bgh[pousr]_[A-Za-z0-9]{36,}/g,
