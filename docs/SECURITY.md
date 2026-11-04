@@ -180,6 +180,7 @@ If it has leaked, do the migration at once. Until then, assume anyone holding it
 | `scripts/test-access-control.mjs` | Who can do what | Every pull request and every deploy |
 | `scripts/check-secrets.mjs` | No keys in the repository | Every pull request and every deploy |
 | `scripts/record-app-requests.mjs` | Records what the app sends during the browser tests, then checks it against the rules | The browser tests on every pull request |
+| `scripts/check-live-security.mjs` | The live server from outside: not-found answers, test routes off, sessions required, unexpected fields refused, a real 429 from Cloudflare's rate limiter | After every deploy (`live-security-check.yml`) |
 
 ## Not covered here
 
