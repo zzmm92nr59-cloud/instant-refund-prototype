@@ -49,6 +49,12 @@ const receipts = [
     totalPence: 2600, currency: "GBP", category: "fashion", categoryLabel: "Fashion", returnable: true, items: [{ name: "Silk Scarf", qty: 1, pricePence: 2600, category: "fashion", categorySure: true }],
     returns: null, returnBy: { date: day(26), basis: "policy", from: "order", estimate: true },
     returnPolicy: { shop: "Pellow", days: 30, from: "dispatch", most: true, url: "https://pellow.example/returns", checked: day(-1) } },
+  // Bought in the shop's dated Christmas extension: its date is the one given.
+  { id: "99999999-9999-4999-8999-999999999999", status: "pending", kind: "receipt", retailer: { name: "Brindle", domain: "brindle.example" }, orderRef: "BR-5", orderDate: day(-2),
+    totalPence: 1800, currency: "GBP", category: "home", categoryLabel: "Home & garden", returnable: true, items: [{ name: "Wool Throw", qty: 1, pricePence: 1800, category: "home", categorySure: true }],
+    returns: null, returnBy: { date: day(60), basis: "policy", from: "festive", estimate: true },
+    returnPolicy: { shop: "Brindle", days: 28, from: "purchase", most: true, url: "https://brindle.example/returns", checked: day(-1),
+      festive: { from: day(-20), to: day(30), until: day(60), days: null } } },
   // A food order with nothing that goes back.
   { id: "55555555-5555-4555-8555-555555555555", status: "pending", kind: "receipt", retailer: { name: "Tesco", domain: "tesco.com" }, orderRef: "T-1002", orderDate: day(-1),
     totalPence: 260, currency: "GBP", category: "food", categoryLabel: "Food & drink", returnable: false, notReturnableReason: "Food and drink usually can't be returned.",
@@ -108,7 +114,7 @@ await page.waitForTimeout(600);
 const text = await wallet.innerText();
 for (const thing of ["Court Classic Trainers", "Linen Shirt", "Desk Lamp", "Cord Trousers", "Silk Scarf"]) assert.ok(text.includes(thing), thing + " is in the wallet");
 for (const thing of ["Bananas", "Kitchen Roll", "Semi Skimmed Milk", "Wool Coat"]) assert.ok(!text.includes(thing), thing + " isn't in the wallet");
-assert.match(text, /6 items/);
+assert.match(text, /7 items/);
 const kettle = wallet.locator(".rl-po").filter({ hasText: "Glass Kettle 1.7L" });
 assert.match(await kettle.innerText(), /1 of 3 in this order/);
 assert.ok(!/return by|days? left/i.test(await kettle.innerText()), "a date Relay worked out isn't shown as a deadline: " + await kettle.innerText());
@@ -165,6 +171,12 @@ await sheet.getByRole("button", { name: "Close" }).click();
 await wallet.locator(".rl-po").filter({ hasText: "Silk Scarf" }).getByRole("button", { name: "Details" }).click();
 await sheet.getByText("Pellow's returns policy gives 30 days from when it's sent for most items. Counting from your order, that's until at least " + wdDay(day(26)) + ".").waitFor();
 await sheet.getByRole("link", { name: "Read Pellow's returns policy" }).waitFor();
+await sheet.getByRole("button", { name: "Close" }).click();
+// 4e. The throw: bought in the shop's Christmas dates, so the extension's date.
+const dmy = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+await wallet.locator(".rl-po").filter({ hasText: "Wool Throw" }).getByRole("button", { name: "Details" }).click();
+await sheet.getByText("28 days to return most items", { exact: true }).waitFor();
+await sheet.getByText("Brindle's returns policy gives 28 days from purchase for most items. Bought between " + dmy(day(-20)) + " and " + dmy(day(30)) + ", so it can go back until at least " + wdDay(day(60)) + ".").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - with the shop's own policy: what it gives for most items, the least that means for this order, and a link to it");
 

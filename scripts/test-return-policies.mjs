@@ -65,18 +65,23 @@ assert.deepEqual(policyReturnBy({ orderDate: "2026-10-30" }, pol({ from: "purcha
 assert.equal(policyReturnBy({ orderDate: "2026-09-01" }, pol(), today), null, "a date that's passed says nothing for sure");
 assert.equal(policyReturnBy({ orderDate: "2026-12-01" }, pol(), today), null, "an order date in the future is a misread");
 assert.equal(policyReturnBy({ orderDate: null }, pol(), today), null);
-const xmas = pol({ festive: { bought: ["2026-11-01", "2026-12-31"], until: "2027-01-31", quote: "Bought 1 November to 31 December 2026? Return it by 31 January 2027." } });
+const xmas = pol({ festive: { bought: ["2026-11-01", "2027-01-01"], until: "2027-01-31", quote: "Bought 1 November 2026 to 1 January 2027? Return it by 31 January 2027." } });
 assert.deepEqual(policyReturnBy({ orderDate: "2026-11-02", delivery: { status: "delivered", at: "2026-11-03" } }, xmas, today),
   { date: "2027-01-31", basis: "policy", from: "festive", estimate: true }, "bought in the Christmas dates: the later date");
 assert.equal(policyReturnBy({ orderDate: "2026-10-25", delivery: { status: "delivered", at: "2026-10-27" } }, xmas, today).from, "delivery", "bought before them: the usual window");
-const sixty = pol({ festive: { bought: ["2026-11-01", "2026-12-31"], days: 60, from: "delivery", quote: "Purchases made 1 November to 31 December 2026 get 60 days." } });
-assert.deepEqual(policyReturnBy({ orderDate: "2026-11-02", delivery: { status: "delivered", at: "2026-11-03" } }, sixty, today), { date: "2027-01-02", basis: "policy", from: "festive", estimate: true });
+const sixty = pol({ festive: { bought: ["2026-11-01", "2026-12-31"], days: 60, quote: "Purchases made 1 November to 31 December 2026 get 60 days." } });
+assert.deepEqual(policyReturnBy({ orderDate: "2026-11-02", delivery: { status: "delivered", at: "2026-11-03" } }, sixty, today), { date: "2027-01-01", basis: "policy", from: "festive", estimate: true },
+  "an extension's days count from the order, the earliest they can start");
+assert.deepEqual(policyReturnBy({ orderDate: "2027-01-01", delivery: { status: "delivered", at: "2027-01-05" } }, xmas, "2027-01-06"), { date: "2027-01-31", basis: "policy", from: "festive", estimate: true },
+  "bought on the extension's last day: its date is the sure one, even though the usual 30 days from delivery would end later");
 for (const p of RETURN_POLICIES) {
   const by = policyReturnBy({ orderDate: today, delivery: { status: "delivered", at: today } }, p, today);
   assert.ok(by && by.estimate === true && by.basis === "policy" && by.date > today, p.shop);
 }
 assert.deepEqual(Object.keys(policyForApp(hm)).sort(), ["checked", "days", "from", "most", "shop", "url"], "the app gets what it shows, not the quotes");
-pass("the least the shopper can count on: from delivery when known, else from the order; Christmas dates only when dated; always marked as worked out");
+const shown = policyForApp(RETURN_POLICIES.find(p => p.shop === "Argos"));
+assert.deepEqual(shown.festive, { from: "2026-09-23", to: "2026-12-25", until: "2027-01-31", days: null }, "the app gets an extension's dates to explain the date");
+pass("the least the shopper can count on: from delivery when known, else from the order; a dated Christmas extension's own date; always marked as worked out");
 
 // --- 4. The receipts list: the policy fills in only when the emails give no date or window ---
 const sqlite = new DatabaseSync(":memory:");
