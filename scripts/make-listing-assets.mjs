@@ -161,8 +161,10 @@ await shot("4-price-differences", "When a customer swaps to a dearer item, they 
 });
 
 // ---- The app icon: Relay's R as on the phone app's icon (icons/icon-512.png), square with room around it (Shopify
-// rounds the corners itself). Relay's navy and lime (CLAUDE.md rule 1): change these with the app's colours. ----
-const navy = "#101828", lime = "#c7f567";
+// rounds the corners itself), in the dashboard's own two colours, so it follows any change to Relay's colours. ----
+const dashCss = readFileSync("retailer.html", "utf8");
+const colour = (name) => { const m = new RegExp("--" + name + ":\\s*(#[0-9a-fA-F]{6})").exec(dashCss); if (!m) throw new Error("retailer.html has no --" + name); return m[1]; };
+const navy = colour("navy"), lime = colour("lime");
 const icon = await browser.newPage({ viewport: { width: 1200, height: 1200 }, deviceScaleFactor: 1 });
 await icon.setContent(`<!doctype html><html><body style="margin:0;background:${navy};display:grid;place-items:center;width:1200px;height:1200px">
   <svg width="1200" height="1200" viewBox="0 0 1200 1200" xmlns="http://www.w3.org/2000/svg">
