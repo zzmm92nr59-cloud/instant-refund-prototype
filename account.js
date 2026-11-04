@@ -331,12 +331,19 @@
     ".rl-order{border:1px solid var(--rl-line);border-radius:18px;padding:12px 14px;margin:10px 0;background:var(--rl-card)}" +
     ".rl-po-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin:12px 0 8px}" +
     ".rl-po{background:var(--rl-card);border:1px solid transparent;border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px}" +
-    ".rl-po-top{display:flex;gap:14px;align-items:flex-start}.rl-po-info{flex:1;min-width:0}" +
-    ".rl-po-img{width:68px;height:68px;border-radius:16px;background:var(--rl-fill);flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:var(--rl-text2)}" +
+    ".rl-po-top{display:flex;gap:14px;align-items:center}.rl-po-info{flex:1;min-width:0}" +
+    ".rl-po-img{width:96px;height:96px;border-radius:18px;background:var(--rl-fill);flex:none;overflow:hidden;display:grid;place-items:center;font-weight:800;font-size:20px;color:var(--rl-text2)}" +
     ".rl-po-img img{width:100%;height:100%;object-fit:cover}.rl-has-logo{background:var(--rl-card)!important;box-shadow:inset 0 0 0 1px #e7e1d2}.rl-po-img img.rl-logo-img{object-fit:contain}" +
     ".rl-po-shop{font-size:13px;font-weight:700;color:var(--rl-text2)}" +
-    ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:var(--rl-text)}.rl-po-meta{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-po h3{font-size:17px;line-height:1.25;margin:3px 0 2px;color:var(--rl-text)}.rl-po-meta{font-size:14px;line-height:1.35;margin-top:3px;color:var(--rl-text2)}" +
     ".rl-po-price{font-weight:800;font-size:17px;white-space:nowrap;color:var(--rl-text)}" +
+    // A wallet card: the shop's name and the price on one line, size and date under it, then the parcel's news.
+    ".rl-po-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}" +
+    ".rl-po h3.rl-po-brand{font-size:20px;line-height:1.2;font-weight:800;letter-spacing:-.01em;margin:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".rl-po-ship{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:14px;font-weight:600;line-height:1.3;color:var(--rl-text2)}.rl-po-ship.done{color:var(--rl-accent)}.rl-po-ship .rl-jic{margin:0;flex:none}" +
+    ".rl-sheet>.rl-po-ship{margin:0 0 14px}.rl-dt-sub{margin:0 0 10px;color:var(--rl-text2);font-size:15px;line-height:1.4}" +
+    ".rl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
+    "@media(max-width:360px){.rl-po-img{width:80px;height:80px}}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-status.wait{background:var(--rl-fill);color:var(--rl-text2)}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     // Inside a card: tinted buttons rather than outlined ones, Details only as wide as its word beside another button.
@@ -560,6 +567,7 @@
     ".rl-wact{display:grid;gap:10px;margin-top:8px}" +
     ".rl-wgo,.rl-whave{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;padding:0 14px;text-align:center;font:inherit;cursor:pointer;transition:transform .12s,opacity .12s}" +
     ".rl-wgo{min-height:56px;border-radius:999px;background:#fff;color:#101828;font-size:18px;font-weight:700}.rl-wgo:active{transform:scale(.97)}" +
+    ".rl-wgo.rl-nudge{animation:rlnudge .6s cubic-bezier(.2,.8,.2,1)}@keyframes rlnudge{0%,100%{transform:scale(1)}35%{transform:scale(1.06)}65%{transform:scale(.98)}}" +
     ".rl-whave{min-height:52px;border-radius:999px;border:1.5px solid rgba(255,255,255,.55);background:rgba(0,0,0,.14);color:#fff;font-size:clamp(15px,4.4vw,17px);font-weight:700}.rl-whave:active{transform:scale(.97);background:rgba(0,0,0,.24)}" +
     ".rl-wgo:focus-visible,.rl-whave:focus-visible{outline:2px solid #fff;outline-offset:3px}" +
     // Its pictures: cards drawn the way Relay shows your own, for made-up shops.
@@ -579,7 +587,7 @@
     ".rl-wart>*:nth-child(2){animation-delay:.08s}.rl-wart>*:nth-child(3){animation-delay:.16s}.rl-wart>*:nth-child(4){animation-delay:.24s}" +
     "@media(max-height:720px){.rl-wslide h1{font-size:clamp(28px,9vw,34px);margin-top:18px}.rl-wart{gap:8px;min-height:262px}.rl-wcard{padding:10px 12px}.rl-wbrand{margin-top:12px}}" +
     "@media(max-height:650px){.rl-wart{zoom:.8}}@media(max-height:590px){.rl-wart{display:none}.rl-wslide h1{margin-top:0}}" +
-    "@media(prefers-reduced-motion:reduce){.rl-wslide>*,.rl-wart>*{animation:none}.rl-welcome{transition:none}.rl-wbars .now i{animation:none;width:100%}}" +
+    "@media(prefers-reduced-motion:reduce){.rl-wslide>*,.rl-wart>*,.rl-wgo.rl-nudge{animation:none}.rl-welcome{transition:none}.rl-wbars .now i{animation:none;width:100%}}" +
     // A group's page: header, filters, receipts by month.
     ".rl-cat-back{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:4px;padding:0 10px 0 0;border-radius:10px;font-weight:600;font-size:17px;color:var(--rl-accent)}.rl-cat-back-i{font-size:22px;line-height:1;margin-top:-2px}" +
     ".rl-cat-back:active{opacity:.6}.rl-cat-back:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
@@ -610,6 +618,21 @@
     ".rl-rr-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-rr-mid b{font-size:15.5px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-rr-mid span{font-size:13.5px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-rr-end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}.rl-rr-end b{font-size:15.5px;color:var(--rl-text)}" +
     ".rl-rr-chip{font-size:13px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
+    // An opened receipt: when to return it and why, the shop's returns page, small buttons in a row, one question, its group.
+    ".rl-ret{display:flex;flex-direction:column;gap:4px}.rl-ret+.rl-ret{margin-top:16px}" +
+    ".rl-ret-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.rl-ret-h{font-size:17px;font-weight:700;line-height:1.3;color:var(--rl-text)}" +
+    ".rl-ret-why{display:block;font-size:14px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-ret-go span{color:inherit;font-size:inherit}.rl-order .rl-rr-chip{font-size:13px}.rl-po-ship .rl-jic{color:inherit}" +
+    ".rl-ret-go{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;min-height:44px;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:none;transition:opacity .12s}.rl-ret-go:active{opacity:.55}.rl-ret-go .rl-jic{margin:0}" +
+    ".rl-ret-steps{display:flex;flex-direction:column;gap:4px;margin:4px 0}.rl-ret-steps>span{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--rl-text2)}.rl-ret-steps>span.done{color:var(--rl-accent);font-weight:600}.rl-ret-steps .rl-jic{margin:0;flex:none}" +
+    ".rl-rc-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}" +
+    ".rl-pill{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:999px;background:rgba(120,120,128,.16);color:var(--rl-text);font-size:15px;font-weight:700;text-align:center;text-decoration:none;transition:transform .12s,opacity .12s}" +
+    ".rl-pill:active{transform:scale(.96)}.rl-pill:disabled{opacity:.5;cursor:default}.rl-pill:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pill.rl-pill-on{background:var(--lime,#74ffed);color:var(--navy,#171f44)}" +
+    ".rl-rc-ask{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rl-line)}.rl-rc-ask>span{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.35;color:var(--rl-text)}.rl-rc-ask .rl-pill{padding:0 20px}" +
+    ".rl-rc-group{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:12px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}" +
+    ".rl-rc-pickw{position:relative;display:inline-flex;align-items:center}.rl-rc-pickw .rl-jic{position:absolute;right:0;pointer-events:none;margin:0;color:var(--rl-text2)}" +
+    ".rl-rc-pick{appearance:none;-webkit-appearance:none;border:0;background:transparent;color:var(--rl-text);font:inherit;font-size:15px;font-weight:700;text-align:right;min-height:44px;padding:0 24px 0 8px;cursor:pointer}.rl-rc-pick:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
@@ -813,6 +836,19 @@
     (input || card.querySelector("button")).focus();
   }
   function ask(message, yesLabel, onYes) { askBox(message, yesLabel, false, onYes); }
+  // A short choice on top of whatever is showing: a button for each answer, then Cancel.
+  function chooseBox(message, choices) {
+    var card = el("div", { className: "rl-sheet", role: "alertdialog", ariaModal: "true" }, [el("p", { text: message, style: "color:var(--rl-text);font-size:17px;font-weight:700;margin:0 0 6px" })]);
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function done() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") done(); }
+    choices.forEach(function (c) { card.appendChild(el("button", { className: "rl-btn ghost", text: c[0], onclick: function () { done(); c[1](); } })); });
+    card.appendChild(el("button", { className: "rl-btn ghost rl-plain", text: "Cancel", onclick: done }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) done(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    card.querySelector("button").focus();
+  }
   function askText(message, yesLabel, onText) { askBox(message, yesLabel, true, onText); }
   var back = null;
   function dismiss() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
@@ -901,7 +937,11 @@
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     back: '<path d="m15 6-6 6 6 6"/>',
     ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>'
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    ext: '<path d="M14 4.5h5.5V10"/><path d="m19.5 4.5-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/>',
+    parcel: '<path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 11.5v9"/>',
+    dot: '<circle cx="12" cy="12" r="4.5"/>',
+    down: '<path d="m7 10 5 5 5-5"/>'
   };
   function jIc(n, px) {
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
@@ -1013,8 +1053,13 @@
     var have = el("button", { type: "button", className: "rl-whave", text: "I already have an account", onclick: function () { freeze(); open(function (s) { signedOutView(s, { returning: true }); }); } });
     col.appendChild(bars); col.appendChild(brand); col.appendChild(stage); col.appendChild(el("div", { className: "rl-wact" }, [start, have]));
     root.appendChild(col);
-    function show(n) {
-      i = Math.max(0, Math.min(LAST, n));
+    // A tap past the last slide (or back from the first) has nowhere to go: the slide stays as it is rather than being drawn
+    // again, which made it flash on every tap. At the end, "Get started" gives a small nudge instead.
+    function nudge() { if (calm) return; start.classList.remove("rl-nudge"); void start.offsetWidth; start.classList.add("rl-nudge"); }
+    function show(n, first) {
+      var to = Math.max(0, Math.min(LAST, n));
+      if (!first && to === i) { if (n > LAST) nudge(); return; }
+      i = to;
       var s = WELCOME[i];
       root.style.background = s.bg;
       Array.prototype.forEach.call(bars.children, function (b, k) {
@@ -1049,7 +1094,7 @@
       stop: function () { clearTimeout(timer); timer = null; document.removeEventListener("keydown", onKey); }
     };
     document.body.appendChild(root); document.body.classList.add("rl-welcoming");
-    show(0); focusStory();
+    show(0, true); focusStory();
   }
   function unmountWelcome() {
     if (welcomeCtl) { welcomeCtl.stop(); welcomeCtl = null; }
@@ -1913,7 +1958,12 @@
       signedInView(sheet, email, notice, r.body);
     }).catch(function () { sheet.textContent = ""; sheet.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
-  function receiptCard(x, refresh, slim) {
+  // A receipt's details. slim: inside a row or a sheet that already names the shop. opts.inRow: the row above already shows
+  // the days left, so they aren't repeated. refresh(kind) hears what changed: "confirm" or "dismiss".
+  // Laid out simply: when to return it and why that date, the shop's returns page, then a row of small buttons, then (until
+  // you've checked it) one question, "Is this right?".
+  function receiptCard(x, refresh, slim, opts) {
+    opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
     var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
@@ -1925,85 +1975,51 @@
       apiBlob("/relay/my/receipts/" + x.id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
     }
     var dv = x.delivery;
-    if (!slim && dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) {
-      var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }); };
-      var today = new Date().toISOString().slice(0, 10);
-      var said = dv.status === "delivered" ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "") :
-        dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? (dv.at && dv.at !== today ? "Due " + day(dv.at) : "Due today") : "On its way";
-      var dl = el("div", { style: "clear:both;margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px" }, [
-        el("span", { text: (dv.status === "delivered" ? "✓ " : "") + said + (dv.carrier ? " · " + dv.carrier : ""),
-          style: "font-weight:700;padding:4px 10px;border-radius:999px;background:" + (dv.status === "delivered" ? "#e3f4c8;color:var(--rl-accent)" : "#e7eefc;color:#1d3f8a") })]);
-      if (dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) dl.appendChild(el("a", { href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel", style: "font-weight:600;display:inline-flex;align-items:center;min-height:44px" }));
-      card.appendChild(dl);
-    }
+    if (!slim && dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) card.appendChild(shipLine(dv));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
     else if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
     var left = daysLeft(deadlineOf(x));
-    if (left !== null) {
-      var pill = left < 0 ? ["Deadline passed", "#ece8dd", "#5b6475"] : left === 0 ? ["Return today", "#fde0dd", "#b3261e"] :
-        left <= 2 ? [left + " day" + (left === 1 ? "" : "s") + " left", "#fde0dd", "#b3261e"] :
-        left <= 7 ? [left + " days left", "#ffefc9", "#77520a"] : [left + " days left", "#e3f4c8", "#46601b"];
-      card.appendChild(el("span", { text: pill[0], style: "display:inline-block;margin-top:6px;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:" + pill[1] + ";color:" + pill[2] }));
-      if (left >= 0 && x.id && x.reminder && !(x.returnBy && deadlineOf(x) === x.returnBy.date)) {
-        var rem = el("button", { className: "rl-btn ghost", style: "margin-top:8px;padding:9px 14px;font-size:14px", disabled: x.reminder === "sent",
-          text: x.reminder === "on" ? "Reminder set · turn off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before",
-          onclick: function () { rem.disabled = true;
-            api("/relay/my/receipts/" + x.id + "/remind", { method: "POST", body: { on: x.reminder === "off" } }).then(refresh); } });
-        card.appendChild(rem);
-        if (x.reminder === "off") card.appendChild(el("span", { text: "We'll email you once, at your sign-in address.", style: "display:block;font-size:12px;opacity:.7;margin-top:4px" }));
-      }
-    }
-    if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale && marketOn()) {
-      card.appendChild(el("button", { className: "rl-btn ghost", text: "Missed the window? Sell or swap it", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openResale(x.id); } }));
-    }
-    if (x.id && mailRef(x) && openOriginal) {
-      card.appendChild(el("button", { className: "rl-btn ghost", text: "View original receipt", style: "margin-top:8px;padding:9px 14px;font-size:14px", onclick: function () { openOriginal(x.id); } }));
-    }
+    var leftText = left === null ? "" : left < 0 ? "Deadline passed" : left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left";
+    var leftTone = left === null ? "" : left < 0 ? "past" : left <= 2 ? "red" : left <= 7 ? "amber" : "green";
+    // When to return it, in two lines: the date to go by, then why that date (and whose words they are).
     var by = x.returnBy && deadlineOf(x) === x.returnBy.date ? x.returnBy : null;
     var legal = by && by.basis === "uk_law" ? by.date : null;
-    var rt = x.returns || (legal ? {} : null);
-    var longDay = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }); };
-    if (rt) {
-      var rb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
-      rb.appendChild(el("b", { text: "Returns", style: "display:block;margin-bottom:4px" }));
-      var line = function (t) { rb.appendChild(el("span", { text: t, style: "display:block;margin-top:2px" })); };
-      if (rt.deadline) line("Return by " + new Date(rt.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }));
-      else if (rt.windowDays) {
-        line(rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery" + (by ? "" : " (check your delivery date)") : ""));
-        if (by && by.basis === "window") rb.appendChild(el("span", { style: "display:block;margin-top:2px;font-weight:600",
-          text: by.from === "delivery" ? "That's until " + longDay(by.date) + ", counting from when it was delivered." : "Go by " + longDay(by.date) + " to be safe: that's " + rt.windowDays + " days from the order date." }));
-      }
-      else if (legal) {
-        rb.appendChild(el("span", { text: "Tell " + who + " by " + longDay(legal) + " if you want to send it back",
-          style: "display:block;margin-top:2px;font-weight:600" }));
-        rb.appendChild(el("span", { text: by.from === "order"
-          ? "The email doesn't give a return window. For online orders UK law allows at least 14 days from delivery, so Relay counts 14 days from the order date to be safe. " + who + " may allow longer."
-          : "The email doesn't give a return window, so this is the least UK law allows for online orders: 14 days from delivery. " + who + " may allow longer.",
-          style: "display:block;margin-top:2px;font-size:13px;opacity:.8" }));
-      }
-      if (rt.address) line("Send to: " + rt.address);
-      (rt.instructions || []).forEach(function (t) { line("“" + t + "”"); });
-      if (rt.qrMentioned) line("This email mentions a QR code. Tap “View original receipt” to see it.");
-      else if (rt.labelMentioned) line("A label or drop-off option is mentioned. Tap “View original receipt” to see it.");
-      if (rt.portalUrl && /^https:\/\//.test(rt.portalUrl)) {
-        rb.appendChild(el("a", { href: rt.portalUrl, target: "_blank", rel: "noopener noreferrer", text: "Start a return with " + who, style: "display:flex;align-items:center;min-height:44px;margin-top:2px;font-weight:600" }));
-      }
-      // (Only when the email did say something: a date Relay worked out itself is explained above instead.)
-      if (x.returns) rb.appendChild(el("span", { text: "From your order email.", style: "display:block;margin-top:6px;opacity:.75;font-size:13px" }));
-      card.appendChild(rb);
+    var rt = x.returns || (legal ? {} : null) || {};
+    var day = function (d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
+    var head = null, why = null;
+    if (rt.deadline) { head = "Return by " + day(rt.deadline); why = "The date in " + who + "'s email."; }
+    else if (rt.windowDays && by && by.basis === "window") {
+      head = "Return by " + day(by.date);
+      why = by.from === "delivery" ? rt.windowDays + " days from delivery, as " + who + "'s email says." : "To be safe, " + rt.windowDays + " days from your order. " + who + "'s email gives " + rt.windowDays + " days.";
+    } else if (rt.windowDays) {
+      head = rt.windowDays + " days to return" + (rt.windowFrom === "delivery" ? " from delivery" : "");
+      why = "As " + who + "'s email says." + (rt.windowFrom === "delivery" ? " Count from the day it arrived." : "");
+    } else if (legal) {
+      head = "Return by " + day(legal);
+      why = by.from === "order" ? "To be safe, 14 days from your order. UK law gives at least 14 days from delivery, and " + who + " may give longer."
+        : "14 days from delivery, the least UK law gives. " + who + " may give longer.";
     }
+    var portal = rt.portalUrl && /^https:\/\//.test(rt.portalUrl) ? rt.portalUrl : null;
+    if (head || rt.address || portal) {
+      var rb = el("div", { className: "rl-ret" });
+      if (head) rb.appendChild(el("div", { className: "rl-ret-top" }, [el("b", { className: "rl-ret-h", text: head })].concat(leftText && !opts.inRow ? [el("span", { className: "rl-rr-chip " + leftTone, text: leftText })] : [])));
+      if (why) rb.appendChild(el("span", { className: "rl-ret-why", text: why }));
+      if (rt.address) rb.appendChild(el("span", { className: "rl-ret-why", text: "Send it to " + rt.address }));
+      if (portal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
+      card.appendChild(rb);
+    } else if (leftText && !opts.inRow) card.appendChild(el("span", { className: "rl-rr-chip " + leftTone, text: leftText, style: "display:inline-block;margin-top:2px" }));
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);
     var prog = x.returnProgress || null;
     if (!rp && prog) rp = {};
     if (rp) {
-      var pb = el("div", { style: "margin-top:8px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
-      pb.appendChild(el("b", { text: "Your return", style: "display:block;margin-bottom:4px" }));
-      var pl = function (t, st) { pb.appendChild(el("span", { text: t, style: "display:block;margin-top:2px;" + (st || "") })); };
+      var pb = el("div", { className: "rl-ret" });
+      pb.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
+      var pl = function (t, st) { pb.appendChild(el("span", { className: "rl-ret-why", text: t, style: st || "" })); };
       if (rp.deadline) {
         var past = rp.deadline < new Date().toISOString().slice(0, 10);
-        pl((past ? "Deadline passed: " : "Return by ") + new Date(rp.deadline + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }), past ? "opacity:.7" : "font-weight:600");
+        pl((past ? "Deadline passed: " : "Return by ") + day(rp.deadline), past ? "" : "color:var(--rl-text);font-weight:600");
       }
       if (prog) {
         // Where the return has got to, step by step. Each step comes from an email; Relay can't confirm the refund itself.
@@ -2014,37 +2030,70 @@
           ["Arrived at " + who, arrived, shortDay(prog.receivedAt || (pc && pc.status === "delivered" ? pc.at : null))],
           [prog.refundPence != null ? "Refund of " + money(prog.refundPence, prog.currency || "GBP") + " processed" : "Refund processed", Boolean(prog.refundedAt), shortDay(prog.refundedAt)]
         ];
-        var track = el("div", { style: "margin:6px 0 4px" });
+        var track = el("div", { className: "rl-ret-steps" });
         steps.forEach(function (st) {
-          track.appendChild(el("span", { text: (st[1] ? "✓ " : "○ ") + st[0] + (st[1] ? st[2] : ""), style: "display:block;margin-top:2px;" + (st[1] ? "font-weight:600;color:var(--rl-accent)" : "opacity:.65") }));
+          track.appendChild(el("span", { className: st[1] ? "done" : "" }, [jIc(st[1] ? "check" : "dot", 16), el("span", { text: st[0] + (st[1] ? st[2] : "") })]));
         });
         pb.appendChild(track);
-        if (prog.trackUrl && !rp.trackUrl && /^https:\/\//.test(prog.trackUrl)) pb.appendChild(el("a", { href: prog.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track your return parcel →", style: "display:block;margin:2px 0 4px;font-weight:600" }));
-        if (prog.refundedAt) pl("The refund comes from " + who + "'s email. Allow a few days for it to show on your statement.", "font-size:13px;opacity:.8");
+        if (prog.trackUrl && !rp.trackUrl && /^https:\/\//.test(prog.trackUrl)) pb.appendChild(el("a", { className: "rl-ret-go", href: prog.trackUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Track your return parcel" }), jIc("ext", 18)]));
+        if (prog.refundedAt) pl("The refund comes from " + who + "'s email. Allow a few days for it to show on your statement.");
       }
       if (rp.carrier) pl("Drop off with " + rp.carrier);
       if (rp.returnId) pl("Return ID: " + rp.returnId);
-      (rp.steps || []).forEach(function (t) { pl("• " + t); });
+      (rp.steps || []).forEach(function (t) { pl(t); });
       if (rp.estimatedRefundPence != null) pl("Estimated refund: " + money(rp.estimatedRefundPence, rp.currency) + " (an estimate from the email, not a confirmed refund)");
       if (rp.id && mailRef(rp) && openOriginal) {
-        pb.appendChild(el("button", { className: "rl-btn", text: "Show my QR code / return email", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openOriginal(rp.id); } }));
+        pb.appendChild(el("button", { className: "rl-btn", text: "Show my QR code / return email", style: "margin-top:8px;padding:10px 14px;font-size:15px", onclick: function () { openOriginal(rp.id); } }));
       } else if (/^[A-Za-z0-9]{6,40}$/.test(rp.gmailId || "")) {
-        pb.appendChild(el("a", { href: "https://mail.google.com/mail/u/0/#all/" + rp.gmailId, target: "_blank", rel: "noopener noreferrer", text: "Open the email with your QR code", style: "display:block;margin-top:6px;font-weight:600" }));
+        pb.appendChild(el("a", { className: "rl-ret-go", href: "https://mail.google.com/mail/u/0/#all/" + rp.gmailId, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Open the email with your QR code" }), jIc("ext", 18)]));
       }
-      if (rp.trackUrl && /^https:\/\//.test(rp.trackUrl)) {
-        pb.appendChild(el("a", { href: rp.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track your return", style: "display:block;margin-top:6px;font-weight:600" }));
-      }
-      pb.appendChild(el("span", { text: "Read from the store's email. Relay can't confirm the refund.", style: "display:block;margin-top:6px;opacity:.7;font-size:12px" }));
+      if (rp.trackUrl && /^https:\/\//.test(rp.trackUrl)) pb.appendChild(el("a", { className: "rl-ret-go", href: rp.trackUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Track your return" }), jIc("ext", 18)]));
+      pl("Read from the store's email. Relay can't confirm the refund.", "font-size:13px");
       card.appendChild(pb);
     }
-    if (x.status === "confirmed") { card.appendChild(el("span", { text: "Confirmed by you", style: "display:block;margin-top:4px" })); return card; }
-    card.appendChild(el("span", { text: x.needsShopperConfirmation ? "Some details may be missing or wrong. Please check." : "Please check this is right.", style: "display:block;margin-top:4px" }));
-    [["Looks right", "confirm", "rl-btn", null], ["Not mine / ignore", "dismiss", "rl-btn ghost", null], ["Just a promotion, hide it", "dismiss", "rl-btn ghost", "promo"]].forEach(function (b) {
-      if (b[3] && !slim) return;
-      card.appendChild(el("button", { className: b[2], text: b[0], style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
-        api("/relay/my/receipts/" + x.id + "/" + b[1], { method: "POST", body: b[3] ? { reason: b[3] } : {} }).then(refresh); } }));
-    });
+    // One row of small buttons: the receipt itself (with the QR code or label it mentions), the parcel, a reminder.
+    var acts = el("div", { className: "rl-rc-acts" });
+    var pill = function (text, onclick, extra) { var b = el("button", { type: "button", className: "rl-pill", text: text, onclick: onclick }); if (extra) extra(b); acts.appendChild(b); return b; };
+    if (x.id && mailRef(x) && openOriginal) pill(rt.qrMentioned ? "Receipt and QR code" : rt.labelMentioned ? "Receipt and label" : "View receipt", function () { openOriginal(x.id); });
+    if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl) && freshDelivery(x))
+      acts.appendChild(el("a", { className: "rl-pill", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel" }));
+    if (left !== null && left >= 0 && x.id && x.reminder && !(x.returnBy && deadlineOf(x) === x.returnBy.date)) {
+      var rem = pill(x.reminder === "on" ? "Reminder on · turn off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before", function () {
+        rem.disabled = true; api("/relay/my/receipts/" + x.id + "/remind", { method: "POST", body: { on: x.reminder === "off" } }).then(function () { refresh("remind"); }); });
+      rem.disabled = x.reminder === "sent";
+    }
+    if (left !== null && left < 0 && x.id && x.kind !== "return_instructions" && (x.items || []).length && openResale && marketOn()) pill("Sell or swap it instead", function () { openResale(x.id); });
+    if (acts.childNodes.length) card.appendChild(acts);
+    if (x.status === "confirmed" || !x.id) return card;
+    // Until you've checked it: one question. "No" asks what's wrong (not yours, or just a promotion) and removes it.
+    var chk = el("div", { className: "rl-rc-ask" }, [el("span", { text: x.needsShopperConfirmation ? "Relay may have missed something. Is this right?" : "Is this right?" })]);
+    var no = el("button", { type: "button", className: "rl-pill", text: "No" }), yes = el("button", { type: "button", className: "rl-pill rl-pill-on", text: "Yes" });
+    var post = function (path, body, kind, done) {
+      if (yes.disabled) return;
+      yes.disabled = no.disabled = true;
+      api("/relay/my/receipts/" + x.id + "/" + path, { method: "POST", body: body }).then(function (r) {
+        if (!r.ok) { yes.disabled = no.disabled = false; chk.firstChild.textContent = "Couldn't save that. Please try again."; return; }
+        chk.textContent = ""; chk.appendChild(el("span", { text: done })); refresh(kind);
+      }, function () { yes.disabled = no.disabled = false; chk.firstChild.textContent = "Couldn't reach Relay. Please try again."; });
+    };
+    yes.onclick = function () { post("confirm", {}, "confirm", "Thanks. Marked as right."); };
+    no.onclick = function () {
+      chooseBox("What's wrong with this receipt?", [
+        ["It's not mine", function () { post("dismiss", {}, "dismiss", "Removed. It won't come back."); }],
+        ["It's just a promotion", function () { post("dismiss", { reason: "promo" }, "dismiss", "Removed. Relay will skip emails like it."); }]]);
+    };
+    chk.appendChild(no); chk.appendChild(yes);
+    card.appendChild(chk);
     return card;
+  }
+  // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
+  function shipLine(dv) {
+    var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
+    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier ? " with " + dv.carrier : "";
+    var said = done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
+      : dv.status === "out_for_delivery" ? "Out for delivery" + by
+      : dv.status === "due" ? (dv.at && dv.at !== today ? "Arriving " + day(dv.at) : "Arriving today") + by : "On its way" + by;
+    return el("div", { className: "rl-po-ship" + (done ? " done" : "") }, [jIc(done ? "check" : "parcel", 17), el("span", { text: said })]);
   }
   function disconnectGmail(done, msg) {
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
@@ -2204,16 +2253,16 @@
           if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
           detail = el("div", { className: "rl-rr-detail" });
           if (names && named.length > 1) detail.appendChild(el("p", { className: "rl-rr-items", text: names }));
-          detail.appendChild(receiptCard(row, loadList, true));
-          var acts = el("div", { className: "rl-rr-acts" });
-          if (row.id && mailRef(row) && openOriginal) acts.appendChild(el("button", { type: "button", className: "rl-po-secondary", text: "Open the original email", onclick: function () { openOriginal(row.id); } }));
-          if (acts.childNodes.length) detail.appendChild(acts);
-          var pick = el("select", { ariaLabel: "Move to another group", className: "rl-rr-move" }, [el("option", { value: "", text: "Wrong group? Move it to…" })]);
-          GROUP_KEYS.forEach(function (k) { pick.appendChild(el("option", { value: k, text: groupNames[k] || k })); });
-          pick.onchange = function () { if (!pick.value) return;
+          detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
+          // Its group, as a quiet setting: pick another and Relay moves it (and remembers that for this shop).
+          var keys = GROUP_KEYS.indexOf(row.category) >= 0 || !groupNames[row.category] ? GROUP_KEYS : GROUP_KEYS.concat([row.category]);
+          var pick = el("select", { ariaLabel: "Group", className: "rl-rc-pick" });
+          keys.forEach(function (k) { pick.appendChild(el("option", { value: k, text: groupNames[k] || k })); });
+          pick.value = keys.indexOf(row.category) >= 0 ? row.category : "other";
+          pick.onchange = function () {
+            pick.disabled = true;
             api("/relay/my/receipts/" + row.id + "/category", { method: "POST", body: { category: pick.value } }).then(function () { say(status, "Thanks, Relay will remember this for " + who + "."); loadList(); }); };
-          detail.appendChild(pick);
-          if (row.categoryLearned) detail.appendChild(el("span", { text: "Grouped the way you taught Relay.", className: "rl-rr-note" }));
+          detail.appendChild(el("label", { className: "rl-rc-group" }, [el("span", { text: row.categoryLearned ? "Group (as you taught Relay)" : "Group" }), el("span", { className: "rl-rc-pickw" }, [pick, jIc("down", 16)])]));
           wrap.appendChild(detail); memo.openIds[row.id] = true; btn.setAttribute("aria-expanded", "true"); wrap.classList.add("open");
         };
         var find = [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names].filter(Boolean).join(" ").toLowerCase();
@@ -4182,11 +4231,13 @@
     // The shop's own product photo; without one, a drawing of the item (never just initials).
     var drawIt = function () { illustrate(img, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 36); };
     if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; img.appendChild(ph); } else drawIt();
+    // As the email cards: the shop's name and the price, then size and date (and the item's name when there's no photo).
+    var hasPhoto = Boolean(it.imageUrl && /^https:\/\//.test(it.imageUrl));
     var info = el("div", { className: "rl-po-info" }, [
-      el("div", { className: "rl-po-shop", text: o.store || "Shop" }),
-      el("h3", { text: it.title }),
-      el("div", { className: "rl-po-meta", text: [it.variant, it.quantity > 1 ? "×" + it.quantity : null, shortDate(o.orderedAt)].filter(Boolean).join(" · ") })]);
-    card.appendChild(el("div", { className: "rl-po-top" }, [img, info, el("div", { className: "rl-po-price", text: money(it.priceMinor, it.currency) })]));
+      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: o.store || "Shop" }), el("div", { className: "rl-po-price", text: money(it.priceMinor, it.currency) })]),
+      el("div", { className: "rl-po-meta", text: [hasPhoto ? null : it.title, it.variant, it.quantity > 1 ? "×" + it.quantity : null, shortDate(o.orderedAt)].filter(Boolean).join(" · ") })]);
+    if (hasPhoto) info.insertBefore(el("span", { className: "rl-sr", text: it.title }), info.childNodes[1]);
+    card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
     var shopName = o.store || "the shop";
     if (deadline) card.appendChild(dueBar(deadline, "Swap or return by ", String(o.orderedAt || "").slice(0, 10)));
@@ -4229,7 +4280,7 @@
   // worked out from the order date, which is the safe one to go by ("To be safe, return by").
   function deadlineLead(x, dl, plain) {
     var by = x.returnBy && dl === x.returnBy.date ? x.returnBy : null;
-    return !by ? plain : by.estimate ? "To be safe, return by " : by.basis === "uk_law" ? "Return by at least " : plain;
+    return !by ? plain : by.estimate ? "To be safe, return by " : plain;
   }
   // A card's return date as a countdown, the way the welcome story drew it: the date, the days left, and a bar that fills
   // as the time to send it back runs out (green, then amber in the last week, then red in the last three days).
@@ -4282,16 +4333,18 @@
     var first = one || headlineItem(x) || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
     var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
-    card.appendChild(el("div", { className: "rl-po-top" }, [img, el("div", { className: "rl-po-info" }, [
-      el("div", { className: "rl-po-shop", text: who }), el("h3", { text: one ? one.name : receiptTitle(x) }),
-      el("div", { className: "rl-po-meta", text: [first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]),
-      el("div", { className: "rl-po-price", text: price })]));
+    // Big picture, the shop's name, the price; then size and date, and the parcel's news. With the item's photo the picture
+    // says what it is; without one, the item's name joins the small line, so two cards from one shop can be told apart.
+    var named = (x.items || []).filter(function (i) { return i && i.name; });
+    var photo = Boolean(named.length <= 1 && x.hasImage && x.id);
+    var itemName = one ? one.name : named.length ? receiptTitle(x) : null;
+    var info = el("div", { className: "rl-po-info" }, [
+      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: who }), el("div", { className: "rl-po-price", text: price })]),
+      el("div", { className: "rl-po-meta", text: [photo ? null : itemName, first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]);
+    if (photo && itemName) info.insertBefore(el("span", { className: "rl-sr", text: itemName }), info.childNodes[1]);
     var dv = x.delivery;
-    if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) {
-      var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
-      card.appendChild(el("div", { className: "rl-po-status" + (dv.status === "delivered" ? "" : " wait"), text: (dv.status === "delivered" ? "✓ Delivered" + (dv.at ? " " + day(dv.at) : "")
-        : dv.status === "out_for_delivery" ? "Out for delivery" : dv.status === "due" ? "Due " + (dv.at ? day(dv.at) : "today") : "On its way") + (dv.carrier ? " · " + dv.carrier : "") }));
-    }
+    if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) info.appendChild(shipLine(dv));
+    card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var dl = deadlineOf(x);
     if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
     if (opts.extra) opts.extra(card);
@@ -4309,10 +4362,13 @@
     var hasMain = actions.childNodes.length > 0;
     var details = el("button", { className: "rl-po-secondary rl-po-details", text: "Details", onclick: function () {
       open(function (sheet) {
+        // The shop, then what was bought (the card itself shows only the shop's name), then the details.
         sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
-        sheet.appendChild(receiptCard(x, function () {}, true));
-        if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl)) sheet.appendChild(el("a", { className: "rl-btn ghost", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel", style: "display:block;text-align:center;text-decoration:none;margin-top:10px" }));
-        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
+        var bought = (one ? [one] : named).map(function (i) { return i.name + (i.variant ? ", " + i.variant : ""); }).join(" · ");
+        sheet.appendChild(el("p", { className: "rl-dt-sub", text: [bought, price, x.orderRef ? "Order " + String(x.orderRef).replace(/^#/, "") : null].filter(Boolean).join(" · ") }));
+        if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) sheet.appendChild(shipLine(dv));
+        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true));
+        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
       });
     } });
 

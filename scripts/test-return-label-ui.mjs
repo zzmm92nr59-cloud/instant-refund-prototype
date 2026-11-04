@@ -122,6 +122,10 @@ async function shopperPage(returnBody) {
   await page.goto(origin + '/retailer.html#key=rk_' + 'k'.repeat(40));
   await page.getByRole('heading', { name: 'Royal Mail return labels' }).waitFor();
   await page.getByText('Relay ref RLY-ABCD-EFGH · Royal Mail TT123456789GB').waitFor();
+  // Shops come from the Shopify App Store: no test wording on a Shopify shop's dashboard.
+  assert.equal(await page.locator('#platformTag').innerText(), 'Shopify');
+  await page.getByRole('heading', { name: 'Swaps and returns' }).waitFor();
+  assert.equal(await page.getByText(/development shop|Pilot results|Test shops/).count(), 0);
   // Price differences: Shopify checkout by default; instant card can't be picked until the shop's own Stripe is ready.
   await page.getByRole('heading', { name: 'Price differences on swaps' }).waitFor();
   assert.equal(await page.locator('#payState').innerText(), 'Shopify checkout');

@@ -55,8 +55,8 @@ assert.ok(/Desk Lamp/.test(text), "an order with a return deadline ahead is show
 assert.match(text, /2 items/);
 const cards = wallet.locator(".rl-po");
 const kick = cards.filter({ hasText: "Court Classic Trainers" }), lamp = cards.filter({ hasText: "Desk Lamp" });
-assert.match(await kick.innerText(), /On its way · Royal Mail/, "a recent parcel still shows it's on its way");
-assert.ok(!/Due |On its way/.test(await lamp.innerText()), "an old delivery line isn't shown: " + await lamp.innerText());
+assert.match(await kick.innerText(), /On its way with Royal Mail/, "a recent parcel still shows it's on its way");
+assert.ok(!/Arriving |On its way|Out for delivery/.test(await lamp.innerText()), "an old delivery line isn't shown: " + await lamp.innerText());
 // Pictures: no product photo, so the shop's logo (a known one from Relay's own set, or fetched once) instead of initials.
 await kick.locator(".rl-po-img.rl-has-logo img").waitFor();
 await lamp.locator(".rl-po-img.rl-has-logo img").waitFor();
@@ -69,7 +69,7 @@ await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 await page.waitForTimeout(800);
 const r = await page.locator("#view").innerText();
-assert.ok(!/On its way · Royal Mail[\s\S]*Red Dragon|Red Dragon[\s\S]{0,200}On its way/.test(r), "no stale delivery line in Receipts");
+assert.ok(!/On its way with Royal Mail[\s\S]*Red Dragon|Red Dragon[\s\S]{0,200}On its way/.test(r), "no stale delivery line in Receipts");
 await page.locator("#view").getByText("Fashion", { exact: true }).click();
 await page.locator("#view").getByText("F&F Denim Jacket + 1 more").waitFor();
 assert.ok(!/Finest Sourdough \+ 1 more/.test(await page.locator("#view").innerText()), "a card is named after the costliest thing of the receipt's own kind, not the first line");

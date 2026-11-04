@@ -42,7 +42,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 @media(max-width:480px){.shopify-row{flex-direction:column}}
 @media(max-width:640px){.stats{grid-template-columns:1fr 1fr}.stats .stat:last-child{grid-column:1/-1}.row{grid-template-columns:60px 1fr;gap:12px}.pic{width:60px;height:60px}.count{grid-column:2;text-align:left;display:flex;gap:8px;align-items:baseline}.count strong{font-size:24px}}
 </style></head><body><div class="wrap">
-<div class="top"><div class="logo">Relay<small>for shops</small></div><span class="tag" id="platformTag">Test shops</span></div>
+<div class="top"><div class="logo">Relay<small>for shops</small></div><span class="tag hidden" id="platformTag"></span></div>
 
 <section id="signin" class="signin hidden" style="margin-top:40px">
   <h2>See what Relay shoppers are waiting for</h2>
@@ -60,7 +60,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
   <h1 id="shop">Your shop</h1>
   <p class="sub">How many Relay shoppers are watching each of your items right now. You see totals only — never who they are, and counts under 3 show as “fewer than 3”. Send watchers an offer and Relay alerts their phones.</p>
   <section id="results" class="hidden">
-    <div class="head"><h2>Pilot results</h2></div>
+    <div class="head"><h2>Swaps and returns</h2></div>
     <div class="stats">
       <div class="stat l"><strong id="rSwaps">–</strong><span>swaps instead of returns</span></div>
       <div class="stat"><strong id="rKept">–</strong><span>value of items swapped</span></div>
@@ -228,7 +228,10 @@ async function load() {
     showResults(res && res.status === 200 ? res.body : null);
     demand = d.body;
     $("shop").textContent = demand.store || "Your shop";
-    $("platformTag").textContent = demand.platform === "shopify" ? "Shopify · development shop" : "Square Sandbox · test shop";
+    // Shops install Relay from the Shopify App Store, so a Shopify shop is just "Shopify". Square still runs on its test
+    // system (Square Sandbox) until Relay goes live there.
+    $("platformTag").textContent = demand.platform === "shopify" ? "Shopify" : "Square Sandbox · test shop";
+    $("platformTag").classList.remove("hidden");
     $("platform").textContent = demand.platform === "shopify" ? "Shopify" : "Square";
     const small = (t) => (t === "Fewer than 3" ? "Under 3" : t);
     $("sWatch").textContent = demand.shoppersWatchingItems ?? small(demand.shoppersWatchingItemsText) ?? 0;
