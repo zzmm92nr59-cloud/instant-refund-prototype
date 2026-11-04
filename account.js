@@ -2014,7 +2014,9 @@
     var legal = by && by.basis === "uk_law" ? by.date : null;
     var rt = x.returns || (legal ? {} : null) || {};
     var day = function (d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
-    var head = null, why = null;
+    var head = null, why = null, policyLink = null;
+    // The shop's published returns policy, when its emails say nothing and Relay has read it (worker/return-policies.js).
+    var pol = x.returnPolicy && x.returnPolicy.days && /^https:\/\//.test(x.returnPolicy.url || "") ? x.returnPolicy : null;
     // Only the shop's own words make a deadline. When its email gives none, Relay says so, and gives the legal minimum as
     // what it is (with a date only when the delivery day is known), never as the shop's deadline.
     if (rt.deadline) { head = "Return by " + day(rt.deadline); why = "The date in " + who + "'s email."; }
@@ -2025,6 +2027,19 @@
       head = rt.windowDays + " days to return";
       why = rt.windowFrom === "delivery" ? "From the day it arrives, " + who + "'s email says." + (by ? " Even counting from your order, that's until at least " + day(by.date) + "." : "")
         : who + "'s email doesn't say from when." + (by ? " Counting from your order, that's until at least " + day(by.date) + "." : "");
+    } else if (pol) {
+      // No date or window in the emails, but Relay has read the shop's own returns policy: what it gives for most items,
+      // and the least that means for this order (never a countdown: sale items and the like can have less).
+      var pby = by && by.basis === "policy" ? by : null, arrivedAt = dv && dv.status === "delivered" && dv.at ? dv.at : null;
+      var fromTxt = pol.from === "delivery" ? " from delivery" : pol.from === "dispatch" ? " from when it's sent" : pol.from === "purchase" ? " from purchase" : "";
+      var dm = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
+      head = pol.days + " days to return" + (pol.most ? " most items" : "");
+      why = pol.shop + "'s returns policy gives " + pol.days + " days" + fromTxt + (pol.most ? " for most items" : "") + ".";
+      if (pby && pby.from === "festive" && pol.festive) why += " Bought between " + dm(pol.festive.from) + " and " + dm(pol.festive.to) + ", so it can go back until at least " + day(pby.date) + ".";
+      else if (pby && pby.from === "delivery" && arrivedAt) why += " It arrived " + day(arrivedAt) + ", so that's until at least " + day(pby.date) + ".";
+      else if (pby) why += " Counting from your order, that's until at least " + day(pby.date) + ".";
+      else if (pol.from === "delivery" && !arrivedAt && !x.orderDate) why += " Relay adds the date once it arrives.";
+      policyLink = pol.url;
     } else if (legal) {
       // The legal minimum's date only beside the delivery it counts from, so the two can't disagree on screen.
       var arrived = dv && dv.status === "delivered" && dv.at && !by.estimate && by.from !== "order" ? dv.at : null;
@@ -2036,10 +2051,12 @@
     var portal = rt.portalUrl && /^https:\/\//.test(rt.portalUrl) ? rt.portalUrl : null;
     if (head || rt.address || portal) {
       var rb = el("div", { className: "rl-ret" });
+      var polLink = policyLink ? el("a", { className: "rl-ret-go", href: policyLink, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Read " + pol.shop + "'s returns policy" }), jIc("ext", 18)]) : null;
       if (head) rb.appendChild(el("div", { className: "rl-ret-top" }, [el("b", { className: "rl-ret-h", text: head })].concat(leftText && !opts.inRow ? [el("span", { className: "rl-rr-chip " + leftTone, text: leftText })] : [])));
       if (why) rb.appendChild(el("span", { className: "rl-ret-why", text: why }));
       if (rt.address) rb.appendChild(el("span", { className: "rl-ret-why", text: "Send it to " + rt.address }));
       if (portal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
+      if (polLink) rb.appendChild(polLink);
       card.appendChild(rb);
     } else if (leftText && !opts.inRow) card.appendChild(el("span", { className: "rl-rr-chip " + leftTone, text: leftText, style: "display:inline-block;margin-top:2px" }));
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);

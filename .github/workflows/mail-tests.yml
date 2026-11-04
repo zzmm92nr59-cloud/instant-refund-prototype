@@ -12,6 +12,7 @@ on:
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
+      - 'scripts/test-return-policies.mjs'
       - '.github/workflows/mail-tests.yml'
   push:
     branches: [main]
@@ -24,6 +25,7 @@ on:
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
+      - 'scripts/test-return-policies.mjs'
       - '.github/workflows/mail-tests.yml'
   workflow_dispatch:
 permissions:
@@ -57,3 +59,5 @@ jobs:
           node scripts/test-outlook-throttle.mjs
       - name: Gmail and Outlook give the same receipts, cards and Wrapped
         run: node scripts/test-mail-parity.mjs
+      - name: Shops' own returns policies (complete, recent, used only when the emails give no date)
+        run: node scripts/test-return-policies.mjs
