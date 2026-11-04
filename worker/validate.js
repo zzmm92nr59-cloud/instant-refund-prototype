@@ -127,6 +127,8 @@ const PATTERNS = [
   [new RegExp("^/relay/my/receipts/" + uuidish + "/category$"), { fields: { category: str(40) } }],
   [new RegExp("^/relay/my/receipts/" + uuidish + "/items$"), { fields: { items: list(50, obj({ index: int(0, 999), status: one("returning") })) } }],
   [new RegExp("^/relay/my/receipts/" + uuidish + "/remind$"), { fields: { on: bool } }],
+  // Who a gift was for is a name the shopper types, so it's cleaned like other text people write.
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/gift$"), { fields: { gift: bool, for: text(40) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/ask$"), { fields: { kind: one("swap", "buy"), message: text(600), offeredListingId: str(64) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/withdraw$"), NOTHING],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/(accept|decline|end)$"), NOTHING],

@@ -204,6 +204,11 @@ async function ensureGmailTablesRun(db) {
     `CREATE TABLE IF NOT EXISTS receipt_item_marks (
        shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, item_index INTEGER NOT NULL, status TEXT NOT NULL,
        updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id, item_index))`,
+    // Receipts the shopper said were a present for someone else, and who for (only if they said). is_gift 0 is "not a gift
+    // after all": an order's latest choice wins, whichever of its emails it was made on (see attachGifts).
+    `CREATE TABLE IF NOT EXISTS receipt_gifts (
+       shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, is_gift INTEGER NOT NULL, recipient TEXT, updated_at INTEGER NOT NULL,
+       PRIMARY KEY (shopper_id, receipt_id))`,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -234,6 +239,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -437,6 +443,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`DELETE FROM receipt_images WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM return_reminders WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_item_marks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM captured_receipts WHERE shopper_id = ? AND ${pick}`).bind(...args)];
 }
 // Disconnects one of the other inboxes: Relay's access is cancelled at Google (Microsoft has no such call) and its key
@@ -482,6 +489,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -1227,8 +1235,25 @@ export function mergeOrderEmails(orders) {
         r.qrMentioned = Boolean(r.qrMentioned || o.returns.qrMentioned); r.labelMentioned = Boolean(r.labelMentioned || o.returns.labelMentioned);
       }
     }
+    // Which emails the card was made from, for choices the shopper made on an email that isn't the one shown (attachGifts).
+    // Not enumerable, so it never goes to the app.
+    Object.defineProperty(c, "emailIds", { value: g.map(o => o.id), enumerable: false });
     return c;
   });
+}
+
+// Gifts: an order is a gift when the shopper's latest choice about any of its emails says so (a later email about the
+// same order can become the one shown, so a choice made before then still counts). On the same moment, the card's own wins.
+export function attachGifts(orders, gifts) {
+  const byId = new Map(gifts.map(g => [g.id, g]));
+  for (const o of orders) {
+    let pick = null;
+    for (const id of o.emailIds || [o.id]) {
+      const g = byId.get(id);
+      if (g && (!pick || g.at > pick.at || (g.at === pick.at && id === o.id))) pick = g;
+    }
+    if (pick && pick.g) o.gift = { for: typeof pick.who === "string" && pick.who ? pick.who : null };
+  }
 }
 
 // Parcel updates join the purchase they belong to: by tracking number, then order number, then (for a carrier's
@@ -1373,10 +1398,11 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
+    env.RELAY_DB.prepare("SELECT receipt_id AS id, is_gift AS g, recipient AS who, updated_at AS at FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId).all(),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
@@ -1390,6 +1416,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   }
   attachReturnProgress(orders, deliveries, updates);
   attachItemReturns(orders, (marks && marks.results) || []);
+  attachGifts(orders, (gifts && gifts.results) || []);
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
   // An order the shopper dismissed stays hidden even when the shop sent other emails about it.
   const cards = orders.filter(o => !(o.orderRef && dismissedRefs.has(o.orderRef)));
@@ -1773,6 +1800,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       "UPDATE captured_receipts SET status = ? WHERE id = ? AND shopper_id = ? RETURNING id, details")
       .bind(act[2] === "confirm" ? "confirmed" : "dismissed", act[1], shopper.id).first();
     if (!res) return json({ error: "not_found" }, 404, cors);
+    // Not theirs (or not a purchase), so not a gift of theirs either: who it was for goes too.
+    if (act[2] === "dismiss") await env.RELAY_DB.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]).run();
     // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
     const b = await request.json().catch(() => ({}));
     if (act[2] === "dismiss" && b && b.reason === "promo") {
@@ -1822,6 +1851,21 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       ? env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,?,?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, x.status, now)
       : env.RELAY_DB.prepare("INSERT INTO receipt_item_marks (shopper_id, receipt_id, item_index, status, updated_at) VALUES (?,?,?,'kept',?) ON CONFLICT (shopper_id, receipt_id, item_index) DO UPDATE SET status = 'kept', updated_at = excluded.updated_at").bind(shopper.id, itm[1], x.index, now)));
     return json({ ok: true }, 200, cors);
+  }
+  // The shopper says a receipt was a present for someone else (and, if they like, who for), or that it wasn't after all.
+  // "Not a gift" is kept as a choice, with no name, so it wins over an earlier choice made on another email of the order.
+  const gft = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/gift$/.exec(path);
+  if (gft && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    if (!b || typeof b.gift !== "boolean" || (b.for != null && typeof b.for !== "string")) return json({ error: "bad_gift" }, 400, cors);
+    const who = b.gift && b.for ? b.for.replace(/\s+/g, " ").trim().slice(0, 40) : "";
+    const row = await env.RELAY_DB.prepare("SELECT id FROM captured_receipts WHERE id = ? AND shopper_id = ? AND status NOT IN ('dismissed','not_receipt')")
+      .bind(gft[1], shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    await env.RELAY_DB.prepare(
+      "INSERT INTO receipt_gifts (shopper_id, receipt_id, is_gift, recipient, updated_at) VALUES (?,?,?,?,?) ON CONFLICT (shopper_id, receipt_id) DO UPDATE SET is_gift = excluded.is_gift, recipient = excluded.recipient, updated_at = excluded.updated_at")
+      .bind(shopper.id, gft[1], b.gift ? 1 : 0, who || null, opts.now || Date.now()).run();
+    return json({ ok: true, gift: b.gift ? { for: who || null } : null }, 200, cors);
   }
   const img = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(path);
   if (img && m === "GET") {
