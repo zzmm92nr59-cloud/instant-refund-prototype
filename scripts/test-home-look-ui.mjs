@@ -77,7 +77,7 @@ const polished = async (where, scope) => {
   await page.emulateMedia({ colorScheme: "light" });
 };
 const bgIs = sel => page.locator(sel).first().evaluate(n => getComputedStyle(n).backgroundColor);
-const NAVY = "rgb(23, 31, 68)"; // Midnight Abyss
+const NAVY = "rgb(16, 24, 40)";
 
 // 1. The sign-in page: Relay's navy whatever the phone's setting, the name, a small wallet picture, and the ways in.
 await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -103,7 +103,7 @@ for (const name of ["Continue with Google", "Continue with Microsoft", "Continue
 const face = sheet.getByRole("button", { name: "Sign in with Face ID or a passkey" });
 await face.waitFor();
 assert.equal(await face.locator("svg").count(), 1, "Face ID has its drawn icon");
-assert.equal(await face.evaluate(n => getComputedStyle(n).color), "rgb(116, 255, 237)", "in aqua");
+assert.equal(await face.evaluate(n => getComputedStyle(n).color), "rgb(199, 245, 103)", "in lime");
 assert.equal(await sheet.locator(".rl-jh").evaluate(n => getComputedStyle(n).animationName), "rlup", "the page rises in");
 await polished("sign-in page", ".rl-sheet");
 // Less motion: nothing moves.
@@ -154,7 +154,7 @@ await page.locator(".htile", { hasText: "2 watched" }).waitFor();
 assert.deepEqual(await tiles.evaluateAll(ns => ns.map(n => n.getAttribute("aria-label") || n.innerText.replace(/\s+/g, " ").trim())),
   ["Receipts", "Returns & swaps", "Price alerts 2 watched", "Your " + new Date().getFullYear() + " Wrapped"]);
 assert.deepEqual(await tiles.evaluateAll(ns => ns.map(n => getComputedStyle(n).backgroundColor)),
-  [NAVY, "rgb(224, 68, 110)", "rgb(79, 114, 224)", "rgb(116, 255, 237)"], "the welcome story's navy, pink and blue, and Wrapped's aqua");
+  [NAVY, "rgb(224, 68, 110)", "rgb(79, 114, 224)", "rgb(199, 245, 103)"], "the welcome story's navy, pink and blue, and Wrapped's lime");
 assert.equal(await page.getByRole("button", { name: "All receipts" }).count(), 0, "the tiles replace the old buttons");
 assert.equal(await page.locator("#view .profile-row").count(), 0, "and the old Price alerts row");
 await polished("home", "#view");
