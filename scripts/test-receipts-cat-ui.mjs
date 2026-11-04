@@ -15,9 +15,9 @@ const food = Array.from({ length: 130 }, (_, i) => ({ id: "00000000-0000-4000-80
   items: [{ name: i === 7 ? "Sausage roll" : "Meal " + i, qty: 1 }], category: "food", categoryLabel: "Food & drink", returnable: false, notReturnableReason: "Food and drink usually can't be returned." }));
 const fashion = [{ id: "99999999-9999-4999-8999-999999999999", status: "confirmed", kind: "receipt", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-1", orderDate: day(-5), totalPence: 9500, currency: "GBP",
   items: [{ name: "Long Jacket", qty: 1, pricePence: 9500 }], category: "fashion", categoryLabel: "Fashion", returnable: true, returns: { deadline: day(20) } },
-  { id: "88888888-8888-4888-8888-888888888888", status: "confirmed", kind: "receipt", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-0", orderDate: day(-400), totalPence: 4500, currency: "GBP",
+  { id: "88888888-8888-4888-8888-888888888888", status: "pending", kind: "receipt", gmailId: "hat0email01", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-0", orderDate: day(-400), totalPence: 4500, currency: "GBP",
   items: [{ name: "Bucket Hat", qty: 1, pricePence: 4500 }], category: "fashion", categoryLabel: "Fashion", returnable: true, returns: { deadline: day(-370) } }];
-const asked = [];
+const asked = [], posted = [];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
 await ctx.route("https://**/*", async route => {
@@ -27,6 +27,7 @@ await ctx.route("https://**/*", async route => {
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
+  if (m === "POST" && /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/(dismiss|confirm)$/.test(p)) { posted.push([p.split("/").slice(-2).join("/"), route.request().postDataJSON()]); return j({ ok: true }); }
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() });
   if (p === "/relay/my/receipts") { asked.push(u.search); return j({ receipts: u.searchParams.get("all") === "1" ? [...fashion, ...food] : [...fashion, ...food].slice(0, 100) }); }
   if (p === "/relay/my/purchases") return j({ purchases: [] });
@@ -100,6 +101,23 @@ assert.equal(await page.locator(".rl-rr").count(), 1);
 assert.match(await page.locator(".rl-rr").innerText(), /Long Jacket[\s\S]*£95\.00[\s\S]*20 days left/);
 await page.screenshot({ path: "/tmp/shots/cat-fashion.png" });
 console.log("ok - 'Can still return' shows what can still go back, with the days left");
+// An opened receipt, kept simple: one way to the email, its group as a setting, and (until checked) one question.
+await page.locator(".rl-cat-chips button", { hasText: "All" }).click();
+const hat = page.locator(".rl-rr").filter({ hasText: "Bucket Hat" });
+await hat.locator(".rl-rr-main").click();
+assert.equal(await hat.locator("select").inputValue(), "fashion", "the group setting shows the receipt's group");
+const hatPills = await hat.locator(".rl-pill").allInnerTexts();
+assert.ok(hatPills.includes("View receipt") && hatPills.includes("No") && hatPills.includes("Yes"), "View receipt, then No / Yes: " + hatPills.join(", "));
+assert.equal(await hat.getByText("Open the original email").count(), 0, "one button to the email, not two");
+assert.equal(await hat.getByText("Is this right?").count(), 1);
+assert.deepEqual((await measure()).small, [], "everything in the opened receipt is a proper size to tap");
+await hat.getByRole("button", { name: "No" }).click();
+const why = page.locator(".rl-back .rl-sheet[role=alertdialog]");
+assert.deepEqual(await why.locator("button").allInnerTexts(), ["It's not mine", "It's just a promotion", "Cancel"]);
+await why.getByRole("button", { name: "It's just a promotion" }).click();
+await page.waitForTimeout(300);
+assert.deepEqual(posted, [["88888888-8888-4888-8888-888888888888/dismiss", { reason: "promo" }]], "No, then 'just a promotion' removes it and says why");
+console.log("ok - an opened receipt: View receipt once, its group as a setting, and Is this right? (No asks why and removes it)");
 // Home only shows what can still go back: never supermarket or takeaway food, even when the email mentions a deadline.
 food[0].returns = { deadline: day(10) };
 await page.evaluate(() => window.go("profile"));
