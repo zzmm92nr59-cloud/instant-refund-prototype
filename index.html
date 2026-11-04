@@ -104,8 +104,8 @@ button:active:not(:disabled),.card[role=button]:active,.profile-row:active,a.out
 :root{--rl-sys:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--serif:var(--rl-sys);
 --rl-bg:#fff;--rl-card:#f2f2f7;--rl-fill:#e9e9ee;--rl-sheet:#fff;--rl-text:#000;--rl-text2:rgba(60,60,67,.66);--rl-line:rgba(60,60,67,.2);
 --rl-accent:#3d6b00;--rl-accent-bg:rgba(61,107,0,.12);--rl-danger:#b3261e;--rl-warn:#77520a;--rl-glass:rgba(250,250,252,.8);--rl-glass-line:rgba(0,0,0,.08)}
-@media (prefers-color-scheme:dark){:root{color-scheme:dark;--rl-bg:#000;--rl-card:#1c1c1e;--rl-fill:#2c2c2e;--rl-sheet:#1c1c1e;--rl-text:#fff;--rl-text2:rgba(235,235,245,.62);
---rl-line:rgba(84,84,88,.6);--rl-accent:#c7f567;--rl-accent-bg:rgba(199,245,103,.15);--rl-danger:#ff6b5e;--rl-warn:#f5b84b;--rl-glass:rgba(34,34,37,.68);--rl-glass-line:rgba(255,255,255,.1)}}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--rl-bg:#000;--rl-card:var(--navy,#0f1b33);--rl-fill:rgba(255,255,255,.1);--rl-sheet:var(--navy,#0f1b33);--rl-text:#fff;--rl-text2:rgba(235,235,245,.62);
+--rl-line:rgba(255,255,255,.16);--rl-accent:#c7f567;--rl-accent-bg:rgba(199,245,103,.15);--rl-danger:#ff6b5e;--rl-warn:#f5b84b;--rl-glass:rgba(15,27,51,.74);--rl-glass-line:rgba(255,255,255,.1)}}
 body,.main{background:var(--rl-bg);color:var(--rl-text);font-family:var(--rl-sys)}
 .title{font-family:var(--rl-sys);font-weight:800;letter-spacing:.2px;color:var(--rl-text)}
 .sub,.muted{color:var(--rl-text2)}
@@ -834,6 +834,8 @@ function wrappedView(){return '<h1 class="title">Wrapped</h1><div id="wrappedPag
 function bindWrappedFrame(){const f=$("wrappedFrame");if(!f||typeof f.addEventListener!=="function")return;const fit=()=>{try{const d=f.contentDocument;if(!d||!d.body)return;const h=Math.ceil(d.documentElement.getBoundingClientRect().height);if(h>300)f.style.height=h+"px"}catch(e){}};f.addEventListener("load",()=>{fit();try{const d=f.contentDocument;if(window.ResizeObserver&&d&&d.body)new ResizeObserver(fit).observe(d.body)}catch(e){}});fit();window.addEventListener("resize",fit)}
 // Test shop tools and sandbox labels: only for people testing Relay (Profile → Testing, or ?testing=1).
 function testTools(){try{return testing||localStorage.getItem("relay-testing-tools")==="1"}catch(e){return testing}}
+// The shared account for app reviewers (worker/review-account.js) sees test shops in Discover too: the reviewer's own store is one.
+function reviewAccount(){try{return !!(window.RelayAccount&&RelayAccount.isReview&&RelayAccount.isReview())}catch(e){return false}}
 function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}render()}
 // Signed in on this device? (Read straight from storage so the first screen doesn't wait for the account code.)
 function hasSession(){try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return !!(x&&x.token)}catch(e){return false}}
@@ -891,7 +893,7 @@ let catalogReady=false;
 var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true;loadCatalog()}
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;try{
- const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue",10000);
+ const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
  squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});
  try{
   const response=await squareAsk;

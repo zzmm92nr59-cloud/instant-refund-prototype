@@ -5,7 +5,7 @@ import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import { handleShopifyConnect, listConnectedShopifyStores, syncAllShopify, shopifyShopsForDisplay, normaliseShop, shopifySigned } from "../worker/shopify-connect.js";
 import { handleRetailerRoute } from "../worker/retailer.js";
-import { receiveShopifyWebhook, backfillShopifyOrders } from "../worker/shopify-webhooks.js";
+import { receiveShopifyWebhook, backfillShopifyOrders, eraseRemovedShops } from "../worker/shopify-webhooks.js";
 import { emailHash } from "../worker/auth.js";
 import { ensurePushTables, priceText } from "../worker/push.js";
 import { ensureSquareMerchantSchema } from "../worker/square-connect.js";
@@ -36,6 +36,8 @@ const shops = {
     { id: "gid://shopify/Product/1", title: "USB-C Charger", img: "https://cdn.shopify.com/s/files/charger.png", variants: [{ id: "gid://shopify/ProductVariant/11", title: "65W", sku: "CUSH-SAGE", price: "39.99", qty: 3 }] }] }
 };
 let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "", shopOrders = {};
+// Shops Shopify calls development (test) stores; one says so only through its plan's name, as Shopify has been seen to do.
+const devStores = new Set(), devByName = new Set();
 let tokenCalls = [], apiCalls = [], codeToShop = { "code-oak": "oak-thread.myshopify.com", "code-volt": "volt-tech.myshopify.com" }, grantScope = "read_products,read_inventory";
 globalThis.fetch = async (url, init = {}) => {
   url = String(url);
@@ -56,6 +58,7 @@ globalThis.fetch = async (url, init = {}) => {
   apiCalls.push({ shop, token });
   if (!/^(token|fresh)-/.test(token) && token !== "old-static-token") return json({ errors: "unauthorised" }, 401);
   const { query: q, variables } = JSON.parse(init.body);
+  if (/RelayShopPlan/.test(q)) return json({ data: { shop: { plan: { partnerDevelopment: devStores.has(shop), publicDisplayName: devStores.has(shop) || devByName.has(shop) ? "Development" : "Basic" } } } });
   if (/shop \{ name currencyCode \}/.test(q)) return json({ data: { shop: { name: shops[shop].name, currencyCode: currencies[shop] || "GBP" } } });
   if (/webhookSubscriptions\(/.test(q)) return json({ data: { webhookSubscriptions: { nodes: (hooks[shop] || []).map((h, i) => ({ id: "gid://shopify/WebhookSubscription/" + i, ...h })) } } });
   if (/webhookSubscriptionCreate/.test(q)) {
@@ -129,6 +132,19 @@ assert.match(lastProductQuery, /status:active/, "only products the shop has set 
 const items = sqlite.prepare("SELECT title, store_label, image_url FROM retailer_catalog_items WHERE provider LIKE 'shopify:%' ORDER BY title").all();
 assert.deepEqual(items.map(i => [i.title, i.store_label, i.image_url]), [["Linen Cushion", "Oak & Thread", "https://cdn.shopify.com/s/files/cushion.png"], ["Stoneware Mug", "Oak & Thread", null]]);
 assert.deepEqual((await shopifyShopsForDisplay(env)).map(s => [s.domain, s.label]), [["oak-thread.myshopify.com", "Oak & Thread"]]);
+// A test shop (a Shopify development store) is never shown to real shoppers, whichever way Shopify says it; Relay's testing
+// tools can ask for test shops too, each marked. A shop not yet checked counts as a test shop until it has been.
+assert.equal(sqlite.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = 'oak-thread.myshopify.com'").get().test_shop, 0);
+devStores.add("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "a development store's products aren't shown");
+assert.deepEqual((await shopifyShopsForDisplay(env, { includeTest: true })).map(s => [s.domain, s.test]), [["oak-thread.myshopify.com", true]]);
+devStores.delete("oak-thread.myshopify.com"); devByName.add("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "a plan called Development counts too");
+devByName.delete("oak-thread.myshopify.com"); await syncAllShopify(env, { now });
+assert.deepEqual((await shopifyShopsForDisplay(env)).map(s => s.domain), ["oak-thread.myshopify.com"], "shown again once Shopify says it's a real shop");
+sqlite.prepare("DELETE FROM shopify_shop_plan").run();
+assert.deepEqual(await shopifyShopsForDisplay(env), [], "not checked yet: not shown");
+await syncAllShopify(env, { now });
 
 // 6. A second shop, started from its own Shopify admin (Shopify signs the link), goes straight to its dashboard.
 const launch = sign(new URLSearchParams({ embedded: "0", host: "dm9sdA", shop: "volt-tech.myshopify.com", timestamp: String(now / 1000) }));
@@ -238,6 +254,32 @@ assert.equal((await hook("volt-tech.myshopify.com", "shop/redact", { shop_id: 9 
 shops["oak-thread.myshopify.com"].products = shops["oak-thread.myshopify.com"].products.filter(p => p.title !== "Linen Cushion" && p.title !== "Stoneware Mug").concat([{ id: "gid://shopify/Product/3", title: "Wool Throw", img: null, variants: [{ id: "gid://shopify/ProductVariant/31", title: "Oat", sku: "THR", price: "45.00", qty: 2 }] }]);
 await syncAllShopify(env, { now });
 assert.deepEqual(sqlite.prepare("SELECT title FROM retailer_catalog_items WHERE provider = 'shopify:oak-thread.myshopify.com' ORDER BY title").all().map(r => r.title), ["Wool Throw"]);
+
+// 8b. The 30-day backstop (Shopify API terms 6.2.3): a shop removed over 30 days ago that Shopify's erase request missed
+// is erased; one removed recently, one already erased (Volt, above), and one that came back are left alone.
+{
+  const DAY = 86400000, conn = "shopify:oak-thread.myshopify.com";
+  const orders = () => sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = ?").get(conn).n;
+  const links = () => sqlite.prepare("SELECT COUNT(*) n FROM retailer_order_emails WHERE order_id IN (SELECT id FROM retailer_orders WHERE connection_id = ?)").get(conn).n;
+  assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", { ...paid, id: 7010, customer: { id: 77 } })).status, 200);
+  assert.ok(orders() > 0 && links() > 0);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 31 * DAY), { erased: 0 }, "nothing to do while every removed shop was erased by Shopify's request");
+  assert.equal((await hook("oak-thread.myshopify.com", "app/uninstalled", { id: 8 })).status, 200);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 5 * DAY), { erased: 0 }, "removed 5 days ago: Shopify's own request comes first");
+  assert.ok(orders() > 0, "its orders are still here");
+  // A removed shop that came back is left alone (Kite, made up for this check).
+  sqlite.prepare("INSERT INTO audit_events (id, actor_type, actor_id, event_type, subject_type, subject_id, metadata_json, created_at) VALUES (?,?,?,?,?,?,?,?)")
+    .run("t-kite", "system", "shopify_webhook", "shopify_app_uninstalled", "shopify_store", "kite-goods.myshopify.com", "{}", "2026-01-01 10:00:00");
+  sqlite.prepare("INSERT INTO shopify_shops (domain, label, access_iv, access_data, created_at, updated_at) VALUES (?,?,?,?,?,?)").run("kite-goods.myshopify.com", "Kite", "iv", "data", 1, 1);
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 31 * DAY), { erased: 1 }, "Oak Thread, removed 31 days ago with no erase request, is erased");
+  assert.equal(orders(), 0, "its orders are deleted");
+  assert.equal(links(), 0, "and every link to a customer's email");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_catalog_items WHERE provider = ?").get(conn).n, 0);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopify_shops WHERE domain = 'kite-goods.myshopify.com'").get().n, 1, "the shop that came back is untouched");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM audit_events WHERE event_type = 'shopify_shop_erased' AND subject_id = 'oak-thread.myshopify.com'").get().n, 1, "the erase is recorded");
+  assert.deepEqual(await eraseRemovedShops(env, Date.now() + 32 * DAY), { erased: 0 }, "once erased, it isn't erased again every hour");
+  console.log("ok - shops removed over 30 days ago that Shopify's erase request missed are erased, once; recent, erased and returning shops aren't");
+}
 
 // 9. Without the app's details on the server, nothing can connect, and says so.
 const bare = { ...env, SHOPIFY_CLIENT_SECRET: undefined };

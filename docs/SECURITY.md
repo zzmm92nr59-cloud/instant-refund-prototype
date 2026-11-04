@@ -28,6 +28,7 @@ Written for whoever works on Relay next, person or AI: keep it true when the cod
 | **Shopper** | A session token from signing in (email link or code, Google, Microsoft or a passkey, plus the second step if they turned it on). |
 | **Shopper, half-way through two-step sign-in** | A short-lived "pending" token that only finishes signing in. It is not a session. |
 | **Relay admin** | A signed-in shopper whose email is in `RELAY_ADMIN_EMAILS`. |
+| **App reviewer** | A shopper signed in with the reviewer sign-in (below): a made-up address and a code that stays the same while it's on. |
 | **Shop** | The shop's Relay key (`rk_...`), given when the shop connects with Square or Shopify (or opens Relay inside Shopify admin). Relay keeps only a keyed hash of it. |
 | **Shopify, Square** | Webhooks signed with the shared secret (HMAC); unsigned or wrongly signed ones are refused. |
 | **Relay's scheduled jobs** | Cloudflare's cron triggers. They aren't reachable over the web at all. |
@@ -43,7 +44,7 @@ found" (404) where even saying it exists would tell too much.
 | Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
 | Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | | Read connected inboxes for new receipts (every 15 min) |
 | Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, reminders, open the original email | As a shopper | | | Return reminders |
-| Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed) | Catch up Square orders and refunds |
+| Purchases at connected shops | | Own (matched by verified email hash): list, return, swap | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed), and asks for erasure | Catch up Square orders and refunds; erase a shop's orders 30 days after it removed Relay if Shopify's erase request never came |
 | Card on file (Stripe) | | Own: add, remove. Relay keeps Stripe's reference, the brand, last 4 digits and expiry, never the card number | As a shopper | | | |
 | Price alerts and phone notifications | | Own: watch items or shops, choose alert mode, turn notifications on and off | As a shopper | Sends an offer to its own watchers, without learning who they are | Catalogue changes (signed) | Compare prices, send alerts |
 | Resale listings | Nothing | List items from own receipts; browse others' listings, shown only as "Member" | As a shopper | | | |
@@ -53,8 +54,12 @@ found" (404) where even saying it exists would tell too much.
 | Shop settings (payments, Royal Mail labels) | | | | Own shop only. The Royal Mail key is stored encrypted and never sent back | | |
 | Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
 | List of connected shops | Read names | Read | Read | | | |
+| Reviewer sign-in (`/relay/my/admin/review-account`) | | | Turn on (a new address and code), see the address and code, turn off (deletes the account) | | | |
 | Testing tools (`/relay/my/testing/...`) | | Sandbox test shop only: off when Square is live; 5 test orders a day | | | | |
 | Prototype test routes (`/relay/test-lab`, `/relay/live-test`, `/relay/ledger/...` and others) | Off: "not found" | Off | Off | Off | | |
+
+The **app reviewer** can do what any shopper can, on its own account, except attach anything personal: connecting an
+inbox, adding a passkey, two-step sign-in, a phone number or a card answer `403 {"error":"not_for_review_account"}`.
 
 The prototype test routes are switched off by `worker/legacy-routes.js`. They take no sign-in and some place test payments
 on Relay's Square sandbox account. To use the "Existing API and verification tools" testing page again, set
@@ -64,6 +69,24 @@ on Relay's Square sandbox account. To use the "Existing API and verification too
 no session, a made-up one, a malformed one, a shop's key, an admin route as a shopper, someone else's receipt, unsigned
 webhooks. Ownership of purchases, swaps, returns, resale and inboxes is also tested in `test-auth`, `test-exchange`,
 `test-square-orders`, `test-resale`, `test-resale-admin`, `test-more-inboxes` and `test-retailer`.
+
+## The reviewer sign-in
+
+`worker/review-account.js`. Shopify asks for a test account its reviewers can sign in to without an emailed code
+(App Store requirement 4.5.5). It's off until a Relay admin turns it on in the app (Profile, Team).
+
+- Turning it on makes a random address at `example.com`, a domain set aside for examples that can't receive email, so it
+  can never be a real person's. Requesting a code for it sends nothing.
+- Its 6-digit code is HMAC-SHA256 of the address with `AUTH_SECRET`, so it isn't stored, isn't in the repository and
+  changes with the address. Only an admin can see it.
+- It signs in through the ordinary code route and its limits (5 wrong codes per 15 minutes), plus at most 20 wrong codes
+  a day, since the code doesn't change. The address isn't published anywhere: it goes only in the App Store submission.
+- Several people share the account, so nothing personal can be attached to it (see above). Orders placed at a shop with
+  that address show up for it, as for any shopper.
+- Turning it off deletes the account and everything in it, as "Delete my account" does, signing it out everywhere.
+  Turning it on again makes a new address, code and account.
+
+**Proved by** `scripts/test-review-account.mjs`.
 
 ## Rate limits
 
@@ -156,7 +179,8 @@ so each derived key is different:
   two-step sign-in secret;
 - the keyed hashes of shops' Relay keys;
 - the notification signing key;
-- the signatures that protect connecting Square and Shopify.
+- the signatures that protect connecting Square and Shopify;
+- the reviewer sign-in's code (a new secret means a new code: update the App Store submission).
 
 Sessions don't depend on it: they're plain SHA-256 hashes of random tokens.
 
@@ -172,12 +196,86 @@ and only with a migration that, while both the old and new keys are available:
 If it has leaked, do the migration at once. Until then, assume anyone holding it could decrypt a copy of the database
 (which they would also need).
 
+## When something goes wrong: the incident and data breach plan
+
+For anything that may have exposed, changed, lost or locked away people's data, or let someone in who shouldn't be. The
+person who runs Relay leads it, writes everything down as it happens, and follows these steps in order. When in doubt,
+treat it as a breach until it's shown not to be. Shops get the same promises in their terms (the draft is in the App
+Store submission pack).
+
+**What counts.** A personal data breach is any security incident that leads to personal data being destroyed, lost,
+changed, disclosed or accessed without permission, by accident or on purpose; losing access to it counts too. Signs:
+a key seen anywhere public (a commit, a screenshot, a chat); a sign-in nobody recognises on Cloudflare, GitHub, Shopify
+Partners, Google Cloud, Azure, Stripe, Resend or Twilio; a shopper seeing someone else's receipt or order; an alert or
+report from Shopify, a shop, a shopper or a researcher; unusual traffic in the Worker's logs.
+
+### 1. Stop it (straight away)
+
+- **A key may have leaked:** rotate it now, using the table in "Keys and secrets". For `AUTH_SECRET`, follow its own
+  section.
+- **A session may be in the wrong hands:** sign everyone out. Shoppers simply sign in again:
+  `npx wrangler d1 execute relay-purchase-ledger --remote --command "DELETE FROM auth_sessions"`.
+- **The Worker's own code is the problem:** roll back to the last good version (Cloudflare dashboard → Workers →
+  relay-square-api2 → Deployments, or `npx wrangler rollback`), then revert the commit so the next deploy doesn't bring it
+  back.
+- **Inbox keys may be exposed:** rotate `GOOGLE_CLIENT_SECRET` and `MICROSOFT_CLIENT_SECRET` and disable the old ones.
+  The stored keys are encrypted, and they can't be used without the app's own secret.
+- **A shop's Shopify key may be exposed:** the shop can remove Relay, which deletes it at once. Relay's own app secret is
+  rotated in Shopify Partners.
+- **Keep the evidence.** Don't delete logs or rows. Note the time, and the database's restore point from before it
+  started (`npx wrangler d1 time-travel info relay-purchase-ledger`).
+
+### 2. Work out what happened (within 24 hours)
+
+What data, whose, how many people, from when to when, and whether it has stopped. What Relay stores helps decide how
+serious it is:
+
+- order emails are only keyed hashes;
+- email bodies are never kept, only the receipt details read from them;
+- sessions are only hashes, so a copy of the database can't sign anyone in;
+- inbox keys, shops' keys, phone numbers and two-step secrets are encrypted with keys derived from `AUTH_SECRET`.
+
+A copy of the database alone exposes receipts, names, email addresses and orders. With `AUTH_SECRET` as well, it
+exposes everything encrypted too.
+
+### 3. Tell the people who must be told
+
+| Who | When | How |
+|---|---|---|
+| Shopify, if any shop's data from Shopify may be involved (products, orders, customers' details, keys) | At once, and no later than 24 hours after Relay becomes aware, even if it's only suspected (Shopify API terms, 6.2.10) | Shopify Support, by email; then answer their questions and keep them updated |
+| Each shop affected | Without undue delay, and no later than 48 hours after Relay becomes aware (the shop terms' promise) | Email to the shop's contact: what happened, what data, what Relay has done, what the shop should do |
+| The ICO | When the breach is likely to put people's rights and freedoms at risk: without undue delay, and no later than 72 hours after becoming aware. Later than that, give the reasons | ico.org.uk, "Report a breach" |
+| Shoppers affected | When it's likely to be a high risk to them: directly and without undue delay | An email from Relay in plain English: what happened, what data, what Relay is doing, what they can do (for example, change a password or watch for scam emails) |
+| Google or Microsoft | If inbox access or Relay's app at Google or Microsoft was involved | As their developer terms ask |
+
+Relay runs its own app for shoppers, so for shoppers' accounts Relay decides about telling the ICO. For the customer data
+Relay handles for a shop, the shop decides, and Relay gives it what it needs to. The UK rules on this are under review
+after the Data (Use and Access) Act 2025, so check the ICO's guidance each time.
+
+### 4. Fix it and recover
+
+Fix the cause, add a test that would have caught it, and deploy. Restore lost or damaged data from Time Travel (30 days
+back on Workers Paid; a restore replaces the whole database, so export what's changed since first). Check the fix from
+outside with `scripts/check-live-security.mjs`.
+
+### 5. Write it down
+
+Record every breach, even ones that didn't need reporting (the ICO expects this): when it was found, what happened, the
+data and people involved, what was done, who was told and when, and why anyone wasn't. Keep the record somewhere
+private, not in this repository: it's public.
+
+### 6. Practise
+
+Once a year, and after any big change, walk through a pretend incident with this plan (for example "`AUTH_SECRET`
+appeared in a public commit"). Fix whatever was slow or unclear.
+
 ## Checking it all
 
 | Check | What it covers | Runs |
 |---|---|---|
 | `scripts/test-validation.mjs` | Input checks and rate limits, every route, the app's own requests | Every pull request and every deploy |
 | `scripts/test-access-control.mjs` | Who can do what | Every pull request and every deploy |
+| `scripts/test-review-account.mjs` | The reviewer sign-in | Pull requests that change sign-in, and every deploy |
 | `scripts/check-secrets.mjs` | No keys in the repository | Every pull request and every deploy |
 | `scripts/record-app-requests.mjs` | Records what the app sends during the browser tests, then checks it against the rules | The browser tests on every pull request |
 | `scripts/check-live-security.mjs` | The live server from outside: not-found answers, test routes off, sessions required, unexpected fields refused, a real 429 from Cloudflare's rate limiter | After every deploy (`live-security-check.yml`) |

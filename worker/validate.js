@@ -105,6 +105,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/phone/start": { fields: { phone: str(40) } },
   "/relay/my/phone/confirm": { fields: { code: str(40) } },
   "/relay/my/phone/remove": NOTHING,
+  // Relay admins: the sign-in for app reviewers (review-account.js).
+  "/relay/my/admin/review-account": { fields: { on: bool } },
   // Shops (a shop's Relay key).
   "/relay/retailer/offers": { fields: { sku: str(200), offerMinor: int(0, 100000000), hours: int(0, 24 * 60), note: text(300) } },
   "/relay/retailer/payments": { fields: { method: str(40) } },

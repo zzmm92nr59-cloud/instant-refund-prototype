@@ -1,5 +1,5 @@
 name: Sign-in and security
-# Sign-in, two-step sign-in, phone numbers, passkeys and the security emails are tested before a change is merged
+# Sign-in, two-step sign-in, phone numbers, passkeys, the security emails and the reviewer sign-in are tested before a change is merged
 # (the same tests run again before the Worker is deployed).
 on:
   pull_request:
@@ -9,9 +9,11 @@ on:
       - 'worker/phone.js'
       - 'worker/passkeys.js'
       - 'worker/security-mail.js'
+      - 'worker/review-account.js'
       - 'worker/migrations/**'
       - 'scripts/test-auth.mjs'
       - 'scripts/test-security-mail.mjs'
+      - 'scripts/test-review-account.mjs'
       - '.github/workflows/sign-in-tests.yml'
   workflow_dispatch:
 permissions:
@@ -29,3 +31,5 @@ jobs:
         run: node scripts/test-auth.mjs
       - name: Security emails and signing out other devices
         run: node scripts/test-security-mail.mjs
+      - name: Sign-in for app reviewers
+        run: node scripts/test-review-account.mjs

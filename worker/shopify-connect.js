@@ -11,7 +11,7 @@ import { ensureOnce } from "./once.js";
 import { wrapKey } from "./push.js";
 import { issueRetailerKey } from "./retailer.js";
 import { ensureSquareMerchantSchema } from "./square-connect.js";
-import { getShopifyStores, syncShopifyCatalogues } from "./shopify.js";
+import { getShopifyStores, syncShopifyCatalogues, ensureShopPlanTable } from "./shopify.js";
 
 // write_orders: lets Relay refund the difference when a customer swaps to something cheaper. Without it the swap still
 // works and the shop is asked to refund by hand.
@@ -339,17 +339,30 @@ export async function syncAllShopify(env, opts = {}) {
 }
 
 // Shops whose products Relay may show: shops that connected themselves, plus server-configured shops marked public. No tokens.
-export async function shopifyShopsForDisplay(env) {
+// Real shoppers never see a test shop's products: a shop is shown only once Shopify has said it isn't a development store
+// (checked on each catalogue read, see shopify.js). opts.includeTest (Relay's testing tools) shows test shops too, marked.
+export async function shopifyShopsForDisplay(env, opts = {}) {
   const byDomain = new Map();
   for (const s of getShopifyStores(env)) if (s.published) byDomain.set(s.domain, { domain: s.domain, label: s.label });
+  let plans = null;
   if (env.RELAY_DB) {
     try {
       await ensureShopifyShopSchema(env.RELAY_DB);
       for (const r of ((await env.RELAY_DB.prepare("SELECT domain, label FROM shopify_shops ORDER BY created_at").all()).results || []))
         byDomain.set(r.domain, { domain: r.domain, label: r.label, connected: true });
     } catch { /* table not reachable: show configured shops only */ }
+    try {
+      await ensureShopPlanTable(env.RELAY_DB);
+      plans = new Map(((await env.RELAY_DB.prepare("SELECT domain, test_shop FROM shopify_shop_plan").all()).results || []).map(r => [r.domain, r.test_shop]));
+    } catch { plans = null; }
   }
-  return [...byDomain.values()];
+  const out = [];
+  for (const s of byDomain.values()) {
+    const known = plans && plans.has(s.domain), test = !known || plans.get(s.domain) === 1;
+    if (test && !opts.includeTest) continue; // a test shop, or not checked yet: not for real shoppers
+    out.push(test ? { ...s, test: true } : s);
+  }
+  return out;
 }
 
 // Used by shopify-embedded.js (Relay inside Shopify admin).

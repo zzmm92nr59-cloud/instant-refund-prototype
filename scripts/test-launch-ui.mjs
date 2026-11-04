@@ -42,10 +42,11 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/auth/verify") return j({ sessionToken: "S".repeat(43), email: EMAIL, expiresAt: Date.now() + 864e5 });
   if (p === "/relay/auth/logout") return j({ ok: true });
   if (p === "/relay/live-test/products") return j({ products: sandboxProducts });
-  if (p === "/relay/shopify/catalogue") return j({ published: true, products: shopProducts.map(x => ({ ...x, sku: x.catalogueId, provider: "shopify" })) });
+  if (p === "/relay/shopify/catalogue") { catalogueAsks.push(u.search); return j({ published: true, products: shopProducts.map(x => ({ ...x, sku: x.catalogueId, provider: "shopify" })) }); }
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
+const catalogueAsks = [];
 const SHOPPER_NEVER_SEES = /\bdemo\b|sandbox|simulat|fictional|prototype|test mode|test shop|preview only|not yet coordinated|isn.t built|aren.t built|square catalogue/i;
 const viewText = () => page.locator("#view").innerText();
 const tabs = () => page.locator(page.viewportSize().width < 760 ? "#foot button" : "#side button").allInnerTexts();
@@ -159,7 +160,10 @@ await page.getByRole("button", { name: "Back to Profile" }).click();
 cardSaved = false;
 console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Market and the test card are hidden (a saved card can still be removed)");
 
+// A shopper's Discover asks only for real shops' products (test shops are left out by the server).
+assert.ok(catalogueAsks.length && catalogueAsks.every(q => !/test=1/.test(q)), "no test shops for shoppers: " + catalogueAsks.join(","));
 // 6. Testing tools, switched on with a link: Market tab, sandbox items (labelled), test card and a way to switch off.
+const asksBefore = catalogueAsks.length;
 await page.goto(origin + "/index.html?testtools=1");
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
 assert.deepEqual((await tabs()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile", "Market"]);
@@ -167,6 +171,7 @@ await page.getByRole("heading", { name: "Testing tools" }).waitFor();
 await page.getByText("Bought in a shop? Add it from the receipt").waitFor();
 await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
 await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).getByText(/· TEST/).waitFor();
+assert.ok(catalogueAsks.slice(asksBefore).some(q => /test=1/.test(q)), "with testing tools on, Discover asks for test shops too");
 await page.locator(".avatar").click();
 await page.getByRole("button", { name: "Swap & resell", exact: true }).waitFor();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();

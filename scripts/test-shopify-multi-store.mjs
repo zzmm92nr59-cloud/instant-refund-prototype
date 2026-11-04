@@ -46,7 +46,7 @@ env.RELAY_DB={
 const requests=[];
 const originalFetch=globalThis.fetch;
 globalThis.fetch=async(url,params)=>{
-  requests.push({url,token:params.headers["X-Shopify-Access-Token"]});
+  requests.push({url,token:params.headers["X-Shopify-Access-Token"],plan:/RelayShopPlan/.test(String(params.body||""))});
   return {
     ok:true,
     json:async()=>({data:{
@@ -64,8 +64,10 @@ try{
   const report=await syncShopifyCatalogues(env);
   assert.equal(report.configuredStores,3);
   assert.equal(report.results.filter(x=>x.success).length,3);
-  assert.equal(requests.length,3);
-  assert.equal(requests.filter(x=>x.url.includes("studio-one")).length,1);
+  // One catalogue read per store, plus one check of whether it's a test shop (see shopify.js).
+  assert.equal(requests.filter(x=>!x.plan).length,3);
+  assert.equal(requests.filter(x=>x.plan).length,3,"each store's plan is checked once");
+  assert.equal(requests.filter(x=>!x.plan&&x.url.includes("studio-one")).length,1);
   assert.equal(requests.find(x=>x.url.includes("studio-two")).token,"private-token-2");
   const namespacedIds=calls.filter(x=>x.sql.includes("INSERT INTO retailer_catalog_items")).map(x=>x.values[0]);
   assert.equal(new Set(namespacedIds).size,3,"same Shopify GID across stores must not collide");

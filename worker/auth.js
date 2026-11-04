@@ -27,6 +27,7 @@ import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, han
 import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 import { tellShopper } from "./security-mail.js";
+import { REVIEW_TABLE_SQL, REVIEW_MAX_FAILURES_PER_DAY, isReviewAddress, reviewBlocked, reviewCode, handleReviewAdminRoute } from "./review-account.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_TTL_MS = 90 * DAY_MS;
@@ -96,7 +97,8 @@ async function ensureAuthTablesRun(db) {
        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL)`,
     ...PASSKEY_TABLE_SQL,
     ...TOTP_TABLE_SQL,
-    ...PHONE_TABLE_SQL
+    ...PHONE_TABLE_SQL,
+    ...REVIEW_TABLE_SQL
   ];
   await runAll(db, statements);
   // Whether a Microsoft sign-in also asked to connect Outlook (the wording version the shopper agreed to on the sign-in screen).
@@ -163,17 +165,23 @@ async function requestLink(request, env, cors, opts) {
     "SELECT COUNT(*) AS n FROM auth_login_tokens WHERE client_hash = ? AND created_at > ?").bind(client, since).first();
   if ((perEmail?.n || 0) >= MAX_LINKS_PER_EMAIL_PER_HOUR || (perClient?.n || 0) >= MAX_LINKS_PER_CLIENT_PER_HOUR)
     return json({ error: "too_many_requests" }, 429, cors);
+  // The reviewer sign-in (review-account.js): its code stays the same while it's on, and no email is sent, since nobody
+  // can receive mail at its address. Everything else, the limits included, is as for any address.
+  const review = await isReviewAddress(env, email);
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
   await env.RELAY_DB.prepare(
     "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
     .bind(tokenHash, email, client, now, now + LINK_TTL_MS).run();
   // A 6-digit code for the same sign-in, for people whose app and email link open in different places.
-  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+  const code = review ? await reviewCode(env, email) : String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
   const codeHash = await sha256Hex("code:" + email + ":" + code);
+  // The reviewer's code is the same every time, so its one row is renewed (and made usable again) rather than added twice.
   await env.RELAY_DB.prepare(
-    "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    "INSERT INTO auth_login_tokens (token_hash,email,client_hash,created_at,expires_at) VALUES (?,?,?,?,?)" +
+    (review ? " ON CONFLICT(token_hash) DO UPDATE SET client_hash = excluded.client_hash, created_at = excluded.created_at, expires_at = excluded.expires_at, used_at = NULL" : ""))
     .bind(codeHash, "code:" + email, client, now, now + LINK_TTL_MS).run();
+  if (review) return json({ ok: true, review: true }, 200, cors);
   const appUrl = String(env.RELAY_APP_URL || DEFAULT_APP_URL).split("#")[0];
   const link = appUrl + "#signin=" + token; // fragment: never sent to a server or written to logs
   let sent = false;
@@ -267,7 +275,9 @@ async function startSession(env, email, now, cors, opts = {}) {
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
   // Old sign-in links and codes: the hourly limits only look back an hour, so a day later they're no longer needed.
   await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE created_at <= ?").bind(now - 24 * HOUR_MS).run();
-  return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email, ...extra }, 200, cors);
+  // The app leaves out what the shared reviewer account can't use (connecting an inbox, sign-in settings).
+  const review = (await isReviewAddress(env, email)) ? { reviewAccount: true } : {};
+  return json({ sessionToken, expiresAt: now + SESSION_TTL_MS, email, ...extra, ...review }, 200, cors);
 }
 
 async function verifyCode(request, env, cors, opts) {
@@ -286,6 +296,12 @@ async function verifyCode(request, env, cors, opts) {
   if ((fails?.n || 0) >= MAX_CODE_FAILURES) {
     await env.RELAY_DB.prepare("UPDATE auth_login_tokens SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now, "code:" + email).run();
     return json({ error: "too_many_requests" }, 429, cors);
+  }
+  // The reviewer's code doesn't change, so wrong guesses are also capped per day, not just per 15 minutes.
+  if (await isReviewAddress(env, email)) {
+    const day = await env.RELAY_DB.prepare(
+      "SELECT COUNT(*) AS n FROM auth_code_failures WHERE email = ? AND created_at > ?").bind(email, now - DAY_MS).first();
+    if ((day?.n || 0) >= REVIEW_MAX_FAILURES_PER_DAY) return json({ error: "too_many_requests" }, 429, cors);
   }
   const claimed = await env.RELAY_DB.prepare(
     `UPDATE auth_login_tokens SET used_at = ?
@@ -519,6 +535,33 @@ async function listPurchases(env, shopper, orderId) {
 }
 
 // Returns a Response for auth/"my" routes, or null when the route is not one of ours.
+// "Delete my account": the sign-in and everything linked to it. Also used when the reviewer sign-in is turned off.
+async function deleteShopper(env, shopper, o) {
+  await ensurePushTables(env.RELAY_DB);
+  await ensureProfileTable(env.RELAY_DB);
+  await forgetCard(env, shopper.id, o).catch(() => {});
+  // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
+  await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
+  await env.RELAY_DB.batch([
+    ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
+    ...profileDeleteStatements(env.RELAY_DB, shopper.id),
+    ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
+    ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
+    ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
+    ...totpDeleteStatements(env.RELAY_DB, shopper.id),
+    ...phoneDeleteStatements(env.RELAY_DB, shopper.id),
+    ...pushDeleteStatements(env.RELAY_DB, shopper.id),
+    ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash, shopper.id)),
+    ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
+    // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
+    env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
+    env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
+    env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
+    env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
+    env.RELAY_DB.prepare("DELETE FROM shoppers WHERE id = ?").bind(shopper.id)
+  ]);
+}
+
 export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const path = url.pathname;
   const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback" || path === "/relay/microsoft/callback";
@@ -567,6 +610,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     const shopper = await sessionShopper(request, env, o.now);
     if (!shopper) return json({ error: "not_signed_in" }, 401, cors);
     if (signedInRoute) { const v = await checkBody(request, path, cors); if (v.response) return v.response; request = v.request; }
+    // Nothing personal can be attached to the shared reviewer account (review-account.js).
+    if (reviewBlocked(path, request.method) && await isReviewAddress(env, shopper.email)) return json({ error: "not_for_review_account" }, 403, cors);
     if (path === "/relay/me" && request.method === "GET") return json({ email: shopper.email }, 200, cors);
     if (path === "/relay/auth/logout" && request.method === "POST") {
       await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE session_hash = ?").bind(shopper.sessionHash).run();
@@ -582,31 +627,12 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       return json({ ok: true, count }, 200, cors);
     }
     if (path === "/relay/my/delete" && request.method === "POST") {
-      await ensurePushTables(env.RELAY_DB);
-      await ensureProfileTable(env.RELAY_DB);
-      await forgetCard(env, shopper.id, o).catch(() => {});
-      // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
-      await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
-      await env.RELAY_DB.batch([
-        ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
-        ...profileDeleteStatements(env.RELAY_DB, shopper.id),
-        ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
-        ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
-        ...(await labelDeleteStatements(env.RELAY_DB, shopper.id)),
-        ...totpDeleteStatements(env.RELAY_DB, shopper.id),
-        ...phoneDeleteStatements(env.RELAY_DB, shopper.id),
-        ...pushDeleteStatements(env.RELAY_DB, shopper.id),
-        ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash, shopper.id)),
-        ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
-        // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
-        env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
-        env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
-        env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
-        env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
-        env.RELAY_DB.prepare("DELETE FROM shoppers WHERE id = ?").bind(shopper.id)
-      ]);
+      await deleteShopper(env, shopper, o);
       return json({ ok: true }, 200, cors);
     }
+    // The sign-in for app reviewers: Relay admins only.
+    const reviewResponse = await handleReviewAdminRoute(path, request.method, request, env, cors, shopper, o, deleteShopper);
+    if (reviewResponse) return reviewResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;
