@@ -116,7 +116,14 @@ assert.equal(await story.evaluate(n => n.classList.contains("held")), true, "hol
 await page.mouse.up(); await page.waitForTimeout(200);
 assert.equal(await titleNow(), "Catch the price drop.", "letting go after a hold stays on the slide");
 await titleIs("Your year, wrapped."); // within a few seconds, by itself
-console.log("ok - the welcome story: four slides by tap, hold or arrow keys, moving on by itself, readable on every colour");
+// Tapping the last slide again keeps it as it is (it used to be drawn again, flashing on every tap); Get started nudges instead.
+const lastSlide = await story.locator(".rl-wslide").elementHandle();
+for (let k = 0; k < 3; k++) await page.mouse.click(vp.width * 0.8, vp.height * 0.4);
+await page.waitForTimeout(150);
+assert.equal(await lastSlide.evaluate(n => n.isConnected), true, "tapping the last slide doesn't draw it again");
+assert.equal(await story.locator(".rl-wslide").count(), 1);
+assert.equal(await story.locator(".rl-wgo").evaluate(n => n.classList.contains("rl-nudge")), true, "tapping on at the end nudges Get started");
+console.log("ok - the welcome story: four slides by tap, hold or arrow keys, moving on by itself, readable on every colour, no flash at the end");
 
 // 1. Google, one step: the story → "Get started" → the sign-in page → (Google once) → name, with the scan counting → all set.
 await story.getByRole("button", { name: "Get started" }).click();

@@ -11,7 +11,7 @@ const server = createServer(async (req, res) => { try { const p = resolve(".", "
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
 await mkdir("/tmp/shots", { recursive: true });
 const EMAIL = "jess.tester@example.com", day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
-const longDay = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+const wdDay = d => { const t = new Date(d + "T00:00:00Z"), f = o => t.toLocaleDateString("en-GB", { timeZone: "UTC", ...o }); return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "short" }); };
 const est = (date, basis) => ({ date, basis, from: "order", estimate: true });
 const receipts = [
   // The weekly shop with a kettle in it: only the kettle can go back.
@@ -106,21 +106,21 @@ await kettle.getByRole("button", { name: "Details" }).click();
 const sheet = page.locator(".rl-sheet");
 await sheet.getByText("The food can't go back, but you can usually return the Glass Kettle 1.7L.").waitFor();
 assert.equal(await sheet.getByText("Usually can't be returned").count(), 0, "not the blanket 'can't be returned' label");
-await sheet.getByText("Tell Tesco by " + longDay(day(11)) + " if you want to send it back").waitFor();
-await sheet.getByText(/Relay counts 14 days from the order date to be safe\. Tesco may allow longer\./).waitFor();
+await sheet.getByText("Return by " + wdDay(day(11)), { exact: true }).waitFor();
+await sheet.getByText("To be safe, 14 days from your order. UK law gives at least 14 days from delivery, and Tesco may give longer.").waitFor();
 await polished("food order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 3. The trainers: the same safe date, worded the same way.
 await wallet.locator(".rl-po").filter({ hasText: "Court Classic Trainers" }).getByRole("button", { name: "Details" }).click();
-await sheet.getByText("Tell Kick Lane by " + longDay(day(12)) + " if you want to send it back").waitFor();
-await sheet.getByText(/The email doesn't give a return window\. For online orders UK law allows at least 14 days from delivery, so Relay counts 14 days from the order date to be safe\./).waitFor();
+await sheet.getByText("Return by " + wdDay(day(12)), { exact: true }).waitFor();
+await sheet.getByText("To be safe, 14 days from your order. UK law gives at least 14 days from delivery, and Kick Lane may give longer.").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 4. The shirt: "30 days to return", counted from the order date.
 await wallet.locator(".rl-po").filter({ hasText: "Linen Shirt" }).getByRole("button", { name: "Details" }).click();
-await sheet.getByText("30 days to return", { exact: true }).waitFor();
-await sheet.getByText("Go by " + longDay(day(20)) + " to be safe: that's 30 days from the order date.").waitFor();
+await sheet.getByText("Return by " + wdDay(day(20)), { exact: true }).waitFor();
+await sheet.getByText(/^To be safe, 30 days from your order\. .+'s email gives 30 days\.$/).waitFor();
 await polished("window order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - each page says how its date was worked out: 14 days (UK law) or the email's 30 days, from the order date to be safe");

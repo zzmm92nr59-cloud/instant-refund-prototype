@@ -25,7 +25,11 @@ const receipts = [
   receipt("22222222-2222-4222-8222-222222222222", "Glow Lab", "Vitamin C Serum", 2400, 26, { returns: { windowDays: 28, deadline: day(2) } }),
   // Six days left, and the shop has a returns page: Start return is the main button.
   receipt("33333333-3333-4333-8333-333333333333", "Harlow & Co", "Wool Coat", 12000, 24, { returns: { windowDays: 30, deadline: day(6), portalUrl: "https://returns.harlow.example/start" } }),
+  // With the item's photo, on its way: the card is headed with the shop's name; the item's name is in Details.
+  receipt("44444444-4444-4444-8444-444444444444", "Northfold", "Flow Flared Pant", 6900, 5, { hasImage: true, items: [{ name: "Flow Flared Pant", variant: "UK 8", qty: 1, pricePence: 6900, category: "fashion" }],
+    delivery: { status: "shipped", carrier: "Royal Mail", at: day(-3) }, returnBy: { date: day(10), basis: "uk_law", from: "delivery" } }),
 ];
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
 await ctx.route("https://**/*", async route => {
@@ -34,6 +38,7 @@ await ctx.route("https://**/*", async route => {
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
+  if (/^\/relay\/my\/receipts\/[0-9a-f-]{36}\/image$/.test(p)) return route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG });
   if (p === "/relay/auth/providers") return j({ google: true, microsoft: true, consent: { version: "v5", text: ["To work, Relay needs to see your receipts."] } });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 6e5 });
@@ -145,8 +150,22 @@ assert.equal(await due("Wool Coat").getAttribute("class"), "rl-due soon", "amber
 assert.deepEqual(await card("Court Classic Trainers").locator(".rl-po-actions button").allInnerTexts(), ["I'm sending this back", "Details"]);
 assert.deepEqual(await card("Wool Coat").locator(".rl-po-actions button").allInnerTexts(), ["Start return", "Details"]);
 await card("Wool Coat").locator(".rl-po-marklink", { hasText: "I'm sending this back" }).waitFor();
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-shop").evaluate(n => getComputedStyle(n).textTransform), "none", "the shop's name as it's written, not in capitals");
-console.log("ok - wallet cards count down with a bar (green, amber, red); I'm sending this back sits beside Details, or under Start return");
+assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").evaluate(n => getComputedStyle(n).textTransform), "none", "the shop's name as it's written, not in capitals");
+assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").innerText(), "Kick Lane", "the card is headed with the shop's name");
+// A card with the item's photo: the shop's name (big), the price, size and date, and the parcel's news in a plain line.
+const nf = card("Northfold");
+await nf.locator(".rl-po-img.rl-has-photo img").waitFor();
+assert.equal(await nf.locator(".rl-po-brand").innerText(), "Northfold");
+assert.match(await nf.locator(".rl-po-meta").innerText(), /^UK 8 · /, "with a photo, the small line is size and date, not the item's long name");
+assert.equal(await nf.locator(".rl-sr").textContent(), "Flow Flared Pant", "the item's name is still there for screen readers");
+assert.equal(await nf.locator(".rl-po-ship").innerText(), "On its way with Royal Mail");
+assert.equal(await nf.locator(".rl-po-ship svg").count(), 1, "with a drawn parcel, not a symbol");
+assert.match(await due("Flow Flared Pant").innerText(), new RegExp("^Return by " + shortDay(day(10)) + "\\s+10 days left$"), "UK law's date reads plainly");
+await nf.getByRole("button", { name: "Details" }).click();
+const dsheet = page.locator(".rl-sheet");
+assert.match(await dsheet.locator(".rl-dt-sub").innerText(), /^Flow Flared Pant, UK 8 · £69\.00/, "Details names what was bought");
+await dsheet.getByRole("button", { name: "Close" }).click();
+console.log("ok - wallet cards count down with a bar (green, amber, red); I'm sending this back sits beside Details, or under Start return; a photo card is headed with the shop's name");
 
 // 3. Under the wallet: four colourful tiles, each opening its page; Price alerts says how many things are watched.
 const tiles = page.locator(".home-tiles .htile");
