@@ -185,7 +185,7 @@ export async function handleSquareTestRoute(request, env, url, cors, shopper, o 
       const [status, out] = await testRefund(env, shopper, await request.json().catch(() => ({})), f, o.now || Date.now());
       return json(out, status, cors);
     } catch (e) {
-      return json({ error: "square_refused", detail: String(e && e.message || e).slice(0, 120) }, 502, cors);
+      console.error("square_refused", String(e && e.message || e).slice(0, 120)); return json({ error: "square_refused" }, 502, cors);
     }
   }
   if (path === "/relay/my/testing/square-order" && request.method === "POST") {
@@ -193,7 +193,7 @@ export async function handleSquareTestRoute(request, env, url, cors, shopper, o 
       const [status, out] = await placeTestOrder(env, shopper, await request.json().catch(() => ({})), f, o.now || Date.now());
       return json(out, status, cors);
     } catch (e) {
-      return json({ error: "square_refused", detail: String(e && e.message || e).slice(0, 120) }, 502, cors);
+      console.error("square_refused", String(e && e.message || e).slice(0, 120)); return json({ error: "square_refused" }, 502, cors);
     }
   }
   return json({ error: "not_found" }, 404, cors);
@@ -522,7 +522,7 @@ async function doSquareSwap(env, shopper, body, o) {
       refunded: diff < 0 ? Boolean(refunded) : null, message }];
   } catch (e) {
     await record("failed", e && e.message).catch(() => {});
-    return [502, { error: "shop_refused", detail: String(e && e.message || e).slice(0, 160) }];
+    console.error("shop_refused", String(e && e.message || e).slice(0, 160)); return [502, { error: "shop_refused" }];
   }
 }
 

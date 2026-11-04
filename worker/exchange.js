@@ -264,7 +264,7 @@ async function doExchange(env, shopper, body, o) {
     if (byCard) {
       try { hold = await holdDifference(env, shopper, card, { amountMinor: diff, orderId: owned.order.id, lineId: owned.line.lineId, shop: owned.shop,
         label: owned.line.title + " → " + choice.title, destination: pay.stripeAccount }, o); }
-      catch (e) { return [402, { error: "card_declined", detail: String(e && e.message || e).slice(0, 120) }]; }
+      catch (e) { console.error("card_declined", String(e && e.message || e).slice(0, 120)); return [402, { error: "card_declined" }]; }
     }
     // Shopify order edit: begin, take the old item out (back into stock), add the new one, commit.
     const begin = await gql(owned.shop, store.token, `mutation RelayEditBegin($id: ID!) { orderEditBegin(id: $id) { calculatedOrder { id lineItems(first: 100) { nodes { id quantity variant { id } } } } userErrors { message } } }`,
@@ -320,7 +320,7 @@ async function doExchange(env, shopper, body, o) {
   } catch (e) {
     if (hold) await releaseHold(env, hold, e && e.message, o);
     await record("failed", e && e.message);
-    return [502, { error: "shop_refused", detail: String(e && e.message || e).slice(0, 160) }];
+    console.error("shop_refused", String(e && e.message || e).slice(0, 160)); return [502, { error: "shop_refused" }];
   }
 }
 

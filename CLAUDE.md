@@ -20,3 +20,5 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 15. Shoppers never see demo, sandbox or test wording; testing tools only with ?testtools=1 or ?testing=1.
 
 Also: index.html and relay-app-v2.html must stay identical. Bump VERSION in sw.js when the app shell changes.
+
+Server (docs/SECURITY.md): a new route that takes a body needs its fields listed in worker/validate.js (unlisted routes take none), and a row in "Who can do what". Keys live only as Cloudflare secrets, never in code (scripts/check-secrets.mjs).

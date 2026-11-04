@@ -9,6 +9,7 @@
 //    session's own shopper. Someone else's order looks exactly like a missing one (404).
 //  * The sign-in link is only ever emailed. It is never returned by the API.
 import { labelDeleteStatements } from "./royal-mail.js";
+import { checkBody } from "./validate.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
@@ -523,7 +524,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback" || path === "/relay/microsoft/callback";
   if (!isAuthRoute) return null;
   const o = { now: Date.now(), fetchImpl: (...args) => fetch(...args), ...opts }; // arrow wrapper: a bare fetch called as o.fetchImpl() throws "Illegal invocation" on Workers
+  // Strict checks on what's sent (validate.js). Sign-in routes are checked straight away; signed-in routes once the
+  // session is known, so a request without a valid one is answered "not signed in" before its body is even read.
+  const signedInRoute = path.startsWith("/relay/my/") || path === "/relay/auth/logout";
   try {
+    if (!signedInRoute) { const v = await checkBody(request, path, cors); if (v.response) return v.response; request = v.request; }
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
@@ -561,6 +566,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     const shopper = await sessionShopper(request, env, o.now);
     if (!shopper) return json({ error: "not_signed_in" }, 401, cors);
+    if (signedInRoute) { const v = await checkBody(request, path, cors); if (v.response) return v.response; request = v.request; }
     if (path === "/relay/me" && request.method === "GET") return json({ email: shopper.email }, 200, cors);
     if (path === "/relay/auth/logout" && request.method === "POST") {
       await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE session_hash = ?").bind(shopper.sessionHash).run();

@@ -15,6 +15,9 @@ import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConne
 import { handleShopifyEmbedded } from "./shopify-embedded.js";
 import { ensureOnce } from "./once.js";
 import { syncAwinFeeds } from "./awin-feed.js";
+import { checkRateLimits, tooManyRequests } from "./limits.js";
+import { checkBody, checkUrl } from "./validate.js";
+import { isLegacyTestRoute, legacyTestRoutesOn } from "./legacy-routes.js";
 // The fictional demo products seeded by migration 0003 had no shop name or picture. They belong to three made-up shops;
 // this names them and adds their pictures (served from the Relay site). Only rows still missing a name are touched.
 const DEMO_PICS = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/pics/products/";
@@ -94,6 +97,21 @@ const relayWorker = {
     }
 
     const url = new URL(request.url);
+    // Security checks every request passes before any route runs (docs/SECURITY.md has the full picture):
+    // a sane address (validate.js), then the rate limits for its address and credential (limits.js). Shopify's and
+    // Square's webhooks are signed and skip the limits.
+    if (!checkUrl(url)) return Response.json({ error: "invalid_request" }, { status: 400, headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+    const limited = await checkRateLimits(request, env, url);
+    if (limited) return tooManyRequests(limited, corsHeaders);
+    // The prototype's test-only endpoints are off unless switched on (legacy-routes.js).
+    if (isLegacyTestRoute(url.pathname) && !legacyTestRoutesOn(env))
+      return Response.json({ error: "not_found" }, { status: 404, headers: { ...corsHeaders, "Cache-Control": "no-store" } });
+    // Bodies sent to routes outside sign-in, the app and shops' dashboards (those check their own, after sign-in) are checked here.
+    if (url.pathname === "/relay/shopify/embedded/session" || url.pathname === "/plaid/exchange") {
+      const v = await checkBody(request, url.pathname, corsHeaders);
+      if (v.response) return v.response;
+      request = v.request;
+    }
     if (url.pathname.startsWith("/relay/square/")) {
       // After a shop connects, only that shop's catalogue is read in the background (reading every shop took too long to finish).
       const connectResponse = await handleSquareConnect(request, env, url, { afterConnect: (merchantId) => { try { ctx.waitUntil(syncSquareCatalogue(env, { only: merchantId }).catch(() => {})); } catch {} } });
@@ -6146,30 +6164,8 @@ boot();
 
 
       } catch (error) {
-
-        return Response.json(
-          {
-
-            success:
-              false,
-
-            message:
-              error.message,
-
-            square:
-              error.square ||
-              null,
-          },
-          {
-
-            status:
-              error.status ||
-              500,
-
-            headers:
-              corsHeaders,
-          }
-        );
+        console.error("verified purchases: Square sandbox read failed", String(error && error.message || error).slice(0, 120));
+        return Response.json({ success: false, error: "square_unavailable" }, { status: 502, headers: corsHeaders });
       }
     }
     // ============================================================
@@ -7929,41 +7925,13 @@ boot();
           }
         );
       }
-    }  // ============================================================
-    // 404
+    }
     // ============================================================
-
-    return Response.json(
-      {
-        error:
-          "Not found",
-
-        availableRoutes: [
-          "/",
-          "/purchases",
-          "/order/:orderId",
-          "/plaid/connect?user=relay_user_001",
-          "/plaid/transactions",
-          "/plaid/sandbox-transaction",
-          "/relay/match-test",
-          "/relay/test-lab",
-          "/relay/test-lab/setup",
-          "/relay/test-lab/run",
-          "/relay/test-lab/square-collisions",
-          "/relay/test-lab/paid-square-test",
-        ],
-      },
-
-      {
-        status: 404,
-
-        headers:
-          corsHeaders,
-      }
-    );
+    // 404: nothing here. (It used to list the prototype's routes; an unknown address now says only that.)
+    // ============================================================
+    return Response.json({ error: "not_found" }, { status: 404, headers: { ...corsHeaders, "Cache-Control": "no-store" } });
   },
 };
-
 // Reads go to the nearest copy of the database once D1 read replication is switched on (writes always reach the main copy,
 // in Eastern North America). The app hands back the bookmark from Relay's last answer, so it never sees older data than
 // it already has. Without read replication everything runs on the main copy, exactly as before.

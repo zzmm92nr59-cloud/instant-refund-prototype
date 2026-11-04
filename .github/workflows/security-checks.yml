@@ -1,0 +1,24 @@
+name: Security checks
+# Rate limits, input checks, who can do what, and no keys in the repository (docs/SECURITY.md).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: No keys, tokens or private keys in the repository
+        run: node scripts/check-secrets.mjs
+      - name: Input checks and rate limits on every route
+        run: node scripts/test-validation.mjs
+      - name: Who can do what (visitors, shoppers, admins, shops, webhooks)
+        run: node scripts/test-access-control.mjs

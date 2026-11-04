@@ -99,7 +99,7 @@ export async function handleShopPayRoute(request, env, url, cors, shop, o = {}) 
       if (!/^https:\/\/connect\.stripe\.com\//.test(String(link.url))) throw new Error("Stripe didn't return a set-up link");
       return json({ url: link.url }, 200, cors);
     } catch (e) {
-      return json({ error: "stripe_unavailable", detail: String(e && e.message || e).slice(0, 140) }, 502, cors);
+      console.error("stripe_unavailable", String(e && e.message || e).slice(0, 140)); return json({ error: "stripe_unavailable" }, 502, cors);
     }
   }
   if (path === "/relay/retailer/payments/stripe/remove" && request.method === "POST") {
