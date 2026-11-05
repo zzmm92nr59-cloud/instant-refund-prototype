@@ -137,6 +137,9 @@ const PATTERNS = [
   // "Fix this receipt": what the shopper typed in place of what Relay read (worker/gmail.js cleanFix checks it further).
   [new RegExp("^/relay/my/receipts/" + uuidish + "/fix$"), { limit: 16 * KB, fields: { shop: text(80), totalPence: int(0, 100000000), orderDate: str(10),
     items: list(50, obj({ name: text(120), qty: int(1, 999), pricePence: int(0, 100000000) })), undo: bool } }],
+  // "Send this email to Relay": an optional note from the shopper about what's wrong, or deleting what they sent.
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/share$"), { fields: { note: text(300), delete: bool } }],
+  [new RegExp("^/relay/my/admin/shared-emails/" + uuidish + "$"), { fields: { delete: bool } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/ask$"), { fields: { kind: one("swap", "buy"), message: text(600), offeredListingId: str(64) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/withdraw$"), NOTHING],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/(accept|decline|end)$"), NOTHING],

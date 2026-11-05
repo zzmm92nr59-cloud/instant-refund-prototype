@@ -4,6 +4,7 @@
 // shopper has never used may not exist yet, so each part is read on its own and an empty part is simply empty.
 
 import { exportPhone } from "./phone.js";
+import { sharedForExport } from "./shared-emails.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -67,6 +68,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       returnReminders: (await rows("SELECT receipt_id AS receiptId, title, deadline, remind_at AS remindAt, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?", id))
         .map((r) => ({ receiptId: r.receiptId, title: r.title, deadline: r.deadline, remindAt: iso(r.remindAt), sentAt: iso(r.sentAt) })),
     },
+    // Emails you chose to send to Relay from a receipt it read wrong, as kept (details hidden), until they're deleted.
+    emailsSentToRelay: await sharedForExport(env, id, now),
     // The help chat keeps no conversations: only how many messages you sent each day, and whether you asked for a person.
     helpChat: (await rows("SELECT day, messages, handoffs FROM support_chat_usage WHERE shopper_id = ? ORDER BY day", id)),
     alerts: {

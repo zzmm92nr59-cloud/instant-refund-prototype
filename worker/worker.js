@@ -7,6 +7,7 @@ import { receiveShopifyWebhook, backfillShopifyOrders, eraseRemovedShops } from 
 import { runHealthEmails } from "./health-digest.js";
 import { handleAuthRoute } from "./auth.js";
 import { tidyTexts } from "./phone.js";
+import { tidySharedEmails } from "./shared-emails.js";
 import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
@@ -67,6 +68,8 @@ const relayWorker = {
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
     ctx.waitUntil(tidyTexts(env).catch(() => {}));
+    // Emails shoppers sent to Relay are deleted after 30 days.
+    ctx.waitUntil(tidySharedEmails(env).catch(() => {}));
     // Relay health by email: the admins' morning summary (from 8am UK time) and alerts when something breaks.
     ctx.waitUntil(runHealthEmails(env).then(r => { if (r.sent) console.log("health emails", JSON.stringify(r)); }).catch(e => console.error("health emails failed", String(e && e.message || e).slice(0, 120))));
     // Shops that removed Relay over 30 days ago and that Shopify's erase request missed (Shopify API terms 6.2.3).
