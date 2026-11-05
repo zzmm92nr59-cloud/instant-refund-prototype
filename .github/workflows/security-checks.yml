@@ -28,3 +28,5 @@ jobs:
         run: node scripts/test-support-chat.mjs
       - name: Relay health by email (admins only, counts only, alerts at most every 6 hours)
         run: node scripts/test-health-digest.mjs
+      - name: Shops as the answer key (a shop's order checked only against its own shopper's receipts; counts only)
+        run: node scripts/test-answer-key.mjs

@@ -3727,6 +3727,74 @@
         });
         return l;
       }
+      // Shops as the answer key (worker/answer-key.js): orders connected shops confirmed, found in the shopper's own inbox, and
+      // what Relay read checked against the shop's record.
+      function answerKey(k) {
+        if (!k) return [el("p", { className: "rl-hp-sub", text: "Couldn't check this part just now. Try Refresh in a moment." })];
+        var how = "When a shop connected to Relay confirms an order, Relay finds that order's email in the shopper's own inbox and checks what it read against the shop's record.";
+        if (!k.orders) return [el("p", { className: "rl-hp-sub", text: how + " Nothing to check yet: none of the last " + k.days + " days' orders from connected shops belong to a Relay shopper." })];
+        var money = function (p) { return (Number(p) / 100).toLocaleString("en-GB", { style: "currency", currency: "GBP" }); };
+        var day = function (d) { return d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : "–"; };
+        var P = k.parts, right = pct(k.allRight, k.found);
+        var part = function (label, t, more) {
+          var all = t.right + t.wrong + t.missing;
+          return row(label, all ? pct(t.right, all) + "%" : "–", all ? N(t.right) + " of " + N(all) + (t.wrong ? ", " + N(t.wrong) + " wrong" : "") + (t.missing ? ", " + N(t.missing) + " not read" : "") + (more || "") : "Nothing to check yet");
+        };
+        var it = P.items, items = it.right + it.none + it.missing + it.extra + it.quantity;
+        var out = [
+          el("div", { className: "rl-hp-mhead" }, [el("b", { text: "Read exactly right" }), el("span", { text: k.found ? right + "%" : "–" })]),
+          el("div", { className: "rl-hp-meter", role: "img", ariaLabel: right + "% of orders found were read exactly right" }, [el("i", { style: "width:" + right + "%" })]),
+          el("p", { className: "rl-hp-sub", text: how + " " + plural(k.found, "order was", "orders were") + " found, out of " + plural(k.withInbox, "order", "orders") + " in the last " + k.days + " days from shoppers with an inbox connected." }),
+          el("div", { className: "rl-hp-rows" }, [
+            row("Found in the shopper's inbox", N(k.found), k.found ? N(k.byNumber) + " by order number, the rest by shop and day" : null),
+            row("Not found", N(k.notFound), "The email may be in an inbox they haven't connected, or the shop was read as another")]
+            .concat(k.unsure ? [row("Not sure which receipt", N(k.unsure), "Two receipts from the shop that day, so left out")] : [])
+            .concat(k.orders > k.withInbox ? [row("From shoppers without an inbox", N(k.orders - k.withInbox), "Nothing to look in")] : [])
+            .concat([part("Shop name right", P.shop), part("Total right", P.total), part("Date right", P.date)])
+            .concat(P.number.right + P.number.wrong + P.number.missing ? [part("Order number right", P.number)] : [])
+            .concat([row("Items right", items ? pct(it.right, items) + "%" : "–", items ? N(it.right) + " of " + N(items) + [[it.none, "with none read"], [it.missing, "missing some"], [it.extra, "with extra lines"], [it.quantity, "with a wrong quantity"]]
+              .filter(function (x) { return x[0]; }).map(function (x) { return ", " + N(x[0]) + " " + x[1]; }).join("") : "Nothing to check yet")])
+            .concat((k.byReader || []).map(function (v) { return row("Reader version " + (v.version || "unknown"), N(v.allRight) + " of " + N(v.found), "Read exactly right"); })))];
+        if (k.shops && k.shops.length) {
+          var l = el("div", { className: "rl-hp-shops" });
+          out.push(el("p", { className: "rl-hp-sub", text: "By shop, once 3 or more people's orders there were checked, most mistakes first:" }));
+          k.shops.forEach(function (s) {
+            var c = el("div", { className: "rl-hp-chips" });
+            if (s.found - s.totalRight) c.appendChild(el("i", { text: plural(s.found - s.totalRight, "total wrong", "totals wrong") }));
+            if (s.found - s.itemsRight) c.appendChild(el("i", { text: "Items wrong in " + plural(s.found - s.itemsRight, "order", "orders") }));
+            if (s.found && s.allRight === s.found) c.appendChild(el("i", { className: "ok", text: "All read right" }));
+            l.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: s.name }), el("span", { text: plural(s.orders, "order", "orders") + " from " + plural(s.people, "person", "people") + ", " + N(s.found) + " found" }), c]));
+          });
+          out.push(l);
+        }
+        // The admin's own orders, in detail: what Relay read beside what the shop says.
+        var m = k.mine || { orders: 0, differences: [], notFound: [] };
+        out.push(el("p", { className: "rl-hp-sub", text: !m.orders ? "None of your own orders are from a connected shop yet. Buy something from one with your sign-in email and Relay checks its email here." :
+          !m.withInbox ? plural(m.orders, "of your orders is", "of your orders are") + " from connected shops. Connect your inbox to check them." :
+          "Your own orders: " + N(m.found) + " of " + N(m.orders) + " found, " + N(m.allRight) + " read exactly right." }));
+        var say1 = function (d) {
+          if (d.part === "shop") return d.read ? "Shop read as " + d.read : "No shop name read";
+          if (d.part === "total") return d.read == null ? "No total read (shop says " + money(d.shop) + ")" : "Total read as " + money(d.read) + ", shop says " + money(d.shop);
+          if (d.part === "date") return d.read ? "Date read as " + day(d.read) + ", shop says " + day(d.shop) : "No date read";
+          if (d.part === "number") return d.read ? "Order number read as " + d.read : "No order number read";
+          if (d.verdict === "none") return "No items read (shop lists " + N(d.shop) + ")";
+          if (d.verdict === "missing") return "Items missed: " + d.missing.join(", ");
+          if (d.verdict === "extra") return "Extra lines read: " + d.extra.join(", ");
+          return "An item's quantity read wrong";
+        };
+        var own = el("div", { className: "rl-hp-shops" });
+        (m.differences || []).forEach(function (d) {
+          var c = el("div", { className: "rl-hp-chips" });
+          d.parts.forEach(function (x) { c.appendChild(el("i", { text: say1(x) })); });
+          own.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: d.shop + (d.number ? " " + d.number : "") }), el("span", { text: day(d.day) + ", read by version " + (d.readerVersion || "unknown") }), c]));
+        });
+        (m.notFound || []).forEach(function (u) {
+          own.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: u.shop + (u.number ? " " + u.number : "") }),
+            el("span", { text: day(u.day) + (u.unsure ? ": two receipts from the shop that day, so not checked" : ": not found in your inbox") })]));
+        });
+        if (own.childNodes.length) out.push(own);
+        return out;
+      }
       function draw(h) {
         box.textContent = "";
         when.textContent = "Updated " + stamp(h.generatedAt);
@@ -3768,6 +3836,7 @@
         var mine = h.mine || { shops: [] };
         box.appendChild(group("Your own receipts", [el("p", { className: "rl-hp-sub", text: plural(mine.receipts, "purchase", "purchases") + ", by shop, problems first" +
           (mine.personalMail ? ". " + plural(mine.personalMail, "receipt was", "receipts were") + " forwarded from a personal address" : "") + "." })].concat(mine.shops.length ? [shopList(mine.shops, false)] : [])));
+        box.appendChild(group("Checked against shops' own records", answerKey(h.checkedByShops)));
         // Checking inboxes.
         var sc = ib.scansThisWeek || {}, errs = {};
         (ib.scanErrorsThisWeek || []).forEach(function (e) { var t = SCAN_ERR[e.error] || "Other problems"; errs[t] = (errs[t] || 0) + e.count; });

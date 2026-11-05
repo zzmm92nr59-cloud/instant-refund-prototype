@@ -10,10 +10,13 @@
 //  * The admin's own receipts are theirs, so "Your own receipts" breaks those down by shop with no minimum: that's how the
 //    reader is checked now, while there are few shoppers.
 //  * Read-only. Anyone who isn't an admin gets "not found", as for the other admin routes.
+//  * "Checked against shops' own records" (answer-key.js) follows the same rules: counts, shops named only from
+//    MIN_SHOPPERS_PER_SHOP shoppers, and only the admin's own orders in detail.
 import { isAdmin } from "./resale-admin.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { PARSER_VERSION } from "./gmail.js";
 import { chatAvailable } from "./support-chat.js";
+import { answerKey } from "./answer-key.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
 const DAY = 864e5;
@@ -99,6 +102,9 @@ export async function relayHealth(env, me, now = Date.now()) {
     one("SELECT COALESCE(SUM(messages), 0) AS m, COALESCE(SUM(handoffs), 0) AS h, COUNT(DISTINCT shopper_id) AS people, COALESCE(SUM(CASE WHEN day = ? THEN messages END), 0) AS today FROM support_chat_usage WHERE day >= ?",
       dates[13], dates[7])
   ]);
+  // A problem working this part out never takes the rest of the page with it (the page says it couldn't be checked).
+  const checkedByShops = await answerKey(env, me, now, { minShoppers: MIN_SHOPPERS_PER_SHOP })
+    .catch((e) => { console.error("Answer key failed", String(e && e.message || e).slice(0, 160)); return null; });
 
   // Fixes count against a shop only where the shop is already named (from enough people), or among the admin's own.
   const fixedAt = (list) => new Map(list.map((r) => [r.domain, n(r.n)]));
@@ -143,6 +149,7 @@ export async function relayHealth(env, me, now = Date.now()) {
       notificationDevices: n(pushes.n), notificationPeople: n(pushes.people), priceWatches: n(watches.n), watchers: n(watches.people) },
     shopsConnected: { shopify: n(shopify.n), shopifyTest: n(shopifyTest.n), square: n(square.n) },
     security: { wrongCodesToday: n(codeFails.n) },
-    helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) }
+    helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) },
+    checkedByShops
   };
 }

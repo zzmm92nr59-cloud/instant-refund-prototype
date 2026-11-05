@@ -2,6 +2,7 @@ import { getShopifyStores } from "./shopify.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
+import { saveOrderRef } from "./order-ref.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
@@ -267,6 +268,8 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         .bind(orderId, await emailHash(env.AUTH_SECRET, orderEmail), Date.now()));
     }
     await env.RELAY_DB.batch(statements);
+    // The number the shop showed its customer ("#1001"), so the order can be found in the shopper's own emails (answer-key.js).
+    await saveOrderRef(env.RELAY_DB, orderId, event.name || (event.order_number != null ? "#" + event.order_number : null));
     // Ownership is shown to a shopper only when this order's email matches their own verified sign-in email.
     return { status: 200, body: { received: true, ...(linked ? { emailLinked: true } : {}) } };
   } catch (error) {
@@ -283,7 +286,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
   const since = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
   const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
-    nodes { legacyResourceId email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } }
+    nodes { legacyResourceId name email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } }
       lineItems(first: 100) { nodes { id title quantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
   let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
   try {
@@ -294,7 +297,7 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
       if (!r.ok || (j.errors && j.errors.length)) throw new Error("Shopify said " + r.status + " " + String((j.errors && j.errors[0] && j.errors[0].message) || "").slice(0, 120));
       const page = j.data && j.data.orders || {};
       for (const n of page.nodes || []) {
-        const event = { id: n.legacyResourceId, created_at: n.createdAt, processed_at: n.processedAt, currency: n.currencyCode, email: n.email,
+        const event = { id: n.legacyResourceId, name: n.name, created_at: n.createdAt, processed_at: n.processedAt, currency: n.currencyCode, email: n.email,
           total_price: n.totalPriceSet && n.totalPriceSet.shopMoney && n.totalPriceSet.shopMoney.amount, customer: null, // the customer record itself needs extra access Relay doesn't ask for
           line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity,
             price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
