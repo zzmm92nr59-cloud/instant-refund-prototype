@@ -85,8 +85,9 @@ export async function linkSquareOrderEmails(env, list, f, o = {}) {
   await ensureAuthTables(db); await ensureSquareOrderTables(db);
   const { paymentFacts, anchorStatement, suggestionStatement } = await import("./square-instore.js");
   const ids = list.map(x => x.id), done = new Set();
-  for (let i = 0; i < ids.length; i += 90) {
-    const part = ids.slice(i, i + 90), q = part.map(() => "?").join(",");
+  // Each id is bound twice (two tables), and D1 allows at most 100 bound values a query: 45 ids at a time.
+  for (let i = 0; i < ids.length; i += 45) {
+    const part = ids.slice(i, i + 45), q = part.map(() => "?").join(",");
     for (const r of ((await db.prepare(`SELECT order_id AS id FROM retailer_order_emails WHERE order_id IN (${q}) UNION SELECT order_id AS id FROM square_email_checks WHERE order_id IN (${q})`)
       .bind(...part, ...part).all()).results || [])) done.add(r.id);
   }

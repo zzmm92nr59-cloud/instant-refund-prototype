@@ -12,9 +12,10 @@ for (const [t, c] of [["retailer_catalog_items", "store_label TEXT"], ["retailer
   try { sqlite.exec(`ALTER TABLE ${t} ADD COLUMN ${c}`); } catch { /* already there */ }
 }
 let dbCalls = 0;
+// Like D1: at most 100 bound values in one query.
 function stmt(sql, args = []) {
   return {
-    bind: (...a) => stmt(sql, a),
+    bind: (...a) => { if (a.length > 100) throw new Error("D1_ERROR: too many SQL variables"); return stmt(sql, a); },
     async run() { dbCalls++; sqlite.prepare(sql).run(...args); return {}; },
     async first() { dbCalls++; return sqlite.prepare(sql).get(...args) ?? null; },
     async all() { dbCalls++; return { results: sqlite.prepare(sql).all(...args) }; },
@@ -407,4 +408,12 @@ assert.equal((await call("/relay/my/delete", { method: "POST", token: hal })).st
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_card_anchors WHERE email_hash = ?").get(halHash).n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM square_instore_suggestions WHERE email_hash = ?").get(halHash).n, 0);
 console.log("22 ok: account deletion removes card memory");
+// 23. A big first import (more orders than one query can name): checked in pieces D1 accepts (at most 100 values a query).
+{
+  const { linkSquareOrderEmails } = await import("../worker/square-orders.js");
+  const many = Array.from({ length: 120 }, (_, i) => ({ id: "square:bulk:order:" + i, order: { tenders: [] } }));
+  const r = await linkSquareOrderEmails(env, many, async () => new Response("{}", { status: 404 }), { budget: 0 });
+  assert.equal(r.linked, 0);
+  console.log("23 ok: 120 orders checked for emails without going over D1's limit of 100 values a query");
+}
 console.log("All Square order tests passed");
