@@ -33,11 +33,13 @@ const web = [
   { sku: "web:hollow-pine.test:81", product: "Linen Scarf", variation: "Sand", priceMinor: 3000, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/linen-scarf?variant=81", kind: "Scarves", checkedAt: CHECKED, webShop: true },
   { sku: "web:fern-row.test:91", product: "Canvas Tote Bag", variation: null, priceMinor: 1800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Fern Row", shopDomain: "fern-row.test", productUrl: "https://fern-row.test/products/canvas-tote-bag?variant=91", kind: "Bags", checkedAt: CHECKED, webShop: true }];
 // A clothes shop whose colours are named after food and drink, and a chocolate shop.
-const WEAR = ["Flutter Plunge Bra - Chocolate", "Jamie Drape Top In Bitter Chocolate", "Strike Light Grey Pullover Hoodie", "Everly Pink Cable Knit V-Neck Jumper", "Laptop Bag - Hot Pink Ripstop", "Adore G-String - Wine"];
+const WEAR = ["Flutter Plunge Bra - Chocolate", "Jamie Drape Top In Bitter Chocolate", "Strike Light Grey Pullover Hoodie", "Everly Pink Cable Knit V-Neck Jumper", "Laptop Bag - Hot Pink Ripstop", "Adore G-String - Wine", "Miffy x Velvet Phone Fleece Twosie Set"];
 WEAR.forEach((name, i) => web.push({ sku: "web:velvet-row.test:" + (200 + i), product: name, variation: null, priceMinor: 3000 + i * 100, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
   storeName: "Velvet Row", shopDomain: "velvet-row.test", productUrl: "https://velvet-row.test/products/" + i, kind: "Clothing", checkedAt: CHECKED, webShop: true }));
 web.push({ sku: "web:cocoa-cottage.test:300", product: "Dark Chocolate Truffles - Gift Box", variation: null, priceMinor: 1200, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
   storeName: "Cocoa Cottage", shopDomain: "cocoa-cottage.test", productUrl: "https://cocoa-cottage.test/products/truffles", kind: "Chocolate", checkedAt: CHECKED, webShop: true });
+web.push({ sku: "web:cocoa-cottage.test:301", product: "Black Toast Glass Cake Stand", variation: null, priceMinor: 3500, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
+  storeName: "Cocoa Cottage", shopDomain: "cocoa-cottage.test", productUrl: "https://cocoa-cottage.test/products/cake-stand", kind: "Homeware", checkedAt: CHECKED, webShop: true });
 const st = { webAsked: 0, admin: { admin: false }, purchaseAsks: [], wrapped: { receipts: 0 } };
 
 const browser = await chromium.launch();
@@ -222,7 +224,9 @@ await page.locator("#dcKinds [data-kind='food']").click();
 assert.deepEqual((await grid()).map(c => c[1]), ["Dark Chocolate Truffles - Gift Box"], "only food is food");
 await page.locator("#dcKinds [data-kind='fashion']").click();
 const wear = (await grid()).filter(c => c[0] === "Velvet Row").map(c => c[1]).sort();
-assert.deepEqual(wear, [...WEAR].sort(), "a bra, a top, a hoodie, a jumper, a bag and a G-string are fashion, whatever their colour");
+assert.deepEqual(wear, [...WEAR].sort(), "a bra, a top, a hoodie, a jumper, a bag, a G-string and a twosie are fashion, whatever their colour or print");
+await page.locator("#dcKinds [data-kind='home']").click();
+assert.ok((await grid()).some(c => c[1] === "Black Toast Glass Cake Stand"), "a cake stand is for the home, not food");
 await page.locator("#dcKinds [data-kind='all']").click();
 const picks = await page.$$eval("#dcForYou .dc-strip .dc-card", cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, (c.querySelector(".dc-why") || {}).textContent || ""]));
 assert.ok(picks.length >= 3, "picks from what you spend: " + JSON.stringify(picks));
