@@ -27,6 +27,7 @@ const shopify = [
 const web = [
   { sku: "web:hollow-pine.test:71", product: "Wool Beanie", variation: "Navy", priceMinor: 2800, currency: "GBP", imageUrl: null, quantity: 0, inStock: false, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=71", kind: "Hats", checkedAt: CHECKED, webShop: true },
   { sku: BEANIE, product: "Wool Beanie", variation: "Grey", priceMinor: 2500, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=72", kind: "Hats", checkedAt: CHECKED, webShop: true },
+  { sku: "web:hollow-pine.test:81", product: "Linen Scarf", variation: "Sand", priceMinor: 3000, currency: "GBP", imageUrl: null, quantity: 0, inStock: false, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/linen-scarf?variant=81", kind: "Scarves", checkedAt: CHECKED, webShop: true },
   { sku: "web:fern-row.test:91", product: "Canvas Tote Bag", variation: null, priceMinor: 1800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Fern Row", shopDomain: "fern-row.test", productUrl: "https://fern-row.test/products/canvas-tote-bag?variant=91", kind: "Bags", checkedAt: CHECKED, webShop: true }];
 const ANSWERS = {
   results: () => ({ found: true, item: "white leather trainers", results: [
@@ -194,6 +195,9 @@ assert.match(await page.locator(".dc-preview").innerText(), /^Preview: products 
 assert.ok(st.webAsked >= 1);
 const beanie = page.locator(".dc-cardwrap").filter({ hasText: "Wool Beanie" });
 assert.equal(await beanie.locator("[data-watch]").count(), 0, "no price alerts for shops' websites");
+assert.doesNotMatch(await beanie.innerText(), /Out of stock|left/, "one colour sold out, another can be bought: not out of stock, and no count Relay doesn't know");
+assert.match(await page.locator(".dc-cardwrap").filter({ hasText: "Linen Scarf" }).innerText(), /Out of stock/, "every colour sold out: out of stock");
+assert.doesNotMatch(await page.locator(".dc-cardwrap").filter({ hasText: "Canvas Tote Bag" }).innerText(), /Out of stock|left/);
 await polished("discover preview", ".main");
 await beanie.locator(".dc-card").click();
 await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();

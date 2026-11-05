@@ -550,7 +550,9 @@ function dcGroupsRaw(rows){const map=new Map();for(const p of rows){const key=st
   return {key:storeKey(storeOf(vs[0]))+"|"+vs[0].product,store:storeOf(vs[0]),product:vs[0].product,variants:vs,lead,imageUrl:(vs.find(v=>/^https:\/\//.test(String(v.imageUrl||"")))||{}).imageUrl||"",
    min:Math.min(...prices),max:Math.max(...prices),currency:vs[0].currency,draw:of.key,kind:of.kind,
    options:vs.map(v=>String(v.variation||"").trim()).filter(x=>x&&!/^(default( title)?|one size)$/i.test(x)),
-   left:known.length&&known.every(q=>q<=0)?0:known.length?known.reduce((n,q)=>n+Math.max(0,q),0):null}})}
+   // How many are left: only when every size or colour's stock is known. One that isn't known (a shop that doesn't share
+   // it, or a shop's website that only says it can be bought) means Relay can't say it's sold out or how many are left.
+   left:known.length<vs.length?null:known.every(q=>q<=0)?0:known.reduce((n,q)=>n+Math.max(0,q),0)}})}
 function dcPrice(g){return g.min===g.max?priceIn(g.min,g.currency):"From "+priceIn(g.min,g.currency)}
 // "White · UK 7–9", "S, M, L" (at most four, then "+2 more"). What every option shares ("White") is said once.
 const DC_SIZES=["xxs","xs","s","m","l","xl","xxl","xxxl"],DC_SIZE_WORDS={small:"s",medium:"m",large:"l","extra large":"xl"};
