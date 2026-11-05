@@ -327,7 +327,8 @@ const relayWorker = {
             .bind("shopify:" + store.domain).all();
           for (const row of rows.results || []) {
             products.push({...row, sku:row.catalogueId, provider:"shopify",
-              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {})});
+              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {}),
+              ...(store.test && store.canOrder ? {testOrders:true} : {})});
           }
         }
         return Response.json({products,published:true,publishedStoreCount:stores.length,

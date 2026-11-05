@@ -341,6 +341,8 @@ export async function syncAllShopify(env, opts = {}) {
 // Shops whose products Relay may show: shops that connected themselves, plus server-configured shops marked public. No tokens.
 // Real shoppers never see a test shop's products: a shop is shown only once Shopify has said it isn't a development store
 // (checked on each catalogue read, see shopify.js). opts.includeTest (Relay's testing tools) shows test shops too, marked.
+// For a connected shop: sendsOrders, when Shopify was set up to tell Relay about its paid orders (with permission to read
+// them), and canOrder, when the shop let Relay create orders (needed for the testing tools' test orders).
 export async function shopifyShopsForDisplay(env, opts = {}) {
   const byDomain = new Map();
   for (const s of getShopifyStores(env)) if (s.published) byDomain.set(s.domain, { domain: s.domain, label: s.label });
@@ -348,8 +350,12 @@ export async function shopifyShopsForDisplay(env, opts = {}) {
   if (env.RELAY_DB) {
     try {
       await ensureShopifyShopSchema(env.RELAY_DB);
-      for (const r of ((await env.RELAY_DB.prepare("SELECT domain, label FROM shopify_shops ORDER BY created_at").all()).results || []))
-        byDomain.set(r.domain, { domain: r.domain, label: r.label, connected: true });
+      for (const r of ((await env.RELAY_DB.prepare("SELECT domain, label, scopes, hooks FROM shopify_shops ORDER BY created_at").all()).results || [])) {
+        const granted = new Set(String(r.scopes || "").split(",").map(x => x.trim()));
+        byDomain.set(r.domain, { domain: r.domain, label: r.label, connected: true,
+          sendsOrders: String(r.hooks || "").split(",").includes("ORDERS_PAID") && (granted.has("read_orders") || granted.has("write_orders")),
+          canOrder: granted.has("write_orders") });
+      }
     } catch { /* table not reachable: show configured shops only */ }
     try {
       await ensureShopPlanTable(env.RELAY_DB);

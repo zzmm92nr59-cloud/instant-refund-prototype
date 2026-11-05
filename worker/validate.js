@@ -149,6 +149,7 @@ const PATTERNS = [
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/messages$"), { fields: { body: text(600) } }],
   [new RegExp("^/relay/my/resale/requests/" + uuidish + "/report$"), { fields: { reason: text(300) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/report$"), { fields: { reason: text(300) } }],
+  [new RegExp("^/relay/my/cross-swap/" + uuidish + "/cancel$"), NOTHING],
   [new RegExp("^/relay/my/admin/reports/" + uuidish + "/review$"), { fields: { outcome: one("dismiss", "remove_listing", "block") } }],
   [/^\/relay\/my\/instore\/suggestions\/[A-Za-z0-9-]{8,64}$/, { fields: { answer: one("mine", "not_mine") } }]
 ];
