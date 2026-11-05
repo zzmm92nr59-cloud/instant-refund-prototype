@@ -39,11 +39,11 @@ product(BIRCH, 3, "Canvas Tote", [[31, "Default Title", 1800, 0], [32, "Euro", 1
 product(FERN, 4, "Test Trainers", [[41, "UK 9", 6000, 6]]);
 
 const PNG = "data:image/png;base64," + Buffer.from("not really a png, just made-up bytes for the test").toString("base64");
-let asked = [], reply = { found: true, item: "white leather trainers", matches: [1] }, status = 200, raw = null;
+let asked = [], reply = { found: true, item: "white leather trainers", matches: [1] }, status = 200, raw = null, errBody = "{}";
 const fetchImpl = async (url, init) => {
   assert.equal(String(url), "https://api.anthropic.com/v1/messages", "only Anthropic is asked");
   const body = JSON.parse(init.body); asked.push({ headers: init.headers, body });
-  if (status !== 200) return new Response("{}", { status });
+  if (status !== 200) return new Response(errBody, { status });
   return new Response(JSON.stringify({ content: [{ type: "text", text: raw !== null ? raw : JSON.stringify(reply) }] }), { status: 200 });
 };
 const alice = { id: "alice-id", email: "alice@example.com", emailHash: "h-alice" }, bob = { id: "bob-id", email: "bob@example.com", emailHash: "h-bob" };
@@ -111,7 +111,15 @@ reply = { found: false, item: "a cat", matches: [1] };
 assert.deepEqual((await call(alice, { image: PNG })).body, { found: false, item: null, results: [] });
 raw = "Sorry, I can't help with that."; assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "busy" } }); raw = null;
 status = 429; assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "busy" } });
-status = 400; assert.deepEqual(await call(alice, { image: PNG }), { status: 400, body: { error: "image_unreadable" } }); status = 200;
+status = 400; errBody = '{"type":"error","error":{"type":"invalid_request_error","message":"Could not process image"}}';
+assert.deepEqual(await call(alice, { image: PNG }), { status: 400, body: { error: "image_unreadable" } }, "Anthropic says the picture is the problem");
+errBody = '{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}';
+assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "ai_off" } }, "no credit left: not available, never blamed on the picture");
+status = 401; errBody = '{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}';
+assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "ai_off" } }, "a key that doesn't work: not available");
+status = 400; errBody = "{}";
+assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "ai_off" } }, "a refusal that doesn't mention the picture: not available");
+status = 200; errBody = "{}";
 assert.deepEqual(cleanAnswer('{"found":true,"item":"  red\\n  dress  ","matches":[3,3,2]}', 2), { found: true, item: "red dress", matches: [2] });
 console.log("ok - no product, nonsense, busy or refused: plain answers");
 
