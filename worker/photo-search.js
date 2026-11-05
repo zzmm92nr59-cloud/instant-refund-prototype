@@ -33,8 +33,9 @@ Answer with JSON only, nothing else:
 "found" is false when there's no product in the picture. Only list items a shopper would see as the same kind of thing (a bag for a bag, trainers for trainers); colour and style make them closer. An empty list is right when nothing is close.`;
 
 // The products shops on Relay sell, as Discover shows them, one each: real shops only; for Relay's testing tools, test
-// shops too, and the preview from shops' own websites (web-shops.js), each marked.
-async function candidates(env, includeTest, now) {
+// shops too; and the preview from shops' own websites (web-shops.js) for the testing tools or Relay's team's preview
+// switch; each marked.
+async function candidates(env, includeTest, now, includeWeb = includeTest) {
   const db = env.RELAY_DB;
   await ensureImageTable(db);
   const shops = await shopifyShopsForDisplay(env, { includeTest }).catch(() => []);
@@ -54,7 +55,7 @@ async function candidates(env, includeTest, now) {
       priceMinor: r.priceMinor, imageUrl: r.imageUrl, inStock: r.quantity == null ? null : Number(r.quantity) > 0,
       storeName: s.label || s.domain.replace(/\.myshopify\.com$/, ""), ...(s.test ? { testShop: true } : {}) });
   }
-  if (includeTest) for (const p of await webShopProducts(env, now).catch(() => []))
+  if (includeWeb) for (const p of await webShopProducts(env, now).catch(() => []))
     variants.push({ sku: p.sku, product: p.product, variation: p.variation, priceMinor: p.priceMinor, imageUrl: p.imageUrl, inStock: p.inStock,
       storeName: p.storeName, webShop: true, productUrl: p.productUrl });
   // One per product (a shop's sizes and colours of one thing): its lowest price, whether any of it can be bought, and the
@@ -124,7 +125,7 @@ export function cleanAnswer(text, count) {
   return { found, item: found ? oneLine(j.item, 60) || null : null, matches: found ? matches : [] };
 }
 
-// GET /relay/my/photo-search: whether it's on. POST { image, test }: the search.
+// GET /relay/my/photo-search: whether it's on. POST { image, test, web }: the search (web: the shops' websites preview).
 export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o = {}) {
   if (url.pathname !== "/relay/my/photo-search") return null;
   if (request.method === "GET") return json({ available: photoSearchAvailable(env), perDay: PHOTO_SEARCHES_PER_DAY }, 200, cors);
@@ -142,7 +143,7 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
   if (Number(all && all.n) >= PHOTO_SEARCHES_ALL_DAY) return json({ error: "busy" }, 503, cors);
   await db.prepare("INSERT INTO photo_search_uses (shopper_id, created_at) VALUES (?, ?)").bind(shopper.id, now).run();
 
-  const items = await candidates(env, body.test === true, now);
+  const items = await candidates(env, body.test === true, now, body.test === true || body.web === true);
   const list = items.length ? items.map((x, i) => (i + 1) + ". " + [x.product, x.variation, x.storeName, money(x.priceMinor) + (x.maxPriceMinor ? "–" + money(x.maxPriceMinor) : ""),
     x.options ? "in " + x.options.join(", ") : null, x.inStock === false ? "out of stock" : null].filter(Boolean).join(" · ")).join("\n")
     : "(No items on Relay yet.)";

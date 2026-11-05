@@ -106,6 +106,13 @@ assert.deepEqual(r.body.results.map(x => [x.product, x.testShop, x.webShop]), [[
 assert.deepEqual([r.body.results[1].sku, r.body.results[1].productUrl, r.body.results[1].inStock], ["web:hollow-pine.test:72", "https://hollow-pine.test/products/wool-beanie?variant=72", true],
   "the colour the shop's website said can be bought, with its link");
 console.log("ok - test shops and shops' websites only for the testing tools, marked");
+// The team's preview of shops' websites, without testing tools: the websites' products, still no test shops.
+reply = { found: true, item: "beanie", matches: [4] };
+r = await call(alice, { image: PNG, web: true });
+assert.match(asked.at(-1).body.messages[0].content[1].text, /\n4\. Wool Beanie · Hollow Pine · £25\.00–£28\.00 · in Navy, Grey$/, "shops' websites, after the real shops");
+assert.doesNotMatch(asked.at(-1).body.messages[0].content[1].text, /Test Trainers|Fern Test/, "no test shops");
+assert.deepEqual(r.body.results.map(x => [x.product, x.testShop, x.webShop]), [["Wool Beanie", undefined, true]]);
+console.log("ok - the team's website preview: shops' websites without test shops");
 
 // 5. No product in the picture, an answer that makes no sense, and Anthropic busy or refusing: plain errors, nothing shown.
 reply = { found: false, item: "a cat", matches: [1] };

@@ -91,7 +91,7 @@ const ROUTES = new Map(Object.entries({
   // Swaps, returns and payments.
   "/relay/my/exchange": { fields: { orderId: id(), lineId: id(), variantKey: str(300), agreedDiffMinor: int(-100000000, 100000000) } },
   "/relay/my/return": { fields: { orderId: id(), lineId: id(), reason: str(60) } },
-  "/relay/my/photo-search": { limit: 1800 * KB, fields: { image: str(1700000), test: bool } },
+  "/relay/my/photo-search": { limit: 1800 * KB, fields: { image: str(1700000), test: bool, web: bool } },
   "/relay/my/cross-swap": { fields: { orderId: id(), lineId: id(), toKey: str(200), reason: one("wrong_size", "changed_mind", "faulty", "not_as_described"), agreedPriceMinor: int(0, 100000000) } },
   "/relay/my/card/setup": NOTHING,
   "/relay/my/card/confirm": { fields: { setupIntentId: str(200) } },

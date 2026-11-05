@@ -6,6 +6,8 @@
   // The shopper's name and photo, kept on this device so the avatar shows straight away (the server copy is the real one).
   var PROFILE_KEY = "relay.profile";
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { return null; } }
+  // Orders the shops confirmed. Orders from Relay's own test shops come only with the testing tools on (worker/auth.js).
+  function purchasesPath() { return "/relay/my/purchases" + (testingOn() ? "?test=1" : ""); }
   // The shared account for app reviewers (worker/review-account.js): no inbox or sign-in settings can be added to it, so
   // the app leaves those out and explains what to do instead.
   function isReview() { var s = load(); return Boolean(s && s.token && s.review); }
@@ -2971,7 +2973,7 @@
         if (drawnSig === null && memo.receipts) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); }
         var sk = list.firstChild; if (sk && sk.className === "rl-cats" && sk.style.marginTop) sk.style.marginTop = "8px";
         // Shop orders and email receipts are drawn together, so the page never redraws itself a moment later.
-        var shopsLoaded = !onPage ? Promise.resolve() : (memo.purchases || api("/relay/my/purchases")).then(function (pr) {
+        var shopsLoaded = !onPage ? Promise.resolve() : (memo.purchases || api(purchasesPath())).then(function (pr) {
           var rows = []; ((pr.ok && pr.body && pr.body.purchases) || []).forEach(function (o) { (o.items || []).forEach(function (it) { rows.push([o, it]); }); });
           var sig = JSON.stringify(rows.map(function (x) { return [x[0].id, x[1].lineId, x[1].exchange && x[1].exchange.status, x[1].returnInfo && x[1].returnInfo.status]; }));
           var changed = sig !== memo.shopSig; shopRows = rows; memo.shopRows = rows; memo.shopSig = sig;
@@ -3751,7 +3753,7 @@
       mailRow.setDetail(!mailState ? "" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " · connected" : "Not connected yet");
     }).catch(function () { mailRow.setDetail(""); });
     var orders = [];
-    api("/relay/my/purchases").then(function (r) {
+    api(purchasesPath()).then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       orders = (r.ok && r.body && r.body.purchases) || [];
       if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + " confirmed by the shop"); }
@@ -3846,22 +3848,32 @@
     sheet.appendChild(outBtn);
     sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
 
-    // Testing tools on this device, for Relay's team: Relay's test shops and test orders, and the preview from shops' own
-    // websites in Discover. Like opening Relay with ?testtools=1, it only changes what this device shows, so it also works
-    // in the app on the home screen, which a link can't reach. Shoppers never see this switch.
-    function teamTesting() {
+    // Two switches for Relay's team, each changing only what this device shows (so they also work in the app on the home
+    // screen, which a link can't reach). Shoppers never see them.
+    //  * Shops' websites: the preview from shops' own websites in Discover and search by photo. Real products only.
+    //  * Testing tools: Relay's test shops, test orders and sample items (the same as opening Relay with ?testtools=1).
+    function teamSwitch(title, label, text, key) {
       var box = el("div", { className: "rl-aih" });
       var sw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
-      sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Testing tools on this device");
-      var draw = function () { sw.setAttribute("aria-checked", testingOn() ? "true" : "false"); };
-      box.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "Testing tools" }), sw]));
-      box.appendChild(el("p", { text: "Shows Relay's test shops, and the preview of shops' own websites in Discover, on this device only." }));
+      sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", label);
+      var on = function () { try { return key === "relay-testing-tools" ? testingOn() : localStorage.getItem(key) === "1"; } catch (e) { return false; } };
+      var draw = function () { sw.setAttribute("aria-checked", on() ? "true" : "false"); };
+      box.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: title }), sw]));
+      box.appendChild(el("p", { text: text }));
       draw();
       sw.onclick = function () {
-        try { localStorage.setItem("relay-testing-tools", testingOn() ? "0" : "1"); } catch (e) {}
+        try { localStorage.setItem(key, on() ? "0" : "1"); } catch (e) {}
         draw();
         if (typeof window.testToolsChanged === "function") window.testToolsChanged();
       };
+      return box;
+    }
+    function teamTesting() {
+      var box = el("div");
+      box.appendChild(teamSwitch("Shops' websites in Discover", "Shops' websites in Discover on this device",
+        "Real products and prices from shops' own websites, read once a day, in Discover and search by photo. Only Relay's team sees them.", "relay-web-preview"));
+      box.appendChild(teamSwitch("Testing tools", "Testing tools on this device",
+        "Relay's test shops, test orders and sample items, for trying things out. Off shows Relay as shoppers see it.", "relay-testing-tools"));
       return box;
     }
     // AI help (worker/ai-reader.js): Claude reads emails Relay's own reader isn't sure about, only once switched on here.
@@ -5518,7 +5530,7 @@
       for (var i = 0; i < 4; i++) grid.appendChild(el("div", { className: "rl-skel rl-ps-skel" }));
       out.appendChild(grid);
       if (!shut.parentNode) sheet.appendChild(shut);
-      api("/relay/my/photo-search", { method: "POST", body: { image: data, test: Boolean(opts.test) } }).then(function (r) {
+      api("/relay/my/photo-search", { method: "POST", body: { image: data, test: Boolean(opts.test), web: Boolean(opts.web) } }).then(function (r) {
         busy = false;
         if (!layer.parentNode) return;
         out.textContent = "";
@@ -5963,7 +5975,7 @@
     return named.map(function (e) { return { index: e.i, returning: marks[e.i] === "returning" }; });
   }
   function loadBoth() {
-    var p = memo.purchases || api("/relay/my/purchases");
+    var p = memo.purchases || api(purchasesPath());
     return Promise.all([p.then(function (r) { return r.ok ? (r.body && r.body.purchases) || [] : null; }, function () { return null; }),
       api("/relay/my/receipts").then(function (r) { return r.ok ? (r.body && r.body.receipts) || [] : null; }, function () { return null; })]).then(function (both) {
       // Remember what came back, so the next visit shows it straight away.
@@ -6110,7 +6122,7 @@
     host.textContent = "";
     var s = load(); if (!s || !s.token) return;
     // The wallet can be drawn twice as the page settles: both share one request rather than asking the server twice.
-    if (!memo.purchases) memo.purchases = api("/relay/my/purchases").then(function (r) { setTimeout(function () { memo.purchases = null; }, 1500); return r; }, function (e) { memo.purchases = null; throw e; });
+    if (!memo.purchases) memo.purchases = api(purchasesPath()).then(function (r) { setTimeout(function () { memo.purchases = null; }, 1500); return r; }, function (e) { memo.purchases = null; throw e; });
     memo.purchases.then(function (r) {
       var rows = (r.ok && r.body && r.body.purchases) || [];
       var refresh = function () { memo.purchases = null; mountConfirmed(host, opts); };
@@ -6360,7 +6372,7 @@
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
-    purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
+    purchases: function () { return (memo.purchases || api(purchasesPath())).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;
     var fit = function () { var kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)); document.documentElement.style.setProperty("--rl-kb", (kb > 60 ? kb : 0) + "px"); };
