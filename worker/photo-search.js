@@ -126,7 +126,15 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
         { type: "text", text: "Items shops on Relay sell:\n" + list } ] }] }) });
   } catch { return json({ error: "busy" }, 503, cors); }
   if (r.status === 429 || r.status >= 500) return json({ error: "busy" }, 503, cors);
-  if (!r.ok) { console.error("photo_search_refused", r.status); return json({ error: r.status === 400 ? "image_unreadable" : "busy" }, r.status === 400 ? 400 : 503, cors); }
+  // Anthropic refused: the picture itself only when it says so (a 400 about the image). No credit left, a key that doesn't
+  // work and anything else mean photo search isn't available right now, never "couldn't read that picture".
+  if (!r.ok) {
+    const detail = String(await r.text().catch(() => "")).slice(0, 2000);
+    const credit = /credit balance|billing|purchase credits/i.test(detail);
+    const image = r.status === 400 && !credit && /image|media|base64/i.test(detail);
+    console.error("photo_search_refused", r.status, image ? "image" : credit ? "no_credit" : "other");
+    return image ? json({ error: "image_unreadable" }, 400, cors) : json({ error: "ai_off" }, 503, cors);
+  }
   const answer = await r.json().catch(() => null);
   const text = answer && Array.isArray(answer.content) ? answer.content.filter(c => c && c.type === "text").map(c => c.text).join("") : "";
   const got = cleanAnswer(text, items.length);
