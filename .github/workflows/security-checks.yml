@@ -26,3 +26,5 @@ jobs:
         run: node scripts/test-health.mjs
       - name: Help chat (nothing from anyone's email goes to the AI company; limits; a person by email)
         run: node scripts/test-support-chat.mjs
+      - name: Relay health by email (admins only, counts only, alerts at most every 6 hours)
+        run: node scripts/test-health-digest.mjs
