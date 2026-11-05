@@ -3825,6 +3825,7 @@
         abox.appendChild(accGroup("Team", [accRow("shield", "Sign in again for team tools", "Team tools need a sign-in with your second step", function () {
           api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); open(function (sh) { signedOutView(sh); }); });
         })]));
+        abox.appendChild(teamTesting());
         return;
       }
       if (!r.ok || !r.body || r.body.admin !== true) return;
@@ -3834,6 +3835,7 @@
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
         accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
+      abox.appendChild(teamTesting());
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
 
@@ -3844,6 +3846,24 @@
     sheet.appendChild(outBtn);
     sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
 
+    // Testing tools on this device, for Relay's team: Relay's test shops and test orders, and the preview from shops' own
+    // websites in Discover. Like opening Relay with ?testtools=1, it only changes what this device shows, so it also works
+    // in the app on the home screen, which a link can't reach. Shoppers never see this switch.
+    function teamTesting() {
+      var box = el("div", { className: "rl-aih" });
+      var sw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
+      sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "Testing tools on this device");
+      var draw = function () { sw.setAttribute("aria-checked", testingOn() ? "true" : "false"); };
+      box.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "Testing tools" }), sw]));
+      box.appendChild(el("p", { text: "Shows Relay's test shops, and the preview of shops' own websites in Discover, on this device only." }));
+      draw();
+      sw.onclick = function () {
+        try { localStorage.setItem("relay-testing-tools", testingOn() ? "0" : "1"); } catch (e) {}
+        draw();
+        if (typeof window.testToolsChanged === "function") window.testToolsChanged();
+      };
+      return box;
+    }
     // AI help (worker/ai-reader.js): Claude reads emails Relay's own reader isn't sure about, only once switched on here.
     // Shown only once Relay can offer it (the AI key is set). Switching it off deletes what the AI read.
     function aiHelp() {
@@ -5687,7 +5707,7 @@
     }).catch(function () {});
   }
   // Test shop tools (Square sandbox test orders, test refunds, card-only test payments) only for people testing Relay:
-  // switched on from Profile → Testing, or with ?testing=1. Shoppers never see them.
+  // switched on with ?testtools=1 or ?testing=1, or by Relay's team in Profile → Team. Shoppers never see them.
   // The Market isn't part of the launch: it shows for people testing Relay and in the ?demo=1 walkthrough.
   // Swap & resell is open to every shopper. It has no tab of its own: Profile, Discover and receipts past their return date
   // lead to it (the Market tab is only among the testing tools).

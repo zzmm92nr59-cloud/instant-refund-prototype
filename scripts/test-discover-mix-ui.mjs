@@ -1,8 +1,11 @@
-// Browser test: Discover mixes shops, so the first screen shows every shop instead of one shop's whole range.
+// Browser test: Discover mixes shops, so the first screen shows every shop instead of one shop's whole range, and Relay's
+// team can switch testing tools on in Profile (which a link can't do in the app on a phone's home screen).
 // Stubbed Relay server with made-up shops and products; nothing reaches a shop. Checks: a shop with more products than
 // Discover shows at once no longer hides the others; each shop keeps its own order; with testing tools, the preview from
 // shops' own websites is on the first screen too; Lowest and Highest price still sort across every shop; a shop's chip
-// shows just that shop, in its own order. Passes the polish rules in light and dark, at phone size.
+// shows just that shop, in its own order; the Testing tools switch is only for Relay's team (also before they sign in
+// again for team tools), turns the preview on and off in Discover without reloading, and is remembered on the device.
+// Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
@@ -26,7 +29,7 @@ const web = [
   { sku: "web:hollow-pine.test:71", product: "Wool Beanie", variation: "Navy", priceMinor: 2800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=71", kind: "Hats", checkedAt: CHECKED, webShop: true },
   { sku: "web:hollow-pine.test:81", product: "Linen Scarf", variation: "Sand", priceMinor: 3000, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/linen-scarf?variant=81", kind: "Scarves", checkedAt: CHECKED, webShop: true },
   { sku: "web:fern-row.test:91", product: "Canvas Tote Bag", variation: null, priceMinor: 1800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Fern Row", shopDomain: "fern-row.test", productUrl: "https://fern-row.test/products/canvas-tote-bag?variant=91", kind: "Bags", checkedAt: CHECKED, webShop: true }];
-const st = { webAsked: 0 };
+const st = { webAsked: 0, admin: { admin: false } };
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -44,7 +47,7 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
   if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
-  if (p === "/relay/my/admin/me") return j({ admin: false });
+  if (p === "/relay/my/admin/me") return j(st.admin);
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   return j({});
 });
@@ -142,6 +145,55 @@ assert.ok(cards.some(c => c[1] === "Linen Scarf"), "a website shop's second prod
 await polished("testing tools", ".main");
 console.log("ok - testing tools: one product from every shop first, the shops' websites included");
 
+// 5. Shoppers never see the Testing tools switch.
+const me = page.locator("#mePage");
+const openProfile = async () => { await page.evaluate(() => window.go("me")); await me.locator(".rl-arow").first().waitFor(); await page.waitForTimeout(300); };
+await page.goto(origin + "/index.html");
+await page.evaluate(() => localStorage.removeItem("relay-testing-tools"));
+await page.reload();
+await openProfile();
+assert.equal(await me.getByRole("switch", { name: "Testing tools on this device" }).count(), 0, "shoppers don't get the switch");
+console.log("ok - shoppers never see the Testing tools switch");
+
+// 6. Relay's team, still to sign in again for team tools: the switch is there, off. On: Discover gets the preview from
+// shops' own websites straight away; off again: it goes. The device remembers it.
+st.admin = { admin: false, signInAgain: true };
+await page.reload();
+await openProfile();
+await me.locator(".rl-arow", { hasText: "Sign in again for team tools" }).waitFor();
+const sw = me.getByRole("switch", { name: "Testing tools on this device" });
+await sw.waitFor();
+assert.equal(await sw.getAttribute("aria-checked"), "false");
+assert.match(await me.locator(".rl-aih", { hasText: "Testing tools" }).innerText(), /Shows Relay's test shops, and the preview of shops' own websites in Discover, on this device only\./);
+await polished("team switch off", "#mePage");
+const askedBefore = st.webAsked;
+await sw.click();
+assert.equal(await sw.getAttribute("aria-checked"), "true");
+assert.equal(await page.evaluate(() => localStorage.getItem("relay-testing-tools")), "1", "remembered on this device");
+await discover("Wool Beanie");
+await page.locator(".dc-preview").waitFor();
+assert.ok(st.webAsked > askedBefore, "the shops' websites are loaded once it's on");
+await page.reload();
+await discover("Wool Beanie");
+console.log("ok - the team's switch turns the shops' websites preview on, and the device remembers it");
+await openProfile();
+await me.getByRole("switch", { name: "Testing tools on this device" }).click();
+assert.equal(await me.getByRole("switch", { name: "Testing tools on this device" }).getAttribute("aria-checked"), "false");
+await discover();
+await page.waitForTimeout(500);
+assert.equal(await page.locator(".dc-preview").count(), 0, "off again: no preview");
+assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Wool Beanie" }).count(), 0, "off again: no shops' websites");
+console.log("ok - off again: the preview goes");
+
+// 7. Relay's team after signing in again: the switch sits with the team tools.
+st.admin = { admin: true, openReports: 0 };
+await page.reload();
+await openProfile();
+await me.locator(".rl-arow", { hasText: "Relay health" }).waitFor();
+await me.getByRole("switch", { name: "Testing tools on this device" }).waitFor();
+await polished("team tools", "#mePage");
+console.log("ok - the switch is with the team tools too");
+
 assert.deepEqual(errors, []);
 await browser.close(); server.close();
-console.log("PASS Discover mixes shops");
+console.log("PASS Discover mixes shops; Relay's team can switch testing tools on");

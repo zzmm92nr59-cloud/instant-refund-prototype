@@ -92,7 +92,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-report-review-ui.mjs
       - name: Test search by photo and the shops' websites preview (says where the picture goes first, made smaller, once per tap, preview only in testing tools)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-photo-search-ui.mjs
-      - name: Test Discover mixes shops (every shop on the first screen, each in its own order, price sorts across shops)
+      - name: Test Discover mixes shops (every shop on the first screen, each in its own order, price sorts across shops) and the team's Testing tools switch
         run: node --import ./scripts/record-app-requests.mjs scripts/test-discover-mix-ui.mjs
       - name: Test two-step sign-in for everyone (protect the account first, once per tap, the last can't go, team signs in again, passkey finish)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-second-step-ui.mjs
