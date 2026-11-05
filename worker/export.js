@@ -109,6 +109,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         .map((m) => ({ ...m, createdAt: iso(m.createdAt) })),
       reportsYouMade: (await rows("SELECT request_id AS requestId, reason, created_at AS createdAt FROM resale_reports WHERE reporter_id = ?", id))
         .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
+      listingsYouReported: (await rows("SELECT listing_id AS listingId, reason, created_at AS createdAt FROM resale_listing_reports WHERE reporter_id = ?", id))
+        .map((r) => ({ ...r, createdAt: iso(r.createdAt) })),
     },
     inStorePurchaseSuggestions: (await rows("SELECT order_id AS orderId, brand, last4, amount_minor AS amountPence, currency, paid_at AS paidAt, store, status FROM square_instore_suggestions WHERE email_hash = ?", shopper.emailHash)),
     ordersFromConnectedShops: (await rows("SELECT order_id AS orderId FROM retailer_order_emails WHERE email_hash = ?", shopper.emailHash)).map((o) => o.orderId),

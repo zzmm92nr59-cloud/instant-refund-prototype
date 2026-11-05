@@ -121,4 +121,18 @@ assert.deepEqual(emails[0].to, ["ops@example.com"]);
 assert.equal((await call("/relay/my/admin/health/email", { method: "POST", body: {}, token: ops })).status, 429);
 assert.equal((await call("/relay/my/admin/health/email", { method: "POST", body: { to: "x@example.com" }, token: ops })).status, 400, "takes nothing: the address can't be chosen");
 console.log("ok - an admin can email themselves the summary now (and nobody else can)");
+
+// Swap & resell reports waiting for review are in "Needs a look" (counts only), until they're reviewed.
+const { ensureResaleTables } = await import("../worker/resale.js");
+await ensureResaleTables(db);
+sqlite.prepare("INSERT INTO resale_listing_reports (id, listing_id, reporter_id, reason, created_at) VALUES (?,?,?,?,?)").run("r1", "l1", "someone", "Counterfeit", clock);
+sqlite.prepare("INSERT INTO resale_reports (id, request_id, reporter_id, reason, created_at) VALUES (?,?,?,?,?)").run("r2", "q1", "someone", "Rude", clock);
+clock = Date.UTC(2026, 10, 9, 8, 0); emails = []; await run();
+const withReports = emails.find(e => /this morning/.test(e.subject));
+assert.match(withReports.text, /- 2 Swap & resell reports are waiting for review \(Profile, Team, Review reports\)\./);
+assert.ok(!/Counterfeit|Rude/.test(withReports.text), "never what a report says");
+sqlite.prepare("INSERT INTO resale_report_reviews (report_id, outcome, reviewed_at) VALUES ('r1','dismiss',1), ('r2','dismiss',1)").run();
+clock = Date.UTC(2026, 10, 10, 8, 0); emails = []; await run();
+assert.ok(!/Swap & resell report/.test(emails.find(e => /this morning/.test(e.subject)).text), "gone once reviewed");
+console.log("ok - Swap & resell reports waiting for review are in the morning summary, counts only");
 console.log("PASS health emails: morning summary from 8am, counts only, alerts in plain words at most every " + ALERT_GAP_HOURS + " hours, admins only");

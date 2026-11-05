@@ -3,7 +3,8 @@
 // Who is an admin: a signed-in shopper whose email is listed in the RELAY_ADMIN_EMAILS secret
 // (comma separated). With no secret set, nobody is an admin and every admin route answers as if it did not exist.
 // What an admin sees: the reported conversation, with the two people shown only as "reporter" and
-// "reported member". Never an email, name, order number or address.
+// "reported member", or for a listing reported from Browse, the listing as members see it. Never an email, name,
+// order number or address.
 // What an admin can do: dismiss, remove the reported seller's listing, or block the reported member.
 // A block is remembered by a hash of the email so deleting and re-creating the account does not undo it.
 export const ADMIN_TABLE_SQL = [
@@ -43,31 +44,69 @@ async function openReports(env) {
     const reportedId = reporterIsBuyer ? r.seller_id : r.asker_id;
     const msgs = (await env.RELAY_DB.prepare(
       "SELECT sender_id, body, created_at FROM resale_messages WHERE request_id = ? ORDER BY created_at ASC, rowid ASC LIMIT 200").bind(r.request_id).all()).results || [];
-    const total = await env.RELAY_DB.prepare(
-      `SELECT COUNT(*) AS n FROM resale_reports rp JOIN resale_requests q ON q.id = rp.request_id JOIN resale_listings l ON l.id = q.listing_id
-        WHERE rp.reporter_id != ? AND (q.asker_id = ? OR l.seller_id = ?)`).bind(reportedId, reportedId, reportedId).first();
-    const hash = await env.RELAY_DB.prepare("SELECT email_hash FROM shoppers WHERE id = ?").bind(reportedId).first();
-    const blocked = hash ? Boolean(await env.RELAY_DB.prepare("SELECT 1 AS x FROM resale_blocks WHERE email_hash = ?").bind(hash.email_hash).first()) : false;
     out.push({
-      id: r.id, createdAt: r.created_at, reason: r.reason || "",
+      id: r.id, kind: "conversation", createdAt: r.created_at, reason: r.reason || "",
       item: { title: r.title, store: r.store || "", status: r.listing_status },
       reporterRole: reporterIsBuyer ? "buyer" : "seller",
       reportedRole: reporterIsBuyer ? "seller" : "buyer",
-      reportsAgainstReported: total ? total.n : 1,
-      reportedAlreadyBlocked: blocked,
+      reportsAgainstReported: await reportsAgainst(env, reportedId),
+      reportedAlreadyBlocked: await blockedMember(env, reportedId),
       canRemoveListing: reporterIsBuyer, // only when the reported member is the seller (the reporter is the buyer)
       messages: msgs.map(m => ({ from: m.sender_id === r.reporter_id ? "reporter" : "reported member", body: m.body, createdAt: m.created_at }))
     });
   }
-  return out;
+  // Listings reported straight from Browse: the listing as members see it.
+  const listed = (await env.RELAY_DB.prepare(
+    `SELECT rp.id, rp.reason, rp.created_at, l.seller_id, l.title, l.store, l.status AS listing_status, l.size, l.condition, l.note, l.ask_pence, l.currency
+       FROM resale_listing_reports rp JOIN resale_listings l ON l.id = rp.listing_id
+       LEFT JOIN resale_report_reviews v ON v.report_id = rp.id
+      WHERE v.report_id IS NULL ORDER BY rp.created_at DESC LIMIT 50`).all()).results || [];
+  for (const r of listed) {
+    out.push({
+      id: r.id, kind: "listing", createdAt: r.created_at, reason: r.reason || "",
+      item: { title: r.title, store: r.store || "", status: r.listing_status, size: r.size || null, condition: r.condition || null, note: r.note || null,
+        askPence: r.ask_pence, currency: r.currency || "GBP" },
+      reporterRole: "member", reportedRole: "seller",
+      reportsAgainstReported: await reportsAgainst(env, r.seller_id),
+      reportedAlreadyBlocked: await blockedMember(env, r.seller_id),
+      canRemoveListing: true, messages: []
+    });
+  }
+  return out.sort((a, b) => b.createdAt - a.createdAt).slice(0, 50);
+}
+
+// How many reports other members have made against this member: about their conversations, and about their listings.
+async function reportsAgainst(env, memberId) {
+  const talk = await env.RELAY_DB.prepare(
+    `SELECT COUNT(*) AS n FROM resale_reports rp JOIN resale_requests q ON q.id = rp.request_id JOIN resale_listings l ON l.id = q.listing_id
+      WHERE rp.reporter_id != ? AND (q.asker_id = ? OR l.seller_id = ?)`).bind(memberId, memberId, memberId).first();
+  const listings = await env.RELAY_DB.prepare(
+    "SELECT COUNT(*) AS n FROM resale_listing_reports rp JOIN resale_listings l ON l.id = rp.listing_id WHERE l.seller_id = ? AND rp.reporter_id != ?").bind(memberId, memberId).first();
+  return Math.max(1, Number(talk && talk.n || 0) + Number(listings && listings.n || 0));
+}
+async function blockedMember(env, memberId) {
+  const hash = await env.RELAY_DB.prepare("SELECT email_hash FROM shoppers WHERE id = ?").bind(memberId).first();
+  return hash ? Boolean(await env.RELAY_DB.prepare("SELECT 1 AS x FROM resale_blocks WHERE email_hash = ?").bind(hash.email_hash).first()) : false;
+}
+
+// Open reports of either kind, for the admin's count (and the morning summary).
+export async function openReportCount(env) {
+  const n = await env.RELAY_DB.prepare(`SELECT
+      (SELECT COUNT(*) FROM resale_reports rp LEFT JOIN resale_report_reviews v ON v.report_id = rp.id WHERE v.report_id IS NULL) +
+      (SELECT COUNT(*) FROM resale_listing_reports rp LEFT JOIN resale_report_reviews v ON v.report_id = rp.id WHERE v.report_id IS NULL) AS n`).first();
+  return Number(n && n.n || 0);
 }
 
 async function review(env, admin, reportId, outcome, now) {
   if (!OUTCOMES.includes(outcome)) return { status: 400, body: { error: "invalid_outcome" } };
+  // A conversation report, or a listing reported from Browse (whose reporter is a member looking at it, not a buyer).
   const r = await env.RELAY_DB.prepare(
     `SELECT rp.id, rp.reporter_id, q.asker_id, l.seller_id, l.id AS listing_id
        FROM resale_reports rp JOIN resale_requests q ON q.id = rp.request_id JOIN resale_listings l ON l.id = q.listing_id
-      WHERE rp.id = ?`).bind(reportId).first();
+      WHERE rp.id = ?`).bind(reportId).first()
+    || await env.RELAY_DB.prepare(
+    `SELECT rp.id, rp.reporter_id, rp.reporter_id AS asker_id, l.seller_id, l.id AS listing_id
+       FROM resale_listing_reports rp JOIN resale_listings l ON l.id = rp.listing_id WHERE rp.id = ?`).bind(reportId).first();
   if (!r) return { status: 404, body: { error: "not_found" } };
   const done = await env.RELAY_DB.prepare("SELECT 1 AS x FROM resale_report_reviews WHERE report_id = ?").bind(reportId).first();
   if (done) return { status: 409, body: { error: "already_reviewed" } };
@@ -105,9 +144,7 @@ export async function handleResaleAdminRoute(path, method, request, env, cors, s
   if (!path.startsWith("/relay/my/admin/")) return null;
   if (path === "/relay/my/admin/me" && method === "GET") {
     if (!isAdmin(env, shopper)) return json({ admin: false }, 200, cors);
-    const n = await env.RELAY_DB.prepare(
-      "SELECT COUNT(*) AS n FROM resale_reports rp LEFT JOIN resale_report_reviews v ON v.report_id = rp.id WHERE v.report_id IS NULL").first();
-    return json({ admin: true, openReports: n ? n.n : 0 }, 200, cors);
+    return json({ admin: true, openReports: await openReportCount(env) }, 200, cors);
   }
   // Anyone else gets the same answer as for a path that does not exist.
   if (!isAdmin(env, shopper)) return json({ error: "not_found" }, 404, cors);
