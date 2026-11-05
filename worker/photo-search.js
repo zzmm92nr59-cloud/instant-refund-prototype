@@ -63,17 +63,32 @@ async function candidates(env, includeTest, now) {
   for (const v of variants) {
     const key = v.storeName.toLowerCase() + "|" + String(v.product).trim().toLowerCase();
     const g = byProduct.get(key);
-    if (!g) { byProduct.set(key, { ...v, priceMinor: v.priceMinor, maxPriceMinor: v.priceMinor, count: 1 }); continue; }
-    g.count++;
+    if (!g) { byProduct.set(key, { ...v, priceMinor: v.priceMinor, maxPriceMinor: v.priceMinor, count: 1, variations: [v.variation] }); continue; }
+    g.count++; g.variations.push(v.variation);
     g.priceMinor = Math.min(g.priceMinor, v.priceMinor); g.maxPriceMinor = Math.max(g.maxPriceMinor, v.priceMinor);
     if (g.inStock !== true && v.inStock === true) { g.sku = v.sku; g.variation = v.variation; g.productUrl = v.productUrl || g.productUrl; }
     g.inStock = g.inStock === true || v.inStock === true ? true : g.inStock === null || v.inStock === null ? null : false;
     if (!g.imageUrl && v.imageUrl) g.imageUrl = v.imageUrl;
   }
   return [...byProduct.values()].slice(0, MAX_CANDIDATES).map(g => ({ sku: g.sku, product: g.product, variation: g.count === 1 ? g.variation : null,
+    ...(g.count > 1 && optionWords(g.variations).length ? { options: optionWords(g.variations) } : {}),
     priceMinor: g.priceMinor, ...(g.maxPriceMinor > g.priceMinor ? { maxPriceMinor: g.maxPriceMinor } : {}), currency: "GBP",
     imageUrl: /^https:\/\/[^\s"'<>]{8,600}$/.test(String(g.imageUrl || "")) ? g.imageUrl : null, inStock: g.inStock, storeName: g.storeName,
     ...(g.testShop ? { testShop: true } : {}), ...(g.webShop ? { webShop: true, productUrl: g.productUrl } : {}) }));
+}
+
+// The colours (or materials, finishes) a product comes in, from its variants' names, without the sizes: "Navy / M" and
+// "Oatmeal / L" give Navy, Oatmeal. At most 4, so a product's line stays short. Colour is often only in these names.
+const SIZE_WORD = /^(?:x{0,3}s|m|x{0,3}l|\d?xl|one size|os|petite|regular|tall|long|short|small|medium|large|x-large|default title|buy|pre-?order|(?:uk|eu|us|w|l)\s?\d.*|\d.*)$/i;
+function optionWords(variations) {
+  const out = [];
+  for (const v of variations) for (const part of String(v || "").split(/\s*[\/|,]\s*/)) {
+    const p = part.trim();
+    if (!p || p.length > 30 || SIZE_WORD.test(p) || /\(\s*uk/i.test(p) || out.some(x => x.toLowerCase() === p.toLowerCase())) continue;
+    out.push(p);
+    if (out.length >= 4) return out;
+  }
+  return out;
 }
 
 const money = (m) => "£" + (Number(m) / 100).toFixed(2);
@@ -129,7 +144,7 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
 
   const items = await candidates(env, body.test === true, now);
   const list = items.length ? items.map((x, i) => (i + 1) + ". " + [x.product, x.variation, x.storeName, money(x.priceMinor) + (x.maxPriceMinor ? "–" + money(x.maxPriceMinor) : ""),
-    x.inStock === false ? "out of stock" : null].filter(Boolean).join(" · ")).join("\n")
+    x.options ? "in " + x.options.join(", ") : null, x.inStock === false ? "out of stock" : null].filter(Boolean).join(" · ")).join("\n")
     : "(No items on Relay yet.)";
   let r;
   try {

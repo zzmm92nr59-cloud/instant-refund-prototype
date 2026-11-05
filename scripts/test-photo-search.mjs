@@ -100,7 +100,8 @@ console.log("ok - the picture and real shops' items go to Claude, nothing about 
 // 4. Testing tools: test shops' items and the shops' websites preview too, marked.
 reply = { found: true, item: "trainers", matches: [4, 5] };
 r = await call(alice, { image: PNG, test: true });
-assert.match(asked.at(-1).body.messages[0].content[1].text, /\n4\. Test Trainers · UK 9 · Fern Test · £60\.00\n5\. Wool Beanie · Hollow Pine · £25\.00–£28\.00$/);
+assert.match(asked.at(-1).body.messages[0].content[1].text, /\n4\. Test Trainers · UK 9 · Fern Test · £60\.00\n5\. Wool Beanie · Hollow Pine · £25\.00–£28\.00 · in Navy, Grey$/,
+  "the colours a product comes in, when there's more than one");
 assert.deepEqual(r.body.results.map(x => [x.product, x.testShop, x.webShop]), [["Test Trainers", true, undefined], ["Wool Beanie", undefined, true]]);
 assert.deepEqual([r.body.results[1].sku, r.body.results[1].productUrl, r.body.results[1].inStock], ["web:hollow-pine.test:72", "https://hollow-pine.test/products/wool-beanie?variant=72", true],
   "the colour the shop's website said can be bought, with its link");
