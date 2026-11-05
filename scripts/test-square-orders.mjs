@@ -137,7 +137,8 @@ async function signIn(email, ip) {
   const link = /#signin=([A-Za-z0-9_-]{43})/.exec(mails[0].text)[1];
   return (await (await call("/relay/auth/verify", { method: "POST", body: { token: link } })).json()).sessionToken;
 }
-const purchases = async (t) => (await (await call("/relay/my/purchases", { token: t })).json()).purchases;
+// Square's sandbox orders are test orders: only Relay's testing tools ask for them (?test=1).
+const purchases = async (t) => (await (await call("/relay/my/purchases?test=1", { token: t })).json()).purchases;
 const alice = await signIn("alice@example.com", "5.5.5.5");
 const bob = await signIn("bob@example.com", "6.6.6.6");
 const carol = await signIn("carol@example.com", "7.7.7.7");
@@ -156,6 +157,8 @@ assert.equal(a[0].items[0].variant, "Medium"); assert.equal(a[0].items[0].imageU
 const b = await purchases(bob);
 assert.equal(b.length, 1); assert.equal(b[0].id, "square:sandbox:order:O_BOB");
 assert.equal((await purchases(carol)).length, 0, "nobody else sees these orders");
+assert.deepEqual((await (await call("/relay/my/purchases", { token: alice })).json()).purchases, [], "without the testing tools, Square's sandbox orders aren't shown as purchases");
+assert.equal((await (await call("/relay/my/purchases", { token: alice, e: { ...env, SQUARE_ENVIRONMENT: "production" } })).json()).purchases.length, 1, "with Relay on Square's live service, they're real purchases");
 // Someone else's order looks exactly like a missing one.
 assert.equal((await call("/relay/my/purchases/square:sandbox:order:O_ALICE", { token: bob })).status, 404);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM retailer_order_emails").get().n, 2);

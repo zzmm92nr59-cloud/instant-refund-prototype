@@ -157,6 +157,25 @@ assert.equal((await call(bobsId, { token: bob })).status, 200);
 assert.equal((await call("/relay/my/purchases")).status, 401);
 assert.equal((await call("/relay/my/purchases", { token: "A".repeat(43) })).status, 401);
 assert.equal((await call("/relay/my/purchases?shopper=" + "x", { token: carol })).status, 200);
+// Orders from Relay's own test shops (a Shopify development store, Square's sandbox) only for the testing tools (?test=1).
+const aliceHash = sqlite.prepare("SELECT email_hash FROM retailer_order_emails WHERE order_id = ?").get("shopify:relay-demo.myshopify.com:order:1").email_hash;
+sqlite.prepare("INSERT INTO retailer_connections (id, provider, merchant_external_id) VALUES (?,?,?)").run("square:sandbox:LTEST1", "square", "sandbox-merchant");
+sqlite.prepare("INSERT INTO retailer_orders (id, connection_id, external_order_id, ordered_at, amount_minor, currency, status) VALUES (?,?,?,?,?,?,?)")
+  .run("square:sandbox:order:9", "square:sandbox:LTEST1", "9", "2026-11-01T10:00:00Z", 2999, "GBP", "COMPLETED");
+sqlite.prepare("INSERT INTO retailer_order_emails (order_id, email_hash, created_at) VALUES (?,?,?)").run("square:sandbox:order:9", aliceHash, Date.now());
+list = await (await call("/relay/my/purchases", { token: alice })).json();
+assert.deepEqual(list.purchases.map(p => p.id), ["shopify:relay-demo.myshopify.com:order:1"], "no sandbox orders without the testing tools");
+list = await (await call("/relay/my/purchases?test=1", { token: alice })).json();
+assert.deepEqual(list.purchases.map(p => [p.id, p.test]).sort(), [["shopify:relay-demo.myshopify.com:order:1", undefined], ["square:sandbox:order:9", true]], "the testing tools see them, marked");
+sqlite.exec("CREATE TABLE IF NOT EXISTS shopify_shop_plan (domain TEXT PRIMARY KEY, test_shop INTEGER NOT NULL, plan TEXT, checked_at INTEGER NOT NULL)");
+sqlite.prepare("INSERT OR REPLACE INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?,?,?,?)").run("relay-demo.myshopify.com", 1, "partner_test", Date.now());
+list = await (await call("/relay/my/purchases", { token: alice })).json();
+assert.deepEqual(list.purchases, [], "no orders from a Shopify development store without the testing tools");
+list = await (await call("/relay/my/purchases?test=1", { token: alice })).json();
+assert.deepEqual(list.purchases.map(p => [p.id, p.test]).sort(), [["shopify:relay-demo.myshopify.com:order:1", true], ["square:sandbox:order:9", true]]);
+assert.equal((await call("/relay/my/purchases/shopify:relay-demo.myshopify.com:order:1", { token: alice })).status, 200, "a test order still opens by its own link (returns and swaps from the testing tools)");
+sqlite.prepare("DELETE FROM shopify_shop_plan WHERE domain = ?").run("relay-demo.myshopify.com");
+console.log("ok - orders from Relay's test shops only for the testing tools");
 
 // 6b. Pasted receipts: sign-in required, parsed, never stored, never refund-eligible.
 const sample = "From: Example Outfitters <orders@exampleoutfitters.test>\nSubject: Your order confirmation #EO-1\nContent-Type: text/plain\n\nOrder number: EO-1\nOrder date: 14 Oct 2026\nWool jumper - Qty 1 - £59.00\nOrder total: £59.00\n";

@@ -25,6 +25,7 @@ import { handleShopifyTestRoute, shopifyTestOrderDeleteStatements } from "./shop
 import { handlePhotoSearchRoute, photoSearchDeleteStatements } from "./photo-search.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
+import { squareIsProduction } from "./square-env.js";
 import { handleExportRoute } from "./export.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
@@ -534,18 +535,27 @@ async function listPurchases(env, shopper, orderId) {
     for (const r of rows) { const { orderId, ...line } = r; if (!lines.has(orderId)) lines.set(orderId, []); if (lines.get(orderId).length < 100) lines.get(orderId).push(line); }
   }
   const domains = [...new Set(list.map(o => (/^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(o.retailer || "")) || [])[1]).filter(Boolean))];
+  const testShops = new Set();
   if (domains.length) {
+    const marks = domains.map(() => "?").join(",");
     try {
-      for (const r of (await env.RELAY_DB.prepare(`SELECT domain, label FROM shopify_shops WHERE domain IN (${domains.map(() => "?").join(",")})`).bind(...domains).all()).results || [])
+      for (const r of (await env.RELAY_DB.prepare(`SELECT domain, label FROM shopify_shops WHERE domain IN (${marks})`).bind(...domains).all()).results || [])
         labels.set(r.domain, r.label);
     } catch { /* no connected shops table yet: shop addresses are used */ }
+    try {
+      for (const r of (await env.RELAY_DB.prepare(`SELECT domain FROM shopify_shop_plan WHERE test_shop = 1 AND domain IN (${marks})`).bind(...domains).all()).results || [])
+        testShops.add(r.domain);
+    } catch { /* no shop plans yet: none known to be test shops */ }
   }
   const result = [];
   for (const order of list) {
     // The shop's name for orders from Shopify shops that connected themselves (their address otherwise).
     const m = /^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(order.retailer || ""));
     const store = m ? (labels.get(m[1]) || m[1].replace(/\.myshopify\.com$/, "")) : null;
-    result.push({ ...order, store, ownership: "retailer_email_matched", items: lines.get(order.id) || [] });
+    // Orders from Relay's own test shops: Square's sandbox (every Square order while Relay talks to Square's sandbox,
+    // square-env.js) and Shopify development stores. Only Relay's testing tools show them.
+    const test = (/^square:/.test(String(order.retailer || "")) && !squareIsProduction(env)) || Boolean(m && testShops.has(m[1]));
+    result.push({ ...order, store, ownership: "retailer_email_matched", items: lines.get(order.id) || [], ...(test ? { test: true } : {}) });
   }
   return result;
 }
@@ -715,8 +725,11 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // Testing tools: a test order at one of Relay's Shopify test shops (development stores only).
     const shopifyTestResponse = await handleShopifyTestRoute(request, env, url, cors, shopper, o);
     if (shopifyTestResponse) return shopifyTestResponse;
-    if (path === "/relay/my/purchases" && request.method === "GET")
-      return json({ purchases: await attachCrossSwaps(env, shopper, await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper)), o)) }, 200, cors);
+    // Orders from Relay's test shops only for Relay's testing tools (?test=1): nobody else sees test orders as purchases.
+    if (path === "/relay/my/purchases" && request.method === "GET") {
+      const mine = (await listPurchases(env, shopper)).filter(p => !p.test || url.searchParams.get("test") === "1");
+      return json({ purchases: await attachCrossSwaps(env, shopper, await enrichSquarePurchases(env, await enrichPurchases(env, mine), o)) }, 200, cors);
+    }
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {
       // Reads a pasted order-confirmation email. Nothing is stored. The result is
       // shopper-supplied evidence (refundEligible is always false).

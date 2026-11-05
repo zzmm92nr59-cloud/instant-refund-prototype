@@ -17,7 +17,7 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 12. Never show raw error text, codes or server messages: plain English with what to do next.
 13. Every button visibly reacts when pressed.
 14. Preferences survive updates: keep them with the account where possible; never rename storage keys without moving the old value.
-15. Shoppers never see demo, sandbox or test wording; testing tools only with ?testtools=1 or ?testing=1, or the Testing tools switch Relay's team has in Profile → Team.
+15. Shoppers never see demo, sandbox or test wording; testing tools only with ?testtools=1 or ?testing=1, or the Testing tools switch Relay's team has in Profile → Team. Orders from Relay's test shops show only with testing tools. The preview from shops' own websites shows only with testing tools or the team's Shops' websites switch.
 
 Also: index.html and relay-app-v2.html must stay identical. Bump VERSION in sw.js when the app shell changes.
 

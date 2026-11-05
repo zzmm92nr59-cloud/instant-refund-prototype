@@ -134,6 +134,10 @@ body.typing .footnav,body.typing .nextup{display:none}
 </style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html">Testing tools ↗</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><p class="sub" style="margin-top:28px">Loading…</p></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script src="./relay-recommendation-engine.js?v=20261014-discover"></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet"></script><script>(function(){try{
 
 const testing=new URLSearchParams(location.search).get("testing")==="1";
+// The shops' websites preview used to come only with the testing tools; it now has its own switch (Relay's team, Profile
+// → Team). Once per device, a device that had testing tools on gets the preview instead, with testing tools off: real
+// shops only, no test shops or test orders. Runs before ?testtools=1 is read, so the link still turns testing tools on.
+try{if(localStorage.getItem("relay-web-preview")===null){const on=localStorage.getItem("relay-testing-tools")==="1";localStorage.setItem("relay-web-preview",on?"1":"0");if(on)localStorage.setItem("relay-testing-tools","0")}}catch(e){}
 try{const tt=new URLSearchParams(location.search).get("testtools");if(tt==="1"||tt==="0")localStorage.setItem("relay-testing-tools",tt)}catch(e){}
 const API="https://relay-square-api2.9pts72cy5j.workers.dev",VERIFIED=API+"/relay/verified-purchases";const sample=null;
 // Self-contained original SVG product illustrations: no external image hosts or broken hotlinks.
@@ -525,9 +529,15 @@ const DC_KIND_RULES=[
  ["pets",/\b(pets?|dogs?|cats?|pupp(?:y|ies)|kittens?|collars?|leads?|leash(?:es)?|litter|scratching|squeaky|chew|bird ?feeders?)\b/i],
  ["home",/\b(cushions?|throws?|blankets?|duvets?|pillows?|rugs?|lamps?|lights?|candles?|vases?|mugs?|plates?|bowls?|glass(?:es)?|flutes?|cutlery|pans?|pots?|planters?|plants?|garden(?:ing)?|watering|shears|pruners?|bird ?houses?|seeds?|hose|ladders?|hammers?|drills?|screwdrivers?|spanners?|wrench(?:es)?|saws?|spirit levels?|tool ?box(?:es)?|tools?|tape measures?|paint|rollers?|shelf|shelves|frames?|mirrors?|towels?|bedding|guest book|confetti|bunting|napkins?|champagne|kettles?|toasters?)\b/i],
  ["beauty",/\b(perfume|fragrance|eau de|lipstick|mascara|serum|moisturi[sz]er|cleanser|shampoo|conditioner|skincare|make-?up|nail polish|body wash)\b/i],
- ["electronics",/\b(phones?|headphones|earbuds|speakers?|laptops?|tablets?|chargers?|cables?|cameras?|consoles?|monitors?|keyboards?|smart ?watch)\b/i],
- ["fashion",/\b(trainers?|sneakers?|shoes?|boots?|sandals?|sliders?|slippers?|heels|loafers|jackets?|coats?|shells?|parkas?|jumpers?|sweaters?|cardigans?|hoodies?|t-?shirts?|tees?|shirts?|blouses?|dress(?:es)?|skirts?|trousers|chinos?|jeans|leggings|shorts|suits?|blazers?|ties?|scarf|scarves|hats?|caps?|gloves|socks|veils?|bags?|totes?|clutch(?:es)?|backpacks?|purses?|wallets?|belts?|watch(?:es)?|rings?|necklaces?|earrings?|bracelets?|jewell?ery|sunglasses)\b/i],
+ ["electronics",/\b(phones?|iphones?|phone cases?|headphones|earbuds|speakers?|laptops?|tablets?|chargers?|cables?|cameras?|consoles?|monitors?|keyboards?|smart ?watch)\b/i],
+ ["fashion",/\b(trainers?|sneakers?|shoes?|boots?|sandals?|sliders?|slippers?|heels|loafers|jackets?|coats?|shells?|parkas?|jumpers?|sweaters?|cardigans?|hoodies?|t-?shirts?|tees?|shirts?|blouses?|dress(?:es)?|skirts?|trousers|chinos?|jeans|leggings|shorts|suits?|blazers?|ties?|scarf|scarves|hats?|caps?|gloves|socks|veils?|bags?|totes?|clutch(?:es)?|backpacks?|purses?|wallets?|belts?|watch(?:es)?|rings?|necklaces?|earrings?|bracelets?|jewell?ery|sunglasses|sock|bras?|bralettes?|briefs|knickers|thongs?|g-strings?|bodysuits?|lingerie|underwear|boxers|pyjamas?|pajamas?|nightdress(?:es)?|robes?|kimonos?|camis?|camisoles?|vests?|tops?|halters?|jumpsuits?|playsuits?|dungarees|tights|beanies?|knitwear|fleeces?|gilets?|joggers|sweatpants|sweatshirts?|polos?|bikinis?|swimsuits?|swimwear|pants|cruisers?|runners?|mules|clogs|espadrilles|plimsolls|waistcoats?|kilts?|ponchos?|shawls?)\b/i],
  ["food",/\b(coffee|tea|chocolates?|wine|beer|gin|snacks?|sauces?|cheese|bread|cakes?|biscuits?|hampers?)\b/i]];
+// Colours named after food or drink ("Dark Chocolate", "Wine", "In Bitter Chocolate") say nothing about what a thing is:
+// left out when working out its kind, so a "Flutter Plunge Bra - Chocolate" is fashion, not food.
+const DC_FOOD_COLOUR=/(?:\s[-–|]\s|\s+in\s+)[^-–|]*\b(?:chocolate|wine|coffee|espresso|mocha|latte|tea|champagne|cherry|plum|caramel|toffee|honey|biscuit|cream|butter|peach|lemon|lime|mint|olive|berry|raspberry|strawberry|cocoa|cinnamon|ginger|mustard|tomato|apricot|melon|salmon|truffle|oat|vanilla|cognac|whisky|bordeaux|burgundy|merlot|claret|sorbet|bubblegum|praline|pistachio|hazelnut|almond|aubergine|pumpkin|paprika|saffron|sage|rosemary|lavender)\b[^-–|]*$/i;
+// Words that only describe a colour, a knit or what a bag is for: "Light Grey" isn't a lamp, a "Cable Knit Jumper" isn't
+// a cable, and a "Laptop Bag" is a bag.
+const DC_NOT_KIND=/\b(?:light|dark|pale|deep|bright|dusty|washed)\s+(?=(?:blue|grey|gray|green|pink|brown|navy|khaki|beige|red|yellow|orange|purple|lilac|cream|stone|sand|olive|teal|tan|camel|charcoal|black|white|silver|gold)\b)|\bcable(?=[\s-]+knit)|\blaptop(?=\s+(?:bags?|sleeves?|backpacks?)\b)/gi;
 const DC_SHOP_KIND=[["pets",/\bpets?\b/i],["home",/\b(home|garden|hardware|diy|tools?|hammer|interiors?)\b/i],["beauty",/\b(beauty|cosmetics|perfumery|skin)\b/i],["food",/\b(deli|bakery|coffee|grocer|wine)\b/i]];
 // A drawing for things the receipt drawings don't cover (a ladder is drawn as a tool, not a shopping bag).
 const DC_DRAW_HINTS=[[/\b(ladders?|hammers?|drills?|screwdrivers?|spanners?|wrench(?:es)?|saws?|spirit levels?|tool ?box(?:es)?|tools?|tape measures?|paint|rollers?)\b/i,"wrench"],
@@ -535,20 +545,22 @@ const DC_DRAW_HINTS=[[/\b(ladders?|hammers?|drills?|screwdrivers?|spanners?|wren
  [/\b(lights?|lamps?)\b/i,"lamp"],[/\b(candles?)\b/i,"candle"],[/\b(flutes?|champagne|wine glass(?:es)?)\b/i,"wine"],[/\b(mugs?|cups?)\b/i,"cup"],[/\b(bowls?|plates?)\b/i,"bowl"]];
 function dcKindOf(product,store){for(const [k,re] of DC_KIND_RULES)if(re.test(product))return k;for(const [k,re] of DC_SHOP_KIND)if(re.test(store))return k;return null}
 function dcDrawing(){return window.RelayAccount&&RelayAccount.drawing}
-// One product, all its sizes and colours together.
+// One product, all its sizes and colours together. A product whose name doesn't say what it is (only its drawing guessed)
+// takes the kind most of its shop's products clearly are: a clothes shop's "Lenny Wrap Front" is fashion, not food.
 function dcGroups(rows){const gs=dcGroupsRaw(rows),most=new Map();
- for(const g of gs)if(g.kind!=="other"){const m=most.get(g.store)||{};m[g.kind]=(m[g.kind]||0)+1;most.set(g.store,m)}
- for(const g of gs)if(g.kind==="other"&&most.has(g.store)){const m=most.get(g.store),k=Object.keys(m).sort((a,b)=>m[b]-m[a])[0];if(m[k]>=2)g.kind=k}
+ for(const g of gs)if(g.sure&&g.kind!=="other"){const m=most.get(g.store)||{};m[g.kind]=(m[g.kind]||0)+1;most.set(g.store,m)}
+ for(const g of gs)if(!g.sure&&most.has(g.store)){const m=most.get(g.store),k=Object.keys(m).sort((a,b)=>m[b]-m[a])[0];if(m[k]>=2)g.kind=k}
  return gs}
 function dcGroupsRaw(rows){const map=new Map();for(const p of rows){const key=storeKey(storeOf(p))+"|"+String(p.product||"").trim().toLowerCase();if(!map.has(key))map.set(key,[]);map.get(key).push(p)}
  return [...map.values()].map(vs=>{const d=dcDrawing(),of=d?d.of(vs[0].product):{key:"shop",kind:"other"};
   // A dog bed, or anything from a pet shop, is for pets (the drawing still shows what it is).
-  of.kind=DC_PETS.test(vs[0].product+" "+storeOf(vs[0]))?"pets":dcKindOf(String(vs[0].product||""),storeOf(vs[0]))||of.kind;
+  const named=DC_PETS.test(vs[0].product+" "+storeOf(vs[0]))?"pets":dcKindOf(String(vs[0].product||"").replace(DC_FOOD_COLOUR,"").replace(DC_NOT_KIND,""),storeOf(vs[0]));
+  of.kind=named||of.kind;
   if(of.key==="shop"){const h=DC_DRAW_HINTS.find(([re])=>re.test(String(vs[0].product||"")));if(h)of.key=h[1]}const prices=vs.map(v=>Number(v.priceMinor)).filter(Number.isFinite);
   const stock=vs.map(v=>v.quantity==null||v.quantity===""?null:Number(v.quantity));const known=stock.filter(q=>q!==null&&Number.isFinite(q));
   const inStock=vs.filter((v,i)=>stock[i]===null||stock[i]>0);const lead=inStock[0]||vs[0];
   return {key:storeKey(storeOf(vs[0]))+"|"+vs[0].product,store:storeOf(vs[0]),product:vs[0].product,variants:vs,lead,imageUrl:(vs.find(v=>/^https:\/\//.test(String(v.imageUrl||"")))||{}).imageUrl||"",
-   min:Math.min(...prices),max:Math.max(...prices),currency:vs[0].currency,draw:of.key,kind:of.kind,
+   min:Math.min(...prices),max:Math.max(...prices),currency:vs[0].currency,draw:of.key,kind:of.kind,sure:Boolean(named),
    options:vs.map(v=>String(v.variation||"").trim()).filter(x=>x&&!/^(default( title)?|one size)$/i.test(x)),
    // How many are left: only when every size or colour's stock is known. One that isn't known (a shop that doesn't share
    // it, or a shop's website that only says it can be bought) means Relay can't say it's sold out or how many are left.
@@ -613,7 +625,7 @@ function shopperDiscoverView(){return '<h1 class="title">Discover</h1><p class="
  +'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div><div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div><div id="storeAlert"></div><div id="dcPreview"></div><div id="catalogResults" class="dc-grid"></div>'}
 // Search by photo (account.js): the camera shows once it's on, and always in Relay's testing tools (which say if it's off).
 function photoShown(){const A=window.RelayAccount;return !!(A&&A.photoAvailable&&A.signedIn&&A.signedIn()&&(A.photoAvailable()||testTools()))}
-function photoSearch(){const A=window.RelayAccount;if(A&&A.photoSearch)A.photoSearch({test:testTools()})}
+function photoSearch(){const A=window.RelayAccount;if(A&&A.photoSearch)A.photoSearch({test:testTools(),web:webPreview()})}
 // A photo search result: its product page, or (not in the catalogue here) a search for its name.
 function relayOpenProduct(sku,name){if(page!=="discover")go("discover");if(catalog.some(x=>x.sku===sku)){chooseSku(sku);return}relaySearchFor(name)}
 function relaySearchFor(text){if(page!=="discover")go("discover");const q=$("query");if(!q)return;q.value=String(text||"").slice(0,80);storeFilter="all";discoverKind="all";renderCatalog();q.scrollIntoView({block:"center"})}
@@ -641,7 +653,7 @@ function renderShopperCatalog(root){
   groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||a[1]-b[1]).map(x=>x[0])}}
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
- if(prev)prev.innerHTML=testTools()&&webShops.size?'<div class="dc-preview"><b>Preview: products from '+webShops.size+' shops\' own websites.</b> Relay reads their public product lists once a day. These shops haven\'t joined Relay, so shoppers don\'t see them. Tap a product to buy it on the shop\'s website.</div>':"";
+ if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview"><b>Preview: products from '+webShops.size+' shops\' own websites.</b> Relay reads their public product lists once a day. These shops haven\'t joined Relay, so shoppers don\'t see them. Tap a product to buy it on the shop\'s website.</div>':"";
  root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p></div>';
  const wire=box=>{if(!box)return;
   box.querySelectorAll("[data-watch]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleWatch(b.dataset.watch)});
@@ -868,11 +880,14 @@ function bindWrappedFrame(){const f=$("wrappedFrame");if(!f||typeof f.addEventLi
 // Test shop tools and sandbox labels: only for people testing Relay (?testtools=1, ?testing=1, or Relay's team with the
 // Testing tools switch in Profile → Team).
 function testTools(){try{return testing||localStorage.getItem("relay-testing-tools")==="1"}catch(e){return testing}}
+// The preview from shops' own websites in Discover (and search by photo): Relay's team turns it on in Profile → Team. It
+// comes with the testing tools too. Real shops' products only: no test shops or test orders.
+function webPreview(){try{return localStorage.getItem("relay-web-preview")==="1"}catch(e){return false}}
 // The shared account for app reviewers (worker/review-account.js) sees test shops in Discover too: the reviewer's own store is one.
 function reviewAccount(){try{return !!(window.RelayAccount&&RelayAccount.isReview&&RelayAccount.isReview())}catch(e){return false}}
 function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}if(catalogAsked)loadCatalog();render()}
-// The Testing tools switch (Profile → Team) changed on this device: the tabs and the testing link follow it, and the
-// catalogue loads again with or without Relay's test shops and the preview from shops' own websites.
+// The Testing tools or shops' websites switch (Profile → Team) changed on this device: the tabs and the testing link
+// follow it, and the catalogue loads again with or without Relay's test shops and the preview from shops' own websites.
 function testToolsChanged(){navRender();{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}if(catalogAsked)loadCatalog()}
 // Signed in on this device? (Read straight from storage so the first screen doesn't wait for the account code.)
 function hasSession(){try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return !!(x&&x.token)}catch(e){return false}}
@@ -931,7 +946,7 @@ var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;try{
  const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
- const webAsk=testTools()?fetchWithin(API+"/relay/web-shops",10000):null;
+ const webAsk=testTools()||webPreview()?fetchWithin(API+"/relay/web-shops",10000):null;
  squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});if(webAsk)webAsk.catch(()=>{});
  try{
   const response=await squareAsk;
@@ -979,7 +994,7 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){const orderTime=o.createdAt||o.authorizedAt||o.orderCreatedAt;if(!orderTime||!Number.isFinite(Date.parse(orderTime))||Date.parse(orderTime)<Date.parse(walletCutover))continue;if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false,verified:true,createdAt:orderTime})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{photoSearch,relayOpenProduct,relaySearchFor,testTools,testToolsChanged,openMarket,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
+Object.assign(window,{photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
 // For relay-gestures.js: is this a tab's own screen (pull to refresh works there), and refreshing it. Discover's catalogue
 // comes straight from the shops' feeds, so it's read again too; on Receipts the inbox is checked as well.
 window.RelayShell={isTabRoot:onTabRoot,refresh:shellRefresh,open:openLink};

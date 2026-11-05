@@ -1,10 +1,13 @@
-// Browser test: Discover mixes shops, so the first screen shows every shop instead of one shop's whole range, and Relay's
-// team can switch testing tools on in Profile (which a link can't do in the app on a phone's home screen).
+// Browser test: Discover mixes shops, so the first screen shows every shop instead of one shop's whole range; Relay's
+// team has two switches in Profile (shops' websites, and testing tools), which a link can't do in the app on a phone's
+// home screen; and a product's kind comes from what it is, not its colour.
 // Stubbed Relay server with made-up shops and products; nothing reaches a shop. Checks: a shop with more products than
 // Discover shows at once no longer hides the others; each shop keeps its own order; with testing tools, the preview from
 // shops' own websites is on the first screen too; Lowest and Highest price still sort across every shop; a shop's chip
-// shows just that shop, in its own order; the Testing tools switch is only for Relay's team (also before they sign in
-// again for team tools), turns the preview on and off in Discover without reloading, and is remembered on the device.
+// shows just that shop, in its own order; the switches are only for Relay's team (also before they sign in again for
+// team tools), work without reloading and are remembered on the device; the shops' websites switch shows real shops
+// only (no test shops, and test orders aren't asked for); a device that had testing tools on moves to the shops'
+// websites once; a "Plunge Bra - Chocolate" is fashion, and For you only gives a food reason for food.
 // Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -29,7 +32,13 @@ const web = [
   { sku: "web:hollow-pine.test:71", product: "Wool Beanie", variation: "Navy", priceMinor: 2800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=71", kind: "Hats", checkedAt: CHECKED, webShop: true },
   { sku: "web:hollow-pine.test:81", product: "Linen Scarf", variation: "Sand", priceMinor: 3000, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/linen-scarf?variant=81", kind: "Scarves", checkedAt: CHECKED, webShop: true },
   { sku: "web:fern-row.test:91", product: "Canvas Tote Bag", variation: null, priceMinor: 1800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Fern Row", shopDomain: "fern-row.test", productUrl: "https://fern-row.test/products/canvas-tote-bag?variant=91", kind: "Bags", checkedAt: CHECKED, webShop: true }];
-const st = { webAsked: 0, admin: { admin: false } };
+// A clothes shop whose colours are named after food and drink, and a chocolate shop.
+const WEAR = ["Flutter Plunge Bra - Chocolate", "Jamie Drape Top In Bitter Chocolate", "Strike Light Grey Pullover Hoodie", "Everly Pink Cable Knit V-Neck Jumper", "Laptop Bag - Hot Pink Ripstop", "Adore G-String - Wine"];
+WEAR.forEach((name, i) => web.push({ sku: "web:velvet-row.test:" + (200 + i), product: name, variation: null, priceMinor: 3000 + i * 100, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
+  storeName: "Velvet Row", shopDomain: "velvet-row.test", productUrl: "https://velvet-row.test/products/" + i, kind: "Clothing", checkedAt: CHECKED, webShop: true }));
+web.push({ sku: "web:cocoa-cottage.test:300", product: "Dark Chocolate Truffles - Gift Box", variation: null, priceMinor: 1200, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
+  storeName: "Cocoa Cottage", shopDomain: "cocoa-cottage.test", productUrl: "https://cocoa-cottage.test/products/truffles", kind: "Chocolate", checkedAt: CHECKED, webShop: true });
+const st = { webAsked: 0, admin: { admin: false }, purchaseAsks: [], wrapped: { receipts: 0 } };
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -44,7 +53,8 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3, maxInboxes: 5 });
   if (p === "/relay/my/receipts") return j({ receipts: [] });
-  if (p === "/relay/my/purchases") return j({ purchases: [] });
+  if (p === "/relay/my/purchases") { st.purchaseAsks.push(u.search); return j({ purchases: [] }); }
+  if (p === "/relay/my/wrapped") return j(st.wrapped);
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
   if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
   if (p === "/relay/my/admin/me") return j(st.admin);
@@ -164,7 +174,7 @@ await me.locator(".rl-arow", { hasText: "Sign in again for team tools" }).waitFo
 const sw = me.getByRole("switch", { name: "Testing tools on this device" });
 await sw.waitFor();
 assert.equal(await sw.getAttribute("aria-checked"), "false");
-assert.match(await me.locator(".rl-aih", { hasText: "Testing tools" }).innerText(), /Shows Relay's test shops, and the preview of shops' own websites in Discover, on this device only\./);
+assert.match(await me.locator(".rl-aih", { hasText: "Testing tools" }).innerText(), /Relay's test shops, test orders and sample items, for trying things out\. Off shows Relay as shoppers see it\./);
 await polished("team switch off", "#mePage");
 const askedBefore = st.webAsked;
 await sw.click();
@@ -194,6 +204,58 @@ await me.getByRole("switch", { name: "Testing tools on this device" }).waitFor()
 await polished("team tools", "#mePage");
 console.log("ok - the switch is with the team tools too");
 
+// 8. The shops' websites switch on its own: real shops only (no test shops, no test orders asked for), and each product's
+// kind from what it is: colours named after food don't make clothes food, and For you gives a food reason only for food.
+await page.evaluate(() => { localStorage.setItem("relay-web-preview", "1"); localStorage.setItem("relay-testing-tools", "0"); localStorage.setItem("relay-discover-personalise-v1", "true"); });
+st.wrapped = { year: new Date().getFullYear(), receipts: 30, topShops: [], industries: [
+  { category: "food", label: "Food & drink", spentPence: 37000 }, { category: "home", label: "Home & garden", spentPence: 33000 }, { category: "fashion", label: "Fashion", spentPence: 30000 }] };
+st.purchaseAsks = [];
+await page.reload();
+await page.waitForTimeout(800);
+assert.ok(st.purchaseAsks.length > 0 && st.purchaseAsks.every(q => q === ""), "test orders aren't asked for without the testing tools");
+await discover("Plunge Bra");
+await page.locator(".dc-preview").waitFor();
+const shopNames = await page.$$eval("#dcShops [data-shop]", bs => bs.map(b => b.dataset.shop).filter(s => s !== "all").sort());
+assert.deepEqual(shopNames, ["Big Barn", "Cocoa Cottage", "Fern Row", "Hollow Pine", "Pebble & Co", "Velvet Row"], "real shops and shops' websites only: no test shops");
+assert.equal(await page.locator("#catalogResults .dc-shop", { hasText: "TEST" }).count(), 0);
+await page.locator("#dcKinds [data-kind='food']").click();
+assert.deepEqual((await grid()).map(c => c[1]), ["Dark Chocolate Truffles - Gift Box"], "only food is food");
+await page.locator("#dcKinds [data-kind='fashion']").click();
+const wear = (await grid()).filter(c => c[0] === "Velvet Row").map(c => c[1]).sort();
+assert.deepEqual(wear, [...WEAR].sort(), "a bra, a top, a hoodie, a jumper, a bag and a G-string are fashion, whatever their colour");
+await page.locator("#dcKinds [data-kind='all']").click();
+const picks = await page.$$eval("#dcForYou .dc-strip .dc-card", cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, (c.querySelector(".dc-why") || {}).textContent || ""]));
+assert.ok(picks.length >= 3, "picks from what you spend: " + JSON.stringify(picks));
+for (const [, product, why] of picks) if (/food/i.test(why)) assert.equal(product, "Dark Chocolate Truffles - Gift Box", "a food reason only for food: " + product + " — " + why);
+assert.ok(picks.some(([shop, , why]) => shop !== "Cocoa Cottage" && /^30% of your spending is fashion/.test(why)), "clothes get the fashion reason: " + JSON.stringify(picks));
+await polished("shops websites only", ".main");
+console.log("ok - the shops' websites switch: real shops only; clothes are fashion whatever their colour; food reasons only for food");
+
+// 9. The team's two switches, and a device that had testing tools on moves to the shops' websites once.
+st.admin = { admin: false, signInAgain: true };
+await openProfile();
+const webSw = me.getByRole("switch", { name: "Shops' websites in Discover on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
+assert.equal(await webSw.getAttribute("aria-checked"), "true");
+assert.equal(await testSw.getAttribute("aria-checked"), "false");
+assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Discover" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Discover and search by photo\. Only Relay's team sees them\./);
+await polished("team switches", "#mePage");
+await testSw.click();
+st.purchaseAsks = [];
+await page.evaluate(() => window.go("profile"));
+await page.waitForTimeout(800);
+assert.ok(st.purchaseAsks.includes("?test=1"), "the testing tools ask for test orders too");
+await page.evaluate(() => { localStorage.removeItem("relay-web-preview"); localStorage.setItem("relay-testing-tools", "1"); });
+await page.reload();
+assert.deepEqual(await page.evaluate(() => [localStorage.getItem("relay-web-preview"), localStorage.getItem("relay-testing-tools")]), ["1", "0"], "moved to the shops' websites, testing tools off");
+await discover("Plunge Bra");
+assert.equal(await page.locator("#catalogResults .dc-shop", { hasText: "TEST" }).count(), 0, "no test shops after the move");
+// A fresh device: the ?testtools=1 link still turns testing tools on, and they stay on.
+await page.evaluate(() => localStorage.clear());
+await page.goto(origin + "/index.html?testtools=1");
+await page.goto(origin + "/index.html");
+assert.deepEqual(await page.evaluate(() => [localStorage.getItem("relay-web-preview"), localStorage.getItem("relay-testing-tools")]), ["0", "1"], "the link still works on a fresh device");
+console.log("ok - the team's two switches; a device with testing tools on moves to the shops' websites once; the link still works");
+
 assert.deepEqual(errors, []);
 await browser.close(); server.close();
-console.log("PASS Discover mixes shops; Relay's team can switch testing tools on");
+console.log("PASS Discover mixes shops; product kinds; Relay's team's switches for shops' websites and testing tools");
