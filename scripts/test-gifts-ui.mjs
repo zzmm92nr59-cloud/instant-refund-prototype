@@ -1,7 +1,7 @@
 // Browser test: tagging receipts as gifts. Stubbed Relay server, made-up account and shops; the Wrapped it serves is built
 // by the real worker/wrapped.js from the same receipts, so the story shows what the server would really send.
 // Checks: a receipt's details have a "Bought as a gift" switch (a double tap saves once), then an optional "who's it for";
-// the row says who it's for and gets a small present on its picture; a Gifts tile in Relay's Aqua Jade gathers them, with
+// the row says who it's for and gets a small present on its picture; a Gifts tile in Relay's lime gathers them, with
 // a filter for each person and a search that finds them by name; untagging works; Wrapped's cover counts gifts and the
 // story has a gifts slide (and the biggest treat isn't a gift). Every new part passes the polish rules in light and dark.
 import assert from "node:assert/strict";
@@ -80,13 +80,13 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
 
-// 1. Receipts: a Gifts tile for the two already tagged, in Aqua Jade with navy text.
+// 1. Receipts: a Gifts tile for the two already tagged, in lime with navy text.
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 const giftsTile = page.getByRole("button", { name: "Gifts, 2 gifts" });
 await giftsTile.waitFor();
 const tileLook = await giftsTile.evaluate(n => [getComputedStyle(n).backgroundColor, getComputedStyle(n.querySelector("b")).color]);
-assert.deepEqual(tileLook, ["rgb(116, 255, 237)", "rgb(23, 31, 68)"], "Aqua Jade with navy text");
+assert.deepEqual(tileLook, ["rgb(199, 245, 103)", "rgb(16, 24, 40)"], "lime with navy text");
 await polished(".rl-tiles", "tiles");
 console.log("ok - a Gifts tile gathers the receipts already tagged, in Relay's own colours");
 
@@ -123,7 +123,7 @@ await page.getByRole("button", { name: "Gifts, 3 gifts" }).click();
 await page.getByRole("heading", { name: "Gifts", exact: true }).waitFor();
 const hero = page.locator(".rl-cat-hero");
 assert.match(await hero.innerText(), /3 gifts · £425\.00 spent/);
-assert.equal(await hero.evaluate(n => getComputedStyle(n).color), "rgb(23, 31, 68)", "navy on the aqua page header");
+assert.equal(await hero.evaluate(n => getComputedStyle(n).color), "rgb(16, 24, 40)", "navy on the lime page header");
 const chips = page.locator(".rl-cat-chips button");
 assert.deepEqual(await chips.allInnerTexts(), ["All", "Dad", "Mum", "Sam"], "a filter for each person");
 await polished("#view .rl-cat-hero", "gifts header");
