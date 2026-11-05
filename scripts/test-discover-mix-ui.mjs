@@ -1,0 +1,147 @@
+// Browser test: Discover mixes shops, so the first screen shows every shop instead of one shop's whole range.
+// Stubbed Relay server with made-up shops and products; nothing reaches a shop. Checks: a shop with more products than
+// Discover shows at once no longer hides the others; each shop keeps its own order; with testing tools, the preview from
+// shops' own websites is on the first screen too; Lowest and Highest price still sort across every shop; a shop's chip
+// shows just that shop, in its own order. Passes the polish rules in light and dark, at phone size.
+import assert from "node:assert/strict";
+import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+const require = createRequire(import.meta.url); const { chromium } = require("playwright");
+const root = resolve(".");
+const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
+  res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
+await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
+await mkdir("/tmp/shots", { recursive: true });
+const EMAIL = "sam.tester@example.com";
+const SHOPPER_NEVER_SEES = /\bdemo\b|sandbox|simulat|fictional|prototype|test mode|test shop|preview|testing/i;
+const CHECKED = new Date(Date.now() - 3 * 36e5).toISOString();
+
+// One shop with more products than Discover shows at once (60), listed first, and a small shop after it.
+const variant = (shop, n) => "shopify:" + shop + ".myshopify.com:variant:gid://shopify/ProductVariant/" + n;
+const big = Array.from({ length: 70 }, (_, i) => ({ sku: variant("big-barn", 1000 + i), catalogueId: variant("big-barn", 1000 + i), product: "Barn Jumper " + (i + 1),
+  variation: "M", priceMinor: 4000 + i * 10, currency: "GBP", quantity: 5, storeName: "Big Barn", shopDomain: "big-barn.myshopify.com", imageUrl: null }));
+const small = [
+  { sku: variant("pebble", 1), catalogueId: variant("pebble", 1), product: "Pebble Mug", variation: "Sage", priceMinor: 1500, currency: "GBP", quantity: 4, storeName: "Pebble & Co", shopDomain: "pebble.myshopify.com", imageUrl: null },
+  { sku: variant("pebble", 2), catalogueId: variant("pebble", 2), product: "Pebble Bowl", variation: "Sage", priceMinor: 9900, currency: "GBP", quantity: 2, storeName: "Pebble & Co", shopDomain: "pebble.myshopify.com", imageUrl: null }];
+const web = [
+  { sku: "web:hollow-pine.test:71", product: "Wool Beanie", variation: "Navy", priceMinor: 2800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=71", kind: "Hats", checkedAt: CHECKED, webShop: true },
+  { sku: "web:hollow-pine.test:81", product: "Linen Scarf", variation: "Sand", priceMinor: 3000, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/linen-scarf?variant=81", kind: "Scarves", checkedAt: CHECKED, webShop: true },
+  { sku: "web:fern-row.test:91", product: "Canvas Tote Bag", variation: null, priceMinor: 1800, currency: "GBP", imageUrl: null, quantity: null, inStock: true, storeName: "Fern Row", shopDomain: "fern-row.test", productUrl: "https://fern-row.test/products/canvas-tote-bag?variant=91", kind: "Bags", checkedAt: CHECKED, webShop: true }];
+const st = { webAsked: 0 };
+
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+await ctx.route("https://**/*", async route => {
+  const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
+  const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
+  if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
+  if (!p.startsWith("/relay/")) return route.abort();
+  if (p === "/relay/shopify/catalogue") return j({ products: [...big, ...small], published: true, publishedStoreCount: 2 });
+  if (p === "/relay/web-shops") { st.webAsked++; return j({ products: web, shops: [], preview: true }); }
+  if (p === "/relay/my/photo-search") return j({ available: false, perDay: 30 });
+  if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
+  if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3, maxInboxes: 5 });
+  if (p === "/relay/my/receipts") return j({ receipts: [] });
+  if (p === "/relay/my/purchases") return j({ purchases: [] });
+  if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
+  if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
+  if (p === "/relay/my/admin/me") return j({ admin: false });
+  if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
+  return j({});
+});
+const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
+page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
+const measure = scope => page.evaluate(scope => {
+  const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
+  const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
+  const out = { small: [], tiny: [], symbols: [], faint: [], wide: [] };
+  for (const el of document.querySelectorAll(scope + " button, " + scope + " a, " + scope + " input")) {
+    if (!vis(el)) continue; const r = el.getBoundingClientRect();
+    if (r.height < 43.5) out.small.push((el.innerText || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 30) + " " + Math.round(r.height));
+    if (/[◎✦↻▶⌂◈▤⇄→✓+×✕↩]/u.test(el.innerText || "")) out.symbols.push((el.innerText || "").trim().slice(0, 30));
+  }
+  for (const el of document.querySelectorAll(scope + " *")) {
+    if (!vis(el) || ![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue;
+    const s = getComputedStyle(el), px = parseFloat(s.fontSize);
+    const caps = s.textTransform === "uppercase" || (/[A-Z]/.test(el.textContent) && el.textContent === el.textContent.toUpperCase());
+    if (px < 13 && !(caps && px >= 12)) out.tiny.push(el.textContent.trim().slice(0, 30) + " " + px);
+    const back = bgOf(el), a = lum(flat(rgb(s.color), back)), b = lum(back), ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    if (ratio < 3 && !el.closest("button:disabled")) out.faint.push(el.textContent.trim().slice(0, 30) + " " + ratio.toFixed(2));
+  }
+  if (document.documentElement.scrollWidth > innerWidth + 1) out.wide.push(document.documentElement.scrollWidth);
+  return out;
+}, scope);
+const polished = async (where, scope) => {
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(150);
+    assert.deepEqual(await measure(scope), { small: [], tiny: [], symbols: [], faint: [], wide: [] }, where + " (" + scheme + ")");
+    await page.screenshot({ path: "/tmp/shots/discover-mix-" + where.replace(/\W+/g, "-") + "-" + scheme + ".png" });
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+};
+const signIn = async (url) => {
+  await page.goto(url);
+  await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
+  await page.reload();
+};
+// The grid's cards, in order: [shop, product].
+const grid = () => page.$$eval("#catalogResults .dc-card", cards => cards.map(c => [c.querySelector(".dc-shop").textContent.replace(/ · TEST$/, ""), c.querySelector("h3").textContent]));
+const discover = async (waitFor) => {
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#catalogResults .dc-card").first().waitFor();
+  if (waitFor) await page.locator("#catalogResults .dc-card", { hasText: waitFor }).first().waitFor();
+};
+const inOwnOrder = (cards, shop) => { const names = cards.filter(c => c[0] === shop).map(c => c[1]); return names.join("|") === [...names].sort((a, b) => Number(a.replace(/\D+/g, "")) - Number(b.replace(/\D+/g, "")) || 0).join("|"); };
+
+// 1. Shoppers: a shop with 70 products no longer hides the small shop listed after it.
+await signIn(origin + "/index.html");
+await discover("Pebble");
+let cards = await grid();
+assert.equal(cards.length, 60, "Discover still shows 60 at once");
+assert.deepEqual(new Set(cards.slice(0, 2).map(c => c[0])), new Set(["Big Barn", "Pebble & Co"]), "the first two are from different shops");
+assert.deepEqual(cards.filter(c => c[0] === "Pebble & Co").map(c => c[1]), ["Pebble Mug", "Pebble Bowl"], "the small shop's products, in its own order");
+assert.ok(inOwnOrder(cards, "Big Barn"), "the big shop's products stay in its own order");
+assert.equal(st.webAsked, 0, "shoppers never get the shops' websites preview");
+assert.ok(!SHOPPER_NEVER_SEES.test(await page.locator(".main").innerText()), "no test or preview words for shoppers");
+await polished("shoppers", ".main");
+console.log("ok - shoppers: every shop near the top, each in its own order");
+
+// 2. Lowest and Highest price still sort across every shop.
+await page.selectOption("#filter", "low");
+cards = await grid();
+assert.deepEqual(cards.slice(0, 2), [["Pebble & Co", "Pebble Mug"], ["Big Barn", "Barn Jumper 1"]], "cheapest first, whichever shop");
+await page.selectOption("#filter", "high");
+cards = await grid();
+assert.deepEqual(cards[0], ["Pebble & Co", "Pebble Bowl"], "dearest first, whichever shop");
+await page.selectOption("#filter", "all");
+console.log("ok - Lowest and Highest price sort across every shop");
+
+// 3. A shop's chip: just that shop, in its own order.
+await page.locator("#dcShops [data-shop='Big Barn']").click();
+cards = await grid();
+assert.ok(cards.every(c => c[0] === "Big Barn"), "only that shop");
+assert.deepEqual(cards.slice(0, 3).map(c => c[1]), ["Barn Jumper 1", "Barn Jumper 2", "Barn Jumper 3"], "in the shop's own order");
+await page.locator("#dcShops [data-shop='all']").click();
+console.log("ok - a shop's chip shows just that shop, in its own order");
+
+// 4. Testing tools (which add Relay's demo shops): one product from every shop comes first, the shops' websites
+// included, instead of the first shop's whole range.
+await page.goto(origin + "/index.html?testing=1");
+await discover("Wool Beanie");
+await page.locator(".dc-preview").waitFor();
+cards = await grid();
+const shops = await page.$$eval("#dcShops [data-shop]", bs => bs.map(b => b.dataset.shop).filter(s => s !== "all"));
+assert.ok(shops.length > 4 && shops.length < 60, "the demo shops are there too (" + shops.length + " shops)");
+const firstRound = cards.slice(0, shops.length).map(c => c[0]);
+assert.deepEqual(new Set(firstRound), new Set(shops), "one product from every shop first");
+assert.equal(firstRound.length, new Set(firstRound).size, "no shop twice before every shop has had one");
+assert.ok(firstRound.includes("Hollow Pine") && firstRound.includes("Fern Row"), "the shops' websites are in the first round");
+assert.ok(cards.some(c => c[1] === "Linen Scarf"), "a website shop's second product is there too");
+await polished("testing tools", ".main");
+console.log("ok - testing tools: one product from every shop first, the shops' websites included");
+
+assert.deepEqual(errors, []);
+await browser.close(); server.close();
+console.log("PASS Discover mixes shops");
