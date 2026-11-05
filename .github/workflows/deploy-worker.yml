@@ -68,6 +68,7 @@ jobs:
           node scripts/test-shopify-pilot-apps.mjs
           node scripts/test-shopify-embedded.mjs
           node scripts/test-exchange.mjs
+          node scripts/test-cross-swap.mjs
           node --check worker/payments.js
           node scripts/test-price-diff-swaps.mjs
           node --check worker/shop-payments.js

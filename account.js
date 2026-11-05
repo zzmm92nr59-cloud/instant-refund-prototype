@@ -763,6 +763,25 @@
     ".rl-mk-check{display:flex;align-items:center;gap:12px;min-height:44px;margin:2px 0;font-size:15px;line-height:1.35;color:var(--rl-text);cursor:pointer}" +
     ".rl-mk-check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--rl-accent)}.rl-mk-check.small{font-size:14px;color:var(--rl-text2);padding:6px 0}" +
     ".rl-mk-form [hidden]{display:none!important}" +
+    // Swap with another shop.
+    ".rl-xs-h{margin:6px 0 6px;font-size:24px;line-height:1.2;color:var(--rl-text)}.rl-xs-lead{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-xs-list{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.rl-xs-skel{min-height:68px;border-radius:16px}" +
+    ".rl-xs-shop{margin:12px 0 2px;font-size:17px;color:var(--rl-text)}" +
+    ".rl-xs-item{display:flex;align-items:center;gap:12px;width:100%;min-height:68px;box-sizing:border-box;padding:10px 12px;border:1px solid var(--rl-line);border-radius:16px;background:var(--rl-card);color:var(--rl-text);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s,background .12s}" +
+    ".rl-xs-item:active{transform:scale(.98);background:var(--rl-fill)}.rl-xs-item:focus-visible,.rl-xs-chip:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-xs-pic{flex:none;width:48px;height:48px;border-radius:12px;overflow:hidden;background:var(--rl-fill);display:grid;place-items:center}.rl-xs-pic img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-xs-name{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-xs-name b{font-size:15px;line-height:1.3;overflow-wrap:anywhere}.rl-xs-name span{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-xs-price{flex:none;font-size:15px;font-weight:700}" +
+    ".rl-xs-leg{display:flex;flex-direction:column;gap:3px;margin:0 0 8px;padding:14px 16px;border-radius:16px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
+    ".rl-xs-leg>span:first-child{font-size:13px;font-weight:700;color:var(--rl-text2)}.rl-xs-leg b{font-size:16px;color:var(--rl-text);overflow-wrap:anywhere}.rl-xs-leg>span:last-child{font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
+    ".rl-xs-net{margin:12px 0 4px;font-size:15px;font-weight:700;line-height:1.4;color:var(--rl-text)}.rl-xs-q{margin:14px 0 8px;font-size:15px;font-weight:700;color:var(--rl-text)}" +
+    ".rl-xs-reasons{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}" +
+    ".rl-xs-chip{min-height:44px;padding:10px 14px;border-radius:999px;border:1.5px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);font:inherit;font-size:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}" +
+    ".rl-xs-chip:active{transform:scale(.96)}.rl-xs-chip[aria-checked=true]{background:var(--rl-text);border-color:var(--rl-text);color:var(--rl-bg)}" +
+    ".rl-xs-small{margin:0 0 12px;font-size:13px;line-height:1.45;color:var(--rl-text2)}.rl-xs-p{margin:0 0 12px;font-size:15px;line-height:1.45;color:var(--rl-text)}" +
+    ".rl-xs-ref{display:flex;flex-direction:column;gap:2px;margin:0 0 12px;padding:14px 16px;border-radius:16px;background:var(--rl-fill)}.rl-xs-ref span{font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-xs-ref b{font-size:18px;letter-spacing:1px;color:var(--rl-text)}" +
+    ".rl-xs-qr{display:block;width:200px;height:200px;margin:0 auto 8px;image-rendering:pixelated;border-radius:12px;background:#fff}" +
+    ".rl-xs-buy{display:flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;text-decoration:none;margin:0 0 8px}.rl-xs-buy .rl-jic{margin:0}" +
     ".rl-se-card{margin:0 0 12px;padding:16px 18px}.rl-se-card>b{display:block;font-size:16px;color:var(--rl-text);overflow-wrap:anywhere}" +
     ".rl-se-card>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-se-note{margin:8px 0 0;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
     ".rl-se-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.rl-se-acts .rl-pill{padding:0 16px}.rl-se-body{margin-top:12px}.rl-se-body .rl-hp-rows{margin:0 0 10px}" +
@@ -5276,6 +5295,157 @@
       sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
     });
   }
+  // ---- Swap with another shop: send an item back to the shop it came from and get something from another shop on Relay. ----
+  // Relay starts the return at the first shop and opens the second shop's own checkout with the new item in the basket. The
+  // shopper pays the second shop there, and the first shop refunds them once the item is back: Relay takes no money
+  // (worker/cross-swap.js). The second shop's order shows the swap as done once it reaches Relay.
+  var CROSS_ERR = { not_your_order: "Relay couldn't match this order to you.", outside_return_window: "It's more than 7 days since you bought this, so Relay can't start a return for it.",
+    already_returned: "A return has already been started for this item.", already_exchanged: "This item has already been swapped for another size or colour.",
+    retailer_not_supported: "Swaps with another shop work for orders from shops on Relay through Shopify.", reason_needed: "Pick why you're sending it back.",
+    not_an_option: "That item isn't available for a swap any more. Pick another.", out_of_stock: "That one has just sold out. Pick another.",
+    shop_unavailable: "That shop isn't answering right now. Try again in a minute.", already_swapping: "A swap for this item has just started. Close this and look again." };
+  // A picture of an item: the shop's own photo, or a drawing when there isn't one (or it won't load).
+  function itemPic(x, px) {
+    var box = el("div", { className: "rl-xs-pic" }); box.setAttribute("aria-hidden", "true");
+    var draw = function () { illustrate(box, { items: [{ name: x.product || x.title || "" }], retailer: { name: x.shop || "" }, category: "other" }, px || 30); };
+    if (x.imageUrl && /^https:\/\//.test(x.imageUrl)) { var im = el("img", { src: x.imageUrl, alt: "" }); im.onerror = function () { im.remove(); draw(); }; box.appendChild(im); } else draw();
+    return box;
+  }
+  // Testing tools only: buys the item at one of Relay's Shopify test shops with a test order (no card, no real money).
+  function testBuy(host, toKey, toShop, after) {
+    var msg = el("div", { className: "rl-msg" });
+    var b = el("button", { className: "rl-btn ghost", text: "Test shop: place this order at " + toShop, onclick: function () {
+      b.disabled = true; say(msg, "Placing the test order…");
+      api("/relay/my/testing/shopify-order", { method: "POST", body: { variantKey: toKey } }).then(function (r) {
+        if (r.ok && r.body && r.body.ok) { say(msg, r.body.message); setTimeout(after, 900); return; }
+        b.disabled = false;
+        say(msg, r.body && r.body.error === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
+      }, function () { b.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
+    } });
+    host.appendChild(b); host.appendChild(msg);
+  }
+  function openCrossSwap(o, it, done) {
+    var shopA = o.store || "the shop", started = false, picked = null;
+    var sheet = el("div", { className: "rl-sheet rl-xs", role: "dialog", ariaModal: "true", ariaLabel: "Swap with another shop" });
+    var layer = el("div", { className: "rl-back" }, [sheet]);
+    function close() { if (!layer.parentNode) return; layer.remove(); document.removeEventListener("keydown", onKey); if (started && done) done(); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    function frame(title, lead) {
+      sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {}
+      sheet.appendChild(el("h2", { className: "rl-xs-h", text: title }));
+      if (lead) sheet.appendChild(el("p", { className: "rl-xs-lead", text: lead }));
+    }
+    // 1. What other shops on Relay have in stock.
+    function pick() {
+      frame("Swap it for something from another shop", "Send " + it.title + " back to " + shopA + " and choose something from another shop on Relay instead.");
+      var list = el("div", { className: "rl-xs-list" }); list.setAttribute("aria-busy", "true");
+      for (var i = 0; i < 4; i++) list.appendChild(el("div", { className: "rl-skel rl-xs-skel" }));
+      var msg = el("div", { className: "rl-msg" });
+      sheet.appendChild(list); sheet.appendChild(msg);
+      sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close }));
+      var draw = function (r) {
+        list.textContent = ""; list.removeAttribute("aria-busy");
+        if (!r.ok) return say(msg, CROSS_ERR[r.body && r.body.error] || "Couldn't load what other shops have. Check your connection and try again.", true);
+        if (!r.body.eligible) return say(msg, CROSS_ERR[r.body.reason] || "This item can't be swapped with another shop.", true);
+        var shops = r.body.shops || [];
+        if (!shops.length) return list.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Nothing to swap to yet" }),
+          el("p", { text: "No other shop on Relay has something in stock right now. You can still return it to " + shopA + " for a refund." })]));
+        shops.forEach(function (sh) {
+          list.appendChild(el("h3", { className: "rl-xs-shop", text: sh.name }));
+          sh.items.forEach(function (x) {
+            list.appendChild(el("button", { type: "button", className: "rl-xs-item", ariaLabel: x.product + (x.variant ? ", " + x.variant : "") + ", " + money(x.priceMinor, "GBP") + ", from " + sh.name,
+              onclick: function () { picked = { shop: sh.name, item: x }; review(x.priceMinor); } },
+              [itemPic({ product: x.product, imageUrl: x.imageUrl, shop: sh.name }, 30), el("span", { className: "rl-xs-name" }, [el("b", { text: x.product }), el("span", { text: x.variant || "One size" })]),
+                el("span", { className: "rl-xs-price", text: money(x.priceMinor, "GBP") })]));
+          });
+        });
+      };
+      api("/relay/my/cross-swap/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId), { fresh: true })
+        .then(function (r) { if (layer.parentNode) draw(r); }, function () { if (layer.parentNode) draw({ ok: false, body: {} }); });
+    }
+    // 2. Both halves of the swap, what it costs overall, and why it's going back.
+    function review(price, note) {
+      var x = picked.item, diff = price - (Number(it.priceMinor) || 0), reason = null;
+      frame("Check the swap");
+      sheet.appendChild(el("div", { className: "rl-xs-leg" }, [el("span", { text: "Send back to " + shopA }), el("b", { text: it.title + (it.variant ? " (" + it.variant + ")" : "") }),
+        el("span", { text: money(it.priceMinor, it.currency) + ". " + shopA + " refunds you to how you paid once they get it back." })]));
+      sheet.appendChild(el("div", { className: "rl-xs-leg" }, [el("span", { text: "Get from " + picked.shop }), el("b", { text: x.product + (x.variant ? " (" + x.variant + ")" : "") }),
+        el("span", { text: money(price, "GBP") + ". You pay " + picked.shop + " at their own checkout." })]));
+      sheet.appendChild(el("p", { className: "rl-xs-net", text: diff === 0 ? "Same price: once the refund arrives, you'll have paid the same overall."
+        : "Once the refund arrives, you'll have paid " + money(Math.abs(diff), "GBP") + (diff > 0 ? " more" : " less") + " overall." }));
+      sheet.appendChild(el("p", { className: "rl-xs-q", text: "Why are you sending it back?" }));
+      var group = el("div", { className: "rl-xs-reasons", role: "radiogroup", ariaLabel: "Why are you sending it back?" });
+      RETURN_REASONS.forEach(function (rr) {
+        var chip = el("button", { type: "button", className: "rl-xs-chip", role: "radio", text: rr[1], onclick: function () {
+          reason = rr[0]; group.querySelectorAll("button").forEach(function (n) { n.setAttribute("aria-checked", n === chip ? "true" : "false"); }); say(msg, "");
+        } });
+        chip.setAttribute("aria-checked", "false"); group.appendChild(chip);
+      });
+      sheet.appendChild(group);
+      sheet.appendChild(el("p", { className: "rl-xs-small", text: "Relay doesn't take any payment: your refund comes from " + shopA + ", and you pay " + picked.shop + " directly." }));
+      var msg = el("div", { className: "rl-msg" });
+      var go = el("button", { className: "rl-btn", text: "Start the swap", onclick: function () {
+        if (!reason) return say(msg, CROSS_ERR.reason_needed, true);
+        go.disabled = true; say(msg, "Starting the return with " + shopA + "…");
+        api("/relay/my/cross-swap", { method: "POST", body: { orderId: o.id, lineId: it.lineId, toKey: x.key, reason: reason, agreedPriceMinor: price } }).then(function (r) {
+          if (!layer.parentNode) return;
+          if (r.ok) { started = true; return finished(r.body); }
+          var e = r.body && r.body.error;
+          if (e === "price_changed" && Number.isInteger(r.body.priceMinor)) return review(r.body.priceMinor, picked.shop + " now charges " + money(r.body.priceMinor, "GBP") + " for it. Check the swap again.");
+          go.disabled = false; say(msg, CROSS_ERR[e] || "Couldn't start the swap. Please try again.", true);
+        }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      } });
+      sheet.appendChild(msg); sheet.appendChild(go);
+      sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: pick }));
+      if (note) say(msg, note, true);
+    }
+    // 3. The return has started; what to do at each shop.
+    function finished(b) {
+      frame("Return started with " + shopA);
+      if (b.labelAvailable && b.trackingNumber) {
+        if (b.qrImage && /^data:image\//.test(b.qrImage)) sheet.appendChild(el("img", { className: "rl-xs-qr", src: b.qrImage, alt: "Royal Mail QR code for your return" }));
+        sheet.appendChild(el("p", { className: "rl-xs-p", text: "Pack the item and show this QR code at a Post Office counter. Royal Mail tracking number: " + b.trackingNumber + "." }));
+      }
+      sheet.appendChild(el("div", { className: "rl-xs-ref" }, [el("span", { text: "Relay reference" }), el("b", { text: b.returnRef }),
+        el("span", { text: "For your records. It isn't a postage label or tracking number." })]));
+      sheet.appendChild(el("p", { className: "rl-xs-p", text: (b.labelAvailable ? (b.shopNotified ? "Relay has emailed " + shopA + " to say it's coming back. " : "")
+        : b.shopNotified ? "Relay has emailed " + shopA + " to say it's coming back. Send it back using " + shopA + "'s own returns process. "
+        : "Relay couldn't email " + shopA + ", so send it back using their own returns process. ") + "Your refund comes from " + shopA + " once they get it." }));
+      sheet.appendChild(el("h3", { className: "rl-xs-shop", text: "Next: buy it from " + b.toShop }));
+      sheet.appendChild(el("p", { className: "rl-xs-p", text: b.toTitle + ", " + money(b.toPriceMinor, "GBP") + ". This opens " + b.toShop + "'s own checkout with it in your basket. Use your Relay email there, so Relay can show the swap as done." }));
+      if (/^https:\/\//.test(b.buyUrl || "")) sheet.appendChild(el("a", { className: "rl-btn rl-xs-buy", href: b.buyUrl, target: "_blank", rel: "noopener noreferrer" },
+        [el("span", { text: "Go to " + b.toShop + "'s checkout" }), jIc("ext", 18)]));
+      if (b.testShop && testingOn() && b.toKey) testBuy(sheet, b.toKey, b.toShop, close);
+      sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Done", onclick: close }));
+    }
+    pick();
+  }
+  // ---- Test orders at Relay's Shopify test shops (development stores): testing tools only. ----
+  function mountShopifyTest(host, done) {
+    api("/relay/shopify/catalogue?test=1").then(function (r) {
+      var items = ((r.ok && r.body && r.body.products) || []).filter(function (p) { return p.testShop && Number(p.quantity) > 0 && p.currency === "GBP" && p.sku; });
+      if (!items.length) return;
+      var card = el("details", { className: "card", style: "padding:14px 16px;margin-top:10px" });
+      card.appendChild(el("summary", { text: "Testing: place a test order at a Shopify test shop", style: "font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center" }));
+      card.appendChild(el("p", { className: "small muted", style: "margin:8px 0 10px", text: "Places an order at one of Relay's Shopify test shops under your Relay email, marked as a test in Shopify. No card, no receipt email and no real money. Up to 5 a day." }));
+      var pick = el("select", { ariaLabel: "Item to order", style: "width:100%;min-height:44px;padding:10px;border-radius:12px;border:1px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);font:inherit;margin-bottom:8px" });
+      items.forEach(function (p) { pick.appendChild(el("option", { value: p.sku, text: [p.storeName, p.product, p.variation && !/^default title$/i.test(p.variation) ? p.variation : null, money(p.priceMinor, "GBP")].filter(Boolean).join(" · ") })); });
+      var msg = el("div", { className: "rl-msg" });
+      var go = el("button", { className: "darkbtn", text: "Place test order", onclick: function () {
+        go.disabled = true; say(msg, "Placing the test order…");
+        api("/relay/my/testing/shopify-order", { method: "POST", body: { variantKey: pick.value } }).then(function (p) {
+          go.disabled = false;
+          if (p.ok && p.body && p.body.ok) { say(msg, p.body.message); setTimeout(done, 1200); return; }
+          say(msg, p.body && p.body.error === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
+        }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
+      } });
+      [pick, go, msg].forEach(function (n) { card.appendChild(n); });
+      host.appendChild(card);
+    }).catch(function () {});
+  }
   // Test shop tools (Square sandbox test orders, test refunds, card-only test payments) only for people testing Relay:
   // switched on from Profile → Testing, or with ?testing=1. Shoppers never see them.
   // The Market isn't part of the launch: it shows for people testing Relay and in the ?demo=1 walkthrough.
@@ -5337,8 +5507,18 @@
         actions.appendChild(tb); card.appendChild(tm);
       }
     }
+    // Swapped for something from another shop on Relay: where it's got to, and that shop's checkout until it's bought.
+    var xs = it.crossSwap;
+    if (xs && xs.status === "ordered") status("Swapped for " + xs.toTitle + " from " + xs.toShop + (xs.orderedAt ? ", ordered " + shortDate(xs.orderedAt) : "") + ".", true);
+    else if (xs) {
+      status("Swapping for " + xs.toTitle + " from " + xs.toShop + ". Buy it there with your Relay email to finish.", false);
+      if (/^https:\/\//.test(xs.buyUrl || "")) actions.appendChild(el("a", { className: "rl-po-primary", href: xs.buyUrl, target: "_blank", rel: "noopener noreferrer", text: "Buy it from " + xs.toShop }));
+      if (xs.testShop && xs.toKey && testingOn()) { var tbx = el("div", { style: "flex:1 1 100%" }); testBuy(tbx, xs.toKey, xs.toShop, redraw); actions.appendChild(tbx); }
+    }
+    if (it.boughtInSwap) status("Bought in a swap for " + it.boughtInSwap.fromTitle + " from " + it.boughtInSwap.fromShop + ".", true);
     if (it.exchangeable) actions.appendChild(el("button", { className: "rl-po-primary", text: "Swap", title: "Swap for another size or colour", onclick: function () { openExchange(o, it, redraw); } }));
     if (it.returnable) actions.appendChild(el("button", { className: "rl-po-secondary", text: "Return", onclick: function () { openReturn(o, it, redraw); } }));
+    if (it.returnable && it.otherShops) actions.appendChild(el("button", { className: "rl-po-secondary", text: "Swap with another shop", onclick: function () { openCrossSwap(o, it, redraw); } }));
     if (actions.childNodes.length) card.appendChild(actions);
     return card;
   }
@@ -5595,7 +5775,7 @@
         el("button", { className: "rl-po-secondary", text: "All receipts", onclick: function () { window.go && window.go("receipts"); } }),
         el("button", { className: "rl-po-secondary", text: "Returns & swaps", onclick: function () { window.go && window.go("returns"); } })]));
       var box = el("div", { style: "margin-top:10px" }); foot.appendChild(box); mountInstore(box, refresh, "box");
-      if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); foot.appendChild(t); mountSquareTest(t, refresh); }
+      if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); foot.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
     };
     if (memo.walletPurchases && memo.receipts) drawBoth([memo.walletPurchases, memo.receipts.rows]);
     loadBoth().then(function (both) { if (document.body.contains(grid)) drawBoth(both); });
@@ -5662,7 +5842,7 @@
       var refresh = function () { memo.purchases = null; mountConfirmed(host, opts); };
       var inHost = el("div"); mountInstore(inHost, refresh);
       var testHost = el("div", { style: "margin-top:14px" });
-      if (testingOn()) mountSquareTest(testHost, refresh);
+      if (testingOn()) { mountSquareTest(testHost, refresh); mountShopifyTest(testHost, refresh); }
       host.appendChild(inHost);
       if (rows.length) {
         var items = [];

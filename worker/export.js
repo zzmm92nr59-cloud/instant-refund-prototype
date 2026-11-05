@@ -5,6 +5,7 @@
 
 import { exportPhone } from "./phone.js";
 import { sharedForExport } from "./shared-emails.js";
+import { crossSwapsForExport } from "./cross-swap.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -96,6 +97,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         .map((p) => ({ ...p, createdAt: iso(p.createdAt) })),
       returnLabels: (await rows("SELECT return_id AS returnId, created_at AS createdAt FROM relay_return_labels WHERE shopper_id = ?", id))
         .map((l) => ({ returnId: l.returnId, createdAt: iso(l.createdAt) })),
+      // Items sent back to one shop for something from another shop on Relay.
+      swapsWithOtherShops: await crossSwapsForExport(env, id),
     },
     swapAndSell: {
       listings: (await rows("SELECT id, title, store, size, condition, ask_pence AS askPence, swap_ok AS swapOk, note, area, status, created_at AS createdAt FROM resale_listings WHERE seller_id = ?", id))

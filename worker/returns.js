@@ -136,8 +136,8 @@ export function generateReturnRef() {
   return "RLY-" + c.slice(0, 4) + "-" + c.slice(4);
 }
 
-// Checks whether an order line is eligible for return
-async function checkEligibility(env, shopper, orderId, lineId) {
+// Checks whether an order line is eligible for return (also used by swaps across shops, cross-swap.js)
+export async function checkEligibility(env, shopper, orderId, lineId) {
   const db = env.RELAY_DB;
 
   // Must own the order
@@ -187,8 +187,9 @@ async function checkEligibility(env, shopper, orderId, lineId) {
   return { eligible: true, order, shop: m ? m[1] : order.retailer, square: Boolean(sqr), line, daysSince: Math.floor(daysSince) };
 }
 
-// POST /relay/my/return — start a return; get back a Relay reference, plus a Royal Mail label when the shop has set that up
-async function initiateReturn(env, shopper, body, o = {}) {
+// POST /relay/my/return — start a return; get back a Relay reference, plus a Royal Mail label when the shop has set that up.
+// A swap across shops starts its return here too (cross-swap.js).
+export async function initiateReturn(env, shopper, body, o = {}) {
   const db = env.RELAY_DB;
   await ensureReturnsTables(db);
 

@@ -28,6 +28,17 @@ test("More expensive replacement captures only extra amount",()=>{const r=Engine
 test("Cheaper replacement refunds only difference",()=>{const r=Engine.createExchange({purchase:coat,candidate:coatAlt,reason:"design",id:"RELAY-TEST-03"});assert.equal(r.differenceMinor,-2000);assert.deepEqual(r.ledger.map(x=>[x.type,x.amountMinor]),[["PRICE_DIFFERENCE_REFUND",2000]])});
 test("Out of stock blocks exchange and no ledger created",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,quantity:0},reason:"design"}),/out of stock/i));
 test("Wrong store blocks exchange",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,store:"Relay Studio"},reason:"design"}),/does not qualify/));
+test("A swap with another shop takes any in-stock item from that shop, only when asked for",()=>{
+  const tee={...item("Boxy Cotton Tee","Forest / L","Relay Studio",2899),sku:"DEMO-STUDIO-002"};
+  assert.throws(()=>Engine.quote({purchase:coat,candidate:tee,reason:"design"}),/does not qualify/);
+  const q=Engine.quote({purchase:coat,candidate:tee,reason:"design",otherShop:true});
+  assert.deepEqual([q.crossShop,q.fromStore,q.store,q.differenceMinor],[true,"Harbour Goods","Relay Studio",2899-13999]);
+  assert.throws(()=>Engine.quote({purchase:coat,candidate:{...tee,quantity:0},reason:"design",otherShop:true}),/out of stock/i);
+  assert.throws(()=>Engine.quote({purchase:coat,candidate:{...tee,fixture:false,provider:"shopify"},reason:"design",otherShop:true}),/Only editable demo inventory/);
+  assert.equal(Engine.quote({purchase:coat,candidate:coatAlt,reason:"design",otherShop:true}).crossShop,false,"the same shop is an ordinary exchange");
+  const r=Engine.createExchange({purchase:coat,candidate:tee,reason:"design",id:"RELAY-TEST-XS",otherShop:true});
+  assert.deepEqual([r.crossShop,r.originalStore,r.store,r.differenceMinor],[true,"Harbour Goods","Relay Studio",2899-13999]);
+});
 test("Real customer purchases blocked from browser-only demo checkout",()=>assert.throws(()=>Engine.quote({purchase:{...coat,demo:false},candidate:coatAlt,reason:"design"}),/Only fictional demo/));
 test("Untrusted Square browse-only items cannot be exchanged",()=>assert.throws(()=>Engine.quote({purchase:coat,candidate:{...coatAlt,fixture:false},reason:"design"}),/Only editable demo/));
 test("Two exchanges cannot use the same original purchase",()=>{const e=Engine.createExchange({purchase:coat,candidate:coatAlt,reason:"design",id:"RELAY-TEST-04"});assert.throws(()=>Engine.createExchange({purchase:coat,candidate:coatMore,reason:"design",existing:[e],id:"RELAY-TEST-05"}),/already has an exchange/)});

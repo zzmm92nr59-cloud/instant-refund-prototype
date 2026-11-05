@@ -91,6 +91,7 @@ const ROUTES = new Map(Object.entries({
   // Swaps, returns and payments.
   "/relay/my/exchange": { fields: { orderId: id(), lineId: id(), variantKey: str(300), agreedDiffMinor: int(-100000000, 100000000) } },
   "/relay/my/return": { fields: { orderId: id(), lineId: id(), reason: str(60) } },
+  "/relay/my/cross-swap": { fields: { orderId: id(), lineId: id(), toKey: str(200), reason: one("wrong_size", "changed_mind", "faulty", "not_as_described"), agreedPriceMinor: int(0, 100000000) } },
   "/relay/my/card/setup": NOTHING,
   "/relay/my/card/confirm": { fields: { setupIntentId: str(200) } },
   "/relay/my/card/remove": NOTHING,
@@ -99,6 +100,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/testing/square-tap": { fields: { variationId: str(100) } },
   "/relay/my/testing/square-order": { fields: { variationId: str(100) } },
   "/relay/my/testing/square-refund": { fields: { orderId: id(), lineId: id() } },
+  "/relay/my/testing/shopify-order": { fields: { variantKey: str(200) } },
   // Passkeys, two-step sign-in and phone numbers.
   "/relay/my/passkeys/options": NOTHING,
   "/relay/my/passkeys/register": { limit: 30 * KB, fields: { id: str(1400), name: text(100), response: obj({ clientDataJSON: str(8000), attestationObject: str(16000) }) } },
