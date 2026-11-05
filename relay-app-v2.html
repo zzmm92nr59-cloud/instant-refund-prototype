@@ -553,6 +553,10 @@ function dcGroupsRaw(rows){const map=new Map();for(const p of rows){const key=st
    // How many are left: only when every size or colour's stock is known. One that isn't known (a shop that doesn't share
    // it, or a shop's website that only says it can be bought) means Relay can't say it's sold out or how many are left.
    left:known.length<vs.length?null:known.every(q=>q<=0)?0:known.reduce((n,q)=>n+Math.max(0,q),0)}})}
+// All shops together: one product from each shop in turn (shops with the most products first), each shop's own order
+// kept, so the first screen shows every shop instead of one shop's whole range.
+function dcMix(groups){const by=new Map();for(const g of groups){if(!by.has(g.store))by.set(g.store,[]);by.get(g.store).push(g)}
+ const lists=[...by.values()].sort((a,b)=>b.length-a.length),out=[];for(let i=0;out.length<groups.length;i++)for(const l of lists)if(i<l.length)out.push(l[i]);return out}
 function dcPrice(g){return g.min===g.max?priceIn(g.min,g.currency):"From "+priceIn(g.min,g.currency)}
 // "White · UK 7–9", "S, M, L" (at most four, then "+2 more"). What every option shares ("White") is said once.
 const DC_SIZES=["xxs","xs","s","m","l","xl","xxl","xxxl"],DC_SIZE_WORDS={small:"s",medium:"m",large:"l","extra large":"xl"};
@@ -632,8 +636,9 @@ function renderShopperCatalog(root){
  let groups=inShop.filter(g=>(discoverKind==="all"||g.kind===discoverKind)&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
  const forYou=$("dcForYou");if(forYou)forYou.innerHTML=query||storeFilter!=="all"||discoverKind!=="all"?"":dcForYou(all);
  if(sort==="low")groups.sort((a,b)=>a.min-b.min);else if(sort==="high")groups.sort((a,b)=>b.max-a.max);
- else if(personalise&&discoverSpend){const order=new Map(dcPicks(groups).map((x,i)=>[x.g.key,i])),sh=k=>{const x=discoverSpend.kinds.find(y=>y.category===k);return x?x.share:0};
-  groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||a[1]-b[1]).map(x=>x[0])}
+ else{if(storeFilter==="all")groups=dcMix(groups);
+  if(personalise&&discoverSpend){const order=new Map(dcPicks(groups).map((x,i)=>[x.g.key,i])),sh=k=>{const x=discoverSpend.kinds.find(y=>y.category===k);return x?x.share:0};
+  groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||a[1]-b[1]).map(x=>x[0])}}
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
  if(prev)prev.innerHTML=testTools()&&webShops.size?'<div class="dc-preview"><b>Preview: products from '+webShops.size+' shops\' own websites.</b> Relay reads their public product lists once a day. These shops haven\'t joined Relay, so shoppers don\'t see them. Tap a product to buy it on the shop\'s website.</div>':"";
