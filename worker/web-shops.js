@@ -188,8 +188,11 @@ export async function readShop(f, shop, now) {
   if (!robotsAllow(robots.groups, listPath) || !robotsAllow(robots.groups, "/meta.json")) return { status: "robots", rows: [], origin };
   const meta = await getJson(f, origin + "/meta.json");
   if (meta.status !== "ok") return { status: meta.status, rows: [], origin };
-  if (String(meta.json && meta.json.currency || "").toUpperCase() !== "GBP") return { status: "not_gbp", rows: [], origin };
-  const ships = meta.json.ships_to_countries;
+  // The shop's currency, or (if it isn't given) its price format: "£{{amount}}" is pounds.
+  const m = meta.json && typeof meta.json === "object" ? meta.json : {};
+  const currency = m.currency ? String(m.currency).toUpperCase() : /£|\bGBP\b/.test(String(m.money_format || "")) ? "GBP" : "";
+  if (currency !== "GBP") return { status: "not_gbp", rows: [], origin };
+  const ships = m.ships_to_countries;
   if (Array.isArray(ships) && ships.length && !ships.includes("GB") && !ships.includes("*")) return { status: "no_uk_delivery", rows: [], origin };
   const list = await getJson(f, origin + listPath);
   if (list.status !== "ok") return { status: list.status, rows: [], origin };

@@ -86,6 +86,10 @@ for (const [what, o, status, requests] of cases) {
 }
 web = new Map(); asked = []; shopSite("https://elm.test", { ships: ["*"] });
 assert.equal((await readShop(fetchImpl, { domain: "elm.test", label: "Elm" }, NOW)).status, "ok", "delivers everywhere");
+for (const [meta, status] of [[{ money_format: "£{{amount}}" }, "ok"], [{ money_format: "{{amount}} GBP" }, "ok"], [{ money_format: "€{{amount}}" }, "not_gbp"], [{}, "not_gbp"], [[], "not_gbp"]]) {
+  web = new Map(); shopSite("https://elm.test"); web.set("https://elm.test/meta.json", { body: meta });
+  assert.equal((await readShop(fetchImpl, { domain: "elm.test", label: "Elm" }, NOW)).status, status, "currency from the price format: " + JSON.stringify(meta));
+}
 web = new Map(); asked = []; web.set("https://elm.test/robots.txt", { status: 503, body: "busy", type: "text/plain" });
 assert.deepEqual([(await readShop(fetchImpl, { domain: "elm.test", label: "Elm" }, NOW)).status, asked.length], ["unreachable", 1], "robots.txt erroring: nothing read");
 web = new Map(); web.set("https://elm.test/robots.txt", "down");
