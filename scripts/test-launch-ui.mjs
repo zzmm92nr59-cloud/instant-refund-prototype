@@ -46,6 +46,9 @@ await ctx.route("https://**/*", async route => {
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
+// When the machine is very busy (tests run side by side), Chromium sometimes reports a reload as cut short (ERR_ABORTED)
+// even though the page goes on to load: then that load is waited for, and the checks after it decide. Any other error fails.
+const reload = () => page.reload().catch(async (e) => { if (!/ERR_ABORTED|frame was detached/.test(String(e))) throw e; await page.waitForLoadState("load"); });
 const catalogueAsks = [];
 const SHOPPER_NEVER_SEES = /\bdemo\b|sandbox|simulat|fictional|prototype|test mode|test shop|preview only|not yet coordinated|isn.t built|aren.t built|square catalogue/i;
 const viewText = () => page.locator("#view").innerText();
@@ -72,7 +75,7 @@ await page.evaluate(e => {
   localStorage.setItem("relay-radar-v2", JSON.stringify({ "DEMO-NORTH-003": { name: "Retro High Trainers", variant: "White / UK 8", baseline: 12999, created: "2026-10-01T00:00:00Z" },
     "DEMO-SBX-1": { name: "Sandbox Hoodie", variant: "M", baseline: 4000, created: "2026-10-01T00:00:00Z" } }));
 }, EMAIL);
-await page.reload();
+await reload();
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
 await page.getByRole("heading", { name: "Wallet" }).waitFor();
 await page.locator("#walletPage").getByText("Long Jacket").waitFor();
@@ -132,6 +135,9 @@ await page.getByText("Nothing watched yet").waitFor();
 await page.getByRole("button", { name: "Discover", exact: true }).first().click();
 await page.getByRole("heading", { name: "Discover" }).waitFor();
 console.log("ok - Price alerts lists what's watched, lives under Discover, and stops watching on request");
+// Swap & resell has no tab, but Discover leads to it.
+await page.locator(".profile-row", { hasText: "Swap & resell" }).waitFor();
+assert.match(await page.locator(".profile-row", { hasText: "Swap & resell" }).innerText(), /What other members are selling or swapping/);
 
 // 4. Receipts and Wrapped read cleanly too.
 for (const tab of ["Receipts", "Profile"]) {
@@ -139,26 +145,27 @@ for (const tab of ["Receipts", "Profile"]) {
   await page.waitForTimeout(900);
   assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES, tab);
 }
-// 5. The Profile page (the avatar opens it): no Market, no test card, no empty-purchases caveat.
+// 5. The Profile page (the avatar opens it): Swap & resell as a row (no Market tab), no test card, no empty-purchases caveat.
 await page.locator(".avatar").click();
 await page.getByRole("heading", { name: "Profile", exact: true }).waitFor();
 await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
 assert.equal(await page.locator("#foot button.active").innerText(), "Profile");
 assert.equal(await page.getByRole("button", { name: "Done" }).count(), 0, "a page, not a sheet: nothing to close");
 const sheet = await page.locator("#mePage").innerText();
-assert.doesNotMatch(sheet, /Swap & resell|TEST MODE|Card for swaps|No purchases matched/);
+assert.match(sheet, /Swap & resell\s+Sell or swap what you can't return/, "Swap & resell is reachable from Profile");
+assert.doesNotMatch(sheet, /TEST MODE|Card for swaps|No purchases matched/);
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
 // Someone who saved a card during a test-mode swap can always find it again to remove it (labelled as test mode).
 cardSaved = true;
 // The card was saved away from this screen, so the app learns about it the next time it opens (reads are reused for a minute).
-await page.reload();
+await reload();
 await page.locator(".avatar").click();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByRole("button", { name: "Remove card" }).waitFor();
 await page.getByText("TEST MODE · no real money").waitFor();
 await page.getByRole("button", { name: "Back to Profile" }).click();
 cardSaved = false;
-console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Market and the test card are hidden (a saved card can still be removed)");
+console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Swap & resell is a Profile row, not a tab; the test card is hidden (a saved card can still be removed)");
 
 // A shopper's Discover asks only for real shops' products (test shops are left out by the server).
 assert.ok(catalogueAsks.length && catalogueAsks.every(q => !/test=1/.test(q)), "no test shops for shoppers: " + catalogueAsks.join(","));
@@ -173,7 +180,7 @@ await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
 await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).getByText(/· TEST/).waitFor();
 assert.ok(catalogueAsks.slice(asksBefore).some(q => /test=1/.test(q)), "with testing tools on, Discover asks for test shops too");
 await page.locator(".avatar").click();
-await page.getByRole("button", { name: "Swap & resell", exact: true }).waitFor();
+await page.locator(".rl-arow", { hasText: "Swap & resell" }).waitFor();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByText("TEST MODE · no real money").waitFor();
 await page.goto(origin + "/index.html?testtools=0");
@@ -184,7 +191,7 @@ console.log("ok - testing tools appear only after ?testtools=1, and ?testtools=0
 
 // 7. Desktop: the same four tabs down the side, Home first.
 await page.setViewportSize({ width: 1280, height: 900 });
-await page.reload();
+await reload();
 await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
 assert.deepEqual((await page.locator("#side button").allInnerTexts()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile"]);
 await page.screenshot({ path: "/tmp/shots/launch-desktop.png" });

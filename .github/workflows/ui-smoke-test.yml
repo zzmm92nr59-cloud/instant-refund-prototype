@@ -84,6 +84,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-share-email-ui.mjs
       - name: Test AI help (hidden until available, off to start, on and off once, AI-filled parts marked)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-ai-help-ui.mjs
+      - name: Test Swap & resell without a tab (Discover, Profile and old receipts lead to it; plain words, once per tap, polished)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-market-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
