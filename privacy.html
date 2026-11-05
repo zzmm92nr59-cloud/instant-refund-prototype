@@ -76,7 +76,8 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <ul>
 <li><strong>What it looks for:</strong> order confirmations, receipts and return emails. Other emails are not kept.</li>
 <li><strong>What it keeps from each one:</strong> the store, order number, date, total and items; the email address the shop sent the order to (so a returns page gets the right one); return details such as the deadline, how to return, any return ID or link; one small product photo from the email if there is one; and a link back to the original email so you can open it yourself.</li>
-<li><strong>How it reads them:</strong> with fixed rules that run on Relay's own servers. No AI model reads your emails, and they are never sent to an AI company or used to train one.</li>
+<li><strong>How it reads them:</strong> with fixed rules that run on Relay's own servers. Unless you switch on AI help, no AI model reads your emails and they are never sent to an AI company. Your emails are never used to train an AI model.</li>
+<li><strong>AI help (off unless you switch it on):</strong> under Email connection. When Relay's rules can't work out a receipt, Claude, an AI made by Anthropic, reads that email to fill in what's missing. It gets the email's text with web links, email addresses, phone numbers, card numbers and codes, postcodes, addresses and your name hidden. Anthropic's terms don't let it train its models on what Relay sends. What the AI fills in is marked in Relay for you to check, never replaces what you corrected yourself, and is deleted when you switch AI help off.</li>
 <li><strong>How far back:</strong> about the last 16 months. If you ask for a Wrapped of an earlier year, Relay looks through that year as well.</li>
 <li><strong>Keeping up to date:</strong> while your email is connected, Relay checks for new receipts every so often in the background.</li>
 <li><strong>The key to your inbox:</strong> stored encrypted, and used only to look for receipts.</li>
@@ -102,7 +103,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Cloudflare</th><td>Hosts Relay's servers and database.</td></tr>
 <tr><th>Google and Microsoft</th><td>Sign-in with Google or Microsoft, and reading your Gmail or Outlook when you connect it.</td></tr>
 <tr><th>Resend</th><td>Sends sign-in emails and return reminders, so it receives your email address and the message.</td></tr>
-<tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. It never receives your receipts, anything else from your email, or your email address. Relay keeps no copy of the chat.</td></tr>
+<tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. Relay keeps no copy of the chat. If you switch on AI help, it also reads emails Relay's rules couldn't work out, with your personal details hidden (see Your email). Otherwise it never receives your receipts, anything else from your email, or your email address.</td></tr>
 <tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
 <tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference.</td></tr>
@@ -117,6 +118,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <h2 id="keep">How long we keep it</h2>
 <table class="table">
 <tr><th>Receipts and purchase details from your email</th><td>Until you disconnect your email, withdraw your permission or delete your account.</td></tr>
+<tr><th>What the AI read, if you switch on AI help</th><td>Until you switch AI help off, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>Emails you choose to send to Relay</th><td>30 days, or until you delete it, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>The help chat</th><td>Relay keeps no copy of the chat: only how many messages you sent each day (to keep the chat within its limits), for 30 days. If you choose Talk to a person, the chat is emailed to Relay's team so they can reply, and kept in that email.</td></tr>
 <tr><th>Your sign-in session</th><td>Up to 90 days after you last used Relay, or until you sign out.</td></tr>

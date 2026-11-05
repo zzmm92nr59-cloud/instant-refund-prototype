@@ -13,6 +13,7 @@ import { checkBody } from "./validate.js";
 import { handleHealthRoute } from "./health.js";
 import { handleHealthEmailRoute } from "./health-digest.js";
 import { handleSharedEmailAdminRoute } from "./shared-emails.js";
+import { handleAiReadingRoute } from "./ai-runner.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -649,6 +650,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // The help chat (an AI assistant, and "Talk to a person"). Off until the ANTHROPIC_API_KEY secret is set.
     const supportResponse = await handleSupportRoute(path, request.method, request, env, cors, shopper, o);
     if (supportResponse) return supportResponse;
+    // "AI help": Claude reads emails Relay's own reader isn't sure about, only for shoppers who switch it on.
+    const aiResponse = await handleAiReadingRoute(path, request.method, request, env, cors, shopper, o);
+    if (aiResponse) return aiResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;

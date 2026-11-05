@@ -8,6 +8,7 @@ import { runHealthEmails } from "./health-digest.js";
 import { handleAuthRoute } from "./auth.js";
 import { tidyTexts } from "./phone.js";
 import { tidySharedEmails } from "./shared-emails.js";
+import { runAiReads } from "./ai-runner.js";
 import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
@@ -70,6 +71,9 @@ const relayWorker = {
     ctx.waitUntil(tidyTexts(env).catch(() => {}));
     // Emails shoppers sent to Relay are deleted after 30 days.
     ctx.waitUntil(tidySharedEmails(env).catch(() => {}));
+    // AI help: a few receipts the rules weren't sure about, for shoppers who switched it on (off until the AI key is set).
+    ctx.waitUntil(runAiReads(env).then(r => { if (r.read || r.failed || r.stopped) console.log("AI reads", JSON.stringify(r)); })
+      .catch(e => console.error("AI reads failed", String(e && e.message || e).slice(0, 120))));
     // Relay health by email: the admins' morning summary (from 8am UK time) and alerts when something breaks.
     ctx.waitUntil(runHealthEmails(env).then(r => { if (r.sent) console.log("health emails", JSON.stringify(r)); }).catch(e => console.error("health emails failed", String(e && e.message || e).slice(0, 120))));
     // Shops that removed Relay over 30 days ago and that Shopify's erase request missed (Shopify API terms 6.2.3).

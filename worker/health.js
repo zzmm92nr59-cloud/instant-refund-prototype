@@ -18,6 +18,7 @@ import { PARSER_VERSION } from "./gmail.js";
 import { chatAvailable } from "./support-chat.js";
 import { answerKey } from "./answer-key.js";
 import { SHARE_DAYS } from "./shared-emails.js";
+import { aiAvailable } from "./ai-reader.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
 const DAY = 864e5;
@@ -59,7 +60,7 @@ export async function relayHealth(env, me, now = Date.now()) {
 
   const [people, sessions, signIns, inboxes, inboxPeople, checked, jobs, jobErrors, emails, kinds, purchases, purchases7, versions, unread,
     learned, marks, gifts, giftShoppers, history, perDay, shops, mine, returns, swaps, payments, labels, shopify, shopifyTest, square, pushes, watches, codeFails,
-    fixes, fixReaders, fixShops, myFixes, chat, shared] = await Promise.all([
+    fixes, fixReaders, fixShops, myFixes, chat, shared, aiOn, ai] = await Promise.all([
     one("SELECT COUNT(*) AS total, SUM(created_at >= ?) AS week, SUM(created_at >= ?) AS month FROM shoppers", d7, d30),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE expires_at > ?", now),
     one("SELECT COUNT(DISTINCT shopper_id) AS n FROM auth_sessions WHERE created_at >= ?", d7),
@@ -103,7 +104,12 @@ export async function relayHealth(env, me, now = Date.now()) {
     one("SELECT COALESCE(SUM(messages), 0) AS m, COALESCE(SUM(handoffs), 0) AS h, COUNT(DISTINCT shopper_id) AS people, COALESCE(SUM(CASE WHEN day = ? THEN messages END), 0) AS today FROM support_chat_usage WHERE day >= ?",
       dates[13], dates[7]),
     // Emails shoppers chose to send to Relay (shared-emails.js): how many are kept, and how many nobody has read yet.
-    one("SELECT COUNT(*) AS kept, SUM(looked_at IS NULL) AS waiting, SUM(created_at >= ?) AS week, COUNT(DISTINCT shopper_id) AS people FROM shared_emails WHERE expires_at > ?", d7, now)
+    one("SELECT COUNT(*) AS kept, SUM(looked_at IS NULL) AS waiting, SUM(created_at >= ?) AS week, COUNT(DISTINCT shopper_id) AS people FROM shared_emails WHERE expires_at > ?", d7, now),
+    // AI help (ai-reader.js): who has it on, and for each part whether the AI filled a gap (1), agreed with the rules (2) or
+    // differed from them (3).
+    one("SELECT COUNT(*) AS n FROM ai_reading"),
+    one(`SELECT COUNT(*) AS n, SUM(created_at >= ?) AS week, SUM(fields IS NULL) AS failed, SUM(not_purchase) AS notPurchase,
+      ${["shop", "total", "date", "number", "items"].map((k) => `SUM(${k} = 1) AS ${k}1, SUM(${k} = 2) AS ${k}2, SUM(${k} = 3) AS ${k}3`).join(", ")} FROM receipt_ai_reads`, d7)
   ]);
   // A problem working this part out never takes the rest of the page with it (the page says it couldn't be checked).
   const checkedByShops = await answerKey(env, me, now, { minShoppers: MIN_SHOPPERS_PER_SHOP })
@@ -154,6 +160,8 @@ export async function relayHealth(env, me, now = Date.now()) {
     security: { wrongCodesToday: n(codeFails.n) },
     helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) },
     sharedEmails: { kept: n(shared.kept), waiting: n(shared.waiting), thisWeek: n(shared.week), people: n(shared.people), keptDays: SHARE_DAYS },
+    aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
+      parts: Object.fromEntries(["shop", "total", "date", "number", "items"].map((k) => [k, { filled: n(ai[k + "1"]), agreed: n(ai[k + "2"]), differed: n(ai[k + "3"]) }])) },
     checkedByShops
   };
 }

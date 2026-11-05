@@ -72,6 +72,7 @@ const ROUTES = new Map(Object.entries({
   // The help chat: the conversation so far, as the app holds it (worker/support-chat.js checks it further).
   // "Email me one now" on the Relay health page: nothing to send (it goes to the admin asking).
   "/relay/my/admin/health/email": { fields: {} },
+  "/relay/my/ai-reading": { fields: { on: bool } },
   "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },
   "/relay/my/help/handoff": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },
   "/relay/my/receipts/parse": { limit: 1000 * KB, fields: { email: str(250000) } },

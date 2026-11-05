@@ -19,6 +19,7 @@ import { buildWrapped } from "./wrapped.js";
 import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
+import { AI_READS_SQL, AI_SETTING_SQL, attachAiReads } from "./ai-reader.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
@@ -218,6 +219,8 @@ async function ensureGmailTablesRun(db) {
        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id))`,
     // "Send this email to Relay": the one email a shopper chose to send, details hidden, encrypted, kept 30 days at most.
     SHARED_EMAILS_SQL,
+    // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
+    AI_SETTING_SQL, AI_READS_SQL,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -251,6 +254,8 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -457,6 +462,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM captured_receipts WHERE shopper_id = ? AND ${pick}`).bind(...args)];
 }
 // Disconnects one of the other inboxes: Relay's access is cancelled at Google (Microsoft has no such call) and its key
@@ -505,6 +511,8 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -1066,7 +1074,18 @@ async function tellScanDone(env, shopperId, found, o) {
 }
 
 
-// One email, read again from the inbox it came from, as it was sent ("Send this email to Relay"). Nothing is stored here.
+// One receipt's email, read again from its inbox, with the shopper's personal details hidden (shared-emails.js), their own
+// names too (from their profile, and the part before the @ of their addresses). For "Send this email to Relay" and the AI
+// second reader. Returns { copy } or { status, error }.
+export async function hiddenCopyOf(env, shopper, d, fetchImpl) {
+  const got = await readReceiptEmail(env, shopper.id, d, fetchImpl);
+  if (!got.raw) return got;
+  const db = env.RELAY_DB;
+  const prof = await db.prepare("SELECT name FROM shopper_profiles WHERE shopper_id = ?").bind(shopper.id).first().catch(() => null);
+  const boxes = (await db.prepare("SELECT google_email AS e FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopper.id, shopper.id + "~%").all()).results || [];
+  return { copy: sharedCopy(got.raw, namesToHide(prof && prof.name, [shopper.email, ...boxes.map((x) => x.e)])) };
+}
+// One email, read again from the inbox it came from, as it was sent. Nothing is stored here.
 async function readReceiptEmail(env, shopperId, d, fetchImpl) {
   const fromBox = boxIdOf(shopperId, Number(d.mailbox));
   const conn = await env.RELAY_DB.prepare("SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(fromBox).first();
@@ -1480,13 +1499,14 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, is_gift AS g, recipient AS who, updated_at AS at FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, updated_at AS at FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId).all(),
     sharedByReceipt(env.RELAY_DB, shopperId, Date.now()),
+    env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? AND fields IS NOT NULL").bind(shopperId).all(),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
@@ -1501,6 +1521,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   attachReturnProgress(orders, deliveries, updates);
   attachItemReturns(orders, (marks && marks.results) || []);
   attachGifts(orders, (gifts && gifts.results) || []);
+  // What the AI read fills only what the rules missed, and the shopper's own fixes still win (so they come after).
+  attachAiReads(orders, (aiReads && aiReads.results) || []);
   attachFixes(orders, (fixes && fixes.results) || []);
   attachShared(orders, sent);
   const remById = new Map((rem.results || []).map(r => [r.id, r]));
@@ -1880,12 +1902,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
         .bind(now - DAY_MS, shr[1], shopper.id, now).first();
       if (Number(c && c.today) >= SHARES_PER_DAY || Number(c && c.others) >= SHARES_KEPT) return json({ error: "too_many_requests" }, 429, cors);
     }
-    const got = await readReceiptEmail(env, shopper.id, d, opts.fetchImpl);
-    if (!got.raw) return json({ error: got.error }, got.status, cors);
-    // Their own names are hidden too: from their profile, and the part before the @ of their addresses.
-    const prof = await db.prepare("SELECT name FROM shopper_profiles WHERE shopper_id = ?").bind(shopper.id).first().catch(() => null);
-    const boxes = (await db.prepare("SELECT google_email AS e FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopper.id, shopper.id + "~%").all()).results || [];
-    const copy = sharedCopy(got.raw, namesToHide(prof && prof.name, [shopper.email, ...boxes.map((x) => x.e)]));
+    const got = await hiddenCopyOf(env, shopper, d, opts.fetchImpl);
+    if (!got.copy) return json({ error: got.error }, got.status, cors);
+    const copy = got.copy;
     if (m === "GET") {
       const kept = await db.prepare("SELECT created_at AS at, expires_at AS until FROM shared_emails WHERE shopper_id = ? AND receipt_id = ? AND expires_at > ?")
         .bind(shopper.id, shr[1], now).first();
@@ -1937,7 +1956,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (act[2] === "dismiss") await env.RELAY_DB.batch([
       env.RELAY_DB.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
-      env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
+      env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
+      env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
     // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
     const b = await request.json().catch(() => ({}));
     if (act[2] === "dismiss" && b && b.reason === "promo") {
