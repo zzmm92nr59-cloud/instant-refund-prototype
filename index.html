@@ -865,11 +865,15 @@ function wrappedView(){return '<h1 class="title">Wrapped</h1><div id="wrappedPag
 // Size the Wrapped frame to its real content so nothing is cut off at any screen width.
 // 1640px stays as the starting height until the page inside has loaded and been measured.
 function bindWrappedFrame(){const f=$("wrappedFrame");if(!f||typeof f.addEventListener!=="function")return;const fit=()=>{try{const d=f.contentDocument;if(!d||!d.body)return;const h=Math.ceil(d.documentElement.getBoundingClientRect().height);if(h>300)f.style.height=h+"px"}catch(e){}};f.addEventListener("load",()=>{fit();try{const d=f.contentDocument;if(window.ResizeObserver&&d&&d.body)new ResizeObserver(fit).observe(d.body)}catch(e){}});fit();window.addEventListener("resize",fit)}
-// Test shop tools and sandbox labels: only for people testing Relay (Profile → Testing, or ?testing=1).
+// Test shop tools and sandbox labels: only for people testing Relay (?testtools=1, ?testing=1, or Relay's team with the
+// Testing tools switch in Profile → Team).
 function testTools(){try{return testing||localStorage.getItem("relay-testing-tools")==="1"}catch(e){return testing}}
 // The shared account for app reviewers (worker/review-account.js) sees test shops in Discover too: the reviewer's own store is one.
 function reviewAccount(){try{return !!(window.RelayAccount&&RelayAccount.isReview&&RelayAccount.isReview())}catch(e){return false}}
-function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}render()}
+function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}if(catalogAsked)loadCatalog();render()}
+// The Testing tools switch (Profile → Team) changed on this device: the tabs and the testing link follow it, and the
+// catalogue loads again with or without Relay's test shops and the preview from shops' own websites.
+function testToolsChanged(){navRender();{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}if(catalogAsked)loadCatalog()}
 // Signed in on this device? (Read straight from storage so the first screen doesn't wait for the account code.)
 function hasSession(){try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return !!(x&&x.token)}catch(e){return false}}
 function shownWatches(){return Object.entries(watch).filter(([sku])=>showDemo()||/^shopify:/.test(sku)||liveProduct(catalog.find(x=>x.sku===sku)))}
@@ -975,7 +979,7 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){const orderTime=o.createdAt||o.authorizedAt||o.orderCreatedAt;if(!orderTime||!Number.isFinite(Date.parse(orderTime))||Date.parse(orderTime)<Date.parse(walletCutover))continue;if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false,verified:true,createdAt:orderTime})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{photoSearch,relayOpenProduct,relaySearchFor,testTools,openMarket,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
+Object.assign(window,{photoSearch,relayOpenProduct,relaySearchFor,testTools,testToolsChanged,openMarket,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
 // For relay-gestures.js: is this a tab's own screen (pull to refresh works there), and refreshing it. Discover's catalogue
 // comes straight from the shops' feeds, so it's read again too; on Receipts the inbox is checked as well.
 window.RelayShell={isTabRoot:onTabRoot,refresh:shellRefresh,open:openLink};
