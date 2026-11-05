@@ -69,6 +69,8 @@ export function digestMessage(h, alerts) {
   const reconnect = (ib.scanErrorsThisWeek || []).filter((e) => e.error === "gmail_reconnect_needed").reduce((s, e) => s + e.count, 0);
   if (reconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(reconnect, "inbox", "inboxes") + " needed connecting again this week (their owners see a prompt in the app).");
   if (rd.waitingToBeRead >= 20) look.push(plural(rd.waitingToBeRead, "email is", "emails are") + " waiting to be read again.");
+  // Emails shoppers sent to Relay because they were read wrong (deleted after 30 days, so worth reading soon).
+  if (h.sharedEmails && h.sharedEmails.waiting) look.push(plural(h.sharedEmails.waiting, "email", "emails") + " that shoppers sent to Relay " + (h.sharedEmails.waiting === 1 ? "is" : "are") + " waiting to be read.");
   const fixed = rd.fixedByShoppers || { receipts: 0, thisWeek: 0 };
   const groups = [
     ["Needs a look", look.length ? look : ["Nothing needs a look."]],

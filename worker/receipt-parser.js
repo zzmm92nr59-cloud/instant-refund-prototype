@@ -549,6 +549,19 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
 const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L} .'’&-]{1,40}?) to (\p{Lu}[\p{L} .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
+// An email as the reader sees it: its subject, sender and date, its plain-text part, and its HTML part turned into text the
+// same way the reader turns it. Used for "Send this email to Relay" (shared-emails.js), so what a person at Relay reads is
+// what the reader read. Pictures, attachments and the other headers are left out.
+export function emailForReading(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  return { subject: headers.subject || "", from: headers.from || "", date: headers.date || "",
+    plain: parts.text.join("\n").trim(), fromHtml: html ? htmlToText(html) : "" };
+}
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);

@@ -47,6 +47,7 @@ export const APP_FACTS = [
   "On a receipt with a return date from the shop, 'Remind me 3 days before' sends one email to your sign-in address.",
   "To mark something as a gift, open the receipt in Receipts and turn on 'Bought as a gift'. You can add who it was for. Gifts get their own tile in Receipts and their own slide in Wrapped.",
   "If Relay read a receipt wrong, open it in Receipts and tap 'Fix details' (or answer No to 'Is this right?' and choose 'Some details are wrong'). You can correct the shop, total, date and items, and undo that later.",
+  "If Relay keeps reading a receipt wrong, open it, tap 'Fix details' and choose 'Send this email to Relay'. You see exactly what will be sent first, with your name, addresses, links, phone numbers and card numbers hidden. A person at Relay reads it to improve how Relay reads emails like it, and it's deleted after 30 days (or sooner, from the receipt).",
   "If a receipt isn't yours or is just a promotion, answer No to 'Is this right?' and choose 'It's not mine' or 'It's just a promotion'. It's removed, and for a promotion Relay skips emails like it.",
   "Wrapped is your year in shopping, as a story: open Profile and play it. You can add earlier years from there.",
   "Returns and swaps inside Relay work only for shops connected to Relay. Their orders show under 'Shop orders' in Receipts. For other shops, Relay shows the shop's own returns page and the details you need.",

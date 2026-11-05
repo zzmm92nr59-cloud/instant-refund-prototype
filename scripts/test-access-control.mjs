@@ -75,14 +75,16 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
 // Admin routes: only Relay's admins; everyone else is told they don't exist.
 {
   for (const [method, path, body] of [["GET", "/relay/my/admin/reports"], ["POST", "/relay/my/admin/reports/11111111-1111-4111-8111-111111111111/review", { outcome: "dismiss" }],
-    ["GET", "/relay/my/admin/health"], ["POST", "/relay/my/admin/health/email", {}]]) {
+    ["GET", "/relay/my/admin/health"], ["POST", "/relay/my/admin/health/email", {}], ["GET", "/relay/my/admin/shared-emails"],
+    ["GET", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111"], ["POST", "/relay/my/admin/shared-emails/11111111-1111-4111-8111-111111111111", { delete: true }]]) {
     const res = await call(path, { method, auth: "Bearer " + alice, body });
     assert.equal(res.status, 404, method + " " + path + " is hidden from shoppers"); assert.deepEqual(await res.json(), { error: "not_found" });
   }
   assert.deepEqual(await (await call("/relay/my/admin/me", { auth: "Bearer " + alice })).json(), { admin: false });
   assert.equal((await call("/relay/my/admin/reports", { auth: "Bearer " + admin })).status, 200, "an admin can see reports");
   assert.equal((await call("/relay/my/admin/health", { auth: "Bearer " + admin })).status, 200, "an admin can see Relay health");
-  console.log("ok - admins: report reviews and Relay health hidden from shoppers (not found), open to Relay's admins");
+  assert.equal((await call("/relay/my/admin/shared-emails", { auth: "Bearer " + admin })).status, 200, "an admin can see the emails shoppers sent");
+  console.log("ok - admins: report reviews, Relay health and emails shoppers sent hidden from shoppers (not found), open to Relay's admins");
 }
 // Shops: each route needs that shop's own key.
 {
@@ -103,7 +105,8 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)").run(id, aliceId, "m-1", "pending", JSON.stringify(details), now);
   const before = JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id));
   const tries = [["GET", "/original"], ["GET", "/image"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
-    ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }]];
+    ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }],
+    ["GET", "/share"], ["POST", "/share", { note: "mine now" }]];
   for (const [method, end, body] of tries) {
     const res = await call("/relay/my/receipts/" + id + end, { method, auth: "Bearer " + bob, body });
     assert.ok(res.status === 404 || res.status === 403, method + " " + end + " by someone else → " + res.status);
@@ -111,11 +114,12 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   assert.equal(JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id)), before, "alice's receipt is untouched");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_gifts WHERE receipt_id = ?").get(id).n, 0, "and isn't tagged as a gift");
   assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_fixes WHERE receipt_id = ?").get(id).n, 0, "or fixed");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM shared_emails WHERE receipt_id = ?").get(id).n, 0, "or sent to Relay");
   const list = await (await call("/relay/my/receipts", { auth: "Bearer " + bob })).json();
   assert.ok(!JSON.stringify(list).includes("KO-9"), "bob's list doesn't include alice's receipt");
   const own = await call("/relay/my/receipts/" + id + "/category", { method: "POST", auth: "Bearer " + alice, body: { category: "home" } });
   assert.equal(own.status, 200, "alice can change her own");
-  console.log("ok - shoppers' data: someone else's receipt can't be read, opened, confirmed, hidden, recategorised, marked, tagged as a gift, fixed or reminded about");
+  console.log("ok - shoppers' data: someone else's receipt can't be read, opened, confirmed, hidden, recategorised, marked, tagged as a gift, fixed, sent to Relay or reminded about");
 }
 // Two-step sign-in's half-way token is not a session.
 {

@@ -732,6 +732,18 @@
     ".rl-fix-x{all:unset;box-sizing:border-box;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;color:var(--rl-text2);cursor:pointer}.rl-fix-x:active{background:var(--rl-fill)}.rl-fix-x:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px}" +
     ".rl-fix-add{all:unset;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:15px;font-weight:700;color:var(--rl-accent)}.rl-fix-add:active{opacity:.6}.rl-fix-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
     ".rl-fix .rl-jic{margin:0}.rl-fix-x .rl-jic{color:inherit}" +
+    // "Send this email to Relay": what will be sent, then an optional note.
+    ".rl-fix textarea{box-sizing:border-box;width:100%;min-width:0;min-height:88px;margin:0;padding:12px 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px;line-height:1.4;resize:vertical}" +
+    ".rl-fix textarea::placeholder{color:var(--rl-text2)}.rl-fix textarea:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-fix-more{margin:4px 0 10px;padding-top:10px;border-top:1px solid var(--rl-line)}.rl-fix-more p{margin:0;font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
+    ".rl-share-box{max-height:38vh;overflow:auto;margin:0 0 10px;padding:12px 14px;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}" +
+    ".rl-share-box.rl-skel{min-height:180px}.rl-share-box b{display:block;font-size:15px;margin:0 0 2px}.rl-share-box .rl-share-from{display:block;font-size:13px;color:var(--rl-text2);margin:0 0 10px}" +
+    ".rl-share-box i{display:block;margin-top:10px;font-style:normal;color:var(--rl-text2)}.rl-share-box:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-share-check{margin:0 0 12px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-fix [hidden],.rl-se [hidden]{display:none!important}" +
+    ".rl-se-card{margin:0 0 12px;padding:16px 18px}.rl-se-card>b{display:block;font-size:16px;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".rl-se-card>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-se-note{margin:8px 0 0;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
+    ".rl-se-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.rl-se-acts .rl-pill{padding:0 16px}.rl-se-body{margin-top:12px}.rl-se-body .rl-hp-rows{margin:0 0 10px}" +
+    ".rl-se-body .rl-hp-row:first-child{border-top:0}" +
     ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#74ffed;color:#171f44;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
@@ -1037,11 +1049,96 @@
       undo.onclick = function () { send({ undo: true }, function () {}); };
       card.appendChild(undo);
     }
+    // Too much to fix by hand: the email itself can go to Relay (only one that came from an inbox; a pasted one wasn't kept).
+    if (x.id && mailRef(x)) {
+      var sendIt = el("button", { type: "button", className: "rl-fix-add" }, [jIc("send", 18), el("span", { text: "Send this email to Relay" })]);
+      sendIt.onclick = function () { shut(); shareSheet(x, function () { if (done) done("shared"); }); };
+      card.appendChild(el("div", { className: "rl-fix-more" }, [el("p", { text: "Too much to fix, or keeps coming out wrong?" }), sendIt]));
+    }
     card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
     layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
     document.addEventListener("keydown", onKey);
     document.body.appendChild(layer);
     shop.focus();
+  }
+  // "Send this email to Relay" (worker/shared-emails.js). First shows exactly what would be sent: the email's text with the
+  // shopper's details hidden. Then sends it, with a note if they want, for a person at Relay to read and improve the reader.
+  // It's deleted after 30 days, or when they delete it here. done() runs after it's sent or deleted.
+  function shareSheet(x, done) {
+    var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "Send this email to Relay" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    var day = function (iso) { return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
+    card.appendChild(el("h2", { text: "Send this email to Relay" }));
+    card.appendChild(el("p", { className: "rl-fix-lead", text: "A person at Relay will read this one email to see why it was read wrong, and use what they learn to read emails like it better. Before it goes, Relay hides web links, email addresses, phone numbers, card numbers and codes, postcodes, addresses and your name. It's deleted after 30 days, or sooner if you delete it." }));
+    var head = el("span", { className: "rl-fix-h", text: "What will be sent" });
+    var box = el("div", { className: "rl-share-box rl-skel" });
+    box.setAttribute("aria-busy", "true");
+    var check = el("p", { className: "rl-share-check", text: "Check that nothing private is left in it before you send it." });
+    var noteIn = el("textarea", { rows: 3, maxLength: 300, placeholder: "For example: the total is wrong" });
+    var noteField = el("label", { className: "rl-fix-f" }, [el("span", { text: "What's wrong? (optional)" }), noteIn]);
+    var msg = el("p", { className: "rl-msg" });
+    msg.setAttribute("role", "status");
+    var send = el("button", { type: "button", className: "rl-btn", text: "Send to Relay" });
+    var del = el("button", { type: "button", className: "rl-btn ghost", text: "Delete what you sent" });
+    send.disabled = true; del.hidden = true;
+    [head, box, check, noteField, msg, send, del].forEach(function (n) { card.appendChild(n); });
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    var problem = function (r) {
+      var e = r.body && r.body.error;
+      return e === "no_email" ? "This receipt was pasted in, so there's no email to send."
+        : e === "gmail_not_connected" ? "The inbox this receipt came from isn't connected any more."
+        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Open Profile, then Email connection."
+        : e === "email_not_found" ? "That email is no longer in your inbox, so it can't be sent."
+        : e === "consent_required" ? "Relay needs your permission to read your email first."
+        : r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh."
+        : r.status === 429 ? "You've sent a lot of emails to Relay today. Try again tomorrow."
+        : r.status === 502 ? "Your inbox didn't answer just now. Try again in a moment."
+        : "Couldn't load the email. Try again in a moment.";
+    };
+    // After sending or deleting, the sheet says what happened, with one way out.
+    function finished(title, text) {
+      card.textContent = "";
+      card.appendChild(el("h2", { text: title }));
+      card.appendChild(el("p", { className: "rl-fix-lead", text: text }));
+      var ok = el("button", { type: "button", className: "rl-btn", text: "Done", onclick: function () { shut(); if (done) done(); } });
+      card.appendChild(ok); ok.focus();
+    }
+    api("/relay/my/receipts/" + x.id + "/share", { fresh: true }).then(function (r) {
+      box.classList.remove("rl-skel"); box.removeAttribute("aria-busy");
+      if (!r.ok) { [head, box, check, noteField, send].forEach(function (n) { n.hidden = true; }); return say(msg, problem(r), true); }
+      var b = r.body || {};
+      box.textContent = "";
+      box.appendChild(el("b", { text: b.subject || "(No subject)" }));
+      box.appendChild(el("span", { className: "rl-share-from", text: "From " + (b.from || "an unknown sender") }));
+      box.appendChild(document.createTextNode(b.text || ""));
+      if (b.cut) box.appendChild(el("i", { text: "The rest of this long email is left out." }));
+      box.tabIndex = 0; box.setAttribute("role", "region"); box.setAttribute("aria-label", "What will be sent");
+      send.disabled = false;
+      if (b.sent) { say(msg, "You sent this on " + day(b.sent.at) + ". Sending it again replaces that copy."); send.textContent = "Send it again"; del.hidden = false; }
+    }, function () { box.classList.remove("rl-skel"); [head, box, check, noteField, send].forEach(function (n) { n.hidden = true; }); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    var busy = false;
+    function post(body, after) {
+      if (busy) return;
+      busy = true; send.disabled = del.disabled = true; say(msg, "");
+      api("/relay/my/receipts/" + x.id + "/share", { method: "POST", body: body }).then(function (r) {
+        busy = false; send.disabled = del.disabled = false;
+        if (!r.ok) return say(msg, body.delete ? "Couldn't delete it. Try again in a moment." : problem(r), true);
+        after(r.body || {});
+      }, function () { busy = false; send.disabled = del.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    send.onclick = function () {
+      var note = noteIn.value.replace(/\s+/g, " ").trim();
+      post(note ? { note: note.slice(0, 300) } : {}, function (b) {
+        finished("Sent to Relay", "Thanks. A person at Relay will read it to improve how Relay reads emails like it. It's deleted on " + day(b.sent.until) + ", and you can delete it sooner from this receipt.");
+      });
+    };
+    del.onclick = function () { post({ delete: true }, function () { finished("Deleted", "Relay no longer has a copy of this email."); }); };
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    card.querySelector("button.rl-plain").focus();
   }
   var back = null;
   function dismiss() { if (back) { back.remove(); back = null; } if (pageLaunchers) pageLaunchers(); }
@@ -2508,7 +2605,23 @@
           var fx = row.fixed || null, fixedParts = fx ? [fx.shop && "shop", fx.total && "total", fx.date && "date", fx.items && "items"].filter(Boolean) : [];
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
           detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
-            el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function () { say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+            el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+          // Sent to Relay: until when it's kept, whether it's been read, and a way to delete it now.
+          if (row.shared) {
+            var sh = row.shared, until = new Date(sh.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+            var drop = el("button", { type: "button", className: "rl-pill", text: "Delete it" });
+            drop.onclick = function () {
+              ask("Delete the copy of this email you sent to Relay?", "Delete it", function () {
+                drop.disabled = true;
+                api("/relay/my/receipts/" + (row.sharedId || row.id) + "/share", { method: "POST", body: { delete: true } }).then(function (r) {
+                  drop.disabled = false;
+                  if (!r.ok) return say(status, "Couldn't delete it. Try again in a moment.", true);
+                  say(status, "Deleted. Relay no longer has a copy of that email."); loadList();
+                }, function () { drop.disabled = false; say(status, "Couldn't reach Relay. Check your connection and try again.", true); });
+              });
+            };
+            detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: "You sent this email to Relay" + (sh.read ? " and it's been read" : "") + ". It's deleted on " + until + "." }), drop]));
+          }
           wrap.appendChild(detail); memo.openIds[row.id] = true; btn.setAttribute("aria-expanded", "true"); wrap.classList.add("open");
         };
         // What the search box matches: the shop, the order number, what was bought, and who a gift was for.
@@ -3519,6 +3632,7 @@
       openHealthPage = function () { if (!abox.isConnected) return false; page("Relay health", healthPage); return true; };
       if (wantHealth) setTimeout(function () { if (wantHealth && openHealthPage()) wantHealth = false; }, 0);
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
+        accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
         accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
@@ -3837,6 +3951,12 @@
         box.appendChild(group("Your own receipts", [el("p", { className: "rl-hp-sub", text: plural(mine.receipts, "purchase", "purchases") + ", by shop, problems first" +
           (mine.personalMail ? ". " + plural(mine.personalMail, "receipt was", "receipts were") + " forwarded from a personal address" : "") + "." })].concat(mine.shops.length ? [shopList(mine.shops, false)] : [])));
         box.appendChild(group("Checked against shops' own records", answerKey(h.checkedByShops)));
+        // Emails shoppers sent because they were read wrong: how many are waiting, and the way to read them.
+        var se = h.sharedEmails;
+        if (se) box.appendChild(group("Emails shoppers sent", [el("div", { className: "rl-hp-rows" }, [
+          row("Waiting to be read", N(se.waiting)), row("Kept", N(se.kept), "Each is deleted " + se.keptDays + " days after it was sent"),
+          row("Sent this week", N(se.thisWeek), se.people ? "From " + plural(se.people, "person", "people") + " in all" : null)]),
+          el("button", { type: "button", className: "rl-po-secondary rl-hp-mail", text: "Read them", onclick: function () { page("Emails shoppers sent", sharedPage); } })]));
         // Checking inboxes.
         var sc = ib.scansThisWeek || {}, errs = {};
         (ib.scanErrorsThisWeek || []).forEach(function (e) { var t = SCAN_ERR[e.error] || "Other problems"; errs[t] = (errs[t] || 0) + e.count; });
@@ -3890,6 +4010,88 @@
       again.onclick = function () { load(true); };
       if (memo.health) draw(memo.health); else skeleton();
       load(false);
+    }
+    // Emails shoppers chose to send to Relay because they were read wrong (worker/shared-emails.js), newest first. Each opens
+    // to what Relay read beside the email itself, personal details already hidden. Opening one is recorded on Relay's side,
+    // and who sent it is never shown. Each is deleted after 30 days, or here.
+    function sharedPage(b) {
+      var note = el("div", { className: "rl-msg" }), list = el("div", { className: "rl-se" });
+      b.appendChild(el("p", { className: "rl-hp-lead", text: "Emails shoppers chose to send because Relay read them wrong, with their personal details hidden. You never see who sent one, and each time one is opened it's recorded. Each is deleted 30 days after it was sent." }));
+      b.appendChild(note); b.appendChild(list);
+      var day = function (iso) { return iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "–"; };
+      var dayOf = function (d) { return /^\d{4}-\d{2}-\d{2}$/.test(d || "") ? new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null; };
+      var cash = function (p, cur) { return Number.isInteger(p) ? (p / 100).toLocaleString("en-GB", { style: "currency", currency: cur || "GBP" }) : null; };
+      var row = function (label, value, sub) { return el("div", { className: "rl-hp-row" }, [el("span", {}, [el("span", { text: label })].concat(sub ? [el("small", { text: sub })] : [])), el("b", { text: value })]); };
+      var itemsText = function (items) { return (items || []).map(function (i) { return (i.qty > 1 ? i.qty + " × " : "") + i.name + (Number.isInteger(i.pricePence) ? " " + cash(i.pricePence) : ""); }).join("; "); };
+      // What Relay read, and what the shopper says it should be (from "Fix this receipt") where they changed it.
+      function compare(rd, fx) {
+        rd = rd || {}; fx = fx || {};
+        var says = function (k, show) { return fx[k] !== undefined && fx[k] !== null ? "Shopper says: " + show(fx[k]) : null; };
+        return el("div", { className: "rl-hp-rows" }, [
+          row("Shop", rd.shop || "Not read", says("shop", String)),
+          row("Total", cash(rd.totalPence, rd.currency) || "Not found", says("totalPence", function (v) { return cash(v, rd.currency); })),
+          row("Date", dayOf(rd.orderDate) || "Not read", says("orderDate", dayOf)),
+          row("Order number", rd.orderRef || "Not read"),
+          row("Items", String((rd.items || []).length), [itemsText(rd.items), says("items", itemsText)].filter(Boolean).join(". ") || null)]);
+      }
+      function empty() { list.textContent = ""; list.appendChild(el("p", { className: "rl-hp-sub", text: "No emails yet. When a shopper sends one from a receipt Relay read wrong, it shows here for 30 days." })); }
+      function item(e) {
+        var card = el("div", { className: "rl-acard rl-se-card" });
+        card.appendChild(el("b", { text: e.shop || e.domain || "Shop not read" }));
+        card.appendChild(el("span", { text: "Sent " + day(e.sentAt) + ", deleted on " + day(e.deletedBy) + ". Read by version " + (e.reader || "unknown") + (e.lookedAt ? ". Opened before" : "") + "." }));
+        if (e.note) card.appendChild(el("p", { className: "rl-se-note", text: "“" + e.note + "”" }));
+        var fx = e.fixed || {}, fixedParts = [["shop", "shop"], ["totalPence", "total"], ["orderDate", "date"], ["items", "items"]].filter(function (k) { return fx[k[0]] !== undefined; }).map(function (k) { return k[1]; });
+        var chips = el("div", { className: "rl-hp-chips" }, [el("i", { text: fixedParts.length ? "Shopper fixed the " + fixedParts.join(", ") : "Not fixed by the shopper" })]);
+        if (e.read && e.read.confidence) chips.appendChild(el("i", { text: "Read with " + e.read.confidence + " confidence" }));
+        card.appendChild(chips);
+        var body = el("div", { className: "rl-se-body" }); body.hidden = true;
+        var open = el("button", { type: "button", className: "rl-pill", text: "Read it" }), drop = el("button", { type: "button", className: "rl-pill", text: "Delete" });
+        open.setAttribute("aria-expanded", "false");
+        open.onclick = function () {
+          if (!body.hidden) { body.hidden = true; open.textContent = "Read it"; open.setAttribute("aria-expanded", "false"); return; }
+          if (open.disabled) return;
+          open.disabled = true; body.hidden = false; body.textContent = "";
+          body.appendChild(el("div", { className: "rl-skel", style: "min-height:160px;border-radius:12px" }));
+          api("/relay/my/admin/shared-emails/" + e.id, { fresh: true }).then(function (r) {
+            open.disabled = false; body.textContent = "";
+            if (!r.ok) return body.appendChild(el("p", { className: "rl-msg err", text: r.status === 404 ? "This email has been deleted." : "Couldn't open it. Try again in a moment." }));
+            var v = r.body || {};
+            e.lookedAt = v.lookedAt;
+            body.appendChild(compare(v.read, v.fixed));
+            var box = el("div", { className: "rl-share-box", tabIndex: 0 }, [el("b", { text: v.subject || "(No subject)" }), el("span", { className: "rl-share-from", text: "From " + (v.from || "an unknown sender") }), document.createTextNode(v.text || "")]);
+            box.setAttribute("role", "region"); box.setAttribute("aria-label", "The email");
+            if (v.cut) box.appendChild(el("i", { text: "The rest of this long email was left out." }));
+            body.appendChild(box);
+            open.textContent = "Close"; open.setAttribute("aria-expanded", "true");
+          }, function () { open.disabled = false; body.textContent = ""; body.appendChild(el("p", { className: "rl-msg err", text: "Couldn't reach Relay. Check your connection and try again." })); });
+        };
+        drop.onclick = function () {
+          ask("Delete this email now? It can't be brought back.", "Delete it", function () {
+            if (drop.disabled) return;
+            drop.disabled = true;
+            api("/relay/my/admin/shared-emails/" + e.id, { method: "POST", body: { delete: true } }).then(function (r) {
+              drop.disabled = false;
+              if (!r.ok && r.status !== 404) return say(note, "Couldn't delete it. Try again in a moment.", true);
+              card.remove(); say(note, "Deleted.");
+              if (memo.sharedEmails) memo.sharedEmails = memo.sharedEmails.filter(function (x) { return x.id !== e.id; });
+              if (!list.childNodes.length) empty();
+            }, function () { drop.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          });
+        };
+        card.appendChild(el("div", { className: "rl-se-acts" }, [open, drop]));
+        card.appendChild(body);
+        return card;
+      }
+      function draw(emails) { list.textContent = ""; if (!emails.length) return empty(); emails.forEach(function (e) { list.appendChild(item(e)); }); }
+      if (memo.sharedEmails) draw(memo.sharedEmails);
+      else for (var i = 0; i < 3; i++) list.appendChild(el("div", { className: "rl-skel", style: "min-height:110px;border-radius:18px;margin:0 0 12px" }));
+      api("/relay/my/admin/shared-emails", { fresh: true }).then(function (r) {
+        if (!b.isConnected) return;
+        if (!r.ok || !r.body || !Array.isArray(r.body.emails)) { if (!memo.sharedEmails) list.textContent = ""; return say(note, "Couldn't load the emails. Try again in a moment.", true); }
+        var sig = JSON.stringify(r.body.emails), was = memo.sharedEmails && JSON.stringify(memo.sharedEmails);
+        memo.sharedEmails = r.body.emails;
+        if (sig !== was) draw(r.body.emails);
+      }, function () { if (!memo.sharedEmails) list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
     }
     function permissionPage(b) {
       var note = el("div", { className: "rl-msg" });

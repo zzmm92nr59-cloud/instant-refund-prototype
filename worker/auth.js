@@ -12,6 +12,7 @@ import { labelDeleteStatements } from "./royal-mail.js";
 import { checkBody } from "./validate.js";
 import { handleHealthRoute } from "./health.js";
 import { handleHealthEmailRoute } from "./health-digest.js";
+import { handleSharedEmailAdminRoute } from "./shared-emails.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -642,6 +643,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     const healthResponse = await handleHealthRoute(path, request.method, env, cors, shopper, o)
       || await handleHealthEmailRoute(path, request.method, env, cors, shopper, o);
     if (healthResponse) return healthResponse;
+    // Emails shoppers chose to send to Relay, for Relay's admins to read (each opening recorded). Admins only.
+    const sharedResponse = await handleSharedEmailAdminRoute(path, request.method, request, env, cors, shopper, o);
+    if (sharedResponse) return sharedResponse;
     // The help chat (an AI assistant, and "Talk to a person"). Off until the ANTHROPIC_API_KEY secret is set.
     const supportResponse = await handleSupportRoute(path, request.method, request, env, cors, shopper, o);
     if (supportResponse) return supportResponse;
