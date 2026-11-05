@@ -131,4 +131,45 @@ const second = await signIn("other-admin@example.com");
 assert.equal((await review(r4.id, "dismiss", second)).status, 200, "another admin can");
 assert.equal(sqlite.prepare("SELECT outcome FROM resale_report_reviews WHERE report_id = ?").get(r4.id).outcome, "dismiss");
 assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(c4.L).status, "active", "dismiss changes nothing (the report itself had already put the item back on sale)");
-console.log("PASS resale report review: admin-only, pseudonymous, dismiss / remove listing / block, blocks survive re-signup, no self-review");
+
+// Reporting a listing straight from Browse (no conversation): any member who can see it, not the seller; one each; 10 a day.
+seed("alice@example.com", R(5), "Silk scarf"); seed("alice@example.com", R(6), "Leather belt");
+const L5 = await list(alice, R(5));
+const reportL = (token, id, reason) => post(`/relay/my/resale/listings/${id}/report`, token, reason === undefined ? {} : { reason });
+assert.equal((await reportL(dave, L5)).status, 400, "what's wrong is needed");
+assert.equal((await reportL(dave, L5, "   ")).status, 400);
+assert.equal((await reportL(alice, L5, "My own")).status, 404, "not your own listing");
+assert.equal((await reportL(dave, "12345678-1234-1234-1234-123456789012", "Gone")).status, 404, "only a listing that's there");
+assert.ok((await (await get("/relay/my/resale/feed", dave)).json()).listings.some(l => l.id === L5));
+assert.equal((await reportL(dave, L5, "Looks like a fake <b>designer</b> scarf")).status, 200);
+assert.equal((await reportL(dave, L5, "Again")).status, 409, "one report per member per listing");
+assert.ok(!(await (await get("/relay/my/resale/feed", dave)).json()).listings.some(l => l.id === L5), "the listing stops showing to whoever reported it");
+assert.ok((await (await get("/relay/my/resale/feed", second)).json()).listings.some(l => l.id === L5), "everyone else still sees it until it's reviewed");
+let open = (await (await admin_("/reports")).json()).reports.filter(x => x.kind === "listing");
+assert.equal(open.length, 1);
+assert.deepEqual([open[0].reason, open[0].reporterRole, open[0].reportedRole, open[0].canRemoveListing, open[0].item.title, open[0].item.status, open[0].messages.length],
+  ["Looks like a fake b designer /b scarf", "member", "seller", true, "Silk scarf", "active", 0], "the listing as members see it; angle brackets taken out of what was written");
+assert.ok(open[0].reportsAgainstReported >= 2, "counts reports against the seller's conversations and listings: " + open[0].reportsAgainstReported);
+const all = JSON.stringify(open);
+for (const who of ["alice", "dave"]) assert.ok(!all.includes(who + "@") && !all.includes(idOf(who + "@example.com")), "admin never sees who listed or reported it");
+assert.equal((await (await get("/relay/my/admin/me", admin)).json()).openReports, 1, "counted for the admin");
+assert.equal((await review(open[0].id, "remove_listing")).status, 200);
+assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(L5).status, "withdrawn", "taken down");
+assert.equal((await review(open[0].id, "dismiss")).status, 409, "reviewed once");
+assert.equal((await (await get("/relay/my/admin/me", admin)).json()).openReports, 0);
+// An admin's own listing reported: another admin reviews it.
+seed("admin@example.com", R(7), "Admin gloves");
+const L7 = await list(admin, R(7));
+assert.equal((await reportL(dave, L7, "Wrong photo")).status, 200);
+const r7 = (await (await admin_("/reports")).json()).reports.find(x => x.kind === "listing");
+assert.equal((await review(r7.id, "dismiss")).status, 403, "conflict of interest");
+assert.equal((await review(r7.id, "dismiss", second)).status, 200);
+assert.equal(sqlite.prepare("SELECT status FROM resale_listings WHERE id = ?").get(L7).status, "active", "dismissed: nothing changes");
+// 10 a day.
+for (let i = 0; i < 9; i++) {
+  const id = "bbbbbbbb-bbbb-4bbb-8bbb-" + String(100000000000 + i);
+  sqlite.prepare("INSERT INTO resale_listings (id, seller_id, receipt_id, item_index, title, condition, status, created_at) VALUES (?,?,?,?,?,?,?,?)").run(id, idOf("alice@example.com"), id, 0, "Thing " + i, "good", "active", clock);
+  assert.equal((await reportL(dave, id, "Spam " + i)).status, i < 8 ? 200 : 429, "report " + (i + 3));
+}
+console.log("ok - listings reported from Browse: what's wrong needed, not your own, once each, hidden for the reporter, reviewed without names, 10 a day");
+console.log("PASS resale report review: admin-only, pseudonymous, dismiss / remove listing / block, blocks survive re-signup, no self-review, listings reported from Browse");

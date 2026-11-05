@@ -12,7 +12,7 @@
 //  * Read-only. Anyone who isn't an admin gets "not found", as for the other admin routes.
 //  * "Checked against shops' own records" (answer-key.js) follows the same rules: counts, shops named only from
 //    MIN_SHOPPERS_PER_SHOP shoppers, and only the admin's own orders in detail.
-import { isAdmin } from "./resale-admin.js";
+import { isAdmin, openReportCount } from "./resale-admin.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { PARSER_VERSION } from "./gmail.js";
 import { chatAvailable } from "./support-chat.js";
@@ -162,6 +162,8 @@ export async function relayHealth(env, me, now = Date.now()) {
     sharedEmails: { kept: n(shared.kept), waiting: n(shared.waiting), thisWeek: n(shared.week), people: n(shared.people), keptDays: SHARE_DAYS },
     aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),
       parts: Object.fromEntries(["shop", "total", "date", "number", "items"].map((k) => [k, { filled: n(ai[k + "1"]), agreed: n(ai[k + "2"]), differed: n(ai[k + "3"]) }])) },
-    checkedByShops
+    checkedByShops,
+    // Swap & resell reports (conversations and listings) waiting for a Relay admin; null if the board isn't set up.
+    marketReports: await openReportCount(env).catch(() => null)
   };
 }

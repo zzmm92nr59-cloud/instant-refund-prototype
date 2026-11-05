@@ -36,7 +36,7 @@ export function postcodeArea(v) {
   const m = String(v || "").toUpperCase().replace(/\s+/g, " ").trim().match(/^([A-Z]{1,2}[0-9][A-Z0-9]?)(?: ?[0-9][A-Z]{2})?$/);
   return m ? m[1] : null;
 }
-const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000;
+const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000, MAX_LISTING_REPORTS_PER_DAY = 10;
 
 export function ensureResaleTables(db) { return ensureOnce(db, "resale", () => ensureResaleTablesRun(db)); }
 async function ensureResaleTablesRun(db) {
@@ -59,6 +59,9 @@ async function ensureResaleTablesRun(db) {
     `CREATE INDEX IF NOT EXISTS idx_resale_msg ON resale_messages(request_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS resale_reports (
        id TEXT PRIMARY KEY, request_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL)`,
+    // A listing reported straight from Browse, without a conversation (one report per member per listing).
+    `CREATE TABLE IF NOT EXISTS resale_listing_reports (
+       id TEXT PRIMARY KEY, listing_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL, UNIQUE (listing_id, reporter_id))`,
     ...ADMIN_TABLE_SQL
   ];
   await runAll(db, statements);
@@ -74,6 +77,7 @@ export function resaleDeleteStatements(db, shopperId) {
     // (Their own messages go even from a conversation whose request is already gone.)
     db.prepare("DELETE FROM resale_messages WHERE sender_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_reports WHERE reporter_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
+    db.prepare("DELETE FROM resale_listing_reports WHERE reporter_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId),
     db.prepare("DELETE FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?) OR offered_listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_listings WHERE seller_id = ?").bind(shopperId)
   ];
@@ -167,7 +171,8 @@ const publicListing = (r, mine) => ({
 async function feed(env, shopper) {
   const rows = await env.RELAY_DB.prepare(
     `SELECT l.* FROM resale_listings l WHERE l.status = 'active' AND l.seller_id != ?
-       ORDER BY l.created_at DESC LIMIT 60`).bind(shopper.id).all();
+       AND l.id NOT IN (SELECT listing_id FROM resale_listing_reports WHERE reporter_id = ?)
+       ORDER BY l.created_at DESC LIMIT 60`).bind(shopper.id, shopper.id).all();
   const mine = await env.RELAY_DB.prepare("SELECT id, listing_id, kind, status FROM resale_requests WHERE asker_id = ?").bind(shopper.id).all();
   const asked = new Map((mine.results || []).map(r => [r.listing_id, r]));
   return (rows.results || []).map(r => ({ ...publicListing(r, false), myRequest: asked.has(r.id) ? { id: asked.get(r.id).id, kind: asked.get(r.id).kind, status: asked.get(r.id).status } : null }));
@@ -293,6 +298,21 @@ async function endConversation(env, shopper, requestId, reason, now) {
   return { status: 200, body: { ok: true } };
 }
 
+// Any member can report a listing they can see (not their own), with what's wrong. It goes to Relay's review queue
+// (resale-admin.js), and the listing stops showing in their Browse. 10 a day, one per listing.
+async function reportListing(env, shopper, listingId, reason, now) {
+  const why = clean(reason, 300);
+  if (!why) return { status: 400, body: { error: "reason_needed" } };
+  const l = await env.RELAY_DB.prepare("SELECT seller_id FROM resale_listings WHERE id = ? AND status IN ('active','matched')").bind(listingId).first();
+  if (!l || l.seller_id === shopper.id) return { status: 404, body: { error: "not_found" } };
+  const today = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_listing_reports WHERE reporter_id = ? AND created_at > ?").bind(shopper.id, now - 864e5).first();
+  if (today && today.n >= MAX_LISTING_REPORTS_PER_DAY) return { status: 429, body: { error: "too_many_reports" } };
+  try {
+    await env.RELAY_DB.prepare("INSERT INTO resale_listing_reports (id, listing_id, reporter_id, reason, created_at) VALUES (?,?,?,?,?)").bind(uuid(), listingId, shopper.id, why, now).run();
+  } catch { return { status: 409, body: { error: "already_reported" } }; }
+  return { status: 200, body: { ok: true } };
+}
+
 export async function handleResaleRoute(request, env, url, cors, shopper, opts) {
   const path = url.pathname;
   if (!path.startsWith("/relay/my/resale/") && !path.startsWith("/relay/my/admin/")) return null;
@@ -320,6 +340,11 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
       await env.RELAY_DB.prepare("UPDATE resale_requests SET status = 'closed' WHERE listing_id = ? AND status = 'accepted'").bind(withdraw[1]).run();
     }
     return r ? json({ ok: true }, 200, cors) : json({ error: "not_found" }, 404, cors);
+  }
+  const reported = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/report$/.exec(path);
+  if (reported && m === "POST") {
+    const b = await body(); if (!b) return json({ error: "invalid_request" }, 400, cors);
+    return send(await reportListing(env, shopper, reported[1], b.reason, opts.now));
   }
   const interest = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/ask$/.exec(path);
   if (interest && m === "POST") {

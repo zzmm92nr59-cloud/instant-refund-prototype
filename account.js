@@ -763,6 +763,7 @@
     ".rl-mk-check{display:flex;align-items:center;gap:12px;min-height:44px;margin:2px 0;font-size:15px;line-height:1.35;color:var(--rl-text);cursor:pointer}" +
     ".rl-mk-check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--rl-accent)}.rl-mk-check.small{font-size:14px;color:var(--rl-text2);padding:6px 0}" +
     ".rl-mk-form [hidden]{display:none!important}" +
+    ".rl-btn.rl-mk-report{min-height:44px;margin-top:6px;font-size:14px;font-weight:600;color:var(--rl-text2)}" +
     // Swap with another shop.
     ".rl-xs-h{margin:6px 0 6px;font-size:24px;line-height:1.2;color:var(--rl-text)}.rl-xs-lead{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
     ".rl-xs-list{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.rl-xs-skel{min-height:68px;border-radius:16px}" +
@@ -3210,13 +3211,13 @@
   function adminView(sheet, onBack) {
     var list = el("div"), msg = el("div", { className: "rl-msg" });
     [el("h2", { text: "Reports to review" }),
-     el("p", { text: "You see the conversation only, never who the members are. Dismiss, take the listing down, or block the member." }),
+     el("p", { text: "You see the conversation or the listing only, never who the members are. Dismiss, take the listing down, or block the member." }),
      list, msg, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack })].forEach(function (n) { sheet.appendChild(n); });
     function act(id, outcome, question) {
       if (question) return ask(question, "Yes, do it", function () { act(id, outcome, null); });
       api("/relay/my/admin/reports/" + id + "/review", { method: "POST", body: { outcome: outcome } }).then(function (r) {
         if (r.ok) { say(msg, "Done."); load(); }
-        else say(msg, r.body.error === "conflict_of_interest" ? "You're part of this conversation, so another admin has to review it." : "That didn't work. Try again.", true);
+        else say(msg, r.body.error === "conflict_of_interest" ? "You're part of this report, so another admin has to review it." : "That didn't work. Try again.", true);
       }).catch(function () { say(msg, "Couldn't reach Relay.", true); });
     }
     function load() {
@@ -3229,14 +3230,23 @@
           var card = el("div", { className: "rl-order" });
           card.appendChild(el("b", { text: x.reason || "(no reason given)" }));
           card.appendChild(el("span", { text: x.item.title + (x.item.store ? " · " + x.item.store : "") + " · " + new Date(x.createdAt).toLocaleDateString("en-GB") }));
-          card.appendChild(el("span", { style: "display:block;margin-top:4px", text: "Reported by the " + x.reporterRole + " about the " + x.reportedRole + ". Reports against this member: " + x.reportsAgainstReported + (x.reportedAlreadyBlocked ? " (already blocked)" : "") + "." }));
+          var listing = x.kind === "listing", it = x.item || {};
+          card.appendChild(el("span", { style: "display:block;margin-top:4px", text: (listing ? "A member reported this listing." : "Reported by the " + x.reporterRole + " about the " + x.reportedRole + ".") +
+            " Reports against this " + (listing ? "seller" : "member") + ": " + x.reportsAgainstReported + (x.reportedAlreadyBlocked ? " (already blocked)" : "") + "." }));
           var log = el("div", { style: "margin:8px 0;max-height:180px;overflow:auto;border-top:1px solid var(--rl-line);padding-top:6px" });
-          (x.messages || []).forEach(function (m) {
-            log.appendChild(el("div", { style: "font-size:13px;margin:4px 0" }, [el("b", { text: m.from + ": " }), el("span", { text: m.body })]));
-          });
-          if (!(x.messages || []).length) log.appendChild(el("span", { text: "No messages in this conversation." }));
+          if (listing) {
+            // The listing as members see it.
+            log.appendChild(el("div", { style: "font-size:14px;margin:4px 0" }, [el("span", { text: [it.size ? "Size " + it.size : null, CONDITION[it.condition] || null,
+              it.askPence == null ? "Open to offers" : it.askPence === 0 ? "Free" : money(it.askPence, it.currency || "GBP"), it.status === "active" ? "On sale" : it.status === "matched" ? "Matched" : "Taken down"].filter(Boolean).join(" · ") })]));
+            if (it.note) log.appendChild(el("div", { style: "font-size:14px;margin:4px 0" }, [el("span", { text: "Seller's note: “" + it.note + "”" })]));
+          } else {
+            (x.messages || []).forEach(function (m) {
+              log.appendChild(el("div", { style: "font-size:13px;margin:4px 0" }, [el("b", { text: m.from + ": " }), el("span", { text: m.body })]));
+            });
+            if (!(x.messages || []).length) log.appendChild(el("span", { text: "No messages in this conversation." }));
+          }
           card.appendChild(log);
-          var small = "padding:9px 14px;font-size:14px;margin:4px 6px 0 0;width:auto;display:inline-block";
+          var small = "min-height:44px;padding:9px 14px;font-size:14px;margin:4px 6px 0 0;width:auto;display:inline-block";
           card.appendChild(el("button", { className: "rl-btn ghost", text: "Dismiss", style: small, onclick: function () { act(x.id, "dismiss"); } }));
           if (x.canRemoveListing) card.appendChild(el("button", { className: "rl-btn ghost", text: "Take listing down", style: small, onclick: function () { act(x.id, "remove_listing", "Take this listing down?"); } }));
           card.appendChild(el("button", { className: "rl-btn ghost", text: "Block member", style: small, onclick: function () { act(x.id, "block", "Block this member? Their listings come down and they can't list, ask or message again."); } }));
@@ -3397,6 +3407,21 @@
               add("Offer a swap", "swap");
             }
           }
+          // Anyone can report a listing; it goes to Relay's team and stops showing here for them.
+          var rep = el("button", { type: "button", className: "rl-btn ghost rl-plain rl-mk-report", text: "Report this listing", onclick: function () {
+            askText("What's wrong with this listing? For example, it isn't what it says, or it's something that shouldn't be sold. Relay's team will look at it. The seller won't see who reported it.", "Send report", function (why) {
+              why = String(why || "").trim();
+              if (!why) return tell("Say what's wrong, so Relay's team can check it.", true);
+              if (rep.disabled) return;
+              rep.disabled = true;
+              api("/relay/my/resale/listings/" + l.id + "/report", { method: "POST", body: { reason: why } }).then(function (r) {
+                rep.disabled = false;
+                if (r.ok || (r.body && r.body.error === "already_reported")) { tell("Reported. Relay's team will look at it, and you won't see this listing again."); drawBrowse(); }
+                else tell(r.body && r.body.error === "too_many_reports" ? "That's 10 reports today. Try again tomorrow, or use Talk to a person in Help." : "Couldn't send the report. Please try again.", true);
+              }, function () { rep.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
+            });
+          } });
+          card.appendChild(rep);
           body.appendChild(card);
         });
       });

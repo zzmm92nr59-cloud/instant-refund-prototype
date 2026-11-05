@@ -88,6 +88,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-market-ui.mjs
       - name: Test swapping with another shop (offered where there's a choice, plain words, once per tap, own checkout, polished)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-cross-swap-ui.mjs
+      - name: Test reviewing Swap & resell reports (reported listings and conversations, no names, asks first, once per tap)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-report-review-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)

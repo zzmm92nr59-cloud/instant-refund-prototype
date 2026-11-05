@@ -33,12 +33,14 @@ await ctx.route("https://**/*", async route => {
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/") || /\/image$/.test(p)) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   const slow = () => new Promise(ok => setTimeout(ok, 350));
-  if (p === "/relay/my/resale/feed") { st.feedCalls++; await slow(); return j({ listings: FEED }); }
+  if (p === "/relay/my/resale/feed") { st.feedCalls++; await slow(); return j({ listings: FEED.filter(l => !(st.reports || []).some(r => r[0] === l.id)) }); }
   if (p === "/relay/my/resale/mine") { await slow(); return j(MINE); }
   if (p === "/relay/my/resale/items") { await slow(); return j(ITEMS); }
   if (p === "/relay/my/resale/listings" && m === "POST") { st.listings.push(JSON.parse(route.request().postData() || "{}")); await slow(); return j({ ok: true, id: "NEW" }); }
   let x = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/ask$/.exec(p);
   if (x && m === "POST") { st.asks.push([x[1], JSON.parse(route.request().postData() || "{}")]); await slow(); return j({ ok: true }); }
+  x = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/report$/.exec(p);
+  if (x && m === "POST") { (st.reports = st.reports || []).push([x[1], JSON.parse(route.request().postData() || "{}")]); await slow(); return j({ ok: true }); }
   x = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/accept$/.exec(p);
   if (x && m === "POST") { st.accepts.push(x[1]); await slow(); return j({ ok: true }); }
   x = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/withdraw$/.exec(p);
@@ -112,6 +114,26 @@ await sheet.getByText("Sent. The seller sees your request from “Member”, not
 assert.deepEqual(st.asks, [["aaaaaaaa-aaaa-4aaa-8aaa-000000000001", { kind: "buy" }]], "asked once for a double tap");
 console.log("ok - Discover leads to Swap & resell: outlines, then listings nearest first, in plain words with drawn icons; asking happens once");
 
+// Reporting a listing: says what happens, needs what's wrong, sends once, and the listing goes from Browse.
+const shirt = sheet.locator(".rl-order", { hasText: "Linen Shirt" });
+await shirt.getByRole("button", { name: "Report this listing" }).click();
+const dlg = page.getByRole("alertdialog");
+await dlg.getByText("What's wrong with this listing?", { exact: false }).waitFor();
+assert.match(await dlg.innerText(), /Relay's team will look at it\. The seller won't see who reported it\./);
+await dlg.getByRole("button", { name: "Send report" }).click();
+await sheet.getByText("Say what's wrong, so Relay's team can check it.").waitFor();
+assert.equal((st.reports || []).length, 0, "nothing sent without what's wrong");
+await shirt.getByRole("button", { name: "Report this listing" }).click();
+await dlg.locator("textarea").fill("It's a counterfeit");
+await dlg.getByRole("button", { name: "Send report" }).dblclick();
+await sheet.getByText("Reported. Relay's team will look at it, and you won't see this listing again.").waitFor();
+await page.waitForTimeout(900);
+assert.deepEqual(st.reports, [["aaaaaaaa-aaaa-4aaa-8aaa-000000000002", { reason: "It's a counterfeit" }]], "reported once");
+assert.equal(await sheet.locator(".rl-order", { hasText: "Linen Shirt" }).count(), 0, "gone from Browse");
+await sheet.locator(".rl-order", { hasText: "Merino Wool Scarf" }).waitFor();
+await polished("browse after a report", ".rl-sheet");
+console.log("ok - a listing can be reported from Browse: what's wrong needed, sent once, then gone from Browse");
+
 // 2. Yours: a request to accept (once), what you asked about, and taking a listing down (asks first).
 await sheet.getByRole("button", { name: "Yours" }).click();
 const tote = sheet.locator(".rl-order", { hasText: "Canvas Tote" });
@@ -167,5 +189,5 @@ assert.equal(await page.locator(".rl-mk-tabs").getByRole("button", { name: "Sell
 await page.locator(".rl-order", { hasText: "Ceramic Vase" }).first().waitFor();
 console.log("ok - Profile and a receipt past its return date lead there too");
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS swap & resell without a tab: Discover, Profile and old receipts lead to it; outlines, words, drawn icons, once per tap, labelled form, polished");
+console.log("PASS swap & resell without a tab (and reporting a listing): Discover, Profile and old receipts lead to it; outlines, words, drawn icons, once per tap, labelled form, polished");
 await browser.close(); server.close();
