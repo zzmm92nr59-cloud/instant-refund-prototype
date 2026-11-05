@@ -32,3 +32,5 @@ jobs:
         run: node scripts/test-answer-key.mjs
       - name: Emails sent to Relay (the shopper sees the copy first, details hidden, encrypted, admins only and recorded, deleted on time)
         run: node scripts/test-shared-emails.mjs
+      - name: AI help (off until the key and the shopper's switch, personal details hidden, answers checked, gaps only, deleted when off)
+        run: node scripts/test-ai-reader.mjs

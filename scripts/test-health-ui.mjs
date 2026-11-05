@@ -30,6 +30,10 @@ const HEALTH = {
   returnsAndSwaps: { returns: { requested: 2, refunded: 1 }, swaps: { completed: 3 }, labels: 2, payments: [{ status: "succeeded", test: true, count: 4 }] },
   extras: { gifts: 7, giftGivers: 2, earlierYearsRead: 5, notificationDevices: 4, notificationPeople: 3, priceWatches: 11, watchers: 4 },
   shopsConnected: { shopify: 6, shopifyTest: 6, square: 1 }, security: { wrongCodesToday: 0 },
+  sharedEmails: { kept: 3, waiting: 2, thisWeek: 1, people: 2, keptDays: 30 },
+  aiReader: { on: true, shoppersOn: 2, reads: 14, thisWeek: 5, failed: 1, notPurchase: 2,
+    parts: { shop: { filled: 2, agreed: 8, differed: 0 }, total: { filled: 6, agreed: 3, differed: 1 }, date: { filled: 0, agreed: 0, differed: 0 },
+      number: { filled: 1, agreed: 9, differed: 0 }, items: { filled: 4, agreed: 5, differed: 2 } } },
   checkedByShops: { days: 90, orders: 14, shoppers: 6, withInbox: 12, found: 10, byNumber: 8, notFound: 1, unsure: 1, allRight: 7,
     parts: { shop: { right: 9, wrong: 1, missing: 0 }, total: { right: 8, wrong: 1, missing: 1 }, date: { right: 10, wrong: 0, missing: 0 },
       number: { right: 8, wrong: 0, missing: 0 }, items: { right: 8, none: 1, missing: 0, extra: 1, quantity: 0 } },
@@ -150,6 +154,16 @@ for (const s of ["Read exactly right", "70%", "10 orders were found, out of 12 o
   assert.ok(key.includes(s), "the answer key shows: " + s);
 assert.match(await view.locator(".rl-agroup", { hasText: "Checked against shops' own records" }).locator(".rl-hp-meter").getAttribute("aria-label"), /^70% of orders found were read exactly right$/);
 console.log("ok - orders checked against shops' own records: each part, each reader version, shops from 3 people, and the admin's own differences in plain words");
+// AI help, and emails shoppers sent.
+const aiGroup = (await view.locator(".rl-agroup", { hasText: "Emails read by the AI" }).innerText()).replace(/^AI HELP\n/, "AI help\n");
+for (const s of ["AI help", "On", "Shoppers with it on", "Emails read by the AI", "14", "5 this week, 1 couldn't be read, 2 not purchases", "Totals", "6 filled in",
+  "3 agreed with the rules, 1 differed", "Items", "4 filled in", "Order numbers"]) assert.ok(aiGroup.includes(s), "AI help shows: " + s);
+assert.ok(!aiGroup.includes("Dates"), "a part with nothing to say is left out");
+const sentGroup = view.locator(".rl-agroup", { hasText: "Each is deleted 30 days after it was sent" });
+const sentText = (await sentGroup.innerText()).toLowerCase(); // section names are shown in capitals
+for (const s of ["Emails shoppers sent", "Waiting to be read", "Each is deleted 30 days after it was sent", "From 2 people in all"]) assert.ok(sentText.includes(s.toLowerCase()), "emails sent shows: " + s);
+assert.equal(await sentGroup.getByRole("button", { name: "Read them" }).count(), 1);
+console.log("ok - AI help: on, who has it, where it agreed and differed; emails shoppers sent: waiting, kept, a way to read them");
 
 // 3. The chart: 14 columns; tapping one gives its numbers; the table has them all.
 const cols = view.locator(".rl-hp-chart button");

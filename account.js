@@ -740,6 +740,11 @@
     ".rl-share-box.rl-skel{min-height:180px}.rl-share-box b{display:block;font-size:15px;margin:0 0 2px}.rl-share-box .rl-share-from{display:block;font-size:13px;color:var(--rl-text2);margin:0 0 10px}" +
     ".rl-share-box i{display:block;margin-top:10px;font-style:normal;color:var(--rl-text2)}.rl-share-box:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-share-check{margin:0 0 12px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-fix [hidden],.rl-se [hidden]{display:none!important}" +
+    // AI help: a switch with what it means underneath, on the Email connection page.
+    ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
+    ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
+    ".rl-aih p{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-aih p.rl-msg{color:var(--rl-text)}.rl-aih p.rl-msg:empty{display:none}" +
+    ".rl-rc-ai{margin:6px 0 2px;font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
     ".rl-se-card{margin:0 0 12px;padding:16px 18px}.rl-se-card>b{display:block;font-size:16px;color:var(--rl-text);overflow-wrap:anywhere}" +
     ".rl-se-card>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-se-note{margin:8px 0 0;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
     ".rl-se-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.rl-se-acts .rl-pill{padding:0 16px}.rl-se-body{margin-top:12px}.rl-se-body .rl-hp-rows{margin:0 0 10px}" +
@@ -2606,6 +2611,11 @@
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
           detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+          // What the AI filled in (AI help), for the shopper to check.
+          if (row.aiFilled && row.aiFilled.length) {
+            var AIP = { total: "total", items: "items", date: "date", number: "order number", shop: "shop" }, ap = row.aiFilled.map(function (k) { return AIP[k] || k; });
+            detail.appendChild(el("p", { className: "rl-rc-ai", text: "The " + (ap.length > 1 ? ap.slice(0, -1).join(", ") + " and " + ap[ap.length - 1] : ap[0]) + (ap.length > 1 || ap[0] === "items" ? " were" : " was") + " read by AI. Check " + (ap.length > 1 || ap[0] === "items" ? "they're" : "it's") + " right, and use Fix details if not." }));
+          }
           // Sent to Relay: until when it's kept, whether it's been read, and a way to delete it now.
           if (row.shared) {
             var sh = row.shared, until = new Date(sh.until).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -3644,6 +3654,36 @@
     sheet.appendChild(outBtn);
     sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
 
+    // AI help (worker/ai-reader.js): Claude reads emails Relay's own reader isn't sure about, only once switched on here.
+    // Shown only once Relay can offer it (the AI key is set). Switching it off deletes what the AI read.
+    function aiHelp() {
+      var box = el("div", { className: "rl-aih" }); box.hidden = true;
+      var sw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
+      sw.setAttribute("role", "switch"); sw.setAttribute("aria-label", "AI help with receipts");
+      var msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
+      box.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI help with receipts" }), sw]));
+      box.appendChild(el("p", { text: "When Relay's own reader can't work out a receipt, Claude, an AI made by Anthropic, can read that email to fill in what's missing. It gets the email's text with your name, addresses, links, phone numbers and card numbers hidden, and Anthropic can't train its AI on it. What it fills in is marked for you to check." }));
+      box.appendChild(msg);
+      var on = false, busy = false;
+      var draw = function () { sw.setAttribute("aria-checked", on ? "true" : "false"); };
+      api("/relay/my/ai-reading", { fresh: true }).then(function (r) {
+        if (!r.ok || !r.body || !r.body.available) return;
+        on = Boolean(r.body.on); draw(); box.hidden = false;
+      }, function () {});
+      sw.onclick = function () {
+        if (busy) return;
+        var want = !on;
+        busy = true; sw.disabled = true; say(msg, "");
+        api("/relay/my/ai-reading", { method: "POST", body: { on: want } }).then(function (r) {
+          busy = false; sw.disabled = false;
+          if (!r.ok) return say(msg, r.status === 503 ? "AI help isn't available right now. Try again later." : "Couldn't change that. Try again in a moment.", true);
+          on = Boolean(r.body && r.body.on); draw();
+          say(msg, on ? "On. Relay will ask the AI about receipts it isn't sure of, a few at a time." : "Off. What the AI read has been deleted.");
+          memo.receipts = null;
+        }, function () { busy = false; sw.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      return box;
+    }
     function mailPage(b) {
       if (!window.go) return gmailSection(b, c || {}, msg);
       var note = el("div", { className: "rl-msg" });
@@ -3671,6 +3711,7 @@
         b.appendChild(el("p", { className: "rl-anote", text: "Shop with more than one email address? Add the others and Relay reads them all." }));
         b.appendChild(adds); addInboxButtons(adds, note);
       } else b.appendChild(el("p", { className: "rl-anote", text: "That's the most inboxes Relay can read for one account." }));
+      b.appendChild(aiHelp());
       b.appendChild(note);
       b.appendChild(el("button", { className: "rl-btn", text: "Open my receipts", style: "margin-top:18px", onclick: function () { close(); window.go("receipts"); } }));
       b.appendChild(el("button", { className: "rl-btn ghost", text: "Add a missing receipt", onclick: function () { openFind(); } }));
@@ -3951,6 +3992,17 @@
         box.appendChild(group("Your own receipts", [el("p", { className: "rl-hp-sub", text: plural(mine.receipts, "purchase", "purchases") + ", by shop, problems first" +
           (mine.personalMail ? ". " + plural(mine.personalMail, "receipt was", "receipts were") + " forwarded from a personal address" : "") + "." })].concat(mine.shops.length ? [shopList(mine.shops, false)] : [])));
         box.appendChild(group("Checked against shops' own records", answerKey(h.checkedByShops)));
+        // AI help: who has it on, and where the AI and the rules agreed or differed (the rules get better from the differences).
+        var ar = h.aiReader;
+        if (ar) {
+          var arRows = [row("AI help", ar.on ? "On" : "Off", ar.on ? null : "Comes on once the AI key is added in Cloudflare"),
+            row("Shoppers with it on", N(ar.shoppersOn)), row("Emails read by the AI", N(ar.reads), N(ar.thisWeek) + " this week" + (ar.failed ? ", " + N(ar.failed) + " couldn't be read" : "") + (ar.notPurchase ? ", " + N(ar.notPurchase) + " not purchases" : ""))];
+          [["total", "Totals"], ["items", "Items"], ["date", "Dates"], ["number", "Order numbers"], ["shop", "Shop names"]].forEach(function (x) {
+            var p = ar.parts && ar.parts[x[0]]; if (!p || !(p.filled + p.agreed + p.differed)) return;
+            arRows.push(row(x[1], N(p.filled) + " filled in", N(p.agreed) + " agreed with the rules, " + N(p.differed) + " differed"));
+          });
+          box.appendChild(group("AI help", [el("div", { className: "rl-hp-rows" }, arRows)]));
+        }
         // Emails shoppers sent because they were read wrong: how many are waiting, and the way to read them.
         var se = h.sharedEmails;
         if (se) box.appendChild(group("Emails shoppers sent", [el("div", { className: "rl-hp-rows" }, [

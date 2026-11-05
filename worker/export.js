@@ -70,6 +70,13 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     },
     // Emails you chose to send to Relay from a receipt it read wrong, as kept (details hidden), until they're deleted.
     emailsSentToRelay: await sharedForExport(env, id, now),
+    // AI help: whether it's on, and what the AI read from emails Relay's own reader wasn't sure about.
+    aiHelp: await (async () => {
+      const on = await one("SELECT on_since AS since FROM ai_reading WHERE shopper_id = ?", id);
+      return { on: Boolean(on), since: on ? iso(on.since) : null,
+        readings: (await rows("SELECT receipt_id AS receiptId, fields, failed, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? ORDER BY created_at", id))
+          .map((r) => ({ receiptId: r.receiptId, read: parse(r.fields), couldNotRead: r.failed || null, at: iso(r.at) })) };
+    })(),
     // The help chat keeps no conversations: only how many messages you sent each day, and whether you asked for a person.
     helpChat: (await rows("SELECT day, messages, handoffs FROM support_chat_usage WHERE shopper_id = ? ORDER BY day", id)),
     alerts: {

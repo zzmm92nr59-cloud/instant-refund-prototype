@@ -53,6 +53,7 @@ jobs:
           node scripts/test-health-digest.mjs
           node scripts/test-answer-key.mjs
           node scripts/test-shared-emails.mjs
+          node scripts/test-ai-reader.mjs
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs
