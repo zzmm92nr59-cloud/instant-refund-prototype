@@ -1,4 +1,5 @@
-// Browser test: Swap & resell without a tab of its own. Stubbed Relay server, made-up members, shops and items.
+// Browser test: Swap & resell without a tab of its own. Stubbed Relay server, made-up members, shops and items (ids shaped like
+// the server's, so scripts/test-validation.mjs can check every request the app makes here against the server's rules).
 // Checks: Discover, Profile and a receipt past its return date lead to it, and there's no Market tab; greyed outlines while
 // it loads, never "Loading…"; drawn icons, never emoji; statuses and dates in plain words; asking, accepting and taking
 // down happen once for a double tap (taking down asks first); listing an item uses labelled fields; passes the polish rules
@@ -16,10 +17,10 @@ const receipts = [{ id: R1, status: "confirmed", kind: "receipt", gmailId: "m1ab
   items: [{ name: "Ceramic Vase", qty: 1, pricePence: 4000, category: "home" }] }];
 const st = { asks: [], accepts: [], withdraws: [], listings: [], feedCalls: 0 };
 const FEED = [
-  { id: "L1", title: "Merino Wool Scarf", store: "Brindle & Co", size: "M", condition: "like_new", askPence: 2500, currency: "GBP", swapOk: true, handover: "either", area: "SW11", note: "Worn once", hasImage: false, myRequest: null },
-  { id: "L2", title: "Linen Shirt", store: "Fennel", size: "L", condition: "good", askPence: null, currency: "GBP", swapOk: false, handover: "post", area: null, hasImage: false, myRequest: { id: "Q9", status: "pending" } }];
-const MINE = { listings: [{ id: "M1", title: "Canvas Tote", status: "active", store: "Fennel", condition: "good", askPence: null, currency: "GBP", swapOk: false, handover: "post", hasImage: false,
-  requests: [{ id: "Q1", who: "Member", kind: "buy", status: "pending", message: "Is it still available?" }] }], myRequests: [{ id: "Q9", title: "Linen Shirt", kind: "buy", status: "pending" }] };
+  { id: "aaaaaaaa-aaaa-4aaa-8aaa-000000000001", title: "Merino Wool Scarf", store: "Brindle & Co", size: "M", condition: "like_new", askPence: 2500, currency: "GBP", swapOk: true, handover: "either", area: "SW11", note: "Worn once", hasImage: false, myRequest: null },
+  { id: "aaaaaaaa-aaaa-4aaa-8aaa-000000000002", title: "Linen Shirt", store: "Fennel", size: "L", condition: "good", askPence: null, currency: "GBP", swapOk: false, handover: "post", area: null, hasImage: false, myRequest: { id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000009", status: "pending" } }];
+const MINE = { listings: [{ id: "cccccccc-cccc-4ccc-8ccc-000000000001", title: "Canvas Tote", status: "active", store: "Fennel", condition: "good", askPence: null, currency: "GBP", swapOk: false, handover: "post", hasImage: false,
+  requests: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000001", who: "Member", kind: "buy", status: "pending", message: "Is it still available?" }] }], myRequests: [{ id: "bbbbbbbb-bbbb-4bbb-8bbb-000000000009", title: "Linen Shirt", kind: "buy", status: "pending" }] };
 const ITEMS = { items: [
   { receiptId: R1, itemIndex: 0, title: "Ceramic Vase", store: "Larkspur Home", pricePence: 4000, currency: "GBP", orderDate: "2026-09-01", returnWindowOpen: false, returnDeadline: "2026-10-01", alreadyListed: false },
   { receiptId: "22222222-2222-4222-8222-222222222222", itemIndex: 0, title: "Brass Lamp", store: "Larkspur Home", pricePence: 6000, currency: "GBP", orderDate: "2026-10-30", returnWindowOpen: true, returnDeadline: "2026-11-20", alreadyListed: false }] };
@@ -36,11 +37,11 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/resale/mine") { await slow(); return j(MINE); }
   if (p === "/relay/my/resale/items") { await slow(); return j(ITEMS); }
   if (p === "/relay/my/resale/listings" && m === "POST") { st.listings.push(JSON.parse(route.request().postData() || "{}")); await slow(); return j({ ok: true, id: "NEW" }); }
-  let x = /^\/relay\/my\/resale\/listings\/([A-Z0-9]+)\/ask$/.exec(p);
+  let x = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/ask$/.exec(p);
   if (x && m === "POST") { st.asks.push([x[1], JSON.parse(route.request().postData() || "{}")]); await slow(); return j({ ok: true }); }
-  x = /^\/relay\/my\/resale\/requests\/([A-Z0-9]+)\/accept$/.exec(p);
+  x = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/accept$/.exec(p);
   if (x && m === "POST") { st.accepts.push(x[1]); await slow(); return j({ ok: true }); }
-  x = /^\/relay\/my\/resale\/listings\/([A-Z0-9]+)\/withdraw$/.exec(p);
+  x = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/withdraw$/.exec(p);
   if (x && m === "POST") { st.withdraws.push(x[1]); await slow(); return j({ ok: true }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3 });
@@ -108,7 +109,7 @@ assert.match(await sheet.locator(".rl-order", { hasText: "Linen Shirt" }).innerT
 await polished("browse", ".rl-sheet");
 await scarf.getByRole("button", { name: "I'd like this" }).dblclick();
 await sheet.getByText("Sent. The seller sees your request from “Member”, not your name.").waitFor();
-assert.deepEqual(st.asks, [["L1", { kind: "buy" }]], "asked once for a double tap");
+assert.deepEqual(st.asks, [["aaaaaaaa-aaaa-4aaa-8aaa-000000000001", { kind: "buy" }]], "asked once for a double tap");
 console.log("ok - Discover leads to Swap & resell: outlines, then listings nearest first, in plain words with drawn icons; asking happens once");
 
 // 2. Yours: a request to accept (once), what you asked about, and taking a listing down (asks first).
@@ -120,12 +121,12 @@ await sheet.getByText("You'd like to buy it. Waiting for the seller.").waitFor()
 await polished("yours", ".rl-sheet");
 await tote.getByRole("button", { name: "Accept" }).dblclick();
 await page.waitForTimeout(900);
-assert.deepEqual(st.accepts, ["Q1"], "accepted once for a double tap");
+assert.deepEqual(st.accepts, ["bbbbbbbb-bbbb-4bbb-8bbb-000000000001"], "accepted once for a double tap");
 await sheet.locator(".rl-order", { hasText: "Canvas Tote" }).getByRole("button", { name: "Take this down" }).click();
 await page.getByRole("alertdialog").getByText("Take Canvas Tote off Relay? Anyone who asked about it is told it's gone.").waitFor();
 await page.getByRole("alertdialog").getByRole("button", { name: "Take it down" }).click();
 await sheet.getByText("Taken down.").waitFor();
-assert.deepEqual(st.withdraws, ["M1"]);
+assert.deepEqual(st.withdraws, ["cccccccc-cccc-4ccc-8ccc-000000000001"]);
 console.log("ok - Yours: requests accepted once, statuses in words, taking down asks first");
 
 // 3. Sell: human dates, a heads-up while it can still go back, and a form with labelled fields.
