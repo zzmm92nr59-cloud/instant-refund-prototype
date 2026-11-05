@@ -703,19 +703,24 @@ function chooseSku(sku){recordTap(catalog.find(x=>x.sku===sku));
  const context=!!exchangeContext,sameRetailer=context&&storeOf(chosen).toLowerCase()===String(selected.merchant).toLowerCase();
  const fixtureInStock=chosen.fixture&&Number(chosen.quantity)>0;
  const sandboxPreview=!chosen.fixture&&chosen.provider==="square_sandbox"&&context&&selected?.demo===true;
- const eligible=context&&sameRetailer&&(fixtureInStock||sandboxPreview);
+ // A swap with another shop: one of the walkthrough's own shops, with the item in stock (see worker/cross-swap.js for the real one).
+ const otherShop=context&&!sameRetailer&&chosen.fixture===true&&selected?.demo===true;
+ const eligible=context&&((sameRetailer&&(fixtureInStock||sandboxPreview))||(otherShop&&fixtureInStock));
  let quote=null,message="";
- if(eligible){try{quote=RelayExchangeEngine.quote({purchase:selected,candidate:{...chosen,store:storeOf(chosen),previewSimulation:sandboxPreview},reason,existing:readDemoLog()})}catch(e){message=e.message}}
+ if(eligible){try{quote=RelayExchangeEngine.quote({purchase:selected,candidate:{...chosen,store:storeOf(chosen),previewSimulation:sandboxPreview},reason,existing:readDemoLog(),otherShop})}catch(e){message=e.message}}
  const original=Math.round(Number(selected?.price||0)*100),next=Number(chosen.priceMinor);
  const held=planPreview==="free";
- const warning=message?"The exchange cannot be started: "+message:!context?"To exchange, open the purchase in your Wallet first.":!sameRetailer?"This replacement belongs to another retailer. Cross-retailer swaps are not yet coordinated.":chosen.fixture?"This demo item has no available stock.":chosen.provider==="shopify"?"This Shopify product is from a published catalogue. Stock is only a snapshot, and Relay is not authorised to create a replacement order or return for it.":"This Square Sandbox item has unconfirmed stock and retailer exchange eligibility. It is browse-only except for a labelled simulation using a fictional original purchase.";
- const review=quote?
+ const warning=message?"The exchange cannot be started: "+message:!context?"To exchange, open the purchase in your Wallet first.":!sameRetailer?(otherShop?"This demo item has no available stock.":"Swaps with another shop work with shops on Relay. In this walkthrough, pick an item from one of its own shops."):chosen.fixture?"This demo item has no available stock.":chosen.provider==="shopify"?"This Shopify product is from a published catalogue. Stock is only a snapshot, and Relay is not authorised to create a replacement order or return for it.":"This Square Sandbox item has unconfirmed stock and retailer exchange eligibility. It is browse-only except for a labelled simulation using a fictional original purchase.";
+ const fromShop=safe(String(selected?.merchant||"the original shop")),toShop=safe(storeOf(chosen));
+ const review=quote&&quote.crossShop?
+ '<div class="card" style="background:#263e32;border-color:#71934e;margin-top:15px"><h3>Review simulated swap with another shop</h3><p class="small">Return '+safe(selected.item)+' · '+safe(selected.detail)+' to '+fromShop+', and get this from '+toShop+'.</p><div class="split"><span>Return to '+fromShop+'</span><b>'+money(original/100)+'</b></div><div class="split"><span>Buy from '+toShop+'</span><b>'+money(next/100)+'</b></div><hr style="border:0;border-top:1px solid #66845d"><strong>'+quoteText(quote)+'</strong><p class="small">'+(held?"Relay Free demo: Relay starts the return with "+fromShop+". You buy from "+toShop+" at their own checkout, and "+fromShop+" refunds you once the item is back.":"Relay Plus demo: Relay pays "+toShop+" now and collects the refund from "+fromShop+" once the item is back, so the new item is sent straight away.")+'</p><p class="small">Editable demo stock at '+toShop+': '+Number(chosen.quantity)+' units. One demo unit will be reserved when the simulation is confirmed.</p></div>':
+ quote?
  '<div class="card" style="background:#263e32;border-color:#71934e;margin-top:15px"><h3>Review simulated exchange</h3><p class="small">Original: '+safe(selected.item)+' · '+safe(selected.detail)+'</p><div class="split"><span>Original purchase</span><b>'+money(original/100)+'</b></div><div class="split"><span>Replacement item</span><b>'+money(next/100)+'</b></div><hr style="border:0;border-top:1px solid #66845d"><strong>'+quoteText(quote)+'</strong><p class="small">'+(held?"Relay Free demo: start the original return and queue the replacement together. The replacement order is created after the demo return is received.":"Relay Plus demo: create the simulated replacement order and original return together, before the return is received.")+'</p>'+(sandboxPreview?'<div class="notice">This is a Square Sandbox catalogue preview. Stock is NOT confirmed, nothing is reserved, and the retailer receives NO order. The following action is entirely fictional.</div>':'<p class="small">Editable demo stock: '+Number(chosen.quantity)+' units. One demo unit will be reserved when the simulation is confirmed.</p>')+'</div>':
  '<div class="notice" style="margin-top:16px">'+safe(warning)+'</div>';
  box.innerHTML='<div class="card" style="grid-column:1/-1"><button class="link" data-back id="backToResults">← Back to suggestions</button><div class="eyebrow" style="margin-top:12px">'+safe(storeOf(chosen))+' · '+(chosen.fixture?'EDITABLE DEMO INVENTORY':chosen.provider==='shopify'?'PUBLISHED SHOPIFY CATALOGUE':'SQUARE SANDBOX CATALOGUE')+'</div><div class="art">'+productImage(chosen.product,chosen.variation,chosen.imageUrl)+'</div><h2>'+safe(chosen.product)+'</h2><p>'+safe(chosen.variation)+'</p><div class="price">'+priceIn(next,chosen.currency)+'</div>'+review+
  '<p class="small muted">This preview never makes a card payment, sends a retailer return or places a real replacement order.</p><div class="actions"><button class="outline" id="watchSelected">◎ Watch price</button>'+
  (context?'<button class="outline" id="refundOriginal">↩ Refund original instead</button>':'')+
- (quote?'<button class="darkbtn" id="placeSelected">'+(held?'Simulate return + replacement request →':'Simulate instant exchange + return →')+'</button>':context?'<button class="outline" id="backToPurchase">← Back to original purchase</button>':'<button class="darkbtn" id="goToWallet">Go to my purchases →</button>')+
+ (quote?'<button class="darkbtn" id="placeSelected">'+(quote.crossShop?'Simulate swap with another shop':held?'Simulate return + replacement request →':'Simulate instant exchange + return →')+'</button>':context?'<button class="outline" id="backToPurchase">← Back to original purchase</button>':'<button class="darkbtn" id="goToWallet">Go to my purchases →</button>')+
  '</div><div id="orderResult" aria-live="polite"></div></div>';
  const back=$("backToResults");if(back)back.onclick=renderCatalog;
  const watchButton=$("watchSelected");if(watchButton)watchButton.onclick=()=>watchSku(sku);
@@ -743,7 +748,8 @@ function commitDemoOrder(sku,isExchange){
    const previewSimulation=p.fixture!==true&&p.provider==="square_sandbox";
    if(chosen&&chosen.sku===sku&&chosen.priceMinor!==p.priceMinor)throw Error("The replacement price changed. Go back and review the updated offer.");
    const candidate={...p,store:storeOf(p),previewSimulation};
-   rec=RelayExchangeEngine.createExchange({purchase:selected,candidate,reason,existing,id,at:now,fulfilmentMode:planPreview==="free"?"hold":"advance"});
+   const otherShop=String(storeOf(p)).toLowerCase()!==String(selected.merchant).toLowerCase();
+   rec=RelayExchangeEngine.createExchange({purchase:selected,candidate,reason,existing,id,at:now,fulfilmentMode:planPreview==="free"?"hold":"advance",otherShop});
    rec={...rec,customer:activeShopper(),originalSource:selected.source||"demo"};
    if(p.fixture&&Number(p.quantity)<1)throw Error("The demo item is out of stock.");
    const nextChanges=p.fixture?{...inventoryChanges,[sku]:{...(inventoryChanges[sku]||{}),quantity:Number(p.quantity)-1,updatedAt:now}}:inventoryChanges;
@@ -758,7 +764,7 @@ function commitDemoOrder(sku,isExchange){
    }
    if(p.fixture){inventoryChanges=nextChanges;catalog=catalog.filter(x=>!x.fixture).concat(demoProducts())}
  }catch(e){showCheckoutError(e.message);return}
- const confirm=$("placeSelected");if(confirm){confirm.disabled=true;confirm.textContent="✓ Demo exchange recorded"}
+ const confirm=$("placeSelected");if(confirm){confirm.disabled=true;confirm.textContent=rec.crossShop?"Demo swap with another shop recorded":"✓ Demo exchange recorded"}
  const root=$("orderResult");if(root)root.innerHTML=demoExchangeReceipt(rec);
  bindDemoExchangeReceipt(rec.id);
 }
@@ -766,7 +772,7 @@ function demoExchangeReceipt(rec){
  const entries=(rec.ledger||[]).map(e=>'<li>'+safe(e.type.replace(/_/g," "))+' · '+money(Number(e.amountMinor)/100)+' · '+safe(e.status)+'</li>').join("");
  const held=rec.replacementStatus==="PENDING_RETURN_RECEIPT";
  return '<div class="card" style="background:var(--rl-accent-bg);color:#1d3522;margin-top:15px">'+
- '<h3>✓ Coordinated exchange simulated</h3><p class="small">Request: '+safe(rec.id)+'</p>'+
+ (rec.crossShop?'<h3>Swap with another shop simulated</h3><p class="small">Return to '+safe(rec.originalStore||"the original shop")+', new item from '+safe(rec.store||"another shop")+'. Request: '+safe(rec.id)+'</p>':'<h3>✓ Coordinated exchange simulated</h3><p class="small">Request: '+safe(rec.id)+'</p>')+
  '<p><b>Replacement:</b> '+(held?'Queued until return receipt':safe(rec.replacementOrderId||rec.replacementRequestId))+'</p>'+
  '<p><b>Original return:</b> '+safe(rec.returnRequestId)+' · '+safe(rec.returnStatus)+'</p>'+
  '<p><b>Stock source:</b> '+(rec.stockConfirmed?'Editable fictional inventory':'Square Sandbox listing — stock NOT verified')+'</p>'+

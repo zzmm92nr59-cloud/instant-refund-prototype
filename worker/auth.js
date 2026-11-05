@@ -20,6 +20,8 @@ import { ensureOnce, runAll } from "./once.js";
 import { handlePushRoute, pushDeleteStatements, ensurePushTables } from "./push.js";
 import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
+import { handleCrossSwapRoute, attachCrossSwaps, crossSwapDeleteStatements } from "./cross-swap.js";
+import { handleShopifyTestRoute, shopifyTestOrderDeleteStatements } from "./shopify-test-orders.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleExportRoute } from "./export.js";
@@ -560,6 +562,8 @@ async function deleteShopper(env, shopper, o) {
     ...pushDeleteStatements(env.RELAY_DB, shopper.id),
     ...(await instoreDeleteStatements(env.RELAY_DB, shopper.emailHash, shopper.id)),
     ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
+    ...(await crossSwapDeleteStatements(env.RELAY_DB, shopper.id)),
+    ...(await shopifyTestOrderDeleteStatements(env.RELAY_DB, shopper.id)),
     // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
     env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
     env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
@@ -676,12 +680,18 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (cardResponse) return cardResponse;
     const returnResponse = await handleReturnRoute(request, env, url, cors, shopper, o);
     if (returnResponse) return returnResponse;
+    // Swapping an item for something from another shop on Relay: the return at the first shop, the second shop's checkout.
+    const crossSwapResponse = await handleCrossSwapRoute(request, env, url, cors, shopper, o);
+    if (crossSwapResponse) return crossSwapResponse;
     const instoreResponse = await handleInstoreRoute(request, env, url, cors, shopper, o);
     if (instoreResponse) return instoreResponse;
     const squareTestResponse = await handleSquareTestRoute(request, env, url, cors, shopper, o);
     if (squareTestResponse) return squareTestResponse;
+    // Testing tools: a test order at one of Relay's Shopify test shops (development stores only).
+    const shopifyTestResponse = await handleShopifyTestRoute(request, env, url, cors, shopper, o);
+    if (shopifyTestResponse) return shopifyTestResponse;
     if (path === "/relay/my/purchases" && request.method === "GET")
-      return json({ purchases: await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper)), o) }, 200, cors);
+      return json({ purchases: await attachCrossSwaps(env, shopper, await enrichSquarePurchases(env, await enrichPurchases(env, await listPurchases(env, shopper)), o)) }, 200, cors);
     if (path === "/relay/my/receipts/parse" && request.method === "POST") {
       // Reads a pasted order-confirmation email. Nothing is stored. The result is
       // shopper-supplied evidence (refundEligible is always false).

@@ -106,7 +106,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. Relay keeps no copy of the chat. If you switch on AI help, it also reads emails Relay's rules couldn't work out, with your personal details hidden (see Your email). Otherwise it never receives your receipts, anything else from your email, or your email address.</td></tr>
 <tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
-<tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference.</td></tr>
+<tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference. When you swap with another shop, the second shop gets nothing from Relay: you buy from it at its own checkout.</td></tr>
 <tr><th>Royal Mail</th><td>If you print a returns label, receives the name and address needed for it.</td></tr>
 <tr><th>Apple, Google, Mozilla and Microsoft push services</th><td>Deliver notifications to your device. The messages are encrypted.</td></tr>
 <tr><th>GitHub Pages</th><td>Delivers the Relay app to your browser, so it sees your IP address like any website.</td></tr>
@@ -124,7 +124,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Your sign-in session</th><td>Up to 90 days after you last used Relay, or until you sign out.</td></tr>
 <tr><th>Sign-in links and codes, and the scrambled IP addresses and phone numbers kept to stop misuse</th><td>Up to two days.</td></tr>
 <tr><th>Name, photo, phone number, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>
-<tr><th>Returns, swaps and payments made through Relay</th><td>Kept after you delete your account, because the shops involved rely on them.</td></tr>
+<tr><th>Returns, swaps and payments made through Relay</th><td>Kept after you delete your account, because the shops involved rely on them. A swap with another shop is deleted; the return it started is kept.</td></tr>
 <tr><th>If you're blocked from swap and sell</th><td>A scrambled form of your email address is kept, so a blocked member can't rejoin to get round the block.</td></tr>
 </table>
 
