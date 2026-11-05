@@ -156,10 +156,15 @@ export async function handleSupportRoute(path, method, request, env, cors, shopp
       body: JSON.stringify({ model: env.SUPPORT_CHAT_MODEL || DEFAULT_MODEL, max_tokens: 450, system,
         messages: turns.map(t => ({ role: t.role, content: t.text })) })
     });
-  } catch { return json({ error: "chat_unavailable" }, 502, cors); }
-  if (!res || !res.ok) return json({ error: res && res.status === 429 ? "chat_busy" : "chat_unavailable" }, 502, cors);
+  } catch (e) { console.error("help_chat_failed", String(e && e.name || "error")); return json({ error: "chat_unavailable" }, 502, cors); }
+  // Why the assistant couldn't answer, for the logs (Anthropic's status, or how its answer stopped), never the chat itself.
+  if (!res || !res.ok) {
+    const detail = res ? String(await res.text().catch(() => "")).slice(0, 2000) : "";
+    console.error("help_chat_refused", res && res.status, /credit balance|billing|purchase credits/i.test(detail) ? "no_credit" : "other");
+    return json({ error: res && res.status === 429 ? "chat_busy" : "chat_unavailable" }, 502, cors);
+  }
   const data = await res.json().catch(() => null);
   const reply = data && Array.isArray(data.content) ? data.content.filter(c => c && c.type === "text").map(c => c.text).join("\n").trim() : "";
-  if (!reply) return json({ error: "chat_unavailable" }, 502, cors);
+  if (!reply) { console.error("help_chat_empty_answer", JSON.stringify({ stop: data && data.stop_reason || null, blocks: data && Array.isArray(data.content) ? data.content.map(c => c && c.type) : null })); return json({ error: "chat_unavailable" }, 502, cors); }
   return json({ reply: reply.slice(0, 4000) }, 200, cors);
 }
