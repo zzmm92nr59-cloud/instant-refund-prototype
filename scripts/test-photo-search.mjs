@@ -121,6 +121,9 @@ status = 400; errBody = "{}";
 assert.deepEqual(await call(alice, { image: PNG }), { status: 503, body: { error: "ai_off" } }, "a refusal that doesn't mention the picture: not available");
 status = 200; errBody = "{}";
 assert.deepEqual(cleanAnswer('{"found":true,"item":"  red\\n  dress  ","matches":[3,3,2]}', 2), { found: true, item: "red dress", matches: [2] });
+assert.deepEqual(cleanAnswer('Here you go:\n```json\n{"found":true,"item":"tote","matches":[1]}\n```\nHope that helps {smile}', 2), { found: true, item: "tote", matches: [1] }, "a ```json block with words around it");
+assert.deepEqual(cleanAnswer('The picture shows {a bag}. {"found":true,"item":"tote","matches":[2]}', 2), { found: true, item: "tote", matches: [2] }, "the first {...} that reads as JSON");
+assert.equal(cleanAnswer('{"found":true,"item":"tote","matches":[1', 2), null, "cut off mid-answer: unusable");
 console.log("ok - no product, nonsense, busy or refused: plain answers");
 
 // 6. Nothing of the picture is kept: only that a search happened, for the limits (30 a day each), gone after 2 days.

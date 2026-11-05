@@ -79,11 +79,25 @@ async function candidates(env, includeTest, now) {
 const money = (m) => "£" + (Number(m) / 100).toFixed(2);
 const oneLine = (t, n) => String(t == null ? "" : t).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
+// The JSON in an answer: a ```json block if there is one, otherwise the first {...} that reads as JSON (the answer may have
+// a sentence around it).
+function firstJson(t) {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
+  for (const candidate of [fenced && fenced[1], t]) {
+    if (!candidate) continue;
+    // A handful of tries each way is plenty for a short answer, and keeps a strange one from taking long.
+    for (let start = candidate.indexOf("{"), a = 0; start >= 0 && a < 5; start = candidate.indexOf("{", start + 1), a++) {
+      for (let end = candidate.lastIndexOf("}"), b = 0; end > start && b < 5; end = candidate.lastIndexOf("}", end - 1), b++) {
+        try { const j = JSON.parse(candidate.slice(start, end + 1)); if (j && typeof j === "object" && !Array.isArray(j)) return j; } catch {}
+      }
+    }
+  }
+  return null;
+}
+
 // Claude's answer, checked: only list numbers that exist, each once, at most 12; the item's name in a few plain words.
 export function cleanAnswer(text, count) {
-  let j = null;
-  const m = /\{[\s\S]*\}/.exec(String(text || ""));
-  try { j = m ? JSON.parse(m[0]) : null; } catch { j = null; }
+  const j = firstJson(String(text || ""));
   if (!j || typeof j !== "object") return null;
   const seen = new Set(), matches = [];
   for (const n of Array.isArray(j.matches) ? j.matches : []) {
@@ -121,11 +135,12 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
   try {
     r = await f("https://api.anthropic.com/v1/messages", { method: "POST", signal: AbortSignal.timeout(30000),
       headers: { "x-api-key": env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: env.PHOTO_SEARCH_MODEL || aiModel(env), max_tokens: 400, system: PHOTO_SYSTEM, messages: [{ role: "user", content: [
+      // Room for a model that thinks a little before it answers; the answer itself is a few dozen tokens.
+      body: JSON.stringify({ model: env.PHOTO_SEARCH_MODEL || aiModel(env), max_tokens: 1024, system: PHOTO_SYSTEM, messages: [{ role: "user", content: [
         { type: "image", source: { type: "base64", media_type: "image/" + pic[1], data: pic[2] } },
         { type: "text", text: "Items shops on Relay sell:\n" + list } ] }] }) });
-  } catch { return json({ error: "busy" }, 503, cors); }
-  if (r.status === 429 || r.status >= 500) return json({ error: "busy" }, 503, cors);
+  } catch (e) { console.error("photo_search_failed", String(e && e.name || "error")); return json({ error: "busy" }, 503, cors); }
+  if (r.status === 429 || r.status >= 500) { console.error("photo_search_busy", r.status); return json({ error: "busy" }, 503, cors); }
   // Anthropic refused: the picture itself only when it says so (a 400 about the image). No credit left, a key that doesn't
   // work and anything else mean photo search isn't available right now, never "couldn't read that picture".
   if (!r.ok) {
@@ -138,6 +153,9 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
   const answer = await r.json().catch(() => null);
   const text = answer && Array.isArray(answer.content) ? answer.content.filter(c => c && c.type === "text").map(c => c.text).join("") : "";
   const got = cleanAnswer(text, items.length);
+  // Why an answer couldn't be used, for the logs: how it stopped and what it held (never the picture or the answer itself).
+  if (!got) console.error("photo_search_unreadable_answer", JSON.stringify({ stop: answer && answer.stop_reason || null,
+    blocks: answer && Array.isArray(answer.content) ? answer.content.map(c => c && c.type) : null, chars: text.length }));
   if (!got) return json({ error: "busy" }, 503, cors);
   return json({ found: got.found, item: got.item, results: got.matches.map(i => items[i - 1]) }, 200, cors);
 }
