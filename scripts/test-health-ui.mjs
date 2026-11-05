@@ -41,6 +41,7 @@ await ctx.route("https://**/*", async route => {
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   if (p === "/relay/my/admin/me") return j(st.admin ? { admin: true, openReports: 1 } : { admin: false });
   if (p === "/relay/my/admin/review-account") return st.admin ? j({ on: false }) : j({ error: "not_found" }, 404);
+  if (p === "/relay/my/admin/health/email" && m === "POST") { st.mails = (st.mails || 0) + 1; await new Promise(r => setTimeout(r, 300)); return st.mails === 1 ? j({ ok: true, to: ADMIN }) : j({ error: "too_many_requests" }, 429); }
   if (p === "/relay/my/admin/health") {
     if (!st.admin) return j({ error: "not_found" }, 404);
     st.healthCalls++; await new Promise(r => setTimeout(r, 400)); // slow enough to see the outlines, and for a second tap to land
@@ -155,6 +156,25 @@ assert.ok((await view.innerText()).includes("4,210"), "the numbers stay on scree
 await view.getByRole("button", { name: /Back to/ }).click();
 await row.click();
 assert.ok((await view.innerText()).includes("4,210"), "opening it again shows the last copy at once");
+// 5. By email: one now (once for a double tap), and a plain message when one was sent a moment ago.
+await view.getByText("Each morning from 8am, Relay's admins get a summary of these numbers by email", { exact: false }).waitFor();
+await view.getByRole("button", { name: "Email me one now" }).dblclick();
+await view.getByText("Sent to " + ADMIN + ". It can take a minute to arrive.").waitFor();
+assert.equal(st.mails, 1, "a double tap sends once");
+await page.waitForTimeout(500); // a deliberate second tap, not part of the double tap (the app ignores repeats within 400ms)
+await view.getByRole("button", { name: "Email me one now" }).click();
+await view.getByText("One was sent a moment ago. Try again in a few minutes.").waitFor();
+console.log("ok - Email me one now: sends once, then says plainly when one was just sent");
+
+// 6. The morning email's link opens the page.
+await page.goto(origin + "/index.html#open=health");
+await view.locator(".rl-hp-kpis").waitFor();
+assert.ok((await view.innerText()).includes("4,210"), "the link from the email opens Relay health");
+await page.goto("about:blank");
+await page.goto(origin + "/index.html#open=health"); // opening the app fresh from the email
+await view.locator(".rl-hp-kpis").waitFor();
+assert.ok(!/open=/.test(await page.evaluate(() => location.hash)), "the address is tidied, so a reload doesn't open it again");
+console.log("ok - the link in the morning email opens Relay health");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS Relay health page: admins only, outlines then numbers, chart and table, plain words, refresh once, polished in light and dark");
 await browser.close(); server.close();

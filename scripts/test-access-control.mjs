@@ -75,7 +75,7 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
 // Admin routes: only Relay's admins; everyone else is told they don't exist.
 {
   for (const [method, path, body] of [["GET", "/relay/my/admin/reports"], ["POST", "/relay/my/admin/reports/11111111-1111-4111-8111-111111111111/review", { outcome: "dismiss" }],
-    ["GET", "/relay/my/admin/health"]]) {
+    ["GET", "/relay/my/admin/health"], ["POST", "/relay/my/admin/health/email", {}]]) {
     const res = await call(path, { method, auth: "Bearer " + alice, body });
     assert.equal(res.status, 404, method + " " + path + " is hidden from shoppers"); assert.deepEqual(await res.json(), { error: "not_found" });
   }
