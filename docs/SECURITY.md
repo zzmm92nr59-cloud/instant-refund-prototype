@@ -27,11 +27,24 @@ Written for whoever works on Relay next, person or AI: keep it true when the cod
 | **Visitor** | Nothing: anyone on the internet. |
 | **Shopper** | A session token from signing in (email link or code, Google, Microsoft or a passkey, plus the second step if they turned it on). |
 | **Shopper, half-way through two-step sign-in** | A short-lived "pending" token that only finishes signing in. It is not a session. |
-| **Relay admin** | A signed-in shopper whose email is in `RELAY_ADMIN_EMAILS`. |
+| **Relay admin** | A signed-in shopper whose email is in `RELAY_ADMIN_EMAILS`, in a session that passed a second step (below). |
 | **App reviewer** | A shopper signed in with the reviewer sign-in (below): a made-up address and a code that stays the same while it's on. |
 | **Shop** | The shop's Relay key (`rk_...`), given when the shop connects with Square or Shopify (or opens Relay inside Shopify admin). Relay keeps only a keyed hash of it. |
 | **Shopify, Square** | Webhooks signed with the shared secret (HMAC); unsigned or wrongly signed ones are refused. |
 | **Relay's scheduled jobs** | Cloudflare's cron triggers. They aren't reachable over the web at all. |
+
+### Two-step sign-in for everyone
+
+With `SECOND_STEP_REQUIRED = "on"` (worker/wrangler.toml; `worker/second-step.js`):
+
+- Every account needs a second step: an authenticator app, codes by text, or a passkey (Face ID, Touch ID or the phone's screen lock). The shared app-reviewer account is the exception, because nothing personal can be attached to it.
+- Until an account has a second step, a signed-in shopper can only do these: set one up (`/relay/my/2fa…`, `/relay/my/passkeys…`, `/relay/my/phone…`), see `/relay/me`, `/relay/my/second-step`, their profile, the email permission and `/relay/my/admin/me`, sign out, sign other devices out, or delete the account. Everything else answers `403 {"error":"second_step_needed"}`, and the app asks them to set one up.
+- Signing in with an email link or code, Google or Microsoft then always asks for the second step. That's a code, or, when the account's only second step is a passkey, the passkey itself (a passkey sign-in is complete on its own). A mailbox connected while signing in waits for that step.
+- A session records whether it passed a second step (`auth_sessions.second_step`). It counts as passed after a passkey sign-in, after a code at sign-in, or when the account's first second step was set up in that session. Adding another way from an older session doesn't count.
+- Relay's team tools need a session that passed a second step. With an older session, every admin route answers as if it didn't exist. `/relay/my/admin/me` says `signInAgain`, and the app offers a fresh sign-in.
+- While it's required, the last second step can't be turned off or removed (`409 {"error":"last_second_step"}`). Another has to be added first.
+- Setting a second step up, turning it off or removing a passkey emails the account, as before (`security-mail.js`). Forced set-up has one known limit: someone who gets into an inbox before its owner has set up a second step could set up their own. The owner is emailed when that happens.
+- **Proved by** `scripts/test-second-step.mjs` and `scripts/test-second-step-ui.mjs`.
 
 ### What each caller can do
 

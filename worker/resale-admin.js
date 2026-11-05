@@ -7,6 +7,8 @@
 // order number or address.
 // What an admin can do: dismiss, remove the reported seller's listing, or block the reported member.
 // A block is remembered by a hash of the email so deleting and re-creating the account does not undo it.
+import { secondStepRequired } from "./second-step.js";
+
 export const ADMIN_TABLE_SQL = [
   `CREATE TABLE IF NOT EXISTS resale_report_reviews (
      report_id TEXT PRIMARY KEY, outcome TEXT NOT NULL, reviewed_at INTEGER NOT NULL)`,
@@ -14,7 +16,12 @@ export const ADMIN_TABLE_SQL = [
      email_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, report_id TEXT)`
 ];
 
+// While two-step sign-in is required (second-step.js), an admin's session must also have passed a second step; otherwise
+// every admin route answers as if it did not exist, and /relay/my/admin/me says to sign in again.
 export function isAdmin(env, shopper) {
+  return listedAdmin(env, shopper) && (!secondStepRequired(env) || shopper.secondStep === true);
+}
+function listedAdmin(env, shopper) {
   const list = String(env.RELAY_ADMIN_EMAILS || "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
   return Boolean(shopper && shopper.email && list.includes(String(shopper.email).toLowerCase()));
 }
@@ -143,7 +150,7 @@ async function review(env, admin, reportId, outcome, now) {
 export async function handleResaleAdminRoute(path, method, request, env, cors, shopper, now) {
   if (!path.startsWith("/relay/my/admin/")) return null;
   if (path === "/relay/my/admin/me" && method === "GET") {
-    if (!isAdmin(env, shopper)) return json({ admin: false }, 200, cors);
+    if (!isAdmin(env, shopper)) return json({ admin: false, ...(listedAdmin(env, shopper) ? { signInAgain: true } : {}) }, 200, cors);
     return json({ admin: true, openReports: await openReportCount(env) }, 200, cors);
   }
   // Anyone else gets the same answer as for a path that does not exist.
