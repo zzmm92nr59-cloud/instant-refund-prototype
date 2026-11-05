@@ -12,7 +12,9 @@
 //
 // Who: only the shopper whose verified sign-in email matches shop A's order (returns.js checks). What: an item that can still
 // be returned through Relay, for an item shop B has for sale right now (asked of shop B's Shopify before anything starts).
-// Test shops (Shopify development stores) only swap with test shops, and real shops only with real shops.
+// Shop B must be one that tells Relay about its paid orders, or the swap could never show as done. Test shops (Shopify
+// development stores) only swap with test shops, and real shops only with real shops. A swap still waiting for shop B's
+// order can be stopped by the shopper; the return at shop A goes ahead.
 import { ensureOnce } from "./once.js";
 import { checkEligibility, initiateReturn, ensureReturnsTables, REASON_TEXT } from "./returns.js";
 import { listConnectedShopifyStores, shopifyShopsForDisplay } from "./shopify-connect.js";
@@ -60,7 +62,7 @@ async function shopsFor(env, fromShop) {
   // A shop Relay can't place is treated as a test shop, so it's never mixed with real ones.
   const fromTest = !from || Boolean(from.test);
   return { fromName: (from && from.label) || shopWord(fromShop), fromTest,
-    shops: all.filter(s => s.connected && s.domain !== fromShop && Boolean(s.test) === fromTest) };
+    shops: all.filter(s => s.connected && s.sendsOrders && s.domain !== fromShop && Boolean(s.test) === fromTest) };
 }
 
 // Items at a shop from the catalogue Relay keeps of it (refreshed from the shop): priced in pounds and in stock when Relay
@@ -150,7 +152,8 @@ async function start(env, shopper, body, o) {
   }
   await db.prepare("UPDATE relay_cross_swaps SET status = 'waiting', return_id = ?, return_ref = ? WHERE id = ?").bind(ret.returnId, ret.returnRef, id).run();
   return [200, { ...ret, swapId: id, fromShop: fromName, fromTitle: check.line.title, fromPriceMinor: check.line.priceMinor,
-    toShop: to.label || shopWord(to.domain), toTitle, toPriceMinor: livePrice, toKey: body.toKey, buyUrl: buyLink(to.domain, k[2]), testShop: Boolean(to.test) }];
+    toShop: to.label || shopWord(to.domain), toTitle, toPriceMinor: livePrice, toKey: body.toKey, buyUrl: buyLink(to.domain, k[2]), testShop: Boolean(to.test),
+    testOrders: Boolean(to.test && to.canOrder) }];
 }
 
 // Shop B's own checkout with the item in the basket (Shopify's cart link). Nothing about the shopper goes in it.
@@ -179,7 +182,8 @@ export async function crossSwapsFor(env, shopper) {
     if (Number(done && done.meta && done.meta.changes) === 0) continue;
     r.status = "ordered"; r.new_order_id = hit.id; r.ordered_at = hit.t;
   }
-  const tests = new Set((await shopifyShopsForDisplay(env, { includeTest: true }).catch(() => [])).filter(s => s.test).map(s => s.domain));
+  const shops = await shopifyShopsForDisplay(env, { includeTest: true }).catch(() => []);
+  const tests = new Set(shops.filter(s => s.test).map(s => s.domain)), testOrders = new Set(shops.filter(s => s.test && s.canOrder).map(s => s.domain));
   return rows.map(r => {
     const variant = (/\/(\d{1,20})$/.exec(String(r.to_variant)) || [])[1];
     const waiting = r.status === "waiting" && variant;
@@ -187,7 +191,7 @@ export async function crossSwapsFor(env, shopper) {
       fromPriceMinor: r.from_price_minor, returnRef: r.return_ref, toShop: r.to_shop_name || shopWord(r.to_shop), toTitle: r.to_title, toPriceMinor: r.to_price_minor,
       status: r.status, startedAt: iso(r.created_at), orderedAt: iso(r.ordered_at), newOrderId: r.new_order_id || null, toVariantId: variant || null,
       buyUrl: waiting ? buyLink(r.to_shop, variant) : null, toKey: waiting ? "shopify:" + r.to_shop + ":variant:gid://shopify/ProductVariant/" + variant : null,
-      testShop: tests.has(r.to_shop) };
+      testShop: tests.has(r.to_shop), testOrders: testOrders.has(r.to_shop) };
   });
 }
 
@@ -198,7 +202,7 @@ async function shopsWithStock(env) {
   const stocked = new Set(((await env.RELAY_DB.prepare(`SELECT DISTINCT i.provider AS p FROM retailer_catalog_items i JOIN retailer_catalog_variants v ON v.item_id = i.id
       JOIN retailer_inventory_snapshots q ON q.variant_id = v.id WHERE i.provider LIKE 'shopify:%' AND v.price_minor > 0 AND v.currency = 'GBP' AND q.quantity > 0`).all()).results || [])
     .map(r => String(r.p).slice(8)));
-  return { kinds: new Map(all.map(s => [s.domain, Boolean(s.test)])), stocked: all.filter(s => s.connected && stocked.has(s.domain)) };
+  return { kinds: new Map(all.map(s => [s.domain, Boolean(s.test)])), stocked: all.filter(s => s.connected && s.sendsOrders && stocked.has(s.domain)) };
 }
 
 // Puts each swap on the purchases it belongs to: the item sent back (crossSwap, which stops it being offered for another
@@ -246,15 +250,26 @@ export async function crossSwapsForExport(env, shopperId) {
   } catch (e) { if (/no such table/i.test(String(e && e.message))) return []; throw e; }
 }
 
+// POST /relay/my/cross-swap/<id>/cancel: the shopper's own swap, while it waits for shop B's order. The return at shop A
+// goes ahead (it's the shopper's return, and the shop has been told).
+async function cancel(env, shopper, id) {
+  const done = await env.RELAY_DB.prepare("UPDATE relay_cross_swaps SET status = 'cancelled' WHERE id = ? AND shopper_id = ? AND status = 'waiting'").bind(id, shopper.id).run();
+  if (Number(done && done.meta && done.meta.changes) === 1) return [200, { ok: true }];
+  const row = await env.RELAY_DB.prepare("SELECT status FROM relay_cross_swaps WHERE id = ? AND shopper_id = ?").bind(id, shopper.id).first();
+  return row ? [409, { error: row.status === "ordered" ? "already_ordered" : "not_waiting" }] : [404, { error: "not_found" }];
+}
+
 // Routes under /relay/my/cross-swap for a signed-in shopper.
 export async function handleCrossSwapRoute(request, env, url, cors, shopper, o = {}) {
   const path = url.pathname;
-  if (path !== "/relay/my/cross-swap" && path !== "/relay/my/cross-swap/options" && path !== "/relay/my/cross-swaps") return null;
+  const stop = /^\/relay\/my\/cross-swap\/([0-9a-f-]{36})\/cancel$/.exec(path);
+  if (path !== "/relay/my/cross-swap" && path !== "/relay/my/cross-swap/options" && path !== "/relay/my/cross-swaps" && !stop) return null;
   await ensureCrossSwapTables(env.RELAY_DB);
   await ensureReturnsTables(env.RELAY_DB);
   await ensureExchangeTables(env.RELAY_DB); // the return checks look for a swap of another size or colour too
   if (path === "/relay/my/cross-swap/options" && request.method === "GET") { const [s, b] = await options(env, shopper, url); return json(b, s, cors); }
   if (path === "/relay/my/cross-swaps" && request.method === "GET") return json({ swaps: await crossSwapsFor(env, shopper) }, 200, cors);
+  if (stop && request.method === "POST") { const [s, b] = await cancel(env, shopper, stop[1]); return json(b, s, cors); }
   if (path === "/relay/my/cross-swap" && request.method === "POST") {
     const body = await request.json().catch(() => null);
     const [s, b] = await start(env, shopper, body || {}, o);

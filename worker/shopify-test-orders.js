@@ -39,6 +39,10 @@ export async function handleShopifyTestRoute(request, env, url, cors, shopper, o
   await ensureShopPlanTable(db);
   const plan = await db.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = ?").bind(k[1]).first();
   if (!plan || Number(plan.test_shop) !== 1) return json({ error: "not_a_test_shop" }, 403, cors);
+  // The shop must have let Relay create orders (Shopify's "write_orders"); a test shop connected before Relay asked for it
+  // hasn't, until it opens Relay in its Shopify admin again. Not counted against the day's test orders.
+  const conn = await db.prepare("SELECT scopes FROM shopify_shops WHERE domain = ?").bind(k[1]).first();
+  if (!conn || !String(conn.scopes || "").split(",").map(x => x.trim()).includes("write_orders")) return json({ error: "shop_cannot_order" }, 409, cors);
   await db.prepare(SHOPIFY_TEST_ORDERS_SQL).run();
   const used = await db.prepare("SELECT COUNT(*) AS n FROM shopify_test_orders WHERE shopper_id = ? AND created_at > ?").bind(shopper.id, now - DAY).first();
   if (Number(used && used.n) >= TEST_ORDERS_PER_DAY) return json({ error: "too_many_test_orders" }, 429, cors);

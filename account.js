@@ -5344,10 +5344,15 @@
       api("/relay/my/testing/shopify-order", { method: "POST", body: { variantKey: toKey } }).then(function (r) {
         if (r.ok && r.body && r.body.ok) { say(msg, r.body.message); setTimeout(after, 900); return; }
         b.disabled = false;
-        say(msg, r.body && r.body.error === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
+        say(msg, testOrderError(r.body && r.body.error), true);
       }, function () { b.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
     } });
     host.appendChild(b); host.appendChild(msg);
+  }
+  function testOrderError(e) {
+    return e === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow."
+      : e === "shop_cannot_order" ? "This test shop hasn't let Relay place orders yet. Open Relay in the shop's Shopify admin to update its permissions, then try again."
+      : "The test shop didn't take the order. Please try again in a minute.";
   }
   function openCrossSwap(o, it, done) {
     var shopA = o.store || "the shop", started = false, picked = null;
@@ -5443,7 +5448,7 @@
       sheet.appendChild(el("p", { className: "rl-xs-p", text: b.toTitle + ", " + money(b.toPriceMinor, "GBP") + ". This opens " + b.toShop + "'s own checkout with it in your basket. Use your Relay email there, so Relay can show the swap as done." }));
       if (/^https:\/\//.test(b.buyUrl || "")) sheet.appendChild(el("a", { className: "rl-btn rl-xs-buy", href: b.buyUrl, target: "_blank", rel: "noopener noreferrer" },
         [el("span", { text: "Go to " + b.toShop + "'s checkout" }), jIc("ext", 18)]));
-      if (b.testShop && testingOn() && b.toKey) testBuy(sheet, b.toKey, b.toShop, close);
+      if (b.testOrders && testingOn() && b.toKey) testBuy(sheet, b.toKey, b.toShop, close);
       sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Done", onclick: close }));
     }
     pick();
@@ -5451,7 +5456,7 @@
   // ---- Test orders at Relay's Shopify test shops (development stores): testing tools only. ----
   function mountShopifyTest(host, done) {
     api("/relay/shopify/catalogue?test=1").then(function (r) {
-      var items = ((r.ok && r.body && r.body.products) || []).filter(function (p) { return p.testShop && Number(p.quantity) > 0 && p.currency === "GBP" && p.sku; });
+      var items = ((r.ok && r.body && r.body.products) || []).filter(function (p) { return p.testShop && p.testOrders && Number(p.quantity) > 0 && p.currency === "GBP" && p.sku; });
       if (!items.length) return;
       var card = el("details", { className: "card", style: "padding:14px 16px;margin-top:10px" });
       card.appendChild(el("summary", { text: "Testing: place a test order at a Shopify test shop", style: "font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center" }));
@@ -5464,7 +5469,7 @@
         api("/relay/my/testing/shopify-order", { method: "POST", body: { variantKey: pick.value } }).then(function (p) {
           go.disabled = false;
           if (p.ok && p.body && p.body.ok) { say(msg, p.body.message); setTimeout(done, 1200); return; }
-          say(msg, p.body && p.body.error === "too_many_test_orders" ? "That's 5 test orders today. Try again tomorrow." : "The test shop didn't take the order. Please try again in a minute.", true);
+          say(msg, testOrderError(p.body && p.body.error), true);
         }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Please try again.", true); });
       } });
       [pick, go, msg].forEach(function (n) { card.appendChild(n); });
@@ -5538,7 +5543,21 @@
     else if (xs) {
       status("Swapping for " + xs.toTitle + " from " + xs.toShop + ". Buy it there with your Relay email to finish.", false);
       if (/^https:\/\//.test(xs.buyUrl || "")) actions.appendChild(el("a", { className: "rl-po-primary", href: xs.buyUrl, target: "_blank", rel: "noopener noreferrer", text: "Buy it from " + xs.toShop }));
-      if (xs.testShop && xs.toKey && testingOn()) { var tbx = el("div", { style: "flex:1 1 100%" }); testBuy(tbx, xs.toKey, xs.toShop, redraw); actions.appendChild(tbx); }
+      var stopMsg = el("div", { className: "rl-msg" });
+      var stopBtn = el("button", { className: "rl-po-secondary", text: "Stop the swap", onclick: function () {
+        ask("Stop swapping for " + xs.toTitle + " from " + xs.toShop + "? Your return to " + shopName + " still goes ahead, and " + shopName + " refunds you as usual.", "Stop the swap", function () {
+          if (stopBtn.disabled) return;
+          stopBtn.disabled = true;
+          api("/relay/my/cross-swap/" + xs.id + "/cancel", { method: "POST" }).then(function (r) {
+            if (r.ok) return redraw();
+            stopBtn.disabled = false;
+            say(stopMsg, r.body && r.body.error === "already_ordered" ? "You've already bought it from " + xs.toShop + ", so the swap is done." : "Couldn't stop the swap. Please try again.", true);
+          }, function () { stopBtn.disabled = false; say(stopMsg, "Couldn't reach Relay. Check your connection and try again.", true); });
+        });
+      } });
+      actions.appendChild(stopBtn);
+      if (xs.testOrders && xs.toKey && testingOn()) { var tbx = el("div", { style: "flex:1 1 100%" }); testBuy(tbx, xs.toKey, xs.toShop, redraw); actions.appendChild(tbx); }
+      card.appendChild(stopMsg);
     }
     if (it.boughtInSwap) status("Bought in a swap for " + it.boughtInSwap.fromTitle + " from " + it.boughtInSwap.fromShop + ".", true);
     if (it.exchangeable) actions.appendChild(el("button", { className: "rl-po-primary", text: "Swap", title: "Swap for another size or colour", onclick: function () { openExchange(o, it, redraw); } }));

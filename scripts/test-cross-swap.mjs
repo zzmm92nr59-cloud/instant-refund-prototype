@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { handleCrossSwapRoute, attachCrossSwaps, crossSwapsForExport } from "../worker/cross-swap.js";
 import { handleShopifyTestRoute, TEST_ORDERS_PER_DAY } from "../worker/shopify-test-orders.js";
 import { ingestShopifyOrder } from "../worker/shopify-webhooks.js";
-import { ensureShopifyShopSchema } from "../worker/shopify-connect.js";
+import { ensureShopifyShopSchema, HOOKS_SET } from "../worker/shopify-connect.js";
 import { emailHash } from "../worker/auth.js";
 
 const sqlite = new DatabaseSync(":memory:");
@@ -23,11 +23,16 @@ sqlite.exec(`ALTER TABLE retailer_catalog_items ADD COLUMN store_label TEXT; ALT
   CREATE TABLE IF NOT EXISTS retailer_order_emails (order_id TEXT PRIMARY KEY, email_hash TEXT NOT NULL, created_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS shopify_shop_plan (domain TEXT PRIMARY KEY, test_shop INTEGER NOT NULL, plan TEXT, checked_at INTEGER NOT NULL);`);
 
-// Shops: Oak & Thread and Birch Lane are real shops; Fern Test and Moss Test are Shopify development stores (test shops).
+// Shops: Oak & Thread, Birch Lane and Elm Row are real shops; Fern Test, Moss Test and Ash Test are Shopify development stores
+// (test shops). Elm Row and Ash Test connected before Relay set up order notifications (and Ash Test before it could
+// create orders), so neither tells Relay about its orders: a swap to them could never show as done.
 const OAK = "oak-thread.myshopify.com", BIRCH = "birch-lane.myshopify.com", FERN = "fern-test.myshopify.com", MOSS = "moss-test.myshopify.com";
+const ELM = "elm-row.myshopify.com", ASH = "ash-test.myshopify.com";
 await ensureShopifyShopSchema(db);
-for (const [domain, label, test] of [[OAK, "Oak & Thread", 0], [BIRCH, "Birch Lane", 0], [FERN, "Fern Test", 1], [MOSS, "Moss Test", 1]]) {
-  sqlite.prepare("INSERT INTO shopify_shops (domain, label, access_iv, access_data, created_at, updated_at) VALUES (?,?,?,?,?,?)").run(domain, label, "iv", "data", 1, 1);
+const FULL = "read_products,read_inventory,write_order_edits,write_orders", OLD = "read_products,read_inventory,read_orders,write_order_edits";
+for (const [domain, label, test, scopes, hooks] of [[OAK, "Oak & Thread", 0, FULL, HOOKS_SET], [BIRCH, "Birch Lane", 0, OLD, HOOKS_SET], [FERN, "Fern Test", 1, FULL, HOOKS_SET],
+  [MOSS, "Moss Test", 1, FULL, HOOKS_SET], [ELM, "Elm Row", 0, OLD, null], [ASH, "Ash Test", 1, OLD, null]]) {
+  sqlite.prepare("INSERT INTO shopify_shops (domain, label, access_iv, access_data, scopes, hooks, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)").run(domain, label, "iv", "data", scopes, hooks, 1, 1);
   sqlite.prepare("INSERT INTO shopify_shop_plan (domain, test_shop, plan, checked_at) VALUES (?,?,?,?)").run(domain, test, test ? "Development" : "Basic", 1);
   sqlite.prepare("INSERT OR IGNORE INTO retailer_connections (id, provider, merchant_external_id) VALUES (?,?,?)").run("shopify:" + domain, "shopify", domain);
 }
@@ -45,6 +50,8 @@ product(BIRCH, 2, "Linen Shirt", [[21, "M", 4500, 4], [22, "L", 4500, 0]]);
 product(BIRCH, 3, "Canvas Tote", [[31, "Default Title", 1800, 2], [32, "Euro", 1800, 5, "EUR"]]);
 product(FERN, 4, "Test Trainers", [[41, "UK 9", 6000, 6]]);
 product(MOSS, 5, "Test Jacket", [[51, "M", 9000, 1]]);
+product(ELM, 6, "Wool Socks", [[61, "One size", 900, 9]]);
+product(ASH, 7, "Test Gloves", [[71, "M", 1500, 4]]);
 const key = (shop, vid) => "shopify:" + shop + ":variant:gid://shopify/ProductVariant/" + vid;
 
 const alice = { id: "alice-id", email: "alice@example.com", emailHash: await emailHash(SECRET, "alice@example.com") };
@@ -106,13 +113,14 @@ const opts = await optionsFor(alice, o1, "901");
 assert.equal(opts.status, 200); assert.equal(opts.body.eligible, true);
 assert.deepEqual(opts.body.item, { title: "Logo Cap", priceMinor: 2000, shop: "Oak & Thread" });
 assert.deepEqual(opts.body.shops.map(s => [s.name, s.items.map(i => [i.product, i.variant, i.priceMinor])]),
-  [["Birch Lane", [["Canvas Tote", null, 1800], ["Linen Shirt", "M", 4500]]]], "Birch Lane only: in stock, in pounds; no test shops, not Oak & Thread itself");
+  [["Birch Lane", [["Canvas Tote", null, 1800], ["Linen Shirt", "M", 4500]]]],
+  "Birch Lane only: in stock, in pounds; no test shops, not Oak & Thread itself, and not Elm Row (it doesn't tell Relay about its orders)");
 assert.equal(opts.body.shops[0].items[1].key, key(BIRCH, 21));
 assert.equal(opts.body.shops[0].items[1].imageUrl, "https://cdn.example/2.png");
 // Past the 7 days: not offered, with the reason.
 assert.deepEqual((await optionsFor(alice, o2, "902")).body, { eligible: false, reason: "outside_return_window" });
 // A test shop's order is offered other test shops only.
-assert.deepEqual((await optionsFor(alice, o3, "931")).body.shops.map(s => s.name), ["Moss Test"]);
+assert.deepEqual((await optionsFor(alice, o3, "931")).body.shops.map(s => s.name), ["Moss Test"], "not Ash Test either");
 // The app offers the swap only where there's a choice: another shop of the same kind with something in stock.
 let pre = await attachCrossSwaps(env, alice, [{ id: o1, retailer: "shopify:" + OAK, items: [{ lineId: "901", returnable: true }, { lineId: "909", returnable: false }] },
   { id: o3, retailer: "shopify:" + FERN, items: [{ lineId: "931", returnable: true }] }]);
@@ -131,6 +139,7 @@ assert.equal((await call(alice, "/relay/my/cross-swap", { ...base, reason: undef
 assert.equal((await call(alice, "/relay/my/cross-swap", { ...base, toKey: "made-up" })).body.error, "not_an_option");
 assert.equal((await call(alice, "/relay/my/cross-swap", { ...base, toKey: key(OAK, 11) })).body.error, "not_an_option", "not the same shop");
 assert.equal((await call(alice, "/relay/my/cross-swap", { ...base, toKey: key(MOSS, 51), agreedPriceMinor: 9000 })).body.error, "not_an_option", "a real order never swaps to a test shop");
+assert.equal((await call(alice, "/relay/my/cross-swap", { ...base, toKey: key(ELM, 61), agreedPriceMinor: 900 })).body.error, "not_an_option", "never to a shop that doesn't tell Relay about its orders");
 assert.equal(calls.length + emails.length, 0);
 live["21"] = { availableForSale: false, price: "45.00", product: { status: "ACTIVE" } };
 let r = await call(alice, "/relay/my/cross-swap", base);
@@ -153,8 +162,8 @@ assert.equal(r.status, 200, JSON.stringify(r.body));
 assert.match(r.body.returnRef, /^RLY-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
 assert.equal(r.body.shopNotified, true); assert.equal(r.body.labelAvailable, false);
 assert.equal(r.body.buyUrl, "https://" + BIRCH + "/cart/21:1", "shop B's own checkout, with nothing about the shopper in the link");
-assert.deepEqual([r.body.fromShop, r.body.fromTitle, r.body.fromPriceMinor, r.body.toShop, r.body.toTitle, r.body.toPriceMinor, r.body.testShop],
-  ["Oak & Thread", "Logo Cap", 2000, "Birch Lane", "Linen Shirt (M)", 4750, false]);
+assert.deepEqual([r.body.fromShop, r.body.fromTitle, r.body.fromPriceMinor, r.body.toShop, r.body.toTitle, r.body.toPriceMinor, r.body.testShop, r.body.testOrders],
+  ["Oak & Thread", "Logo Cap", 2000, "Birch Lane", "Linen Shirt (M)", 4750, false, false]);
 assert.equal(emails.length, 1); assert.deepEqual(emails[0].to, ["help@oak.example"]); assert.match(emails[0].subject, /^Return request RLY-/);
 assert.ok(!calls.some(c => /mutation/.test(c.query)), "Relay places no order and changes nothing at either shop");
 assert.ok(!calls.some(c => c.shop === BIRCH && !/RelayCrossSwapCheck/.test(c.query)), "shop B is only asked whether it can sell the item");
@@ -201,6 +210,7 @@ console.log("ok - listed for the shopper, and in their data download");
 calls = [];
 assert.equal((await testOrder(alice, key(BIRCH, 21))).body.error, "not_a_test_shop", "never at a real shop");
 assert.equal((await testOrder(alice, "made-up")).body.error, "not_a_test_item");
+assert.deepEqual(await testOrder(alice, key(ASH, 71)), { status: 409, body: { error: "shop_cannot_order" } }, "a test shop that hasn't let Relay create orders");
 assert.equal(calls.length, 0);
 let t = await testOrder(alice, key(MOSS, 51));
 assert.equal(t.status, 200, JSON.stringify(t.body)); assert.equal(t.body.shown, true);
@@ -220,12 +230,28 @@ console.log("ok - test orders: test shops only, the tester's own email, shown st
 // 9. The whole thing on test shops: a test order at one test shop, swapped for a test shop's item, bought there with a test order.
 const fernOrder = sqlite.prepare("SELECT id FROM retailer_orders WHERE connection_id = ?").get("shopify:" + FERN).id;
 const sw = await call(alice, "/relay/my/cross-swap", { orderId: fernOrder, lineId: "931", toKey: key(MOSS, 51), reason: "wrong_size", agreedPriceMinor: 9000 });
-assert.equal(sw.status, 200, JSON.stringify(sw.body)); assert.equal(sw.body.testShop, true);
+assert.equal(sw.status, 200, JSON.stringify(sw.body)); assert.equal(sw.body.testShop, true); assert.equal(sw.body.testOrders, true);
 sqlite.prepare("DELETE FROM shopify_test_orders").run();
 await ingestShopifyOrder(env, MOSS, { id: 7777, name: "#7777", created_at: new Date(Date.now() + 2000).toISOString(), currency: "GBP", email: "alice@example.com", total_price: "90.00",
   line_items: [{ id: 8888, title: "Test Jacket", quantity: 1, price: "90.00", product_id: 5, variant_id: 51 }] }, "test:1");
 p = await attachCrossSwaps(env, alice, [{ id: fernOrder, retailer: "shopify:" + FERN, items: [{ lineId: "931", variantId: "41", title: "Test Trainers" }] }]);
 assert.equal(p[0].items[0].crossSwap.status, "ordered");
 console.log("ok - end to end on test shops: test order, swap to another test shop, its order matched");
+
+// 10. Stopping a swap: only the shopper's own, only while it waits for shop B's order; the return at shop A goes ahead.
+const o4 = order(OAK, 1004, alice, daysAgo(1), { ...capLine, id: "904" });
+live["31"] = { availableForSale: true, price: "18.00", product: { status: "ACTIVE" } };
+const sw2 = await call(alice, "/relay/my/cross-swap", { orderId: o4, lineId: "904", toKey: key(BIRCH, 31), reason: "faulty", agreedPriceMinor: 1800 });
+assert.equal(sw2.status, 200, JSON.stringify(sw2.body));
+const stop = (who, id) => call(who, "/relay/my/cross-swap/" + id + "/cancel", {});
+assert.deepEqual(await stop(bob, sw2.body.swapId), { status: 404, body: { error: "not_found" } }, "never someone else's");
+assert.deepEqual(await stop(alice, sw2.body.swapId), { status: 200, body: { ok: true } });
+assert.deepEqual(await stop(alice, sw2.body.swapId), { status: 409, body: { error: "not_waiting" } });
+const done = (await call(alice, "/relay/my/cross-swaps")).body.swaps.find(x => x.status === "ordered");
+assert.deepEqual(await stop(alice, done.id), { status: 409, body: { error: "already_ordered" } }, "a finished swap stays finished");
+p = await attachCrossSwaps(env, alice, [{ id: o4, retailer: "shopify:" + OAK, items: [{ lineId: "904", variantId: "11", title: "Logo Cap", returnable: false }] }]);
+assert.equal(p[0].items[0].crossSwap, undefined, "a stopped swap isn't shown");
+assert.equal(sqlite.prepare("SELECT status FROM relay_returns WHERE order_id = ?").get(o4).status, "requested", "the return goes ahead");
+console.log("ok - a waiting swap can be stopped by its shopper; the return goes ahead; a finished one can't");
 
 console.log("PASS swaps across shops: owner only, real with real and test with test, live stock and price at shop B, return started at shop A, shop B's own checkout, its order matched, test orders at test shops only");

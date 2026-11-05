@@ -14,7 +14,7 @@ await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http:/
 await mkdir("/tmp/shots", { recursive: true });
 const EMAIL = "jess.tester@example.com", day = n => new Date(Date.now() + n * 864e5).toISOString();
 const ORDER = "shopify:oak-thread.myshopify.com:order:1001", KEY = "shopify:birch-lane.myshopify.com:variant:gid://shopify/ProductVariant/21";
-const TEST_KEY = "shopify:moss-test.myshopify.com:variant:gid://shopify/ProductVariant/51";
+const TEST_KEY = "shopify:moss-test.myshopify.com:variant:gid://shopify/ProductVariant/51", SWAP = "dddddddd-dddd-4ddd-8ddd-000000000001";
 const SHOPPER_NEVER_SEES = /\bdemo\b|sandbox|simulat|fictional|prototype|test mode|test shop|preview only/i;
 
 const st = { phase: "new", otherShops: true, posts: [], testShop: false, livePrice: 4750 };
@@ -23,10 +23,11 @@ const cap = () => {
   if (st.phase === "new" && st.otherShops) it.otherShops = true;
   if (st.phase !== "new") {
     it.returnInfo = { status: "requested", ref: "RLY-ABCD-EFGH", trackingNumber: null, refundMinor: null, refundedAt: null };
-    it.crossSwap = { id: "x1", orderId: ORDER, lineId: "901", fromShop: "Oak & Thread", fromTitle: "Logo Cap", fromPriceMinor: 2000, returnRef: "RLY-ABCD-EFGH",
+    it.crossSwap = { id: SWAP, orderId: ORDER, lineId: "901", fromShop: "Oak & Thread", fromTitle: "Logo Cap", fromPriceMinor: 2000, returnRef: "RLY-ABCD-EFGH",
       toShop: st.testShop ? "Moss Test" : "Birch Lane", toTitle: st.testShop ? "Test Jacket (M)" : "Linen Shirt (M)", toPriceMinor: 4750, status: st.phase === "ordered" ? "ordered" : "waiting",
       startedAt: day(0), orderedAt: st.phase === "ordered" ? day(0) : null, buyUrl: st.phase === "ordered" ? null : "https://birch-lane.myshopify.com/cart/21:1",
-      toKey: st.phase === "ordered" ? null : (st.testShop ? TEST_KEY : KEY), testShop: st.testShop };
+      toKey: st.phase === "ordered" ? null : (st.testShop ? TEST_KEY : KEY), testShop: st.testShop, testOrders: st.testShop };
+    if (st.phase === "stopped") delete it.crossSwap;
   }
   return it;
 };
@@ -52,10 +53,11 @@ await ctx.route("https://**/*", async route => {
     await new Promise(ok => setTimeout(ok, 300));
     if (b.agreedPriceMinor !== st.livePrice) return j({ error: "price_changed", priceMinor: st.livePrice }, 409);
     st.phase = "waiting";
-    return j({ returnId: "r1", returnRef: "RLY-ABCD-EFGH", status: "requested", labelAvailable: false, shopNotified: true, item: "Logo Cap", priceMinor: 2000, swapId: "x1",
+    return j({ returnId: "r1", returnRef: "RLY-ABCD-EFGH", status: "requested", labelAvailable: false, shopNotified: true, item: "Logo Cap", priceMinor: 2000, swapId: SWAP,
       fromShop: "Oak & Thread", fromTitle: "Logo Cap", fromPriceMinor: 2000, toShop: "Birch Lane", toTitle: "Linen Shirt (M)", toPriceMinor: 4750, toKey: KEY,
       buyUrl: "https://birch-lane.myshopify.com/cart/21:1", testShop: false });
   }
+  if (p === "/relay/my/cross-swap/" + SWAP + "/cancel" && m === "POST") { await new Promise(ok => setTimeout(ok, 300)); st.phase = "stopped"; return j({ ok: true }); }
   if (p === "/relay/my/testing/shopify-order" && m === "POST") { await new Promise(ok => setTimeout(ok, 300)); st.phase = "ordered"; return j({ ok: true, name: "#5001", message: "Test order #5001 placed at Moss Test under your Relay email. No real money moved." }); }
   if (p === "/relay/shopify/catalogue") return j({ products: [] });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
@@ -175,9 +177,20 @@ const card = page.locator(".rl-po").filter({ hasText: "Swapping for Linen Shirt 
 await card.waitFor();
 assert.match(await card.innerText(), /Return started · ref RLY-ABCD-EFGH/);
 assert.equal(await card.getByRole("link", { name: "Buy it from Birch Lane" }).getAttribute("href"), "https://birch-lane.myshopify.com/cart/21:1");
-assert.equal(await card.getByRole("button", { name: /Swap|Return/ }).count(), 0, "can't be returned or swapped again");
+assert.equal(await card.getByRole("button", { name: /^(Swap|Return|Swap with another shop)$/ }).count(), 0, "can't be returned or swapped again");
 assert.ok(!SHOPPER_NEVER_SEES.test(await card.innerText()));
+await polished("waiting card", ".rl-po");
 console.log("ok - the card shows the swap waiting, with the second shop's checkout");
+
+// 6b. Stopping the swap asks first, says the return goes ahead, and is sent once; then only the return shows.
+await card.getByRole("button", { name: "Stop the swap" }).click();
+const confirmBox = page.getByRole("alertdialog");
+await confirmBox.getByText("Stop swapping for Linen Shirt (M) from Birch Lane? Your return to Oak & Thread still goes ahead, and Oak & Thread refunds you as usual.").waitFor();
+await confirmBox.getByRole("button", { name: "Stop the swap" }).dblclick();
+await page.locator(".rl-po").filter({ hasText: "Return started · ref RLY-ABCD-EFGH" }).filter({ hasNotText: "Swapping for" }).waitFor();
+assert.deepEqual(st.posts.filter(x => /cancel$/.test(x[0])).map(x => x[0]), ["/relay/my/cross-swap/" + SWAP + "/cancel"], "stopped once for a double tap");
+console.log("ok - stopping a swap asks first, keeps the return, and is sent once");
+st.phase = "waiting";
 
 // 7. With testing on, a swap to a test shop can be finished with a test order; then the card shows it done.
 st.testShop = true;
