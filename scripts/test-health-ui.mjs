@@ -2,8 +2,9 @@
 // Checks: only an admin sees "Relay health"; the page shows the headline numbers, how confidently purchases were read, a
 // 14-day chart whose columns give their numbers when tapped (and a table of them all), shops (named only from 3 people)
 // and the admin's own receipts by shop, inboxes and scans (in plain words, never an error code), returns, swaps and the
-// rest; it shows greyed outlines while loading, keeps the last copy, and Refresh asks again once for a double tap. Every
-// part passes the polish rules in light and dark.
+// rest; orders checked against shops' own records (with the admin's own differences in plain words); it shows greyed
+// outlines while loading, keeps the last copy, and Refresh asks again once for a double tap. Every part passes the polish
+// rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
@@ -28,7 +29,16 @@ const HEALTH = {
   mine: { receipts: 61, personalMail: 2, noShop: 0, shops: [{ domain: "fennel.example", ...q({ receipts: 5, high: 3, low: 2, noTotal: 2, pasted: 1 }) }, { domain: "brindle.example", ...q({ receipts: 8, high: 8 }) }] },
   returnsAndSwaps: { returns: { requested: 2, refunded: 1 }, swaps: { completed: 3 }, labels: 2, payments: [{ status: "succeeded", test: true, count: 4 }] },
   extras: { gifts: 7, giftGivers: 2, earlierYearsRead: 5, notificationDevices: 4, notificationPeople: 3, priceWatches: 11, watchers: 4 },
-  shopsConnected: { shopify: 6, shopifyTest: 6, square: 1 }, security: { wrongCodesToday: 0 }
+  shopsConnected: { shopify: 6, shopifyTest: 6, square: 1 }, security: { wrongCodesToday: 0 },
+  checkedByShops: { days: 90, orders: 14, shoppers: 6, withInbox: 12, found: 10, byNumber: 8, notFound: 1, unsure: 1, allRight: 7,
+    parts: { shop: { right: 9, wrong: 1, missing: 0 }, total: { right: 8, wrong: 1, missing: 1 }, date: { right: 10, wrong: 0, missing: 0 },
+      number: { right: 8, wrong: 0, missing: 0 }, items: { right: 8, none: 1, missing: 0, extra: 1, quantity: 0 } },
+    byReader: [{ version: 26, found: 9, allRight: 7 }, { version: 25, found: 1, allRight: 0 }],
+    shops: [{ name: "Brindle & Co", people: 3, orders: 7, found: 6, allRight: 4, totalRight: 5, itemsRight: 5 }],
+    mine: { orders: 3, withInbox: true, found: 2, allRight: 1,
+      differences: [{ shop: "Larkspur Home", day: "2026-10-20", number: "#1002", readerVersion: 26, how: "number", parts: [
+        { part: "total", read: 5000, shop: 6000 }, { part: "items", verdict: "extra", read: 2, shop: 1, missing: [], extra: ["Shipping"] }] }],
+      notFound: [{ shop: "Larkspur Home", day: "2026-11-01", number: "#1004", unsure: false }] } }
 };
 const st = { admin: true, healthCalls: 0 };
 const browser = await chromium.launch();
@@ -130,6 +140,16 @@ for (const s of ["Shoppers", "12", "+3 this week", "Inboxes connected", "13", "R
   assert.ok(text.toLowerCase().includes(s.toLowerCase()), "the page shows: " + s); // section names are shown in capitals
 for (const code of ["gmail_reconnect_needed", "something_new"]) assert.ok(!text.includes(code), "no error codes on screen: " + code);
 console.log("ok - the page shows the headline numbers, reading quality, shops (from 3 people), the admin's own receipts, inboxes, returns and the rest");
+// Checked against shops' own records.
+const key = await view.locator(".rl-agroup", { hasText: "Checked against shops' own records" }).innerText();
+for (const s of ["Read exactly right", "70%", "10 orders were found, out of 12 orders in the last 90 days from shoppers with an inbox connected.",
+  "Found in the shopper's inbox", "8 by order number, the rest by shop and day", "Not sure which receipt", "From shoppers without an inbox",
+  "Total right", "8 of 10, 1 wrong, 1 not read", "Items right", "8 of 10, 1 with none read, 1 with extra lines", "Reader version 26", "7 of 9",
+  "Brindle & Co", "7 orders from 3 people, 6 found", "1 total wrong", "Items wrong in 1 order", "Your own orders: 2 of 3 found, 1 read exactly right.",
+  "Larkspur Home #1002", "20 Oct, read by version 26", "Total read as £50.00, shop says £60.00", "Extra lines read: Shipping", "Larkspur Home #1004", "1 Nov: not found in your inbox"])
+  assert.ok(key.includes(s), "the answer key shows: " + s);
+assert.match(await view.locator(".rl-agroup", { hasText: "Checked against shops' own records" }).locator(".rl-hp-meter").getAttribute("aria-label"), /^70% of orders found were read exactly right$/);
+console.log("ok - orders checked against shops' own records: each part, each reader version, shops from 3 people, and the admin's own differences in plain words");
 
 // 3. The chart: 14 columns; tapping one gives its numbers; the table has them all.
 const cols = view.locator(".rl-hp-chart button");
@@ -153,6 +173,15 @@ await view.getByRole("button", { name: "Refresh" }).dblclick();
 await page.waitForTimeout(900);
 assert.equal(st.healthCalls - before, 1, "a double tap refreshes once");
 assert.ok((await view.innerText()).includes("4,210"), "the numbers stay on screen while refreshing");
+// With no shop orders to check yet, the part says so (and what it will do); if it couldn't be worked out, it says that.
+HEALTH.checkedByShops = { ...HEALTH.checkedByShops, orders: 0, withInbox: 0, found: 0 };
+await view.getByRole("button", { name: "Refresh" }).click();
+await view.getByText("Nothing to check yet: none of the last 90 days' orders from connected shops belong to a Relay shopper.", { exact: false }).waitFor();
+await page.waitForTimeout(500);
+HEALTH.checkedByShops = null;
+await view.getByRole("button", { name: "Refresh" }).click();
+await view.getByText("Couldn't check this part just now. Try Refresh in a moment.").waitFor();
+assert.ok((await view.innerText()).includes("4,210"), "and the rest of the page is still there");
 await view.getByRole("button", { name: /Back to/ }).click();
 await row.click();
 assert.ok((await view.innerText()).includes("4,210"), "opening it again shows the last copy at once");

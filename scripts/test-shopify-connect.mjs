@@ -220,25 +220,28 @@ assert.equal((await (await hook("oak-thread.myshopify.com", "products/delete", {
 assert.deepEqual(sqlite.prepare("SELECT title FROM retailer_catalog_items WHERE provider = 'shopify:oak-thread.myshopify.com' ORDER BY title").all().map(r => r.title), ["Linen Cushion"]);
 // Paid orders from a shop that connected itself are kept with only a hash of the order email, so the shopper who
 // verified that email (and nobody else) sees the purchase in Relay.
-const paid = { id: 7001, created_at: "2026-10-20T10:00:00Z", currency: "GBP", total_price: "24.00", email: "Alice@Example.com", customer: { id: 5 },
+const paid = { id: 7001, name: "#1001", created_at: "2026-10-20T10:00:00Z", currency: "GBP", total_price: "24.00", email: "Alice@Example.com", customer: { id: 5 },
   line_items: [{ id: 9001, title: "Linen Cushion", quantity: 1, price: "24.00", product_id: 1, variant_id: 11 }] };
 assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", paid)).status, 200);
 const ord = sqlite.prepare("SELECT o.id, o.amount_minor, e.email_hash FROM retailer_orders o JOIN retailer_order_emails e ON e.order_id = o.id WHERE o.connection_id = 'shopify:oak-thread.myshopify.com'").all();
 assert.equal(ord.length, 1); assert.equal(ord[0].amount_minor, 2400);
 assert.equal(ord[0].email_hash, await emailHash(env.AUTH_SECRET, "alice@example.com"));
 assert.ok(!JSON.stringify(sqlite.prepare("SELECT * FROM retailer_orders").all()).toLowerCase().includes("alice@"), "the email address itself is never stored");
+assert.equal(sqlite.prepare("SELECT order_ref FROM retailer_orders WHERE id = ?").get(ord[0].id).order_ref, "#1001", "the order number the shop showed its customer is kept with the order");
 assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", { ...paid, id: 7002, currency: "USD" })).status, 422, "orders in another currency are refused");
 assert.equal((await (await hook("unknown-shop.myshopify.com", "orders/paid", { ...paid, id: 7003 })).json()).ignored, true, "orders from a shop that never connected are ignored");
 // Catch-up read on connect: recent paid orders, the same order twice is stored once.
 shopOrders["oak-thread.myshopify.com"] = [
   { legacyResourceId: "7001", email: "alice@example.com", createdAt: "2026-10-20T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "24.0" } }, 
     lineItems: { nodes: [{ id: "gid://shopify/LineItem/9001", title: "Linen Cushion", quantity: 1, originalUnitPriceSet: { shopMoney: { amount: "24.0" } }, product: { legacyResourceId: "1" }, variant: { legacyResourceId: "11" } }] } },
-  { legacyResourceId: "7004", email: null, createdAt: "2026-10-21T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "12.5" } }, 
+  { legacyResourceId: "7004", name: "#1004", email: null, createdAt: "2026-10-21T10:00:00Z", processedAt: null, currencyCode: "GBP", totalPriceSet: { shopMoney: { amount: "12.5" } }, 
     lineItems: { nodes: [{ id: "gid://shopify/LineItem/9004", title: "Stoneware Mug", quantity: 2, originalUnitPriceSet: { shopMoney: { amount: "6.25" } }, product: null, variant: null }] } }];
 const bf = await backfillShopifyOrders(env, "oak-thread.myshopify.com", "token-oak-thread.myshopify.com", { now });
 assert.deepEqual(bf, { orders: 2, emailLinked: 1, skipped: 0, error: null });
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = 'shopify:oak-thread.myshopify.com'").get().n, 2);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM order_items WHERE order_id LIKE 'shopify:oak-thread.myshopify.com:order:7001%'").get().n, 1, "webhook and catch-up never duplicate a line");
+assert.equal(sqlite.prepare("SELECT order_ref FROM retailer_orders WHERE id = 'shopify:oak-thread.myshopify.com:order:7004'").get().order_ref, "#1004", "the catch-up read keeps order numbers too");
+assert.equal(sqlite.prepare("SELECT order_ref FROM retailer_orders WHERE id = 'shopify:oak-thread.myshopify.com:order:7001'").get().order_ref, "#1001", "and never loses one it already had");
 // Privacy requests are answered.
 for (const t of ["customers/data_request", "customers/redact"]) assert.equal((await hook("oak-thread.myshopify.com", t, { customer: { id: 5 } })).status, 200, t);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE external_customer_id = '5'").get().n, 0, "a redact request deletes that customer's orders");

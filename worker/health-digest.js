@@ -80,6 +80,13 @@ export function digestMessage(h, alerts) {
       ...(h.helpChat ? [plural(h.helpChat.messagesThisWeek, "help chat message", "help chat messages") + ", " + plural(h.helpChat.handoffsThisWeek, "hand-off", "hand-offs") + " to a person."] : [])
     ]]
   ];
+  // Checked against shops' own records (answer-key.js), once there's anything to check.
+  const key = h.checkedByShops;
+  if (key && key.orders) groups.push(["Checked against shops' own records", [
+    plural(key.found, "order", "orders") + " from connected shops found in shoppers' inboxes in the last " + key.days + " days" +
+      (key.found ? "; " + Math.round(key.allRight / key.found * 100) + "% read exactly right." : "."),
+    ...(key.notFound ? [plural(key.notFound, "order wasn't", "orders weren't") + " found."] : [])
+  ]]);
   const subject = "Relay this morning: " + (look.length ? plural(look.length, "thing needs", "things need") + " a look" : "all well") + ", " + plural(y.kept, "receipt", "receipts") + " yesterday";
   const link = APP_URL + "#open=health";
   const text = "Here's how Relay is doing. Counts only, never anyone's receipts.\n\n" +
