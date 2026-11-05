@@ -100,6 +100,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       // Items sent back to one shop for something from another shop on Relay.
       swapsWithOtherShops: await crossSwapsForExport(env, id),
     },
+    // When you searched by photo, kept 2 days for the daily limit. The pictures themselves are never kept.
+    photoSearches: (await rows("SELECT created_at AS at FROM photo_search_uses WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => iso(r.at)),
     swapAndSell: {
       listings: (await rows("SELECT id, title, store, size, condition, ask_pence AS askPence, swap_ok AS swapOk, note, area, status, created_at AS createdAt FROM resale_listings WHERE seller_id = ?", id))
         .map((l) => ({ ...l, swapOk: Boolean(l.swapOk), createdAt: iso(l.createdAt) })),

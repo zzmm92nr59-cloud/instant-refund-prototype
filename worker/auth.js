@@ -22,6 +22,7 @@ import { handleExchangeRoute, enrichPurchases } from "./exchange.js";
 import { handleReturnRoute } from "./returns.js";
 import { handleCrossSwapRoute, attachCrossSwaps, crossSwapDeleteStatements } from "./cross-swap.js";
 import { handleShopifyTestRoute, shopifyTestOrderDeleteStatements } from "./shopify-test-orders.js";
+import { handlePhotoSearchRoute, photoSearchDeleteStatements } from "./photo-search.js";
 import { handleSquareTestRoute, enrichSquarePurchases, squareOrderDeleteStatements } from "./square-orders.js";
 import { handleInstoreRoute, instoreDeleteStatements } from "./square-instore.js";
 import { handleExportRoute } from "./export.js";
@@ -564,6 +565,7 @@ async function deleteShopper(env, shopper, o) {
     ...(await squareOrderDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await crossSwapDeleteStatements(env.RELAY_DB, shopper.id)),
     ...(await shopifyTestOrderDeleteStatements(env.RELAY_DB, shopper.id)),
+    ...(await photoSearchDeleteStatements(env.RELAY_DB, shopper.id)),
     // Which orders at shops connected to Relay were placed with this email address (the orders themselves stay with the shop).
     env.RELAY_DB.prepare("DELETE FROM retailer_order_emails WHERE email_hash = ?").bind(shopper.emailHash),
     env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
@@ -683,6 +685,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // Swapping an item for something from another shop on Relay: the return at the first shop, the second shop's checkout.
     const crossSwapResponse = await handleCrossSwapRoute(request, env, url, cors, shopper, o);
     if (crossSwapResponse) return crossSwapResponse;
+    // Search by photo on Discover: Claude says what's in the picture and which items on Relay are closest.
+    const photoResponse = await handlePhotoSearchRoute(request, env, url, cors, shopper, o);
+    if (photoResponse) return photoResponse;
     const instoreResponse = await handleInstoreRoute(request, env, url, cors, shopper, o);
     if (instoreResponse) return instoreResponse;
     const squareTestResponse = await handleSquareTestRoute(request, env, url, cors, shopper, o);

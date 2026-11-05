@@ -764,6 +764,14 @@
     ".rl-mk-check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--rl-accent)}.rl-mk-check.small{font-size:14px;color:var(--rl-text2);padding:6px 0}" +
     ".rl-mk-form [hidden]{display:none!important}" +
     ".rl-btn.rl-mk-report{min-height:44px;margin-top:6px;font-size:14px;font-weight:600;color:var(--rl-text2)}" +
+    // Search by photo (Discover).
+    ".rl-ps-pic{display:block;width:100%;max-height:220px;object-fit:contain;border-radius:16px;background:var(--rl-fill);margin:0 0 10px}" +
+    ".rl-ps-note{margin:0 0 12px;font-size:13px;line-height:1.45;color:var(--rl-text2)}.rl-ps-looks{margin:4px 0 10px;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
+    ".rl-ps-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 12px}.rl-ps-skel{min-height:200px;border-radius:16px}" +
+    ".rl-ps-item{display:flex;flex-direction:column;gap:4px;min-height:44px;box-sizing:border-box;padding:8px 8px 10px;border:1px solid var(--rl-line);border-radius:16px;background:var(--rl-card);color:var(--rl-text);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}" +
+    ".rl-ps-item:active{transform:scale(.97)}.rl-ps-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-ps-img{aspect-ratio:1/1;border-radius:12px;overflow:hidden;background:var(--rl-fill);display:grid;place-items:center;margin:0 0 4px}.rl-ps-img img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-ps-item b{font-size:14px;line-height:1.3;overflow-wrap:anywhere}.rl-ps-item span{font-size:13px;line-height:1.3;color:var(--rl-text2)}.rl-ps-item .rl-ps-price{font-weight:700;color:var(--rl-text)}" +
     // Swap with another shop.
     ".rl-xs-h{margin:6px 0 6px;font-size:24px;line-height:1.2;color:var(--rl-text)}.rl-xs-lead{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
     ".rl-xs-list{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.rl-xs-skel{min-height:68px;border-radius:16px}" +
@@ -5320,6 +5328,126 @@
       sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
     });
   }
+  // ---- Search by photo (Discover): a screenshot or a picture, and the closest items from shops on Relay. ----
+  // The picture is made smaller here first (which also drops its hidden details, like where a photo was taken), then sent
+  // to Relay, which asks Claude what it is and which items on Relay are closest (worker/photo-search.js). Nothing of it is
+  // kept. Shown only when it's on (the AI key is set).
+  var photoOn = null, PHOTO_OK_KEY = "relay.photo-ok";
+  function photoAvailable() {
+    if (photoOn === null && load()) {
+      photoOn = false;
+      cachedGet("photo", "/relay/my/photo-search").then(function (r) {
+        photoOn = Boolean(r.ok && r.body && r.body.available);
+        var b = document.getElementById("dcCam"); if (b) b.hidden = !(photoOn || (typeof window.testTools === "function" && window.testTools()));
+      }, function () { photoOn = null; });
+    }
+    return Boolean(photoOn);
+  }
+  var PHOTO_ERR = { too_many_searches: "That's 30 photo searches today. Try again tomorrow.", image_unreadable: "Couldn't read that picture. Try another photo or screenshot.",
+    busy: "Photo search is busy right now. Try again in a minute.", ai_off: "Photo search isn't available right now." };
+  // The picture, at most 1024 pixels across, as a JPEG. null if it can't be read.
+  function shrinkPhoto(file) {
+    return new Promise(function (done) {
+      if (!file || !/^image\//.test(file.type || "")) return done(null);
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var k = Math.min(1, 1024 / Math.max(im.naturalWidth || 1, im.naturalHeight || 1)), c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+        var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        try { done(c.toDataURL("image/jpeg", 0.82)); } catch (e) { done(null); }
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); done(null); };
+      im.src = url;
+    });
+  }
+  function photoSearch(opts) {
+    opts = opts || {};
+    if (!load()) return show();
+    // Only Relay's testing tools show the camera while it's off: say why, and what turns it on.
+    if (photoOn === false) return photoOffSheet();
+    var input = el("input", { type: "file", accept: "image/*" }); input.hidden = true;
+    input.addEventListener("change", function () { var f = input.files && input.files[0]; input.remove(); if (f) photoSheet(f, opts); });
+    document.body.appendChild(input);
+    input.click();
+  }
+  function photoOffSheet() {
+    var sheet = el("div", { className: "rl-sheet rl-ps", role: "dialog", ariaModal: "true", ariaLabel: "Search by photo" });
+    var layer = el("div", { className: "rl-back" }, [sheet]);
+    function close() { if (layer.parentNode) layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
+    document.addEventListener("keydown", onKey);
+    [el("h2", { className: "rl-xs-h", text: "Search by photo is off" }),
+      el("p", { className: "rl-ps-note", text: "It needs Relay's Anthropic key. In Cloudflare, open Workers & Pages, then relay-square-api2, Settings, Variables and Secrets. Add a secret named ANTHROPIC_API_KEY with the key from console.anthropic.com, then reload Relay." }),
+      el("p", { className: "rl-ps-note", text: "The same key turns on the help chat and AI help for receipts." }),
+      el("button", { className: "rl-btn", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+    document.body.appendChild(layer);
+  }
+  function photoSheet(file, opts) {
+    var sheet = el("div", { className: "rl-sheet rl-ps", role: "dialog", ariaModal: "true", ariaLabel: "Search by photo" });
+    var layer = el("div", { className: "rl-back" }, [sheet]), busy = false;
+    function close() { if (layer.parentNode) layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    sheet.appendChild(el("h2", { className: "rl-xs-h", text: "Search by photo" }));
+    var pic = el("img", { className: "rl-ps-pic", alt: "The picture you chose" }); sheet.appendChild(pic);
+    var note = el("p", { className: "rl-ps-note", text: "Your picture is sent to Claude, an AI made by Anthropic, to see what's in it and find the closest items from shops on Relay. Relay doesn't keep the picture." });
+    var out = el("div"), msg = el("div", { className: "rl-msg" });
+    var again = el("button", { className: "rl-btn ghost", text: "Try another photo", onclick: function () { close(); photoSearch(opts); } });
+    [note, out, msg].forEach(function (n) { sheet.appendChild(n); });
+    var shut = el("button", { className: "rl-btn ghost", text: "Close", onclick: close });
+    shrinkPhoto(file).then(function (data) {
+      if (!layer.parentNode) return;
+      if (!data) { say(msg, PHOTO_ERR.image_unreadable, true); sheet.appendChild(again); sheet.appendChild(shut); return; }
+      pic.src = data;
+      var seen = false; try { seen = localStorage.getItem(PHOTO_OK_KEY) === "1"; } catch (e) {}
+      if (seen) return search(data);
+      // The first time on this device: what happens to the picture, before it's sent.
+      var go = el("button", { className: "rl-btn", text: "Find it", onclick: function () { try { localStorage.setItem(PHOTO_OK_KEY, "1"); } catch (e) {} go.remove(); search(data); } });
+      out.appendChild(go); sheet.appendChild(shut);
+    });
+    function search(data) {
+      if (busy) return; busy = true;
+      out.textContent = ""; say(msg, "");
+      var grid = el("div", { className: "rl-ps-grid" }); grid.setAttribute("aria-busy", "true");
+      for (var i = 0; i < 4; i++) grid.appendChild(el("div", { className: "rl-skel rl-ps-skel" }));
+      out.appendChild(grid);
+      if (!shut.parentNode) sheet.appendChild(shut);
+      api("/relay/my/photo-search", { method: "POST", body: { image: data, test: Boolean(opts.test) } }).then(function (r) {
+        busy = false;
+        if (!layer.parentNode) return;
+        out.textContent = "";
+        if (!r.ok) { say(msg, PHOTO_ERR[r.body && r.body.error] || "Couldn't search just now. Please try again.", true); sheet.insertBefore(again, shut); return; }
+        var b = r.body || {}, results = b.results || [];
+        if (!b.found) {
+          out.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Couldn't see a product" }), el("p", { text: "Try a photo or screenshot where the item fills most of the picture." })]));
+          sheet.insertBefore(again, shut); return;
+        }
+        if (b.item) out.appendChild(el("p", { className: "rl-ps-looks", text: "Looks like: " + b.item }));
+        if (!results.length) {
+          out.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Nothing like it on Relay yet" }),
+            el("p", { text: "As more shops join Relay, there's more to find. You can also search by name." })]));
+          if (b.item) out.appendChild(el("button", { className: "rl-btn", text: "Search for “" + b.item + "”", onclick: function () { close(); if (window.relaySearchFor) window.relaySearchFor(b.item); } }));
+          sheet.insertBefore(again, shut); return;
+        }
+        var list = el("div", { className: "rl-ps-grid" });
+        results.forEach(function (x) {
+          var img = el("div", { className: "rl-ps-img" }); img.setAttribute("aria-hidden", "true");
+          var draw = function () { var o = { items: [{ name: x.product }], retailer: { name: x.storeName } }; o.category = ILL_KIND[illKey(o)] || "other"; illustrate(img, o, 40); };
+          if (x.imageUrl && /^https:\/\//.test(x.imageUrl)) { var ph = el("img", { src: x.imageUrl, alt: "", referrerPolicy: "no-referrer", loading: "lazy" }); ph.onerror = function () { ph.remove(); draw(); }; img.appendChild(ph); } else draw();
+          var price = (x.maxPriceMinor ? "From " : "") + money(x.priceMinor, "GBP");
+          list.appendChild(el("button", { type: "button", className: "rl-ps-item", ariaLabel: x.product + (x.variation ? ", " + x.variation : "") + ", " + price + ", from " + x.storeName + (x.inStock === false ? ", out of stock" : ""),
+            onclick: function () { close(); if (window.relayOpenProduct) window.relayOpenProduct(x.sku, x.product); } },
+            [img, el("b", { text: x.product }), el("span", { text: [x.variation, x.storeName].filter(Boolean).join(" · ") }), el("span", { className: "rl-ps-price", text: price + (x.inStock === false ? " · out of stock" : "") })]));
+        });
+        out.appendChild(list);
+        sheet.insertBefore(again, shut);
+      }, function () { busy = false; out.textContent = ""; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); sheet.insertBefore(again, shut); });
+    }
+  }
   // ---- Swap with another shop: send an item back to the shop it came from and get something from another shop on Relay. ----
   // Relay starts the return at the first shop and opens the second shop's own checkout with the new item in the basket. The
   // shopper pays the second shop there, and the first shop refunds them once the item is back: Relay takes no money
@@ -6128,6 +6256,8 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
+    // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
+    photoAvailable: photoAvailable, photoSearch: photoSearch,
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;

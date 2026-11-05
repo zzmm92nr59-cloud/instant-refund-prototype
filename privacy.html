@@ -92,6 +92,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <li>To send you a return reminder, but only for items where you ask for one. It goes once, to your sign-in address.</li>
 <li>To send price alerts and other notifications to your phone, only if you turn them on. A shop can also send an offer on something you're watching; it reaches you as an alert, and the shop never learns who received it.</li>
 <li>To build your Wrapped from your own receipts.</li>
+<li>To search by photo, only when you use it on the Discover page. The picture you choose is made smaller on your phone first (which also removes hidden details such as where a photo was taken), then sent to Claude, an AI made by Anthropic, with the list of products shops on Relay sell. Claude says what the product is and which products on Relay are closest. It is told to look only at the product, never to describe or identify people, and to ignore names, messages and other personal details a screenshot may show. Relay doesn't keep the picture or what Claude said.</li>
 <li>To check how well Relay reads receipts, using counts across everyone (for example, how often a total was read right). When a shop connected to Relay confirms an order of yours, we compare it with what Relay read from that shop's email to you about the same order. Nobody at Relay reads your emails for this, and it changes nothing in your account.</li>
 <li>To keep your account secure.</li>
 </ul>
@@ -103,7 +104,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Cloudflare</th><td>Hosts Relay's servers and database.</td></tr>
 <tr><th>Google and Microsoft</th><td>Sign-in with Google or Microsoft, and reading your Gmail or Outlook when you connect it.</td></tr>
 <tr><th>Resend</th><td>Sends sign-in emails and return reminders, so it receives your email address and the message.</td></tr>
-<tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. Relay keeps no copy of the chat. If you switch on AI help, it also reads emails Relay's rules couldn't work out, with your personal details hidden (see Your email). Otherwise it never receives your receipts, anything else from your email, or your email address.</td></tr>
+<tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. Relay keeps no copy of the chat. If you switch on AI help, it also reads emails Relay's rules couldn't work out, with your personal details hidden (see Your email). If you search by photo, it receives the picture you chose (see How we use it), and no copy is kept. Otherwise it never receives your receipts, anything else from your email, or your email address.</td></tr>
 <tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
 <tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference. When you swap with another shop, the second shop gets nothing from Relay: you buy from it at its own checkout.</td></tr>
@@ -121,6 +122,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>What the AI read, if you switch on AI help</th><td>Until you switch AI help off, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>Emails you choose to send to Relay</th><td>30 days, or until you delete it, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>The help chat</th><td>Relay keeps no copy of the chat: only how many messages you sent each day (to keep the chat within its limits), for 30 days. If you choose Talk to a person, the chat is emailed to Relay's team so they can reply, and kept in that email.</td></tr>
+<tr><th>Search by photo</th><td>The picture and what Claude said aren't kept. Only that you searched, and when, is kept for two days, so each person stays within 30 searches a day.</td></tr>
 <tr><th>Your sign-in session</th><td>Up to 90 days after you last used Relay, or until you sign out.</td></tr>
 <tr><th>Sign-in links and codes, and the scrambled IP addresses and phone numbers kept to stop misuse</th><td>Up to two days.</td></tr>
 <tr><th>Name, photo, phone number, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>

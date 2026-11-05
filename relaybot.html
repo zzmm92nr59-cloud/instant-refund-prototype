@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="only light">
+<meta name="theme-color" content="#f6f3ec"><link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>RelayBot · Relay</title>
+<style>
+:root{--navy:#171f44;--ink:#1d2939;--muted:#5b6475;--cream:#f6f3ec;--line:#e6e0d2;--lime:#74ffed;--green:#00756a}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--cream);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.bar{position:sticky;top:0;z-index:2;background:rgba(246,243,236,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:720px;margin:0 auto;padding:4px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.back{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 8px;border-radius:12px;color:var(--navy);font-weight:650;text-decoration:none;transition:background .15s,transform .06s}
+.back:active{background:rgba(23,31,68,.08);transform:scale(.96)}.back:focus-visible,a:focus-visible{outline:2px solid var(--navy);outline-offset:2px}
+.logo{font:600 22px Georgia,serif;letter-spacing:-.3px;color:var(--navy);padding-right:8px}
+main{max-width:720px;margin:0 auto;padding:22px 18px 72px}
+h1{font:600 clamp(32px,7vw,44px)/1.08 Georgia,serif;letter-spacing:-.02em;color:var(--navy);margin:8px 0 6px}
+.updated{color:var(--muted);font-size:14px;margin:0 0 22px}
+.summary{background:#fff;border:1px solid var(--line);border-radius:20px;padding:18px 18px 6px;margin:0 0 26px}
+.summary h2{margin-top:0}
+h2{font:600 22px/1.25 Georgia,serif;color:var(--navy);margin:32px 0 8px;letter-spacing:-.01em}
+h3{font-size:16px;color:var(--navy);margin:20px 0 4px}
+p,li{margin:0 0 12px}ul{padding-left:22px;margin:0 0 12px}li{margin-bottom:8px}
+a{color:var(--green);font-weight:600}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+nav.toc a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--navy);text-decoration:none;font-size:15px;transition:transform .06s,background .15s}
+nav.toc a:active{transform:scale(.96);background:#efeadf}
+.table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:0 0 14px;font-size:15px}
+.table th,.table td{text-align:left;vertical-align:top;padding:12px 14px;border-top:1px solid var(--line)}.table tr:first-child th,.table tr:first-child td{border-top:0}
+.table th{width:42%;color:var(--navy);font-weight:650}
+footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:var(--muted);font-size:14px}
+@media(max-width:520px){.table th,.table td{display:block;width:auto}.table td{border-top:0;padding-top:0}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+pre{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;overflow-x:auto;font-size:15px;line-height:1.5;margin:0 0 14px}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+</style></head><body>
+<div class="bar"><div class="bar-in"><a class="back" href="./"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Relay</a><span class="logo">relay</span></div></div>
+<main>
+<h1>RelayBot</h1>
+<p class="updated">Last updated 5 November 2026</p>
+
+<section class="summary">
+<h2>The short version</h2>
+<p>RelayBot is how Relay, a UK shopping app, reads shops' public product lists, so shoppers can see what's for sale. It reads only what your robots.txt allows, about once a day, and never anything about your customers.</p>
+</section>
+
+<h2>What it reads</h2>
+<p>On shops built on Shopify, RelayBot asks for three public addresses, in this order, and nothing else:</p>
+<ul>
+<li><strong>/robots.txt</strong>, to see what it may read. If robots.txt doesn't allow the next two, it stops here.</li>
+<li><strong>/meta.json</strong>, for your shop's currency and the countries you deliver to. Relay shows only shops that sell in pounds and deliver to the UK.</li>
+<li><strong>/products.json</strong>, for your newest products: names, sizes and colours, prices, pictures, and whether each one can be bought right now.</li>
+</ul>
+<p>It never signs in, adds anything to a basket, checks out, or reads customer accounts or orders.</p>
+
+<h2>How often</h2>
+<p>About once a day for each shop: three requests, one after another. If your website doesn't answer, it tries again about 6 hours later. If your robots.txt says no, it checks again after a week.</p>
+
+<h2>Where your products show</h2>
+<p>For now, they appear only in a testing preview of the app's shopping page, not to shoppers. Each product links to its page on your website, where it's bought. Relay shows the price and stock as your website showed them, with when Relay last checked, and hides a shop's products once they're 3 days old, so prices are never days out of date. Relay doesn't sell your products or take payments for them.</p>
+
+<h2>How to stop it</h2>
+<p>Add this to your robots.txt:</p>
+<pre><code>User-agent: RelayBot
+Disallow: /</code></pre>
+<p>RelayBot reads robots.txt before anything else, every time. Once it says no, Relay removes your products the next time RelayBot visits.</p>
+
+<h2>How to recognise it</h2>
+<p>Every request RelayBot makes has this User-Agent:</p>
+<pre><code>RelayBot/1.0 (+https://zzmm92nr59-cloud.github.io/instant-refund-prototype/relaybot.html)</code></pre>
+
+<footer>Shops can also <a href="./retailer.html">join Relay</a>, so shoppers can swap and return what they bought from you in the app. See also the <a href="./privacy.html">Privacy policy</a>.</footer>
+</main>
+</body></html>

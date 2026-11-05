@@ -18,6 +18,7 @@ import { handleShopifyConnect, syncAllShopify, shopifyShopsForDisplay, listConne
 import { handleShopifyEmbedded } from "./shopify-embedded.js";
 import { ensureOnce } from "./once.js";
 import { syncAwinFeeds } from "./awin-feed.js";
+import { refreshWebShops, handleWebShopsRoute } from "./web-shops.js";
 import { checkRateLimits, tooManyRequests } from "./limits.js";
 import { checkBody, checkUrl } from "./validate.js";
 import { isLegacyTestRoute, legacyTestRoutesOn } from "./legacy-routes.js";
@@ -64,7 +65,11 @@ const relayWorker = {
     if (event && event.cron === SCAN_JOBS_CRON) { ctx.waitUntil(runScanJobs(env).then(r => { if (r.jobs) console.log("background scans", JSON.stringify(r)); })
       .catch(e => console.error("background scans failed", String(e && e.message || e).slice(0, 120)))
       .then(() => new Date().getUTCMinutes() % 15 === 7 ? null : catchUpFullReads(env).then(r => { if (r.checked) console.log("catching up", JSON.stringify(r)); }))
-      .catch(e => console.error("catching up failed", String(e && e.message || e).slice(0, 120)))); return; }
+      .catch(e => console.error("catching up failed", String(e && e.message || e).slice(0, 120))));
+      // Shops' websites for the catalogue preview (web-shops.js): the shops due, about once a day each.
+      ctx.waitUntil(refreshWebShops(env).then(r => { if (r.checked) console.log("shops' websites", JSON.stringify(r)); })
+        .catch(e => console.error("shops' websites failed", String(e && e.message || e).slice(0, 120))));
+      return; }
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
     ctx.waitUntil(sendReturnReminders(env).catch(() => {}));
@@ -299,6 +304,9 @@ const relayWorker = {
         note: "Store-by-store authorisation is required. Unpublished catalogues and all customer orders remain private."
       }, {headers:{...corsHeaders,"Cache-Control":"no-store"}});
     }
+
+    // The catalogue preview from shops' own websites (web-shops.js): public product details, for Relay's testing tools.
+    { const webShops = await handleWebShopsRoute(request, env, url, corsHeaders); if (webShops) return webShops; }
 
     // Publish only retailer-opted-in read-only products. Separate Shopify
     // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.
