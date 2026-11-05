@@ -745,6 +745,24 @@
     ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
     ".rl-aih p{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-aih p.rl-msg{color:var(--rl-text)}.rl-aih p.rl-msg:empty{display:none}" +
     ".rl-rc-ai{margin:6px 0 2px;font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
+    // Swap & resell: a segmented switch between its three parts, and its cards and form.
+    ".rl-mk-tabs{display:flex;gap:4px;margin:10px 0 6px;padding:4px;border-radius:14px;background:var(--rl-fill)}" +
+    ".rl-mk-tabs button{all:unset;box-sizing:border-box;flex:1;min-height:44px;display:grid;place-items:center;border-radius:11px;font-size:15px;font-weight:700;color:var(--rl-text);cursor:pointer;-webkit-tap-highlight-color:transparent}" +
+    ".rl-mk-tabs button[aria-pressed=true]{background:#74ffed;color:#171f44}.rl-mk-tabs button:active{transform:scale(.97)}.rl-mk-tabs button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-mk-lead{font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-mk-skel{min-height:110px;margin:10px 0;border-radius:18px}" +
+    ".rl-mk-area{display:flex;gap:8px;align-items:center;margin:12px 0;color:var(--rl-text2)}.rl-mk-area .rl-jic{margin:0;flex:none}" +
+    ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-select{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}" +
+    ".rl-mk-select{margin-top:8px}.rl-mk-area input{flex:1}" +
+    ".rl-mk-near{display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:3px 10px;border-radius:999px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:13px;font-weight:700}.rl-mk-near .rl-jic{margin:0}" +
+    ".rl-mk-quote,.rl-mk-status{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-mk-warn{display:block;margin-top:6px;font-size:14px;line-height:1.4;color:var(--rl-text)}" +
+    ".rl-mk-req{margin-top:10px;padding:10px 12px;border-radius:12px;background:var(--rl-fill);font-size:14px;line-height:1.4;color:var(--rl-text)}.rl-mk-req b{display:block}.rl-mk-req>span{display:block;margin-top:2px}" +
+    ".rl-mk-acts{display:flex;gap:8px;margin-top:8px}.rl-mk-acts .rl-btn{flex:1;margin:0}.rl-order .rl-btn{margin-top:10px}" +
+    ".rl-mk-h{margin:18px 0 6px;font-size:17px;color:var(--rl-text)}" +
+    ".rl-mk-form{margin-top:10px}.rl-mk-field{display:flex;flex-direction:column;gap:6px;margin:0 0 10px}.rl-mk-field>span{font-size:13px;font-weight:700;color:var(--rl-text2)}" +
+    ".rl-mk-note{display:block;margin:-4px 0 10px;font-size:13px;line-height:1.4;color:var(--rl-text2)}" +
+    ".rl-mk-check{display:flex;align-items:center;gap:12px;min-height:44px;margin:2px 0;font-size:15px;line-height:1.35;color:var(--rl-text);cursor:pointer}" +
+    ".rl-mk-check input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--rl-accent)}.rl-mk-check.small{font-size:14px;color:var(--rl-text2);padding:6px 0}" +
+    ".rl-mk-form [hidden]{display:none!important}" +
     ".rl-se-card{margin:0 0 12px;padding:16px 18px}.rl-se-card>b{display:block;font-size:16px;color:var(--rl-text);overflow-wrap:anywhere}" +
     ".rl-se-card>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-se-note{margin:8px 0 0;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
     ".rl-se-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.rl-se-acts .rl-pill{padding:0 16px}.rl-se-body{margin-top:12px}.rl-se-body .rl-hp-rows{margin:0 0 10px}" +
@@ -1240,6 +1258,7 @@
     down: '<path d="m7 10 5 5 5-5"/>',
     x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
     send: '<path d="M4.5 12h14M13 6l6 6-6 6"/>',
+    pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -3227,7 +3246,7 @@
     var tips = el("details", { style: "background:var(--rl-fill);border-radius:14px;padding:10px 14px;margin:6px 0;font-size:14px;color:var(--rl-text2)" }, [
       el("summary", { text: "Doing the deal safely", style: "font-weight:800;cursor:pointer" }),
       el("p", { text: "Collecting: meet somewhere public in daylight, check the item, then pay on the spot (cash, or a bank transfer you can see arrive).", style: "margin:8px 0 4px" }),
-      el("p", { text: "Posting: Relay doesn't handle payments yet, so never pay a stranger in advance by bank transfer. Collection is the safe option for now.", style: "margin:4px 0" }),
+      el("p", { text: "Posting: Relay doesn't handle payments, so never pay a stranger in advance by bank transfer. Collecting in person is the safer way.", style: "margin:4px 0" }),
       el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
     [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
     var timer = null, isOpen = false;
@@ -3237,7 +3256,7 @@
       api("/relay/my/resale/requests/" + requestId + "/messages").then(function (r) {
         if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
         var b = r.body; isOpen = b.open;
-        head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Payment and postage aren't built yet.";
+        head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Relay doesn't handle payment or postage, so agree them here.";
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
         b.messages.forEach(function (m) {
@@ -3272,16 +3291,16 @@
   }
   function resaleView(sheet, onBack, focusReceipt, startTab) {
     var body = el("div"), msg = el("div", { className: "rl-msg" });
-    var tabs = el("div", { style: "display:flex;gap:6px;margin:10px 0" });
+    var tabs = el("div", { className: "rl-mk-tabs", role: "group", ariaLabel: "Swap & resell" });
     var cur = startTab || (focusReceipt ? "sell" : "browse");
     function openChat(id) { sheet.textContent = ""; chatView(sheet, id, function () { sheet.textContent = ""; resaleView(sheet, onBack, null, "mine"); }); }
-    [["browse", "Browse"], ["mine", "Mine"], ["sell", "Sell"]].forEach(function (t) {
-      var b = el("button", { className: "rl-btn ghost", text: t[1], style: "margin:0;padding:9px 6px;font-size:14px", onclick: function () { cur = t[0]; focusReceipt = null; draw(); } });
+    [["browse", "Browse"], ["mine", "Yours"], ["sell", "Sell"]].forEach(function (t) {
+      var b = el("button", { type: "button", text: t[1], onclick: function () { if (cur === t[0] && !focusReceipt) return; cur = t[0]; focusReceipt = null; draw(); } });
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
     // On the Market page (no onBack) the page supplies its own heading and there is nothing to go back to.
     [onBack ? el("h2", { text: "Swap & resell" }) : null,
-     onBack ? el("p", { text: "Passed your return window? Sell or swap with other Relay members. Relay puts you in touch, and you agree payment and postage between you." }) : null,
+     onBack ? el("p", { className: "rl-mk-lead", text: "Passed the return date? Sell or swap it with other Relay members. Relay puts you in touch, and you agree payment and handover between you." }) : null,
      tabs, body, msg,
      onBack ? el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: onBack }) : null].forEach(function (n) { if (n) sheet.appendChild(n); });
     function tell(t, bad) { say(msg, t, bad); }
@@ -3294,52 +3313,65 @@
     }
     function facts(l) {
       return [l.store, l.size ? "Size " + l.size : null, CONDITION[l.condition] || null,
-        l.askPence == null ? "Price: open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null,
+        l.askPence == null ? "Open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null,
         l.handover === "collect" ? "Collection in " + l.area : l.handover === "either" ? "Collect in " + l.area + " or post" : l.handover === "post" ? "Posted" : null].filter(Boolean).join(" · ");
     }
+    // Where a request has got to, in words (the server keeps a short code).
+    var STATUS = { pending: "Waiting for the seller", accepted: "Accepted", declined: "Declined", closed: "Ended", withdrawn: "Taken down", matched: "Matched", active: "On sale" };
+    var said = function (s) { return STATUS[s] || "Ended"; };
+    var dayOf = function (d) { return /^\d{4}-\d{2}-\d{2}/.test(d || "") ? new Date(String(d).slice(0, 10) + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : null; };
+    // Greyed outlines while a list loads.
+    var outlines = function (n) { for (var i = 0; i < n; i++) body.appendChild(el("div", { className: "rl-skel rl-mk-skel" })); };
     function draw() {
-      Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "#74ffed" : "transparent"; });
+      Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-tab") === cur ? "true" : "false"); });
       body.textContent = ""; tell("");
       if (cur === "browse") return drawBrowse();
       if (cur === "mine") return drawMine();
       drawSell();
     }
     function drawBrowse() {
-      body.appendChild(el("p", { text: "Loading…" }));
+      outlines(3);
       Promise.all([api("/relay/my/resale/feed"), api("/relay/my/resale/mine")]).then(function (rs) {
+        if (cur !== "browse") return;
         body.textContent = "";
-        if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load listings." }));
+        if (!rs[0].ok) return body.appendChild(el("p", { text: "Couldn't load what's listed. Pull down to try again." }));
         var mine = ((rs[1].body && rs[1].body.listings) || []).filter(function (l) { return l.status === "active"; });
         var rows = rs[0].body.listings || [];
         // Like a local marketplace: put things you could collect near you first. Only the postcode area is used.
         var near = ""; try { near = localStorage.getItem("relay-market-area") || ""; } catch (e) {}
-        var nearBox = el("input", { placeholder: "Your postcode area, e.g. SW11", value: near, maxLength: 8, style: "flex:1;min-width:0;padding:10px 14px;border:1px solid var(--rl-line);border-radius:12px;font-size:15px;background:var(--rl-card)" });
+        var nearBox = el("input", { placeholder: "Your postcode area, e.g. SW11", value: near, maxLength: 8, autocomplete: "off", enterKeyHint: "done" });
+        nearBox.setAttribute("aria-label", "Your postcode area, to show things near you first");
         nearBox.addEventListener("change", function () { try { localStorage.setItem("relay-market-area", nearBox.value.trim().toUpperCase().split(" ")[0]); } catch (e) {} drawBrowse(); });
-        if (rows.length) body.appendChild(el("div", { style: "display:flex;gap:8px;align-items:center;margin:12px 0" }, [el("span", { text: "📍", ariaHidden: "true" }), nearBox]));
+        if (rows.length) body.appendChild(el("label", { className: "rl-mk-area" }, [jIc("pin", 20), nearBox]));
         var mineArea = near.toUpperCase().split(" ")[0], letters = mineArea.replace(/[0-9].*$/, "");
         var score = function (l) { if (!mineArea || !l.area || l.handover === "post") return 0; return l.area === mineArea ? 2 : l.area.replace(/[0-9].*$/, "") === letters ? 1 : 0; };
         rows = rows.slice().sort(function (a, b) { return score(b) - score(a); });
-        if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return window? List it from the Sell tab." })]));
+        if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return date? List it from the Sell tab." })]));
         rows.forEach(function (l) {
           var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
-          if (score(l)) card.appendChild(el("span", { text: score(l) === 2 ? "📍 Near you" : "📍 In your area", style: "display:inline-block;margin-top:6px;background:var(--rl-accent-bg);color:var(--rl-accent);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:800" }));
+          if (score(l)) card.appendChild(el("span", { className: "rl-mk-near" }, [jIc("pin", 14), el("span", { text: score(l) === 2 ? "Near you" : "In your area" })]));
           photo(card, l.id, l.hasImage);
-          if (l.note) card.appendChild(el("span", { text: "“" + l.note + "”", style: "display:block;margin-top:4px" }));
+          if (l.note) card.appendChild(el("span", { className: "rl-mk-quote", text: "“" + l.note + "”" }));
           if (l.myRequest) {
-            card.appendChild(el("span", { text: "You asked about this (" + l.myRequest.status + ")", style: "display:block;margin-top:6px;font-weight:600" }));
-            if (l.myRequest.status === "accepted") card.appendChild(el("button", { className: "rl-btn", text: "Message the seller", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openChat(l.myRequest.id); } }));
+            card.appendChild(el("span", { className: "rl-mk-status", text: "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }));
+            if (l.myRequest.status === "accepted") card.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(l.myRequest.id); } }));
           } else {
-            var add = function (label, kind, extra) {
-              card.appendChild(el("button", { className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
+            var add = function (label, kind) {
+              var btn = el("button", { type: "button", className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, onclick: function () {
+                if (btn.disabled) return;
                 var pick = card.querySelector("select");
                 var b = { kind: kind };
                 if (kind === "swap") { if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true); b.offeredListingId = pick.value; }
-                api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { if (r.ok) { tell("Sent. The seller will see your request as “Member”, not your name."); drawBrowse(); } else fail(r); }); } }));
+                btn.disabled = true;
+                api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { btn.disabled = false; if (r.ok) { tell("Sent. The seller sees your request from “Member”, not your name."); drawBrowse(); } else fail(r); },
+                  function () { btn.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
+              card.appendChild(btn);
             };
             add("I'd like this", "buy");
             if (l.swapOk) {
               if (mine.length) {
-                var sel = el("select", { style: "width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1px solid var(--rl-line);font-size:14px" });
+                var sel = el("select", { className: "rl-mk-select" });
+                sel.setAttribute("aria-label", "What you'd offer in a swap");
                 mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
                 card.appendChild(sel);
               }
@@ -3351,50 +3383,67 @@
       });
     }
     function drawMine() {
-      body.appendChild(el("p", { text: "Loading…" }));
+      outlines(2);
       api("/relay/my/resale/mine").then(function (r) {
+        if (cur !== "mine") return;
         body.textContent = "";
-        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings." }));
+        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your listings. Pull down to try again." }));
         var ls = r.body.listings || [];
-        if (!ls.length) body.appendChild(el("p", { text: "You haven't listed anything yet. Use the Sell tab." }));
+        if (!ls.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "Use the Sell tab to list something from your receipts." })]));
         ls.forEach(function (l) {
-          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title + (l.status === "matched" ? " · matched" : "") }), el("span", { text: facts(l) })]);
+          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
+          if (l.status === "matched") card.appendChild(el("span", { className: "rl-mk-status", text: "Matched: you're chatting with a member about this." }));
           photo(card, l.id, l.hasImage);
           (l.requests || []).forEach(function (q) {
-            var row = el("div", { style: "margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(127,127,127,.12);font-size:14px" });
-            row.appendChild(el("b", { text: q.who + (q.kind === "swap" ? " offers a swap" : " would like to buy"), style: "display:block" }));
-            if (q.offered) row.appendChild(el("span", { text: "Offering: " + q.offered.title + (q.offered.size ? " (size " + q.offered.size + ")" : ""), style: "display:block" }));
-            if (q.message) row.appendChild(el("span", { text: "“" + q.message + "”", style: "display:block" }));
+            var row = el("div", { className: "rl-mk-req" });
+            row.appendChild(el("b", { text: q.who + (q.kind === "swap" ? " offers a swap" : " would like to buy") }));
+            if (q.offered) row.appendChild(el("span", { text: "Offering: " + q.offered.title + (q.offered.size ? " (size " + q.offered.size + ")" : "") }));
+            if (q.message) row.appendChild(el("span", { text: "“" + q.message + "”" }));
             if (q.status === "pending" && l.status === "active") {
+              var acts = el("div", { className: "rl-mk-acts" });
               [["Accept", "accept", "rl-btn"], ["Decline", "decline", "rl-btn ghost"]].forEach(function (a) {
-                row.appendChild(el("button", { className: a[2], text: a[0], style: "margin-top:6px;padding:8px 12px;font-size:14px", onclick: function () {
-                  api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) { if (x.ok) drawMine(); else fail(x); }); } }));
+                var b = el("button", { type: "button", className: a[2], text: a[0], onclick: function () {
+                  if (b.disabled) return;
+                  Array.prototype.forEach.call(acts.children, function (x) { x.disabled = true; });
+                  api("/relay/my/resale/requests/" + q.id + "/" + a[1], { method: "POST" }).then(function (x) {
+                    if (x.ok) return drawMine();
+                    Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); fail(x);
+                  }, function () { Array.prototype.forEach.call(acts.children, function (y) { y.disabled = false; }); tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
+                acts.appendChild(b);
               });
+              row.appendChild(acts);
             } else {
-              row.appendChild(el("span", { text: q.status === "accepted" ? "Accepted. Payment and postage aren't built yet, so agree the handover by message." : q.status, style: "display:block;margin-top:4px;opacity:.75" }));
-              if (q.status === "accepted") row.appendChild(el("button", { className: "rl-btn", text: "Open messages", style: "margin-top:6px;padding:8px 12px;font-size:14px", onclick: function () { openChat(q.id); } }));
+              row.appendChild(el("span", { className: "rl-mk-status", text: q.status === "accepted" ? "Accepted. Relay doesn't handle payment or postage, so agree the handover by message." : said(q.status) + "." }));
+              if (q.status === "accepted") row.appendChild(el("button", { type: "button", className: "rl-btn", text: "Open messages", onclick: function () { openChat(q.id); } }));
             }
             card.appendChild(row);
           });
-          card.appendChild(el("button", { className: "rl-btn ghost", text: "Take this down", style: "margin-top:8px;padding:8px 12px;font-size:14px", onclick: function () {
-            api("/relay/my/resale/listings/" + l.id + "/withdraw", { method: "POST" }).then(drawMine); } }));
+          var down = el("button", { type: "button", className: "rl-btn ghost", text: "Take this down", onclick: function () {
+            ask("Take " + l.title + " off Relay? Anyone who asked about it is told it's gone.", "Take it down", function () {
+              if (down.disabled) return;
+              down.disabled = true;
+              api("/relay/my/resale/listings/" + l.id + "/withdraw", { method: "POST" }).then(function (x) { if (x.ok) { tell("Taken down."); drawMine(); } else { down.disabled = false; fail(x); } },
+                function () { down.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
+            }); } });
+          card.appendChild(down);
           body.appendChild(card);
         });
         var mr = r.body.myRequests || [];
         if (mr.length) {
-          body.appendChild(el("h2", { text: "Your requests", style: "font-size:18px;margin-top:14px" }));
+          body.appendChild(el("h3", { className: "rl-mk-h", text: "Things you asked about" }));
           mr.forEach(function (q) {
-            var c = el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "Swap offered" : "You'd like to buy") + " · " + q.status })]);
-            if (q.status === "accepted") c.appendChild(el("button", { className: "rl-btn", text: "Message the seller", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () { openChat(q.id); } }));
+            var c = el("div", { className: "rl-order" }, [el("b", { text: q.title }), el("span", { text: (q.kind === "swap" ? "You offered a swap" : "You'd like to buy it") + ". " + said(q.status) + "." })]);
+            if (q.status === "accepted") c.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(q.id); } }));
             body.appendChild(c); });
         }
       });
     }
     function drawSell() {
-      body.appendChild(el("p", { text: "Loading your items…" }));
+      outlines(2);
       api("/relay/my/resale/items").then(function (r) {
+        if (cur !== "sell") return;
         body.textContent = "";
-        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items." }));
+        if (!r.ok) return body.appendChild(el("p", { text: "Couldn't load your items. Pull down to try again." }));
         var items = (r.body.items || []).filter(function (i) { return !i.alreadyListed && (!focusReceipt || i.receiptId === focusReceipt); });
         if (!items.length) body.appendChild(el("p", { text: focusReceipt ? "That item is already listed." : "Nothing to list yet. Items come from the receipts Relay found in your email." }));
         items.forEach(function (i) { body.appendChild(sellCard(i)); });
@@ -3402,38 +3451,45 @@
       });
     }
     function sellCard(i) {
-      var card = el("div", { className: "rl-order" }, [el("b", { text: i.title }), el("span", { text: [i.store, i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : null, i.orderDate].filter(Boolean).join(" · ") })]);
-      if (i.returnWindowOpen === true) card.appendChild(el("span", { text: "Heads up: you can still return this to the store for a refund until " + i.returnDeadline + ".", style: "display:block;margin-top:4px;color:var(--rl-warn)" }));
-      card.appendChild(el("button", { className: "rl-btn", text: "List this", style: "margin-top:8px;padding:10px 14px;font-size:14px", onclick: function () {
-        card.querySelector("button").remove();
-        var cond = el("select", { style: "width:100%;margin:8px 0;padding:10px;border-radius:12px;border:1px solid var(--rl-line);font-size:15px" });
+      var card = el("div", { className: "rl-order" }, [el("b", { text: i.title }), el("span", { text: [i.store, i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : null, dayOf(i.orderDate)].filter(Boolean).join(" · ") })]);
+      if (i.returnWindowOpen === true) card.appendChild(el("span", { className: "rl-mk-warn", text: "You can still return this to the shop for a refund" + (dayOf(i.returnDeadline) ? " until " + dayOf(i.returnDeadline) : "") + "." }));
+      var start = el("button", { type: "button", className: "rl-btn", text: "List this", onclick: function () {
+        start.remove();
+        var form = el("div", { className: "rl-mk-form" });
+        var field = function (label, input) { input.setAttribute("aria-label", label); return el("label", { className: "rl-mk-field" }, [el("span", { text: label }), input]); };
+        var cond = el("select");
         Object.keys(CONDITION).forEach(function (k) { cond.appendChild(el("option", { value: k, text: CONDITION[k] })); });
         cond.value = "like_new";
-        var size = el("input", { placeholder: "Size (optional)", maxLength: 20 });
-        var price = el("input", { placeholder: "Asking price in £ (leave empty for open to offers)", inputMode: "decimal" });
-        var note = el("input", { placeholder: "Note for buyers (optional, no contact details)", maxLength: 200 });
+        var size = el("input", { placeholder: "Optional", maxLength: 20, autocomplete: "off" });
+        var price = el("input", { placeholder: "Leave empty for offers", inputMode: "decimal", autocomplete: "off" });
+        var note = el("input", { placeholder: "Optional, no contact details", maxLength: 200, autocomplete: "off" });
         var dk = "listing:" + i.receiptId + ":" + i.itemIndex + ":";
         keepDraft(size, dk + "size"); keepDraft(price, dk + "price"); keepDraft(note, dk + "note");
-        var swap = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
-        var hand = el("select", { style: "width:100%;margin:8px 0;padding:10px;border-radius:12px;border:1px solid var(--rl-line);font-size:15px" });
+        var swap = el("input", { type: "checkbox" });
+        var hand = el("select");
         [["either", "Collection or post"], ["collect", "Collection only"], ["post", "Post only"]].forEach(function (o) { hand.appendChild(el("option", { value: o[0], text: o[1] })); });
         var savedArea = ""; try { savedArea = localStorage.getItem("relay-market-area") || ""; } catch (e) {}
-        var area = el("input", { placeholder: "Postcode area for collection, e.g. SW11", maxLength: 8, value: savedArea });
-        var areaNote = el("span", { text: "Only the first part of your postcode is shown, never your address.", style: "display:block;font-size:12px;color:var(--rl-text2);margin:-4px 0 6px" });
-        hand.onchange = function () { var c = hand.value !== "post"; area.style.display = areaNote.style.display = c ? "" : "none"; };
-        var agree = el("input", { type: "checkbox", style: "width:auto;margin:0 8px 0 0" });
-        var go = el("button", { className: "rl-btn", text: "Put it on Relay", style: "margin-top:10px", onclick: function () {
+        var area = el("input", { placeholder: "For example SW11", maxLength: 8, value: savedArea, autocomplete: "off" });
+        var areaField = el("div", {}, [field("Postcode area for collection", area), el("span", { className: "rl-mk-note", text: "Only the first part of your postcode is shown, never your address." })]);
+        hand.onchange = function () { areaField.hidden = hand.value === "post"; };
+        var agree = el("input", { type: "checkbox" });
+        var go = el("button", { type: "button", className: "rl-btn", text: "Put it on Relay", onclick: function () {
+          if (go.disabled) return;
           var p = price.value.trim(), pence = null;
           if (p) { var n = Number(p.replace(/[£,\s]/g, "")); if (!isFinite(n) || n < 0 || n > 5000) return tell(resaleErrors.invalid_price, true); pence = Math.round(n * 100); }
           go.disabled = true;
           api("/relay/my/resale/listings", { method: "POST", body: { receiptId: i.receiptId, itemIndex: i.itemIndex, condition: cond.value, size: size.value, askPence: pence, swapOk: swap.checked, note: note.value, agree: agree.checked, handover: hand.value, area: hand.value === "post" ? null : area.value.trim() || null } })
-            .then(function (r) { go.disabled = false; if (r.ok) { ["size", "price", "note"].forEach(function (f) { draftSet(dk + f, ""); }); cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); });
+            .then(function (r) { go.disabled = false; if (r.ok) { ["size", "price", "note"].forEach(function (f) { draftSet(dk + f, ""); }); cur = "mine"; focusReceipt = null; draw(); tell("Listed. Other members can now see it."); } else fail(r); },
+              function () { go.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); });
         } });
-        [cond, size, price, note, hand, area, areaNote,
-         el("label", { style: "display:block;font-size:14px;margin:4px 0" }, [swap, document.createTextNode("I'm open to swaps")]),
-         el("label", { style: "display:block;font-size:13px;margin:8px 0;color:var(--rl-text2)" }, [agree, document.createTextNode("I agree Relay shows this item's name, store, size, condition, price, note and photo to other Relay members. My name, email, order number and address are never shown.")]),
-         go].forEach(function (n) { card.appendChild(n); });
-      } }));
+        [field("Condition", cond), field("Size", size), field("Asking price in £", price), field("Note for buyers", note), field("Handover", hand), areaField,
+         el("label", { className: "rl-mk-check" }, [swap, el("span", { text: "I'm open to swaps" })]),
+         el("label", { className: "rl-mk-check small" }, [agree, el("span", { text: "I agree Relay shows this item's name, shop, size, condition, price, note and photo to other Relay members. My name, email, order number and address are never shown." })]),
+         go].forEach(function (n) { form.appendChild(n); });
+        card.appendChild(form);
+        cond.focus();
+      } });
+      card.appendChild(start);
       return card;
     }
     draw();
@@ -3558,7 +3614,7 @@
     var receiptRows = review ? [] : [mailRow, accRow("paste", "Add a missing receipt", "Search your inbox or paste an email", function () { openFind(); })];
     var ordersRow = accRow("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
     receiptRows.push(ordersRow);
-    if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "", function () { openResale(); }));
+    if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "Sell or swap what you can't return", function () { openResale(); }));
     sheet.appendChild(accGroup("Receipts", receiptRows));
     var mailState = null;
     api("/relay/my/gmail").then(function (g) {
@@ -4426,7 +4482,7 @@
       host.appendChild(el("button", { className: "rl-btn", text: "Sign in", style: "max-width:260px", onclick: show }));
       return;
     }
-    host.appendChild(el("p", { text: "Loading…" }));
+    host.appendChild(el("div", { className: "rl-skel rl-mk-skel" }));
     cachedGet("consent", "/relay/my/consent").then(function (r) {
       host.textContent = "";
       if (r.status === 401) { save(null); mountMarket(host); return; }
@@ -5223,7 +5279,9 @@
   // Test shop tools (Square sandbox test orders, test refunds, card-only test payments) only for people testing Relay:
   // switched on from Profile → Testing, or with ?testing=1. Shoppers never see them.
   // The Market isn't part of the launch: it shows for people testing Relay and in the ?demo=1 walkthrough.
-  function marketOn() { try { return testingOn() || /[?&]demo=1(&|$)/.test(location.search); } catch (e) { return false; } }
+  // Swap & resell is open to every shopper. It has no tab of its own: Profile, Discover and receipts past their return date
+  // lead to it (the Market tab is only among the testing tools).
+  function marketOn() { return true; }
   function testingOn() {
     try { return /[?&]testing=1(&|$)/.test(location.search) || localStorage.getItem("relay-testing-tools") === "1"; } catch (e) { return false; }
   }
@@ -5844,6 +5902,8 @@
     // Pull to refresh (relay-gestures.js through index.html): ask again for everything, know when it's in, check the inbox.
     forget: forget, whenIdle: whenIdle, checkInbox: checkInbox,
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
+    // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
+    openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     purchases: function () { return (memo.purchases || api("/relay/my/purchases")).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;
