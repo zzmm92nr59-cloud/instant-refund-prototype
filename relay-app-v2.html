@@ -664,15 +664,20 @@ function renderShopperCatalog(root){
  shopsEl&&shopsEl.querySelectorAll("[data-shop]").forEach(b=>b.onclick=()=>{storeFilter=b.dataset.shop;renderCatalog()});
  kindsEl&&kindsEl.querySelectorAll("[data-kind]").forEach(b=>b.onclick=()=>{discoverKind=b.dataset.kind;renderCatalog()});
 }
+// A shop's own checkout with this size or colour already in the basket: Shopify's cart links (/cart/<variant>:<quantity>),
+// which every shop in the website preview supports. The shopper pays there (Apple Pay, Shop Pay or a card). Sold out, or
+// no variant to go by: none, and the button opens the product's own page instead.
+function webCheckoutUrl(p){try{const v=/:(\d{1,20})$/.exec(String(p.sku||""));if(!v||p.inStock===false)return null;const u=new URL(p.productUrl);return u.protocol==="https:"?u.origin+"/cart/"+v[1]+":1":null}catch(e){return null}}
 // A product's page: its picture, every size or colour with its stock, the price and Watch price.
 let dcListY=0;
 function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)return;if(!$("backToResults"))dcListY=window.scrollY;const g=dcGroups(shownProducts().filter(x=>sameStore(storeOf(x),storeOf(p))&&String(x.product).trim().toLowerCase()===String(p.product).trim().toLowerCase()))[0];
  const on=!!watch[sku],stock=liveStock(p);
  const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
  const web=p.provider==="web"&&/^https:\/\//.test(String(p.productUrl||"")),shop=safe(storeOf(p));
- const act=web?'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">Buy on their website'+ic("ext")+'</a>'
+ const checkout=web?webCheckoutUrl(p):null;
+ const act=web?'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>'
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching · tap to stop':ic("bell")+' Watch price')+'</button>';
- const note=web?(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You buy it there, not through Relay.':on?'Relay tells you when the price drops.':'';
+ const note=web?(checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
  box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="link" data-back id="backToResults">'+ic("back")+' Back</button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
