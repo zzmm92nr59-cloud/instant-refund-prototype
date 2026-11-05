@@ -3272,7 +3272,7 @@
             ask("End this conversation? The item goes back on sale.", "End conversation", function () {
               api("/relay/my/resale/requests/" + requestId + "/end", { method: "POST", body: {} }).then(load); }); } }));
           tools.appendChild(el("button", { className: "rl-btn ghost", text: "Report a problem", style: "padding:9px 14px;font-size:14px", onclick: function () {
-            askText("What went wrong? (for example: asked me to pay outside Relay). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
+            askText("What went wrong? (for example: they wanted a bank transfer before you'd seen the item). Reporting lets the Relay team read this conversation to review it. They won't see who either of you is.", "Send report", function (why) {
               api("/relay/my/resale/requests/" + requestId + "/report", { method: "POST", body: { reason: why } }).then(function (x) { if (x.ok) { say(msg, "Reported and ended. Thank you."); load(); } else say(msg, "Couldn't send the report. Try again.", true); }); }); } }));
         }
       });
