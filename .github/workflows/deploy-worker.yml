@@ -86,6 +86,10 @@ jobs:
           node scripts/test-resellable.mjs
           node --check worker/awin-feed.js
           node scripts/test-awin-feed.mjs
+          node --check worker/web-shops.js
+          node scripts/test-web-shops.mjs
+          node --check worker/photo-search.js
+          node scripts/test-photo-search.mjs
           # Security: rate limits, input checks, who can do what, and no keys in the repository (docs/SECURITY.md).
           node --check worker/limits.js
           node --check worker/validate.js

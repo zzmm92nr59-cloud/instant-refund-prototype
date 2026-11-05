@@ -1,8 +1,8 @@
 // Search by photo (Discover): a shopper picks a screenshot or takes a picture, and Relay finds the closest items in the
 // stock of the shops on Relay.
 //
-// How: the picture goes to Claude (an AI made by Anthropic) once, with the list of items shops on Relay have (public
-// product details only: name, size or colour, shop, price). Claude says what the product in the picture is and which items
+// How: the picture goes to Claude (an AI made by Anthropic) once, with the list of products shops on Relay have (public
+// product details only: name, shop, price, and the size or colour when there's only one). Claude says what the product in the picture is and which items
 // on the list are the closest, best first. Relay shows those.
 // Kept: nothing of the picture or what Claude said. Only that a search happened (shopper and time), for the daily limits,
 // deleted after 2 days. Claude is told to look only at the product, never to describe or identify people, and to ignore
@@ -12,10 +12,11 @@
 import { shopifyShopsForDisplay } from "./shopify-connect.js";
 import { ensureImageTable } from "./shopify.js";
 import { aiModel } from "./ai-runner.js";
+import { webShopProducts } from "./web-shops.js";
 
 export const PHOTO_SEARCHES_PER_DAY = 30;
 export const PHOTO_SEARCHES_ALL_DAY = 2000;
-const MAX_CANDIDATES = 300;
+const MAX_CANDIDATES = 800;
 const MAX_RESULTS = 12;
 const DAY = 864e5;
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
@@ -31,12 +32,13 @@ Answer with JSON only, nothing else:
 {"found": true or false, "item": "what the product is, in a few plain words, e.g. white leather trainers", "matches": [list numbers of the closest items, best first, at most 12]}
 "found" is false when there's no product in the picture. Only list items a shopper would see as the same kind of thing (a bag for a bag, trainers for trainers); colour and style make them closer. An empty list is right when nothing is close.`;
 
-// The items shops on Relay sell, as Discover shows them: real shops only, test shops too for Relay's testing tools.
-async function candidates(env, includeTest) {
+// The products shops on Relay sell, as Discover shows them, one each: real shops only; for Relay's testing tools, test
+// shops too, and the preview from shops' own websites (web-shops.js), each marked.
+async function candidates(env, includeTest, now) {
   const db = env.RELAY_DB;
   await ensureImageTable(db);
   const shops = await shopifyShopsForDisplay(env, { includeTest }).catch(() => []);
-  const out = [];
+  const variants = [];
   for (const s of shops) {
     const sql = (picture) => `SELECT i.title AS product, v.title AS variation, v.id AS sku, v.price_minor AS priceMinor, v.currency AS currency, ${picture} AS imageUrl,
         MAX(q.quantity) AS quantity
@@ -48,11 +50,30 @@ async function candidates(env, includeTest) {
     let rows;
     try { rows = (await db.prepare(sql("COALESCE(i.image_url, img.image_url)")).bind("shopify:" + s.domain).all()).results || []; }
     catch { rows = (await db.prepare(sql("img.image_url")).bind("shopify:" + s.domain).all()).results || []; }
-    for (const r of rows) out.push({ sku: r.sku, product: r.product, variation: r.variation && !/^default title$/i.test(r.variation) ? r.variation : null,
-      priceMinor: r.priceMinor, currency: "GBP", imageUrl: /^https:\/\/[^\s"'<>]{8,600}$/.test(String(r.imageUrl || "")) ? r.imageUrl : null,
-      inStock: Number(r.quantity) > 0, storeName: s.label || s.domain.replace(/\.myshopify\.com$/, ""), ...(s.test ? { testShop: true } : {}) });
+    for (const r of rows) variants.push({ sku: r.sku, product: r.product, variation: r.variation && !/^default title$/i.test(r.variation) ? r.variation : null,
+      priceMinor: r.priceMinor, imageUrl: r.imageUrl, inStock: r.quantity == null ? null : Number(r.quantity) > 0,
+      storeName: s.label || s.domain.replace(/\.myshopify\.com$/, ""), ...(s.test ? { testShop: true } : {}) });
   }
-  return out.slice(0, MAX_CANDIDATES);
+  if (includeTest) for (const p of await webShopProducts(env, now).catch(() => []))
+    variants.push({ sku: p.sku, product: p.product, variation: p.variation, priceMinor: p.priceMinor, imageUrl: p.imageUrl, inStock: p.inStock,
+      storeName: p.storeName, webShop: true, productUrl: p.productUrl });
+  // One per product (a shop's sizes and colours of one thing): its lowest price, whether any of it can be bought, and the
+  // one a tap opens (the first that can be bought).
+  const byProduct = new Map();
+  for (const v of variants) {
+    const key = v.storeName.toLowerCase() + "|" + String(v.product).trim().toLowerCase();
+    const g = byProduct.get(key);
+    if (!g) { byProduct.set(key, { ...v, priceMinor: v.priceMinor, maxPriceMinor: v.priceMinor, count: 1 }); continue; }
+    g.count++;
+    g.priceMinor = Math.min(g.priceMinor, v.priceMinor); g.maxPriceMinor = Math.max(g.maxPriceMinor, v.priceMinor);
+    if (g.inStock !== true && v.inStock === true) { g.sku = v.sku; g.variation = v.variation; g.productUrl = v.productUrl || g.productUrl; }
+    g.inStock = g.inStock === true || v.inStock === true ? true : g.inStock === null || v.inStock === null ? null : false;
+    if (!g.imageUrl && v.imageUrl) g.imageUrl = v.imageUrl;
+  }
+  return [...byProduct.values()].slice(0, MAX_CANDIDATES).map(g => ({ sku: g.sku, product: g.product, variation: g.count === 1 ? g.variation : null,
+    priceMinor: g.priceMinor, ...(g.maxPriceMinor > g.priceMinor ? { maxPriceMinor: g.maxPriceMinor } : {}), currency: "GBP",
+    imageUrl: /^https:\/\/[^\s"'<>]{8,600}$/.test(String(g.imageUrl || "")) ? g.imageUrl : null, inStock: g.inStock, storeName: g.storeName,
+    ...(g.testShop ? { testShop: true } : {}), ...(g.webShop ? { webShop: true, productUrl: g.productUrl } : {}) }));
 }
 
 const money = (m) => "£" + (Number(m) / 100).toFixed(2);
@@ -92,8 +113,9 @@ export async function handlePhotoSearchRoute(request, env, url, cors, shopper, o
   if (Number(all && all.n) >= PHOTO_SEARCHES_ALL_DAY) return json({ error: "busy" }, 503, cors);
   await db.prepare("INSERT INTO photo_search_uses (shopper_id, created_at) VALUES (?, ?)").bind(shopper.id, now).run();
 
-  const items = await candidates(env, body.test === true);
-  const list = items.length ? items.map((x, i) => (i + 1) + ". " + [x.product, x.variation, x.storeName, money(x.priceMinor), x.inStock ? null : "out of stock"].filter(Boolean).join(" · ")).join("\n")
+  const items = await candidates(env, body.test === true, now);
+  const list = items.length ? items.map((x, i) => (i + 1) + ". " + [x.product, x.variation, x.storeName, money(x.priceMinor) + (x.maxPriceMinor ? "–" + money(x.maxPriceMinor) : ""),
+    x.inStock === false ? "out of stock" : null].filter(Boolean).join(" · ")).join("\n")
     : "(No items on Relay yet.)";
   let r;
   try {

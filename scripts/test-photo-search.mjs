@@ -5,6 +5,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handlePhotoSearchRoute, cleanAnswer, photoSearchDeleteStatements, PHOTO_SEARCHES_PER_DAY, PHOTO_SYSTEM } from "../worker/photo-search.js";
 import { ensureShopifyShopSchema, HOOKS_SET } from "../worker/shopify-connect.js";
+import { ensureWebShopTables } from "../worker/web-shops.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -33,7 +34,7 @@ const product = (shop, pid, title, variants, image) => {
   }
 };
 product(OAK, 1, "Court Classic Trainers", [[11, "White / UK 8", 8500, 3]], "https://cdn.example/court.png");
-product(BIRCH, 2, "Linen Shirt", [[21, "M", 4500, 4]]);
+product(BIRCH, 2, "Linen Shirt", [[21, "M", 4500, 4], [22, "L", 4700, 0]]);
 product(BIRCH, 3, "Canvas Tote", [[31, "Default Title", 1800, 0], [32, "Euro", 1800, 5, "EUR"]]);
 product(FERN, 4, "Test Trainers", [[41, "UK 9", 6000, 6]]);
 
@@ -47,6 +48,12 @@ const fetchImpl = async (url, init) => {
 };
 const alice = { id: "alice-id", email: "alice@example.com", emailHash: "h-alice" }, bob = { id: "bob-id", email: "bob@example.com", emailHash: "h-bob" };
 let clock = 1_800_000_000_000;
+// A shop's website in the catalogue preview (web-shops.js), for Relay's testing tools only.
+await ensureWebShopTables(db);
+sqlite.prepare("INSERT INTO web_shops (domain, label, status, products, items, checked_at, next_at) VALUES (?,?,?,?,?,?,?)").run("hollow-pine.test", "Hollow Pine", "ok", 1, 2, clock, clock + 864e5);
+for (const [vid, colour, price, available] of [[71, "Navy", 2800, 0], [72, "Grey", 2500, 1]])
+  sqlite.prepare("INSERT INTO web_shop_items (id, domain, product_key, position, product, variation, price_minor, available, image_url, product_url, kind, checked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run("web:hollow-pine.test:" + vid, "hollow-pine.test", "web:hollow-pine.test:7", 0, "Wool Beanie", colour, price, available, "https://cdn.shopify.com/s/files/1/beanie.jpg?width=600", "https://hollow-pine.test/products/wool-beanie?variant=" + vid, "Hats", clock);
 const call = async (who, body) => {
   const req = new Request("https://w.test/relay/my/photo-search", { method: body === undefined ? "GET" : "POST", headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const r = await handlePhotoSearchRoute(req, env, new URL(req.url), {}, who, { now: clock, fetchImpl });
@@ -74,6 +81,8 @@ let r = await call(alice, { image: PNG });
 assert.equal(r.status, 200, JSON.stringify(r.body));
 assert.deepEqual([r.body.found, r.body.item, r.body.results.map(x => x.product)], [true, "white leather trainers", ["Court Classic Trainers", "Linen Shirt"]],
   "only list numbers that exist, each once, best first");
+assert.deepEqual(r.body.results[1], { sku: "shopify:" + BIRCH + ":variant:gid://shopify/ProductVariant/21", product: "Linen Shirt", variation: null, priceMinor: 4500, maxPriceMinor: 4700,
+  currency: "GBP", imageUrl: null, inStock: true, storeName: "Birch Lane" }, "one per product: its prices, and a tap opens a size that can be bought");
 assert.deepEqual(r.body.results[0], { sku: "shopify:" + OAK + ":variant:gid://shopify/ProductVariant/11", product: "Court Classic Trainers", variation: "White / UK 8", priceMinor: 8500,
   currency: "GBP", imageUrl: "https://cdn.example/court.png", inStock: true, storeName: "Oak & Thread" });
 const sent = asked[0];
@@ -81,19 +90,21 @@ assert.equal(sent.headers["x-api-key"], "sk-ant-test-key");
 assert.equal(sent.body.model, "claude-haiku-5-5");
 const [img, txt] = sent.body.messages[0].content;
 assert.deepEqual(img, { type: "image", source: { type: "base64", media_type: "image/png", data: PNG.split(",")[1] } });
-assert.equal(txt.text, "Items shops on Relay sell:\n1. Court Classic Trainers · White / UK 8 · Oak & Thread · £85.00\n2. Linen Shirt · M · Birch Lane · £45.00\n3. Canvas Tote · Birch Lane · £18.00 · out of stock",
-  "public product details only; real shops only; pounds only; in stock first");
+assert.equal(txt.text, "Items shops on Relay sell:\n1. Court Classic Trainers · White / UK 8 · Oak & Thread · £85.00\n2. Linen Shirt · Birch Lane · £45.00–£47.00\n3. Canvas Tote · Birch Lane · £18.00 · out of stock",
+  "public product details only, one line a product; real shops only (no test shops, no shops' websites); pounds only; in stock first");
 assert.ok(!JSON.stringify(sent.body).includes("alice"), "nothing about the shopper");
 assert.match(PHOTO_SYSTEM, /Never describe or identify people/);
 assert.match(PHOTO_SYSTEM, /ignore names, addresses, messages, prices and other personal details/);
 console.log("ok - the picture and real shops' items go to Claude, nothing about the shopper; its picks come back best first");
 
-// 4. Testing tools: test shops' items too, marked.
-reply = { found: true, item: "trainers", matches: [4] };
+// 4. Testing tools: test shops' items and the shops' websites preview too, marked.
+reply = { found: true, item: "trainers", matches: [4, 5] };
 r = await call(alice, { image: PNG, test: true });
-assert.match(asked.at(-1).body.messages[0].content[1].text, /Test Trainers · UK 9 · Fern Test · £60\.00/);
-assert.deepEqual(r.body.results.map(x => [x.product, x.testShop]), [["Test Trainers", true]]);
-console.log("ok - test shops only for the testing tools, marked");
+assert.match(asked.at(-1).body.messages[0].content[1].text, /\n4\. Test Trainers · UK 9 · Fern Test · £60\.00\n5\. Wool Beanie · Hollow Pine · £25\.00–£28\.00$/);
+assert.deepEqual(r.body.results.map(x => [x.product, x.testShop, x.webShop]), [["Test Trainers", true, undefined], ["Wool Beanie", undefined, true]]);
+assert.deepEqual([r.body.results[1].sku, r.body.results[1].productUrl, r.body.results[1].inStock], ["web:hollow-pine.test:72", "https://hollow-pine.test/products/wool-beanie?variant=72", true],
+  "the colour the shop's website said can be bought, with its link");
+console.log("ok - test shops and shops' websites only for the testing tools, marked");
 
 // 5. No product in the picture, an answer that makes no sense, and Anthropic busy or refusing: plain errors, nothing shown.
 reply = { found: false, item: "a cat", matches: [1] };

@@ -5338,7 +5338,7 @@
       photoOn = false;
       cachedGet("photo", "/relay/my/photo-search").then(function (r) {
         photoOn = Boolean(r.ok && r.body && r.body.available);
-        var b = document.getElementById("dcPhoto"); if (b) b.hidden = !photoOn;
+        var b = document.getElementById("dcCam"); if (b) b.hidden = !(photoOn || (typeof window.testTools === "function" && window.testTools()));
       }, function () { photoOn = null; });
     }
     return Boolean(photoOn);
@@ -5364,10 +5364,25 @@
   function photoSearch(opts) {
     opts = opts || {};
     if (!load()) return show();
+    // Only Relay's testing tools show the camera while it's off: say why, and what turns it on.
+    if (photoOn === false) return photoOffSheet();
     var input = el("input", { type: "file", accept: "image/*" }); input.hidden = true;
     input.addEventListener("change", function () { var f = input.files && input.files[0]; input.remove(); if (f) photoSheet(f, opts); });
     document.body.appendChild(input);
     input.click();
+  }
+  function photoOffSheet() {
+    var sheet = el("div", { className: "rl-sheet rl-ps", role: "dialog", ariaModal: "true", ariaLabel: "Search by photo" });
+    var layer = el("div", { className: "rl-back" }, [sheet]);
+    function close() { if (layer.parentNode) layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") close(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer) close(); });
+    document.addEventListener("keydown", onKey);
+    [el("h2", { className: "rl-xs-h", text: "Search by photo is off" }),
+      el("p", { className: "rl-ps-note", text: "It needs Relay's Anthropic key. In Cloudflare, open Workers & Pages, then relay-square-api2, Settings, Variables and Secrets. Add a secret named ANTHROPIC_API_KEY with the key from console.anthropic.com, then reload Relay." }),
+      el("p", { className: "rl-ps-note", text: "The same key turns on the help chat and AI help for receipts." }),
+      el("button", { className: "rl-btn", text: "Close", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+    document.body.appendChild(layer);
   }
   function photoSheet(file, opts) {
     var sheet = el("div", { className: "rl-sheet rl-ps", role: "dialog", ariaModal: "true", ariaLabel: "Search by photo" });
@@ -5421,11 +5436,12 @@
         var list = el("div", { className: "rl-ps-grid" });
         results.forEach(function (x) {
           var img = el("div", { className: "rl-ps-img" }); img.setAttribute("aria-hidden", "true");
-          var draw = function () { illustrate(img, { items: [{ name: x.product }], retailer: { name: x.storeName }, category: "other" }, 40); };
-          if (x.imageUrl && /^https:\/\//.test(x.imageUrl)) { var ph = el("img", { src: x.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); draw(); }; img.appendChild(ph); } else draw();
-          list.appendChild(el("button", { type: "button", className: "rl-ps-item", ariaLabel: x.product + (x.variation ? ", " + x.variation : "") + ", " + money(x.priceMinor, "GBP") + ", from " + x.storeName,
+          var draw = function () { var o = { items: [{ name: x.product }], retailer: { name: x.storeName } }; o.category = ILL_KIND[illKey(o)] || "other"; illustrate(img, o, 40); };
+          if (x.imageUrl && /^https:\/\//.test(x.imageUrl)) { var ph = el("img", { src: x.imageUrl, alt: "", referrerPolicy: "no-referrer", loading: "lazy" }); ph.onerror = function () { ph.remove(); draw(); }; img.appendChild(ph); } else draw();
+          var price = (x.maxPriceMinor ? "From " : "") + money(x.priceMinor, "GBP");
+          list.appendChild(el("button", { type: "button", className: "rl-ps-item", ariaLabel: x.product + (x.variation ? ", " + x.variation : "") + ", " + price + ", from " + x.storeName + (x.inStock === false ? ", out of stock" : ""),
             onclick: function () { close(); if (window.relayOpenProduct) window.relayOpenProduct(x.sku, x.product); } },
-            [img, el("b", { text: x.product }), el("span", { text: [x.variation, x.storeName].filter(Boolean).join(" · ") }), el("span", { className: "rl-ps-price", text: money(x.priceMinor, "GBP") + (x.inStock === false ? " · out of stock" : "") })]));
+            [img, el("b", { text: x.product }), el("span", { text: [x.variation, x.storeName].filter(Boolean).join(" · ") }), el("span", { className: "rl-ps-price", text: price + (x.inStock === false ? " · out of stock" : "") })]));
         });
         out.appendChild(list);
         sheet.insertBefore(again, shut);
