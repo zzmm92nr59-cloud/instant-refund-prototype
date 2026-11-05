@@ -8,6 +8,7 @@
 //  * A passkey signs in the shopper it was registered for. No shopper ID is ever taken from the client.
 //  * Attestation is "none": we do not claim to know what kind of authenticator it is.
 import { tellShopper } from "./security-mail.js";
+import { secondSteps, hasSecondStep, markSessionChecked, lastSecondStep } from "./second-step.js";
 const enc = new TextEncoder();
 const HOUR_MS = 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
@@ -225,8 +226,11 @@ export async function handlePasskeyShopperRoute(path, method, request, env, cors
       const taken = await env.RELAY_DB.prepare("SELECT credential_id FROM auth_passkeys WHERE credential_id = ?").bind(id).first();
       if (taken) return fail();
       const name = String(body.name || "").replace(/[^\p{L}\p{N} .'-]/gu, "").trim().slice(0, 40) || "This device";
+      const before = await secondSteps(env, shopper.id);
       await env.RELAY_DB.prepare("INSERT INTO auth_passkeys (credential_id,shopper_id,public_key,sign_count,name,created_at) VALUES (?,?,?,?,?,?)")
         .bind(id, shopper.id, b64u(pub), ad.signCount, name, now).run();
+      // The account's first second step, made in this session (with Face ID or the like): the session counts as checked.
+      if (!hasSecondStep(before)) await markSessionChecked(env, shopper.sessionHash);
       await tellShopper(env, o, shopper.email, "passkey_added", { name });
       return h.json({ ok: true, name }, 200, cors);
     } catch { return fail(); }
@@ -234,6 +238,8 @@ export async function handlePasskeyShopperRoute(path, method, request, env, cors
   if (path === "/relay/my/passkeys/remove" && method === "POST") {
     const body = await h.readJson(request, 4000);
     const id = body && typeof body.id === "string" ? body.id : "";
+    const mine = await env.RELAY_DB.prepare("SELECT credential_id FROM auth_passkeys WHERE credential_id = ? AND shopper_id = ?").bind(id, shopper.id).first();
+    if (mine && lastSecondStep(env, await secondSteps(env, shopper.id), "passkey")) return h.json({ error: "last_second_step" }, 409, cors);
     const gone = await env.RELAY_DB.prepare("DELETE FROM auth_passkeys WHERE credential_id = ? AND shopper_id = ? RETURNING credential_id, name").bind(id, shopper.id).first();
     if (!gone) return h.json({ error: "not_found" }, 404, cors);
     await tellShopper(env, o, shopper.email, "passkey_removed", { name: gone.name || null });

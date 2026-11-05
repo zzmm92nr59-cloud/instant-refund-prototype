@@ -90,6 +90,8 @@ jobs:
           node scripts/test-web-shops.mjs
           node --check worker/photo-search.js
           node scripts/test-photo-search.mjs
+          node --check worker/second-step.js
+          node scripts/test-second-step.mjs
           # Security: rate limits, input checks, who can do what, and no keys in the repository (docs/SECURITY.md).
           node --check worker/limits.js
           node --check worker/validate.js

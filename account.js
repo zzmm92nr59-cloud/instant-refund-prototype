@@ -86,6 +86,7 @@
         return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
       });
     answer.then(settled, settled);
+    answer.then(function (r) { if (r.status === 403 && /"second_step_needed"/.test(r.text || "")) needSecondStep(); }, function () {});
     if (key) {
       var entry = { answer: answer, waiting: true, at: 0 };
       reads[key] = entry;
@@ -1212,6 +1213,7 @@
     two_step_on: "Sign-in codes go to this number. Turn off codes by text under Two-step sign-in first.", no_phone: "Add your phone number first.",
     already_enabled: "That's already on.", not_enabled: "That's already off.",
     not_for_review_account: "This account is for reviewing Relay, so that can't be added to it.",
+    last_second_step: "Relay needs at least one second step for signing in. Add another way first, then turn this one off.", second_step_needed: "Set up a second step for signing in first.",
     text_on: "Codes by text are on. Turn them off first to use an authenticator app instead.", app_on: "The authenticator app is on. Turn it off first to use texts instead.", sign_in_expired: "That sign-in timed out or was cancelled. Please start again." };
   function say(node, text, bad) { node.textContent = text; node.className = "rl-msg" + (bad ? " err" : ""); }
   // Unfinished writing is kept on this device, for this account only, until it's sent: leaving the screen, the app closing
@@ -1615,7 +1617,10 @@
       sheet.classList.add("rl-full", "rl-jr");
       sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:60px;border-radius:16px;margin:56px 0 14px" }));
       sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:200px;border-radius:18px" }));
-      Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail")]).then(function (r) {
+      api("/relay/my/second-step", { fresh: true }).then(function (ss) {
+        // A second step comes first when the account needs one (it can't use anything else until then).
+        if (ss.ok && ss.body.required && !ss.body.done) return protectAccount(function () { startJourney(info); });
+        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail")]).then(function (r) {
         if (!document.body.contains(sheet)) return;
         if (r[1].status === 401) { save(null); return open(signedOutView); }
         var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {};
@@ -1628,6 +1633,7 @@
         if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
         steps.push("done");
         runJourney(sheet, st, steps, 0);
+        });
       }).catch(function () {
         if (!document.body.contains(sheet)) return;
         sheet.textContent = "";
@@ -1896,6 +1902,22 @@
       }
     });
   }
+  // Makes a passkey on this device and saves it to the account. Resolves with Relay's answer; rejects if the device
+  // says no (cancelled, not supported).
+  function newPasskey() {
+    return api("/relay/my/passkeys/options", { method: "POST" }).then(function (o) {
+      if (!o.ok) return o;
+      var p = o.body;
+      return navigator.credentials.create({ publicKey: { challenge: b64uToBytes(p.challenge), rp: p.rp, user: { id: b64uToBytes(p.user.id), name: p.user.name, displayName: p.user.displayName },
+        pubKeyCredParams: p.pubKeyCredParams, authenticatorSelection: p.authenticatorSelection, attestation: "none", timeout: p.timeout,
+        excludeCredentials: (p.excludeCredentials || []).map(function (c) { return { type: "public-key", id: b64uToBytes(c.id) }; }) } }).then(function (cred) {
+        var ua = navigator.userAgent || "", name = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android phone" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows PC" : "This device";
+        return api("/relay/my/passkeys/register", { method: "POST", body: { id: cred.id, name: name, response: {
+          clientDataJSON: bytesToB64u(cred.response.clientDataJSON), attestationObject: bytesToB64u(cred.response.attestationObject) } } });
+      });
+    });
+  }
+  function passkeySaveProblem(x) { return x && x.body && x.body.error === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : "That passkey couldn't be saved. Try again."; }
   function passkeySection(box, msg) {
     if (!passkeysSupported()) return;
     var list = el("div"), note = el("div", { className: "rl-msg" });
@@ -1912,7 +1934,7 @@
           var rm = el("button", { className: "rl-btn ghost", text: "Remove", style: "width:auto;display:inline-block;margin:6px 0 0;padding:8px 14px;font-size:14px" });
           rm.onclick = function () {
             ask("Remove this passkey? You can still sign in with an email link.", "Remove passkey", function () {
-              api("/relay/my/passkeys/remove", { method: "POST", body: { id: k.id } }).then(function (x) { if (x.ok) refresh(); else say(note, "Couldn't remove it. Try again.", true); });
+              api("/relay/my/passkeys/remove", { method: "POST", body: { id: k.id } }).then(function (x) { if (x.ok) refresh(); else say(note, errors[x.body && x.body.error] || "Couldn't remove it. Try again.", true); });
             });
           };
           list.appendChild(el("div", { className: "rl-order" }, [el("b", { text: k.name || "Passkey" }),
@@ -1922,20 +1944,10 @@
     }
     add.onclick = function () {
       add.disabled = true; say(note, "Waiting for Face ID…");
-      api("/relay/my/passkeys/options", { method: "POST" }).then(function (o) {
-        if (!o.ok) { add.disabled = false; return say(note, o.body.error === "too_many_passkeys" ? "You've reached the limit of 5 passkeys. Remove one first." : "Couldn't start. Try again.", true); }
-        var p = o.body;
-        return navigator.credentials.create({ publicKey: { challenge: b64uToBytes(p.challenge), rp: p.rp, user: { id: b64uToBytes(p.user.id), name: p.user.name, displayName: p.user.displayName },
-          pubKeyCredParams: p.pubKeyCredParams, authenticatorSelection: p.authenticatorSelection, attestation: "none", timeout: p.timeout,
-          excludeCredentials: (p.excludeCredentials || []).map(function (c) { return { type: "public-key", id: b64uToBytes(c.id) }; }) } }).then(function (cred) {
-          var ua = navigator.userAgent || "", name = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android phone" : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows PC" : "This device";
-          return api("/relay/my/passkeys/register", { method: "POST", body: { id: cred.id, name: name, response: {
-            clientDataJSON: bytesToB64u(cred.response.clientDataJSON), attestationObject: bytesToB64u(cred.response.attestationObject) } } });
-        }).then(function (x) {
-          add.disabled = false;
-          if (x.ok) { say(note, "Added. Next time you can sign in with Face ID."); refresh(); }
-          else say(note, "That passkey couldn't be saved. Try again.", true);
-        });
+      newPasskey().then(function (x) {
+        add.disabled = false;
+        if (x.ok) { say(note, "Added. Next time you can sign in with Face ID."); refresh(); }
+        else say(note, passkeySaveProblem(x), true);
       }).catch(function (e) { add.disabled = false; say(note, passkeyProblem(e), true); });
     };
     refresh();
@@ -2012,8 +2024,67 @@
     box.appendChild(el("button", { type: "button", className: "rl-btn", text: "I've saved them", style: "margin-top:10px", onclick: then }));
   }
 
+  function passkeyStepView(sheet, info) {
+    var body = jFrame(sheet, { back: function () { emailStep(sheet, info.email); }, title: "Finish with Face ID",
+      sub: "This account uses Face ID or a passkey as its second step. Use it now to finish signing in." });
+    sheet.setAttribute("aria-label", "Two-step sign-in");
+    var msg = el("div", { className: "rl-msg", role: "status" });
+    if (passkeysSupported()) { var b = passkeyButton(msg); b.className = "rl-btn"; b.textContent = "Use Face ID or a passkey"; body.appendChild(b); }
+    else body.appendChild(el("p", { text: "This browser can't use passkeys. Open Relay on the phone or computer where you added it." }));
+    body.appendChild(msg);
+    body.appendChild(el("p", { className: "rl-jnote", text: "Your passkey is on another device? Your browser can show a code to scan with that phone." }));
+  }
+  // ---- "Protect your account": every account needs a second step for signing in (worker/second-step.js) ----
+  // Opened when Relay answers "second_step_needed", or as a step after signing up. It can't be skipped: the shopper sets
+  // one up (Face ID or the phone's screen lock, codes by text, or an authenticator app), or signs out.
+  var protectTimer = null;
+  function protectOpen() { return Boolean(document.querySelector('.rl-sheet[aria-label="Protect your account"]')); }
+  function needSecondStep() {
+    if (protectTimer || protectOpen() || !load()) return;
+    // A moment's wait: the sign-up journey may be opening it itself.
+    protectTimer = setTimeout(function () { protectTimer = null; if (!protectOpen() && load()) protectAccount(); }, 0);
+  }
+  function protectAccount(onDone) {
+    open(function (sheet) {
+      var body = jFrame(sheet, { noClose: true, title: "Protect your account",
+        sub: "Relay asks everyone for a second step when they sign in, so nobody can get into your account with just your email. Pick one. It takes a minute." });
+      sheet.setAttribute("aria-label", "Protect your account");
+      var msg = el("div", { className: "rl-msg", role: "status" });
+      function finish() {
+        say(msg, "Checking…");
+        api("/relay/my/second-step", { fresh: true }).then(function (r) {
+          if (!r.ok || !r.body.done) return say(msg, "That didn't finish. Try again.", true);
+          close(); forget();
+          if (onDone) onDone(); else if (typeof window.render === "function") { try { window.render(); } catch (e) {} }
+        }).catch(function () { say(msg, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      if (passkeysSupported()) {
+        var face = el("button", { type: "button", className: "rl-btn", text: "Use Face ID or screen lock" });
+        face.onclick = function () {
+          if (face.disabled) return;
+          face.disabled = true; say(msg, "Waiting for Face ID…");
+          newPasskey().then(function (x) {
+            face.disabled = false;
+            if (x.ok) return finish();
+            say(msg, passkeySaveProblem(x), true);
+          }).catch(function (e) { face.disabled = false; say(msg, passkeyProblem(e), true); });
+        };
+        body.appendChild(el("div", { className: "rl-2s" }, [el("div", { className: "rl-2s-h" }, [accIc("face"), el("b", { text: "Face ID or screen lock" })]),
+          el("p", { text: "Your face, fingerprint or your phone's screen lock. Nothing to type, and it signs you in on its own next time." }), face]));
+      }
+      body.appendChild(msg);
+      var others = el("div"); body.appendChild(others);
+      twoStepSection(others, { onOn: finish });
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Sign out", onclick: function () {
+        api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); if (window.go) window.go("home"); });
+      } }));
+    });
+  }
+
   // Signing in, step two: the code texted to the phone (sent straight away), from the authenticator app, or a recovery code.
+  // An account whose only second step is a passkey finishes with the passkey instead.
   function secondStepView(sheet, info) {
+    if (info && info.methods && info.methods[0] === "passkey" && !info.pendingToken) return passkeyStepView(sheet, info);
     if (typeof info === "string") info = { pendingToken: info };
     var methods = info.methods && info.methods.length ? info.methods : ["app"], pending = info.pendingToken, ending = info.phoneEnding || "";
     var mode = methods[0], textSent = false, waitUntil = 0;
@@ -2185,8 +2256,11 @@
   }
 
   // Account → Two-step sign-in: a code as well as the email link, Google or Microsoft. By text, from an app, or both.
-  function twoStepSection(box) {
+  function twoStepSection(box, opts) {
+    opts = opts || {};
     var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    // After a way is on and its recovery codes are saved: carry on where the shopper came from, or show the settings again.
+    var afterOn = function (done) { if (opts.onOn) opts.onOn(); else render(done); };
     box.appendChild(body); box.appendChild(note);
     function render(done) {
       body.textContent = ""; say(note, done || "");
@@ -2195,7 +2269,7 @@
         body.textContent = "";
         if (!r.ok) return say(note, "Couldn't load your settings. Check your connection and try again.", true);
         var s = r.body;
-        body.appendChild(el("p", { text: "With this on, signing in with an email link, Google or Microsoft also asks for a code. Face ID sign-in doesn't need one." }));
+        if (!opts.onOn) body.appendChild(el("p", { text: "With this on, signing in with an email link, Google or Microsoft also asks for a code. Face ID sign-in doesn't need one." }));
         // One way at a time, so a stolen session can't add its own way and use it to switch the shopper's off.
         if (s.textAvailable || s.text) body.appendChild(textCard(s));
         body.appendChild(appCard(s));
@@ -2211,10 +2285,10 @@
     }
     var turnOn = function (code) { return api("/relay/my/2fa/text", { method: "POST", body: { on: true, code: code } }); };
     function textOnDone(b) {
-      if (!b.recoveryCodes) return render("Codes by text are on.");
+      if (!b.recoveryCodes) return afterOn("Codes by text are on.");
       body.textContent = "";
       body.appendChild(el("p", { text: "Codes by text are on.", style: "color:var(--rl-text);font-weight:700" }));
-      recoveryCodesCard(body, b.recoveryCodes, function () { render(); });
+      recoveryCodesCard(body, b.recoveryCodes, function () { afterOn(); });
     }
     function textCard(s) {
       var c = card("phone", "Text message", s.text, s.text ? "Codes go to your number ending " + s.phoneEnding + "."
@@ -2224,7 +2298,8 @@
         codeOnly(body, note, "To turn this off, type the code we've just texted to your number ending " + s.phoneEnding + ". No phone? Type a recovery code instead.", "Turn off",
           function (code) { return api("/relay/my/2fa/text", { method: "POST", body: { on: false, code: code } }); }, function () { render("Codes by text are off."); }, function () { render(); }, true);
       } }));
-      else c.appendChild(el("button", { type: "button", className: "rl-btn", text: "Turn on codes by text", onclick: function () {
+      // In "Protect your account", Face ID is the one suggested first, so the other ways are quieter.
+      else c.appendChild(el("button", { type: "button", className: "rl-btn" + (opts.onOn && passkeysSupported() ? " ghost" : ""), text: "Turn on codes by text", onclick: function () {
         if (!s.phoneEnding) return numberStep(body, note, { intro: "Which mobile should the codes go to? Relay texts a code now to check it's yours. UK mobile numbers only for now.", confirm: turnOn, confirmLabel: "Turn on", onDone: textOnDone, onCancel: function () { render(); } });
         codeOnly(body, note, "We've texted a 6-digit code to your number ending " + s.phoneEnding + ". Type it to turn this on.", "Turn on", turnOn, textOnDone, function () { render(); });
       } }));
@@ -2271,7 +2346,7 @@
             if (!x.ok) { c.value = ""; return say(note, x.body && x.body.error === "invalid_code" ? "That code isn't right. Check your app and try again." : errors[x.body && x.body.error] || "Couldn't turn it on. Try again.", true); }
             body.textContent = ""; say(note, "");
             body.appendChild(el("p", { text: "The authenticator app is on.", style: "color:var(--rl-text);font-weight:700" }));
-            recoveryCodesCard(body, x.body.recoveryCodes || [], function () { render(); });
+            recoveryCodesCard(body, x.body.recoveryCodes || [], function () { afterOn(); });
           }).catch(function () { busy = false; on.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
         };
         [c, on, el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: function () { render(); } })].forEach(function (n) { body.appendChild(n); });
@@ -3745,6 +3820,13 @@
     // Reviewing member reports: only for the people who do that.
     var abox = el("div"); sheet.appendChild(abox);
     api("/relay/my/admin/me").then(function (r) {
+      // Relay's team signs in with their second step to use the team tools (worker/second-step.js).
+      if (r.ok && r.body && r.body.signInAgain) {
+        abox.appendChild(accGroup("Team", [accRow("shield", "Sign in again for team tools", "Team tools need a sign-in with your second step", function () {
+          api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); open(function (sh) { signedOutView(sh); }); });
+        })]));
+        return;
+      }
       if (!r.ok || !r.body || r.body.admin !== true) return;
       var revRow = accRow("key", "Sign-in for app reviewers", "", function () { page("Sign-in for app reviewers", reviewerPage); });
       openHealthPage = function () { if (!abox.isConnected) return false; page("Relay health", healthPage); return true; };

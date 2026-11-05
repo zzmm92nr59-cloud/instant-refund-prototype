@@ -2,6 +2,7 @@
 // texted to the shopper's confirmed phone (the number and the texts live in phone.js).
 // The app secret is stored encrypted (AES-GCM, key derived from AUTH_SECRET). Recovery codes are stored only as hashes and
 // work whichever way the codes arrive. Passkey (Face ID) sign-in already proves the person, so it never asks for this step.
+import { secondSteps, hasSecondStep, markSessionChecked, lastSecondStep } from "./second-step.js";
 import { textConfigured, issueTextCode, useTextCode, confirmedPhone, confirmNumberWithCode, textResponse, clientHashOf } from "./phone.js";
 import { tellShopper } from "./security-mail.js";
 const enc = new TextEncoder();
@@ -193,6 +194,8 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
   const row = await env.RELAY_DB.prepare("SELECT secret_enc, enabled FROM auth_totp WHERE shopper_id = ?").bind(shopper.id).first();
 
   const on = await methodsOn(env, shopper.id);
+  // Every second step the account has (passkeys too), for the rules in second-step.js.
+  const before = method === "POST" ? await secondSteps(env, shopper.id) : null;
   const recoveryLeft = async () => (await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM auth_totp_recovery WHERE shopper_id = ? AND used_at IS NULL").bind(shopper.id).first())?.n || 0;
   // Fresh recovery codes, shown once (only hashes are kept). Replaces any earlier set.
   const newRecoveryCodes = async () => {
@@ -240,11 +243,14 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
       // The first way on comes with recovery codes, shown once.
       const fresh = await newRecoveryCodes();
       await env.RELAY_DB.batch(fresh.statements);
+      // The account's first second step, set up in this session: the session counts as checked (second-step.js).
+      if (!hasSecondStep({ ...before, text: false })) await markSessionChecked(env, shopper.sessionHash);
       await tellShopper(env, o, shopper.email, "text_on", { ending });
       return h.json({ ok: true, recoveryCodes: fresh.codes }, 200, cors);
     }
     if (b && b.on === false) {
       if (!on.text) return h.json({ error: "not_enabled" }, 400, cors);
+      if (lastSecondStep(env, before, "text")) return h.json({ error: "last_second_step" }, 409, cors);
       if (!(await checkCode(env, shopper.id, code, now, ["manage", "manage:" + shopper.id]))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
       await env.RELAY_DB.batch([
         env.RELAY_DB.prepare("UPDATE auth_phone SET two_step = 0, two_step_at = NULL WHERE shopper_id = ?").bind(shopper.id),
@@ -281,12 +287,14 @@ export async function handleTotpShopperRoute(path, method, request, env, cors, o
     const fresh = await newRecoveryCodes();
     await env.RELAY_DB.batch([...fresh.statements,
       env.RELAY_DB.prepare("UPDATE auth_totp SET enabled = 1, enabled_at = ?, last_step = ? WHERE shopper_id = ?").bind(now, step, shopper.id)]);
+    if (!hasSecondStep({ ...before, app: false })) await markSessionChecked(env, shopper.sessionHash);
     await tellShopper(env, o, shopper.email, "app_on", {});
     return h.json({ ok: true, recoveryCodes: fresh.codes }, 200, cors); // shown once; only hashes are kept
   }
 
   if (path === "/relay/my/2fa/disable") {
     if (!row || !row.enabled) return h.json({ error: "not_enabled" }, 400, cors);
+    if (lastSecondStep(env, before, "app")) return h.json({ error: "last_second_step" }, 409, cors);
     if (await tooManyFails(env, shopper.id, now)) return h.json({ error: "too_many_requests" }, 429, cors);
     if (!(await checkCode(env, shopper.id, code, now))) { await recordFail(env, shopper.id, now); return h.json({ error: "invalid_code" }, 400, cors); }
     await env.RELAY_DB.batch(totpDeleteStatements(env.RELAY_DB, shopper.id));

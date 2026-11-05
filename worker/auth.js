@@ -30,6 +30,7 @@ import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
+import { secondStepRequired, secondSteps, hasSecondStep, openWithoutSecondStep } from "./second-step.js";
 import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
 import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, handlePasskeyShopperRoute } from "./passkeys.js";
 import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
@@ -118,6 +119,9 @@ async function ensureAuthTablesRun(db) {
   try { await db.prepare("ALTER TABLE auth_pending_mailbox ADD COLUMN consent_version TEXT").run(); } catch { /* already there */ }
   // The name Google or Microsoft gave, offered (never saved without asking) on the "What should we call you?" step.
   try { await db.prepare("ALTER TABLE auth_login_tokens ADD COLUMN suggested_name TEXT").run(); } catch { /* already there */ }
+  // Whether the session passed a second step (second-step.js): 1 after a passkey or a code at sign-in, or once the
+  // account's first second step is set up in it. Sessions from before this are 0.
+  try { await db.prepare("ALTER TABLE auth_sessions ADD COLUMN second_step INTEGER NOT NULL DEFAULT 0").run(); } catch { /* already there */ }
   await ensureGmailTables(db);
 }
 
@@ -143,7 +147,7 @@ export async function sessionShopper(request, env, now = Date.now()) {
   const match = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(header);
   if (!match || !env.RELAY_DB) return null;
   const row = await env.RELAY_DB.prepare(
-    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash, a.expires_at AS expiresAt
+    `SELECT s.id AS id, s.email AS email, s.email_hash AS emailHash, a.session_hash AS sessionHash, a.expires_at AS expiresAt, a.second_step AS secondStep
      FROM auth_sessions a JOIN shoppers s ON s.id = a.shopper_id
      WHERE a.session_hash = ? AND a.expires_at > ?`).bind(await sha256Hex(match[1]), now).first();
   if (!row) return null;
@@ -153,6 +157,7 @@ export async function sessionShopper(request, env, now = Date.now()) {
     await env.RELAY_DB.prepare("UPDATE auth_sessions SET expires_at = ? WHERE session_hash = ? AND expires_at < ?")
       .bind(now + SESSION_TTL_MS, row.sessionHash, now + SESSION_RENEW_WITHIN_MS).run();
   delete row.expiresAt;
+  row.secondStep = Number(row.secondStep) === 1;
   return row;
 }
 
@@ -241,7 +246,7 @@ async function verifyLink(request, env, cors, opts) {
       const shopperId = await ensureShopper(env, claimed.email, now);
       // Nothing is agreed or connected yet when 2-step sign-in still has to be passed (connecting waits for the app's own
       // step after sign-in), or when the wording changed since it was shown.
-      const twoStep = await twoStepOn(env, shopperId);
+      const twoStep = await twoStepOn(env, shopperId) || (secondStepRequired(env) && (await secondSteps(env, shopperId)).passkeys > 0);
       const sameWording = (pending.consent_version || CONSENT_VERSION) === CONSENT_VERSION;
       // An inbox already connected (a different one) is never swapped silently: the shopper keeps it.
       const current = await env.RELAY_DB.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
@@ -275,11 +280,14 @@ async function startSession(env, email, now, cors, opts = {}) {
     if (second && second.tooMany) return json({ error: "too_many_requests" }, 429, cors);
     if (second) return json({ needsSecondStep: true, pendingToken: second.pendingToken, methods: second.methods,
       ...(second.phoneEnding ? { phoneEnding: second.phoneEnding } : {}), email, ...extra }, 200, cors);
+    // An account whose only second step is a passkey finishes signing in with it (second-step.js).
+    if (secondStepRequired(env) && !(await isReviewAddress(env, email)) && (await secondSteps(env, shopper.id)).passkeys > 0)
+      return json({ needsSecondStep: true, methods: ["passkey"], email, ...extra }, 200, cors);
   }
   const sessionToken = randomToken();
   await env.RELAY_DB.prepare(
-    "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at) VALUES (?,?,?,?)")
-    .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS).run();
+    "INSERT INTO auth_sessions (session_hash,shopper_id,created_at,expires_at,second_step) VALUES (?,?,?,?,?)")
+    .bind(await sha256Hex(sessionToken), shopper.id, now, now + SESSION_TTL_MS, opts.skipSecondStep ? 1 : 0).run();
   await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now).run();
   // Old sign-in links and codes: the hourly limits only look back an hour, so a day later they're no longer needed.
   await env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE created_at <= ?").bind(now - 24 * HOUR_MS).run();
@@ -625,6 +633,18 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (signedInRoute) { const v = await checkBody(request, path, cors); if (v.response) return v.response; request = v.request; }
     // Nothing personal can be attached to the shared reviewer account (review-account.js).
     if (reviewBlocked(path, request.method) && await isReviewAddress(env, shopper.email)) return json({ error: "not_for_review_account" }, 403, cors);
+    // Two-step sign-in for everyone (second-step.js): until the account has a second step, only setting one up and the
+    // account's basics work. A session that passed a second step skips the check.
+    if (secondStepRequired(env) && !shopper.secondStep && (path === "/relay/my/second-step" || !openWithoutSecondStep(path))) {
+      const steps = await secondSteps(env, shopper.id), review = !hasSecondStep(steps) && await isReviewAddress(env, shopper.email);
+      if (path === "/relay/my/second-step" && request.method === "GET")
+        return json({ required: !review, done: review || hasSecondStep(steps), checked: false, ...steps }, 200, cors);
+      if (!review && !hasSecondStep(steps)) return json({ error: "second_step_needed" }, 403, cors);
+    }
+    if (path === "/relay/my/second-step" && request.method === "GET") {
+      const steps = await secondSteps(env, shopper.id);
+      return json({ required: secondStepRequired(env) && !(await isReviewAddress(env, shopper.email)), done: hasSecondStep(steps), checked: shopper.secondStep, ...steps }, 200, cors);
+    }
     if (path === "/relay/me" && request.method === "GET") return json({ email: shopper.email }, 200, cors);
     if (path === "/relay/auth/logout" && request.method === "POST") {
       await env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE session_hash = ?").bind(shopper.sessionHash).run();

@@ -12,6 +12,9 @@ AWIN_PUBLISHER_ID = "3134429"
 MICROSOFT_CLIENT_ID = "08207e63-9ef5-4a9c-ba4d-528e35f4c92a"
 # The prototype's test-only endpoints (worker/legacy-routes.js). "on" only for a testing session, then back to "off".
 LEGACY_TEST_ROUTES = "off"
+# Two-step sign-in for everyone (worker/second-step.js): every account needs a second step (Face ID or a passkey, codes by
+# text, or an authenticator app), and Relay's team tools need a sign-in that passed one. "off" makes it optional again.
+SECOND_STEP_REQUIRED = "on"
 
 [[d1_databases]]
 binding = "RELAY_DB"
