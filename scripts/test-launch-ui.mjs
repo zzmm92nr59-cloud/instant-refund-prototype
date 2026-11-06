@@ -151,7 +151,7 @@ await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTime
 assert.equal(await page.locator("#foot button.active").innerText(), "Profile");
 assert.equal(await page.getByRole("button", { name: "Done" }).count(), 0, "a page, not a sheet: nothing to close");
 const sheet = await page.locator("#mePage").innerText();
-assert.match(sheet, /Swap & resell\s+Sell or swap what you can't return/, "Swap & resell is reachable from Profile");
+assert.match(sheet, /Swap & resell/, "Swap & resell is reachable from Profile");
 assert.doesNotMatch(sheet, /TEST MODE|Card for swaps|No purchases matched/);
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
 // Someone who saved a card during a test-mode swap can always find it again to remove it (labelled as test mode).
@@ -179,7 +179,7 @@ await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
 await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).getByText(/· TEST/).waitFor();
 assert.ok(catalogueAsks.slice(asksBefore).some(q => /test=1/.test(q)), "with testing tools on, Discover asks for test shops too");
 await page.locator(".avatar").click();
-await page.locator(".rl-arow", { hasText: "Swap & resell" }).waitFor();
+await page.locator(".rl-ptile", { hasText: "Swap & resell" }).waitFor();
 await page.locator(".rl-arow", { hasText: "Card for swaps" }).click();
 await page.getByText("TEST MODE · no real money").waitFor();
 await page.goto(origin + "/index.html?testtools=0");

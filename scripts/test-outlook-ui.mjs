@@ -148,7 +148,7 @@ await page.locator(".rl-rr-detail .rl-pill", { hasText: /^(View receipt|Receipt 
 await page.getByText("Shown straight from your Outlook. Relay doesn't keep a copy.").waitFor();
 await page.keyboard.press("Escape");
 await page.evaluate(() => window.RelayAccount.open());
-await page.locator(".rl-arow", { hasText: "Outlook · connected" }).click();
+await page.locator(".rl-ptile", { hasText: "Outlook connected" }).click();
 await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Disconnect jess.tester@outlook.com" }).count());
 assert.match(await page.locator(".rl-ibx-row").innerText(), /jess\.tester@outlook\.com[\s\S]*Outlook · Checked/);

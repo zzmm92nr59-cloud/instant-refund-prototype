@@ -75,7 +75,7 @@ for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
 }
 await page.locator(".avatar").click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
 for (const sub of [null, "Email connection", "Email permission", "Download my data", "Delete my account", "Help", "Two-step sign-in"]) {
-  if (sub) { await page.locator(".rl-arow", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
+  if (sub) { await page.locator(".rl-arow, .rl-ptile", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
   const m = await measure(), where = "Profile" + (sub ? " > " + sub : "");
   assert.deepEqual(m.small, [], where + ": everything tappable is at least 44px tall");
   assert.deepEqual(m.tiny, [], where + ": no everyday text under 13px (capitals 12px)");
