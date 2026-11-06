@@ -59,7 +59,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -449,6 +449,12 @@
     ".rl-tile .rl-tile-art{position:absolute;z-index:1;top:-14%;right:-12%;width:68%;height:auto;color:rgba(0,0,0,.2)}" +
     ".rl-tile .rl-tile-badge{position:absolute;left:10px;top:10px;z-index:2;font-size:13px;line-height:1;font-weight:700;padding:7px 10px;border-radius:999px;background:rgba(0,0,0,.3);color:#fff}" +
     ".rl-tile.rl-gifts{color:#101828}.rl-tile.rl-gifts .rl-tile-art{color:rgba(16,24,40,.2)}.rl-tile.rl-gifts .rl-tile-badge{background:rgba(16,24,40,.14);color:#101828}" +
+    // Profile's tiles: like the Receipts tiles, laid out top to bottom so a bigger text size makes them taller, not cut off.
+    ".rl-inpage>.rl-msg:empty{display:none}.rl-ptiles{margin:16px 0 4px}.rl-tile.rl-ptile{aspect-ratio:auto;min-height:112px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;padding:10px 12px 11px 13px}" +
+    // (Beats the app's 44px floor for every button, which is more specific.)
+    "#view .rl-ptiles .rl-tile.rl-ptile{min-height:112px}" +
+    ".rl-tile.rl-ptile b{position:static;font-size:19px;padding-right:6px}.rl-tile.rl-ptile .rl-tile-badge{position:static;align-self:flex-start;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".rl-tile.rl-ptile .rl-tile-art{width:62%;top:-10%;right:-10%;color:rgba(0,0,0,.18)}.rl-tile.rl-ptile .rl-tile-badge[style*='none']+b{margin-top:auto}" +
     ".rl-tile.rl-year{background:#c7f567;color:#101828}.rl-tile.rl-year .rl-year-n{position:absolute;left:11px;top:8px;z-index:1;font-size:clamp(44px,13.5vw,60px);line-height:1;font-weight:900;letter-spacing:-.06em;color:inherit}" +
     ".rl-search{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 0 16px;padding:0 14px;border-radius:12px;background:var(--rl-fill);color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input{all:unset;flex:1;min-width:0;min-height:44px;font-size:17px;color:var(--rl-text)}.rl-search input::placeholder{color:var(--rl-text2,rgba(60,60,67,.6))}" +
@@ -513,7 +519,7 @@
     ".rl-acard{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;overflow:hidden}" +
     ".rl-arow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:56px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
     ".rl-arow+.rl-arow{border-top:1px solid var(--rl-line)}.rl-arow:active{background:var(--rl-fill)}.rl-arow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
-    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}" +
+    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.rl-ai.rl-ai-tint{color:#fff}" +
     ".rl-arow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}.rl-arow-t b{font-size:16px;font-weight:650;color:var(--rl-text)}.rl-arow-d{font-size:13.5px;color:var(--rl-text2)}" +
     ".rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2)}" +
     ".rl-arow.danger b{color:var(--rl-danger)}.rl-arow.danger .rl-ai{background:#fde8e6;color:#b3261e}" +
@@ -853,7 +859,41 @@
     ".rl-dl-item b{font-size:17px;font-weight:600;color:var(--rl-text)}.rl-dl-item span{font-size:15px;color:var(--rl-text2)}" +
     ".rl-dl-to{margin:0 0 6px}.rl-dl-to .rl-dt-fact b{white-space:pre-line;line-height:1.4}.rl-dl-link,.rl-dl-open{display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-decoration:none;min-height:50px}" +
     ".rl-dl-done{display:flex;flex-direction:column;gap:10px;margin:4px 0 16px}.rl-dl-tick{display:flex;align-items:flex-start;gap:10px;font-size:16px;line-height:1.35;color:var(--rl-text)}" +
-    ".rl-dl-tick .rl-jic{flex:none;margin:1px 0 0;color:var(--rl-accent)}.rl-dl-tick.no .rl-jic{color:var(--rl-warn)}";
+    ".rl-dl-tick .rl-jic{flex:none;margin:1px 0 0;color:var(--rl-accent)}.rl-dl-tick.no .rl-jic{color:var(--rl-warn)}" +
+    // Find address: the button beside the postcode, then the addresses there as a list to tap.
+    ".rl-dl-pc{display:flex;gap:8px;align-items:stretch;margin:0 0 12px}.rl-dl-pc .rl-field{flex:1;min-width:0;margin:0}" +
+    ".rl-dl-pc .rl-btn.rl-dl-find{flex:none;width:auto;margin:0;padding:0 16px;white-space:nowrap;border-radius:16px}" +
+    ".rl-dl-pick{margin:12px 2px 6px;font-size:15px;font-weight:600;color:var(--rl-text)}" +
+    ".rl-dl-list{display:flex;flex-direction:column;border-radius:14px;background:var(--rl-card);max-height:300px;overflow-y:auto;margin:0 0 8px;-webkit-overflow-scrolling:touch}" +
+    "@media (prefers-color-scheme: dark){.rl-dl-list{background:rgba(255,255,255,.07)}}" +
+    ".rl-dl-addr{all:unset;box-sizing:border-box;cursor:pointer;min-height:48px;display:flex;align-items:center;padding:11px 14px;font-size:16px;line-height:1.35;color:var(--rl-text);border-top:.5px solid var(--rl-line);-webkit-tap-highlight-color:transparent;transition:background .12s}" +
+    ".rl-dl-addr:first-child{border-top:0}.rl-dl-addr:active{background:var(--rl-fill)}.rl-dl-addr:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px}" +
+    ".rl-dl-sugg{display:inline-flex;width:auto;margin:6px 8px 0 0;padding:0 16px}.rl-dl-found .rl-msg{margin:8px 2px 0}" +
+    // Auctions: a card per auction (one tap opens it), and its page.
+    // On a sheet the cards sit on a lighter grey (light) or a lighter navy (dark), so each one reads as a card.
+    ".rl-sheet .rl-au-card{background:var(--rl-card)}@media (prefers-color-scheme: dark){.rl-sheet .rl-au-card{background:rgba(255,255,255,.07)}}" +
+    ".rl-au-card{margin:10px 0}.rl-au-card .rl-po-top{display:flex;align-items:flex-start}.rl-au-pic{flex:none;overflow:hidden;background:var(--rl-fill)}" +
+    ".rl-au-pic img,.rl-au-big img,.rl-au-thumb img{width:100%;height:100%;object-fit:cover;display:block}" +
+    ".rl-au-what{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-title{font-size:17px;font-weight:600;line-height:1.3;color:var(--rl-text)}" +
+    ".rl-au-shop,.rl-au-left{font-size:15px;line-height:1.35;color:var(--rl-text2)}.rl-au-price{font-size:15px;font-weight:600;color:var(--rl-text);margin-top:4px}" +
+    ".rl-au-you{font-size:15px;line-height:1.4;color:var(--rl-text)}.rl-au-you.todo{color:var(--rl-danger);font-weight:600}.rl-au-you.good{color:var(--rl-accent);font-weight:600}" +
+    ".rl-au-skel{height:104px;border-radius:20px;margin:10px 0}" +
+    ".rl-au-big{border-radius:20px;overflow:hidden;background:var(--rl-fill);aspect-ratio:1/1;max-height:420px;display:grid;place-items:center;margin:10px 0}.rl-au-none{color:var(--rl-text2)}" +
+    ".rl-au-strip{display:flex;gap:8px;overflow-x:auto;margin:0 0 10px;padding:2px}" +
+    ".rl-au-thumb{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:56px;height:56px;border-radius:12px;overflow:hidden;background:var(--rl-fill);-webkit-tap-highlight-color:transparent;transition:transform .12s}" +
+    ".rl-au-thumb:active{transform:scale(.95)}.rl-au-thumb:focus-visible{outline:3px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-au-shopname{font-size:15px;color:var(--rl-text2);margin:4px 0 2px}.rl-au-h{margin:0 0 4px;font-size:24px;line-height:1.2;color:var(--rl-text)}" +
+    ".rl-au-sub{font-size:15px;line-height:1.4;color:var(--rl-text2);margin:0 0 12px}" +
+    ".rl-au-pricebox{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:14px 16px;border-radius:18px;background:var(--rl-card);margin:4px 0 12px}" +
+    "@media (prefers-color-scheme: dark){.rl-au-pricebox{background:rgba(255,255,255,.07)}}" +
+    ".rl-au-pricebox>div{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-lbl{font-size:13px;font-weight:600;color:var(--rl-text2)}" +
+    ".rl-au-now{font-size:28px;font-weight:700;line-height:1.1;color:var(--rl-text)}.rl-au-meta{font-size:15px;color:var(--rl-text2)}" +
+    ".rl-au-left.big{font-weight:600;color:var(--rl-text);text-align:right;flex:none}.rl-au-you.big{margin:0 0 12px}" +
+    ".rl-au-pay{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box}" +
+    ".rl-dt-fact.rl-au-desc{flex-direction:column;align-items:flex-start;gap:4px}.rl-au-desc b{white-space:pre-line;font-weight:400;text-align:left}" +
+    ".rl-au-small{font-size:13px;line-height:1.45;color:var(--rl-text2);margin:14px 0 0}" +
+    ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
+    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -1340,6 +1380,7 @@
     x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
     send: '<path d="M4.5 12h14M13 6l6 6-6 6"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
+    gavel: '<path d="M13.5 4.5 19.5 10.5 16.5 13.5 10.5 7.5Z"/><path d="m13.5 10.5-8.5 8.5"/><path d="M13 20.5h8"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -3709,6 +3750,7 @@
     download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
     doc: '<path d="M7 3.5h7l4 4v13H7Z"/><path d="M14 3.5v4h4M10 12h5M10 16h5"/>',
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5M12 17h.01"/>',
+    gavel: '<path d="M13.5 4.5 19.5 10.5 16.5 13.5 10.5 7.5Z"/><path d="m13.5 10.5-8.5 8.5"/><path d="M13 20.5h8"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
     pulse: '<path d="M3 12.5h4l2.5-6.5 4.5 13 2.5-6.5H21"/>',
@@ -3722,7 +3764,12 @@
     s.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 20) + '" height="' + (px || 20) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + ACC_IC[n] + "</svg>";
     return s;
   }
-  // One row: icon, label, an optional line underneath, and a chevron (or an arrow for pages that open outside the app).
+  // Profile's colours, from the Receipts tiles' set (TILE_COLOURS): each kind of thing keeps its own, as tile or row icon.
+  var ACC_TINT = { mail: "#4F72E0", pin: "#14918A", bell: "#6662D9", swap: "#E0446E", gavel: "#E0612F", paste: "#B455C9", doc: "#7A7F8C", bag: "#2B3A5C",
+    face: "#2E9E5B", lock: "#4F72E0", devices: "#6662D9", phone: "#2E9E5B", card: "#B455C9", shield: "#14918A", download: "#4F72E0", help: "#D47B1F",
+    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E" };
+  // One row: icon (a white drawing on its colour), label, an optional line underneath, and a chevron (or an arrow for pages
+  // that open outside the app).
   function accRow(icon, label, detail, onclick, opts) {
     opts = opts || {};
     var sub = el("span", { className: "rl-arow-d", text: detail || "" });
@@ -3730,9 +3777,22 @@
     var tag = opts.href ? "a" : "button";
     var props = { className: "rl-arow" + (opts.danger ? " danger" : "") };
     if (opts.href) { props.href = opts.href; } else { props.type = "button"; props.onclick = onclick; }
-    var row = el(tag, props, [accIc(icon), el("span", { className: "rl-arow-t" }, [el("b", { text: label }), sub]), accIc(opts.href ? "ext" : "chev", 18, "rl-arow-c")]);
+    var pic = accIc(icon);
+    if (!opts.danger && ACC_TINT[icon]) { pic.classList.add("rl-ai-tint"); pic.style.background = ACC_TINT[icon]; }
+    var row = el(tag, props, [pic, el("span", { className: "rl-arow-t" }, [el("b", { text: label }), sub]), accIc(opts.href ? "ext" : "chev", 18, "rl-arow-c")]);
     row.setDetail = function (t) { sub.textContent = t || ""; sub.style.display = t ? "" : "none"; };
     return row;
+  }
+  // Everyday things on Profile as colourful tiles, like the Receipts page: the colour, a big faded drawing, the name, and
+  // how it stands (a badge in the corner, like "1 due soon" on Receipts). setDetail changes the badge, as on a row.
+  function accTile(icon, label, detail, onclick) {
+    var badge = el("span", { className: "rl-tile-badge rl-ptile-d" });
+    var art = el("span", { className: "rl-tile-art" });
+    art.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + ACC_IC[icon] + "</svg>";
+    var t = el("button", { type: "button", className: "rl-tile rl-ptile", onclick: onclick, style: "background:" + (ACC_TINT[icon] || TILE_COLOURS.other) }, [art, badge, el("b", { text: label })]);
+    t.setDetail = function (x) { badge.textContent = x || ""; badge.style.display = x ? "" : "none"; t.setAttribute("aria-label", label + (x ? ", " + x : "")); };
+    t.setDetail(detail);
+    return t;
   }
   function accGroup(title, rows) {
     var card = el("div", { className: "rl-acard" }, rows);
@@ -3803,47 +3863,55 @@
     // The reviewer account (isReview) can't have an inbox or sign-in settings, so those rows, and Wrapped (made from inbox
     // receipts), are left out for it.
     var review = isReview();
-    if (inPage && !review) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
     if (notice) say(msg, notice.text, notice.bad);
 
-    // Receipts
-    var mailRow = accRow("mail", "Email connection", "Checking…", function () { page("Email connection", mailPage); });
-    var receiptRows = review ? [] : [mailRow, accRow("paste", "Add a missing receipt", "Search your inbox or paste an email", function () { openFind(); })];
-    var ordersRow = accRow("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
-    receiptRows.push(ordersRow);
-    if (marketOn()) receiptRows.push(accRow("swap", "Swap & resell", "Sell or swap what you can't return", function () { openResale(); }));
-    sheet.appendChild(accGroup("Receipts", receiptRows));
+    // The everyday things, as colourful tiles like the Receipts page (settings stay as lists below). The reviewer account
+    // (isReview) can't have an inbox, delivery details or bids, so those tiles, and Wrapped (made from inbox receipts), are
+    // left out for it.
+    var tiles = [];
+    var mailRow = accTile("mail", "Email connection", "", function () { page("Email connection", mailPage); });
+    if (!review) tiles.push(mailRow);
+    var deliveryRow = null, auctionRow = null, alertRow = null;
+    if (!review) {
+      // The delivery details Relay fills in at shops' checkouts.
+      deliveryRow = accTile("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
+        deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
+      tiles.push(deliveryRow);
+    }
+    // Price alerts (only where the app's pages are here to open).
+    if (window.go) { alertRow = accTile("bell", "Price alerts", "", function () { close(); window.go("radar"); }); tiles.push(alertRow); }
+    if (marketOn()) tiles.push(accTile("swap", "Swap & resell", "", function () { openResale(); }));
+    // Auctions: bids and wins (a win to pay for comes first, in words).
+    if (!review) { auctionRow = accTile("gavel", "Auctions", "", function () { openAuctions("mine"); }); tiles.push(auctionRow); }
+    if (!review) tiles.push(accTile("paste", "Add a missing receipt", "", function () { openFind(); }));
+    var ordersRow = accTile("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
+    tiles.push(ordersRow);
+    sheet.appendChild(el("div", { className: "rl-tiles rl-ptiles" }, tiles));
     var mailState = null;
     api("/relay/my/gmail").then(function (g) {
       if (g.ok) rememberMailbox(g.body);
       mailState = g.ok && g.body ? g.body : null;
       var more = mailState && (mailState.others || []).length;
-      mailRow.setDetail(!mailState ? "" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " · connected" : "Not connected yet");
+      mailRow.setDetail(!mailState ? "" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " connected" : "Not connected yet");
     }).catch(function () { mailRow.setDetail(""); });
     var orders = [];
     api(purchasesPath()).then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       orders = (r.ok && r.body && r.body.purchases) || [];
-      if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + " confirmed by the shop"); }
+      if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders")); }
     }).catch(function () {});
-
-    // Alerts (only where the app's pages are here to open)
-    if (window.go) {
-      var alertRow = accRow("bell", "Price alerts", "", function () { close(); window.go("radar"); });
-      sheet.appendChild(accGroup("Alerts", [alertRow]));
-      alertStatus().then(function (st) {
-        var n = st && st.watches ? st.watches.length : 0;
-        alertRow.setDetail(n ? "Watching " + n + " product" + (n === 1 ? "" : "s") : "Get told when prices drop");
-      });
-    }
-
-    // Shopping: the delivery details Relay fills in at shops' checkouts.
-    if (!review) {
-      var deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
-        deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
-      sheet.appendChild(accGroup("Shopping", [deliveryRow]));
-      api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? deliveryLine(r.body.delivery) : "Add your address"); }).catch(function () {});
-    }
+    if (alertRow) alertStatus().then(function (st) {
+      var n = st && st.watches ? st.watches.length : 0;
+      alertRow.setDetail(n ? n + " watched" : "");
+    });
+    if (deliveryRow) api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? r.body.delivery.postcode : "Add your address"); }).catch(function () {});
+    if (auctionRow) auctionsMine().then(function (b) {
+      var rows = (b && b.auctions) || [], todo = rows.filter(function (r) { return AU_TODO[r.you.state]; }).length;
+      var live = rows.filter(function (r) { return r.auction.status === "live" || r.auction.status === "ending"; }).length;
+      auctionRow.setDetail(todo ? todo + " to pay for" : live ? "Bidding on " + live : "");
+    });
+    // This year's Wrapped, under the tiles.
+    if (inPage && !review) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
 
     // Sign-in & security
     var secRows = [];
@@ -6015,14 +6083,16 @@
   }
   // ---- Delivery details (worker/delivery.js): kept with the account, and filled in at a shop's checkout when the shopper
   // buys there through Relay. They go only to that shop, only when the shopper taps to buy. Payment is always at the shop.
+  // The postcode comes before the address, so "Find address" can fill the rest in. The phone's own AutoFill fills them all
+  // too (each field says what it is).
   var DELIVERY_FIELDS = [
     ["firstName", "First name", "given-name", "Type your first name."],
     ["lastName", "Last name", "family-name", "Type your last name."],
+    ["postcode", "Postcode", "postal-code", "That isn't a UK postcode. Type it like SW11 1AA."],
     ["line1", "Address", "address-line1", "Type the first line of your address."],
     ["line2", "Flat, floor or building (optional)", "address-line2", "Check the second line of your address."],
     ["town", "Town or city", "address-level2", "Type your town or city."],
     ["county", "County (optional)", "address-level1", "Check the county."],
-    ["postcode", "Postcode", "postal-code", "That isn't a UK postcode. Type it like SW11 1AA."],
     ["phone", "Phone number for the courier (optional)", "tel", "That isn't a UK phone number. Type it like 07700 900123."]];
   function deliveryLine(d) { return [d.line1, d.postcode].filter(Boolean).join(", "); }
   // "+447700900456" → "07700 900456"; "+442079460018" → "020 7946 0018".
@@ -6038,18 +6108,20 @@
     var body = el("div");
     box.appendChild(body); box.appendChild(note);
     body.appendChild(el("div", { className: "rl-skel", style: "min-height:240px;border-radius:16px" }));
-    var draw = function (d) {
+    var draw = function (d, lookup) {
       body.textContent = "";
       body.appendChild(el("p", { className: "rl-dl-intro", text: opts.intro || "Relay fills these in at a shop's checkout when you buy through Relay, and gives them only to that shop." }));
-      var inputs = {};
+      var inputs = {}, finder = null;
       DELIVERY_FIELDS.forEach(function (f) {
         var input = el("input", { id: "rl-dl-" + f[0], className: "rl-field", autocomplete: f[2], value: (d && d[f[0]]) || "", maxLength: f[0] === "postcode" ? 10 : f[0] === "phone" ? 24 : 100 });
         if (f[0] === "phone") { input.type = "tel"; input.inputMode = "tel"; if (d && d.phone) input.value = ukPhone(d.phone); }
-        if (f[0] === "postcode") { input.setAttribute("autocapitalize", "characters"); input.setAttribute("enterkeyhint", "next"); }
+        if (f[0] === "postcode") { input.setAttribute("autocapitalize", "characters"); input.setAttribute("enterkeyhint", lookup ? "search" : "next"); }
         if (f[0] === "firstName" || f[0] === "lastName" || f[0] === "town") input.setAttribute("autocapitalize", "words");
         inputs[f[0]] = input;
         body.appendChild(el("label", { htmlFor: input.id, className: "rl-jlabel", text: f[1] }));
-        body.appendChild(input);
+        // Find address: the postcode, then a list of the addresses there to pick from (Relay's postcode lookup, when it's on).
+        if (f[0] === "postcode" && lookup) { finder = addressFinder(input, inputs); body.appendChild(finder.row); body.appendChild(finder.box); }
+        else body.appendChild(input);
       });
       var saveBtn = el("button", { type: "button", className: "rl-btn", text: opts.saveLabel || "Save" });
       saveBtn.onclick = function () {
@@ -6084,11 +6156,55 @@
         body.appendChild(rm);
       }
     };
-    api("/relay/my/delivery").then(function (r) {
+    // Opened on purpose, so it asks for the latest (whether Find address is on can change).
+    api("/relay/my/delivery", { fresh: true }).then(function (r) {
       if (!document.body.contains(body)) return;
       if (!r.ok) { body.textContent = ""; say(note, "Couldn't load your details. Check your connection and try again.", true); return; }
-      draw(r.body && r.body.delivery);
+      draw(r.body && r.body.delivery, Boolean(r.body && r.body.lookup));
     }, function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+  }
+  // The postcode field with Find address beside it, and under them the addresses at that postcode. Picking one fills in the
+  // address, flat, town, county and postcode; "My address isn't here" leaves the shopper to type it.
+  function addressFinder(input, inputs) {
+    var go = el("button", { type: "button", className: "rl-btn ghost rl-dl-find", text: "Find address" });
+    var row = el("div", { className: "rl-dl-pc" }, [input, go]);
+    var box = el("div", { className: "rl-dl-found" }), msg = el("div", { className: "rl-msg", role: "status" });
+    var said = function (t, bad) { say(msg, t, bad); if (!msg.parentNode) box.appendChild(msg); };
+    function fill(a) {
+      inputs.line1.value = a.line1; inputs.line2.value = a.line2 || ""; inputs.town.value = a.town; inputs.county.value = a.county || ""; inputs.postcode.value = a.postcode;
+      box.textContent = ""; said("Filled in. Check it, then save.");
+      try { inputs.line1.scrollIntoView({ block: "center" }); } catch (e) {}
+    }
+    function find(pc) {
+      if (go.disabled) return;
+      pc = String(pc || input.value).trim().toUpperCase();
+      if (!/^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/.test(pc)) { box.textContent = ""; said("Type the whole postcode, like SW11 1AA.", true); input.focus(); return; }
+      input.value = pc;
+      go.disabled = true; go.textContent = "Finding…"; box.textContent = "";
+      box.appendChild(el("div", { className: "rl-skel", style: "height:144px;border-radius:14px;margin:4px 0 8px" }));
+      api("/relay/my/address-lookup?postcode=" + encodeURIComponent(pc)).then(function (r) {
+        go.disabled = false; go.textContent = "Find address"; box.textContent = "";
+        var b = r.body || {};
+        if (r.ok && b.addresses && b.addresses.length) {
+          var list = el("div", { className: "rl-dl-list", role: "group", ariaLabel: "Addresses at " + b.postcode });
+          b.addresses.forEach(function (a) { list.appendChild(el("button", { type: "button", className: "rl-dl-addr", text: a.label, onclick: function () { fill(a); } })); });
+          box.appendChild(el("p", { className: "rl-dl-pick", text: "Choose your address" }));
+          box.appendChild(list);
+          box.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "My address isn't here", onclick: function () { box.textContent = ""; inputs.line1.focus(); } }));
+          return;
+        }
+        if (b.error === "postcode_not_found") {
+          said("Couldn't find " + pc + "." + ((b.suggestions || []).length ? " Did you mean one of these?" : " Check it, or type your address below."), true);
+          (b.suggestions || []).forEach(function (x) { box.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-dl-sugg", text: x, onclick: function () { find(x); } })); });
+          return;
+        }
+        said(b.error === "too_many_lookups" || b.error === "lookups_busy" ? "You've looked up a lot of postcodes today. Type your address below."
+          : "Finding addresses isn't working just now. Type your address below.", true);
+      }, function () { go.disabled = false; go.textContent = "Find address"; box.textContent = ""; said("Couldn't reach Relay. Check your connection, or type your address below.", true); });
+    }
+    go.onclick = function () { find(); };
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); find(); } });
+    return { row: row, box: box };
   }
   // Buying from a shop's own website (Discover): Relay starts the shop's checkout with the shopper's email and delivery
   // address filled in, then the shopper opens it to choose delivery and pay. p: { sku, title, variation, price, shop, fallbackUrl }.
@@ -6162,6 +6278,278 @@
       sheet.appendChild(el("a", { className: "rl-btn rl-dl-open", href: b.url, target: "_blank", rel: "noopener noreferrer", text: "Open " + (b.shop || p.shop) + "'s checkout", onclick: function () { setTimeout(close, 400); } }));
       sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: close }));
     }
+  }
+  // ---- Auctions (worker/auctions.js): shops on Relay put clothing up for auction; the winner pays the shop at its own
+  // checkout. Relay bids for each shopper only as much as it takes to keep them ahead, up to the most they said they'd pay.
+  var AU_BID_KEY = "relay.auctions.v1"; // this device has bid, so Home checks for wins to pay (and nobody else's Home asks)
+  function auTest() { try { return window.testTools ? window.testTools() : testingOn(); } catch (e) { return false; } }
+  var auLive = { at: 0, rows: null, asking: null };
+  // Live auctions, remembered for a minute (Discover's tile and the Auctions page share them).
+  function auctionsLive(fresh) {
+    if (!fresh && auLive.rows && Date.now() - auLive.at < 60000) return Promise.resolve(auLive.rows);
+    if (auLive.asking) return auLive.asking;
+    auLive.asking = fetch(API + "/relay/auctions" + (auTest() ? "?test=1" : "")).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) { auLive.asking = null; if (b && Array.isArray(b.auctions)) { auLive.rows = b.auctions; auLive.at = Date.now(); } return auLive.rows || []; },
+        function () { auLive.asking = null; return auLive.rows || []; });
+    return auLive.asking;
+  }
+  function auPic(p) { return !p ? null : p.charAt(0) === "/" ? API + p : /^https:\/\//.test(p) ? p : null; }
+  // "Sat 7 Nov at 18:30".
+  function auWhen(t) { var d = new Date(t); return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") + " at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
+  // "Ends in 2 days", "Ends in 3 hours", "Ends in 12 minutes", "Ends in 40 seconds", "Ending now".
+  function auLeft(endsAt) {
+    var s = Math.round((endsAt - Date.now()) / 1000);
+    if (s <= 0) return "Ending now";
+    var plural = function (n, w) { return n + " " + w + (n === 1 ? "" : "s"); };
+    return "Ends in " + (s >= 172800 ? plural(Math.floor(s / 86400), "day") : s >= 7200 ? plural(Math.floor(s / 3600), "hour") : s >= 120 ? plural(Math.floor(s / 60), "minute") : plural(s, "second"));
+  }
+  function auPriceLine(a) {
+    if (a.status !== "live" && a.status !== "ending") return a.sold ? "Sold" : "Ended";
+    return a.bids ? money(a.priceMinor, "GBP") + ", " + a.bids + (a.bids === 1 ? " bid" : " bids") : "Starts at " + money(a.startMinor, "GBP");
+  }
+  // What the shopper's own bid means now, in a sentence.
+  function auYou(y, a) {
+    if (!y) return null;
+    var shop = a.shop, total = y.totalMinor != null ? money(y.totalMinor, "GBP") : null;
+    return ({
+      leading: "You're winning. The most you'd pay is " + money(y.maxMinor, "GBP") + ".",
+      outbid: "You've been outbid. Bid again to win it.",
+      pay: "You won. Pay " + total + " to " + shop + " by " + auWhen(y.payBy) + ".",
+      offered: "The winner didn't pay, so it's yours for " + total + " if you pay " + shop + " by " + auWhen(y.payBy) + ".",
+      add_address: "You won. Add your delivery details so " + shop + " can send it, then pay by " + auWhen(y.payBy) + ".",
+      setting_up: "You won. Relay is making your order at " + shop + ".",
+      paid: "Paid. " + shop + " will send it to you.",
+      expired: "Time ran out to pay, so it went to the next bidder.",
+      shop_problem: shop + " couldn't take the order, so there's nothing to pay.",
+      not_won: "Someone else won it.",
+      cancelled: "The shop cancelled this auction."
+    })[y.state] || null;
+  }
+  var AU_TODO = { pay: 1, offered: 1, add_address: 1 };
+  // Wins waiting for the shopper: a red number on the Profile tab (index.html relayBadge), like returns due.
+  function auBadge(rows) {
+    var n = (rows || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }).length;
+    window.__relayPayDue = n; if (window.relayBadge) window.relayBadge();
+  }
+  function auctionsMine(fresh) {
+    if (!load()) return Promise.resolve(null);
+    return api("/relay/my/auctions", { fresh: fresh }).then(function (r) {
+      if (!r.ok || !r.body) return null;
+      if ((r.body.auctions || []).length) { try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {} }
+      auBadge(r.body.auctions); return r.body;
+    }, function () { return null; });
+  }
+  function auMineCheck() { var on = false; try { on = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {} if (on) auctionsMine(); else auBadge([]); }
+  // One auction as a card: one tap opens it (no buttons on the card).
+  function auCard(a, you, onOpen) {
+    var pic = el("div", { className: "rl-po-img rl-au-pic" }), src = auPic(a.pictures && a.pictures[0]);
+    if (src) pic.appendChild(el("img", { alt: "", src: src, loading: "lazy", referrerPolicy: "no-referrer", onerror: function () { this.remove(); } }));
+    var mine = auYou(you, a);
+    var card = el("div", { className: "rl-po rl-tap rl-au-card", role: "button", tabIndex: 0 }, [
+      el("div", { className: "rl-po-top" }, [pic, el("div", { className: "rl-au-what" }, [
+        el("b", { className: "rl-au-title", text: a.title + (a.variant ? ", " + a.variant : a.size ? ", size " + a.size : "") }),
+        el("span", { className: "rl-au-shop", text: a.shop }),
+        el("span", { className: "rl-au-price", text: auPriceLine(a) }),
+        a.status === "live" || a.status === "ending" ? el("span", { className: "rl-au-left", "data-ends": String(a.endsAt), text: auLeft(a.endsAt) }) : null
+      ].filter(Boolean))])].concat(mine ? [el("span", { className: "rl-au-you" + (you && AU_TODO[you.state] ? " todo" : you && you.state === "leading" ? " good" : ""), text: mine })] : []));
+    card.setAttribute("aria-label", a.title + ", " + a.shop + ", " + auPriceLine(a) + (mine ? ". " + mine : ""));
+    card.onclick = onOpen;
+    card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } };
+    return card;
+  }
+  // The Auctions page: what's live, and the shopper's own bids and wins.
+  function openAuctions(tab) { if (!load()) return show(); open(function (sheet) { auctionsView(sheet, tab || "live"); }); }
+  function openAuction(id) { if (!load()) return show(); open(function (sheet) { auctionView(sheet, id, function () { auctionsView(sheet, "live"); }); }); }
+  function auctionsView(sheet, tab) {
+    sheet.textContent = ""; sheet.setAttribute("aria-label", "Auctions");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var cur = tab, body = el("div"), tabs = el("div", { className: "rl-mk-tabs", role: "group", ariaLabel: "Auctions" });
+    [["live", "Live"], ["mine", "Your bids"]].forEach(function (t) {
+      var b = el("button", { type: "button", text: t[1], onclick: function () { if (cur !== t[0]) { cur = t[0]; draw(); } } });
+      b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
+    });
+    [el("h2", { text: "Auctions" }), tabs, body, el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+    function outlines() { body.textContent = ""; for (var i = 0; i < 3; i++) body.appendChild(el("div", { className: "rl-skel rl-au-skel" })); }
+    function draw() {
+      Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-tab") === cur ? "true" : "false"); });
+      outlines();
+      var want = cur;
+      // Opened on purpose, so it asks for the latest: prices and wins change while the app is closed.
+      Promise.all([cur === "live" ? auctionsLive(true) : Promise.resolve(null), auctionsMine(true)]).then(function (rs) {
+        if (want !== cur || !document.body.contains(body)) return;
+        body.textContent = "";
+        var mine = (rs[1] && rs[1].auctions) || [], youOf = {};
+        mine.forEach(function (r) { youOf[r.auction.id] = r.you; });
+        var open1 = function (id) { return function () { auctionView(sheet, id, function () { auctionsView(sheet, want); }); }; };
+        if (cur === "live") {
+          var rows = rs[0] || [];
+          if (!rows.length) return body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No auctions right now" }),
+            el("p", { text: "When shops on Relay put clothes up for auction, they show here. You bid the most you'd pay, and Relay bids for you only as much as it takes to stay ahead." })]));
+          rows.forEach(function (a) { body.appendChild(auCard(a, youOf[a.id], open1(a.id))); });
+        } else {
+          if (!rs[1]) return body.appendChild(el("p", { className: "rl-msg err", text: "Couldn't load your bids. Check your connection and try again." }));
+          if (!mine.length) return body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No bids yet" }),
+            el("p", { text: "Bids you make show here, with anything you win and how to pay for it." })]));
+          // Wins to pay first, then what's still running, then the rest.
+          var rank = function (r) { return AU_TODO[r.you.state] ? 0 : r.auction.status === "live" || r.auction.status === "ending" ? 1 : 2; };
+          mine.slice().sort(function (x, y) { return rank(x) - rank(y); }).forEach(function (r) { body.appendChild(auCard(r.auction, r.you, open1(r.auction.id))); });
+        }
+        auTick(body);
+      });
+    }
+    draw();
+  }
+  // Time left on every card or page on screen, kept up to date while it's open.
+  function auTick(box) {
+    var t = setInterval(function () {
+      if (!document.body.contains(box)) return clearInterval(t);
+      Array.prototype.forEach.call(box.querySelectorAll("[data-ends]"), function (n) { n.textContent = auLeft(Number(n.getAttribute("data-ends"))); });
+    }, 1000);
+  }
+  // One auction: its photos, what it is, the price and time left, the shopper's own bid, and what they can do.
+  function auctionView(sheet, id, back) {
+    sheet.textContent = ""; sheet.setAttribute("aria-label", "Auction");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var top = el("button", { type: "button", className: "rl-navback", "data-back": "", ariaLabel: "Back to auctions", onclick: back }, [jIc("back", 22), el("span", { text: "Auctions" })]);
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    [top, body, note].forEach(function (n) { sheet.appendChild(n); });
+    body.appendChild(el("div", { className: "rl-skel", style: "height:260px;border-radius:20px" }));
+    body.appendChild(el("div", { className: "rl-skel", style: "height:90px;border-radius:16px;margin-top:14px" }));
+    var shown = null;
+    function get(fresh) {
+      return Promise.all([fetch(API + "/relay/auctions/" + encodeURIComponent(id) + (auTest() ? "?test=1" : ""), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }, function () { return null; }),
+        auctionsMine(fresh)]).then(function (rs) {
+        var mine = rs[1] && (rs[1].auctions || []).filter(function (r) { return r.auction.id === id; })[0];
+        var a = (rs[0] && rs[0].auction) || (mine && mine.auction) || null;
+        return a ? { a: a, you: mine ? mine.you : null, canBid: rs[1] ? rs[1].canBid : false, why: rs[1] && rs[1].why, until: rs[1] && rs[1].until } : null;
+      });
+    }
+    function draw(x) {
+      if (!document.body.contains(body)) return;
+      body.textContent = "";
+      if (!x) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "This auction isn't available" }), el("p", { text: "It may have ended a while ago, or the shop took it down." })])); return; }
+      shown = x; var a = x.a, you = x.you;
+      // Photos: the first large, the rest as a strip to tap through.
+      var pics = (a.pictures || []).map(auPic).filter(Boolean);
+      var big = el("div", { className: "rl-au-big" });
+      var showPic = function (src) { big.textContent = ""; big.appendChild(el("img", { alt: a.title, src: src, referrerPolicy: "no-referrer" })); };
+      if (pics.length) showPic(pics[0]); else big.appendChild(el("div", { className: "rl-au-none" }, [jIc("gavel", 44)]));
+      body.appendChild(big);
+      if (pics.length > 1) {
+        var strip = el("div", { className: "rl-au-strip", role: "group", ariaLabel: "Photos" });
+        pics.forEach(function (src, i) {
+          var b = el("button", { type: "button", className: "rl-au-thumb", ariaLabel: "Photo " + (i + 1) + " of " + pics.length, onclick: function () { showPic(src); } }, [el("img", { alt: "", src: src, referrerPolicy: "no-referrer" })]);
+          strip.appendChild(b);
+        });
+        body.appendChild(strip);
+      }
+      body.appendChild(el("div", { className: "rl-au-shopname", text: a.shop }));
+      body.appendChild(el("h2", { className: "rl-au-h", text: a.title }));
+      var sub = [a.variant, a.size ? "Size " + a.size : null, a.conditionText].filter(Boolean);
+      if (sub.length) body.appendChild(el("p", { className: "rl-au-sub", text: sub.join(", ") }));
+      var live = a.status === "live" || a.status === "ending";
+      var priceBox = el("div", { className: "rl-au-pricebox" }, [
+        el("div", {}, [el("span", { className: "rl-au-lbl", text: !live ? (a.sold ? "Sold" : "Ended") : a.bids ? "Current bid" : "Starting bid" }),
+          el("b", { className: "rl-au-now", text: money(a.bids ? a.priceMinor : a.startMinor, "GBP") }),
+          el("span", { className: "rl-au-meta", text: (a.bids ? a.bids + (a.bids === 1 ? " bid" : " bids") : "No bids yet") + (a.deliveryMinor ? ", delivery " + money(a.deliveryMinor, "GBP") : ", free delivery") })]),
+        live ? el("span", { className: "rl-au-left big", "data-ends": String(a.endsAt), text: auLeft(a.endsAt) }) : null].filter(Boolean));
+      body.appendChild(priceBox);
+      var said = auYou(you, a);
+      if (said) body.appendChild(el("p", { className: "rl-au-you big" + (you && AU_TODO[you.state] ? " todo" : you && you.state === "leading" ? " good" : ""), text: said }));
+      var acts = el("div", { className: "rl-dt-acts" });
+      if (you && (you.state === "pay" || you.state === "offered")) {
+        if (you.payUrl) acts.appendChild(el("a", { className: "rl-btn rl-au-pay", href: you.payUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Pay " + money(you.totalMinor, "GBP") + " at " + a.shop }), jIc("ext", 18)]));
+        else acts.appendChild(el("p", { className: "rl-au-sub", text: "Relay is getting the link to pay from " + a.shop + ". Pull down or come back in a minute." }));
+      }
+      if (you && you.state === "add_address") acts.appendChild(el("button", { type: "button", className: "rl-btn", text: "Add delivery details", onclick: function () {
+        body.textContent = ""; say(note, "");
+        deliveryForm(body, { saveLabel: "Save", onSaved: function () { say(note, "Saved. Relay will make your order at " + a.shop + " in a minute or two."); get(true).then(draw); }, onCancel: function () { get().then(draw); } });
+      } }));
+      if (live) acts.appendChild(el("button", { type: "button", className: "rl-btn", text: you && you.state === "leading" ? "Raise the most you'd pay" : you ? "Bid again" : "Place a bid", onclick: function () { bidView(x); } }));
+      if (acts.childNodes.length) body.appendChild(acts);
+      if (a.description) body.appendChild(el("div", { className: "rl-dt-facts" }, [el("div", { className: "rl-dt-fact rl-au-desc" }, [el("span", { text: "From the shop" }), el("b", { text: a.description })])]));
+      body.appendChild(el("p", { className: "rl-au-small", text: "You bid the most you'd pay, and Relay bids for you only as much as it takes to keep you ahead. If you win, you pay " + a.shop +
+        " within 24 hours at its own checkout: Relay never takes the money. It's an online order from the shop, so you can still change your mind within 14 days of delivery." }));
+      auTick(body);
+    }
+    // Bidding, in the same sheet: the most they'd pay, then what that means.
+    function bidView(x) {
+      var a = x.a, you = x.you;
+      body.textContent = ""; say(note, "");
+      try { sheet.scrollTop = 0; } catch (e) {}
+      var backToIt = el("button", { type: "button", className: "rl-btn ghost", text: "Back to the auction", onclick: function () { draw(shown); } });
+      body.appendChild(el("h2", { className: "rl-au-h", text: a.title }));
+      if (!x.canBid && x.why === "delivery_details_needed") {
+        body.appendChild(el("p", { className: "rl-dl-intro", text: "Add your delivery details first: if you win, " + a.shop + " sends it there." }));
+        var box = el("div"); body.appendChild(box);
+        deliveryForm(box, { saveLabel: "Save and bid", intro: "Relay gives these to " + a.shop + " only if you win, so it can send it to you.",
+          onSaved: function () { get(true).then(function (y) { if (y) { shown = y; bidView(y); } }); }, onCancel: function () { draw(shown); } });
+        return;
+      }
+      if (!x.canBid && x.why === "bidding_paused") {
+        body.appendChild(el("p", { className: "rl-dl-intro", text: "Two auctions you won in the last 90 days weren't paid for, so you can bid again from " + (x.until ? new Date(x.until).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "next month") + "." }));
+        body.appendChild(backToIt); return;
+      }
+      var leading = you && you.state === "leading";
+      var least = leading ? you.maxMinor + 1 : a.nextMinor;
+      body.appendChild(el("p", { className: "rl-dl-intro", text: leading ? "You're winning at " + money(a.priceMinor, "GBP") + ". You can raise the most you'd pay above " + money(you.maxMinor, "GBP") + ": the price only goes up if someone else bids."
+        : "Type the most you'd pay. Relay bids for you only as much as it takes to stay ahead, up to that." }));
+      var input = el("input", { id: "rl-au-max", className: "rl-field", inputMode: "decimal", autocomplete: "off", enterKeyHint: "go", value: (least / 100).toFixed(2) });
+      body.appendChild(el("label", { htmlFor: "rl-au-max", className: "rl-jlabel", text: "The most you'd pay (£" + (least / 100).toFixed(2) + " or more)" }));
+      body.appendChild(input);
+      // What's wrong with a bid shows right under it.
+      var msg = el("div", { className: "rl-msg", role: "status" });
+      body.appendChild(msg);
+      var go = el("button", { type: "button", className: "rl-btn" });
+      var pence = function () { var n = Number(String(input.value).replace(/[£,\s]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) : NaN; };
+      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Bid" : "Bid up to " + money(p, "GBP"); };
+      input.addEventListener("input", label); label();
+      body.appendChild(el("p", { className: "rl-au-small", text: "Plus " + (a.deliveryMinor ? money(a.deliveryMinor, "GBP") + " delivery" : "free delivery") + " if you win. You pay " + a.shop + " within 24 hours at its own checkout." }));
+      var ERR = { bid_too_low: function (b) { return "Bid " + money(b.nextMinor || least, "GBP") + " or more."; }, bid_not_higher: function (b) { return "The most you'd pay is already " + money(b.maxMinor, "GBP") + ". Type more than that."; },
+        bid_too_high: function () { return "That's more than Relay takes for one bid."; }, auction_ended: function () { return "This auction has ended."; },
+        bidding_paused: function () { return "Two auctions you won weren't paid for, so bidding is paused for now."; }, delivery_details_needed: function () { return "Add your delivery details first."; } };
+      go.onclick = function () {
+        if (go.disabled) return;
+        var p = pence();
+        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
+        go.disabled = true; go.textContent = "Bidding…"; say(msg, "");
+        api("/relay/my/auctions/bid", { method: "POST", body: { auctionId: a.id, maxMinor: p } }).then(function (r) {
+          go.disabled = false; label();
+          if (r.ok && r.body && r.body.auction) {
+            try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {}
+            auLive.at = 0;
+            bidDone(r.body.auction, r.body.you.leading, p);
+            return;
+          }
+          var e = r.body && r.body.error;
+          if (e === "delivery_details_needed") { x.canBid = false; x.why = e; return bidView(x); }
+          say(msg, ERR[e] ? ERR[e](r.body) : "Couldn't place your bid. Try again.", true);
+        }, function () { go.disabled = false; label(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.onclick(); });
+      body.appendChild(go); body.appendChild(backToIt);
+      setTimeout(function () { try { input.focus(); input.select(); } catch (e) {} }, 60);
+    }
+    // After a bid: whether they're winning, in words, then back to the auction (or straight into bidding again).
+    function bidDone(now, leading, max) {
+      body.textContent = ""; say(note, "");
+      try { sheet.scrollTop = 0; } catch (e) {}
+      var refresh = function () { get(true).then(function (y) { draw(y || { a: now, you: { state: leading ? "leading" : "outbid", maxMinor: max }, canBid: true }); }); };
+      body.appendChild(el("div", { className: "rl-au-done" + (leading ? " good" : "") }, [leading ? jIc("check", 28) : null,
+        el("h2", { className: "rl-au-h", text: leading ? "You're the highest bidder" : "Someone bid more" })].filter(Boolean)));
+      body.appendChild(el("p", { className: "rl-dl-intro", text: leading
+        ? "The price is " + money(now.priceMinor, "GBP") + ". If anyone else bids, Relay bids for you, up to " + money(max, "GBP") + ". With notifications on, Relay tells you if you're outbid."
+        : "Their maximum is higher than yours, so the price is now " + money(now.priceMinor, "GBP") + ". You can bid again." }));
+      if (!leading) body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Bid again", onclick: function () { get(true).then(function (y) { if (y) { shown = y; bidView(y); } }); } }));
+      body.appendChild(el("button", { type: "button", className: leading ? "rl-btn" : "rl-btn ghost", text: leading ? "Done" : "Back to the auction", onclick: refresh }));
+    }
+    get().then(draw);
+    // While it's open, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
+    var poll = setInterval(function () {
+      if (!document.body.contains(body)) return clearInterval(poll);
+      if (body.querySelector("#rl-au-max") || body.querySelector("#rl-dl-firstName")) return;
+      get(true).then(function (y) { if (y && document.body.contains(body) && !body.querySelector("#rl-au-max") && !body.querySelector("#rl-dl-firstName")) draw(y); });
+    }, 20000);
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
   function copyText(text) {
@@ -6571,7 +6959,8 @@
     if (host) { host.hidden = true; host.textContent = ""; }
     var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { setDue(0); return; }
+    if (!s || !s.token) { window.__relayPayDue = 0; setDue(0); return; }
+    auMineCheck();
     var draw = function (rows) {
       var today = new Date().toISOString().slice(0, 10), n = 0;
       (rows || []).forEach(function (x) {
@@ -6595,6 +6984,7 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
+    openAuctions: openAuctions, openAuction: openAuction, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,

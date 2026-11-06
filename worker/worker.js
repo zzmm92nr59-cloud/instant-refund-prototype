@@ -21,6 +21,7 @@ import { ensureOnce } from "./once.js";
 import { syncAwinFeeds } from "./awin-feed.js";
 import { refreshWebShops, handleWebShopsRoute } from "./web-shops.js";
 import { handleUcpProfileRoute } from "./delivery.js";
+import { handleAuctionPublicRoute, runAuctions } from "./auctions.js";
 import { checkRateLimits, tooManyRequests } from "./limits.js";
 import { checkBody, checkUrl } from "./validate.js";
 import { isLegacyTestRoute, legacyTestRoutesOn } from "./legacy-routes.js";
@@ -68,6 +69,9 @@ const relayWorker = {
       .catch(e => console.error("background scans failed", String(e && e.message || e).slice(0, 120)))
       .then(() => new Date().getUTCMinutes() % 15 === 7 ? null : catchUpFullReads(env).then(r => { if (r.checked) console.log("catching up", JSON.stringify(r)); }))
       .catch(e => console.error("catching up failed", String(e && e.message || e).slice(0, 120))));
+      // Auctions (auctions.js): end those that are due, make winners' orders at the shop, notice payments, move unpaid ones on.
+      ctx.waitUntil(runAuctions(env).then(r => { if (r.ended || r.paid || r.expired) console.log("auctions", JSON.stringify(r)); })
+        .catch(e => console.error("auctions failed", String(e && e.message || e).slice(0, 120))));
       // Shops' websites for the catalogue preview (web-shops.js): the shops due, about once a day each.
       ctx.waitUntil(refreshWebShops(env).then(r => { if (r.checked) console.log("shops' websites", JSON.stringify(r)); })
         .catch(e => console.error("shops' websites failed", String(e && e.message || e).slice(0, 120))));
@@ -321,6 +325,8 @@ const relayWorker = {
     { const webShops = await handleWebShopsRoute(request, env, url, corsHeaders); if (webShops) return webShops; }
     // Relay's agent profile for shops' checkouts (Universal Commerce Protocol): what it takes part in (delivery.js).
     { const ucp = handleUcpProfileRoute(request, url, corsHeaders); if (ucp) return ucp; }
+    // Live auctions, one auction and its photos: anyone can see them (auctions.js). Bidding is signed in (auth.js).
+    { const auctions = await handleAuctionPublicRoute(request, env, url, corsHeaders); if (auctions) return auctions; }
 
     // Publish only retailer-opted-in read-only products. Separate Shopify
     // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.

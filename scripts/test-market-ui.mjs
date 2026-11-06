@@ -175,7 +175,7 @@ console.log("ok - Sell: plain dates, a heads-up while it can still go back, labe
 
 // 4. Profile leads there too, and so does a receipt past its return date.
 await page.locator(".avatar").click();
-await page.locator("#mePage .rl-arow", { hasText: "Swap & resell" }).click();
+await page.locator("#mePage .rl-ptile", { hasText: "Swap & resell" }).click();
 await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
 await page.locator("#mePage").getByRole("button", { name: "Back", exact: true }).click();
 await page.locator("#foot").getByRole("button", { name: "Receipts" }).click();

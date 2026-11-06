@@ -93,13 +93,13 @@ const signedIn = async (hash = "") => {
   await page.goto(origin + "/index.html" + hash);
 };
 const profile = async () => { await page.evaluate(() => window.go("me")); await page.locator("#mePage .rl-arow").first().waitFor(); };
-const mailPage = async () => { await page.locator(".rl-arow", { hasText: "Email connection" }).click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.locator(".rl-ibx-row").first().waitFor(); };
+const mailPage = async () => { await page.locator(".rl-ptile", { hasText: "Email connection" }).click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.locator(".rl-ibx-row").first().waitFor(); };
 const view = page.locator("#mePage");
 
 // 1. Profile and the Email connection page: each inbox, how its reading is going, its own Disconnect, and ways to add more.
 await signedIn();
 await profile();
-await page.locator(".rl-arow", { hasText: "Email connection" }).getByText("2 inboxes · connected").waitFor();
+await page.locator(".rl-ptile", { hasText: "Email connection" }).getByText("2 inboxes connected").waitFor();
 await mailPage();
 const rows = page.locator(".rl-ibx-row");
 assert.equal(await rows.count(), 2);
@@ -165,7 +165,7 @@ console.log("ok - disconnecting one inbox, or the main one (the next takes its p
 // 4. Add a receipt searches every inbox, says which inbox each email is in, and adds from that one.
 reset();
 await signedIn(); await profile();
-await page.locator(".rl-arow", { hasText: "Add a missing receipt" }).click();
+await page.locator(".rl-ptile", { hasText: "Add a missing receipt" }).click();
 const q = page.locator("#rl-ar-q");
 await q.waitFor();
 assert.equal(await q.getAttribute("placeholder"), "Search your inboxes");

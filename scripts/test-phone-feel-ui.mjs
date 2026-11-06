@@ -266,7 +266,7 @@ console.log("ok - sheets have a grabber, close when swiped down, and snap back f
 await page.locator("[data-back]").first().click(); await settle();
 
 // ---- Drafts ----
-const addRow = page.locator(".rl-arow", { hasText: "Add a missing receipt" });
+const addRow = page.locator(".rl-ptile", { hasText: "Add a missing receipt" });
 await addRow.click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor();
 const draft = "Thanks for your order with Studio North. Order SN-77, Linen shirt, 45.00 pounds, delivered tomorrow.";
 await page.getByRole("button", { name: "Paste", exact: true }).click();

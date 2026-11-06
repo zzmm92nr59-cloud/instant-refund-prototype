@@ -65,6 +65,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/delivery": { fields: { firstName: text(100), lastName: text(100), line1: text(200), line2: text(200), town: text(120), county: text(120), postcode: str(20), phone: str(40) } },
   "/relay/my/delivery/remove": NOTHING,
   "/relay/my/web-checkout": { fields: { sku: str(140) } },
+  // Bidding on a shop's auction: the most the shopper would pay (auctions.js checks it against the auction).
+  "/relay/my/auctions/bid": { fields: { auctionId: str(40), maxMinor: int(0, 100000000) } },
   "/relay/my/consent": { fields: { version: str(40) } },
   "/relay/my/consent/withdraw": NOTHING,
   // Email: connecting, reading, searching and adding receipts.
@@ -129,6 +131,11 @@ const ROUTES = new Map(Object.entries({
   "/relay/retailer/royal-mail": { fields: { serviceCode: str(40), apiKey: str(400),
     address: obj({ name: text(150), company: text(250), line1: text(250), line2: text(250), city: text(100), postcode: str(16) }) } },
   "/relay/retailer/royal-mail/remove": NOTHING,
+  // Starting an auction: an item from the shop's catalogue, or a one-off with up to 4 photos (made smaller on the shop's
+  // device first; auctions.js checks what each photo really is).
+  "/relay/retailer/auctions": { limit: 2600 * KB, tooLarge: "photos_too_big", fields: { kind: one("catalogue", "oneoff"), variantKey: str(200), title: text(120),
+    size: text(40), description: text(1000), condition: str(20), startMinor: int(0, 100000000), deliveryMinor: int(0, 100000000), hours: int(0, 1000),
+    photos: list(4, str(620000)), agree: bool } },
   // Relay inside Shopify admin: signs in with Shopify's token in the Authorization header, nothing in the body.
   "/relay/shopify/embedded/session": NOTHING,
   // The bank-link demo in the testing tools (Plaid's sandbox).
@@ -157,6 +164,7 @@ const PATTERNS = [
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/report$"), { fields: { reason: text(300) } }],
   [new RegExp("^/relay/my/cross-swap/" + uuidish + "/cancel$"), NOTHING],
   [new RegExp("^/relay/my/admin/reports/" + uuidish + "/review$"), { fields: { outcome: one("dismiss", "remove_listing", "block") } }],
+  [new RegExp("^/relay/retailer/auctions/" + uuidish + "/cancel$"), NOTHING],
   [/^\/relay\/my\/instore\/suggestions\/[A-Za-z0-9-]{8,64}$/, { fields: { answer: one("mine", "not_mine") } }]
 ];
 

@@ -56,7 +56,7 @@ console.log("ok - moving between tabs within a minute reuses what was loaded (" 
 // A change sends the next read to Relay again.
 const t2 = Date.now();
 await page.evaluate(() => window.go("me"));
-await page.locator(".rl-arow", { hasText: "Email connection" }).first().waitFor();
+await page.locator(".rl-ptile", { hasText: "Email connection" }).first().waitFor();
 await page.locator(".rl-ahead").click();
 await page.locator("#rl-name").fill("Jess T");
 await page.getByRole("button", { name: /^Save/ }).first().click();

@@ -12,6 +12,7 @@ import { checkBody } from "./validate.js";
 import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
 import { handleShopPayRoute } from "./shop-payments.js";
+import { handleRetailerAuctionRoute } from "./auctions.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -249,6 +250,11 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
   if (path === "/relay/retailer/payments" || path.startsWith("/relay/retailer/payments/")) {
     if (shop.provider !== "shopify") return json({ error: "shopify_only" }, 400, cors);
     const res = await handleShopPayRoute(request, env, url, cors, shop.shop_ref, { ...o, now });
+    if (res) return res;
+  }
+  // Auctions: the shop's own, starting one (from its catalogue or a one-off with photos), cancelling one nobody has bid on.
+  if (path === "/relay/retailer/auctions" || path.startsWith("/relay/retailer/auctions/")) {
+    const res = await handleRetailerAuctionRoute(request, env, url, cors, shop, { ...o, now });
     if (res) return res;
   }
   // Royal Mail return labels on the shop's own Click & Drop account (Shopify shops only). The key is never sent back.

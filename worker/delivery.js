@@ -8,6 +8,8 @@
 // The details go only to the shop they're buying from, only when they tap to buy there, and each time is noted (what they
 // can see in "Download my data"). Deleting the account deletes the details and the notes.
 //
+// Finding the address from a postcode uses Ideal Postcodes (lookupPostcode below), only once Relay's key is set.
+//
 // Relay tells shops who it is with its agent profile (GET /.well-known/ucp below): it takes part in checkout, with delivery
 // details (fulfillment). It doesn't sign its requests yet (Shopify's "anonymous" level, which can start checkouts but not
 // finish them); finishing a purchase without the shop's own page needs Shopify's permission, which Relay doesn't have.
@@ -26,14 +28,72 @@ const json = (body, status, cors, cache) => Response.json(body, { status, header
 export const DELIVERY_SQL = [
   "CREATE TABLE IF NOT EXISTS delivery_details (shopper_id TEXT PRIMARY KEY, details TEXT NOT NULL, updated_at INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS web_checkouts (id INTEGER PRIMARY KEY AUTOINCREMENT, shopper_id TEXT NOT NULL, domain TEXT NOT NULL, shop TEXT NOT NULL, product TEXT, at INTEGER NOT NULL, address INTEGER NOT NULL DEFAULT 0)",
-  "CREATE INDEX IF NOT EXISTS web_checkouts_shopper ON web_checkouts (shopper_id, at)"
+  "CREATE INDEX IF NOT EXISTS web_checkouts_shopper ON web_checkouts (shopper_id, at)",
+  // Postcode lookups (for the daily limits only: no postcode or address is kept).
+  "CREATE TABLE IF NOT EXISTS address_lookups (shopper_id TEXT NOT NULL, at INTEGER NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS address_lookups_at ON address_lookups (at)"
 ];
 export function ensureDeliveryTables(db) {
   return ensureOnce(db, "delivery", () => db.batch(DELIVERY_SQL.map(s => db.prepare(s))));
 }
 // Deleting the account deletes the address and the record of which shops it went to.
 export function deliveryDeleteStatements(db, shopperId) {
-  return [db.prepare("DELETE FROM delivery_details WHERE shopper_id = ?").bind(shopperId), db.prepare("DELETE FROM web_checkouts WHERE shopper_id = ?").bind(shopperId)];
+  return [db.prepare("DELETE FROM delivery_details WHERE shopper_id = ?").bind(shopperId), db.prepare("DELETE FROM web_checkouts WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM address_lookups WHERE shopper_id = ?").bind(shopperId)];
+}
+
+// ---- Finding an address from a postcode ----
+// Royal Mail's address list (PAF) is licensed, so Relay asks Ideal Postcodes (api.ideal-postcodes.co.uk), which sells
+// lookups in it: about 4.5p for each postcode it finds addresses for; a postcode it doesn't know costs nothing. Off until
+// Relay's key is set as the Cloudflare secret IDEAL_POSTCODES_KEY. Only the postcode is sent: nothing about the shopper.
+// Signed-in shoppers only, LOOKUPS_PER_DAY each and LOOKUPS_PER_DAY_ALL across everyone, so the bill can't run away.
+export const LOOKUPS_PER_DAY = 20, LOOKUPS_PER_DAY_ALL = 400;
+const SMALL_WORDS = new Set(["upon", "on", "in", "under", "the", "by", "with", "le", "de", "en", "and", "of", "next", "super", "sub"]);
+// Royal Mail writes towns in capitals: "NEWCASTLE UPON TYNE" → "Newcastle upon Tyne", "STOKE-ON-TRENT" → "Stoke-on-Trent".
+export function townCase(t) {
+  return String(t || "").toLowerCase().split(" ").map((w, i) => w.split("-").map((p, j) => (i + j > 0 && SMALL_WORDS.has(p)) ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("-")).join(" ");
+}
+// A flat or unit on its own first line goes second, so "Address" is the street (as shops' checkouts expect).
+const SUB_PREMISE = /^(flat|apartment|apt|unit|studio|maisonette|room|suite|floor|basement|ground floor|first floor|second floor|third floor|top floor)\b/i;
+export function addressFrom(r) {
+  const lines = [r.line_1, r.line_2, r.line_3].map(x => oneLine(x)).filter(Boolean);
+  if (!lines.length) return null;
+  let line1 = lines[0], line2 = lines.slice(1).join(", ");
+  if (lines.length > 1 && SUB_PREMISE.test(lines[0])) { line1 = lines.slice(1).join(", "); line2 = lines[0]; }
+  const postcode = cleanPostcode(String(r.postcode || ""));
+  const town = townCase(oneLine(r.post_town));
+  if (!postcode || !town) return null;
+  return { label: lines.join(", "), line1: line1.slice(0, 200), line2: line2 ? line2.slice(0, 200) : null, town: town.slice(0, 120), county: oneLine(r.county).slice(0, 120) || null, postcode };
+}
+export async function lookupPostcode(env, shopper, raw, o = {}) {
+  const db = env.RELAY_DB, now = o.now || Date.now(), f = o.fetchImpl || ((...a) => fetch(...a));
+  if (!env.IDEAL_POSTCODES_KEY) return { status: 503, body: { error: "lookup_off" } };
+  const postcode = cleanPostcode(String(raw || ""));
+  if (!postcode) return { status: 400, body: { error: "bad_postcode" } };
+  await ensureDeliveryTables(db);
+  const mine = await db.prepare("SELECT COUNT(*) AS n FROM address_lookups WHERE shopper_id = ? AND at > ?").bind(shopper.id, now - DAY).first();
+  if (Number(mine && mine.n) >= LOOKUPS_PER_DAY) return { status: 429, body: { error: "too_many_lookups" } };
+  const all = await db.prepare("SELECT COUNT(*) AS n FROM address_lookups WHERE at > ?").bind(now - DAY).first();
+  if (Number(all && all.n) >= LOOKUPS_PER_DAY_ALL) return { status: 429, body: { error: "lookups_busy" } };
+  await db.prepare("INSERT INTO address_lookups (shopper_id, at) VALUES (?, ?)").bind(shopper.id, now).run();
+  await db.prepare("DELETE FROM address_lookups WHERE at < ?").bind(now - 2 * DAY).run();
+  let r, j = null;
+  try {
+    r = await f("https://api.ideal-postcodes.co.uk/v1/postcodes/" + encodeURIComponent(postcode.replace(" ", "")) + "?api_key=" + encodeURIComponent(env.IDEAL_POSTCODES_KEY),
+      { headers: { Accept: "application/json", "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(10000) });
+    j = await r.json().catch(() => null);
+  } catch { return { status: 503, body: { error: "lookup_unavailable" } }; }
+  if (r.status === 404 || (j && j.code === 4040)) {
+    const suggestions = ((j && j.suggestions) || []).map(x => cleanPostcode(String(x))).filter(Boolean).slice(0, 3);
+    return { status: 404, body: { error: "postcode_not_found", suggestions } };
+  }
+  if (!r.ok || !j || !Array.isArray(j.result)) {
+    // A key that's wrong or out of lookups is Relay's to fix: logged, and the shopper types their address.
+    console.error("address_lookup_failed", r.status, String((j && j.code) || "").slice(0, 10));
+    return { status: 503, body: { error: "lookup_unavailable" } };
+  }
+  const addresses = j.result.map(addressFrom).filter(Boolean).slice(0, 150);
+  return addresses.length ? { status: 200, body: { postcode, addresses } } : { status: 404, body: { error: "postcode_not_found", suggestions: [] } };
 }
 
 // ---- The details ----
@@ -204,10 +264,15 @@ export async function startWebCheckout(env, shopper, sku, o = {}) {
 // POST /relay/my/web-checkout { sku }: start a checkout at the shop with the details filled in.
 export async function handleDeliveryRoute(request, env, url, cors, shopper, o = {}) {
   const path = url.pathname;
-  if (path !== "/relay/my/delivery" && path !== "/relay/my/delivery/remove" && path !== "/relay/my/web-checkout") return null;
+  if (path !== "/relay/my/delivery" && path !== "/relay/my/delivery/remove" && path !== "/relay/my/web-checkout" && path !== "/relay/my/address-lookup") return null;
   await ensureDeliveryTables(env.RELAY_DB);
   const now = o.now || Date.now();
-  if (path === "/relay/my/delivery" && request.method === "GET") return json({ delivery: await readDelivery(env, shopper.id) }, 200, cors);
+  // lookup: whether "Find address" can be offered (Relay's postcode lookup key is set).
+  if (path === "/relay/my/delivery" && request.method === "GET") return json({ delivery: await readDelivery(env, shopper.id), lookup: Boolean(env.IDEAL_POSTCODES_KEY) }, 200, cors);
+  if (path === "/relay/my/address-lookup" && request.method === "GET") {
+    const r = await lookupPostcode(env, shopper, url.searchParams.get("postcode"), { ...o, now });
+    return json(r.body, r.status, cors);
+  }
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, cors);
   let body = {};
   try { const t = await request.text(); body = t ? JSON.parse(t) : {}; } catch { return json({ error: "bad_request" }, 400, cors); }

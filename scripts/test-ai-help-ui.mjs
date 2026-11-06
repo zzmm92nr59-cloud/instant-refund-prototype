@@ -78,7 +78,7 @@ await page.reload();
 const view = page.locator("#mePage");
 const openMail = async () => {
   await page.evaluate(() => window.go("me"));
-  await view.locator(".rl-arow", { hasText: "Email connection" }).click();
+  await view.locator(".rl-ptile", { hasText: "Email connection" }).click();
   await view.getByText("Relay is reading your", { exact: false }).waitFor();
   await page.waitForTimeout(400);
 };
