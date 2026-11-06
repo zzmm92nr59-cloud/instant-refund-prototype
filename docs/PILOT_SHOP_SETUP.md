@@ -13,7 +13,9 @@ Shopify admin under Settings → Domains).
 2. Copy the settings from the existing Relay app version:
    - App URL: `https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/launch`
    - Redirect URL: `https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/oauth/callback`
-   - Scopes: `read_products,read_inventory,read_orders,write_order_edits`
+   - Scopes: `read_products,read_inventory,read_orders,write_order_edits,write_orders`
+     (`write_orders` lets Relay refund the difference on a cheaper swap and make the order when someone wins one
+     of the shop's auctions. Without it the shop refunds by hand and can't run auctions.)
    - Compliance webhooks (customer data request, customer redact, shop redact):
      `https://relay-square-api2.9pts72cy5j.workers.dev/relay/webhooks/shopify`
 3. Release that version.

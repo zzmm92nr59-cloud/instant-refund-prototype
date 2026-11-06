@@ -58,7 +58,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 
 <section id="signin" class="signin hidden" style="margin-top:40px">
   <h2>See what Relay shoppers are waiting for</h2>
-  <p>Sign in with the account that runs your shop. Relay only reads your products, prices and stock.</p>
+  <p>Sign in with the account that runs your shop. Relay reads your products, prices and stock. On Shopify it also reads your paid orders, changes one only when the customer asks for a size or colour swap in Relay, and adds one only when a shopper wins one of your auctions.</p>
   <p><a class="btn dark" style="display:inline-block;text-decoration:none" href="https://relay-square-api2.9pts72cy5j.workers.dev/relay/square/connect?for=dashboard">Sign in with Square</a></p>
   <form class="shopify" action="https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/connect" method="get">
     <input type="hidden" name="for" value="dashboard">
