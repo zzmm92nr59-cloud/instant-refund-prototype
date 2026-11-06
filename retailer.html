@@ -32,6 +32,18 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .offers .row{grid-template-columns:1fr auto}.state{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px}.live{background:#eef6dc;color:#3f6212}.ended{background:#efeae0;color:#6b6252}
 .fine{font-size:12px;color:var(--muted);line-height:1.6;margin-top:30px}
 .hidden{display:none!important}
+.aform{display:grid;gap:14px}.aform label{font-size:12px;font-weight:700;color:var(--muted);display:grid;gap:6px}
+.aform input:not([type=radio]):not([type=checkbox]):not([type=file]),.aform select,.aform textarea{border:1px solid #d9d3c6;border-radius:11px;padding:10px 12px;background:#fff;font:inherit;font-weight:500;color:var(--ink);min-height:44px}
+.aform input[type=file]{border:1px dashed #cfc7b7;border-radius:11px;padding:10px 12px;background:#fff;font-size:14px;font-weight:500;color:var(--ink);min-height:44px}
+.aform label.choice{display:flex;font-size:14px;font-weight:500;color:var(--ink)}.aform label.choice b{font-weight:700}
+.aform select[size]{padding:6px;font-size:14px}
+.aform textarea{min-height:88px;resize:vertical}.aform .two{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.aform .kinds{display:grid;grid-template-columns:1fr 1fr;gap:10px}.aform .agree{display:flex;gap:10px;align-items:flex-start;font-size:14px;font-weight:500;color:var(--ink);line-height:1.5}
+.aform .agree input{min-height:auto;margin-top:4px;accent-color:var(--navy)}
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
+.aform .acts{display:flex;gap:10px;flex-wrap:wrap}.aform .acts .btn{min-height:44px}
+.alink{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
+@media(max-width:640px){.aform .two,.aform .kinds{grid-template-columns:1fr}}
 .choice{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:14px;cursor:pointer}
 .choice input{margin-top:4px;accent-color:var(--navy)}.choice.dim{opacity:.55;cursor:not-allowed}
 .act{grid-template-columns:auto 1fr auto!important}.kind{font-size:11px;font-weight:800;border-radius:99px;padding:4px 9px;white-space:nowrap}.kind.swap{background:var(--lime);color:#1d2911}.kind.ret{background:#efeae0;color:#6b6252}
@@ -79,6 +91,37 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
   <div class="list" id="items"><div class="empty">Loading…</div></div>
   <div class="head"><h2>Offers you've sent</h2></div>
   <div class="list offers" id="offers"></div>
+  <section id="auc" class="hidden">
+    <div class="head"><h2>Auctions</h2><button class="btn limebtn" type="button" id="aucNew">Start an auction</button></div>
+    <p class="meta" id="aucPerm" style="margin:0 0 12px;line-height:1.55" hidden>To run auctions, Relay needs your permission to create orders in Shopify, so it can make the winner's order. Open Relay from your Shopify admin (Apps, then Relay) and accept the new permission, then press Refresh.</p>
+    <form class="row aform hidden" id="aucForm" style="grid-template-columns:1fr" autocomplete="off" novalidate>
+      <div class="kinds">
+        <label class="choice"><input type="radio" name="kind" value="catalogue" checked> <span><b>Something from your shop</b><br>An item in your Shopify catalogue. The winner's order takes one from your stock.</span></label>
+        <label class="choice"><input type="radio" name="kind" value="oneoff"> <span><b>Something that isn't on your website</b><br>A sample, a return or the last of a line, with your own photos.</span></label>
+      </div>
+      <div id="aucCat"><label>Find the item<input type="search" id="aucFind" placeholder="Name or size"></label>
+        <label style="margin-top:10px">Item<select id="aucItem" size="6"></select></label></div>
+      <div id="aucOne" hidden>
+        <label>What it is<input name="title" maxlength="120" placeholder="e.g. Waxed jacket, sample"></label>
+        <div class="two" style="margin-top:10px"><label>Size (optional)<input name="size" maxlength="40" placeholder="e.g. M or UK 10"></label></div>
+        <label style="margin-top:10px">Description (optional)<textarea name="description" maxlength="1000" placeholder="Anything a buyer should know: marks, alterations, how it fits"></textarea></label>
+      </div>
+      <label><span id="aucPhotoLabel">Photos of this one (optional, up to 4)</span><input type="file" id="aucPhotos" accept="image/jpeg,image/png,image/webp" multiple></label>
+      <div class="thumbs" id="aucThumbs"></div>
+      <div class="two">
+        <label>Condition<select name="condition" id="aucCondition"></select></label>
+        <label>Starting bid (£)<input name="start" inputmode="decimal" placeholder="e.g. 20.00"></label>
+        <label>Delivery (£, 0 for free)<input name="delivery" inputmode="decimal" value="0.00"></label>
+      </div>
+      <div class="two"><label>How long<select name="hours" id="aucHours"></select></label></div>
+      <label class="agree"><input type="checkbox" name="agree"> <span>We'll send it to the winner once they've paid. Nobody at our shop, and nobody for us, will bid on it.</span></label>
+      <div class="acts"><button class="btn dark" type="submit" id="aucGo">Start auction</button><button class="btn ghost" type="button" id="aucCancelForm">Not now</button></div>
+      <div class="msg hidden" id="aucFormMsg"></div>
+    </form>
+    <div class="msg hidden" id="aucMsg" style="margin-bottom:12px"></div>
+    <div class="list" id="aucList"></div>
+    <p class="fine" style="margin-top:12px">Relay shoppers bid on what you put up, and Relay bids for each of them only as much as it takes to stay ahead. When it ends, Relay makes the winner's order in your Shopify at the winning price plus your delivery price, marked as not paid, and the winner pays you through your own checkout within 24 hours. Send it once it's paid. If they don't pay, Relay cancels that order (the stock goes back) and offers it to the next bidder. You see the price and how many bids, never who bid. It's an online sale from your shop, so the buyer can cancel within 14 days of delivery, as with any online order. You, your staff and anyone acting for you mustn't bid on your own auctions: the law doesn't allow it unless announced, and Relay doesn't allow it at all.</p>
+  </section>
   <section id="pay" class="hidden">
     <div class="head"><h2>Price differences on swaps</h2><span class="state live" id="payState">Shopify checkout</span></div>
     <div class="row" style="grid-template-columns:1fr">
@@ -242,7 +285,7 @@ async function load() {
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
-    loadRm(); loadPay();
+    loadRm(); loadPay(); loadAuctions();
   } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
 }
 $("items").addEventListener("click", (e) => {
@@ -357,6 +400,133 @@ $("rmOff").onclick = async () => {
     if (r.status === 200) { rmShow({ connected: false }); rmSay("ok", "Off. Relay deleted your Click & Drop key. Customers will use your usual returns process."); }
   } catch { rmSay("bad", "Couldn't reach Relay just now."); }
 };
+// ---- Auctions ----
+const AUC_ERR = { needs_order_permission: "Relay needs your permission to create orders in Shopify first. Open Relay from your Shopify admin and accept it.",
+  agree_needed: "Tick the box to say you'll send it once it's paid and nobody for you will bid.", bad_condition: "Choose the condition.",
+  bad_start: "Enter a starting bid between £1 and £10,000.", bad_delivery: "Enter a delivery price up to £50, or 0 for free.", bad_duration: "Choose how long it runs.",
+  not_your_item: "Choose an item from your shop.", title_needed: "Say what it is.", photo_needed: "Add at least one photo.", bad_photo: "That photo couldn't be read. Try a JPEG or PNG.",
+  photo_too_big: "A photo is too big even after Relay made it smaller. Try another.", photos_too_big: "Those photos are too big together. Try fewer.", too_many_photos: "Up to 4 photos.",
+  too_many_live: "You have 20 auctions running, the most at once. Start this one when one ends.", too_many_today: "You've started 30 auctions today. Try again tomorrow.",
+  not_gbp: "Relay is for UK shops that sell in pounds (£).", has_bids: "Someone has bid, so it has to run to the end.", auction_ended: "That auction has already ended." };
+let auc = null, aucItems = null, aucPhotos = [];
+const aucPic = (p) => (!p ? "" : p.startsWith("/") ? API + p : p);
+// "Sat 7 Nov at 18:30".
+const aucWhen = (t) => { const d = new Date(t); return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") + " at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); };
+function aucSay(id, cls, text) { const m = $(id); m.className = "msg " + cls; m.textContent = text; }
+function aucLine(a) {
+  const won = a.offers && a.offers.length ? a.offers[a.offers.length - 1] : null;
+  if (a.status === "live" || a.status === "ending") return (a.bids ? `${gbp(a.priceMinor)} now, ${a.bids} bid${a.bids === 1 ? "" : "s"}.` : `No bids yet. Starts at ${gbp(a.startMinor)}.`) + ` Ends ${aucWhen(a.endsAt)}.`;
+  if (a.status === "cancelled") return "Cancelled before anyone bid.";
+  if (a.outcome === "no_bids") return "Ended with no bids.";
+  if (a.outcome === "sold" && won) return `Sold for ${gbp(won.priceMinor)}${a.deliveryMinor ? " plus " + gbp(a.deliveryMinor) + " delivery" : ""}, and paid. Send it to the address on the order.`;
+  if (a.outcome === "unsold") return "Nobody paid in time, so it didn't sell. Relay cancelled the unpaid orders in Shopify.";
+  if (a.outcome === "shop_problem") return "Shopify couldn't take the winner's order (it may have run out of stock, or the order was cancelled), so it didn't sell.";
+  if (won && won.status === "setting_up") return `Won for ${gbp(won.priceMinor)}. Relay is making the order in Shopify.`;
+  if (won) return (won.rank > 1 ? `Offered to the next bidder for ${gbp(won.priceMinor)}` : `Won for ${gbp(won.priceMinor)}`) + `. Waiting for payment until ${aucWhen(won.payBy)}. Don't send it until it's paid.`;
+  return "Ended.";
+}
+function aucRow(a) {
+  const pic = a.pictures && a.pictures[0] ? `style="background-image:url('${esc(aucPic(a.pictures[0]))}')"` : "";
+  const won = a.offers && a.offers.length ? a.offers[a.offers.length - 1] : null;
+  const live = a.status === "live" || a.status === "ending";
+  const state = live ? "Live" : a.outcome === "sold" ? "Sold" : a.status === "cancelled" ? "Cancelled" : won && (won.status === "awaiting_payment" || won.status === "setting_up") ? "Awaiting payment" : "Ended";
+  return `<div class="row" data-id="${esc(a.id)}"><div class="pic" ${pic}>${pic ? "" : esc((a.title || "?")[0])}</div>
+    <div><h3>${esc(a.title)}${a.variant ? ", " + esc(a.variant) : ""}${a.size ? ", size " + esc(a.size) : ""}</h3>
+      <div class="meta">${esc(a.conditionText || "")}</div><div class="meta" style="margin-top:4px">${esc(aucLine(a))}</div>
+      ${won && won.orderUrl ? `<a class="alink" href="${esc(won.orderUrl)}" target="_blank" rel="noopener noreferrer">View order ${esc(won.orderName || "")} in Shopify</a>` : ""}</div>
+    <div class="count"><span class="state ${live ? "live" : "ended"}">${esc(state)}</span>${live && !a.bids ? `<div><button class="btn ghost" type="button" data-cancel style="margin-top:8px">Cancel</button></div>` : ""}</div></div>`;
+}
+function aucDraw() {
+  if (!auc) return;
+  $("aucPerm").hidden = auc.canOrder; $("aucNew").disabled = !auc.canOrder;
+  $("aucList").innerHTML = auc.auctions.length ? auc.auctions.map(aucRow).join("")
+    : `<div class="empty">No auctions yet. Put up something from your shop, or a sample or return that isn't on your website, and Relay shoppers can bid on it.</div>`;
+}
+async function loadAuctions() {
+  const shopify = demand && demand.platform === "shopify";
+  $("auc").classList.toggle("hidden", !shopify);
+  if (!shopify) return;
+  try { const r = await api("/relay/retailer/auctions"); if (r.status === 200) { auc = r.body; aucDraw(); fillAucForm(); } } catch { /* shown on Refresh */ }
+}
+function fillAucForm() {
+  if (!auc || $("aucCondition").options.length) return;
+  $("aucCondition").innerHTML = Object.entries(auc.conditions).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("");
+  $("aucHours").innerHTML = auc.durations.map(h => `<option value="${h}"${h === 72 ? " selected" : ""}>${h === 24 ? "1 day" : h === 168 ? "1 week" : h / 24 + " days"}</option>`).join("");
+}
+function aucKind() { return document.querySelector('#aucForm input[name=kind]:checked').value; }
+function aucKindShow() {
+  const one = aucKind() === "oneoff";
+  $("aucCat").hidden = one; $("aucOne").hidden = !one;
+  $("aucPhotoLabel").textContent = one ? "Photos of it (at least 1, up to 4)" : "Photos of this one (optional, up to 4): useful for a return or a sample";
+}
+function aucItemsDraw() {
+  const q = $("aucFind").value.trim().toLowerCase();
+  const rows = (aucItems || []).filter(i => !q || (i.product + " " + (i.variant || "")).toLowerCase().includes(q)).slice(0, 300);
+  $("aucItem").innerHTML = rows.length ? rows.map(i => `<option value="${esc(i.variantKey)}">${esc(i.product)}${i.variant ? ", " + esc(i.variant) : ""} (${gbp(i.priceMinor)}${i.stock != null ? ", " + i.stock + " in stock" : ""})</option>`).join("")
+    : `<option value="" disabled>${aucItems && aucItems.length ? "Nothing matches that" : "Your Shopify items show here once Relay has read your catalogue"}</option>`;
+}
+$("aucNew").onclick = async () => {
+  $("aucForm").classList.toggle("hidden"); fillAucForm(); aucKindShow(); $("aucFormMsg").className = "msg hidden"; $("aucMsg").className = "msg hidden";
+  if (!$("aucForm").classList.contains("hidden") && !aucItems) {
+    $("aucItem").innerHTML = `<option value="" disabled>Getting your items…</option>`;
+    try { const r = await api("/relay/retailer/auctions/catalogue"); aucItems = r.status === 200 ? r.body.items : []; } catch { aucItems = []; }
+    aucItemsDraw();
+  }
+};
+$("aucCancelForm").onclick = () => $("aucForm").classList.add("hidden");
+$("aucForm").agree.onchange = (e) => { if (e.target.checked && /agree|Tick/.test($("aucFormMsg").textContent)) $("aucFormMsg").className = "msg hidden"; };
+$("aucFind").oninput = aucItemsDraw;
+for (const r of document.querySelectorAll('#aucForm input[name=kind]')) r.onchange = aucKindShow;
+// Photos are made smaller on this device first (at most 1600 pixels across), so they upload quickly.
+async function shrink(file) {
+  const img = await new Promise((done, fail) => { const i = new Image(); i.onload = () => done(i); i.onerror = fail; i.src = URL.createObjectURL(file); });
+  for (const [px, q] of [[1600, 0.85], [1200, 0.8], [1000, 0.72], [800, 0.65]]) {
+    const k = Math.min(1, px / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL("image/jpeg", q);
+    if (url.length * 0.75 < 440 * 1024) { URL.revokeObjectURL(img.src); return url; }
+  }
+  URL.revokeObjectURL(img.src); throw Error("too_big");
+}
+$("aucPhotos").onchange = async (e) => {
+  const files = [...e.target.files].slice(0, 4);
+  aucPhotos = []; $("aucThumbs").innerHTML = "";
+  for (const f of files) { try { aucPhotos.push(await shrink(f)); } catch { aucSay("aucFormMsg", "bad", AUC_ERR.bad_photo); } }
+  $("aucThumbs").innerHTML = aucPhotos.map(u => `<img alt="" src="${u}">`).join("");
+};
+const penceOf = (v) => { const n = Number(String(v).replace(/[£,\s]/g, "")); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : NaN; };
+$("aucForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = $("aucGo");
+  if (btn.disabled) return;
+  const kind = aucKind();
+  const body = { kind, condition: f.condition.value, startMinor: penceOf(f.start.value), deliveryMinor: penceOf(f.delivery.value || "0"), hours: Number(f.hours.value), agree: f.agree.checked, photos: aucPhotos };
+  if (kind === "catalogue") { body.variantKey = $("aucItem").value; if (!body.variantKey) return aucSay("aucFormMsg", "bad", AUC_ERR.not_your_item); }
+  else { body.title = f.title.value; body.size = f.size.value; body.description = f.description.value; }
+  if (!f.agree.checked) return aucSay("aucFormMsg", "bad", AUC_ERR.agree_needed);
+  if (!Number.isFinite(body.startMinor)) return aucSay("aucFormMsg", "bad", AUC_ERR.bad_start);
+  if (!Number.isFinite(body.deliveryMinor)) return aucSay("aucFormMsg", "bad", AUC_ERR.bad_delivery);
+  btn.disabled = true; btn.textContent = "Starting…";
+  try {
+    const r = await api("/relay/retailer/auctions", { method: "POST", body: JSON.stringify(body) });
+    if (r.status === 200) {
+      f.reset(); aucPhotos = []; $("aucThumbs").innerHTML = ""; $("aucForm").classList.add("hidden"); aucKindShow(); $("aucFormMsg").className = "msg hidden";
+      aucSay("aucMsg", "ok", `Started. ${r.body.auction.title} is up for auction until ${aucWhen(r.body.auction.endsAt)}.`);
+      await loadAuctions();
+    } else aucSay("aucFormMsg", "bad", AUC_ERR[r.body.error] || "That didn't start. Please try again.");
+  } catch { aucSay("aucFormMsg", "bad", "Couldn't reach Relay just now."); }
+  btn.disabled = false; btn.textContent = "Start auction";
+});
+$("aucList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-cancel]"); if (!b || b.disabled) return;
+  b.disabled = true; b.textContent = "Cancelling…";
+  try {
+    const r = await api("/relay/retailer/auctions/" + b.closest(".row").dataset.id + "/cancel", { method: "POST", body: "{}" });
+    if (r.status === 200) { aucSay("aucMsg", "ok", "Cancelled."); await loadAuctions(); }
+    else { aucSay("aucMsg", "bad", AUC_ERR[r.body.error] || "That didn't cancel."); b.disabled = false; b.textContent = "Cancel"; }
+  } catch { aucSay("aucMsg", "bad", "Couldn't reach Relay just now."); b.disabled = false; b.textContent = "Cancel"; }
+});
 $("refresh").onclick = load;
 $("signout").onclick = () => { store(false, null); key = null; show(); };
 load();
