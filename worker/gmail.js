@@ -1879,7 +1879,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     // instant: Gmail or Outlook tells Relay the moment this inbox gets new mail (mail-push.js), so the app doesn't say "every
     // 15 minutes". Only while the watch or subscription is in force and Relay is set up to hear it.
     const now = (opts && opts.now) || Date.now();
-    const instant = x => Boolean(x.push_expires_at && x.push_expires_at > now && (x.provider === "microsoft" ? outlookPushOn(env) : gmailPushOn(env)));
+    const instant = x => Boolean(!x.mail_problem && x.push_expires_at && x.push_expires_at > now && (x.provider === "microsoft" ? outlookPushOn(env) : gmailPushOn(env)));
     // How each inbox is doing, from reads that worked only (see ensureHealthColumns): checkedAt is when Relay last read its
     // mail without a problem, and needsReconnect says Google or Microsoft ended Relay's access, so the app can say so and
     // offer to connect it again. (autoAt keeps its name for copies of the app from before, which show the later of it and

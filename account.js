@@ -489,7 +489,7 @@
     ".rl-ibx-off{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;min-height:44px;padding:0;color:var(--rl-danger);font-size:15px;font-weight:700}.rl-ibx-off:active{opacity:.6}.rl-ibx-off:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
     ".rl-ibx-t span.rl-ibx-bad{color:var(--rl-danger);font-weight:600}.rl-ibx-again{margin-top:12px}" +
     ".rl-recfix{background:var(--rl-card);border-radius:18px;padding:16px 18px;margin:0 0 14px}.rl-recfix b{display:block;font-size:17px;color:var(--rl-text);margin-bottom:4px}" +
-    ".rl-recfix p{margin:0;font-size:15px;line-height:1.4;color:var(--rl-text2)}.rl-recfix .rl-btn{margin-top:12px}" +
+    ".rl-recfix p{margin:0;font-size:15px;line-height:1.4;color:var(--rl-text2)}.rl-recfix .rl-btn{margin-top:12px}.rl-recfix .rl-msg:empty,.rl-fixnote:empty{min-height:0;margin:0}" +
     ".rl-ibx-adds{display:grid;gap:10px;margin:8px 0 4px}.rl-ibx-addbtn{display:flex!important;align-items:center;justify-content:center;gap:8px;margin-top:0!important}.rl-ibx-addbtn .rl-jic{color:inherit;margin:0}" +
     ".rl-find-link{all:unset;box-sizing:border-box;cursor:pointer;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:underline;text-underline-offset:3px;text-align:center}" +
     ".rl-recstat{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 0;font-size:13px;color:var(--rl-text2)}" +
@@ -4131,7 +4131,7 @@
       });
       b.appendChild(list);
       if (fix.length) {
-        var fixNote = el("div", { className: "rl-msg" });
+        var fixNote = el("div", { className: "rl-msg rl-fixnote" });
         fix.forEach(function (x) { b.appendChild(reconnectButton(x, fixNote, fix.length === 1 && boxes.length === 1 ? "Connect " + inboxName(x.provider) + " again" : null)); });
         b.appendChild(fixNote);
       }
@@ -4444,6 +4444,7 @@
         box.appendChild(group("Checking inboxes", [el("div", { className: "rl-hp-rows" }, [
           row("Gmail", N(ib.gmail)), row("Outlook", N(ib.outlook)), row("People with an inbox", N(ib.shoppers)),
           row("Checked in the last day", N(ib.checkedToday)), row("Not checked in the last day", N(ib.notCheckedToday)),
+          row("Need connecting again", N(ib.needReconnect || 0)),
           row("Last check", stamp(ib.lastChecked)), row("Connected this week", N(ib.newThisWeek)),
           row("Scans this week", N((sc.done || 0) + (sc.failed || 0) + (sc.running || 0)), N(sc.done || 0) + " finished, " + N(sc.running || 0) + " still going, " + N(sc.failed || 0) + " stopped")]
           .concat(Object.keys(errs).map(function (t) { return row(t, N(errs[t]), "This week"); })))]));
