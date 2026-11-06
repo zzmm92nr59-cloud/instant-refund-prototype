@@ -88,6 +88,8 @@ jobs:
           node scripts/test-awin-feed.mjs
           node --check worker/web-shops.js
           node scripts/test-web-shops.mjs
+          node --check worker/delivery.js
+          node scripts/test-delivery.mjs
           node --check worker/photo-search.js
           node scripts/test-photo-search.mjs
           node --check worker/second-step.js
