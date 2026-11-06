@@ -7,6 +7,7 @@
 //  * Only to the addresses in RELAY_ADMIN_EMAILS: nothing is sent while that's empty. HEALTH_EMAILS=off stops both.
 //  * "Email me one now" (an admin on the health page) sends the summary to that admin only, at most once in 5 minutes.
 import { relayHealth } from "./health.js";
+import { ensureHealthColumns } from "./gmail.js";
 import { isAdmin } from "./resale-admin.js";
 
 export const ALERT_GAP_HOURS = 6;
@@ -44,14 +45,21 @@ export async function currentAlerts(env, now = Date.now()) {
     out.push({ kind: "scans_failing", title: "Most inbox checks stopped in the last hour",
       text: N(failed) + " of the last hour's " + plural(finished, "check", "checks") + " stopped" + (reasons ? ": " + reasons : "") + ". The server logs in Cloudflare say more." });
   }
-  const boxes = await one("SELECT COUNT(*) AS n, MAX(last_scan_at) AS last FROM gmail_connections");
-  const last = Number(boxes.last) || 0;
-  if (Number(boxes.n) > 0 && (!last || now - last > 3 * HOUR)) {
+  // Checked means read without a problem (gmail.js ensureHealthColumns): a check that failed doesn't count.
+  try { await ensureHealthColumns(db); } catch { /* no inboxes yet */ }
+  const boxes = await one(`SELECT COUNT(*) AS n, MAX(MAX(COALESCE(mail_ok_at, 0), COALESCE(last_scan_at, 0))) AS last,
+    SUM(mail_problem = 'reconnect') AS ended, SUM(mail_problem = 'reconnect' AND mail_problem_at >= ?) AS endedNow FROM gmail_connections`, h1);
+  const last = Number(boxes.last) || 0, total = Number(boxes.n) || 0;
+  if (total > 0 && (!last || now - last > 3 * HOUR)) {
     out.push({ kind: "checks_stalled", title: "No inbox has been checked for " + (last ? Math.floor((now - last) / HOUR) + " hours" : "a long time"),
-      text: "Relay checks inboxes every 15 minutes, so something has stopped it. The automatic check's lines in Cloudflare's server logs say why." });
+      text: Number(boxes.ended) === total
+        ? "Google or Microsoft ended Relay's access to every connected inbox, so none can be read until their owners connect them again. If that happened to all of them at once, check the Google Cloud and Microsoft app settings."
+        : "Relay checks inboxes every 15 minutes, so something has stopped it. The automatic check's lines in Cloudflare's server logs say why." });
   }
-  const re = await one("SELECT COUNT(*) AS n FROM mail_scan_jobs WHERE error = 'gmail_reconnect_needed' AND updated_at >= ?", h1);
-  if (Number(re.n) >= 3) out.push({ kind: "reconnects", title: plural(re.n, "inbox needs", "inboxes need") + " connecting again",
+  // Inboxes whose access ended in the last hour, as Relay found when reading them (scans or the 15-minute check).
+  const jobsRe = await one("SELECT COUNT(*) AS n FROM mail_scan_jobs WHERE error = 'gmail_reconnect_needed' AND updated_at >= ?", h1);
+  const re = { n: Math.max(Number(jobsRe.n) || 0, Number(boxes.endedNow) || 0) };
+  if (re.n >= 3) out.push({ kind: "reconnects", title: plural(re.n, "inbox needs", "inboxes need") + " connecting again",
     text: "That many in an hour can mean Google or Microsoft stopped Relay's access. Check the Google Cloud and Microsoft app settings. Each shopper also sees a prompt to connect again." });
   const codes = await one("SELECT COUNT(*) AS n FROM auth_code_failures WHERE created_at >= ?", h1);
   if (Number(codes.n) >= 30) out.push({ kind: "sign_in_codes", title: plural(codes.n, "wrong sign-in code", "wrong sign-in codes") + " in the last hour",
@@ -67,7 +75,8 @@ export function digestMessage(h, alerts) {
   const look = alerts.map((a) => a.title + ". " + a.text);
   if (ib.notCheckedToday) look.push(plural(ib.notCheckedToday, "inbox hasn't", "inboxes haven't") + " been checked in the last day.");
   const reconnect = (ib.scanErrorsThisWeek || []).filter((e) => e.error === "gmail_reconnect_needed").reduce((s, e) => s + e.count, 0);
-  if (reconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(reconnect, "inbox", "inboxes") + " needed connecting again this week (their owners see a prompt in the app).");
+  if (ib.needReconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(ib.needReconnect, "inbox needs", "inboxes need") + " connecting again (their owners see a Connect again button in the app).");
+  else if (reconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(reconnect, "inbox", "inboxes") + " needed connecting again this week (their owners see a prompt in the app).");
   if (rd.waitingToBeRead >= 20) look.push(plural(rd.waitingToBeRead, "email is", "emails are") + " waiting to be read again.");
   // Emails shoppers sent to Relay because they were read wrong (deleted after 30 days, so worth reading soon).
   if (h.marketReports) look.push(plural(h.marketReports, "Swap & resell report is", "Swap & resell reports are") + " waiting for review (Profile, Team, Review reports).");

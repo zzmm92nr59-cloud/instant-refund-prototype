@@ -487,6 +487,9 @@
     ".rl-ibx-ic{flex:none;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:#fff;margin:0}.rl-ibx-ic.g{background:#E0446E}.rl-ibx-ic.ms{background:#4F72E0}" +
     ".rl-ibx-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:1px}.rl-ibx-t b{font-size:16px;font-weight:600;color:var(--rl-text);overflow-wrap:anywhere}.rl-ibx-t span{font-size:13px;line-height:1.35;color:var(--rl-text2)}" +
     ".rl-ibx-off{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-start;min-height:44px;padding:0;color:var(--rl-danger);font-size:15px;font-weight:700}.rl-ibx-off:active{opacity:.6}.rl-ibx-off:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:8px}" +
+    ".rl-ibx-t span.rl-ibx-bad{color:var(--rl-danger);font-weight:600}.rl-ibx-again{margin-top:12px}" +
+    ".rl-recfix{background:var(--rl-card);border-radius:18px;padding:16px 18px;margin:0 0 14px}.rl-recfix b{display:block;font-size:17px;color:var(--rl-text);margin-bottom:4px}" +
+    ".rl-recfix p{margin:0;font-size:15px;line-height:1.4;color:var(--rl-text2)}.rl-recfix .rl-btn{margin-top:12px}.rl-recfix .rl-msg:empty,.rl-fixnote:empty{min-height:0;margin:0}" +
     ".rl-ibx-adds{display:grid;gap:10px;margin:8px 0 4px}.rl-ibx-addbtn{display:flex!important;align-items:center;justify-content:center;gap:8px;margin-top:0!important}.rl-ibx-addbtn .rl-jic{color:inherit;margin:0}" +
     ".rl-find-link{all:unset;box-sizing:border-box;cursor:pointer;display:block;min-height:44px;line-height:44px;margin:12px auto 0;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:underline;text-underline-offset:3px;text-align:center}" +
     ".rl-recstat{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0 0;font-size:13px;color:var(--rl-text2)}" +
@@ -1232,7 +1235,7 @@
       var e = r.body && r.body.error;
       return e === "no_email" ? "This receipt was pasted in, so there's no email to send."
         : e === "gmail_not_connected" ? "The inbox this receipt came from isn't connected any more."
-        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Open Profile, then Email connection."
+        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Open Profile, then Email connection, and tap Connect again."
         : e === "email_not_found" ? "That email is no longer in your inbox, so it can't be sent."
         : e === "consent_required" ? "Relay needs your permission to read your email first."
         : r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh."
@@ -2674,12 +2677,39 @@
     }, function () {});
   }
   function inboxName(provider) { return provider === "microsoft" ? "Outlook" : "Gmail"; }
-  function inboxWhen(x) {
-    if (x.scan && x.scan.state === "running") return "Reading… " + (x.scan.found || 0) + " found so far";
-    var t = Math.max(x.lastScanAt || 0, x.autoAt || 0);
-    if (!t) return "Reading for the first time";
+  // One plain line on how an inbox is doing. "Checked" is only ever a read that worked (checkedAt from Relay); when Google or
+  // Microsoft has ended Relay's access it says so instead, and the Email connection page offers to connect it again.
+  function inboxLine(x, main) {
+    var who = inboxName(x.provider) + (main ? ", your main inbox," : ",");
+    if (x.needsReconnect) return inboxName(x.provider) + " needs connecting again";
+    if (x.scan && x.scan.state === "running") return who + " reading now: " + (x.scan.found || 0) + " found so far";
+    var t = x.checkedAt || Math.max(x.lastScanAt || 0, x.autoAt || 0);
+    if (!t) return who + " reading for the first time";
     var d = new Date(t);
-    return "Checked " + (d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
+    return who + " checked " + (d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }));
+  }
+  // The inboxes (first one first, with its number) whose access ended, so they need connecting again.
+  function inboxesToFix(g) {
+    if (!g || !g.connected) return [];
+    return [Object.assign({}, g, { mailbox: 1 })].concat(g.others || []).filter(function (x) { return x.needsReconnect; });
+  }
+  // "Connect again": Google's or Microsoft's own sign-in for that same inbox, then back to Relay, which reads what it missed.
+  // The inbox keeps its place and its receipts.
+  function reconnectInbox(x, btn, note) {
+    if (btn.disabled) return;
+    var outlook = x.provider === "microsoft", name = inboxName(x.provider);
+    btn.disabled = true;
+    api("/relay/my/gmail/connect", { method: "POST", body: { again: x.mailbox || 1 } }).then(function (r) {
+      var host = outlook ? /^https:\/\/login\.microsoftonline\.com\// : /^https:\/\/accounts\.google\.com\//;
+      if (r.ok && r.body && host.test(r.body.url || "")) { try { sessionStorage.setItem("relay.reconnecting", "1"); } catch (e) {} location.href = r.body.url; return; }
+      btn.disabled = false;
+      say(note, r.status === 409 ? "That inbox isn't connected any more. Pull down to refresh." : "Couldn't start connecting " + name + " again. Please try again.", true);
+    }, function () { btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+  }
+  function reconnectButton(x, note, label) {
+    var b = el("button", { type: "button", className: "rl-btn rl-ibx-again", text: label || "Connect " + (x.email || inboxName(x.provider)) + " again" });
+    b.onclick = function () { reconnectInbox(x, b, note); };
+    return b;
   }
   // Without a connected inbox, the Receipts page still lets the shopper add a receipt themselves, and lists the ones they added.
   function addedByHand(box) {
@@ -2743,12 +2773,15 @@
         return;
       }
       var MB = r.body.provider === "microsoft" ? "Outlook" : "Gmail", owner = MB === "Outlook" ? "Microsoft" : "Google";
+      var fixCard = null, drawFix = function () {};
+      mailFixBadge(r.body);
       if (!onPage) box.appendChild(el("p", { text: MB + " connected" + (r.body.googleEmail ? ": " + r.body.googleEmail : "") + ". Relay only looks for order confirmations, receipts and return emails." }));
       var lastScan = r.body.lastScanAt ? new Date(r.body.lastScanAt) : null;
       var scanBtn = el("button", { className: "rl-btn", text: lastScan ? "Check for new receipts" : "Scan my " + MB + " for receipts" });
       var status = el("div", { className: "rl-msg" });
+      // When Relay last read the inbox without a problem (a check that failed never counts).
       var autoAt = r.body.autoAt ? new Date(r.body.autoAt) : null;
-      var checked = autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
+      var checked = r.body.checkedAt ? new Date(r.body.checkedAt) : autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
       var when = function (d) { return d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
       var nInbox = 1 + ((r.body.others || []).length);
       // On the Receipts page the line stays empty until there's news (reading, or what was found); Profile says how it works.
@@ -3100,7 +3133,10 @@
         if (scanning) return;
         scanning = true; scanBtn.disabled = true; say(status, lastScan && !full ? "Checking for new mail…" : "Scanning…");
         var rounds = 0, tries = 0;
-        function finish(text, bad) { scanning = false; scanBtn.disabled = false; memo.gmail = null; if (text) say(status, text, bad); }
+        // ended: Google or Microsoft ended Relay's access to the inbox, so the page shows the Connect again card at the top too.
+        function finish(text, bad, ended) { scanning = false; scanBtn.disabled = false; memo.gmail = null; if (ended) { drawFix([{ provider: r.body.provider, email: r.body.email, mailbox: 1 }]);
+          cachedGet("gmail", "/relay/my/gmail").then(function (g) { if (g.ok) mailFixBadge(g.body); }, function () {}); }
+          if (text) say(status, text, bad); }
         // A round that fails (the mailbox or Relay busy for a moment) is tried again a few seconds later; Relay also carries on by itself.
         function retry() {
           tries++;
@@ -3112,11 +3148,11 @@
           // The shopper went to another page: Relay carries on by itself.
           if (!document.body.contains(status)) { scanning = false; return; }
           return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
-            if (x.status === 401) return finish(owner + " needs you to reconnect " + MB + ". Disconnect and connect again.", true);
+            if (x.status === 401) return finish(owner + " has ended Relay's access to your " + MB + ". Tap Connect again at the top of this page. Your receipts stay as they are.", true, true);
             if (!x.ok) return retry();
             tries = 0;
             var job = x.body.job;
-            if (job && job.state === "failed") return finish(job.error === "gmail_reconnect_needed" ? owner + " needs you to reconnect " + MB + ". Disconnect and connect again." : "Couldn't finish reading " + MB + ". Please try again later.", true);
+            if (job && job.state === "failed") return job.error === "gmail_reconnect_needed" ? finish(owner + " has ended Relay's access to your " + MB + ". Tap Connect again at the top of this page. Your receipts stay as they are.", true, true) : finish("Couldn't finish reading " + MB + ". Please try again later.", true);
             // Relay is reading this mailbox right now: show its progress and look again in a moment.
             if (x.body.busy) { progress(job); loadList(); return new Promise(function (res) { setTimeout(res, x.body.retryAfterMs || 4000); }).then(function () { return step(); }); }
             rounds++;
@@ -3152,6 +3188,20 @@
         document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && window.__relayScanResume) window.__relayScanResume(); });
       }
       scanBtn.onclick = function () { doScan(false); };
+      // An inbox Relay can't read any more is said first, in the page (nothing floats over it), with the button that fixes it.
+      // Also drawn when a check finds it out (the main inbox: the one a check of this page reads).
+      drawFix = function (toFix) {
+        if (fixCard || !toFix.length || !document.body.contains(box)) return;
+        var fixNote = el("div", { className: "rl-msg" }), fx = toFix[0], one = toFix.length === 1;
+        fixCard = el("div", { className: "rl-recfix" }, [
+          el("b", { text: one ? "Relay can't read your " + inboxName(fx.provider) + " right now" : "Relay can't read " + toFix.length + " of your inboxes right now" }),
+          el("p", { text: (one ? (fx.provider === "microsoft" ? "Microsoft" : "Google") + " has ended Relay's access to " + (fx.email || "it") : "Google or Microsoft has ended Relay's access to them")
+            + ", so new receipts and parcel updates aren't coming in. Connect " + (one ? "it" : "them") + " again and Relay catches up on what it missed." })]
+          .concat(toFix.map(function (x) { return reconnectButton(x, fixNote, one ? "Connect " + inboxName(x.provider) + " again" : null); }), [fixNote]));
+        var at = box.querySelector(".rl-search") || (scanBtn.parentNode === box ? scanBtn : null);
+        if (at) box.insertBefore(fixCard, at); else box.appendChild(fixCard);
+      };
+      drawFix(inboxesToFix(r.body));
       if (onPage) {
         status.style.cssText = "margin:0;font-size:13px";
         search.setAttribute("aria-label", "Search your receipts");
@@ -3190,7 +3240,7 @@
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
       if (!r.ok) {
-        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs to be reconnected. Go back, disconnect it and connect again."
+        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
           : r.status === 404 ? "That email is no longer in your " + MB + ", so it can't be shown."
           : r.status === 409 ? "Connect your email again to open the original."
           : "Couldn't load the original email. Try again in a moment.";
@@ -3283,7 +3333,7 @@
         if (mine !== seq) return;
         list.textContent = "";
         if (!r.ok) {
-          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs reconnecting first: open Profile, then Email connection."
+          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
             : r.status === 409 ? "Connect your email first: open Profile, then Email connection." : "Couldn't search " + MB + " just now. Try again in a moment.";
           return;
         }
@@ -3891,8 +3941,9 @@
     api("/relay/my/gmail").then(function (g) {
       if (g.ok) rememberMailbox(g.body);
       mailState = g.ok && g.body ? g.body : null;
-      var more = mailState && (mailState.others || []).length;
-      mailRow.setDetail(!mailState ? "" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " connected" : "Not connected yet");
+      var more = mailState && (mailState.others || []).length, toFix = inboxesToFix(mailState).length;
+      mailRow.setDetail(!mailState ? "" : toFix ? "Needs connecting again" : mailState.connected ? (more ? more + 1 + " inboxes" : mailName()) + " connected" : "Not connected yet");
+      if (g.ok) mailFixBadge(mailState);
     }).catch(function () { mailRow.setDetail(""); });
     var orders = [];
     api(purchasesPath()).then(function (r) {
@@ -4060,8 +4111,15 @@
         b.appendChild(note);
         return;
       }
-      var boxes = [{ mailbox: null, provider: mailState.provider, email: mailState.email, lastScanAt: mailState.lastScanAt, autoAt: mailState.autoAt, scan: mailState.scan }].concat(mailState.others || []);
-      b.appendChild(el("p", { text: boxes.length > 1 ? "Relay reads these inboxes in read-only mode and puts all their receipts together." : "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." }));
+      var boxes = [{ mailbox: null, provider: mailState.provider, email: mailState.email, lastScanAt: mailState.lastScanAt, autoAt: mailState.autoAt,
+        checkedAt: mailState.checkedAt, needsReconnect: mailState.needsReconnect, scan: mailState.scan }].concat(mailState.others || []);
+      // An inbox Google or Microsoft ended Relay's access to says so first, with a button to connect it again (nothing is lost).
+      var fix = boxes.filter(function (x) { return x.needsReconnect; });
+      var owner = function (x) { return x.provider === "microsoft" ? "Microsoft" : "Google"; };
+      b.appendChild(el("p", { text: fix.length === 1 && boxes.length === 1
+        ? owner(fix[0]) + " has ended Relay's access to your " + inboxName(fix[0].provider) + ", so new receipts and parcel updates aren't coming in. Connect it again and Relay catches up on what it missed. Your receipts stay as they are."
+        : fix.length ? (fix.length === 1 ? "Relay can't read one of your inboxes at the moment." : "Relay can't read " + fix.length + " of your inboxes at the moment.") + " Connect " + (fix.length === 1 ? "it" : "them") + " again and Relay catches up on what it missed. Your receipts stay as they are."
+        : boxes.length > 1 ? "Relay reads these inboxes in read-only mode and puts all their receipts together." : "Relay is reading your " + mailName() + " in read-only mode and sorting your receipts for you." }));
       var list = el("div", { className: "rl-ibx" });
       boxes.forEach(function (x, i) {
         var off = el("button", { type: "button", className: "rl-ibx-off", text: "Disconnect" });
@@ -4069,9 +4127,14 @@
         off.onclick = function () { disconnectInbox(x, i === 0 ? boxes[1] : null); };
         var ic = jIc("mail", 20); ic.className = "rl-ibx-ic " + (x.provider === "microsoft" ? "ms" : "g");
         list.appendChild(el("div", { className: "rl-ibx-row" }, [ic, el("div", { className: "rl-ibx-t" }, [el("b", { text: x.email || inboxName(x.provider) }),
-          el("span", { text: [inboxName(x.provider), boxes.length > 1 && i === 0 ? "main inbox" : null, inboxWhen(x)].filter(Boolean).join(" · ") }), off])]));
+          el("span", { className: x.needsReconnect ? "rl-ibx-bad" : "", text: inboxLine(x, boxes.length > 1 && i === 0) }), off])]));
       });
       b.appendChild(list);
+      if (fix.length) {
+        var fixNote = el("div", { className: "rl-msg rl-fixnote" });
+        fix.forEach(function (x) { b.appendChild(reconnectButton(x, fixNote, fix.length === 1 && boxes.length === 1 ? "Connect " + inboxName(x.provider) + " again" : null)); });
+        b.appendChild(fixNote);
+      }
       var adds = el("div", { className: "rl-ibx-adds" });
       if (boxes.length < (mailState.maxInboxes || 5)) {
         b.appendChild(el("p", { className: "rl-anote", text: "Shop with more than one email address? Add the others and Relay reads them all." }));
@@ -4381,6 +4444,7 @@
         box.appendChild(group("Checking inboxes", [el("div", { className: "rl-hp-rows" }, [
           row("Gmail", N(ib.gmail)), row("Outlook", N(ib.outlook)), row("People with an inbox", N(ib.shoppers)),
           row("Checked in the last day", N(ib.checkedToday)), row("Not checked in the last day", N(ib.notCheckedToday)),
+          row("Need connecting again", N(ib.needReconnect || 0)),
           row("Last check", stamp(ib.lastChecked)), row("Connected this week", N(ib.newThisWeek)),
           row("Scans this week", N((sc.done || 0) + (sc.failed || 0) + (sc.running || 0)), N(sc.done || 0) + " finished, " + N(sc.running || 0) + " still going, " + N(sc.failed || 0) + " stopped")]
           .concat(Object.keys(errs).map(function (t) { return row(t, N(errs[t]), "This week"); })))]));
@@ -4710,15 +4774,20 @@
   function mailNote(result, name) {
     var notes = { connected: [name + " connected. Scanning for receipts…", false], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
       failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true],
-      added: [name + " inbox added. Relay is reading it now, and its receipts appear here in a few minutes.", false], already_connected: ["That inbox is already connected to Relay.", false] };
+      added: [name + " inbox added. Relay is reading it now, and its receipts appear here in a few minutes.", false], already_connected: ["That inbox is already connected to Relay.", false],
+      reconnected: [name + " is connected again. Relay is catching up on what it missed, and new receipts come in as before.", false] };
     // Adding another inbox that didn't go ahead: the inboxes already connected carry on as they were.
     var adding = false; try { adding = sessionStorage.getItem("relay.addingInbox") === "1"; sessionStorage.removeItem("relay.addingInbox"); } catch (e) {}
     if (adding && result === "denied") return { text: "No inbox was added. Your other inboxes carry on as before.", bad: false };
     if (adding && result === "failed") return { text: "Couldn't add that inbox. Please try again.", bad: true };
+    // Connecting an inbox again that didn't go ahead: Relay still can't read it, and says so plainly.
+    var again = false; try { again = sessionStorage.getItem("relay.reconnecting") === "1"; sessionStorage.removeItem("relay.reconnecting"); } catch (e) {}
+    if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from Profile, then Email connection.", bad: true };
+    if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from Profile, then Email connection.", bad: true };
     return { text: notes[result][0], bad: notes[result][1] };
   }
   function completeGmail() {
-    var m = /(?:^|[#&])(gmail|outlook)=(connected|added|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
+    var m = /(?:^|[#&])(gmail|outlook)=(connected|added|reconnected|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
@@ -4726,7 +4795,8 @@
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
     if (obGet(s.email).back) { obSet(s.email, { back: null }); return startJourney(m[2] === "connected" ? { justConnected: true } : { mailNote: note }); }
-    window.__relayAutoScan = m[2] === "connected";
+    // Connected (or connected again, to catch up on what was missed): the Receipts page reads it straight away, with progress.
+    window.__relayAutoScan = m[2] === "connected" || m[2] === "reconnected";
     if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
     open(function (sheet) { gate(sheet, s.email || "", note); });
   }
@@ -4893,7 +4963,7 @@
           status.textContent = "Reading " + y + (cursor ? " · back to " + cursor.replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2") : "") + "… " + found + " receipts found so far. Keep this page open.";
           api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
             if (!x.ok) {
-              if (x.status === 401) { status.textContent = mailOwner() + " needs you to reconnect " + mailName() + " on the Receipts tab."; return; }
+              if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."; return; }
               if (++errors > 8) { status.textContent = mailName() + " is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
               return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
             }
@@ -6953,14 +7023,17 @@
     }
     draw();
   }
+  // An inbox that needs connecting again: a red number on the Profile tab, where Email connection is (index.html relayBadge).
+  function mailFixBadge(g) { window.__relayMailFix = inboxesToFix(g).length; if (window.relayBadge) window.relayBadge(); }
   // Returns due in the next three days: a red number on the Home tab (index.html relayBadge), the way a phone shows it.
   // The wallet on Home lists them first, so nothing floats over the page. Nothing shows when signed out.
   function mountNextUp(host) {
     if (host) { host.hidden = true; host.textContent = ""; }
     var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { window.__relayPayDue = 0; setDue(0); return; }
+    if (!s || !s.token) { window.__relayPayDue = 0; window.__relayMailFix = 0; setDue(0); return; }
     auMineCheck();
+    cachedGet("gmail", "/relay/my/gmail").then(function (g) { if (g.ok) mailFixBadge(g.body); }, function () {});
     var draw = function (rows) {
       var today = new Date().toISOString().slice(0, 10), n = 0;
       (rows || []).forEach(function (x) {

@@ -43,7 +43,7 @@ const byAccess = token => Object.entries(ACCOUNTS).find(([k]) => token === "Bear
 const OUTLOOK = { email: "alice.home@outlook.com", box: {
   AAMkOutlookMsg0001: { mid: "<sn-88@studionorth.test>", from: "orders@studionorth.test", name: "Studio North", subject: "Your order confirmation #SN-4001", body: "Order number: SN-4001\nOrder date: 14 Oct 2026\nLinen Shirt - Qty 1 - £45.00\nOrder total: £45.00\nReturns accepted within 30 days of purchase.\n" } } };
 const GRAPH = "https://graph.microsoft.com/v1.0";
-const revoked = [], emails = [];
+const revoked = [], emails = [], ended = new Set();
 const b64url = s => Buffer.from(s).toString("base64url");
 const header = (raw, k) => (new RegExp("^" + k + ": (.*)$", "m").exec(raw) || [])[1] || "";
 const fetchImpl = async (url, init = {}) => {
@@ -57,6 +57,8 @@ const fetchImpl = async (url, init = {}) => {
       return k ? Response.json({ access_token: "access-" + k, refresh_token: "refresh-" + k, scope: "https://www.googleapis.com/auth/gmail.readonly" }) : new Response("{}", { status: 400 });
     }
     const k = (/^refresh-([A-Z])$/.exec(p.get("refresh_token") || "") || [])[1];
+    // An account whose sign-in Google has ended (it expired, or was taken back): Google's own answer.
+    if (k && ended.has(k)) return Response.json({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, { status: 400 });
     return k ? Response.json({ access_token: "access-" + k }) : new Response("{}", { status: 400 });
   }
   if (url === "https://oauth2.googleapis.com/revoke") { revoked.push(new URLSearchParams(String(init.body)).get("token")); return new Response("{}", { status: 200 }); }
@@ -206,6 +208,45 @@ assert.deepEqual(mixed.map(x => [x.id, x.mailbox, x.inbox]), [["AAMkOutlookMsg00
 assert.equal((await post("/relay/my/gmail/disconnect", alice, { mailbox: 3 })).status, 200);
 assert.ok(!(await receiptsOf(alice)).some(r => r.orderRef === "SN-4001"), "its receipts go with it");
 console.log("ok - an Outlook inbox works alongside Gmail ones: added, read, searched and removed on its own");
+
+// 4c. Connect again: an inbox whose access Google ended says so, and connecting it again keeps its place and its receipts.
+ended.add("B");
+clock += 10 * 60 * 1000;   // Check now reads the other inboxes at most every few minutes
+await post("/relay/my/gmail/scan", alice); await runJobs();
+st = await get("/relay/my/gmail", alice);
+assert.equal(st.needsReconnect, false, "the first inbox is fine");
+assert.deepEqual(st.others.map(o => [o.mailbox, o.email, o.needsReconnect]), [[2, "alice.work@gmail.com", true]], "the second says it needs connecting again");
+assert.equal((await post("/relay/my/gmail/connect", bob, { again: 2 })).status, 409, "Bob can't connect Alice's inbox again (he has none there)");
+assert.equal((await post("/relay/my/gmail/connect", alice, { again: 9 })).status, 400, "only inboxes 1 to 5");
+assert.equal((await post("/relay/my/gmail/connect", alice, { again: "2" })).status, 400);
+const again2 = await post("/relay/my/gmail/connect", alice, { again: 2 });
+assert.equal(again2.status, 200);
+const againUrl = new URL((await again2.json()).url);
+assert.equal(againUrl.origin + againUrl.pathname, "https://accounts.google.com/o/oauth2/v2/auth");
+assert.equal(againUrl.searchParams.get("login_hint"), "alice.work@gmail.com", "Google suggests that same inbox");
+assert.equal(againUrl.searchParams.get("prompt"), "consent", "so Google gives Relay a new sign-in");
+ended.delete("B");   // Google's new sign-in works
+const keptBefore = refsOf(await receiptsOf(alice));
+assert.match(loc(await call("/relay/gmail/callback?code=code-B&state=" + againUrl.searchParams.get("state"))), /#gmail=reconnected$/);
+st = await get("/relay/my/gmail", alice);
+assert.deepEqual(st.others.map(o => [o.mailbox, o.email, o.needsReconnect]), [[2, "alice.work@gmail.com", false]], "same place, fine again, not added twice");
+assert.deepEqual(refsOf(await receiptsOf(alice)), keptBefore, "every receipt kept");
+await runJobs();
+assert.ok(st.others[0].checkedAt || (await get("/relay/my/gmail", alice)).others[0].checkedAt, "read again straight away");
+// The first inbox too (inbox 1), suggesting its own address.
+ended.add("A");
+clock += 10 * 60 * 1000;
+await post("/relay/my/gmail/scan", alice);
+assert.equal((await get("/relay/my/gmail", alice)).needsReconnect, true);
+const again1 = new URL((await (await post("/relay/my/gmail/connect", alice, { again: 1 })).json()).url);
+assert.equal(again1.searchParams.get("login_hint"), "alice.main@gmail.com");
+ended.delete("A");
+assert.match(loc(await call("/relay/gmail/callback?code=code-A&state=" + again1.searchParams.get("state"))), /#gmail=reconnected$/);
+st = await get("/relay/my/gmail", alice);
+assert.equal(st.needsReconnect, false); assert.equal(st.email, "alice.main@gmail.com"); assert.equal(st.others.length, 1);
+assert.deepEqual(refsOf(await receiptsOf(alice)), keptBefore, "every receipt kept");
+await runJobs();
+console.log("ok - an inbox whose access ended says so; Connect again keeps its place and receipts, and only its owner can");
 
 // 5. At most five inboxes.
 for (const a of ["C", "D", "E"]) assert.match((await connect(alice, a, true)).back, /#gmail=added$/);

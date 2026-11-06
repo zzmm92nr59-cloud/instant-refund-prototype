@@ -30,12 +30,15 @@ const mail = (n) => `From: Example Outfitters <orders@exampleoutfitters.test>\nS
 // A busy mailbox: 120 order emails spread over the last 60 days.
 const box = {};
 for (let i = 0; i < 120; i++) box["m" + i] = { raw: mail(i), day: ymd(clock - Math.floor(i / 2) * DAY) };
-let fetchCalls = 0, failNext = 0, emails = [];
+let fetchCalls = 0, failNext = 0, emails = [], tokenAnswer = "ok";
 const fetchImpl = async (url, init = {}) => {
   url = String(url); fetchCalls++;
   if (url.startsWith("https://api.resend.com/emails")) { emails.push(JSON.parse(init.body)); return new Response("{}"); }
   if (url === "https://oauth2.googleapis.com/token") {
     const p = new URLSearchParams(String(init.body));
+    // Google's own answers when a refresh can't be given: the sign-in has ended (expired or taken back), or Google is down.
+    if (p.get("grant_type") === "refresh_token" && tokenAnswer === "ended") return Response.json({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, { status: 400 });
+    if (p.get("grant_type") === "refresh_token" && tokenAnswer === "busy") return new Response("{}", { status: 503 });
     return Response.json(p.get("grant_type") === "authorization_code"
       ? { access_token: "a1", refresh_token: "1//refresh", scope: "https://www.googleapis.com/auth/gmail.readonly" } : { access_token: "a2" });
   }
@@ -214,3 +217,45 @@ assert.deepEqual(yearRows().map(y => [y.year, y.rev, y.cursor]), [[2023, 10, nul
 assert.equal((await catchUpFullReads(env, clock + 60000, fetchImpl)).checked, 0, "and then left alone");
 assert.equal(emails.length, 0, "no email or message is sent for a re-read");
 console.log("ok - earlier years added for Wrapped are read again by a newer reader once the recent mail is done, newest first");
+
+// 10. A check that fails never counts as a check, and mail that came while checks were failing is read once they work again.
+const row = () => sqlite.prepare("SELECT auto_at AS autoAt, mail_ok_at AS mailOk, mail_problem AS problem FROM gmail_connections").get();
+clock += DAY; await autoScanGmail(env, clock, fetchImpl);
+const good = await (await call("/relay/my/gmail", { token: alice })).json();
+assert.equal(good.checkedAt, clock); assert.equal(good.needsReconnect, false);
+const lastGood = clock;
+box.m600 = { raw: mail(600), day: ymd(clock + 60000) };
+tokenAnswer = "ended";
+for (let i = 0; i < 6; i++) { clock += DAY; const r = await autoScanGmail(env, clock, fetchImpl); assert.equal(r.results[0].status, 401); }
+assert.equal(row().autoAt, clock, "each failed check still moves the inbox to the back of the queue");
+assert.equal(row().mailOk, lastGood, "but isn't a check that worked");
+assert.equal(row().problem, "reconnect");
+const failing = await (await call("/relay/my/gmail", { token: alice })).json();
+assert.equal(failing.needsReconnect, true, "the app is told the inbox needs connecting again");
+assert.equal(failing.checkedAt, lastGood, "and never that it was checked today");
+assert.equal(failing.autoAt, lastGood, "copies of the app from before show the last check that worked too");
+const inBox = n => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE json_extract(details, '$.orderRef') = ?").get("EO-" + n).n;
+assert.equal(inBox(600), 0);
+// Google down for a while: tried again, nothing marked either way.
+tokenAnswer = "busy"; clock += 60 * 60 * 1000;
+assert.equal((await autoScanGmail(env, clock, fetchImpl)).results[0].status, 502);
+assert.equal(row().problem, "reconnect", "a busy Google changes nothing");
+// Access works again (connected again, or Google gave it back): the next check reads what came in meanwhile.
+tokenAnswer = "ok"; box.m601 = { raw: mail(601), day: ymd(clock) };
+clock += 15 * 60 * 1000;
+assert.equal((await autoScanGmail(env, clock, fetchImpl)).results[0].status, 200);
+assert.equal(inBox(600), 1, "mail from six days ago, while checks were failing, is read");
+assert.equal(inBox(601), 1);
+assert.equal(row().problem, null, "the inbox no longer needs connecting again");
+assert.equal(row().mailOk, clock);
+const fixed = await (await call("/relay/my/gmail", { token: alice })).json();
+assert.equal(fixed.needsReconnect, false); assert.equal(fixed.checkedAt, clock);
+console.log("ok - a failed check never counts as checked; the inbox says it needs connecting again; once access works the missed mail is read");
+
+// 11. Google being down never marks an inbox as needing connecting again.
+tokenAnswer = "busy"; clock += 15 * 60 * 1000;
+assert.equal((await autoScanGmail(env, clock, fetchImpl)).results[0].status, 502);
+assert.equal(row().problem, null);
+assert.equal((await (await call("/relay/my/gmail", { token: alice })).json()).needsReconnect, false);
+tokenAnswer = "ok";
+console.log("ok - Google being busy is tried again later and never says connect again");

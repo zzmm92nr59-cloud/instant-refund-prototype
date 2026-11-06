@@ -70,7 +70,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/consent": { fields: { version: str(40) } },
   "/relay/my/consent/withdraw": NOTHING,
   // Email: connecting, reading, searching and adding receipts.
-  "/relay/my/gmail/connect": { fields: { provider: one("microsoft", "google"), another: bool } },
+  "/relay/my/gmail/connect": { fields: { provider: one("microsoft", "google"), another: bool, again: int(1, 5) } },
   "/relay/my/gmail/scan": { fields: { year, cursor: str(200), full: bool, small: bool } },
   "/relay/my/gmail/find": { fields: { query: str(500) } },
   "/relay/my/gmail/add": { fields: { messageId: str(600), mailbox: int(1, 5) } },
