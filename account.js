@@ -112,7 +112,7 @@
   // new answer arrives, so nothing goes blank.
   function forget() { reads = {}; Object.keys(memo).forEach(function (k) { var e = memo[k]; if (e && typeof e === "object" && typeof e.at === "number") e.at = 0; }); }
   // On Receipts, pulling down also checks the inbox now, as "Check now" does.
-  function checkInbox() { var b = document.querySelector("#receiptsPage .rl-check-now"); if (b && !b.disabled && b.offsetParent) b.click(); }
+  function checkInbox() { if (window.__relayCheckNow && document.querySelector("#receiptsPage")) window.__relayCheckNow(); }
   // Each caller gets its own copy, so one screen changing what it was given can't change another's.
   function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j }; }
   // Fetches a signed-in image and returns a local address for it (or null).
@@ -804,7 +804,50 @@
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
     // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
-    ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}";
+    ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}" +
+    // November 2026 polish: a wallet card is one tappable card with no buttons on it (its page, a sheet, has them): what it
+    // is and the price, the shop under it, then the time left to send it back.
+    ".rl-po.rl-tap{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;padding:14px 16px;gap:12px;border-radius:20px}" +
+    ".rl-po.rl-tap:active{transform:scale(.985)}.rl-po.rl-tap:focus-visible{outline:3px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-po.rl-tap .rl-po-top{gap:12px}.rl-po.rl-tap .rl-po-img{width:64px;height:64px;border-radius:14px}" +
+    ".rl-po.rl-tap h3.rl-po-brand{font-size:17px;font-weight:600;letter-spacing:0}.rl-po.rl-tap .rl-po-price{font-size:17px;font-weight:600}" +
+    ".rl-po.rl-tap .rl-po-meta{font-size:15px;margin-top:1px}.rl-po.rl-tap .rl-po-ship{margin-top:4px}" +
+    ".rl-due{gap:7px;padding:0}.rl-due-t{font-size:15px}.rl-due-t b{font-weight:600}.rl-due-bar{height:4px}" +
+    ".pill.rl-count{background:none;color:var(--rl-text2);padding:0;font-size:15px;font-weight:400}" +
+    ".rl-dt-head{display:flex;gap:14px;align-items:center;margin:0 0 16px}.rl-dt-head h2{margin:0 0 2px}.rl-dt-head .rl-dt-sub{margin:0}.rl-dt-name{min-width:0}" +
+    ".rl-po-img.rl-dt-pic{width:72px;height:72px;border-radius:16px}" +
+    ".rl-dt-acts{display:flex;flex-direction:column;gap:10px;margin:0 0 16px}.rl-dt-acts>*{flex:none;width:100%;min-height:50px;font-size:16px;box-sizing:border-box}" +
+    ".rl-dt-acts .rl-po-mark{display:inline-flex;align-items:center;justify-content:center;background:var(--rl-fill);color:var(--rl-text);border-color:transparent;gap:8px}" +
+    // A shop's logo sits on white in light and dark, like an app icon, so dark logos stay readable.
+    ".rl-po .rl-po-img.rl-has-logo,.rl-dt-head .rl-po-img.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}" +
+    ".rl-dt-facts{margin:16px 0 0;border-radius:16px;background:var(--rl-card);padding:0 16px}" +
+    "@media (prefers-color-scheme: dark){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
+    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}" +
+    ".rl-dt-fact span{color:var(--rl-text2);flex:none}.rl-dt-fact b{font-weight:500;text-align:right;overflow-wrap:anywhere;color:var(--rl-text)}" +
+    // Grouped lists like the phone's Settings: no outline, and the line between rows starts after the icon.
+    ".rl-acard{border:0}.rl-arow{position:relative}.rl-arow+.rl-arow{border-top:0}" +
+    ".rl-arow+.rl-arow::before{content:'';position:absolute;top:0;left:60px;right:0;border-top:.5px solid var(--rl-line)}" +
+    // Receipts: no status line until there's news, the add-a-receipt row, and one search box in a group.
+    ".rl-recstat{margin:12px 0 0}.rl-recstat .rl-msg:empty{min-height:0;margin:0}.rl-recstat:has(.rl-msg:empty){display:none}" +
+    ".rl-rec-more{margin:22px 0 0}.rl-find-link{text-decoration:none}" +
+    ".rl-in-cat>.rl-search{display:none}" +
+    ".rl-cat-search{border:0;border-radius:12px;background:var(--rl-fill);min-height:44px;padding:0 14px;font-size:17px;margin:0 0 4px}" +
+    ".rl-cat-back{font-weight:400;gap:2px;margin:0 0 2px -8px;padding:0 10px 0 2px}.rl-cat-back .rl-jic{margin:0;width:24px;height:24px}" +
+    ".rl-cat-chips button{border:0;background:var(--rl-fill);font-size:15px;font-weight:600}" +
+    ".rl-cat-month{margin:20px 4px 8px}.rl-cat-month b{font-size:17px;font-weight:600}.rl-cat-month span{font-size:15px}.rl-cat-list{border:0}" +
+    // Profile's inner pages are screens of their own: no box around them, and the bar names the page instead of the title.
+    "#view:has(#mePage>.rl-abar)>.title{display:none}" +
+    ".rl-inpage .rl-ahead{border:0}.rl-inpage .rl-asub{background:none;border:0;border-radius:0;padding:0;margin-top:2px}" +
+    // The help chat: plain bubbles, the AI named once, and Talk to a person as a quiet button.
+    ".rl-chat-b.bot p{border:0}.rl-chat-bar{border:0;background:var(--rl-glass);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}" +
+    ".rl-chat-person{border:0!important;background:none!important;color:var(--rl-accent)!important;margin-top:4px}" +
+    // Swap & resell listings: name and price, shop and size, then tags, without a border.
+    ".rl-mk-card{border:0;display:block;padding:14px 16px}.rl-mk-card>*{display:block}.rl-mk-card>[hidden]{display:none!important}.rl-mk-from{margin-top:2px}.rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}" +
+    ".rl-mk-top b{font-size:17px;font-weight:600}.rl-mk-price{font-size:17px;font-weight:600;white-space:nowrap;color:var(--rl-text)}.rl-mk-from{font-size:15px;color:var(--rl-text2)}" +
+    ".rl-mk-card>.rl-mk-top,.rl-mk-card>.rl-mk-tags{display:flex}.rl-mk-tags{flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rl-mk-tag{font-size:13px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text)}" +
+    ".rl-mk-card .rl-mk-top .rl-mk-price{color:var(--rl-text)}.rl-mk-card>.rl-mk-near{display:inline-flex}" +
+    ".rl-mk-acts{display:flex;gap:8px;margin-top:10px}.rl-mk-acts .rl-btn{flex:1;margin:0;min-height:48px;padding:12px 10px;font-size:16px}" +
+    ".rl-mk-card .rl-mk-select:not([hidden]){display:block;margin-top:8px}.rl-mk-card .rl-mk-report{margin-top:4px;font-size:15px;color:var(--rl-text2)}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -2453,13 +2496,13 @@
         " " + who + " may give longer.";
     }
     var portal = rt.portalUrl && /^https:\/\//.test(rt.portalUrl) ? rt.portalUrl : null;
-    if (head || rt.address || portal) {
+    if (head || rt.address || (portal && !opts.noPortal)) {
       var rb = el("div", { className: "rl-ret" });
       var polLink = policyLink ? el("a", { className: "rl-ret-go", href: policyLink, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Read " + pol.shop + "'s returns policy" }), jIc("ext", 18)]) : null;
       if (head) rb.appendChild(el("div", { className: "rl-ret-top" }, [el("b", { className: "rl-ret-h", text: head })].concat(leftText && !opts.inRow ? [el("span", { className: "rl-rr-chip " + leftTone, text: leftText })] : [])));
       if (why) rb.appendChild(el("span", { className: "rl-ret-why", text: why }));
       if (rt.address) rb.appendChild(el("span", { className: "rl-ret-why", text: "Send it to " + rt.address }));
-      if (portal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
+      if (portal && !opts.noPortal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
       if (polLink) rb.appendChild(polLink);
       card.appendChild(rb);
     } else if (leftText && !opts.inRow) card.appendChild(el("span", { className: "rl-rr-chip " + leftTone, text: leftText, style: "display:inline-block;margin-top:2px" }));
@@ -2661,7 +2704,8 @@
       var checked = autoAt && (!lastScan || autoAt > lastScan) ? autoAt : lastScan;
       var when = function (d) { return d.toDateString() === new Date().toDateString() ? "today at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); };
       var nInbox = 1 + ((r.body.others || []).length);
-      status.textContent = onPage ? (nInbox > 1 ? nInbox + " inboxes" : MB) + " connected" + (checked ? " · checked " + when(checked) : "") + " · new receipts arrive automatically"
+      // On the Receipts page the line stays empty until there's news (reading, or what was found); Profile says how it works.
+      status.textContent = onPage ? ""
         : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
       if (onPage) { scanBtn.className = "rl-po-secondary rl-check-now"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
       var query = "";
@@ -2828,14 +2872,15 @@
         var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
         var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
-        list.appendChild(el("button", { type: "button", className: "rl-cat-back", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [el("span", { text: "\u2039", className: "rl-cat-back-i" }), el("span", { text: "All groups" })]));
-        list.lastChild.firstChild.setAttribute("aria-hidden", "true");
+        list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All groups" })]));
+        // One search box: in a group, the group's own (the page's search steps aside until you're back).
+        if (list.parentNode) list.parentNode.classList.add("rl-in-cat");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
         var spent = GBP(rows);
         var isGifts = k === "gifts", ink = isGifts ? "#101828" : "#fff", noun = function (n) { return n + (isGifts ? (n === 1 ? " gift" : " gifts") : (n === 1 ? " receipt" : " receipts")); };
         var hero = el("div", { className: "rl-cat-hero", style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) + ";color:" + ink }, [catIcon(k, 52),
           el("div", { className: "rl-cat-hero-t" }, [el("h3", { text: groupNames[k] }),
-            el("span", { text: [noun(rows.length), spent ? money(spent, "GBP") + " spent" : null, oldest ? "since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "short", year: "numeric" }) : null].filter(Boolean).join(" · ") })])]);
+            el("span", { text: (spent ? money(spent, "GBP") + " across " : "") + noun(rows.length) + (oldest ? " since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "") })])]);
         hero.firstChild.style.background = isGifts ? "rgba(16,24,40,.1)" : "rgba(255,255,255,.2)"; hero.firstChild.style.color = ink;
         list.appendChild(hero);
         if (!isGifts && rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
@@ -2884,7 +2929,7 @@
               month = m;
               var inMonth = pick.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
               body.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
-                el("span", { text: noun(inMonth.length) + (tot ? " · " + money(tot, "GBP") : "") })]));
+                el("span", { text: tot ? money(tot, "GBP") : noun(inMonth.length) })]));
               card = el("div", { className: "rl-cat-list" }); body.appendChild(card);
             }
             card.appendChild(receiptRow(r));
@@ -2896,6 +2941,7 @@
       }
       function drawList() {
         list.textContent = "";
+        if (list.parentNode) list.parentNode.classList.remove("rl-in-cat");
         var rows = allRows;
         // An email from a shop on Relay is the same purchase as its shop order, which is already under "Shop orders".
         if (onPage && shopRows.length) { var dup = {}; shopRows.forEach(function (x) { dup[label(x[0].store) + "|" + x[0].amountMinor] = true; });
@@ -3064,10 +3110,11 @@
         var mag = el("span"); mag.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
         box.appendChild(el("label", { className: "rl-search" }, [mag, search]));
         box.appendChild(list);
-        box.appendChild(el("div", { className: "rl-recstat" }, [status, scanBtn]));
+        box.appendChild(el("div", { className: "rl-recstat" }, [status]));
+        // Pulling the page down checks the inbox now (relay-gestures.js through checkInbox), so there's no button for it.
+        window.__relayCheckNow = function () { if (document.body.contains(status) && !scanBtn.disabled) scanBtn.onclick(); };
         // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
-        box.appendChild(el("button", { type: "button", className: "rl-find-link", text: "Missing a receipt? Add it",
-          onclick: function () { open(function (sheet) { addReceiptView(sheet, close); }); } }));
+        box.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
@@ -3425,10 +3472,14 @@
       card.insertBefore(ph, card.firstChild);
       apiBlob("/relay/my/resale/listings/" + id + "/image").then(function (u) { if (u) ph.src = u; else ph.remove(); });
     }
-    function facts(l) {
-      return [l.store, l.size ? "Size " + l.size : null, CONDITION[l.condition] || null,
-        l.askPence == null ? "Open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency), l.swapOk ? "Open to swaps" : null,
-        l.handover === "collect" ? "Collection in " + l.area : l.handover === "either" ? "Collect in " + l.area + " or post" : l.handover === "post" ? "Posted" : null].filter(Boolean).join(" · ");
+    // A listing: its name and price on top, the shop and size under it, then its condition, swaps and handover as tags.
+    function priceOf(l) { return l.askPence == null ? "Open to offers" : l.askPence === 0 ? "Free" : money(l.askPence, l.currency); }
+    function listingHead(l) {
+      var tags = [CONDITION[l.condition] || null, l.swapOk ? "Open to swaps" : null,
+        l.handover === "collect" ? "Collection in " + l.area : l.handover === "either" ? "Collect in " + l.area + " or post" : l.handover === "post" ? "Posted" : null].filter(Boolean);
+      return [el("div", { className: "rl-mk-top" }, [el("b", { text: l.title }), el("span", { className: "rl-mk-price", text: priceOf(l) })]),
+        el("span", { className: "rl-mk-from", text: [l.store, l.size ? "size " + l.size : null].filter(Boolean).join(", ") }),
+        el("span", { className: "rl-mk-tags" }, tags.map(function (t) { return el("span", { className: "rl-mk-tag", text: t }); }))];
     }
     // Where a request has got to, in words (the server keeps a short code).
     var STATUS = { pending: "Waiting for the seller", accepted: "Accepted", declined: "Declined", closed: "Ended", withdrawn: "Taken down", matched: "Matched", active: "On sale" };
@@ -3462,7 +3513,7 @@
         rows = rows.slice().sort(function (a, b) { return score(b) - score(a); });
         if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "When other Relay members list something they no longer need, it shows up here. Got something past its return date? List it from the Sell tab." })]));
         rows.forEach(function (l) {
-          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
+          var card = el("div", { className: "rl-order rl-mk-card" }, listingHead(l));
           if (score(l)) card.appendChild(el("span", { className: "rl-mk-near" }, [jIc("pin", 14), el("span", { text: score(l) === 2 ? "Near you" : "In your area" })]));
           photo(card, l.id, l.hasImage);
           if (l.note) card.appendChild(el("span", { className: "rl-mk-quote", text: "“" + l.note + "”" }));
@@ -3470,16 +3521,22 @@
             card.appendChild(el("span", { className: "rl-mk-status", text: "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }));
             if (l.myRequest.status === "accepted") card.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(l.myRequest.id); } }));
           } else {
+            // The two asks side by side; for a swap, the first tap shows what you'd offer, the second sends it.
+            var acts = el("div", { className: "rl-mk-acts" }); card.appendChild(acts);
             var add = function (label, kind) {
               var btn = el("button", { type: "button", className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, onclick: function () {
                 if (btn.disabled) return;
                 var pick = card.querySelector("select");
                 var b = { kind: kind };
-                if (kind === "swap") { if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true); b.offeredListingId = pick.value; }
+                if (kind === "swap") {
+                  if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true);
+                  if (pick.hidden) { pick.hidden = false; btn.textContent = "Send swap offer"; pick.focus(); return; }
+                  b.offeredListingId = pick.value;
+                }
                 btn.disabled = true;
                 api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { btn.disabled = false; if (r.ok) { tell("Sent. The seller sees your request from “Member”, not your name."); drawBrowse(); } else fail(r); },
                   function () { btn.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
-              card.appendChild(btn);
+              acts.appendChild(btn);
             };
             add("I'd like this", "buy");
             if (l.swapOk) {
@@ -3487,9 +3544,10 @@
                 var sel = el("select", { className: "rl-mk-select" });
                 sel.setAttribute("aria-label", "What you'd offer in a swap");
                 mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
-                card.appendChild(sel);
+                sel.hidden = true;
               }
               add("Offer a swap", "swap");
+              if (sel) card.appendChild(sel);
             }
           }
           // Anyone can report a listing; it goes to Relay's team and stops showing here for them.
@@ -3520,7 +3578,7 @@
         var ls = r.body.listings || [];
         if (!ls.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "Nothing listed yet" }), el("p", { text: "Use the Sell tab to list something from your receipts." })]));
         ls.forEach(function (l) {
-          var card = el("div", { className: "rl-order" }, [el("b", { text: l.title }), el("span", { text: facts(l) })]);
+          var card = el("div", { className: "rl-order rl-mk-card" }, listingHead(l));
           if (l.status === "matched") card.appendChild(el("span", { className: "rl-mk-status", text: "Matched: you're chatting with a member about this." }));
           photo(card, l.id, l.hasImage);
           (l.requests || []).forEach(function (q) {
@@ -4432,12 +4490,13 @@
       function bubble(t) {
         var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
         var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
-        if (who === "bot") n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
+        // Said once, over its first message: who's answering, and that it's an AI.
+        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
         return n;
       }
       function draw() {
         list.textContent = "";
-        list.appendChild(bubble({ role: "bot", text: ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+        list.appendChild(bubble({ role: "bot", first: true, text: ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
           : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
         if (ai && !log.length) {
           var chips = el("div", { className: "rl-chat-chips" });
@@ -5854,10 +5913,12 @@
     return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
   }
   // A purchase found in an email receipt: the shop handles the return, so Relay links to it and shows the deadline and parcel.
+  // The card says what it is, where it's from, the price and the time left to send it back; tapping it opens its page
+  // (a sheet) with what you can do: start the return, say you're sending it back, see the receipt.
   function emailCard(x, opts) {
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
-    var card = el("div", { className: "rl-po" });
+    var card = el("div", { className: "rl-po rl-tap" });
     var img = el("div", { className: "rl-po-img" });
     img.setAttribute("aria-hidden", "true");
     receiptPic(img, x, 36, 44);
@@ -5866,60 +5927,72 @@
     var first = one || headlineItem(x) || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
     var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
-    // Big picture, the shop's name, the price; then size and date, and the parcel's news. With the item's photo the picture
-    // says what it is; without one, the item's name joins the small line, so two cards from one shop can be told apart.
     var named = (x.items || []).filter(function (i) { return i && i.name; });
-    var photo = Boolean(named.length <= 1 && x.hasImage && x.id);
     var itemName = one ? one.name : named.length ? receiptTitle(x) : null;
+    var count = one && (x.items || []).length > 1 ? x.items.length : 0;
+    // What it is, with the price; under it the shop. Without an item name, the shop is the title and the order day goes under.
+    var title = itemName || who;
+    var under = itemName ? who + (count ? ", 1 of " + count + " in this order" : "") : date ? "Ordered " + date : "";
     var info = el("div", { className: "rl-po-info" }, [
-      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: who }), el("div", { className: "rl-po-price", text: price })]),
-      el("div", { className: "rl-po-meta", text: [photo ? null : itemName, first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]);
-    if (photo && itemName) info.insertBefore(el("span", { className: "rl-sr", text: itemName }), info.childNodes[1]);
-    var dv = x.delivery;
-    if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) info.appendChild(shipLine(dv));
+      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: title }), el("div", { className: "rl-po-price", text: price })]),
+      el("div", { className: "rl-po-meta", text: under })]);
+    var dv = x.delivery, showShip = Boolean(dv && dv.status && (dv.status === "delivered" || freshDelivery(x)));
+    if (showShip) info.appendChild(shipLine(dv));
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var dl = statedDeadline(x);
     if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
     if (opts.extra) opts.extra(card);
-    var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
     if (portal && !/^https:\/\//.test(portal)) portal = null;
-    // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
-    // through the shop's own returns page with the order number and email ready to copy.
     var rp = x.returnPlan;
-    if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
-      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
-        open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
-    else if (opts.actions !== false && portal)
-      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sheet) { returnGuide(sheet, x, who, portal); }); } }));
-    var hasMain = actions.childNodes.length > 0;
-    var details = el("button", { className: "rl-po-secondary rl-po-details", text: "Details", onclick: function () {
+    var dlDay = dl ? new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" }) : "";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", [title, itemName ? who : null, price, opts.deadline !== false && dl ? "return by " + dlDay : null].filter(Boolean).join(", "));
+    // Its page: the picture and what it is, what you can do, then the return date, the receipt and the order's details.
+    var details = function () {
       open(function (sheet) {
-        // The shop, then what was bought (the card itself shows only the shop's name), then the details.
-        sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
-        var bought = (one ? [one] : named).map(function (i) { return i.name + (i.variant ? ", " + i.variant : ""); }).join(" · ");
-        sheet.appendChild(el("p", { className: "rl-dt-sub", text: [bought, price, x.orderRef ? "Order " + String(x.orderRef).replace(/^#/, "") : null].filter(Boolean).join(" · ") }));
-        if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) sheet.appendChild(shipLine(dv));
-        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true));
+        var pic = el("div", { className: "rl-po-img rl-dt-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, x, 40, 48);
+        sheet.appendChild(el("div", { className: "rl-dt-head" }, [pic, el("div", { className: "rl-dt-name" }, [el("h2", { text: title }), el("p", { className: "rl-dt-sub", text: itemName ? who : date ? "Ordered " + date : "" })])]));
+        if (showShip) sheet.appendChild(shipLine(dv));
+        var acts = el("div", { className: "rl-dt-acts" });
+        // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
+        // through the shop's own returns page with the order number and email ready to copy.
+        if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
+          acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
+            open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
+        else if (opts.actions !== false && portal)
+          acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sh) { returnGuide(sh, x, who, portal); }); } }));
+        // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
+        if (opts.markable && x.id) {
+          var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
+          if (!idxs.length) idxs = [0];
+          var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
+          var mark = el("button", { type: "button", className: "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
+          mark.onclick = function () {
+            if (mark.disabled) return;
+            mark.disabled = true; words.textContent = "Saving…";
+            markItems(x, idxs, undo ? null : "returning").then(function (ok) {
+              if (ok) { close(); if (opts.changed) opts.changed(); } else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
+          };
+          acts.appendChild(mark);
+        }
+        if (acts.childNodes.length) sheet.appendChild(acts);
+        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true, { noPortal: Boolean(portal && opts.actions !== false) }));
+        // The order's details, one to a line.
+        var facts = el("div", { className: "rl-dt-facts" });
+        var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
+        fact("Price", price);
+        if (first.variant) fact("Size or colour", first.variant);
+        if (!one && named.length > 1) fact("In this order", named.map(function (i) { return i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", "));
+        fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);
+        fact("Order number", x.orderRef ? String(x.orderRef).replace(/^#/, "") : null);
+        if (facts.childNodes.length) sheet.appendChild(facts);
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
       });
-    } });
-
-    // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
-    if (opts.markable && x.id) {
-      var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
-      if (!idxs.length) idxs = [0];
-      var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
-      var mark = el("button", { type: "button", className: hasMain ? "rl-po-marklink" : "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
-      mark.onclick = function () {
-        if (mark.disabled) return;
-        mark.disabled = true; words.textContent = "Saving…";
-        markItems(x, idxs, undo ? null : "returning").then(function (ok) {
-          if (ok && opts.changed) opts.changed(); else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
-      };
-      if (hasMain) { actions.appendChild(details); card.appendChild(actions); card.appendChild(mark); }
-      else { actions.appendChild(mark); actions.appendChild(details); card.appendChild(actions); }
-    } else { actions.appendChild(details); card.appendChild(actions); }
+    };
+    card.onclick = details;
+    card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); details(); } };
     return card;
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
@@ -6052,7 +6125,7 @@
       });
       items.sort(function (a, b) { return (a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1; });
       grid.textContent = "";
-      head.appendChild(el("span", { className: "pill", text: items.length + " item" + (items.length === 1 ? "" : "s") }));
+      head.appendChild(el("span", { className: "pill rl-count", text: items.length + " item" + (items.length === 1 ? "" : "s") }));
       if (!items.length) grid.appendChild(el("div", { className: "rl-empty", style: "grid-column:1/-1" }, [el("h3", { text: "Nothing to return right now" }),
         el("p", { text: "Anything you can still return or swap shows up here. Everything you've bought is in Receipts." })]));
       items.forEach(function (i) { grid.appendChild(i.node()); });
@@ -6098,9 +6171,9 @@
       orderRows(both[1]).forEach(function (x) {
         var p = x.returnProgress, parts = emailItems(x), marked = parts.filter(function (q) { return q.returning; });
         if (!p && !marked.length) return;
-        var step = !p ? "You're sending this back · Relay will update this when the shop's emails arrive"
-          : p.refundedAt ? "✓ Refund processed" + (p.refundPence != null ? " · " + money(p.refundPence, p.currency || "GBP") : "")
-          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Arrived back at the shop · waiting for the refund" : "Sent back · on its way to the shop";
+        var step = !p ? "You're sending this back. Relay follows it from the shop's emails."
+          : p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
         var progress = function (card) { card.appendChild(el("div", { className: "rl-po-status" + (p && p.refundedAt ? "" : " wait"), text: step }));
           if (x.itemReturnsFrom === "refund") card.appendChild(el("div", { text: "Relay matched the refund amount to this item.", style: "font-size:12px;color:var(--rl-text2);margin-top:6px" })); };
         // A return for an order with several items, and Relay can't tell which: ask once.
@@ -6324,38 +6397,22 @@
     }
     draw();
   }
-  // The return that's due soonest, as a strip that floats above the tab bar (like the song that's playing). Tapping it opens
-  // the receipt. Nothing shows when nothing is due in the next fortnight, or when signed out.
+  // Returns due in the next three days: a red number on the Home tab (index.html relayBadge), the way a phone shows it.
+  // The wallet on Home lists them first, so nothing floats over the page. Nothing shows when signed out.
   function mountNextUp(host) {
-    if (!host) return;
+    if (host) { host.hidden = true; host.textContent = ""; }
+    var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { host.hidden = true; host.textContent = ""; return; }
+    if (!s || !s.token) { setDue(0); return; }
     var draw = function (rows) {
-      if (!document.body.contains(host)) return;
-      var today = new Date().toISOString().slice(0, 10), best = null;
+      var today = new Date().toISOString().slice(0, 10), n = 0;
       (rows || []).forEach(function (x) {
         if (!x || x.kind === "return_instructions" || isCarrier(x) || x.returnProgress) return;
         if (x.returnable === false && !(x.returnableItems || []).length) return;
         var dl = statedDeadline(x); if (!dl || dl < today) return;
-        var d = daysLeft(dl); if (d === null || d > 14) return;
-        if (!best || dl < best.dl) best = { x: x, dl: dl, d: d };
+        var d = daysLeft(dl); if (d !== null && d <= 3) n++;
       });
-      host.textContent = "";
-      if (!best) { host.hidden = true; return; }
-      var x = best.x, who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
-      // (From a food order, the thing in it that can go back, not the bananas.)
-      var item = x.returnable === false ? (x.items || [])[x.returnableItems[0]] : headlineItem(x);
-      var pic = el("span", { className: "rl-next-pic" }); receiptPic(pic, x, 28, 30);
-      var day = new Date(best.dl + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-      host.appendChild(el("button", { type: "button", className: "rl-next", ariaLabel: "Next return: " + (item ? item.name : who) + ", back to " + who + " by " + day,
-        onclick: function () { open(function (sheet) {
-          sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
-          sheet.appendChild(receiptCard(x, function () {}, true));
-          sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
-        }); } }, [pic,
-        el("span", { className: "rl-next-t" }, [el("b", { text: item ? item.name : "Order from " + who }), el("span", { className: "rl-next-s", text: "Back to " + who + " by " + day })]),
-        el("span", { className: "rl-next-d" + (best.d <= 3 ? " soon" : ""), text: best.d === 0 ? "Today" : best.d === 1 ? "1 day" : best.d + " days" })]));
-      host.hidden = false;
+      setDue(n);
     };
     if (memo.receipts) draw(memo.receipts.rows);
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)

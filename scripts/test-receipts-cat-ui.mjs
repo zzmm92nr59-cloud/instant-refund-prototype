@@ -56,7 +56,7 @@ await page.getByRole("button", { name: "Food & drink, 130 receipts" }).click();
 const hero = page.locator(".rl-cat-hero");
 await hero.waitFor();
 const spent = food.reduce((n, r) => n + r.totalPence, 0);
-assert.match(await hero.innerText(), new RegExp("130 receipts · £" + (spent / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 }).replace(/[.]/g, "\\.") + " spent · since "));
+assert.match(await hero.innerText(), new RegExp("£" + (spent / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 }).replace(/[.]/g, "\\.") + " across 130 receipts since "));
 const chipNames = await page.locator(".rl-cat-chips button").allInnerTexts();
 assert.equal(chipNames[0], "All"); assert.ok(chipNames.length >= 3, "a filter for each year: " + chipNames);
 assert.ok(!chipNames.includes("Can still return"), "no 'can still return' filter where nothing can go back");
@@ -64,7 +64,7 @@ const months = page.locator(".rl-cat-month"); await months.first().waitFor();
 assert.ok(await months.count() >= 4, "receipts are in months");
 const first = await months.first().innerText();
 assert.match(first, new RegExp(new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })), "newest month first: " + first);
-assert.match(first, /receipts? · £/, "with the month's total");
+assert.match(first, /^[A-Z][a-z]+ \d{4}\s+£[\d,]+\.\d{2}$/, "with the month's total");
 assert.equal(await page.locator(".rl-rr").count(), 40, "40 at a time");
 // The next 40 arrive by themselves before the end comes into view; the button stays for anyone who gets there first.
 await page.getByRole("button", { name: /^Show 40 more of 90$/ }).waitFor();

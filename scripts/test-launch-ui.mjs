@@ -101,7 +101,7 @@ assert.equal(await page.locator("[data-card-select]").count(), 2, "one card per 
 assert.equal(await page.locator('#view img[src*="unsplash"]').count(), 0, "no stock photos: the shop's own picture or a drawing");
 assert.equal(await page.locator('[data-card-select="shopify-v-1"] .rl-ill').count(), 1, "a product with no photo gets a drawing of what it is");
 // Signed in with picks switched off: an invitation to turn them on, saying what they use.
-await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
+await page.locator(".dc-invite", { hasText: "Picks for you" }).waitFor();
 assert.match(await page.locator('[data-card-select="shopify-v-1"]').innerText(), /KICK LANE|Kick Lane/i);
 assert.match(await page.locator('[data-card-select="shopify-v-1"]').innerText(), /Only 4 left/);
 await page.locator('[data-card-select="shopify-v-1"]').click();
@@ -111,7 +111,7 @@ assert.doesNotMatch(await viewText(), SHOPPER_NEVER_SEES);
 await page.getByRole("button", { name: "White / UK 8", exact: true }).waitFor();
 await page.getByRole("button", { name: "White / UK 9 Sold out" }).waitFor();
 await page.getByRole("button", { name: "Watch price", exact: true }).click();
-await page.getByRole("button", { name: "Watching · tap to stop" }).waitFor();
+await page.getByRole("button", { name: "Watching the price" }).waitFor();
 await page.screenshot({ path: "/tmp/shots/launch-product.png" });
 await page.getByRole("button", { name: "Back", exact: true }).click();
 await page.locator('[data-watch="shopify-v-1"][aria-pressed="true"]').waitFor();
@@ -136,8 +136,7 @@ await page.getByRole("button", { name: "Discover", exact: true }).first().click(
 await page.getByRole("heading", { name: "Discover" }).waitFor();
 console.log("ok - Price alerts lists what's watched, lives under Discover, and stops watching on request");
 // Swap & resell has no tab, but Discover leads to it.
-await page.locator(".profile-row", { hasText: "Swap & resell" }).waitFor();
-assert.match(await page.locator(".profile-row", { hasText: "Swap & resell" }).innerText(), /What other members are selling or swapping/);
+await page.locator(".dc-sc", { hasText: "Swap & resell" }).waitFor();
 
 // 4. Receipts and Wrapped read cleanly too.
 for (const tab of ["Receipts", "Profile"]) {

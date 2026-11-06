@@ -131,6 +131,89 @@ body.typing .footnav,body.typing .nextup{display:none}
 /* In the dark, Relay's own buttons are lime, so they stand out from the black. */
 @media (prefers-color-scheme:dark){body .darkbtn,body .rl-po-primary{background:#c7f567;color:#101828;border-color:#c7f567}}
 .nextup[hidden]{display:none}
+</style><style id="relay-v5-polish">
+/* November 2026 polish pass: fewer boxes, buttons and explaining lines. One card style (flat, rounded, no border), back
+   buttons like the phone's own, links without underlines, products first in Discover, a product's page as a screen of its
+   own, and nothing floating over the page except the tab bar (returns due soon are a red number on Home instead). */
+:root{--rl-glass:rgba(249,249,251,.9)}
+@media (prefers-color-scheme:dark){:root{--rl-glass:rgba(15,27,51,.9)}}
+.footnav{-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}
+.nextup{display:none!important}
+@media(max-width:760px){.main{padding-bottom:calc(env(safe-area-inset-bottom) + 112px)}}
+.footnav .ico,.side-nav .nico{position:relative}
+.tab-badge{position:absolute;top:-5px;left:calc(50% + 5px);min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#e5342a;color:#fff;font-size:13px;font-weight:700;line-height:20px;text-align:center;box-shadow:0 0 0 2px var(--rl-glass)}
+/* Links and back buttons: coloured words, no underline. */
+.link{text-decoration:none}
+.rl-navback{all:unset;box-sizing:border-box;display:inline-flex;align-items:center;gap:2px;min-height:44px;margin:0 0 2px -8px;padding:0 10px 0 2px;color:var(--rl-accent);font-size:17px;font-weight:400;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rl-navback svg{width:24px;height:24px}
+.rl-navback:active{opacity:.45}
+.rl-navback:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:8px}
+/* Home: a short hello over the title; section headings with a plain count. */
+.home-hello{margin:4px 60px 0 0;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2)}
+@media(max-width:760px){.home-hello+.title{margin-top:0!important}}
+.sectionhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:22px 0 10px}
+.sectionhead h2{font-family:var(--rl-sys);font-size:22px;font-weight:700;letter-spacing:-.01em}
+/* Discover: two small tiles, then picks, then search and filters, then products. */
+.dc-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}
+.dc-sc{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:12px;min-height:80px;padding:12px 14px;border-radius:16px;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+.dc-sc.blue{background:#4F72E0}.dc-sc.pink{background:#E0446E}
+.dc-sc-ic{display:inline-flex;width:24px;height:24px}.dc-sc-ic svg{width:24px;height:24px}
+.dc-sc b{font-size:16px;line-height:1.2;font-weight:700}
+.dc-sc-n{position:absolute;top:12px;right:12px;font-size:13px;line-height:1;font-weight:600;padding:5px 8px;border-radius:999px;background:rgba(0,0,0,.22)}
+.dc-sc:active{transform:scale(.97)}.dc-sc:focus-visible{outline:3px solid var(--rl-accent);outline-offset:3px}
+.dc-invite{flex-direction:row!important;align-items:center!important;gap:14px;padding:14px 16px;border:0!important;border-radius:16px;margin:0 0 12px}
+.dc-invite b{font-size:16px;font-weight:600}
+.dc-invite p{margin:2px 0 0;font-size:14px;line-height:1.35;color:var(--rl-text2)}
+.dc-invite-on{flex:none;min-height:44px;padding:0 18px;border-radius:999px;border:0;background:#101828;color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s}
+.dc-invite-on:active{transform:scale(.96)}
+@media (prefers-color-scheme:dark){.dc-invite-on{background:#c7f567;color:#101828}}
+.dc-for{background:var(--rl-card);color:var(--rl-text);border-radius:20px;padding:16px;margin:0 0 14px}
+.dc-for h2{font-size:20px;font-weight:700;margin:0;color:var(--rl-text)}
+.dc-basis{color:var(--rl-text2);font-size:14px;margin:4px 0 12px}
+.dc-for .link{color:var(--rl-accent);font-size:15px}
+.dc-forhead>span{display:flex;gap:14px}
+.dc-why{background:none;padding:0;margin-top:2px;font-weight:600;color:var(--rl-accent);white-space:pre-line}
+.dc-bar{gap:8px;margin:0 0 8px}
+.dc-search{border:0;border-radius:12px;min-height:44px;background:var(--rl-fill);padding:0 4px 0 12px}
+.dc-search input{font-size:17px}
+.dc-bar select{appearance:none;-webkit-appearance:none;flex:none;max-width:44%;min-height:44px;margin:0;border:0;border-radius:12px;padding:0 32px 0 14px;font:inherit;font-size:15px;font-weight:600;color:var(--rl-text);
+ background:var(--rl-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233c3c43' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E") no-repeat right 10px center/16px}
+@media (prefers-color-scheme:dark){.dc-bar select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ebebf5' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E")}}
+.dc-chips{margin:0 -18px 6px;padding:2px 18px}
+.dc-chip{border:0;background:var(--rl-fill);font-size:15px;font-weight:600;padding:0 15px}
+.dc-chip.on{background:var(--rl-text);color:var(--rl-bg)}
+.dc-preview{border:0;font-size:14px}
+.dc-grid{gap:20px 12px;margin-top:10px}
+.dc-card{background:none;border:0;border-radius:0;overflow:visible}
+.dc-card:active .dc-pic{transform:scale(.98)}
+.dc-pic{position:relative;aspect-ratio:1;border-radius:16px;overflow:hidden;background:var(--rl-card);transition:transform .12s}
+.dc-body{padding:9px 2px 0;gap:1px}
+.dc-shop{font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--rl-text2)}
+.dc-card h3{font-size:15px;line-height:1.25;font-weight:600;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dc-opts{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc-row{padding-top:3px;justify-content:flex-start;gap:8px}
+.dc-row b{font-size:15px;font-weight:700}
+.dc-stock{padding:0;border-radius:0;background:none;font-weight:600;font-size:13px}
+.dc-stock.low,.dc-stock.out{background:none}.dc-stock.low{color:var(--rl-warn)}.dc-stock.out{color:var(--rl-text2)}
+.dc-watch{top:4px;right:4px;width:44px;height:44px;box-shadow:none;color:#101828;background:radial-gradient(circle,rgba(255,255,255,.9) 17px,transparent 17.5px)}
+.dc-watch.on{color:#fff;background:radial-gradient(circle,#101828 17px,transparent 17.5px)}
+@media (prefers-color-scheme:dark){.dc-watch{color:#fff;background:radial-gradient(circle,rgba(0,0,0,.55) 17px,transparent 17.5px)}.dc-watch.on{color:#101828;background:radial-gradient(circle,#c7f567 17px,transparent 17.5px)}}
+.dc-empty{border:0}
+/* A product's page: a screen of its own, with a big picture, the name and price, the sizes and one main button. */
+#dcRoot.dc-detail>.title,#dcRoot.dc-detail>.dc-shortcuts,#dcRoot.dc-detail>#dcForYou,#dcRoot.dc-detail>.dc-bar,#dcRoot.dc-detail>.dc-chips,#dcRoot.dc-detail>#storeAlert,#dcRoot.dc-detail>#dcPreview{display:none}
+#dcRoot.dc-detail>.dc-grid{display:block;margin-top:0}
+.dc-page{background:none;border:0;border-radius:0;padding:0}
+.dc-page .dc-pagepic{max-width:none;width:100%;margin:4px 0 16px;border-radius:20px;background:var(--rl-card)}
+.dc-page .dc-shop{font-size:15px}
+.dc-page h2{font-size:26px;line-height:1.15;font-weight:700;letter-spacing:-.01em;margin:2px 0 6px}.dc-page h2+.muted{margin:0 0 10px;font-size:15px}
+.dc-page .price{font-size:22px;font-weight:600;margin:0 0 2px}
+.dc-page .dc-sizes{margin:16px 0 4px}
+.dc-size{border:0;background:var(--rl-fill);border-radius:12px;font-size:15px;font-weight:600}
+.dc-size.on,.dc-size.on.out{background:var(--rl-text);color:var(--rl-bg)}
+.dc-size.out{color:var(--rl-text2)}.dc-size span{font-weight:500}
+.dc-page .actions{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+.dc-page .actions>*{width:100%;box-sizing:border-box;justify-content:center;min-height:50px;font-size:17px}
+.dc-page #watchNote{font-size:14px;line-height:1.45;margin:12px 0 0}
 </style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html">Testing tools ↗</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><p class="sub" style="margin-top:28px">Loading…</p></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script src="./relay-recommendation-engine.js?v=20261014-discover"></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet"></script><script>(function(){try{
 
 const testing=new URLSearchParams(location.search).get("testing")==="1";
@@ -259,6 +342,10 @@ function homeTiles(){const n=shownWatches().length,y=new Date().getFullYear(),ar
   '<button type="button" class="htile lime" aria-label="Your '+y+' Wrapped" onclick="go(\'wrapped\')"><span class="htile-y" aria-hidden="true">'+y+'</span><b>Wrapped</b></button></div>'}
 function alertsRow(){return '<button class="card profile-row" onclick="go(\'radar\')"><span class="row-ic">'+ic("bell")+'</span><span class="grow"><b>Price alerts</b><span class="small muted">'+safe(watchLine())+'</span></span>'+ic("chev")+'</button>'}
 // Swap & resell has no tab of its own: Discover leads to it (so do Profile and receipts past their return date).
+// Discover's two shortcuts, as small tiles in the Home tiles' colours: Price alerts, and Swap & resell (once signed in).
+function dcShortcuts(){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn(),n=shownWatches().length;
+ return '<div class="dc-shortcuts"><button type="button" class="dc-sc blue" onclick="go(\'radar\')"><span class="dc-sc-ic" aria-hidden="true">'+ic("bell")+'</span><b>Price alerts</b>'+(n?'<span class="dc-sc-n">'+n+' watched</span>':'')+'</button>'
+  +(signed?'<button type="button" class="dc-sc pink" onclick="openMarket()"><span class="dc-sc-ic" aria-hidden="true">'+ic("swap")+'</span><b>Swap &amp; resell</b></button>':'')+'</div>'}
 function marketRow(){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();if(!signed)return"";return '<button class="card profile-row" onclick="openMarket()"><span class="row-ic">'+ic("swap")+'</span><span class="grow"><b>Swap &amp; resell</b><span class="small muted">What other members are selling or swapping</span></span>'+ic("chev")+'</button>'}
 function openMarket(){if(window.RelayAccount&&RelayAccount.openMarket)RelayAccount.openMarket()}
 function navIcon(key){return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">'+(NAV_ICON[key]||"")+'</svg>'}
@@ -367,7 +454,13 @@ async function checkSandboxBank(){
   if(status)status.innerHTML='Plaid Sandbox is responding. <a class="darkbtn" style="display:inline-block;margin-top:8px" target="_blank" rel="noopener noreferrer" href="'+API+'/plaid/connect?user=relay_demo_001">Open secure Sandbox connection ↗</a>';
  }catch(e){if(status)status.textContent="Could not reach the Plaid Sandbox connection: "+e.message}
 }
-function navRender(){const lit=demo||(testing&&page==="wallet")?page:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key)+'</span>'+name+'</button>').join("")}
+function navRender(){const lit=demo||(testing&&page==="wallet")?page:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key)+'</span>'+name+'</button>').join("");relayBadge()}
+// Returns due in the next three days, as a red number on the Home tab (account.js counts them), the way a phone shows it.
+function relayBadge(){const n=Number(window.__relayDue)||0;for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector&&nav.querySelector('[data-tab="profile"]');if(!b||!b.querySelector)continue;let t=b.querySelector(".tab-badge");
+ if(!n||demo){if(t)t.remove();b.removeAttribute("aria-label");continue}
+ if(!t){t=document.createElement("span");t.className="tab-badge";t.setAttribute("aria-hidden","true");(b.querySelector(".ico,.nico")||b).appendChild(t)}
+ t.textContent=n>9?"9+":String(n);b.setAttribute("aria-label",b.dataset.name+", "+n+(n===1?" return":" returns")+" due soon")}}
+window.relayBadge=relayBadge;
 function go(p){if(p==="wallet"&&!demo&&!testing)p="profile";if(p==="wrapped"&&!demo){p="me";window.__relayOpenWrapped=true}if(p==="discover"&&page==="exchange"){exchangeContext=true;storeFilter=selected.merchant==="NORTH & CO."?"North & Co.":selected.merchant;}else if(p!=="discover"){exchangeContext=false;storeFilter="all";}else if(!exchangeContext){storeFilter="all";}if(onTabRoot())TAB_SCROLL[page]=window.scrollY;page=p;retailer=false;render();scrollBack(isTab(p)?TAB_SCROLL[p]||0:0)}
 // Each tab remembers how far down it was scrolled, so switching tabs and coming back lands where you were. Tapping the tab
 // you're already on goes to its top; from one of its inner screens it goes back to the tab itself.
@@ -403,7 +496,7 @@ let watchesRestored=false;
 function restoreWatches(){if(watchesRestored||demo||!window.RelayAccount||!RelayAccount.signedIn||!RelayAccount.signedIn()||!RelayAccount.alertStatus)return;watchesRestored=true;
  RelayAccount.alertStatus().then(st=>{let added=0;((st&&st.watches)||[]).forEach(w=>{if(w&&w.sku&&!watch[w.sku]){watch[w.sku]={name:String(w.product||"Watched item"),variant:String(w.variant||""),baseline:Number(w.lastSeenMinor)||0,created:new Date().toISOString()};added++}});
   if(added){try{localStorage.setItem("relay-radar-v2",JSON.stringify(watch))}catch(e){}if(page==="radar")showRadar();else if(page==="profile"||page==="discover")render()}}).catch(()=>{});}
-function render(){if(page==="wallet"&&!demo&&!testing)page="profile";if(page==="discover"||page==="radar"||page==="wallet")needCatalog();navRender();if(typeof setTimeout==="function")setTimeout(restoreWatches,0);{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="market"?marketView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="me"?meView():page==="bank"?bankView():page==="returns"?returnsView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();if(demo)loadReceiptPurchases();else if(window.RelayAccount&&RelayAccount.mountWallet)RelayAccount.mountWallet($("walletPage"))}if(page==="returns"&&window.RelayAccount&&RelayAccount.mountReturns)RelayAccount.mountReturns($("returnsPage"));if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="market"&&!retailer&&window.RelayAccount){if(demo&&RelayAccount.mountDemoMarket)RelayAccount.mountDemoMarket($("marketPage"));else RelayAccount.mountMarket($("marketPage"))}if(page==="discover"){renderCatalog();loadReceiptTaste();loadAlertState()}if(page==="radar"){showRadar();if(window.RelayAccount&&RelayAccount.mountAlerts)RelayAccount.mountAlerts($("alertsCard"))}if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus();if(window.RelayAccount&&RelayAccount.onProfile&&$("homeHello")){const hh=$("homeHello");RelayAccount.onProfile(()=>{if(!document.body.contains(hh))return false;hh.textContent=homeHello()})}if(!demo&&window.RelayAccount&&RelayAccount.mountWallet&&$("walletPage"))RelayAccount.mountWallet($("walletPage"),{title:"Wallet",sub:"What you can still return or swap",home:true})}if(page==="wrapped"&&!retailer){if(window.RelayAccount)RelayAccount.mountWrapped($("wrappedPage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="wrapped"&&!retailer)render()},120)}if(page==="me"&&!retailer){if(window.RelayAccount&&RelayAccount.mountMe)RelayAccount.mountMe($("mePage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="me"&&!retailer)render()},120)}if(!retailer&&!demo&&window.RelayAccount&&RelayAccount.mountNextUp)RelayAccount.mountNextUp($("nextUp"));else{const nu=$("nextUp");if(nu)nu.hidden=true}}
+function render(){if(page==="wallet"&&!demo&&!testing)page="profile";if(page==="discover"||page==="radar"||page==="wallet")needCatalog();navRender();if(typeof setTimeout==="function")setTimeout(restoreWatches,0);{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}$("view").innerHTML=retailer?merchantView():page==="wallet"?wallet():page==="receipts"?receiptsView():page==="market"?marketView():page==="detail"?detailView():page==="refund"?refundView():page==="return"?returnView():page==="exchange"?exchangeView():page==="discover"?discoverView():page==="radar"?radarView():page==="wrapped"?wrappedView():page==="me"?meView():page==="bank"?bankView():page==="returns"?returnsView():profileView();if(page==="wallet"&&!retailer){bindPurchaseCards();if(demo)loadReceiptPurchases();else if(window.RelayAccount&&RelayAccount.mountWallet)RelayAccount.mountWallet($("walletPage"))}if(page==="returns"&&window.RelayAccount&&RelayAccount.mountReturns)RelayAccount.mountReturns($("returnsPage"));if(page==="receipts"&&!retailer&&window.RelayAccount){RelayAccount.mountReceipts($("receiptsPage"),window.__relayReceiptsNote);window.__relayReceiptsNote=null}if(page==="market"&&!retailer&&window.RelayAccount){if(demo&&RelayAccount.mountDemoMarket)RelayAccount.mountDemoMarket($("marketPage"));else RelayAccount.mountMarket($("marketPage"))}if(page==="discover"){renderCatalog();loadReceiptTaste();loadAlertState()}if(page==="radar"){showRadar();if(window.RelayAccount&&RelayAccount.mountAlerts)RelayAccount.mountAlerts($("alertsCard"))}if(retailer)bindRetailerControls();if(page==="profile"&&!retailer){bindProfileControls();loadShopifyStatus();if(window.RelayAccount&&RelayAccount.onProfile&&$("homeHello")){const hh=$("homeHello");RelayAccount.onProfile(()=>{if(!document.body.contains(hh))return false;hh.textContent=homeHello()})}if(!demo&&window.RelayAccount&&RelayAccount.mountWallet&&$("walletPage"))RelayAccount.mountWallet($("walletPage"),{title:"Wallet",home:true})}if(page==="wrapped"&&!retailer){if(window.RelayAccount)RelayAccount.mountWrapped($("wrappedPage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="wrapped"&&!retailer)render()},120)}if(page==="me"&&!retailer){if(window.RelayAccount&&RelayAccount.mountMe)RelayAccount.mountMe($("mePage"));else if(typeof setTimeout==="function")setTimeout(()=>{if(page==="me"&&!retailer)render()},120)}if(!retailer&&!demo&&window.RelayAccount&&RelayAccount.mountNextUp)RelayAccount.mountNextUp($("nextUp"));else{const nu=$("nextUp");if(nu)nu.hidden=true}}
 // While something is being typed, the floating bars step aside so the keyboard and the field have the room.
 if(typeof document.addEventListener==="function"){document.addEventListener("focusin",e=>{if(e.target&&e.target.matches&&e.target.matches("input,textarea,select"))document.body.classList.add("typing")});
 document.addEventListener("focusout",()=>document.body.classList.remove("typing"))}
@@ -616,15 +709,15 @@ function dcPicks(groups){if(!discoverSpend)return[];const pr=typeof RelayRecomme
   out.push({g:x.g,score:best.share*10+x.s,why:[said(best),...x.why]})}
  return out}
 function dcForYou(groups){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();if(!signed)return"";
- if(!personalise)return '<div class="dc-invite"><div><b>Picks from what you spend</b><p>Relay can put things first that match what you buy, your sizes and what you usually pay. It uses your receipts and stays private to you.</p></div><button class="darkbtn" onclick="togglePersonalise()">Turn on</button></div>';
+ if(!personalise)return '<div class="dc-invite"><div><b>Picks for you</b><p>Chosen from your receipts. Only you see them.</p></div><button class="dc-invite-on" onclick="togglePersonalise()">Turn on</button></div>';
  if(!discoverSpend)return discoverSpendAsked?'<div class="dc-for"><div class="dc-forhead"><h2>Picked for you</h2><button class="link small" onclick="togglePersonalise()">Turn off</button></div><p class="small muted">Once Relay has found receipts from this year, picks from your spending show here.</p></div>':'<div class="dc-for"><div class="skel" style="height:220px;border-radius:20px"></div></div>';
  const kinds=discoverSpend.kinds.filter(k=>k.category!=="other").sort((a,b)=>b.share-a.share).slice(0,3).map(k=>Math.round(k.share*100)+"% "+String(k.label||"").toLowerCase());
  const picks=dcPicks(groups),pr=typeof RelayRecommendationEngine!=="undefined"?RelayRecommendationEngine.profile(personalisationHistory(),getTaps()):null;
- return '<div class="dc-for"><div class="dc-forhead"><h2>Picked for you</h2><span>'+(pr&&pr.headline?'<button class="link small" onclick="forgetTaste()">Forget my style</button> · ':'')+'<button class="link small" onclick="togglePersonalise()">Turn off</button></span></div><p class="dc-basis">From your '+discoverSpend.year+' spending: '+safe(kinds.join(", "))+'.'+(pr&&pr.headline?' '+safe(pr.headline):'')+'</p>'
-  +(picks.length?'<div class="dc-strip">'+picks.map(x=>dcCard(x.g,x.why.slice(0,2).join(" · "))).join("")+'</div>':'<p class="small muted" style="margin:6px 0 0">Nothing from shops on Relay matches what you buy yet. As more shops join, picks show up here.</p>')+'</div>'}
-function shopperDiscoverView(){return '<h1 class="title">Discover</h1><p class="sub">New from shops on Relay.</p>'+alertsRow()+marketRow()+'<div id="dcForYou"></div>'
+ return '<div class="dc-for"><div class="dc-forhead"><h2>Picked for you</h2><span>'+(pr&&pr.headline?'<button class="link small" onclick="forgetTaste()">Forget my style</button>':'')+'<button class="link small" onclick="togglePersonalise()">Turn off</button></span></div><p class="dc-basis">From your '+discoverSpend.year+' spending: '+safe(kinds.join(", "))+'.'+(pr&&pr.headline?' '+safe(pr.headline):'')+'</p>'
+  +(picks.length?'<div class="dc-strip">'+picks.map(x=>dcCard(x.g,x.why.slice(0,2).join("\n"))).join("")+'</div>':'<p class="small muted" style="margin:6px 0 0">Nothing from shops on Relay matches what you buy yet. As more shops join, picks show up here.</p>')+'</div>'}
+function shopperDiscoverView(){return '<div id="dcRoot"><h1 class="title">Discover</h1>'+dcShortcuts()+'<div id="dcForYou"></div>'
  +'<div class="dc-bar"><div class="dc-search" onclick="if(event.target===this)$(\'query\').focus()"><span class="dc-sic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span><input id="query" type="search" placeholder="Search" aria-label="Search products" oninput="renderCatalog()"><button type="button" class="dc-cam" id="dcCam" aria-label="Search by photo" onclick="photoSearch()"'+(photoShown()?'':' hidden')+'>'+ic("camera")+'</button></div><select id="filter" aria-label="Sort" onchange="renderCatalog()"><option value="all">'+(personalise?'For you':'Newest')+'</option><option value="low">Lowest price</option><option value="high">Highest price</option></select></div>'
- +'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div><div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div><div id="storeAlert"></div><div id="dcPreview"></div><div id="catalogResults" class="dc-grid"></div>'}
+ +'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div><div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div><div id="storeAlert"></div><div id="dcPreview"></div><div id="catalogResults" class="dc-grid"></div></div>'}
 // Search by photo (account.js): the camera shows once it's on, and always in Relay's testing tools (which say if it's off).
 function photoShown(){const A=window.RelayAccount;return !!(A&&A.photoAvailable&&A.signedIn&&A.signedIn()&&(A.photoAvailable()||testTools()))}
 function photoSearch(){const A=window.RelayAccount;if(A&&A.photoSearch)A.photoSearch({test:testTools(),web:webPreview()})}
@@ -635,6 +728,7 @@ function relaySearchFor(text){if(page!=="discover")go("discover");const q=$("que
 function checkedWhen(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return"recently";const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),n=(day(new Date())-day(d))/864e5,t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});return n<1?"today at "+t:n<2?"yesterday at "+t:"on "+d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})}
 function dcChip(label,on,attr){return '<button type="button" class="dc-chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" '+attr+'>'+label+'</button>'}
 function renderShopperCatalog(root){
+ {const r=$("dcRoot");if(r&&r.classList&&r.classList.remove)r.classList.remove("dc-detail")}
  if(personalise&&!discoverSpendAsked&&window.RelayAccount&&RelayAccount.spendProfile){discoverSpendAsked=true;RelayAccount.spendProfile().then(p=>{discoverSpend=p;if(page==="discover")renderCatalog()})}
  const query=($("query")?.value||"").trim().toLowerCase(),sort=$("filter")?.value||"all";
  const all=dcGroups(shownProducts());
@@ -645,7 +739,7 @@ function renderShopperCatalog(root){
  const kindCount=new Map();for(const g of inShop)kindCount.set(g.kind,(kindCount.get(g.kind)||0)+1);
  if(discoverKind!=="all"&&!kindCount.has(discoverKind))discoverKind="all";
  const shopsEl=$("dcShops"),kindsEl=$("dcKinds");
- if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>b[1]-a[1]).map(([n,c])=>dcChip(safe(n)+' <span>'+c+'</span>',sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
+ if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>b[1]-a[1]).map(([n])=>dcChip(safe(n),sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
  if(kindsEl)kindsEl.innerHTML=kindCount.size>1?dcChip("Everything",discoverKind==="all",'data-kind="all"')+[...kindCount.keys()].sort((a,b)=>(a==="other")-(b==="other")||kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
  let groups=inShop.filter(g=>(discoverKind==="all"||g.kind===discoverKind)&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
  const forYou=$("dcForYou");if(forYou)forYou.innerHTML=query||storeFilter!=="all"||discoverKind!=="all"?"":dcForYou(all);
@@ -670,19 +764,20 @@ function renderShopperCatalog(root){
 function webCheckoutUrl(p){try{const v=/:(\d{1,20})$/.exec(String(p.sku||""));if(!v||p.inStock===false)return null;const u=new URL(p.productUrl);return u.protocol==="https:"?u.origin+"/cart/"+v[1]+":1":null}catch(e){return null}}
 // A product's page: its picture, every size or colour with its stock, the price and Watch price.
 let dcListY=0;
-function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)return;if(!$("backToResults"))dcListY=window.scrollY;const g=dcGroups(shownProducts().filter(x=>sameStore(storeOf(x),storeOf(p))&&String(x.product).trim().toLowerCase()===String(p.product).trim().toLowerCase()))[0];
+function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)return;const fresh=!$("backToResults");if(fresh)dcListY=window.scrollY;const g=dcGroups(shownProducts().filter(x=>sameStore(storeOf(x),storeOf(p))&&String(x.product).trim().toLowerCase()===String(p.product).trim().toLowerCase()))[0];
  const on=!!watch[sku],stock=liveStock(p);
  const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
  const web=p.provider==="web"&&/^https:\/\//.test(String(p.productUrl||"")),shop=safe(storeOf(p));
  const checkout=web?webCheckoutUrl(p):null;
  const act=web?'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>'
-  :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching · tap to stop':ic("bell")+' Watch price')+'</button>';
+  :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
  const note=web?(checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
- box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="link" data-back id="backToResults">'+ic("back")+' Back</button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
+ {const r=$("dcRoot");if(r&&r.classList&&r.classList.add)r.classList.add("dc-detail")}
+ box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
  box.querySelectorAll("[data-size]").forEach(b=>b.onclick=()=>chooseSku(b.dataset.size));
- box.scrollIntoView({behavior:"smooth",block:"start"});
+ if(fresh)window.scrollTo(0,0);
 }
 function renderCatalog(){
  const root=$("catalogResults");if(!root)return;
@@ -912,7 +1007,7 @@ function profileView(){
  if(ready?!acct.signedIn():!hasSession())return '<h1 class="title">Welcome to Relay</h1><div class="card welcome-card"><h2>Everything you buy, in one place.</h2><p class="sub">Relay finds the receipts in your Gmail or Outlook, keeps track of return deadlines and tells you when prices drop.</p><button class="darkbtn" onclick="window.RelayAccount?RelayAccount.open():location.reload()">Sign in or create an account</button><p class="small muted" style="margin:12px 0 0">No password needed.</p></div>'+toolsCard();
  // Signed in, but the account code is still loading: show the page's shape and fill it in a moment.
  if(!ready){profileWaitStart=profileWaitStart||Date.now();if(Date.now()-profileWaitStart>12000)return '<h1 class="title">Home</h1><div class="card"><h2>Couldn&#39;t load your account</h2><p class="sub">Check your connection, then reload Relay.</p><button class="darkbtn" onclick="location.reload()">Reload</button></div>';if(typeof setTimeout==="function")setTimeout(()=>{if(page==="profile")render()},120);return '<h1 class="title">Home</h1><div class="skel" style="height:120px;border-radius:22px"></div><div class="skel" style="height:160px;border-radius:22px"></div>'}
- return '<h1 class="title" id="homeHello">'+safe(homeHello())+'</h1>'+
+ return '<p class="home-hello" id="homeHello">'+safe(homeHello())+'</p><h1 class="title home-title">Home</h1>'+
   '<div id="walletPage"></div>'+
   homeTiles()+toolsCard();
 }

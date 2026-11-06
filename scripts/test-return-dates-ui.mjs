@@ -124,7 +124,7 @@ assert.equal(await page.locator(".rl-next").count(), 0, "no countdown strip for 
 console.log("ok - wallet: the kettle from a food order (not the food), the order with no return wording, the '30 days' order; not a passed worked-out date; no made-up countdowns");
 
 // 2. The kettle's page: the food can't go back, the kettle can; the date is counted from the order date, and it says so.
-await kettle.getByRole("button", { name: "Details" }).click();
+await kettle.click();
 const sheet = page.locator(".rl-sheet");
 await sheet.getByText("The food can't go back, but you can usually return the Glass Kettle 1.7L.").waitFor();
 assert.equal(await sheet.getByText("Usually can't be returned").count(), 0, "not the blanket 'can't be returned' label");
@@ -135,13 +135,13 @@ await polished("food order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 3. The trainers: the same safe date, worded the same way.
-await wallet.locator(".rl-po").filter({ hasText: "Court Classic Trainers" }).getByRole("button", { name: "Details" }).click();
+await wallet.locator(".rl-po").filter({ hasText: "Court Classic Trainers" }).click();
 await sheet.getByText("No return date in Kick Lane's email", { exact: true }).waitFor();
 await sheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders. Relay adds the date once it arrives. Kick Lane may give longer.").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 4. The shirt: "30 days to return", counted from the order date.
-await wallet.locator(".rl-po").filter({ hasText: "Linen Shirt" }).getByRole("button", { name: "Details" }).click();
+await wallet.locator(".rl-po").filter({ hasText: "Linen Shirt" }).click();
 await sheet.getByText("30 days to return", { exact: true }).waitFor();
 await sheet.getByText("Studio North's email doesn't say from when. Counting from your order, that's until at least " + wdDay(day(20)) + ".").waitFor();
 await polished("window order page");
@@ -149,7 +149,7 @@ await sheet.getByRole("button", { name: "Close" }).click();
 // 4b. The lamp: delivered, so the legal minimum's date is given, beside the delivery it counts from (and still no countdown).
 const lamp = wallet.locator(".rl-po").filter({ hasText: "Desk Lamp" });
 assert.ok(!/return by|days? left/i.test(await lamp.innerText()), "no countdown on the card: " + await lamp.innerText());
-await lamp.getByRole("button", { name: "Details" }).click();
+await lamp.click();
 await sheet.getByText("No return date in Fernway's email", { exact: true }).waitFor();
 await sheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders: it arrived " + wdDay(day(-2)) + ", so until at least " + wdDay(day(12)) + ". Fernway may give longer.").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
@@ -158,7 +158,7 @@ console.log("ok - each page says what the email gives: no date (and what UK law 
 // 4c. The trousers: the shop's own policy, dated from the delivery as the least it allows for most items, with its link.
 const trousers = wallet.locator(".rl-po").filter({ hasText: "Cord Trousers" });
 assert.ok(!/return by|days? left/i.test(await trousers.innerText()), "a policy is never a countdown: " + await trousers.innerText());
-await trousers.getByRole("button", { name: "Details" }).click();
+await trousers.click();
 await sheet.getByText("30 days to return most items", { exact: true }).waitFor();
 await sheet.getByText("Moorvale's returns policy gives 30 days from delivery for most items. It arrived " + wdDay(day(-3)) + ", so that's until at least " + wdDay(day(27)) + ".").waitFor();
 const policyLink = sheet.getByRole("link", { name: "Read Moorvale's returns policy" });
@@ -168,13 +168,13 @@ assert.ok(!/days? left|Return by|No return date|UK law/.test(await sheet.innerTe
 await polished("policy order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 // 4d. The scarf: a policy counted from when it's sent, so the least it can be is counted from the order.
-await wallet.locator(".rl-po").filter({ hasText: "Silk Scarf" }).getByRole("button", { name: "Details" }).click();
+await wallet.locator(".rl-po").filter({ hasText: "Silk Scarf" }).click();
 await sheet.getByText("Pellow's returns policy gives 30 days from when it's sent for most items. Counting from your order, that's until at least " + wdDay(day(26)) + ".").waitFor();
 await sheet.getByRole("link", { name: "Read Pellow's returns policy" }).waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 // 4e. The throw: bought in the shop's Christmas dates, so the extension's date.
 const dmy = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-await wallet.locator(".rl-po").filter({ hasText: "Wool Throw" }).getByRole("button", { name: "Details" }).click();
+await wallet.locator(".rl-po").filter({ hasText: "Wool Throw" }).click();
 await sheet.getByText("28 days to return most items", { exact: true }).waitFor();
 await sheet.getByText("Brindle's returns policy gives 28 days from purchase for most items. Bought between " + dmy(day(-20)) + " and " + dmy(day(30)) + ", so it can go back until at least " + wdDay(day(60)) + ".").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();

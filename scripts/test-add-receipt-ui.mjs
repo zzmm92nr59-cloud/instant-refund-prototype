@@ -219,7 +219,7 @@ assert.deepEqual(errors, [], "no page errors");
 console.log("ok - forwarding names the inbox Relay reads (Copy works); See it in Receipts goes there");
 
 // 8. From the Receipts page: "Missing a receipt? Add it" opens the same page over Receipts, with a Back button.
-await page.getByRole("button", { name: "Missing a receipt? Add it" }).click();
+await page.getByRole("button", { name: "Add a missing receipt" }).click();
 const sheet = page.locator(".rl-sheet");
 await sheet.getByRole("heading", { name: "Add a receipt" }).waitFor();
 await sheet.locator("#rl-ar-q").waitFor();

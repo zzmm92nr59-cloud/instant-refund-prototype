@@ -56,8 +56,10 @@ const lulu = wallet.locator(".rl-po", { hasText: "Align High-Rise Pant" });
 await lulu.waitFor();
 
 // 1. Start return: what the shop's page asks for, ready to copy.
-await lulu.getByRole("button", { name: "Start return" }).click();
+// (The card opens its page; Start return is its main button.)
+await lulu.click();
 const sheet = page.locator(".rl-sheet");
+await sheet.getByRole("button", { name: "Start return" }).click();
 await sheet.getByRole("heading", { name: "Return to lululemon" }).waitFor();
 await sheet.getByText(/^Send it back by /).waitFor();
 const order = sheet.getByRole("button", { name: "Copy your order number, 1234567890" });
@@ -87,15 +89,17 @@ await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - the shop's returns page opens with the order number copied, and Relay says what happens next");
 
 // The email address offered is the one the shop sent the order to (here a Hide My Email address).
-await wallet.locator(".rl-po", { hasText: "Long Jacket" }).getByRole("button", { name: "Start return" }).click();
+await wallet.locator(".rl-po", { hasText: "Long Jacket" }).click();
+await sheet.getByRole("button", { name: "Start return" }).click();
 await sheet.getByRole("button", { name: "Copy your email address, quiet_fox_12@privaterelay.appleid.com" }).waitFor();
 assert.equal(await sheet.getByRole("button", { name: /^Copy your email address/ }).count(), 1, "one address: the one the shop knows");
 await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - the email address offered is the one the order was sent to");
 
-// 3. The shop's return email has arrived: the card's main button shows the QR code from it.
+// 3. The shop's return email has arrived: the main button on the card's page shows the QR code from it.
 const kl = wallet.locator(".rl-po", { hasText: "Court Classic Trainers" });
-await kl.getByRole("button", { name: "Show return QR code" }).click();
+await kl.click();
+await page.locator(".rl-sheet").getByRole("button", { name: "Show return QR code" }).click();
 await page.locator(".rl-sheet").getByRole("heading", { name: "Your return QR code" }).waitFor();
 const qr = page.frameLocator('iframe[title="Original receipt email"]').locator("img[alt='QR code']");
 await qr.waitFor();

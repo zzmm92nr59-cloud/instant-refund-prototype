@@ -123,7 +123,11 @@ assert.equal(await page.evaluate(() => sessionStorage.getItem("relay.addingInbox
 await page.goto(origin + "/index.html#outlook=added");
 await page.getByText("Outlook inbox added. Relay is reading it now, and its receipts appear here in a few minutes.").waitFor();
 assert.equal(await page.evaluate(() => sessionStorage.getItem("relay.addingInbox")), null, "the note is used once");
-await page.getByText("2 inboxes connected", { exact: false }).waitFor();
+// (Receipts no longer says how many inboxes are connected: Email connection in Profile lists them.)
+await profile(); await mailPage();
+await page.locator(".rl-ibx-row").nth(1).waitFor();
+assert.equal(await page.locator(".rl-ibx-row").count(), 2, "both inboxes are listed");
+await page.getByRole("button", { name: "Back to Profile" }).click();
 // Already connected, and not added (cancelled at Google).
 await page.goto(origin + "/index.html#gmail=already_connected");
 await page.getByText("That inbox is already connected to Relay.").waitFor();
