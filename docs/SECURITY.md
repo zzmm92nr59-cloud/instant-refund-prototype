@@ -31,6 +31,8 @@ Written for whoever works on Relay next, person or AI: keep it true when the cod
 | **App reviewer** | A shopper signed in with the reviewer sign-in (below): a made-up address and a code that stays the same while it's on. |
 | **Shop** | The shop's Relay key (`rk_...`), given when the shop connects with Square or Shopify (or opens Relay inside Shopify admin). Relay keeps only a keyed hash of it. |
 | **Shopify, Square** | Webhooks signed with the shared secret (HMAC); unsigned or wrongly signed ones are refused. |
+| **Google (Gmail notices)** | `/relay/webhooks/gmail`: a token Google signs for the Pub/Sub subscription's service account (OpenID Connect, RS256), checked against Google's published keys, Relay's own address as the audience, `GMAIL_PUSH_SERVICE_ACCOUNT`, and its dates. Anything else is refused (401). `worker/mail-push.js`. |
+| **Microsoft (Outlook notices)** | `/relay/webhooks/outlook` and `/outlook/lifecycle`: each notice must carry the secret (`clientState`) Relay chose for that subscription. Relay keeps only its SHA-256 hash; a notice without it is ignored. |
 | **Relay's scheduled jobs** | Cloudflare's cron triggers. They aren't reachable over the web at all. |
 
 ### Two-step sign-in for everyone
@@ -55,7 +57,7 @@ found" (404) where even saying it exists would tell too much.
 |---|---|---|---|---|---|---|
 | Sign in, sign out | Start and finish sign-in | Sign out; sign out other devices | As a shopper | | | Tidy old text-message records |
 | Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
-| Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | | Read connected inboxes for new receipts (every 15 min) |
+| Email connections (Gmail, Outlook) | | Own: connect up to 5, disconnect, withdraw permission | As a shopper | | Google and Microsoft (not Shopify or Square): say that a connected inbox has new mail (signed, or with the subscription's secret), which makes Relay read that inbox's newest mail with the usual reader. A notice says which inbox, never anything about an email | Read connected inboxes for new receipts (every 15 min); set up and renew each inbox's Gmail watch or Outlook subscription; read inboxes whose notices are waiting |
 | Receipts and their pictures | | Own: list, add (search, paste), confirm, hide, change category, mark items, tag as a gift (and who for), fix what was read wrong, reminders, open the original email | As a shopper | | | Return reminders |
 | Purchases at connected shops | | Own (matched by verified email hash): list (orders from Relay's own test shops, Square's sandbox and Shopify development stores, only with `?test=1`, which the app sends only with its testing tools on), return, swap. Swap with another shop (`/relay/my/cross-swap`): starts the return at the first shop, after the second shop's own Shopify confirms the item is for sale at the price the shopper agreed; answers with the second shop's checkout link, which carries nothing about the shopper. Relay places no order and takes no money. Real shops only swap with real shops, test shops with test shops, and only to a shop that tells Relay about its paid orders. The second shop's order is matched only by the shopper's own verified email. The shopper can stop their own swap while it waits (`/relay/my/cross-swap/<id>/cancel`); the return goes ahead | As a shopper | Sees counts only, never who | Shopify reports paid orders and refunds (signed), and asks for erasure | Catch up Square orders and refunds; erase a shop's orders 30 days after it removed Relay if Shopify's erase request never came |
 | Delivery details and shops' checkouts (`/relay/my/delivery`, `/relay/my/delivery/remove`, `/relay/my/web-checkout`, `/relay/my/address-lookup`) | | Own: find the addresses at a UK postcode (Find address: only the postcode goes to Ideal Postcodes; 20 lookups a day each and 400 a day across everyone, counted without the postcode and kept two days; off until `IDEAL_POSTCODES_KEY` is set); keep one UK delivery address (name, address, postcode, a phone number for the courier), change it, remove it. Start a checkout at a shop in Relay's own list of shops' websites (`worker/web-shops.js`), never an address the app sends: that shop gets the shopper's email and address so its checkout is filled in, and the shopper pays there (40 a day; each one noted, and listed in Download my data). Relay never takes payment | As a shopper | | | |
@@ -124,8 +126,10 @@ webhooks. Ownership of purchases, swaps, returns, resale and inboxes is also tes
 - Over a limit, Relay answers `429` with `{"error":"too_many_requests","retryAfterMs":...}` and a `Retry-After` header. The
   app already shows plain English for it ("Too many attempts. Please try again later." on sign-in; elsewhere "Couldn't …
   Please try again", and inbox reading backs off and carries on in the background).
-- Shopify's and Square's webhooks aren't limited (they're signed, and their senders retry in bursts). Nor is the
-  browser's preflight check.
+- Shopify's and Square's webhooks aren't limited (they're signed, and their senders retry in bursts). Nor are Gmail's
+  and Outlook's new-mail notices (signed by Google, or carrying the subscription's secret; they come in bursts from a few
+  of Google's and Microsoft's addresses for every shopper at once), nor the browser's preflight check. Their bodies are
+  read only up to 64 KB, and only the fields Relay uses are read from them.
 - Counting uses Cloudflare's Rate Limiting binding (`[[ratelimits]]` in `worker/wrangler.toml`), which counts per
   Cloudflare location and is approximate by design. Without the binding, a counter in the Worker's memory stands in. If
   counting fails, the request goes ahead rather than locking everyone out.
@@ -191,6 +195,10 @@ Where each one lives:
 | `AWIN_API_TOKEN` | Reading affiliate product feeds | Cloudflare secret | Awin → API credentials → new token; `wrangler secret put` | Nothing |
 | `ANTHROPIC_API_KEY` | The help chat's AI assistant and AI help with receipts (both off until it's set) | Cloudflare secret | Claude Console → API keys → create a key; `wrangler secret put`; delete the old one | Nothing. Removing it turns both off; "Contact us" by email still works, and receipts are read by Relay's own rules as before. `AI_READER=off` turns off AI help alone |
 | `CLOUDFLARE_API_TOKEN` | Lets GitHub deploy the Worker | GitHub secret | Cloudflare → My Profile → API Tokens → roll; update the GitHub secret | Nothing |
+
+`GMAIL_PUSH_TOPIC` and `GMAIL_PUSH_SERVICE_ACCOUNT` (instant Gmail notices, `docs/MAIL_PUSH_SETUP.md`) aren't secrets:
+they name Relay's Pub/Sub topic and the service account its notices are signed for. What stops a fake notice is Google's
+signature, which only Google can make.
 
 ### `AUTH_SECRET` is special
 

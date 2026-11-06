@@ -22,6 +22,8 @@ import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSumma
 import { AI_READS_SQL, AI_SETTING_SQL, attachAiReads } from "./ai-reader.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
+// Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
+import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
 import { ensurePushTables, subsOf, sendPush } from "./push.js";
@@ -275,15 +277,33 @@ function ensureAutoColumns(db) {
     }
   });
 }
+// Instant email (mail-push.js), kept with each inbox so it moves with it: when its Gmail watch or Outlook subscription
+// lapses (push_expires_at), Outlook's subscription id and a hash of its secret (push_ref, push_secret), how far Gmail's
+// history has been read (push_history), when a notice last came (push_at) and when it was last read for one (push_scan_at),
+// a second look Gmail sometimes needs (push_recheck_at), the one read allowed at a time (push_lease), and the last set-up try.
+export function ensurePushColumns(db) {
+  return ensureOnce(db, "mail-push", async () => {
+    for (const col of ["push_expires_at INTEGER", "push_ref TEXT", "push_secret TEXT", "push_history TEXT", "push_at INTEGER", "push_scan_at INTEGER",
+      "push_recheck_at INTEGER", "push_lease INTEGER", "push_tried_at INTEGER", "push_error TEXT"]) {
+      try { await db.prepare("ALTER TABLE gmail_connections ADD COLUMN " + col).run(); } catch { /* already there */ }
+    }
+    // Each notice finds its inbox by address (Gmail) or subscription (Outlook) without reading every connection.
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_gmail_connections_address ON gmail_connections(lower(google_email))").run();
+    await db.prepare("CREATE INDEX IF NOT EXISTS idx_gmail_connections_push_ref ON gmail_connections(push_ref)").run();
+  });
+}
 export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
   if (!env.RELAY_DB) return { checked: 0 };
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
+  await ensurePushColumns(env.RELAY_DB);
+  // An inbox being read for a new-mail notice right now (mail-push.js) waits for the next round.
   const rows = ((await env.RELAY_DB.prepare(
     `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
      WHERE EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
        AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
-     ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION).all()).results || []);
+       AND (g.push_lease IS NULL OR g.push_lease < ?)
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT 3`).bind(CONSENT_VERSION, now).all()).results || []);
   let passes = 0, calls = 0;
   const out = [];
   for (const r of rows) {
@@ -420,10 +440,24 @@ async function mailToken(env, shopperId, row, fetchImpl) {
   }
   return t.access;
 }
+// For instant email (mail-push.js): an access token for one inbox, or null when it has to be connected again.
+export async function accessTokenFor(env, boxId, fetchImpl) {
+  const row = await env.RELAY_DB.prepare("SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
+  if (!row) return null;
+  const token = await mailToken(env, boxId, row, fetchImpl).catch(() => null);
+  return token ? { token, provider: row.provider === "microsoft" ? "microsoft" : "google" } : null;
+}
+// A notice said this inbox has new mail: its newest few days are read at once, by the same reader, with the same rules and
+// the same search as every other read (so nothing beyond receipts, orders, returns and parcel emails is opened).
+export function scanNewMail(env, boxId, fetchImpl, now) {
+  return scan(env, boxId, fetchImpl, now, "", false, { recent: true, sinceMs: now - 2 * DAY_MS, span: 3, budget: 60, maxFetch: 15 });
+}
 
 // Tells Google to cancel Relay's access to the shopper's Gmail. Microsoft has no equivalent call: the shopper removes
 // Relay from their Microsoft account's app list, and the stored token is deleted either way.
+// Before that, the inbox's instant-email watch (Gmail) or subscription (Outlook) is ended while Relay can still ask.
 export async function revokeMailbox(env, shopperId, fetchImpl) {
+  try { await stopMailPush(env, shopperId, fetchImpl); } catch { /* it lapses on its own within 7 days */ }
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   let revoked = false;
@@ -818,7 +852,8 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   const limitDay = yr ? yr + "/01/01" : ymd(sinceLast);
   const top = yr ? (yr + 1) + "/01/01" : ymd(now + DAY_MS);
   let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= top && cursorIn > limitDay ? cursorIn : top;
-  let incomplete = false, windows = 0, outOfBudget = false, span = WINDOW_DAYS;
+  // A read for a new-mail notice lists only the last few days (o.span) rather than a whole month.
+  let incomplete = false, windows = 0, outOfBudget = false, span = o.span || WINDOW_DAYS;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
     if (calls + 4 > budget) { outOfBudget = true; break; }
     const afterD = ymd(fromYmd(before) - span * DAY_MS);
@@ -1639,14 +1674,22 @@ export async function saveConnection(env, shopperId, provider, address, refreshT
   const enc = await encrypt(env, refreshToken);
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
+  await ensurePushColumns(env.RELAY_DB);
   const same = "gmail_connections.provider IS excluded.provider AND gmail_connections.google_email IS excluded.google_email";
+  // A different mailbox in this place gets its own instant-email watch or subscription (mail-push.js sets one up within a
+  // minute); the old one's notices no longer match anything and it lapses on its own. The same mailbox keeps its own.
   await env.RELAY_DB.prepare(
     `INSERT INTO gmail_connections (shopper_id,google_email,token_iv,token_data,connected_at,provider) VALUES (?,?,?,?,?,?)
      ON CONFLICT(shopper_id) DO UPDATE SET google_email=excluded.google_email, token_iv=excluded.token_iv,
        token_data=excluded.token_data, connected_at=excluded.connected_at, provider=excluded.provider,
        last_scan_at=CASE WHEN ${same} THEN gmail_connections.last_scan_at END,
        auto_cursor=CASE WHEN ${same} THEN gmail_connections.auto_cursor END,
-       full_rev=CASE WHEN ${same} THEN gmail_connections.full_rev END`)
+       full_rev=CASE WHEN ${same} THEN gmail_connections.full_rev END,
+       push_expires_at=CASE WHEN ${same} THEN gmail_connections.push_expires_at END,
+       push_ref=CASE WHEN ${same} THEN gmail_connections.push_ref END,
+       push_secret=CASE WHEN ${same} THEN gmail_connections.push_secret END,
+       push_history=CASE WHEN ${same} THEN gmail_connections.push_history END,
+       push_tried_at=NULL, push_error=NULL`)
     .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
   // The first read starts straight away on Relay's side, so it happens even if the shopper closes the app at once.
   await startScanJob(env, shopperId, now, { restart: true });
@@ -1758,17 +1801,21 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
   }
   if (path === "/relay/my/gmail" && m === "GET") {
+    // instant: Gmail or Outlook tells Relay the moment this inbox gets new mail (mail-push.js), so the app doesn't say "every
+    // 15 minutes". Only while the watch or subscription is in force and Relay is set up to hear it.
+    const now = (opts && opts.now) || Date.now();
+    const instant = x => Boolean(x.push_expires_at && x.push_expires_at > now && (x.provider === "microsoft" ? outlookPushOn(env) : gmailPushOn(env)));
     const c = await env.RELAY_DB.prepare(
       "SELECT * FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first()
       .then(x => x && { provider: x.provider === "microsoft" ? "microsoft" : "google", googleEmail: x.google_email, email: x.google_email,
-        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null });
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, instant: instant(x) });
     // A scan in progress (or just finished), so the app can show it carrying on after the shopper comes back.
     const scanJob = c ? jobView(await jobOf(env, shopper.id)) : null;
     // Other inboxes, each with how its reading is going.
     const others = c ? await Promise.all((await inboxesOf(env.RELAY_DB, shopper.id)).filter(x => x.shopper_id !== shopper.id).map(async x => {
       const j = jobView(await jobOf(env, x.shopper_id));
       return { mailbox: slotOf(x.shopper_id), provider: x.provider === "microsoft" ? "microsoft" : "google", email: x.google_email,
-        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, ...(j ? { scan: j } : {}) };
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, instant: instant(x), ...(j ? { scan: j } : {}) };
     })) : [];
     return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}), others, maxInboxes: MAX_INBOXES }, 200, cors);
   }
