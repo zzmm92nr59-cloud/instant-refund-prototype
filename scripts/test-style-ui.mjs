@@ -63,7 +63,7 @@ await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 // Discover: picks are off until the shopper turns them on. Then they come from the year's spending (from Wrapped: 89% fashion
 // here), the shops they buy from and their sizes from receipts, and each pick says why it's there.
 await page.evaluate(() => window.go("discover"));
-await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
+await page.locator(".dc-invite", { hasText: "Picks for you" }).waitFor();
 await page.locator(".dc-invite").getByRole("button", { name: "Turn on" }).click();
 const panel = page.locator(".dc-for");
 await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
@@ -92,7 +92,7 @@ await panel.getByRole("button", { name: "Forget my style" }).click();
 await page.waitForTimeout(200);
 assert.doesNotMatch(await panel.locator(".dc-basis").innerText(), /sporty/);
 await panel.getByRole("button", { name: "Turn off" }).click();
-await page.locator(".dc-invite", { hasText: "Picks from what you spend" }).waitFor();
+await page.locator(".dc-invite", { hasText: "Picks for you" }).waitFor();
 // Sizes read in their natural order, and the ladder's two sizes are one product.
 assert.equal(await page.locator("#catalogResults [data-card-select]", { hasText: "Aluminium Step Ladder" }).count(), 1);
 assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Aluminium Step Ladder" }).locator(".dc-opts").innerText(), "3 step, 5 step");
@@ -113,7 +113,7 @@ assert.equal(homePicks.filter(p => p[0] === "Home and Garden" || p[0] === "Hamme
 assert.deepEqual(homePicks.filter(p => p[0] === "Kick Lane").map(p => p[1]), ["Court Classic Trainers"], "one pick for the 10% spent on fashion");
 assert.ok(homePicks.every(p => ["Home and Garden", "Hammer & Home", "Kick Lane"].includes(p[0]) && homePicks.filter(q => q[0] === p[0]).length <= 3), "at most three from one shop");
 assert.match(homePicks[0][2], /^You spend most on home & garden/);
-assert.equal(homePicks.find(p => p[1] === "Court Classic Trainers")[2], "10% of your spending is fashion · You buy from Kick Lane");
+assert.equal(homePicks.find(p => p[1] === "Court Classic Trainers")[2], "10% of your spending is fashion\nYou buy from Kick Lane");
 assert.deepEqual((await page.locator("#catalogResults [data-card-select] h3").allInnerTexts()).slice(0, 5).sort(), homePicks.slice(0, 5).map(p => p[1]).sort(), "the list below starts the same way");
 await page.waitForTimeout(1300);
 await page.screenshot({ path: "/tmp/shots/discover-home-picks.png", fullPage: false });

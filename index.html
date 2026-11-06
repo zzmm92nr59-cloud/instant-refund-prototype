@@ -168,7 +168,7 @@ body.typing .footnav,body.typing .nextup{display:none}
 .dc-invite-on:active{transform:scale(.96)}
 @media (prefers-color-scheme:dark){.dc-invite-on{background:#c7f567;color:#101828}}
 .dc-for{background:var(--rl-card);color:var(--rl-text);border-radius:20px;padding:16px;margin:0 0 14px}
-.dc-for h2{font-size:20px;font-weight:700;margin:0}
+.dc-for h2{font-size:20px;font-weight:700;margin:0;color:var(--rl-text)}
 .dc-basis{color:var(--rl-text2);font-size:14px;margin:4px 0 12px}
 .dc-for .link{color:var(--rl-accent);font-size:15px}
 .dc-forhead>span{display:flex;gap:14px}
@@ -209,7 +209,7 @@ body.typing .footnav,body.typing .nextup{display:none}
 .dc-page .price{font-size:22px;font-weight:600;margin:0 0 2px}
 .dc-page .dc-sizes{margin:16px 0 4px}
 .dc-size{border:0;background:var(--rl-fill);border-radius:12px;font-size:15px;font-weight:600}
-.dc-size.on{background:var(--rl-text);color:var(--rl-bg)}
+.dc-size.on,.dc-size.on.out{background:var(--rl-text);color:var(--rl-bg)}
 .dc-size.out{color:var(--rl-text2)}.dc-size span{font-weight:500}
 .dc-page .actions{margin-top:18px;display:flex;flex-direction:column;gap:10px}
 .dc-page .actions>*{width:100%;box-sizing:border-box;justify-content:center;min-height:50px;font-size:17px}
@@ -456,7 +456,7 @@ async function checkSandboxBank(){
 }
 function navRender(){const lit=demo||(testing&&page==="wallet")?page:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key)+'</span>'+name+'</button>').join("");relayBadge()}
 // Returns due in the next three days, as a red number on the Home tab (account.js counts them), the way a phone shows it.
-function relayBadge(){const n=Number(window.__relayDue)||0;for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector('[data-tab="profile"]');if(!b)continue;let t=b.querySelector(".tab-badge");
+function relayBadge(){const n=Number(window.__relayDue)||0;for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector&&nav.querySelector('[data-tab="profile"]');if(!b||!b.querySelector)continue;let t=b.querySelector(".tab-badge");
  if(!n||demo){if(t)t.remove();b.removeAttribute("aria-label");continue}
  if(!t){t=document.createElement("span");t.className="tab-badge";t.setAttribute("aria-hidden","true");(b.querySelector(".ico,.nico")||b).appendChild(t)}
  t.textContent=n>9?"9+":String(n);b.setAttribute("aria-label",b.dataset.name+", "+n+(n===1?" return":" returns")+" due soon")}}
@@ -728,7 +728,7 @@ function relaySearchFor(text){if(page!=="discover")go("discover");const q=$("que
 function checkedWhen(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return"recently";const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),n=(day(new Date())-day(d))/864e5,t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});return n<1?"today at "+t:n<2?"yesterday at "+t:"on "+d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})}
 function dcChip(label,on,attr){return '<button type="button" class="dc-chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" '+attr+'>'+label+'</button>'}
 function renderShopperCatalog(root){
- {const r=$("dcRoot");if(r)r.classList.remove("dc-detail")}
+ {const r=$("dcRoot");if(r&&r.classList&&r.classList.remove)r.classList.remove("dc-detail")}
  if(personalise&&!discoverSpendAsked&&window.RelayAccount&&RelayAccount.spendProfile){discoverSpendAsked=true;RelayAccount.spendProfile().then(p=>{discoverSpend=p;if(page==="discover")renderCatalog()})}
  const query=($("query")?.value||"").trim().toLowerCase(),sort=$("filter")?.value||"all";
  const all=dcGroups(shownProducts());
@@ -772,7 +772,7 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  const act=web?'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>'
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
  const note=web?(checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
- {const r=$("dcRoot");if(r)r.classList.add("dc-detail")}
+ {const r=$("dcRoot");if(r&&r.classList&&r.classList.add)r.classList.add("dc-detail")}
  box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};

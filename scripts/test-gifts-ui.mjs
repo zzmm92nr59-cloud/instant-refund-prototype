@@ -122,7 +122,7 @@ await page.getByRole("button", { name: "All groups" }).click();
 await page.getByRole("button", { name: "Gifts, 3 gifts" }).click();
 await page.getByRole("heading", { name: "Gifts", exact: true }).waitFor();
 const hero = page.locator(".rl-cat-hero");
-assert.match(await hero.innerText(), /3 gifts · £425\.00 spent/);
+assert.match(await hero.innerText(), /£425\.00 across 3 gifts since /);
 assert.equal(await hero.evaluate(n => getComputedStyle(n).color), "rgb(16, 24, 40)", "navy on the lime page header");
 const chips = page.locator(".rl-cat-chips button");
 assert.deepEqual(await chips.allInnerTexts(), ["All", "Dad", "Mum", "Sam"], "a filter for each person");

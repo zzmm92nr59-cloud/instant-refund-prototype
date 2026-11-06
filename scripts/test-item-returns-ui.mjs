@@ -29,7 +29,8 @@ await wallet.getByText("Flared Pant").waitFor();
 await wallet.getByText("Cropped Tee").waitFor();
 assert.equal(await wallet.getByText("1 of 2 in this order").count(), 2, "each item of the order has its own card");
 assert.equal(await wallet.getByText("Rain Jacket").count(), 0, "an order with a return in progress waits until Relay knows which items");
-await wallet.locator(".rl-po", { hasText: "Cropped Tee" }).getByRole("button", { name: "I'm sending this back" }).click();
+await wallet.locator(".rl-po", { hasText: "Cropped Tee" }).click();
+await page.locator(".rl-sheet").getByRole("button", { name: "I'm sending this back" }).click();
 await page.waitForFunction(() => !document.querySelector("#walletPage").innerText.includes("Cropped Tee"));
 assert.deepEqual(posts[0], [order.id, { items: [{ index: 1, status: "returning" }] }]);
 await wallet.getByText("Flared Pant").waitFor();
@@ -48,7 +49,8 @@ await ret.locator(".rl-po", { hasText: "Rain Jacket" }).getByText("Sent back, on
 assert.deepEqual(posts[1], [other.id, { items: [{ index: 0, status: "returning" }] }]);
 await page.screenshot({ path: "/tmp/shots/items-returns.png", fullPage: true });
 // Changed your mind: the item goes back to the wallet.
-await ret.locator(".rl-po", { hasText: "Cropped Tee" }).getByRole("button", { name: "Not sending this back" }).click();
+await ret.locator(".rl-po", { hasText: "Cropped Tee" }).click();
+await page.locator(".rl-sheet").getByRole("button", { name: "Not sending this back" }).click();
 await page.waitForFunction(() => !document.querySelector("#returnsPage").innerText.includes("Cropped Tee"));
 await page.evaluate(() => window.go("wallet"));
 await wallet.getByText("Cropped Tee").waitFor();

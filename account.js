@@ -842,10 +842,12 @@
     ".rl-chat-b.bot p{border:0}.rl-chat-bar{border:0;background:var(--rl-glass);-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}" +
     ".rl-chat-person{border:0!important;background:none!important;color:var(--rl-accent)!important;margin-top:4px}" +
     // Swap & resell listings: name and price, shop and size, then tags, without a border.
-    ".rl-mk-card{border:0;display:block;padding:14px 16px}.rl-mk-card>*{display:block}.rl-mk-from{margin-top:2px}.rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}" +
+    ".rl-mk-card{border:0;display:block;padding:14px 16px}.rl-mk-card>*{display:block}.rl-mk-card>[hidden]{display:none!important}.rl-mk-from{margin-top:2px}.rl-mk-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}" +
     ".rl-mk-top b{font-size:17px;font-weight:600}.rl-mk-price{font-size:17px;font-weight:600;white-space:nowrap;color:var(--rl-text)}.rl-mk-from{font-size:15px;color:var(--rl-text2)}" +
     ".rl-mk-card>.rl-mk-top,.rl-mk-card>.rl-mk-tags{display:flex}.rl-mk-tags{flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rl-mk-tag{font-size:13px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text)}" +
-    ".rl-mk-card .rl-btn{margin-top:6px}.rl-mk-card .rl-mk-report{margin-top:0;font-size:15px;color:var(--rl-text2)}";
+    ".rl-mk-card .rl-mk-top .rl-mk-price{color:var(--rl-text)}.rl-mk-card>.rl-mk-near{display:inline-flex}" +
+    ".rl-mk-acts{display:flex;gap:8px;margin-top:10px}.rl-mk-acts .rl-btn{flex:1;margin:0;min-height:48px;padding:12px 10px;font-size:16px}" +
+    ".rl-mk-card .rl-mk-select:not([hidden]){display:block;margin-top:8px}.rl-mk-card .rl-mk-report{margin-top:4px;font-size:15px;color:var(--rl-text2)}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -3519,16 +3521,22 @@
             card.appendChild(el("span", { className: "rl-mk-status", text: "You asked about this: " + said(l.myRequest.status).toLowerCase() + "." }));
             if (l.myRequest.status === "accepted") card.appendChild(el("button", { type: "button", className: "rl-btn", text: "Message the seller", onclick: function () { openChat(l.myRequest.id); } }));
           } else {
+            // The two asks side by side; for a swap, the first tap shows what you'd offer, the second sends it.
+            var acts = el("div", { className: "rl-mk-acts" }); card.appendChild(acts);
             var add = function (label, kind) {
               var btn = el("button", { type: "button", className: "rl-btn" + (kind === "buy" ? "" : " ghost"), text: label, onclick: function () {
                 if (btn.disabled) return;
                 var pick = card.querySelector("select");
                 var b = { kind: kind };
-                if (kind === "swap") { if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true); b.offeredListingId = pick.value; }
+                if (kind === "swap") {
+                  if (!pick) return tell("List something of your own first (Sell tab), then offer it in a swap.", true);
+                  if (pick.hidden) { pick.hidden = false; btn.textContent = "Send swap offer"; pick.focus(); return; }
+                  b.offeredListingId = pick.value;
+                }
                 btn.disabled = true;
                 api("/relay/my/resale/listings/" + l.id + "/ask", { method: "POST", body: b }).then(function (r) { btn.disabled = false; if (r.ok) { tell("Sent. The seller sees your request from “Member”, not your name."); drawBrowse(); } else fail(r); },
                   function () { btn.disabled = false; tell("Couldn't reach Relay. Check your connection and try again.", true); }); } });
-              card.appendChild(btn);
+              acts.appendChild(btn);
             };
             add("I'd like this", "buy");
             if (l.swapOk) {
@@ -3536,9 +3544,10 @@
                 var sel = el("select", { className: "rl-mk-select" });
                 sel.setAttribute("aria-label", "What you'd offer in a swap");
                 mine.forEach(function (m) { sel.appendChild(el("option", { value: m.id, text: "Offer my " + m.title })); });
-                card.appendChild(sel);
+                sel.hidden = true;
               }
               add("Offer a swap", "swap");
+              if (sel) card.appendChild(sel);
             }
           }
           // Anyone can report a listing; it goes to Relay's team and stops showing here for them.

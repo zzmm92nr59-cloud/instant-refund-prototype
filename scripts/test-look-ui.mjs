@@ -1,7 +1,7 @@
 // Browser test: the Apple-Music-like look. Stubbed Relay server, made-up account.
 // Checks: the app follows the phone's light or dark setting; Receipts is a grid of colourful tiles (white names on each
-// tile's own colour, readable in both modes) led by this year's Wrapped; a tile opens its group in the same colour; the
-// next return floats above the glass tab bar and opens that receipt; the floating bars step aside while typing.
+// tile's own colour, readable in both modes) led by this year's Wrapped; a tile opens its group in the same colour; returns
+// due in three days are a red number on the Home tab of the glass tab bar; the tab bar steps aside while typing.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
@@ -41,24 +41,21 @@ for (const scheme of ["dark", "light"]) {
   for (const t of tiles) { const a = lum(t.bg), b = lum(t.fg); assert.ok((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 3, scheme + ": " + t.name + " is readable on its tile"); }
   for (const t of tiles) { if (tileColours[t.name]) assert.equal(tileColours[t.name], t.bg, t.name + " keeps its colour in both modes"); tileColours[t.name] = t.bg; }
   assert.ok(new Set(tiles.map(t => t.bg)).size === tiles.length, "every kind of shopping has its own colour");
-  // The soonest return floats above the glass tab bar, and opens that receipt.
-  const next = page.locator("#nextUp .rl-next");
-  await next.waitFor();
-  assert.match(await next.innerText(), /Vitamin C Serum[\s\S]*Glow Lab[\s\S]*2 days/);
+  // Returns due in the next three days are a red number on the Home tab (nothing floats over the page); the glass tab bar.
+  const badge = page.locator('#foot [data-tab="profile"] .tab-badge');
+  await badge.waitFor();
+  assert.equal(await badge.innerText(), "1", "one return due in three days (the serum), not the trainers due in nine");
+  assert.equal(await page.locator('#foot [data-tab="profile"]').getAttribute("aria-label"), "Home, 1 return due soon");
+  assert.equal(await page.locator("#nextUp").isVisible(), false, "no strip floating over the page");
   assert.notEqual(await page.locator("#foot").evaluate(f => getComputedStyle(f).backdropFilter), "none", "the tab bar is frosted glass");
-  const [nb, fb] = await Promise.all([page.locator("#nextUp").boundingBox(), page.locator("#foot").boundingBox()]);
-  assert.ok(nb.y + nb.height <= fb.y, "the next return sits above the tab bar");
   await page.screenshot({ path: `/tmp/shots/look-receipts-${scheme}.png` });
-  await next.click();
-  await page.locator(".rl-sheet").getByText("Glow Lab").first().waitFor();
-  await page.locator(".rl-sheet").getByRole("button", { name: "Close" }).click();
   // A tile opens its group in the tile's own colour.
   await page.locator(".rl-tile", { hasText: "Fashion" }).click();
   assert.equal(await page.locator(".rl-cat-hero").evaluate(h => getComputedStyle(h).backgroundColor), tileColours.Fashion);
   await page.getByRole("button", { name: "All groups" }).click();
   // While typing, the floating bars step aside for the keyboard.
   await page.locator(".rl-search input").focus();
-  assert.equal(await page.locator("#foot").isVisible(), false); assert.equal(await page.locator("#nextUp").isVisible(), false);
+  assert.equal(await page.locator("#foot").isVisible(), false);
   await page.locator(".rl-search input").blur();
   assert.equal(await page.locator("#foot").isVisible(), true);
   // The Wrapped tile opens Wrapped.
@@ -68,6 +65,6 @@ for (const scheme of ["dark", "light"]) {
   assert.deepEqual(errors, [], "no page errors");
   await ctx.close();
 }
-console.log("ok - receipts as colourful tiles led by Wrapped, readable in light and dark; next return above the glass tab bar; bars step aside for the keyboard");
-console.log("PASS look: follows the phone's light or dark setting, colourful tiles, floating glass tab bar with the next return");
+console.log("ok - receipts as colourful tiles led by Wrapped, readable in light and dark; returns due soon on the Home tab; the tab bar steps aside for the keyboard");
+console.log("PASS look: follows the phone's light or dark setting, colourful tiles, floating glass tab bar with returns due soon on Home");
 await browser.close(); server.close();

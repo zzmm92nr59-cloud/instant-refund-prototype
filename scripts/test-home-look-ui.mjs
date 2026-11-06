@@ -3,8 +3,8 @@
 // wallet picture (hidden from screen readers), a white headline, three equal white buttons and Face ID in lime with its
 // icon, all readable; it rises in, except where the phone asks for less motion; the next step (email) is back in the app's
 // own colours, and Back from it returns to "Welcome back" when that's where it started. Home: each wallet card counts down
-// to its return date with a bar (green, amber in the last week, red in the last three days); "I'm sending this back" sits
-// beside Details, or under a main button such as Start return; under the wallet, four colourful tiles (Receipts, Returns &
+// to its return date with a bar (green, amber in the last week, red in the last three days) and opens its own page, with
+// Start return (when the shop has a returns page) and "I'm sending this back"; under the wallet, four colourful tiles (Receipts, Returns &
 // swaps, Price alerts with how many things are watched, and Wrapped) each open their page. Every screen passes the polish
 // rules in light and dark.
 import assert from "node:assert/strict";
@@ -146,30 +146,40 @@ assert.match(await due("Vitamin C Serum").innerText(), new RegExp("^Return by " 
 assert.equal(await due("Vitamin C Serum").getAttribute("class"), "rl-due urgent", "red in the last three days");
 assert.equal(await width("Vitamin C Serum"), "93%");
 assert.equal(await due("Wool Coat").getAttribute("class"), "rl-due soon", "amber in the last week");
-// Buttons: "I'm sending this back" beside Details; under Start return when the shop has a returns page.
-assert.deepEqual(await card("Court Classic Trainers").locator(".rl-po-actions button").allInnerTexts(), ["I'm sending this back", "Details"]);
-assert.deepEqual(await card("Wool Coat").locator(".rl-po-actions button").allInnerTexts(), ["Start return", "Details"]);
-await card("Wool Coat").locator(".rl-po-marklink", { hasText: "I'm sending this back" }).waitFor();
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").evaluate(n => getComputedStyle(n).textTransform), "none", "the shop's name as it's written, not in capitals");
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").innerText(), "Kick Lane", "the card is headed with the shop's name");
-// A card with the item's photo: the shop's name (big), the price, size and date, and the parcel's news in a plain line.
+// No buttons on a card: the whole card opens its page, which has what you can do (Start return first when the shop has a
+// returns page, then I'm sending this back).
+assert.equal(await card("Court Classic Trainers").locator("button").count(), 0, "no buttons on the card itself");
+assert.equal(await card("Court Classic Trainers").getAttribute("role"), "button", "the card is the button");
+assert.match(await card("Court Classic Trainers").getAttribute("aria-label"), new RegExp("^Court Classic Trainers, Kick Lane, £85\\.00, return by "));
+assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").evaluate(n => getComputedStyle(n).textTransform), "none");
+assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").innerText(), "Court Classic Trainers", "the card leads with what was bought");
+assert.equal(await card("Court Classic Trainers").locator(".rl-po-meta").innerText(), "Kick Lane", "with the shop under it");
+const dsheet = page.locator(".rl-sheet");
+await card("Court Classic Trainers").click();
+assert.deepEqual(await dsheet.locator(".rl-dt-acts button").allInnerTexts(), ["I'm sending this back"]);
+await dsheet.getByRole("button", { name: "Close" }).click();
+await card("Wool Coat").click();
+assert.deepEqual(await dsheet.locator(".rl-dt-acts button").allInnerTexts(), ["Start return", "I'm sending this back"]);
+assert.equal(await dsheet.getByRole("link", { name: /Start a return with/ }).count(), 0, "one way to start the return, not two");
+await dsheet.getByRole("button", { name: "Close" }).click();
+// A card with the item's photo: what it is, the shop, the price, and the parcel's news in a plain line.
 const nf = card("Northfold");
 await nf.locator(".rl-po-img.rl-has-photo img").waitFor();
-assert.equal(await nf.locator(".rl-po-brand").innerText(), "Northfold");
-assert.match(await nf.locator(".rl-po-meta").innerText(), /^UK 8 · /, "with a photo, the small line is size and date, not the item's long name");
-assert.equal(await nf.locator(".rl-sr").textContent(), "Flow Flared Pant", "the item's name is still there for screen readers");
+assert.equal(await nf.locator(".rl-po-brand").innerText(), "Flow Flared Pant");
+assert.equal(await nf.locator(".rl-po-meta").innerText(), "Northfold");
 assert.equal(await nf.locator(".rl-po-ship").innerText(), "On its way with Royal Mail");
 assert.equal(await nf.locator(".rl-po-ship svg").count(), 1, "with a drawn parcel, not a symbol");
 assert.equal(await nf.locator(".rl-due").count(), 0, "a date Relay worked out (UK law's minimum) is never shown as a countdown");
-await nf.getByRole("button", { name: "Details" }).click();
-const dsheet = page.locator(".rl-sheet");
-assert.match(await dsheet.locator(".rl-dt-sub").innerText(), /^Flow Flared Pant, UK 8 · £69\.00/, "Details names what was bought");
+await nf.click();
+assert.equal(await dsheet.locator(".rl-dt-head h2").innerText(), "Flow Flared Pant", "its page names what was bought");
+assert.equal(await dsheet.locator(".rl-dt-sub").innerText(), "Northfold");
+assert.match(await dsheet.locator(".rl-dt-facts").innerText(), /Price\s+£69\.00\s+Size or colour\s+UK 8\s+Ordered\s+\d+ \w+ \d{4}\s+Order number\s+R-4444/);
 await dsheet.getByText("No return date in Northfold's email", { exact: true }).waitFor();
 // (Still on its way, so no date even though the server counted one from a delivery: the screen never contradicts itself.)
 await dsheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders. Relay adds the date once it arrives. Northfold may give longer.").waitFor();
-assert.ok(!/days? left/.test(await dsheet.innerText()), "no countdown in Details either");
+assert.ok(!/days? left/.test(await dsheet.innerText()), "no countdown on its page either");
 await dsheet.getByRole("button", { name: "Close" }).click();
-console.log("ok - wallet cards count down with a bar (green, amber, red); I'm sending this back sits beside Details, or under Start return; a photo card is headed with the shop's name");
+console.log("ok - wallet cards count down with a bar (green, amber, red), lead with what was bought, and open a page with Start return and I'm sending this back");
 
 // 3. Under the wallet: four colourful tiles, each opening its page; Price alerts says how many things are watched.
 const tiles = page.locator(".home-tiles .htile");

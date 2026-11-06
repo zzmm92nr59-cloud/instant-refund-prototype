@@ -64,7 +64,7 @@ const months = page.locator(".rl-cat-month"); await months.first().waitFor();
 assert.ok(await months.count() >= 4, "receipts are in months");
 const first = await months.first().innerText();
 assert.match(first, new RegExp(new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" })), "newest month first: " + first);
-assert.match(first, /receipts? · £/, "with the month's total");
+assert.match(first, /^[A-Z][a-z]+ \d{4}\s+£[\d,]+\.\d{2}$/, "with the month's total");
 assert.equal(await page.locator(".rl-rr").count(), 40, "40 at a time");
 // The next 40 arrive by themselves before the end comes into view; the button stays for anyone who gets there first.
 await page.getByRole("button", { name: /^Show 40 more of 90$/ }).waitFor();

@@ -97,7 +97,7 @@ assert.deepEqual((await page.locator("#foot button").allInnerTexts()).map(x => x
 
 // 1. From Discover: outlines first, then what members are selling, nearest first, in plain words with drawn icons.
 await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
-await page.locator(".profile-row", { hasText: "Swap & resell" }).click();
+await page.locator(".dc-sc", { hasText: "Swap & resell" }).click();
 const sheet = page.locator(".rl-sheet").filter({ has: page.getByRole("heading", { name: "Swap & resell" }) });
 await sheet.locator(".rl-mk-skel").first().waitFor();
 assert.equal(await sheet.getByText(/Loading/).count(), 0, "no bare 'Loading…'");

@@ -149,11 +149,11 @@ await page.getByText("Shown straight from your Outlook. Relay doesn't keep a cop
 await page.keyboard.press("Escape");
 await page.evaluate(() => window.RelayAccount.open());
 await page.locator(".rl-arow", { hasText: "Outlook · connected" }).click();
-await page.getByRole("button", { name: "Add a missing receipt" }).waitFor();
+await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Disconnect jess.tester@outlook.com" }).count());
 assert.match(await page.locator(".rl-ibx-row").innerText(), /jess\.tester@outlook\.com[\s\S]*Outlook · Checked/);
 assert.ok(await page.getByText("Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay.").count());
-await page.getByRole("button", { name: "Add a missing receipt" }).click();
+await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).click();
 await page.getByRole("searchbox", { name: "Search Outlook for a receipt" }).waitFor();
 assert.equal(await page.locator("#rl-ar-q").getAttribute("placeholder"), "Search your Outlook");
 console.log("ok - with Outlook connected, the scan starts, the original opens from Outlook and every screen names Outlook");
