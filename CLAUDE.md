@@ -18,6 +18,10 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 13. Every button visibly reacts when pressed.
 14. Preferences survive updates: keep them with the account where possible; never rename storage keys without moving the old value.
 15. Shoppers never see demo, sandbox or test wording; testing tools only with ?testtools=1 or ?testing=1, or the Testing tools switch Relay's team has in Profile → Team. Orders from Relay's test shops show only with testing tools. The preview from shops' own websites shows only with testing tools or the team's Shops' websites switch.
+16. A card is one tap: no row of buttons on a card. Tapping it opens its page (a sheet) with what you can do.
+17. Say things once and plainly: no facts glued together with dots ("A · B · C"), no underlined links, no grey explaining line under every heading.
+18. Back is a drawn chevron and a word in the accent colour (class rl-navback, with data-back). An inner screen shows its own bar, not the tab's big title.
+19. Nothing floats over the page except the tab bar and sheets. Something urgent is a red number on its tab.
 
 Also: index.html and relay-app-v2.html must stay identical. Bump VERSION in sw.js when the app shell changes.
 
