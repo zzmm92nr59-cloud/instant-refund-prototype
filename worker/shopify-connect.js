@@ -127,7 +127,7 @@ const page = (title, html, status = 200) => new Response(`<!doctype html><meta c
 <body style="font:16px system-ui;max-width:520px;margin:12vh auto;padding:0 20px;color:#141827;line-height:1.5"><h1 style="font-size:24px">${esc(title)}</h1>${html}`,
   { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "referrer-policy": "no-referrer" } });
 const askForShop = (note, purpose) => page("Connect your Shopify shop", `${note ? `<p style="color:#9c3328">${esc(note)}</p>` : ""}
-<p>Enter your shop's Shopify address. You'll approve Relay inside your own Shopify admin. Relay reads your products, prices, stock and paid orders (so shoppers can see their own purchases). The only change it ever makes is swapping an item on an order for another size or colour at the same price, when the customer who placed that order asks for it in Relay.</p>
+<p>Enter your shop's Shopify address. You'll approve Relay inside your own Shopify admin. Relay reads your products, prices, stock and paid orders (so shoppers can see their own purchases). It changes an order only when the customer who placed it asks in Relay: swapping an item for another size or colour, and refunding the difference if the new one costs less. If you run auctions in Relay, it also adds the winner's order to your shop.</p>
 <form method="get" action="/relay/shopify/connect"><input name="shop" placeholder="your-shop.myshopify.com" required autocomplete="off" style="font:inherit;padding:12px;border:1px solid #ccc;border-radius:10px;width:100%;box-sizing:border-box">
 ${purpose === "d" ? '<input type="hidden" name="for" value="dashboard">' : ""}<button style="margin-top:10px;font:inherit;font-weight:700;background:#141827;color:#fff;border:0;border-radius:10px;padding:12px 18px">Continue to Shopify</button></form>`, note ? 400 : 200);
 
@@ -208,6 +208,16 @@ export async function forgetShopifyShop(env, domain, o = {}) {
   try { await db.prepare("DELETE FROM retailer_keys WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no keys table yet */ }
   await removeShopifyItems(db, conn, null);
   if (o.everything) { try { await db.prepare("DELETE FROM retailer_offers WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no offers yet */ } }
+  // Its auctions (auctions.js): those still running end straight away, without a sale (nobody can be sent an order at a shop
+  // that has removed Relay). With everything, the auctions, their photos, bids and offers are deleted.
+  try {
+    await db.prepare("UPDATE auctions SET status = 'cancelled', outcome = 'shop_left', ended_at = ? WHERE provider = 'shopify' AND shop_ref = ? AND status = 'live'").bind(o.now || Date.now(), domain).run();
+    if (o.everything) {
+      const own = "SELECT id FROM auctions WHERE provider = 'shopify' AND shop_ref = ?";
+      for (const t of ["auction_photos", "auction_bidders", "auction_offers", "auction_strikes"]) await db.prepare(`DELETE FROM ${t} WHERE auction_id IN (${own})`).bind(domain).run();
+      await db.prepare("DELETE FROM auctions WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run();
+    }
+  } catch { /* no auctions yet */ }
 }
 // Removes a shop's products (all of them, or one product when productGid is given), with their sizes, stock and pictures.
 export async function removeShopifyItems(db, conn, productGid) {

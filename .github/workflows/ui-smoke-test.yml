@@ -20,7 +20,8 @@ permissions:
 jobs:
   browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Installing the test browser alone has taken over 9 minutes on a slow runner.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,5 +101,9 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
+      - name: Test auctions in the app (a tile while live, one-tap cards, delivery details first, one bid per tap, a win to pay for first with the shop's own link)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-auctions-ui.mjs
+      - name: Test auctions in the shop's dashboard (what happened to each in words, started once, photos made smaller first, plain refusals)
+        run: node scripts/test-retailer-auctions-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

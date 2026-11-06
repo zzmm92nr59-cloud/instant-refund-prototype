@@ -59,7 +59,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -853,7 +853,32 @@
     ".rl-dl-item b{font-size:17px;font-weight:600;color:var(--rl-text)}.rl-dl-item span{font-size:15px;color:var(--rl-text2)}" +
     ".rl-dl-to{margin:0 0 6px}.rl-dl-to .rl-dt-fact b{white-space:pre-line;line-height:1.4}.rl-dl-link,.rl-dl-open{display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-decoration:none;min-height:50px}" +
     ".rl-dl-done{display:flex;flex-direction:column;gap:10px;margin:4px 0 16px}.rl-dl-tick{display:flex;align-items:flex-start;gap:10px;font-size:16px;line-height:1.35;color:var(--rl-text)}" +
-    ".rl-dl-tick .rl-jic{flex:none;margin:1px 0 0;color:var(--rl-accent)}.rl-dl-tick.no .rl-jic{color:var(--rl-warn)}";
+    ".rl-dl-tick .rl-jic{flex:none;margin:1px 0 0;color:var(--rl-accent)}.rl-dl-tick.no .rl-jic{color:var(--rl-warn)}" +
+    // Auctions: a card per auction (one tap opens it), and its page.
+    // On a sheet the cards sit on a lighter grey (light) or a lighter navy (dark), so each one reads as a card.
+    ".rl-sheet .rl-au-card{background:var(--rl-card)}@media (prefers-color-scheme: dark){.rl-sheet .rl-au-card{background:rgba(255,255,255,.07)}}" +
+    ".rl-au-card{margin:10px 0}.rl-au-card .rl-po-top{display:flex;align-items:flex-start}.rl-au-pic{flex:none;overflow:hidden;background:var(--rl-fill)}" +
+    ".rl-au-pic img,.rl-au-big img,.rl-au-thumb img{width:100%;height:100%;object-fit:cover;display:block}" +
+    ".rl-au-what{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-title{font-size:17px;font-weight:600;line-height:1.3;color:var(--rl-text)}" +
+    ".rl-au-shop,.rl-au-left{font-size:15px;line-height:1.35;color:var(--rl-text2)}.rl-au-price{font-size:15px;font-weight:600;color:var(--rl-text);margin-top:4px}" +
+    ".rl-au-you{font-size:15px;line-height:1.4;color:var(--rl-text)}.rl-au-you.todo{color:var(--rl-danger);font-weight:600}.rl-au-you.good{color:var(--rl-accent);font-weight:600}" +
+    ".rl-au-skel{height:104px;border-radius:20px;margin:10px 0}" +
+    ".rl-au-big{border-radius:20px;overflow:hidden;background:var(--rl-fill);aspect-ratio:1/1;max-height:420px;display:grid;place-items:center;margin:10px 0}.rl-au-none{color:var(--rl-text2)}" +
+    ".rl-au-strip{display:flex;gap:8px;overflow-x:auto;margin:0 0 10px;padding:2px}" +
+    ".rl-au-thumb{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:56px;height:56px;border-radius:12px;overflow:hidden;background:var(--rl-fill);-webkit-tap-highlight-color:transparent;transition:transform .12s}" +
+    ".rl-au-thumb:active{transform:scale(.95)}.rl-au-thumb:focus-visible{outline:3px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-au-shopname{font-size:15px;color:var(--rl-text2);margin:4px 0 2px}.rl-au-h{margin:0 0 4px;font-size:24px;line-height:1.2;color:var(--rl-text)}" +
+    ".rl-au-sub{font-size:15px;line-height:1.4;color:var(--rl-text2);margin:0 0 12px}" +
+    ".rl-au-pricebox{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:14px 16px;border-radius:18px;background:var(--rl-card);margin:4px 0 12px}" +
+    "@media (prefers-color-scheme: dark){.rl-au-pricebox{background:rgba(255,255,255,.07)}}" +
+    ".rl-au-pricebox>div{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-lbl{font-size:13px;font-weight:600;color:var(--rl-text2)}" +
+    ".rl-au-now{font-size:28px;font-weight:700;line-height:1.1;color:var(--rl-text)}.rl-au-meta{font-size:15px;color:var(--rl-text2)}" +
+    ".rl-au-left.big{font-weight:600;color:var(--rl-text);text-align:right;flex:none}.rl-au-you.big{margin:0 0 12px}" +
+    ".rl-au-pay{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box}" +
+    ".rl-dt-fact.rl-au-desc{flex-direction:column;align-items:flex-start;gap:4px}.rl-au-desc b{white-space:pre-line;font-weight:400;text-align:left}" +
+    ".rl-au-small{font-size:13px;line-height:1.45;color:var(--rl-text2);margin:14px 0 0}" +
+    ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
+    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -1340,6 +1365,7 @@
     x: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
     send: '<path d="M4.5 12h14M13 6l6 6-6 6"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
+    gavel: '<path d="M13.5 4.5 19.5 10.5 16.5 13.5 10.5 7.5Z"/><path d="m13.5 10.5-8.5 8.5"/><path d="M13 20.5h8"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -3706,6 +3732,7 @@
     download: '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
     doc: '<path d="M7 3.5h7l4 4v13H7Z"/><path d="M14 3.5v4h4M10 12h5M10 16h5"/>',
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2-2.4 3.5M12 17h.01"/>',
+    gavel: '<path d="M13.5 4.5 19.5 10.5 16.5 13.5 10.5 7.5Z"/><path d="m13.5 10.5-8.5 8.5"/><path d="M13 20.5h8"/>',
     swap: '<path d="M7 7h12l-3-3M17 17H5l3 3"/>',
     flag: '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>',
     pulse: '<path d="M3 12.5h4l2.5-6.5 4.5 13 2.5-6.5H21"/>',
@@ -3838,8 +3865,15 @@
     if (!review) {
       var deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
         deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
-      sheet.appendChild(accGroup("Shopping", [deliveryRow]));
+      // Auctions: bids and wins (a win to pay for comes first, in words).
+      var auctionRow = accRow("gavel", "Auctions", "", function () { openAuctions("mine"); });
+      sheet.appendChild(accGroup("Shopping", [deliveryRow, auctionRow]));
       api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? deliveryLine(r.body.delivery) : "Add your address"); }).catch(function () {});
+      auctionsMine().then(function (b) {
+        var rows = (b && b.auctions) || [], todo = rows.filter(function (r) { return AU_TODO[r.you.state]; }).length;
+        var live = rows.filter(function (r) { return r.auction.status === "live" || r.auction.status === "ending"; }).length;
+        auctionRow.setDetail(todo ? (todo === 1 ? "1 win to pay for" : todo + " wins to pay for") : live ? "Bidding on " + live : "Bid on clothes from shops on Relay");
+      });
     }
 
     // Sign-in & security
@@ -6160,6 +6194,278 @@
       sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: close }));
     }
   }
+  // ---- Auctions (worker/auctions.js): shops on Relay put clothing up for auction; the winner pays the shop at its own
+  // checkout. Relay bids for each shopper only as much as it takes to keep them ahead, up to the most they said they'd pay.
+  var AU_BID_KEY = "relay.auctions.v1"; // this device has bid, so Home checks for wins to pay (and nobody else's Home asks)
+  function auTest() { try { return window.testTools ? window.testTools() : testingOn(); } catch (e) { return false; } }
+  var auLive = { at: 0, rows: null, asking: null };
+  // Live auctions, remembered for a minute (Discover's tile and the Auctions page share them).
+  function auctionsLive(fresh) {
+    if (!fresh && auLive.rows && Date.now() - auLive.at < 60000) return Promise.resolve(auLive.rows);
+    if (auLive.asking) return auLive.asking;
+    auLive.asking = fetch(API + "/relay/auctions" + (auTest() ? "?test=1" : "")).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) { auLive.asking = null; if (b && Array.isArray(b.auctions)) { auLive.rows = b.auctions; auLive.at = Date.now(); } return auLive.rows || []; },
+        function () { auLive.asking = null; return auLive.rows || []; });
+    return auLive.asking;
+  }
+  function auPic(p) { return !p ? null : p.charAt(0) === "/" ? API + p : /^https:\/\//.test(p) ? p : null; }
+  // "Sat 7 Nov at 18:30".
+  function auWhen(t) { var d = new Date(t); return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "") + " at " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
+  // "Ends in 2 days", "Ends in 3 hours", "Ends in 12 minutes", "Ends in 40 seconds", "Ending now".
+  function auLeft(endsAt) {
+    var s = Math.round((endsAt - Date.now()) / 1000);
+    if (s <= 0) return "Ending now";
+    var plural = function (n, w) { return n + " " + w + (n === 1 ? "" : "s"); };
+    return "Ends in " + (s >= 172800 ? plural(Math.floor(s / 86400), "day") : s >= 7200 ? plural(Math.floor(s / 3600), "hour") : s >= 120 ? plural(Math.floor(s / 60), "minute") : plural(s, "second"));
+  }
+  function auPriceLine(a) {
+    if (a.status !== "live" && a.status !== "ending") return a.sold ? "Sold" : "Ended";
+    return a.bids ? money(a.priceMinor, "GBP") + ", " + a.bids + (a.bids === 1 ? " bid" : " bids") : "Starts at " + money(a.startMinor, "GBP");
+  }
+  // What the shopper's own bid means now, in a sentence.
+  function auYou(y, a) {
+    if (!y) return null;
+    var shop = a.shop, total = y.totalMinor != null ? money(y.totalMinor, "GBP") : null;
+    return ({
+      leading: "You're winning. The most you'd pay is " + money(y.maxMinor, "GBP") + ".",
+      outbid: "You've been outbid. Bid again to win it.",
+      pay: "You won. Pay " + total + " to " + shop + " by " + auWhen(y.payBy) + ".",
+      offered: "The winner didn't pay, so it's yours for " + total + " if you pay " + shop + " by " + auWhen(y.payBy) + ".",
+      add_address: "You won. Add your delivery details so " + shop + " can send it, then pay by " + auWhen(y.payBy) + ".",
+      setting_up: "You won. Relay is making your order at " + shop + ".",
+      paid: "Paid. " + shop + " will send it to you.",
+      expired: "Time ran out to pay, so it went to the next bidder.",
+      shop_problem: shop + " couldn't take the order, so there's nothing to pay.",
+      not_won: "Someone else won it.",
+      cancelled: "The shop cancelled this auction."
+    })[y.state] || null;
+  }
+  var AU_TODO = { pay: 1, offered: 1, add_address: 1 };
+  // Wins waiting for the shopper: a red number on the Profile tab (index.html relayBadge), like returns due.
+  function auBadge(rows) {
+    var n = (rows || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }).length;
+    window.__relayPayDue = n; if (window.relayBadge) window.relayBadge();
+  }
+  function auctionsMine(fresh) {
+    if (!load()) return Promise.resolve(null);
+    return api("/relay/my/auctions", { fresh: fresh }).then(function (r) {
+      if (!r.ok || !r.body) return null;
+      if ((r.body.auctions || []).length) { try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {} }
+      auBadge(r.body.auctions); return r.body;
+    }, function () { return null; });
+  }
+  function auMineCheck() { var on = false; try { on = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {} if (on) auctionsMine(); else auBadge([]); }
+  // One auction as a card: one tap opens it (no buttons on the card).
+  function auCard(a, you, onOpen) {
+    var pic = el("div", { className: "rl-po-img rl-au-pic" }), src = auPic(a.pictures && a.pictures[0]);
+    if (src) pic.appendChild(el("img", { alt: "", src: src, loading: "lazy", referrerPolicy: "no-referrer", onerror: function () { this.remove(); } }));
+    var mine = auYou(you, a);
+    var card = el("div", { className: "rl-po rl-tap rl-au-card", role: "button", tabIndex: 0 }, [
+      el("div", { className: "rl-po-top" }, [pic, el("div", { className: "rl-au-what" }, [
+        el("b", { className: "rl-au-title", text: a.title + (a.variant ? ", " + a.variant : a.size ? ", size " + a.size : "") }),
+        el("span", { className: "rl-au-shop", text: a.shop }),
+        el("span", { className: "rl-au-price", text: auPriceLine(a) }),
+        a.status === "live" || a.status === "ending" ? el("span", { className: "rl-au-left", "data-ends": String(a.endsAt), text: auLeft(a.endsAt) }) : null
+      ].filter(Boolean))])].concat(mine ? [el("span", { className: "rl-au-you" + (you && AU_TODO[you.state] ? " todo" : you && you.state === "leading" ? " good" : ""), text: mine })] : []));
+    card.setAttribute("aria-label", a.title + ", " + a.shop + ", " + auPriceLine(a) + (mine ? ". " + mine : ""));
+    card.onclick = onOpen;
+    card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(); } };
+    return card;
+  }
+  // The Auctions page: what's live, and the shopper's own bids and wins.
+  function openAuctions(tab) { if (!load()) return show(); open(function (sheet) { auctionsView(sheet, tab || "live"); }); }
+  function openAuction(id) { if (!load()) return show(); open(function (sheet) { auctionView(sheet, id, function () { auctionsView(sheet, "live"); }); }); }
+  function auctionsView(sheet, tab) {
+    sheet.textContent = ""; sheet.setAttribute("aria-label", "Auctions");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var cur = tab, body = el("div"), tabs = el("div", { className: "rl-mk-tabs", role: "group", ariaLabel: "Auctions" });
+    [["live", "Live"], ["mine", "Your bids"]].forEach(function (t) {
+      var b = el("button", { type: "button", text: t[1], onclick: function () { if (cur !== t[0]) { cur = t[0]; draw(); } } });
+      b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
+    });
+    [el("h2", { text: "Auctions" }), tabs, body, el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close })].forEach(function (n) { sheet.appendChild(n); });
+    function outlines() { body.textContent = ""; for (var i = 0; i < 3; i++) body.appendChild(el("div", { className: "rl-skel rl-au-skel" })); }
+    function draw() {
+      Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-tab") === cur ? "true" : "false"); });
+      outlines();
+      var want = cur;
+      // Opened on purpose, so it asks for the latest: prices and wins change while the app is closed.
+      Promise.all([cur === "live" ? auctionsLive(true) : Promise.resolve(null), auctionsMine(true)]).then(function (rs) {
+        if (want !== cur || !document.body.contains(body)) return;
+        body.textContent = "";
+        var mine = (rs[1] && rs[1].auctions) || [], youOf = {};
+        mine.forEach(function (r) { youOf[r.auction.id] = r.you; });
+        var open1 = function (id) { return function () { auctionView(sheet, id, function () { auctionsView(sheet, want); }); }; };
+        if (cur === "live") {
+          var rows = rs[0] || [];
+          if (!rows.length) return body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No auctions right now" }),
+            el("p", { text: "When shops on Relay put clothes up for auction, they show here. You bid the most you'd pay, and Relay bids for you only as much as it takes to stay ahead." })]));
+          rows.forEach(function (a) { body.appendChild(auCard(a, youOf[a.id], open1(a.id))); });
+        } else {
+          if (!rs[1]) return body.appendChild(el("p", { className: "rl-msg err", text: "Couldn't load your bids. Check your connection and try again." }));
+          if (!mine.length) return body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No bids yet" }),
+            el("p", { text: "Bids you make show here, with anything you win and how to pay for it." })]));
+          // Wins to pay first, then what's still running, then the rest.
+          var rank = function (r) { return AU_TODO[r.you.state] ? 0 : r.auction.status === "live" || r.auction.status === "ending" ? 1 : 2; };
+          mine.slice().sort(function (x, y) { return rank(x) - rank(y); }).forEach(function (r) { body.appendChild(auCard(r.auction, r.you, open1(r.auction.id))); });
+        }
+        auTick(body);
+      });
+    }
+    draw();
+  }
+  // Time left on every card or page on screen, kept up to date while it's open.
+  function auTick(box) {
+    var t = setInterval(function () {
+      if (!document.body.contains(box)) return clearInterval(t);
+      Array.prototype.forEach.call(box.querySelectorAll("[data-ends]"), function (n) { n.textContent = auLeft(Number(n.getAttribute("data-ends"))); });
+    }, 1000);
+  }
+  // One auction: its photos, what it is, the price and time left, the shopper's own bid, and what they can do.
+  function auctionView(sheet, id, back) {
+    sheet.textContent = ""; sheet.setAttribute("aria-label", "Auction");
+    try { sheet.scrollTop = 0; } catch (e) {}
+    var top = el("button", { type: "button", className: "rl-navback", "data-back": "", ariaLabel: "Back to auctions", onclick: back }, [jIc("back", 22), el("span", { text: "Auctions" })]);
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    [top, body, note].forEach(function (n) { sheet.appendChild(n); });
+    body.appendChild(el("div", { className: "rl-skel", style: "height:260px;border-radius:20px" }));
+    body.appendChild(el("div", { className: "rl-skel", style: "height:90px;border-radius:16px;margin-top:14px" }));
+    var shown = null;
+    function get(fresh) {
+      return Promise.all([fetch(API + "/relay/auctions/" + encodeURIComponent(id) + (auTest() ? "?test=1" : ""), { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; }, function () { return null; }),
+        auctionsMine(fresh)]).then(function (rs) {
+        var mine = rs[1] && (rs[1].auctions || []).filter(function (r) { return r.auction.id === id; })[0];
+        var a = (rs[0] && rs[0].auction) || (mine && mine.auction) || null;
+        return a ? { a: a, you: mine ? mine.you : null, canBid: rs[1] ? rs[1].canBid : false, why: rs[1] && rs[1].why, until: rs[1] && rs[1].until } : null;
+      });
+    }
+    function draw(x) {
+      if (!document.body.contains(body)) return;
+      body.textContent = "";
+      if (!x) { body.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "This auction isn't available" }), el("p", { text: "It may have ended a while ago, or the shop took it down." })])); return; }
+      shown = x; var a = x.a, you = x.you;
+      // Photos: the first large, the rest as a strip to tap through.
+      var pics = (a.pictures || []).map(auPic).filter(Boolean);
+      var big = el("div", { className: "rl-au-big" });
+      var showPic = function (src) { big.textContent = ""; big.appendChild(el("img", { alt: a.title, src: src, referrerPolicy: "no-referrer" })); };
+      if (pics.length) showPic(pics[0]); else big.appendChild(el("div", { className: "rl-au-none" }, [jIc("gavel", 44)]));
+      body.appendChild(big);
+      if (pics.length > 1) {
+        var strip = el("div", { className: "rl-au-strip", role: "group", ariaLabel: "Photos" });
+        pics.forEach(function (src, i) {
+          var b = el("button", { type: "button", className: "rl-au-thumb", ariaLabel: "Photo " + (i + 1) + " of " + pics.length, onclick: function () { showPic(src); } }, [el("img", { alt: "", src: src, referrerPolicy: "no-referrer" })]);
+          strip.appendChild(b);
+        });
+        body.appendChild(strip);
+      }
+      body.appendChild(el("div", { className: "rl-au-shopname", text: a.shop }));
+      body.appendChild(el("h2", { className: "rl-au-h", text: a.title }));
+      var sub = [a.variant, a.size ? "Size " + a.size : null, a.conditionText].filter(Boolean);
+      if (sub.length) body.appendChild(el("p", { className: "rl-au-sub", text: sub.join(", ") }));
+      var live = a.status === "live" || a.status === "ending";
+      var priceBox = el("div", { className: "rl-au-pricebox" }, [
+        el("div", {}, [el("span", { className: "rl-au-lbl", text: !live ? (a.sold ? "Sold" : "Ended") : a.bids ? "Current bid" : "Starting bid" }),
+          el("b", { className: "rl-au-now", text: money(a.bids ? a.priceMinor : a.startMinor, "GBP") }),
+          el("span", { className: "rl-au-meta", text: (a.bids ? a.bids + (a.bids === 1 ? " bid" : " bids") : "No bids yet") + (a.deliveryMinor ? ", delivery " + money(a.deliveryMinor, "GBP") : ", free delivery") })]),
+        live ? el("span", { className: "rl-au-left big", "data-ends": String(a.endsAt), text: auLeft(a.endsAt) }) : null].filter(Boolean));
+      body.appendChild(priceBox);
+      var said = auYou(you, a);
+      if (said) body.appendChild(el("p", { className: "rl-au-you big" + (you && AU_TODO[you.state] ? " todo" : you && you.state === "leading" ? " good" : ""), text: said }));
+      var acts = el("div", { className: "rl-dt-acts" });
+      if (you && (you.state === "pay" || you.state === "offered")) {
+        if (you.payUrl) acts.appendChild(el("a", { className: "rl-btn rl-au-pay", href: you.payUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Pay " + money(you.totalMinor, "GBP") + " at " + a.shop }), jIc("ext", 18)]));
+        else acts.appendChild(el("p", { className: "rl-au-sub", text: "Relay is getting the link to pay from " + a.shop + ". Pull down or come back in a minute." }));
+      }
+      if (you && you.state === "add_address") acts.appendChild(el("button", { type: "button", className: "rl-btn", text: "Add delivery details", onclick: function () {
+        body.textContent = ""; say(note, "");
+        deliveryForm(body, { saveLabel: "Save", onSaved: function () { say(note, "Saved. Relay will make your order at " + a.shop + " in a minute or two."); get(true).then(draw); }, onCancel: function () { get().then(draw); } });
+      } }));
+      if (live) acts.appendChild(el("button", { type: "button", className: "rl-btn", text: you && you.state === "leading" ? "Raise the most you'd pay" : you ? "Bid again" : "Place a bid", onclick: function () { bidView(x); } }));
+      if (acts.childNodes.length) body.appendChild(acts);
+      if (a.description) body.appendChild(el("div", { className: "rl-dt-facts" }, [el("div", { className: "rl-dt-fact rl-au-desc" }, [el("span", { text: "From the shop" }), el("b", { text: a.description })])]));
+      body.appendChild(el("p", { className: "rl-au-small", text: "You bid the most you'd pay, and Relay bids for you only as much as it takes to keep you ahead. If you win, you pay " + a.shop +
+        " within 24 hours at its own checkout: Relay never takes the money. It's an online order from the shop, so you can still change your mind within 14 days of delivery." }));
+      auTick(body);
+    }
+    // Bidding, in the same sheet: the most they'd pay, then what that means.
+    function bidView(x) {
+      var a = x.a, you = x.you;
+      body.textContent = ""; say(note, "");
+      try { sheet.scrollTop = 0; } catch (e) {}
+      var backToIt = el("button", { type: "button", className: "rl-btn ghost", text: "Back to the auction", onclick: function () { draw(shown); } });
+      body.appendChild(el("h2", { className: "rl-au-h", text: a.title }));
+      if (!x.canBid && x.why === "delivery_details_needed") {
+        body.appendChild(el("p", { className: "rl-dl-intro", text: "Add your delivery details first: if you win, " + a.shop + " sends it there." }));
+        var box = el("div"); body.appendChild(box);
+        deliveryForm(box, { saveLabel: "Save and bid", intro: "Relay gives these to " + a.shop + " only if you win, so it can send it to you.",
+          onSaved: function () { get(true).then(function (y) { if (y) { shown = y; bidView(y); } }); }, onCancel: function () { draw(shown); } });
+        return;
+      }
+      if (!x.canBid && x.why === "bidding_paused") {
+        body.appendChild(el("p", { className: "rl-dl-intro", text: "Two auctions you won in the last 90 days weren't paid for, so you can bid again from " + (x.until ? new Date(x.until).toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "next month") + "." }));
+        body.appendChild(backToIt); return;
+      }
+      var leading = you && you.state === "leading";
+      var least = leading ? you.maxMinor + 1 : a.nextMinor;
+      body.appendChild(el("p", { className: "rl-dl-intro", text: leading ? "You're winning at " + money(a.priceMinor, "GBP") + ". You can raise the most you'd pay above " + money(you.maxMinor, "GBP") + ": the price only goes up if someone else bids."
+        : "Type the most you'd pay. Relay bids for you only as much as it takes to stay ahead, up to that." }));
+      var input = el("input", { id: "rl-au-max", className: "rl-field", inputMode: "decimal", autocomplete: "off", enterKeyHint: "go", value: (least / 100).toFixed(2) });
+      body.appendChild(el("label", { htmlFor: "rl-au-max", className: "rl-jlabel", text: "The most you'd pay (£" + (least / 100).toFixed(2) + " or more)" }));
+      body.appendChild(input);
+      // What's wrong with a bid shows right under it.
+      var msg = el("div", { className: "rl-msg", role: "status" });
+      body.appendChild(msg);
+      var go = el("button", { type: "button", className: "rl-btn" });
+      var pence = function () { var n = Number(String(input.value).replace(/[£,\s]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) : NaN; };
+      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Bid" : "Bid up to " + money(p, "GBP"); };
+      input.addEventListener("input", label); label();
+      body.appendChild(el("p", { className: "rl-au-small", text: "Plus " + (a.deliveryMinor ? money(a.deliveryMinor, "GBP") + " delivery" : "free delivery") + " if you win. You pay " + a.shop + " within 24 hours at its own checkout." }));
+      var ERR = { bid_too_low: function (b) { return "Bid " + money(b.nextMinor || least, "GBP") + " or more."; }, bid_not_higher: function (b) { return "The most you'd pay is already " + money(b.maxMinor, "GBP") + ". Type more than that."; },
+        bid_too_high: function () { return "That's more than Relay takes for one bid."; }, auction_ended: function () { return "This auction has ended."; },
+        bidding_paused: function () { return "Two auctions you won weren't paid for, so bidding is paused for now."; }, delivery_details_needed: function () { return "Add your delivery details first."; } };
+      go.onclick = function () {
+        if (go.disabled) return;
+        var p = pence();
+        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
+        go.disabled = true; go.textContent = "Bidding…"; say(msg, "");
+        api("/relay/my/auctions/bid", { method: "POST", body: { auctionId: a.id, maxMinor: p } }).then(function (r) {
+          go.disabled = false; label();
+          if (r.ok && r.body && r.body.auction) {
+            try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {}
+            auLive.at = 0;
+            bidDone(r.body.auction, r.body.you.leading, p);
+            return;
+          }
+          var e = r.body && r.body.error;
+          if (e === "delivery_details_needed") { x.canBid = false; x.why = e; return bidView(x); }
+          say(msg, ERR[e] ? ERR[e](r.body) : "Couldn't place your bid. Try again.", true);
+        }, function () { go.disabled = false; label(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.onclick(); });
+      body.appendChild(go); body.appendChild(backToIt);
+      setTimeout(function () { try { input.focus(); input.select(); } catch (e) {} }, 60);
+    }
+    // After a bid: whether they're winning, in words, then back to the auction (or straight into bidding again).
+    function bidDone(now, leading, max) {
+      body.textContent = ""; say(note, "");
+      try { sheet.scrollTop = 0; } catch (e) {}
+      var refresh = function () { get(true).then(function (y) { draw(y || { a: now, you: { state: leading ? "leading" : "outbid", maxMinor: max }, canBid: true }); }); };
+      body.appendChild(el("div", { className: "rl-au-done" + (leading ? " good" : "") }, [leading ? jIc("check", 28) : null,
+        el("h2", { className: "rl-au-h", text: leading ? "You're the highest bidder" : "Someone bid more" })].filter(Boolean)));
+      body.appendChild(el("p", { className: "rl-dl-intro", text: leading
+        ? "The price is " + money(now.priceMinor, "GBP") + ". If anyone else bids, Relay bids for you, up to " + money(max, "GBP") + ". With notifications on, Relay tells you if you're outbid."
+        : "Their maximum is higher than yours, so the price is now " + money(now.priceMinor, "GBP") + ". You can bid again." }));
+      if (!leading) body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Bid again", onclick: function () { get(true).then(function (y) { if (y) { shown = y; bidView(y); } }); } }));
+      body.appendChild(el("button", { type: "button", className: leading ? "rl-btn" : "rl-btn ghost", text: leading ? "Done" : "Back to the auction", onclick: refresh }));
+    }
+    get().then(draw);
+    // While it's open, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
+    var poll = setInterval(function () {
+      if (!document.body.contains(body)) return clearInterval(poll);
+      if (body.querySelector("#rl-au-max") || body.querySelector("#rl-dl-firstName")) return;
+      get(true).then(function (y) { if (y && document.body.contains(body) && !body.querySelector("#rl-au-max") && !body.querySelector("#rl-dl-firstName")) draw(y); });
+    }, 20000);
+  }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
   function copyText(text) {
     try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacyCopy(text); }); } catch (e) {}
@@ -6568,7 +6874,8 @@
     if (host) { host.hidden = true; host.textContent = ""; }
     var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { setDue(0); return; }
+    if (!s || !s.token) { window.__relayPayDue = 0; setDue(0); return; }
+    auMineCheck();
     var draw = function (rows) {
       var today = new Date().toISOString().slice(0, 10), n = 0;
       (rows || []).forEach(function (x) {
@@ -6592,6 +6899,7 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
+    openAuctions: openAuctions, openAuction: openAuction, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,

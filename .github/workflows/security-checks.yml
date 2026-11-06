@@ -34,3 +34,5 @@ jobs:
         run: node scripts/test-shared-emails.mjs
       - name: AI help (off until the key and the shopper's switch, personal details hidden, answers checked, gaps only, deleted when off)
         run: node scripts/test-ai-reader.mjs
+      - name: Auctions (proxy bids, nobody sees who bid, the winner's unpaid order at the shop, 24 hours to pay, then the next bidder)
+        run: node scripts/test-auctions.mjs

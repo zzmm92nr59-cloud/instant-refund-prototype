@@ -13,7 +13,7 @@ Relay's single-shop Shopify integration is prepared but **not connected to a rea
 
 Shop owners connect themselves: `https://relay-square-api2.9pts72cy5j.workers.dev/relay/shopify/connect?shop=their-shop.myshopify.com`
 (or the "Sign in with Shopify" box on `retailer.html`, or opening Relay from the Apps section of their Shopify admin).
-They approve Relay inside their own Shopify admin (read-only: `read_products`, `read_inventory`). Relay then:
+They approve Relay inside their own Shopify admin (`read_products`, `read_inventory`, `read_orders`, `write_order_edits`, `write_orders`: the list is `SCOPES` in `worker/shopify-connect.js`). Relay then:
 
 - stores the shop's name and its access/refresh tokens **encrypted** in D1 (`shopify_shops`), renewing tokens before they expire;
 - reads that shop's products, prices, stock and pictures straight away, then hourly; shoppers see them in Discover and can watch them;
