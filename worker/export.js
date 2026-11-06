@@ -6,6 +6,7 @@
 import { exportPhone } from "./phone.js";
 import { sharedForExport } from "./shared-emails.js";
 import { crossSwapsForExport } from "./cross-swap.js";
+import { deliveryForExport } from "./delivery.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -37,6 +38,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     about: "Everything Relay keeps about you, as of " + iso(now) + ". Receipts are the details Relay read from your emails; the emails themselves stay in your inbox.",
     account: account && { email: account.email, createdAt: iso(account.createdAt) },
     profile: profile && { name: profile.name || null, photo: profile.photoData ? "data:" + (profile.photoType || "image/jpeg") + ";base64," + profile.photoData : null, updatedAt: iso(profile.updatedAt) },
+    // The delivery address kept for filling in shops' checkouts, and each shop it was sent to.
+    delivery: await deliveryForExport(env, id),
     signIn: {
       activeSessions: sessions.map((s) => ({ startedAt: iso(s.createdAt), endsAt: iso(s.expiresAt) })),
       passkeys: (await rows("SELECT name, created_at AS createdAt, last_used_at AS lastUsedAt FROM auth_passkeys WHERE shopper_id = ?", id))

@@ -19,6 +19,7 @@ import { handleShopifyEmbedded } from "./shopify-embedded.js";
 import { ensureOnce } from "./once.js";
 import { syncAwinFeeds } from "./awin-feed.js";
 import { refreshWebShops, handleWebShopsRoute } from "./web-shops.js";
+import { handleUcpProfileRoute } from "./delivery.js";
 import { checkRateLimits, tooManyRequests } from "./limits.js";
 import { checkBody, checkUrl } from "./validate.js";
 import { isLegacyTestRoute, legacyTestRoutesOn } from "./legacy-routes.js";
@@ -307,6 +308,8 @@ const relayWorker = {
 
     // The catalogue preview from shops' own websites (web-shops.js): public product details, for Relay's testing tools.
     { const webShops = await handleWebShopsRoute(request, env, url, corsHeaders); if (webShops) return webShops; }
+    // Relay's agent profile for shops' checkouts (Universal Commerce Protocol): what it takes part in (delivery.js).
+    { const ucp = handleUcpProfileRoute(request, url, corsHeaders); if (ucp) return ucp; }
 
     // Publish only retailer-opted-in read-only products. Separate Shopify
     // installations can use identical SKUs/GIDs; each item has a shop-scoped ID.

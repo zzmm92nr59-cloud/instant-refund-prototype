@@ -30,6 +30,7 @@ import { handleExportRoute } from "./export.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
+import { handleDeliveryRoute, deliveryDeleteStatements, ensureDeliveryTables } from "./delivery.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { secondStepRequired, secondSteps, hasSecondStep, openWithoutSecondStep } from "./second-step.js";
 import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
@@ -565,6 +566,7 @@ async function listPurchases(env, shopper, orderId) {
 async function deleteShopper(env, shopper, o) {
   await ensurePushTables(env.RELAY_DB);
   await ensureProfileTable(env.RELAY_DB);
+  await ensureDeliveryTables(env.RELAY_DB);
   for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
   await forgetCard(env, shopper.id, o).catch(() => {});
   // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
@@ -572,6 +574,7 @@ async function deleteShopper(env, shopper, o) {
   await env.RELAY_DB.batch([
     ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
     ...profileDeleteStatements(env.RELAY_DB, shopper.id),
+    ...deliveryDeleteStatements(env.RELAY_DB, shopper.id),
     ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
     ...supportDeleteStatements(env.RELAY_DB, shopper.id),
     ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
@@ -694,6 +697,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (exportResponse) return exportResponse;
     const profileResponse = await handleProfileRoute(request, env, url, cors, shopper, o);
     if (profileResponse) return profileResponse;
+    // Delivery details, and starting a checkout at a shop's own website with them filled in (delivery.js).
+    const deliveryResponse = await handleDeliveryRoute(request, env, url, cors, shopper, o);
+    if (deliveryResponse) return deliveryResponse;
     const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);
     if (gmailResponse) return gmailResponse;
     const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);

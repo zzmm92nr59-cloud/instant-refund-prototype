@@ -60,6 +60,11 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/devices/sign-out-others": NOTHING,
   "/relay/my/delete": NOTHING,
   "/relay/my/profile": { limit: 300 * KB, tooLarge: "photo_too_big", fields: { name: text(100), photo: str(290 * KB) } },
+  // Delivery details (delivery.js checks each one properly: a UK postcode, a UK phone number), removing them, and starting a
+  // checkout at a shop's website with them filled in.
+  "/relay/my/delivery": { fields: { firstName: text(100), lastName: text(100), line1: text(200), line2: text(200), town: text(120), county: text(120), postcode: str(20), phone: str(40) } },
+  "/relay/my/delivery/remove": NOTHING,
+  "/relay/my/web-checkout": { fields: { sku: str(140) } },
   "/relay/my/consent": { fields: { version: str(40) } },
   "/relay/my/consent/withdraw": NOTHING,
   // Email: connecting, reading, searching and adding receipts.
