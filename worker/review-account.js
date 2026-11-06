@@ -25,7 +25,7 @@ export const REVIEW_BLOCKED = new Set([
   "/relay/my/2fa/setup", "/relay/my/2fa/enable", "/relay/my/2fa/text", "/relay/my/2fa/text/send",
   "/relay/my/phone/start", "/relay/my/phone/confirm",
   "/relay/my/card/setup", "/relay/my/card/confirm",
-  "/relay/my/delivery"
+  "/relay/my/delivery", "/relay/my/auctions/bid"
 ]);
 export const REVIEW_MAX_FAILURES_PER_DAY = 20;
 const encoder = new TextEncoder();

@@ -31,6 +31,7 @@ import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
 import { handleDeliveryRoute, deliveryDeleteStatements, ensureDeliveryTables } from "./delivery.js";
+import { handleAuctionShopperRoute, forgetAuctionBidder } from "./auctions.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
 import { secondStepRequired, secondSteps, hasSecondStep, openWithoutSecondStep } from "./second-step.js";
 import { PHONE_TABLE_SQL, phoneDeleteStatements, handlePhoneRoute } from "./phone.js";
@@ -569,6 +570,8 @@ async function deleteShopper(env, shopper, o) {
   await ensureDeliveryTables(env.RELAY_DB);
   for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
   await forgetCard(env, shopper.id, o).catch(() => {});
+  // Their maximums leave live auctions (the next bidder takes the lead) and their wins stop being theirs.
+  await forgetAuctionBidder(env, shopper.id, o.now).catch(() => {});
   // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
   await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
   await env.RELAY_DB.batch([
@@ -700,6 +703,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // Delivery details, and starting a checkout at a shop's own website with them filled in (delivery.js).
     const deliveryResponse = await handleDeliveryRoute(request, env, url, cors, shopper, o);
     if (deliveryResponse) return deliveryResponse;
+    // Auctions: the shopper's bids and wins, and bidding (auctions.js).
+    const auctionResponse = await handleAuctionShopperRoute(request, env, url, cors, shopper, o);
+    if (auctionResponse) return auctionResponse;
     const gmailResponse = await handleGmailRoute(request, env, url, cors, shopper, o);
     if (gmailResponse) return gmailResponse;
     const resaleResponse = await handleResaleRoute(request, env, url, cors, shopper, o);
