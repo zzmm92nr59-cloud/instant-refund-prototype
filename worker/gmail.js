@@ -277,6 +277,19 @@ function ensureAutoColumns(db) {
     }
   });
 }
+// Whether reading an inbox is actually working, so nothing says "checked" when it wasn't (auto_at is only when the
+// 15-minute check last had a go, whatever happened):
+//  * mail_ok_at: the last time Relay read the inbox's newest mail without a problem (what the app shows as "Checked").
+//    (Mail that came while checks were failing is still read once they work again: each check reads the last 30 days.)
+//  * mail_problem ("reconnect") and mail_problem_at: Google or Microsoft said Relay's access to this inbox has ended (it
+//    expired, or the shopper took it back), so it has to be connected again. Cleared as soon as access works again.
+export function ensureHealthColumns(db) {
+  return ensureOnce(db, "inbox-health", async () => {
+    for (const col of ["mail_ok_at INTEGER", "mail_problem TEXT", "mail_problem_at INTEGER"]) {
+      try { await db.prepare("ALTER TABLE gmail_connections ADD COLUMN " + col).run(); } catch { /* already there */ }
+    }
+  });
+}
 // Instant email (mail-push.js), kept with each inbox so it moves with it: when its Gmail watch or Outlook subscription
 // lapses (push_expires_at), Outlook's subscription id and a hash of its secret (push_ref, push_secret), how far Gmail's
 // history has been read (push_history), when a notice last came (push_at) and when it was last read for one (push_scan_at),
@@ -297,6 +310,7 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
   await ensurePushColumns(env.RELAY_DB);
+  await ensureHealthColumns(env.RELAY_DB);
   // An inbox being read for a new-mail notice right now (mail-push.js) waits for the next round.
   const rows = ((await env.RELAY_DB.prepare(
     `SELECT g.shopper_id AS id, g.auto_at AS autoAt, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev FROM gmail_connections g
@@ -323,7 +337,8 @@ export async function autoScanGmail(env, now = Date.now(), fetchImpl = (...a) =>
       passes++; calls += back.calls || 3;
       if (back.status === 200) cursor = back.body.more ? back.body.cursor : null;
     }
-    // Moved to the back of the queue whatever happened, so one shopper's problem never blocks the rest.
+    // Moved to the back of the queue whatever happened, so one shopper's problem never blocks the rest. (Whether the check
+    // worked is kept apart from this, in mail_ok_at and mail_problem: see ensureHealthColumns.)
     await env.RELAY_DB.prepare("UPDATE gmail_connections SET auto_at = ?, auto_cursor = ? WHERE shopper_id = ?").bind(now, savedCursor(cursor), r.id).run();
     out.push({ status: recent.status, added: recent.body && recent.body.added || 0, updated: recent.body && recent.body.updated || 0, more: Boolean(recent.body && recent.body.more) });
   }
@@ -399,6 +414,14 @@ async function hasConsent(db, shopperId) {
   return Boolean(row);
 }
 
+// Google's and Microsoft's answer when the sign-in Relay holds for an inbox has ended (it expired, the password changed, or
+// the shopper took Relay's access back): only connecting the inbox again helps. Any other refusal (their side down or busy,
+// or a problem with Relay's own app settings) isn't the shopper's to fix, so it's never shown to them as one.
+const ACCESS_ENDED = new Set(["invalid_grant", "interaction_required"]);
+const refused = async (res) => {
+  const body = await res.json().catch(() => null);
+  return { ended: res.status === 400 && ACCESS_ENDED.has(String((body && body.error) || "")) };
+};
 async function accessToken(env, refreshToken, fetchImpl) {
   const res = await fetchImpl("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -408,9 +431,9 @@ async function accessToken(env, refreshToken, fetchImpl) {
       refresh_token: refreshToken, grant_type: "refresh_token"
     })
   });
-  if (!res.ok) return null;
+  if (!res.ok) return refused(res);
   const body = await res.json().catch(() => null);
-  return body && body.access_token ? body.access_token : null;
+  return body && body.access_token ? { access: body.access_token } : { ended: false };
 }
 
 // Microsoft may hand back a new refresh token each time; the newest is kept so the connection doesn't lapse.
@@ -423,22 +446,45 @@ async function msAccessToken(env, refreshToken, fetchImpl) {
       refresh_token: refreshToken, grant_type: "refresh_token", scope: OUTLOOK_SCOPE
     })
   });
-  if (!res.ok) return null;
+  if (!res.ok) return refused(res);
   const body = await res.json().catch(() => null);
-  return body && body.access_token ? { access: body.access_token, refresh: typeof body.refresh_token === "string" ? body.refresh_token : null } : null;
+  return body && body.access_token ? { access: body.access_token, refresh: typeof body.refresh_token === "string" ? body.refresh_token : null } : { ended: false };
 }
-// An access token for whichever mailbox the shopper connected (row from gmail_connections), or null if it must be reconnected.
-async function mailToken(env, shopperId, row, fetchImpl) {
-  const refresh = await decrypt(env, row.token_iv, row.token_data);
-  if (row.provider !== "microsoft") return accessToken(env, refresh, fetchImpl);
-  if (!outlookConfigured(env)) return null;
-  const t = await msAccessToken(env, refresh, fetchImpl);
-  if (!t) return null;
+// Records whether Relay's access to an inbox works (see ensureHealthColumns): "reconnect" when it has ended, cleared when it
+// works. A busy or unreachable Google or Microsoft changes nothing.
+async function noteAccess(env, boxId, works) {
+  try {
+    await ensureHealthColumns(env.RELAY_DB);
+    if (works) await env.RELAY_DB.prepare("UPDATE gmail_connections SET mail_problem = NULL, mail_problem_at = NULL WHERE shopper_id = ? AND mail_problem IS NOT NULL").bind(boxId).run();
+    else await env.RELAY_DB.prepare("UPDATE gmail_connections SET mail_problem = 'reconnect', mail_problem_at = COALESCE(mail_problem_at, ?) WHERE shopper_id = ?").bind(Date.now(), boxId).run();
+  } catch { /* the reading itself carries on either way */ }
+}
+// Access to whichever mailbox the shopper connected (row from gmail_connections): { token }, or { ended: true } when it has to
+// be connected again, or { busy: true } when Google or Microsoft couldn't give it just now (tried again later).
+async function mailAccess(env, shopperId, row, fetchImpl) {
+  if (row.provider === "microsoft" && !outlookConfigured(env)) return { busy: true };
+  let refresh, t;
+  try {
+    refresh = await decrypt(env, row.token_iv, row.token_data);
+    t = row.provider === "microsoft" ? await msAccessToken(env, refresh, fetchImpl) : await accessToken(env, refresh, fetchImpl);
+  } catch { return { busy: true }; }
+  if (!t.access) {
+    if (!t.ended) return { busy: true };
+    await noteAccess(env, shopperId, false);
+    return { ended: true };
+  }
+  await noteAccess(env, shopperId, true);
   if (t.refresh && t.refresh !== refresh) {
     const enc = await encrypt(env, t.refresh);
     await env.RELAY_DB.prepare("UPDATE gmail_connections SET token_iv = ?, token_data = ? WHERE shopper_id = ?").bind(enc.iv, enc.data, shopperId).run();
   }
-  return t.access;
+  return { token: t.access };
+}
+// What each kind of read answers when there's no access: connect again, or try again in a moment.
+const noAccess = (a) => a.ended ? { status: 401, error: "gmail_reconnect_needed" } : { status: 502, error: "gmail_unavailable" };
+async function mailToken(env, shopperId, row, fetchImpl) {
+  const a = await mailAccess(env, shopperId, row, fetchImpl);
+  return a.token || null;
 }
 // For instant email (mail-push.js): an access token for one inbox, or null when it has to be connected again.
 export async function accessTokenFor(env, boxId, fetchImpl) {
@@ -840,8 +886,9 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data, last_scan_at, provider, full_rev FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
-  const token = await mailToken(env, boxId, row, fetchImpl);
-  if (!token) return { status: 401, body: { error: "gmail_reconnect_needed" } };
+  const access = await mailAccess(env, boxId, row, fetchImpl);
+  if (!access.token) { const n = noAccess(access); return { status: n.status, body: { error: n.error } }; }
+  const token = access.token;
   const box = row.provider === "microsoft" ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token);
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
@@ -852,6 +899,8 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   const limitDay = yr ? yr + "/01/01" : ymd(sinceLast);
   const top = yr ? (yr + 1) + "/01/01" : ymd(now + DAY_MS);
   let before = /^\d{4}\/\d{2}\/\d{2}$/.test(cursorIn || "") && cursorIn <= top && cursorIn > limitDay ? cursorIn : top;
+  // A read that starts at today's mail is a check of the inbox (once its first stretch is read, see mail_ok_at below).
+  const fromTop = !yr && before === top;
   // A read for a new-mail notice lists only the last few days (o.span) rather than a whole month.
   let incomplete = false, windows = 0, outOfBudget = false, span = o.span || WINDOW_DAYS;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
@@ -975,6 +1024,12 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     // A finished read of the whole look-back period also records which full read it was (see OUTLOOK_FULL_REV).
     if (sinceLast === fullLimit) await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").bind(now, FULL_REV, boxId).run();
     else await env.RELAY_DB.prepare("UPDATE gmail_connections SET last_scan_at = ? WHERE shopper_id = ?").bind(now, boxId).run();
+  }
+  // Today's mail was read without a problem: that's what the app shows as "Checked" (a read that stopped part-way through
+  // its first stretch, or one of older mail only, isn't a check of what's new).
+  if (fromTop && (windows > 1 || (windows === 1 && !incomplete))) {
+    await ensureHealthColumns(env.RELAY_DB);
+    await env.RELAY_DB.prepare("UPDATE gmail_connections SET mail_ok_at = ? WHERE shopper_id = ?").bind(now, boxId).run();
   }
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
@@ -1127,8 +1182,9 @@ async function readReceiptEmail(env, shopperId, d, fetchImpl) {
   if (!conn) return { status: 409, error: "gmail_not_connected" };
   const outlook = conn.provider === "microsoft", mid = outlook ? d.outlookId : d.gmailId;
   if (typeof mid !== "string" || !(outlook ? OUTLOOK_ID : GMAIL_ID).test(mid)) return { status: 404, error: "email_not_found" };
-  const token = await mailToken(env, fromBox, conn, fetchImpl);
-  if (!token) return { status: 401, error: "gmail_reconnect_needed" };
+  const access = await mailAccess(env, fromBox, conn, fetchImpl);
+  if (!access.token) return noAccess(access);
+  const token = access.token;
   const raw = await (outlook ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token)).read(mid);
   if (raw === GONE) return { status: 404, error: "email_not_found" };
   return typeof raw === "string" ? { raw } : { status: 502, error: "gmail_unavailable" };
@@ -1139,8 +1195,9 @@ async function tokenFor(env, shopperId, fetchImpl) {
   const row = await env.RELAY_DB.prepare(
     "SELECT token_iv, token_data, provider FROM gmail_connections WHERE shopper_id = ?").bind(shopperId).first();
   if (!row) return { status: 409, body: { error: "gmail_not_connected" } };
-  const token = await mailToken(env, shopperId, row, fetchImpl);
-  return token ? { token, provider: row.provider === "microsoft" ? "microsoft" : "google" } : { status: 401, body: { error: "gmail_reconnect_needed" } };
+  const access = await mailAccess(env, shopperId, row, fetchImpl);
+  if (!access.token) { const n = noAccess(access); return { status: n.status, body: { error: n.error } }; }
+  return { token: access.token, provider: row.provider === "microsoft" ? "microsoft" : "google" };
 }
 
 // Nothing here is stored: the list is for the shopper to choose from.
@@ -1657,8 +1714,15 @@ export async function handleGmailCallback(request, env, url, opts) {
     if (p.ok) googleEmail = (await p.json()).emailAddress || null;
   } catch { googleEmail = null; }
   if (await inboxTaken(env, claimed.shopper_id, null, googleEmail)) return back("already_connected");
+  const again = await connectedAgain(env, claimed.shopper_id, null, googleEmail);
   await saveConnection(env, claimed.shopper_id, null, googleEmail, tokens.refresh_token, opts.now);
-  return back(slotOf(claimed.shopper_id) ? "added" : "connected");
+  return back(again ? "reconnected" : slotOf(claimed.shopper_id) ? "added" : "connected");
+}
+// The same inbox was already in this place: it has been connected again (Relay's access had ended), not added.
+async function connectedAgain(env, boxId, provider, address) {
+  if (!address) return false;
+  const was = await env.RELAY_DB.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
+  return Boolean(was && (was.provider === "microsoft") === (provider === "microsoft") && String(was.google_email || "").toLowerCase() === String(address).toLowerCase());
 }
 // Whether this address is already another of the shopper's inboxes (an inbox is only ever read once).
 async function inboxTaken(env, boxId, provider, address) {
@@ -1675,6 +1739,7 @@ export async function saveConnection(env, shopperId, provider, address, refreshT
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
   await ensurePushColumns(env.RELAY_DB);
+  await ensureHealthColumns(env.RELAY_DB);
   const same = "gmail_connections.provider IS excluded.provider AND gmail_connections.google_email IS excluded.google_email";
   // A different mailbox in this place gets its own instant-email watch or subscription (mail-push.js sets one up within a
   // minute); the old one's notices no longer match anything and it lapses on its own. The same mailbox keeps its own.
@@ -1689,7 +1754,8 @@ export async function saveConnection(env, shopperId, provider, address, refreshT
        push_ref=CASE WHEN ${same} THEN gmail_connections.push_ref END,
        push_secret=CASE WHEN ${same} THEN gmail_connections.push_secret END,
        push_history=CASE WHEN ${same} THEN gmail_connections.push_history END,
-       push_tried_at=NULL, push_error=NULL`)
+       mail_ok_at=CASE WHEN ${same} THEN gmail_connections.mail_ok_at END,
+       push_tried_at=NULL, push_error=NULL, mail_problem=NULL, mail_problem_at=NULL`)
     .bind(shopperId, address, enc.iv, enc.data, now, provider).run();
   // The first read starts straight away on Relay's side, so it happens even if the shopper closes the app at once.
   await startScanJob(env, shopperId, now, { restart: true });
@@ -1740,8 +1806,9 @@ export async function handleOutlookCallback(request, env, url, opts) {
     if (p.ok) { const me = await p.json(); address = (typeof me.mail === "string" && me.mail) || (typeof me.userPrincipalName === "string" && me.userPrincipalName) || null; }
   } catch { address = null; }
   if (await inboxTaken(env, claimed.shopper_id, "microsoft", address)) return back("already_connected");
+  const again = await connectedAgain(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null);
   await saveConnection(env, claimed.shopper_id, "microsoft", address ? address.slice(0, 254) : null, tokens.refresh_token, opts.now);
-  return back(slotOf(claimed.shopper_id) ? "added" : "connected");
+  return back(again ? "reconnected" : slotOf(claimed.shopper_id) ? "added" : "connected");
 }
 
 // Routes for a signed-in shopper. Returns a Response, or null if the path is not ours.
@@ -1767,11 +1834,19 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   if (path === "/relay/my/gmail/connect" && m === "POST") {
     const cb = await request.json().catch(() => ({}));
-    const outlook = Boolean(cb && cb.provider === "microsoft");
+    // "Connect again" (again: the inbox's number, 1 for the first): the same inbox through Google's or Microsoft's own sign-in
+    // once more, when Relay's access to it has ended. It keeps its place and its receipts, and its own address is suggested.
+    const againSlot = cb && Number.isInteger(cb.again) && cb.again >= 1 && cb.again <= MAX_INBOXES ? cb.again : null;
+    const againRow = againSlot ? await env.RELAY_DB.prepare("SELECT provider, google_email FROM gmail_connections WHERE shopper_id = ?")
+      .bind(boxIdOf(shopper.id, againSlot)).first() : null;
+    if (againSlot && !againRow) return json({ error: "gmail_not_connected" }, 409, cors);
+    const outlook = againRow ? againRow.provider === "microsoft" : Boolean(cb && cb.provider === "microsoft");
     if (outlook ? !outlookConfigured(env) : !gmailConfigured(env)) return json({ error: "gmail_not_configured" }, 503, cors);
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
-    let boxId = shopper.id;
-    const another = Boolean(cb && cb.another === true);
+    let boxId = againRow ? boxIdOf(shopper.id, againSlot) : shopper.id;
+    const another = !againRow && Boolean(cb && cb.another === true);
+    // Which account Google's or Microsoft's page suggests: the inbox being connected again, or the shopper's own address.
+    const hint = againRow ? againRow.google_email : another ? null : shopper.email;
     if (another) {
       const have = await inboxesOf(env.RELAY_DB, shopper.id);
       if (!have.some(x => x.shopper_id === shopper.id)) boxId = shopper.id;   // no first inbox yet: this one is the first
@@ -1790,13 +1865,13 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (outlook) {
       const ms = new URLSearchParams({
         client_id: env.MICROSOFT_CLIENT_ID, response_type: "code", redirect_uri: microsoftRedirect(env, url), response_mode: "query",
-        scope: OUTLOOK_SCOPE, state, prompt: "select_account", ...(another ? {} : { login_hint: shopper.email })
+        scope: OUTLOOK_SCOPE, state, prompt: "select_account", ...(hint ? { login_hint: hint } : {})
       });
       return json({ url: MS_AUTH + "/authorize?" + ms }, 200, cors);
     }
     const params = new URLSearchParams({
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: redirectUri(env, url), response_type: "code", scope: SCOPE,
-      access_type: "offline", prompt: another ? "consent select_account" : "consent", include_granted_scopes: "false", state, ...(another ? {} : { login_hint: shopper.email })
+      access_type: "offline", prompt: another ? "consent select_account" : "consent", include_granted_scopes: "false", state, ...(hint ? { login_hint: hint } : {})
     });
     return json({ url: "https://accounts.google.com/o/oauth2/v2/auth?" + params }, 200, cors);
   }
@@ -1805,17 +1880,23 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     // 15 minutes". Only while the watch or subscription is in force and Relay is set up to hear it.
     const now = (opts && opts.now) || Date.now();
     const instant = x => Boolean(x.push_expires_at && x.push_expires_at > now && (x.provider === "microsoft" ? outlookPushOn(env) : gmailPushOn(env)));
+    // How each inbox is doing, from reads that worked only (see ensureHealthColumns): checkedAt is when Relay last read its
+    // mail without a problem, and needsReconnect says Google or Microsoft ended Relay's access, so the app can say so and
+    // offer to connect it again. (autoAt keeps its name for copies of the app from before, which show the later of it and
+    // lastScanAt as "Checked": it used to be when the 15-minute check last had a go, even one that failed.)
+    const health = x => ({ autoAt: x.mail_ok_at || null, checkedAt: Math.max(x.mail_ok_at || 0, x.last_scan_at || 0) || null,
+      needsReconnect: x.mail_problem === "reconnect" });
     const c = await env.RELAY_DB.prepare(
       "SELECT * FROM gmail_connections WHERE shopper_id = ?").bind(shopper.id).first()
       .then(x => x && { provider: x.provider === "microsoft" ? "microsoft" : "google", googleEmail: x.google_email, email: x.google_email,
-        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, instant: instant(x) });
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, ...health(x), instant: instant(x) });
     // A scan in progress (or just finished), so the app can show it carrying on after the shopper comes back.
     const scanJob = c ? jobView(await jobOf(env, shopper.id)) : null;
     // Other inboxes, each with how its reading is going.
     const others = c ? await Promise.all((await inboxesOf(env.RELAY_DB, shopper.id)).filter(x => x.shopper_id !== shopper.id).map(async x => {
       const j = jobView(await jobOf(env, x.shopper_id));
       return { mailbox: slotOf(x.shopper_id), provider: x.provider === "microsoft" ? "microsoft" : "google", email: x.google_email,
-        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, autoAt: x.auto_at || null, instant: instant(x), ...(j ? { scan: j } : {}) };
+        connectedAt: x.connected_at, lastScanAt: x.last_scan_at, ...health(x), instant: instant(x), ...(j ? { scan: j } : {}) };
     })) : [];
     return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}), others, maxInboxes: MAX_INBOXES }, 200, cors);
   }
@@ -1920,8 +2001,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const outlook = conn.provider === "microsoft";
     const mid = outlook ? d.outlookId : d.gmailId;
     if (typeof mid !== "string" || !(outlook ? OUTLOOK_ID : GMAIL_ID).test(mid)) return json({ error: "email_not_found" }, 404, cors);
-    const token = await mailToken(env, fromBox, conn, opts.fetchImpl);
-    if (!token) return json({ error: "gmail_reconnect_needed" }, 401, cors);
+    const access = await mailAccess(env, fromBox, conn, opts.fetchImpl);
+    if (!access.token) { const n = noAccess(access); return json({ error: n.error }, n.status, cors); }
+    const token = access.token;
     const r = outlook ? await buildOriginalOutlook(opts.fetchImpl, token, mid) : await buildOriginal(opts.fetchImpl, token, mid);
     return json(r.body, r.status, { ...cors, "Cache-Control": "no-store" });
   }

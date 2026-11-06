@@ -29,11 +29,12 @@ await ctx.route("https://**/*", async route => {
   const body = () => { try { return JSON.parse(route.request().postData() || "{}"); } catch { return {}; } };
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
-  if (p === "/relay/my/gmail" && m === "GET") return j({ connected: true, provider: "google", email: EMAIL, googleEmail: EMAIL, lastScanAt: Date.now() - 6e5, others: st.others, maxInboxes: 5 });
+  if (p === "/relay/my/gmail" && m === "GET") return j({ connected: true, provider: "google", email: EMAIL, googleEmail: EMAIL, lastScanAt: Date.now() - 6e5, needsReconnect: Boolean(st.mainProblem), others: st.others, maxInboxes: 5 });
   if (p === "/relay/my/gmail/connect") {
     st.connects.push(body());
     if (st.connectError) return j({ error: st.connectError, max: 5 }, 409);
-    return j({ url: body().provider === "microsoft" ? "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?state=x" : "https://accounts.google.com/o/oauth2/v2/auth?state=x" });
+    const again = body().again, ms = again ? again > 1 && (st.others.find(o => o.mailbox === again) || {}).provider === "microsoft" : body().provider === "microsoft";
+    return j({ url: ms ? "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?state=x" : "https://accounts.google.com/o/oauth2/v2/auth?state=x" });
   }
   if (p === "/relay/my/gmail/disconnect") {
     const b = body(); st.disconnects.push(b);
@@ -103,8 +104,9 @@ await page.locator(".rl-ptile", { hasText: "Email connection" }).getByText("2 in
 await mailPage();
 const rows = page.locator(".rl-ibx-row");
 assert.equal(await rows.count(), 2);
-assert.match(await rows.nth(0).innerText(), new RegExp(EMAIL.replace(/\./g, "\\.") + "[\\s\\S]*Gmail · main inbox · Checked today at \\d\\d:\\d\\d"));
-assert.match(await rows.nth(1).innerText(), /jess\.home@outlook\.com[\s\S]*Outlook · Reading… 4 found so far/);
+assert.match(await rows.nth(0).innerText(), new RegExp(EMAIL.replace(/\./g, "\\.") + "[\\s\\S]*Gmail, your main inbox, checked today at \\d\\d:\\d\\d"));
+assert.match(await rows.nth(1).innerText(), /jess\.home@outlook\.com[\s\S]*Outlook, reading now: 4 found so far/);
+assert.ok(!(await page.locator(".rl-ibx").innerText()).includes("·"), "said plainly, not glued together with dots");
 await view.getByRole("button", { name: "Disconnect " + EMAIL }).waitFor();
 await view.getByRole("button", { name: "Disconnect " + HOME }).waitFor();
 await view.getByText("Shop with more than one email address? Add the others and Relay reads them all.").waitFor();
@@ -179,6 +181,51 @@ assert.deepEqual(st.adds, [{ messageId: "AAMkOutlookMsg0001", mailbox: 2 }], "ad
 await view.getByRole("button", { name: "Add an Outlook inbox" }).waitFor();
 await polished("add a receipt, two inboxes", "#mePage");
 console.log("ok - Add a receipt searches every inbox, shows which inbox each email is in, and adds from that one");
+
+// 5. An inbox whose access ended: Profile and its tab say so, the Email connection page offers Connect again (that same
+//    inbox, asked for once even on a double tap, then Microsoft's page), and coming back says it's connected again.
+reset({ others: [{ mailbox: 2, provider: "microsoft", email: HOME, lastScanAt: Date.now() - 36e5, checkedAt: Date.now() - 36e5, needsReconnect: true }] });
+await signedIn();
+const tabNumber = page.locator('#foot [data-tab="me"] .tab-badge');
+await tabNumber.waitFor();
+assert.equal(await tabNumber.innerText(), "1", "a red number on the Profile tab");
+assert.match(await page.locator('#foot [data-tab="me"]').getAttribute("aria-label"), /^Profile, an inbox needs connecting again$/);
+assert.equal(await page.locator('#foot [data-tab="profile"] .tab-badge').count(), 0, "on Profile, where Email connection is, not Home");
+await profile();
+await page.locator(".rl-ptile", { hasText: "Email connection" }).getByText("Needs connecting again").waitFor();
+await mailPage();
+assert.match(await rows.nth(1).innerText(), /jess\.home@outlook\.com[\s\S]*Outlook needs connecting again/);
+await view.getByText("Relay can't read one of your inboxes at the moment. Connect it again and Relay catches up on what it missed. Your receipts stay as they are.").waitFor();
+await polished("email connection, connect again", "#mePage");
+await view.getByRole("button", { name: "Connect " + HOME + " again" }).dblclick();
+await page.waitForURL(/login\.microsoftonline\.com/);
+assert.deepEqual(st.connects, [{ again: 2 }], "asked once, for that same inbox");
+await page.goto(origin + "/index.html");
+assert.equal(await page.evaluate(() => sessionStorage.getItem("relay.reconnecting")), "1");
+st.others[0].needsReconnect = false;
+await page.goto(origin + "/index.html#outlook=reconnected");
+await page.getByText("Outlook is connected again. Relay is catching up on what it missed, and new receipts come in as before.").waitFor();
+assert.equal(await page.evaluate(() => sessionStorage.getItem("relay.reconnecting")), null, "the note is used once");
+await page.evaluate(() => window.go("home")); await page.waitForTimeout(400);
+assert.equal(await tabNumber.count(), 0, "the red number goes once it's connected again");
+console.log("ok - an inbox whose access ended: the Profile tab, its tile and its row say so; Connect again asks once for that inbox and says when it's back");
+
+// 6. The first inbox's access ended: Receipts says so at the top, with the button; cancelling at Google says it still can't read it.
+reset({ mainProblem: true, others: [] });
+await signedIn();
+await page.evaluate(() => window.go("receipts"));
+const fixCard = page.locator(".rl-recfix");
+await fixCard.getByText("Relay can't read your Gmail right now").waitFor();
+await fixCard.getByText("Google has ended Relay's access to " + EMAIL + ", so new receipts and parcel updates aren't coming in. Connect it again and Relay catches up on what it missed.").waitFor();
+await polished("receipts, connect again", "#receiptsPage");
+await fixCard.getByRole("button", { name: "Connect Gmail again" }).dblclick();
+await page.waitForURL(/accounts\.google\.com/);
+assert.deepEqual(st.connects, [{ again: 1 }]);
+await page.goto(origin + "/index.html");
+await page.goto(origin + "/index.html#gmail=denied");
+await page.getByText("Gmail wasn't connected again, so Relay still can't read it. You can try again from Profile, then Email connection.").waitFor();
+console.log("ok - the first inbox's access ended: Receipts says so first with Connect Gmail again; cancelling says it still can't read it");
+
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS more than one inbox in the app: listed, added, removed one at a time, and searched together (stubbed server)");
 await browser.close(); server.close();

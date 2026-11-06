@@ -135,4 +135,29 @@ sqlite.prepare("INSERT INTO resale_report_reviews (report_id, outcome, reviewed_
 clock = Date.UTC(2026, 10, 10, 8, 0); emails = []; await run();
 assert.ok(!/Swap & resell report/.test(emails.find(e => /this morning/.test(e.subject)).text), "gone once reviewed");
 console.log("ok - Swap & resell reports waiting for review are in the morning summary, counts only");
+// Checked means a check that worked. Automatic checks that read the inbox fine count, even with nobody checking by hand
+// (that used to raise "No inbox has been checked for 77 hours" for an inbox read every 15 minutes); checks that keep
+// failing don't, and when Google or Microsoft ended Relay's access to every inbox the alert says so.
+stalled = true;
+clock = Date.UTC(2026, 10, 11, 13, 0); sqlite.prepare("DELETE FROM auth_code_failures").run(); sqlite.prepare("DELETE FROM mail_scan_jobs").run();
+sqlite.prepare("UPDATE gmail_connections SET last_scan_at = ?, mail_ok_at = ?").run(clock - 77 * H, clock - 600e3);
+emails = []; r = await run();
+assert.ok(!(r.alerts || []).includes("checks_stalled"), "read 10 minutes ago by the automatic check: no alert");
+sqlite.prepare("UPDATE gmail_connections SET mail_ok_at = ?, mail_problem = 'reconnect', mail_problem_at = ?").run(clock - 5 * H, clock - 5 * H);
+emails = []; r = await run();
+assert.ok(r.alerts.includes("checks_stalled"), "the automatic check still runs but fails: that isn't checked");
+const ended = emails.find(e => e.subject === "Relay alert: No inbox has been checked for 5 hours");
+assert.match(ended.text, /Google or Microsoft ended Relay's access to every connected inbox/);
+// Several inboxes whose access ended within the hour: Google or Microsoft may have stopped Relay's access.
+const box = (id, at) => sqlite.prepare("INSERT INTO gmail_connections (shopper_id, google_email, token_iv, token_data, connected_at, last_scan_at, mail_ok_at, mail_problem, mail_problem_at) VALUES (?,?,?,?,?,?,?,?,?)")
+  .run(id, id + "@example.com", "iv", "d", clock - 48 * H, clock - 48 * H, clock - 2 * H, "reconnect", at);
+box("x1", clock - 600e3); box("x2", clock - 900e3); box("x3", clock - 1200e3);
+emails = []; r = await run();
+assert.ok(r.alerts.includes("reconnects"));
+assert.ok(emails.some(e => e.subject === "Relay alert: 3 inboxes need connecting again"));
+assert.ok(!JSON.stringify(emails).includes("x1@example.com"), "no addresses");
+// The morning summary counts the inboxes waiting to be connected again, now (their owners have a button for it).
+clock = Date.UTC(2026, 10, 12, 8, 0); emails = []; await run();
+assert.match(emails.find(e => /this morning/.test(e.subject)).text, /- 4 inboxes need connecting again \(their owners see a Connect again button in the app\)\./);
+console.log("ok - only checks that worked count as checked; access ended to every inbox, or to several in an hour, is said plainly");
 console.log("PASS health emails: morning summary from 8am, counts only, alerts in plain words at most every " + ALERT_GAP_HOURS + " hours, admins only");

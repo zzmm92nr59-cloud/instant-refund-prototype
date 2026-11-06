@@ -35,7 +35,7 @@ const hidden = {
   m79: `From: lululemon <hello@e.lululemon.test>\nSubject: Thanks for your return request for your lululemon order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nReturn ID: RT-5551234\nOrder Id: #UK04002516\nSend it back no later than December 24.\nEstimated refund: £118.00\nOrder Total £118.00\n`
 };
 let calls = [];
-let refreshOk = true;
+let refreshOk = true, refreshBusy = false;
 let paging = false;
 const listQueries = [];
 const boxDates = {};
@@ -57,7 +57,9 @@ const fetchImpl = async (url, init = {}) => {
         : p.get("code") === "narrow-scope"
           ? Response.json({ access_token: "a", refresh_token: REFRESH, scope: "openid" })
           : new Response("{}", { status: 400 });
-    return refreshOk ? Response.json({ access_token: "access-2" }) : new Response("{}", { status: 400 });
+    // Google's own answers: a sign-in that has ended (expired, or taken back) is "invalid_grant"; Google being down is a 503.
+    return refreshOk ? Response.json({ access_token: "access-2" }) : refreshBusy ? new Response("{}", { status: 503 })
+      : Response.json({ error: "invalid_grant", error_description: "Token has been expired or revoked." }, { status: 400 });
   }
   if (url.startsWith("https://cdn.exampleoutfitters.test/") || url.startsWith("http://insecure.test/")) {
     imageCalls.push(url);
@@ -574,10 +576,31 @@ assert.equal((await post(`/relay/my/receipts/${mine[1].id}/dismiss`, alice)).sta
 const after = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts;
 assert.deepEqual(after.map(x => x.status), ["confirmed"]);
 
-// 9. Google rejecting the stored connection is reported, not hidden.
-refreshOk = false;
+// 9. Google rejecting the stored connection is reported, not hidden: the inbox says it needs connecting again until access
+//    works again. Google being down for a moment is only "busy" (tried again), never "connect again".
+const gm = async () => (await call("/relay/my/gmail", { token: alice })).json();
+const fine = await gm();
+assert.equal(fine.needsReconnect, false);
+assert.ok(fine.checkedAt, "a read that worked counts as a check");
+clock += 60000;
+refreshOk = false; refreshBusy = true;
+assert.equal((await post("/relay/my/gmail/scan", alice)).status, 502, "Google down: busy, not connect again");
+assert.equal((await gm()).needsReconnect, false, "a busy Google never says connect again");
+refreshBusy = false;
 assert.equal((await post("/relay/my/gmail/scan", alice)).status, 401);
+const ended = await gm();
+assert.equal(ended.needsReconnect, true, "access ended: the app is told");
+assert.equal(ended.checkedAt, fine.checkedAt, "Checked is the last read that worked, not this failed one");
+assert.equal(ended.autoAt, fine.autoAt, "nor for copies of the app from before");
+assert.equal(sqlite.prepare("SELECT g.mail_problem AS p FROM gmail_connections g JOIN shoppers s ON s.id = g.shopper_id WHERE s.email = 'alice@example.com'").get().p, "reconnect");
+refreshBusy = true;
+assert.equal((await post("/relay/my/gmail/scan", alice)).status, 502);
+assert.equal((await gm()).needsReconnect, true, "busy changes nothing either way");
+refreshBusy = false;
 refreshOk = true;
+assert.equal((await post("/relay/my/gmail/scan", alice)).status, 200, "access works again");
+assert.equal((await gm()).needsReconnect, false, "and the inbox no longer says it needs connecting again");
+console.log("ok - Google ending Relay's access is said plainly (connect again); Google being busy isn't; it clears once access works");
 assert.equal((await post("/relay/my/gmail/scan", bob)).status, 403, "Bob has no consent");
 await post("/relay/my/consent", bob, { version: CONSENT_VERSION });
 assert.equal((await post("/relay/my/gmail/scan", bob)).status, 409, "Bob consented but has not connected Gmail");

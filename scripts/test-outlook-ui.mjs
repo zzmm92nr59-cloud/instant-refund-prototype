@@ -151,7 +151,7 @@ await page.evaluate(() => window.RelayAccount.open());
 await page.locator(".rl-ptile", { hasText: "Outlook connected" }).click();
 await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Disconnect jess.tester@outlook.com" }).count());
-assert.match(await page.locator(".rl-ibx-row").innerText(), /jess\.tester@outlook\.com[\s\S]*Outlook · Checked/);
+assert.match(await page.locator(".rl-ibx-row").innerText(), /jess\.tester@outlook\.com[\s\S]*Outlook, checked/);
 assert.ok(await page.getByText("Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay.").count());
 await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).click();
 await page.getByRole("searchbox", { name: "Search Outlook for a receipt" }).waitFor();

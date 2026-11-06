@@ -109,6 +109,13 @@ assert.deepEqual([h.reading.days.reduce((s, d) => s + d.kept, 0), h.reading.days
 assert.deepEqual([h.inboxes.gmail, h.inboxes.outlook, h.inboxes.shoppers, h.inboxes.checkedToday, h.inboxes.notCheckedToday], [2, 1, 2, 2, 1]);
 assert.deepEqual(h.inboxes.scansThisWeek, { done: 1, failed: 1 });
 assert.deepEqual(h.inboxes.scanErrorsThisWeek, [{ error: "gmail_reconnect_needed", count: 1 }]);
+assert.equal(h.inboxes.needReconnect, 0);
+// Checked counts reads that worked, the automatic check's included (mail_ok_at); an inbox whose access ended is counted.
+sqlite.prepare("UPDATE gmail_connections SET mail_ok_at = ? WHERE shopper_id = ?").run(now - 300e3, B + "~2");
+sqlite.prepare("UPDATE gmail_connections SET mail_problem = 'reconnect', mail_problem_at = ? WHERE shopper_id = ?").run(now - 300e3, A);
+const h2 = await (await call("/relay/my/admin/health", { token: boss })).json();
+assert.deepEqual([h2.inboxes.checkedToday, h2.inboxes.notCheckedToday, h2.inboxes.needReconnect], [3, 0, 1]);
+assert.ok(!JSON.stringify(h2).includes("ann@example.com"), "counts only");
 assert.deepEqual([h.extras.gifts, h.extras.giftGivers], [1, 1], "gifts tagged (not the one untagged)");
 assert.equal(h.people.shoppers, 4); assert.equal(h.people.signedIn, 4);
 console.log("ok - counts: purchases and how confidently they were read, shoppers' corrections, the last 14 days, inboxes, scans, gifts");
