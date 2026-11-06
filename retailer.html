@@ -463,7 +463,7 @@ function aucItemsDraw() {
   const q = $("aucFind").value.trim().toLowerCase();
   const rows = (aucItems || []).filter(i => !q || (i.product + " " + (i.variant || "")).toLowerCase().includes(q)).slice(0, 300);
   $("aucItem").innerHTML = rows.length ? rows.map(i => `<option value="${esc(i.variantKey)}">${esc(i.product)}${i.variant ? ", " + esc(i.variant) : ""} (${gbp(i.priceMinor)}${i.stock != null ? ", " + i.stock + " in stock" : ""})</option>`).join("")
-    : `<option value="" disabled>${aucItems && aucItems.length ? "Nothing matches that" : "Your Shopify items show here once Relay has read your catalogue"}</option>`;
+    : `<option value="" disabled>${aucItems === null ? "Getting your items…" : aucItems.length ? "Nothing matches that" : "Your Shopify items show here once Relay has read your catalogue"}</option>`;
 }
 $("aucNew").onclick = async () => {
   $("aucForm").classList.toggle("hidden"); fillAucForm(); aucKindShow(); $("aucFormMsg").className = "msg hidden"; $("aucMsg").className = "msg hidden";

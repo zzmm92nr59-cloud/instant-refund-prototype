@@ -80,7 +80,7 @@ console.log("ok - the shop sees each auction and what happened to it in words, w
 // 2. Starting one from the catalogue: search, pick, condition, prices, how long, the promise; sent once.
 await page.getByRole("button", { name: "Start an auction" }).click();
 const form = page.locator("#aucForm");
-await form.locator("#aucItem option").first().waitFor({ state: "attached" });
+await form.locator("#aucItem option", { hasText: "Wool Beanie" }).waitFor({ state: "attached" });
 await page.locator("#aucFind").fill("tee");
 assert.deepEqual(await form.locator("#aucItem option").allInnerTexts(), ["Field Tee (£35.00, 0 in stock)"]);
 await page.locator("#aucFind").fill("");
