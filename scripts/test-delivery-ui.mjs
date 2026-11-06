@@ -1,6 +1,6 @@
 // Browser test: delivery details, and Buy filling in a shop's checkout with them. Stubbed Relay server, made-up person,
 // shop and product; nothing reaches a shop.
-// Checks: Profile has Delivery details (Shopping); the form names what to fix in plain words, saves once, and the row shows
+// Checks: Profile has a Delivery details tile; the form names what to fix in plain words, saves once, and the row shows
 // the address; on a product from a shop's website, Buy opens a sheet saying what goes to the shop, Continue asks Relay once
 // (a double tap too), then says what was filled in (only what the shop took) with the shop's checkout to open; without
 // details it offers to add them first, or to go without; when the shop can't be asked, it says so and offers the shop's
@@ -17,7 +17,7 @@ const EMAIL = "jess.tester@example.com";
 const CHECKED = new Date(Date.now() - 2 * 36e5).toISOString();
 const web = [{ sku: "web:hollow-pine.test:72", product: "Wool Beanie", variation: "Navy", priceMinor: 2800, currency: "GBP", imageUrl: null, quantity: null, inStock: true,
   storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=72", kind: "Hats", checkedAt: CHECKED, webShop: true }];
-const st = { delivery: null, saves: [], checkouts: [], removes: 0, checkout: null, review: false };
+const st = { delivery: null, saves: [], checkouts: [], removes: 0, checkout: null, review: false, lookup: false, lookups: [] };
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
 await ctx.route("https://**/*", async route => {
@@ -26,7 +26,15 @@ await ctx.route("https://**/*", async route => {
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!p.startsWith("/relay/")) return route.abort();
   const body = () => { try { return JSON.parse(req.postData() || "{}"); } catch { return {}; } };
-  if (p === "/relay/my/delivery" && m === "GET") return j({ delivery: st.delivery });
+  if (p === "/relay/my/delivery" && m === "GET") return j({ delivery: st.delivery, lookup: Boolean(st.lookup) });
+  if (p === "/relay/my/address-lookup") {
+    st.lookups.push(u.searchParams.get("postcode")); await new Promise(r => setTimeout(r, 150));
+    if (u.searchParams.get("postcode") === "SW11 1AX") return j({ error: "postcode_not_found", suggestions: ["SW11 1AA"] }, 404);
+    return j({ postcode: "SW11 1AA", addresses: [
+      { label: "Flat 1, 12 High Street", line1: "12 High Street", line2: "Flat 1", town: "London", county: "London", postcode: "SW11 1AA" },
+      { label: "Flat 2, 12 High Street", line1: "12 High Street", line2: "Flat 2", town: "London", county: "London", postcode: "SW11 1AA" },
+      { label: "14 High Street", line1: "14 High Street", line2: null, town: "London", county: "London", postcode: "SW11 1AA" }] });
+  }
   if (p === "/relay/my/delivery" && m === "POST") {
     const b = body(); st.saves.push(b); await new Promise(r => setTimeout(r, 150));
     if (!/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/i.test(b.postcode || "")) return j({ error: "bad_field", field: "postcode" }, 400);
@@ -88,9 +96,9 @@ await page.locator("#walletPage").waitFor();
 
 // 1. Profile: Delivery details under Shopping, and the form.
 await page.evaluate(() => window.go("me"));
-const row = page.locator("#mePage .rl-arow", { hasText: "Delivery details" });
+const row = page.locator("#mePage .rl-ptile", { hasText: "Delivery details" });
 await row.getByText("Add your address").waitFor();
-assert.equal(await page.locator("#mePage .rl-agroup").filter({ hasText: "Delivery details" }).locator("h3").textContent(), "Shopping");
+assert.equal(await row.getAttribute("aria-label"), "Delivery details, Add your address", "a tile on Profile");
 await row.click();
 await page.getByRole("button", { name: "Back to Profile" }).waitFor();
 const field = name => page.getByLabel(name, { exact: true });
@@ -110,9 +118,9 @@ await page.getByText("That isn't a UK postcode. Type it like SW11 1AA.").waitFor
 assert.equal(st.saves.length, 1, "saved once for a double tap");
 await field("Postcode").fill("sw11 1aa");
 await page.getByRole("button", { name: "Save", exact: true }).click();
-await row.getByText("12 High Street, SW11 1AA").waitFor();
+await row.getByText("SW11 1AA", { exact: true }).waitFor();
 assert.deepEqual(st.saves[1], { firstName: "Jess", lastName: "Tester", line1: "12 High Street", line2: "", town: "London", county: "", postcode: "sw11 1aa", phone: "07700 900456" });
-console.log("ok - Profile: Delivery details under Shopping; the form says what to fix, saves once, and the row shows the address");
+console.log("ok - Profile: a Delivery details tile; the form says what to fix, saves once, and the tile shows the postcode");
 
 // 2. Buy on a product from a shop's website: what goes to the shop, then the checkout with it filled in.
 await page.evaluate(() => window.go("discover"));
@@ -179,6 +187,40 @@ assert.ok(!/Phone/.test(await sheet.locator(".rl-dl-to").innerText()), "no phone
 await polished("buy after adding", ".rl-sheet");
 await sheet.getByRole("button", { name: "Cancel" }).click();
 console.log("ok - without delivery details, Buy offers to add them first (then carries on) or to go without");
+
+// 5. Find address: type the postcode, pick from the addresses there, and the rest is filled in.
+assert.equal(await page.getByRole("button", { name: "Find address" }).count(), 0, "no Find address while Relay's postcode lookup is off");
+st.lookup = true;
+await page.evaluate(() => window.go("discover")); await page.evaluate(() => window.go("me"));
+await row.click();
+const find = page.getByRole("button", { name: "Find address" });
+await find.waitFor();
+assert.deepEqual(await page.locator("#mePage label.rl-jlabel").allTextContents(), ["First name", "Last name", "Postcode", "Address", "Flat, floor or building (optional)",
+  "Town or city", "County (optional)", "Phone number for the courier (optional)"], "the postcode comes first, so it can fill in the rest");
+assert.equal(await field("Postcode").getAttribute("autocomplete"), "postal-code", "and the phone's own AutoFill still fills every field");
+await field("Postcode").fill("sw11 1ax");
+await find.click();
+await page.getByText("Couldn't find SW11 1AX. Did you mean one of these?").waitFor();
+await page.getByRole("button", { name: "SW11 1AA", exact: true }).click();
+const pick = page.getByRole("group", { name: "Addresses at SW11 1AA" });
+await pick.waitFor();
+assert.deepEqual(await pick.getByRole("button").allTextContents(), ["Flat 1, 12 High Street", "Flat 2, 12 High Street", "14 High Street"]);
+await polished("find address", "#mePage");
+await pick.getByRole("button", { name: "Flat 2, 12 High Street" }).click();
+await page.getByText("Filled in. Check it, then save.").waitFor();
+assert.deepEqual(await Promise.all(["Address", "Flat, floor or building (optional)", "Town or city", "County (optional)", "Postcode"].map(n => field(n).inputValue())),
+  ["12 High Street", "Flat 2", "London", "London", "SW11 1AA"]);
+assert.deepEqual(st.lookups, ["SW11 1AX", "SW11 1AA"], "one lookup per tap");
+await page.getByRole("button", { name: "Save", exact: true }).click();
+await row.getByText("SW11 1AA", { exact: true }).waitFor();
+assert.equal(st.saves.at(-1).line2, "Flat 2");
+// A postcode that can't be right isn't looked up at all.
+await row.click();
+await field("Postcode").fill("SW11");
+await page.getByRole("button", { name: "Find address" }).click();
+await page.getByText("Type the whole postcode, like SW11 1AA.").waitFor();
+assert.equal(st.lookups.length, 2);
+console.log("ok - Find address: the postcode first, a list of the addresses there, one tap fills the rest in; a wrong postcode says so");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS delivery details and Buy filling in the shop's checkout");
 await browser.close(); server.close();

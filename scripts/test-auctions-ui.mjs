@@ -196,15 +196,15 @@ await polished("pay", ".rl-sheet");
 await sheet.getByRole("button", { name: "Back to auctions" }).click();
 await sheet.getByRole("button", { name: "Close" }).click();
 await page.evaluate(() => window.go("me"));
-const row = page.locator("#mePage .rl-arow", { hasText: "Auctions" });
-await row.getByText("1 win to pay for").waitFor();
-assert.equal(await page.locator("#mePage .rl-agroup").filter({ hasText: "Auctions" }).locator("h3").textContent(), "Shopping");
+const row = page.locator("#mePage .rl-ptile", { hasText: "Auctions" });
+await row.getByText("1 to pay for").waitFor();
+assert.equal(await row.getAttribute("aria-label"), "Auctions, 1 to pay for");
 await page.evaluate(() => window.go("profile"));
 const badge = page.locator('#foot [data-tab="profile"] .tab-badge');
 await badge.waitFor();
 assert.equal(await badge.textContent(), "1");
 assert.match(await page.locator('#foot [data-tab="profile"]').getAttribute("aria-label"), /1 auction win to pay for$/);
-console.log("ok - Your bids puts a win to pay for first, with the shop's own link to pay; Profile says so, and the tab shows a red number");
+console.log("ok - Your bids puts a win to pay for first, with the shop's own link to pay; Profile's Auctions tile says so, and the tab shows a red number");
 
 // 5. A link from a notification opens that auction.
 await page.evaluate(id => { location.hash = "open=auction&id=" + id; }, A2);

@@ -2,7 +2,7 @@
 // The shop is a stand-in: nothing leaves this machine. Made-up people, addresses and products.
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
-import { cleanDelivery, cleanPostcode, cleanUkPhone, ucpProfile, handleUcpProfileRoute, parseWebSku, checkoutUrlOk, checkoutRequest, checkoutFrom,
+import { townCase, addressFrom, lookupPostcode, LOOKUPS_PER_DAY, LOOKUPS_PER_DAY_ALL, cleanDelivery, cleanPostcode, cleanUkPhone, ucpProfile, handleUcpProfileRoute, parseWebSku, checkoutUrlOk, checkoutRequest, checkoutFrom,
   handleDeliveryRoute, startWebCheckout, deliveryDeleteStatements, deliveryForExport, ensureDeliveryTables, CHECKOUTS_PER_DAY } from "../worker/delivery.js";
 import { ensureWebShopTables, WEB_SHOPS } from "../worker/web-shops.js";
 import { REVIEW_BLOCKED } from "../worker/review-account.js";
@@ -93,7 +93,7 @@ const call = async (path, method = "POST", body) => {
   return { status: r.status, body: await r.json() };
 };
 // No address saved yet: the item and the email only.
-assert.deepEqual((await call("/relay/my/delivery", "GET")).body, { delivery: null });
+assert.deepEqual((await call("/relay/my/delivery", "GET")).body, { delivery: null, lookup: false }, "no postcode lookup until Relay's key is set");
 answer = shopSays({ messages: [{ code: "delivery_address_required", severity: "recoverable" }] });
 let r = await call("/relay/my/web-checkout", "POST", { sku: SKU });
 assert.equal(r.status, 200);
@@ -148,7 +148,7 @@ assert.equal(ex.details.postcode, "SW11 1AA");
 assert.deepEqual(ex.checkoutsStartedAtShops[0], { shop: "Finisterre", product: "Fisherman Beanie", at: new Date(NOW).toISOString(), addressSent: false });
 assert.equal(ex.checkoutsStartedAtShops[1].addressSent, true);
 assert.deepEqual((await call("/relay/my/delivery/remove", "POST")).body, { delivery: null });
-assert.deepEqual((await call("/relay/my/delivery", "GET")).body, { delivery: null });
+assert.deepEqual((await call("/relay/my/delivery", "GET")).body, { delivery: null, lookup: false }, "no postcode lookup until Relay's key is set");
 await call("/relay/my/delivery", "POST", good);
 await db.batch(deliveryDeleteStatements(db, "s-1"));
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM delivery_details").get().n + sqlite.prepare("SELECT COUNT(*) AS n FROM web_checkouts").get().n, 0, "deleting the account deletes both");
@@ -164,4 +164,49 @@ for (const [path, body, ok] of [["/relay/my/delivery", good, true], ["/relay/my/
   assert.equal(!res || !res.response, ok, path + " " + JSON.stringify(body).slice(0, 60));
 }
 console.log("ok - the server takes only the delivery fields and a product, nothing else");
+
+// 7. Finding the address from a postcode (Ideal Postcodes, a stand-in here): only the postcode goes; plain answers.
+assert.equal(townCase("NEWCASTLE UPON TYNE"), "Newcastle upon Tyne"); assert.equal(townCase("STOKE-ON-TRENT"), "Stoke-on-Trent");
+assert.equal(townCase("LONDON"), "London"); assert.equal(townCase("BURTON-ON-TRENT"), "Burton-on-Trent"); assert.equal(townCase("ST. ALBANS"), "St. Albans");
+assert.deepEqual(addressFrom({ line_1: "Flat 3", line_2: "12 High Street", line_3: "", post_town: "LONDON", county: "London", postcode: "SW11 1AA" }),
+  { label: "Flat 3, 12 High Street", line1: "12 High Street", line2: "Flat 3", town: "London", county: "London", postcode: "SW11 1AA" }, "the flat goes on the second line");
+assert.deepEqual(addressFrom({ line_1: "Rose Cottage", line_2: "Mill Lane", line_3: "Little Snoring", post_town: "FAKENHAM", county: "", postcode: "nr21 0aa" }),
+  { label: "Rose Cottage, Mill Lane, Little Snoring", line1: "Rose Cottage", line2: "Mill Lane, Little Snoring", town: "Fakenham", county: null, postcode: "NR21 0AA" });
+assert.equal(addressFrom({ line_1: "", post_town: "LONDON", postcode: "SW11 1AA" }), null);
+const lookups = [];
+let pcAnswer = null;
+const pcFetch = async (url) => { lookups.push(String(url)); const a = pcAnswer; if (a === "down") throw new TypeError("fetch failed");
+  return new Response(JSON.stringify(a.body), { status: a.status, headers: { "Content-Type": "application/json" } }); };
+const look = (pc, who = shopper, envx = { ...env, IDEAL_POSTCODES_KEY: "stand-in-key" }) => lookupPostcode(envx, who, pc, { now: NOW, fetchImpl: pcFetch });
+assert.deepEqual((await look("SW11 1AA", shopper, env)).body, { error: "lookup_off" }, "off without Relay's key");
+assert.equal(lookups.length, 0);
+assert.deepEqual((await look("not a postcode")).body, { error: "bad_postcode" });
+assert.equal(lookups.length, 0, "a postcode that can't be right isn't sent anywhere");
+pcAnswer = { status: 200, body: { code: 2000, message: "Success", result: [
+  { line_1: "Flat 1", line_2: "12 High Street", line_3: "", post_town: "LONDON", county: "London", postcode: "SW11 1AA", udprn: 1 },
+  { line_1: "Flat 2", line_2: "12 High Street", line_3: "", post_town: "LONDON", county: "London", postcode: "SW11 1AA", udprn: 2 },
+  { line_1: "14 High Street", line_2: "", line_3: "", post_town: "LONDON", county: "London", postcode: "SW11 1AA", udprn: 3 }] } };
+let lk = await look("sw111aa");
+assert.equal(lk.status, 200);
+assert.deepEqual(lk.body.addresses.map(a => a.label), ["Flat 1, 12 High Street", "Flat 2, 12 High Street", "14 High Street"]);
+assert.equal(lk.body.postcode, "SW11 1AA");
+assert.match(lookups[0], /^https:\/\/api\.ideal-postcodes\.co\.uk\/v1\/postcodes\/SW111AA\?api_key=stand-in-key$/, "only the postcode (and Relay's key) is sent");
+pcAnswer = { status: 404, body: { code: 4040, message: "Postcode not found", suggestions: ["SW1A 2AA", "SW1A 2AB"] } };
+assert.deepEqual((await look("SW1A 2AX")).body, { error: "postcode_not_found", suggestions: ["SW1A 2AA", "SW1A 2AB"] });
+pcAnswer = { status: 402, body: { code: 4020, message: "Token balance depleted" } };
+assert.deepEqual((await look("SW11 1AA")).body, { error: "lookup_unavailable" }, "a key out of lookups: the shopper types the address");
+pcAnswer = "down";
+assert.deepEqual((await look("SW11 1AA")).body, { error: "lookup_unavailable" });
+pcAnswer = { status: 200, body: { code: 2000, result: [] } };
+for (let i = sqlite.prepare("SELECT COUNT(*) AS n FROM address_lookups WHERE shopper_id = 's-1'").get().n; i < LOOKUPS_PER_DAY; i++) sqlite.prepare("INSERT INTO address_lookups (shopper_id, at) VALUES ('s-1', ?)").run(NOW - 1000);
+const before = lookups.length;
+assert.deepEqual((await look("SW11 1AA")).body, { error: "too_many_lookups" });
+for (let i = 0; i < LOOKUPS_PER_DAY_ALL; i++) sqlite.prepare("INSERT INTO address_lookups (shopper_id, at) VALUES (?, ?)").run("other-" + i, NOW - 1000);
+assert.deepEqual((await look("SW11 1AA", { id: "s-2", email: "x@example.com" })).body, { error: "lookups_busy" });
+assert.equal(lookups.length, before, "over a limit, nothing is asked (or paid for)");
+assert.deepEqual((await handleDeliveryRoute(new Request("https://api.relay.test/relay/my/delivery"), { ...env, IDEAL_POSTCODES_KEY: "k" }, new URL("https://api.relay.test/relay/my/delivery"), {}, { id: "s-9", email: "y@example.com" }, { now: NOW }).then(r => r.json())),
+  { delivery: null, lookup: true }, "the app is told when Find address can be offered");
+await db.batch(deliveryDeleteStatements(db, "s-1"));
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM address_lookups WHERE shopper_id = 's-1'").get().n, 0, "deleting the account deletes the lookup counts");
+console.log("ok - postcode lookup: off without Relay's key; only the postcode is sent; flats on the second line, towns written normally; plain errors; daily limits");
 console.log("PASS delivery details and shops' checkouts filled in");
