@@ -10,6 +10,7 @@ import { ensureShopPlanTable } from "../worker/shopify.js";
 import { REVIEW_BLOCKED } from "../worker/review-account.js";
 import { checkBody, schemaFor } from "../worker/validate.js";
 import { handleRetailerRoute, issueRetailerKey } from "../worker/retailer.js";
+import { forgetShopifyShop } from "../worker/shopify-connect.js";
 
 // 1. Prices: proxy bidding, steps, ties and the starting price.
 assert.deepEqual([999, 1000, 4999, 5000, 19999, 20000, 99999, 100000].map(increment), [50, 100, 100, 200, 200, 500, 500, 1000]);
@@ -360,3 +361,15 @@ assert.equal(viaKey.status, 200); assert.equal((await viaKey.json()).store, "Hol
 const noKey = await handleRetailerRoute(new Request("https://api.relay.test/relay/retailer/auctions"), env, new URL("https://api.relay.test/relay/retailer/auctions"), {}, { now: NOW });
 assert.equal(noKey.status, 401);
 console.log("ok - the new routes take only their own fields, and the shop's routes need the shop's key");
+
+// 17. A shop that removes Relay: its running auctions end without a sale; Shopify's erase request deletes them all.
+const G = (await asShop("POST", "/relay/retailer/auctions", { ...base, startMinor: 1000, hours: 24 })).body.auction;
+assert.equal(sqlite.prepare("SELECT status FROM auctions WHERE id = ?").get(G.id).status, "live");
+await forgetShopifyShop(env, DOMAIN, { now: NOW });
+assert.deepEqual({ ...sqlite.prepare("SELECT status, outcome FROM auctions WHERE id = ?").get(G.id) }, { status: "cancelled", outcome: "shop_left" });
+assert.ok(sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE shop_ref = ?").get(DOMAIN).n > 0, "kept until Shopify's erase request");
+await forgetShopifyShop(env, DOMAIN, { now: NOW, everything: true });
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE shop_ref = ?").get(DOMAIN).n, 0);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_offers o WHERE NOT EXISTS (SELECT 1 FROM auctions a WHERE a.id = o.auction_id)").get().n, 0);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_photos p WHERE NOT EXISTS (SELECT 1 FROM auctions a WHERE a.id = p.auction_id)").get().n, 0);
+console.log("ok - a shop that removes Relay: its running auctions end without a sale, and Shopify's erase request deletes them");
