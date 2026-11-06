@@ -98,5 +98,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-second-step-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
+      - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)
         run: node scripts/test-validation.mjs

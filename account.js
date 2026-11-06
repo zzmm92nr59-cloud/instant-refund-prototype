@@ -847,7 +847,13 @@
     ".rl-mk-card>.rl-mk-top,.rl-mk-card>.rl-mk-tags{display:flex}.rl-mk-tags{flex-wrap:wrap;gap:6px;margin:6px 0 2px}.rl-mk-tag{font-size:13px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text)}" +
     ".rl-mk-card .rl-mk-top .rl-mk-price{color:var(--rl-text)}.rl-mk-card>.rl-mk-near{display:inline-flex}" +
     ".rl-mk-acts{display:flex;gap:8px;margin-top:10px}.rl-mk-acts .rl-btn{flex:1;margin:0;min-height:48px;padding:12px 10px;font-size:16px}" +
-    ".rl-mk-card .rl-mk-select:not([hidden]){display:block;margin-top:8px}.rl-mk-card .rl-mk-report{margin-top:4px;font-size:15px;color:var(--rl-text2)}";
+    ".rl-mk-card .rl-mk-select:not([hidden]){display:block;margin-top:8px}.rl-mk-card .rl-mk-report{margin-top:4px;font-size:15px;color:var(--rl-text2)}" +
+    // Delivery details and buying at a shop's website with them filled in.
+    ".rl-dl-intro{font-size:15px;line-height:1.45;color:var(--rl-text2);margin:0 0 14px}.rl-dl-item{display:flex;flex-direction:column;gap:2px;margin:0 0 16px}" +
+    ".rl-dl-item b{font-size:17px;font-weight:600;color:var(--rl-text)}.rl-dl-item span{font-size:15px;color:var(--rl-text2)}" +
+    ".rl-dl-to{margin:0 0 6px}.rl-dl-to .rl-dt-fact b{white-space:pre-line;line-height:1.4}.rl-dl-link,.rl-dl-open{display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-decoration:none;min-height:50px}" +
+    ".rl-dl-done{display:flex;flex-direction:column;gap:10px;margin:4px 0 16px}.rl-dl-tick{display:flex;align-items:flex-start;gap:10px;font-size:16px;line-height:1.35;color:var(--rl-text)}" +
+    ".rl-dl-tick .rl-jic{flex:none;margin:1px 0 0;color:var(--rl-accent)}.rl-dl-tick.no .rl-jic{color:var(--rl-warn)}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -3684,6 +3690,7 @@
   // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
+    pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9.5 4V3h5v1M9.5 10h5M9.5 14h5"/>',
     bag: '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
@@ -3825,6 +3832,14 @@
         var n = st && st.watches ? st.watches.length : 0;
         alertRow.setDetail(n ? "Watching " + n + " product" + (n === 1 ? "" : "s") : "Get told when prices drop");
       });
+    }
+
+    // Shopping: the delivery details Relay fills in at shops' checkouts.
+    if (!review) {
+      var deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
+        deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
+      sheet.appendChild(accGroup("Shopping", [deliveryRow]));
+      api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? deliveryLine(r.body.delivery) : "Add your address"); }).catch(function () {});
     }
 
     // Sign-in & security
@@ -5995,6 +6010,156 @@
     card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); details(); } };
     return card;
   }
+  // ---- Delivery details (worker/delivery.js): kept with the account, and filled in at a shop's checkout when the shopper
+  // buys there through Relay. They go only to that shop, only when the shopper taps to buy. Payment is always at the shop.
+  var DELIVERY_FIELDS = [
+    ["firstName", "First name", "given-name", "Type your first name."],
+    ["lastName", "Last name", "family-name", "Type your last name."],
+    ["line1", "Address", "address-line1", "Type the first line of your address."],
+    ["line2", "Flat, floor or building (optional)", "address-line2", "Check the second line of your address."],
+    ["town", "Town or city", "address-level2", "Type your town or city."],
+    ["county", "County (optional)", "address-level1", "Check the county."],
+    ["postcode", "Postcode", "postal-code", "That isn't a UK postcode. Type it like SW11 1AA."],
+    ["phone", "Phone number for the courier (optional)", "tel", "That isn't a UK phone number. Type it like 07700 900123."]];
+  function deliveryLine(d) { return [d.line1, d.postcode].filter(Boolean).join(", "); }
+  // "+447700900456" → "07700 900456"; "+442079460018" → "020 7946 0018".
+  function ukPhone(t) {
+    var n = String(t || "").replace(/^\+44/, "0");
+    return /^07\d{9}$/.test(n) ? n.slice(0, 5) + " " + n.slice(5) : /^02\d{9}$/.test(n) ? n.slice(0, 3) + " " + n.slice(3, 7) + " " + n.slice(7) : /^0\d{10}$/.test(n) ? n.slice(0, 5) + " " + n.slice(5) : n;
+  }
+  // The form. opts: onSaved(details), onRemoved(), onCancel(), intro.
+  function deliveryForm(box, opts) {
+    opts = opts || {};
+    box.textContent = "";
+    var note = el("div", { className: "rl-msg", role: "status" });
+    var body = el("div");
+    box.appendChild(body); box.appendChild(note);
+    body.appendChild(el("div", { className: "rl-skel", style: "min-height:240px;border-radius:16px" }));
+    var draw = function (d) {
+      body.textContent = "";
+      body.appendChild(el("p", { className: "rl-dl-intro", text: opts.intro || "Relay fills these in at a shop's checkout when you buy through Relay, and gives them only to that shop." }));
+      var inputs = {};
+      DELIVERY_FIELDS.forEach(function (f) {
+        var input = el("input", { id: "rl-dl-" + f[0], className: "rl-field", autocomplete: f[2], value: (d && d[f[0]]) || "", maxLength: f[0] === "postcode" ? 10 : f[0] === "phone" ? 24 : 100 });
+        if (f[0] === "phone") { input.type = "tel"; input.inputMode = "tel"; if (d && d.phone) input.value = ukPhone(d.phone); }
+        if (f[0] === "postcode") { input.setAttribute("autocapitalize", "characters"); input.setAttribute("enterkeyhint", "next"); }
+        if (f[0] === "firstName" || f[0] === "lastName" || f[0] === "town") input.setAttribute("autocapitalize", "words");
+        inputs[f[0]] = input;
+        body.appendChild(el("label", { htmlFor: input.id, className: "rl-jlabel", text: f[1] }));
+        body.appendChild(input);
+      });
+      var saveBtn = el("button", { type: "button", className: "rl-btn", text: opts.saveLabel || "Save" });
+      saveBtn.onclick = function () {
+        if (saveBtn.disabled) return;
+        var sent = {};
+        DELIVERY_FIELDS.forEach(function (f) { sent[f[0]] = inputs[f[0]].value.trim(); });
+        var missing = DELIVERY_FIELDS.filter(function (f) { return !/optional/.test(f[1]) && !sent[f[0]]; })[0];
+        if (missing) { say(note, missing[3], true); inputs[missing[0]].focus(); return; }
+        saveBtn.disabled = true; saveBtn.textContent = "Saving…"; say(note, "");
+        api("/relay/my/delivery", { method: "POST", body: sent }).then(function (r) {
+          saveBtn.disabled = false; saveBtn.textContent = opts.saveLabel || "Save";
+          if (r.ok && r.body && r.body.delivery) { if (opts.onSaved) opts.onSaved(r.body.delivery); else say(note, "Saved."); return; }
+          var bad = r.body && r.body.error === "bad_field" && DELIVERY_FIELDS.filter(function (f) { return f[0] === r.body.field; })[0];
+          if (bad) { say(note, bad[3], true); inputs[bad[0]].focus(); return; }
+          say(note, r.body && r.body.error === "not_for_review_account" ? "This account is shared by Relay's reviewers, so an address can't be added to it." : "Couldn't save your details. Try again.", true);
+        }, function () { saveBtn.disabled = false; saveBtn.textContent = opts.saveLabel || "Save"; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      body.appendChild(saveBtn);
+      if (opts.onCancel) body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: opts.onCancel }));
+      if (d) {
+        var rm = el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Remove my delivery details" });
+        rm.onclick = function () {
+          ask("Remove your delivery details from Relay? Shops' checkouts will ask you for them again.", "Remove", function () {
+            if (rm.disabled) return;
+            rm.disabled = true;
+            api("/relay/my/delivery/remove", { method: "POST", body: {} }).then(function (r) {
+              rm.disabled = false;
+              if (r.ok) { if (opts.onRemoved) opts.onRemoved(); else draw(null); } else say(note, "Couldn't remove them. Try again.", true);
+            }, function () { rm.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          });
+        };
+        body.appendChild(rm);
+      }
+    };
+    api("/relay/my/delivery").then(function (r) {
+      if (!document.body.contains(body)) return;
+      if (!r.ok) { body.textContent = ""; say(note, "Couldn't load your details. Check your connection and try again.", true); return; }
+      draw(r.body && r.body.delivery);
+    }, function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+  }
+  // Buying from a shop's own website (Discover): Relay starts the shop's checkout with the shopper's email and delivery
+  // address filled in, then the shopper opens it to choose delivery and pay. p: { sku, title, variation, price, shop, fallbackUrl }.
+  function buyAtShop(p) {
+    if (!load()) return show();
+    open(function (sheet) { buyView(sheet, p); });
+  }
+  function buyView(sheet, p) {
+    sheet.textContent = "";
+    sheet.setAttribute("aria-label", "Buy at " + p.shop);
+    sheet.appendChild(el("h2", { text: "Buy at " + p.shop }));
+    sheet.appendChild(el("div", { className: "rl-dl-item" }, [el("b", { text: p.title }), el("span", { text: [p.variation, p.price].filter(Boolean).join(", ") })]));
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    sheet.appendChild(body); sheet.appendChild(note);
+    body.appendChild(el("div", { className: "rl-skel", style: "min-height:150px;border-radius:16px" }));
+    var withoutLink = function (text) {
+      return el("a", { className: "rl-btn ghost rl-dl-link", href: p.fallbackUrl, target: "_blank", rel: "noopener noreferrer", text: text || "Go to " + p.shop + " without filling in" });
+    };
+    api("/relay/my/delivery").then(function (r) {
+      if (!document.body.contains(body)) return;
+      body.textContent = "";
+      var d = r.ok && r.body ? r.body.delivery : null;
+      if (!d) {
+        body.appendChild(el("p", { text: "Add your delivery details once, and Relay fills them in at shops' checkouts for you." }));
+        body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Add delivery details", onclick: function () {
+          body.textContent = ""; say(note, "");
+          deliveryForm(body, { saveLabel: "Save and continue", onSaved: function () { buyView(sheet, p); }, onCancel: function () { buyView(sheet, p); } });
+        } }));
+        body.appendChild(withoutLink());
+        return;
+      }
+      // What goes to the shop, and where it's delivered.
+      body.appendChild(el("div", { className: "rl-dt-facts rl-dl-to" }, [
+        el("div", { className: "rl-dt-fact" }, [el("span", { text: "Deliver to" }), el("b", { text: [d.firstName + " " + d.lastName, d.line1, d.line2, d.town, d.county, d.postcode].filter(Boolean).join("\n") })]),
+        el("div", { className: "rl-dt-fact" }, [el("span", { text: "Email" }), el("b", { text: (load() || {}).email || "" })])].concat(d.phone ? [
+        el("div", { className: "rl-dt-fact" }, [el("span", { text: "Phone" }), el("b", { text: ukPhone(d.phone) })])] : [])));
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Change delivery details", onclick: function () {
+        body.textContent = ""; say(note, "");
+        deliveryForm(body, { saveLabel: "Save and continue", onSaved: function () { buyView(sheet, p); }, onCancel: function () { buyView(sheet, p); } });
+      } }));
+      body.appendChild(el("p", { className: "rl-dl-intro", text: "Relay fills these in at " + p.shop + "'s checkout. You choose delivery and pay there, not through Relay." }));
+      var go = el("button", { type: "button", className: "rl-btn", text: "Continue to " + p.shop });
+      go.onclick = function () {
+        if (go.disabled) return;
+        go.disabled = true; go.textContent = "Filling in " + p.shop + "'s checkout…"; say(note, "");
+        api("/relay/my/web-checkout", { method: "POST", body: { sku: p.sku } }).then(function (x) {
+          if (!document.body.contains(go)) return;
+          if (x.ok && x.body && /^https:\/\//.test(x.body.url || "")) return ready(x.body);
+          go.disabled = false; go.textContent = "Continue to " + p.shop;
+          var e = x.body && x.body.error;
+          say(note, e === "sold_out" ? "It's sold out at " + p.shop + " now." : e === "too_many_checkouts" ? "That's a lot of checkouts for one day. You can still buy it at " + p.shop + " and type your details there."
+            : "Couldn't fill in " + p.shop + "'s checkout just now. You can still buy it there and type your details.", true);
+          if (e !== "sold_out" && !body.querySelector(".rl-dl-link")) body.appendChild(withoutLink("Go to " + p.shop));
+        }, function () { go.disabled = false; go.textContent = "Continue to " + p.shop; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      body.appendChild(go);
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: close }));
+    }, function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); body.appendChild(withoutLink("Go to " + p.shop)); });
+    // The checkout is waiting at the shop: say what's been filled in (only what the shop took), then open it.
+    function ready(b) {
+      sheet.textContent = "";
+      sheet.appendChild(el("h2", { text: "Ready at " + (b.shop || p.shop) }));
+      var done = el("div", { className: "rl-dl-done" });
+      var tick = function (text, ok) { done.appendChild(el("div", { className: "rl-dl-tick" + (ok ? "" : " no") }, [jIc(ok ? "check" : "dot", 18), el("span", { text: text })])); };
+      tick(p.title + " is in your basket", true);
+      tick("Your email is filled in", true);
+      if (b.addressFilled) tick("Your delivery address is filled in", true);
+      else tick(p.shop + "'s checkout didn't take your address, so type it there", false);
+      sheet.appendChild(done);
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Choose delivery and pay at " + (b.shop || p.shop) + ". Your receipt will show up in Relay once it's emailed to you." }));
+      sheet.appendChild(el("a", { className: "rl-btn rl-dl-open", href: b.url, target: "_blank", rel: "noopener noreferrer", text: "Open " + (b.shop || p.shop) + "'s checkout", onclick: function () { setTimeout(close, 400); } }));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: close }));
+    }
+  }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
   function copyText(text) {
     try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return legacyCopy(text); }); } catch (e) {}
@@ -6426,6 +6591,7 @@
     forget: forget, whenIdle: whenIdle, checkInbox: checkInbox,
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
+    buyAtShop: buyAtShop,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,

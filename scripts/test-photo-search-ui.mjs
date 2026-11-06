@@ -201,11 +201,10 @@ assert.doesNotMatch(await page.locator(".dc-cardwrap").filter({ hasText: "Canvas
 await polished("discover preview", ".main");
 await beanie.locator(".dc-card").click();
 await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
-const buy = page.getByRole("link", { name: "Buy at Hollow Pine" });
-assert.equal(await buy.getAttribute("href"), "https://hollow-pine.test/cart/72:1", "the shop's own checkout with the colour that can be bought in the basket");
-assert.equal(await buy.getAttribute("target"), "_blank"); assert.match(await buy.getAttribute("rel"), /noopener/);
+// Signed in, Buy fills in the shop's checkout with the shopper's delivery details (test-delivery-ui.mjs has the rest).
+await page.getByRole("button", { name: "Buy at Hollow Pine" }).waitFor();
 const when = new Date(CHECKED).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Opens Hollow Pine's own checkout with this one in the basket\\. Price and stock as Hollow Pine's website showed them (today|yesterday) at " + when + "\\. You pay there, not through Relay\\.$"));
+assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Relay fills in your delivery details at Hollow Pine's checkout\\. Price and stock as Hollow Pine's website showed them (today|yesterday) at " + when + "\\. You pay there, not through Relay\\.$"));
 assert.equal(await page.getByRole("button", { name: /Watch price/ }).count(), 0, "no price alerts for shops' websites");
 await page.getByRole("button", { name: /^Navy/ }).click();
 assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web[0].productUrl, "a sold-out colour opens its own page, not a checkout");
@@ -229,7 +228,7 @@ await sheet.getByText("Looks like: grey wool beanie").waitFor();
 assert.equal(st.posts.at(-1).test, true, "testing tools ask for test shops and shops' websites too");
 await sheet.getByRole("button", { name: "Wool Beanie, From £25.00, from Hollow Pine" }).click();
 await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
-assert.equal(await page.getByRole("link", { name: "Buy at Hollow Pine" }).getAttribute("href"), "https://hollow-pine.test/cart/72:1");
+await page.getByRole("button", { name: "Buy at Hollow Pine" }).waitFor();
 console.log("ok - testing tools: off explains the key; on, searches shops' websites too and opens them");
 
 assert.deepEqual(errors, []);

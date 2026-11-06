@@ -34,7 +34,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <!-- Before launch: have this reviewed by a qualified lawyer, and add a "Who we are" section naming the company
      (registered name, number and address) and an email address for privacy requests. Relay's code has none of these yet. -->
 <h1>Privacy policy</h1>
-<p class="updated">Last updated 5 November 2026</p>
+<p class="updated">Last updated 6 November 2026</p>
 
 <section class="summary">
 <h2>The short version</h2>
@@ -62,6 +62,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <li>A mobile number, if you add one. We keep it encrypted, show it in the app only as its last three digits (Download my data gives you the whole number), and use it only to text you sign-in codes: never for marketing, and never shown to anyone else.</li>
 <li>Two-step sign-in, which every account needs: a passkey, codes by text or an authenticator app. We keep your authenticator key encrypted, and your recovery codes and any codes we text you only in scrambled form. With each sign-in we note whether it passed this second step.</li>
 <li>A card for swaps, if you save one. The card is handled by Stripe; we keep only its brand, last four digits and expiry date.</li>
+<li>Delivery details, if you add them: your name, a UK delivery address and a phone number for the courier. They're used only to fill in a shop's checkout when you buy something through Relay (see Who sees it). Each time, we note which shop they went to and when, which you can see in Download my data.</li>
 <li>If you list something to swap or sell to other members: the listing, your messages with other members, and the first half of your postcode so people can see roughly how far away it is.</li>
 </ul>
 <h3>Purchases from shops connected to Relay</h3>
@@ -108,6 +109,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
 <tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference. When you swap with another shop, the second shop gets nothing from Relay: you buy from it at its own checkout.</td></tr>
+<tr><th>Shops you buy from through Relay</th><td>When you tap Buy on a product from a shop's own website, that shop gets your email address and, if you've added them, your delivery details, so its checkout is filled in. They go only to that shop, only when you tap. You choose delivery and pay at the shop, under its own privacy policy: Relay never takes payment.</td></tr>
 <tr><th>Royal Mail</th><td>If you print a returns label, receives the name and address needed for it.</td></tr>
 <tr><th>Apple, Google, Mozilla and Microsoft push services</th><td>Deliver notifications to your device. The messages are encrypted.</td></tr>
 <tr><th>GitHub Pages</th><td>Delivers the Relay app to your browser, so it sees your IP address like any website.</td></tr>
@@ -125,7 +127,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Search by photo</th><td>The picture and what Claude said aren't kept. Only that you searched, and when, is kept for two days, so each person stays within 30 searches a day.</td></tr>
 <tr><th>Your sign-in session</th><td>Up to 90 days after you last used Relay, or until you sign out.</td></tr>
 <tr><th>Sign-in links and codes, and the scrambled IP addresses and phone numbers kept to stop misuse</th><td>Up to two days.</td></tr>
-<tr><th>Name, photo, phone number, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account.</td></tr>
+<tr><th>Name, photo, phone number, delivery details, price alerts, passkeys and saved card</th><td>Until you remove them or delete your account. The note of which shops your delivery details went to is kept until you delete your account.</td></tr>
 <tr><th>Returns, swaps and payments made through Relay</th><td>Kept after you delete your account, because the shops involved rely on them. A swap with another shop is deleted; the return it started is kept.</td></tr>
 <tr><th>If you're blocked from swap and sell</th><td>A scrambled form of your email address is kept, so a blocked member can't rejoin to get round the block.</td></tr>
 </table>

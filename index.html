@@ -769,13 +769,16 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
  const web=p.provider==="web"&&/^https:\/\//.test(String(p.productUrl||"")),shop=safe(storeOf(p));
  const checkout=web?webCheckoutUrl(p):null;
- const act=web?'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>'
+ // Signed in: Buy starts the shop's checkout with the shopper's delivery details filled in (account.js buyAtShop).
+ const fills=!!(checkout&&window.RelayAccount&&RelayAccount.buyAtShop&&RelayAccount.signedIn&&RelayAccount.signedIn());
+ const act=web?(fills?'<button class="darkbtn dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>')
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
- const note=web?(checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
+ const note=web?(fills?'Relay fills in your delivery details at '+shop+'\'s checkout. ':checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
  {const r=$("dcRoot");if(r&&r.classList&&r.classList.add)r.classList.add("dc-detail")}
  box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
+ if(fills&&$("buyOnSite"))$("buyOnSite").onclick=()=>RelayAccount.buyAtShop({sku:p.sku,title:p.product,variation:p.variation||"",price:priceIn(p.priceMinor,p.currency),shop:storeOf(p),fallbackUrl:checkout});
  box.querySelectorAll("[data-size]").forEach(b=>b.onclick=()=>chooseSku(b.dataset.size));
  if(fresh)window.scrollTo(0,0);
 }
