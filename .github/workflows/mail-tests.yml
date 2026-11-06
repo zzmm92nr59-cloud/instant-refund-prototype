@@ -14,6 +14,7 @@ on:
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
+      - 'scripts/test-mail-push.mjs'
       - '.github/workflows/mail-tests.yml'
   push:
     branches: [main]
@@ -28,6 +29,7 @@ on:
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
+      - 'scripts/test-mail-push.mjs'
       - '.github/workflows/mail-tests.yml'
   workflow_dispatch:
 permissions:
@@ -61,6 +63,8 @@ jobs:
           node scripts/test-outlook-throttle.mjs
       - name: Gmail and Outlook give the same receipts, cards and Wrapped
         run: node scripts/test-mail-parity.mjs
+      - name: Instant email (Gmail notices signed by Google, Outlook notices with their secret; set-up, renewal, disconnecting)
+        run: node scripts/test-mail-push.mjs
       - name: Shops' own returns policies (complete, recent, used only when the emails give no date)
         run: node scripts/test-return-policies.mjs
       - name: Gifts (tagging receipts, who for, Wrapped, own receipts only)

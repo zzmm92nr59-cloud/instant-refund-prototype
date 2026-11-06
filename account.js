@@ -2712,7 +2712,10 @@
       var nInbox = 1 + ((r.body.others || []).length);
       // On the Receipts page the line stays empty until there's news (reading, or what was found); Profile says how it works.
       status.textContent = onPage ? ""
-        : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes" + (checked ? ". Last checked " + when(checked) + "." : ".");
+        : (r.body.instant
+          // Gmail or Outlook tells Relay when new mail arrives (mail-push.js); Google says notices usually take seconds.
+          ? "New receipts and parcel updates from your " + MB + " usually show up in Relay within a minute"
+          : "Relay checks your " + MB + " for new receipts and parcel updates every 15 minutes") + (checked ? ". Last checked " + when(checked) + "." : ".");
       if (onPage) { scanBtn.className = "rl-po-secondary rl-check-now"; scanBtn.style.cssText = "flex:0 0 auto;padding:6px 14px;font-size:13px"; scanBtn.textContent = "Check now"; }
       var query = "";
       var search = el("input", { type: "search", placeholder: "Search your receipts (store, item, order number)", style: "margin-top:12px" });

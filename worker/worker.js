@@ -10,6 +10,7 @@ import { tidyTexts } from "./phone.js";
 import { tidySharedEmails } from "./shared-emails.js";
 import { runAiReads } from "./ai-runner.js";
 import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
+import { handleMailPushRoute, renewMailPush, runPendingPush } from "./mail-push.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
 import { handleRetailerRoute } from "./retailer.js";
@@ -70,6 +71,12 @@ const relayWorker = {
       // Shops' websites for the catalogue preview (web-shops.js): the shops due, about once a day each.
       ctx.waitUntil(refreshWebShops(env).then(r => { if (r.checked) console.log("shops' websites", JSON.stringify(r)); })
         .catch(e => console.error("shops' websites failed", String(e && e.message || e).slice(0, 120))));
+      // Instant email (mail-push.js): new inboxes get a Gmail watch or Outlook subscription and old ones are renewed, then any
+      // notice not read yet (it came during another read) is read.
+      ctx.waitUntil(renewMailPush(env).then(r => { if (r.renewed || r.failed) console.log("instant email set-up", JSON.stringify(r)); })
+        .catch(e => console.error("instant email set-up failed", String(e && e.message || e).slice(0, 120)))
+        .then(() => runPendingPush(env)).then(r => { if (r && r.checked) console.log("instant email reads", JSON.stringify(r)); })
+        .catch(e => console.error("instant email reads failed", String(e && e.message || e).slice(0, 120))));
       return; }
     // Gmail has its own schedule (every 15 minutes) so it gets the request's limits to itself.
     if (event && event.cron === GMAIL_CRON) { ctx.waitUntil(autoScanGmail(env).then(r => console.log("auto Gmail check", JSON.stringify(r))).catch(e => console.error("auto Gmail check failed", String(e && e.message || e).slice(0, 120)))); return; }
@@ -164,6 +171,10 @@ const relayWorker = {
       syncCatalogues: async () => { const r = await Promise.allSettled([syncSquareCatalogue(env), syncAllShopify(env)]); const bad = r.find(x => x.status === "rejected"); if (bad) throw new Error(String(bad.reason && bad.reason.message || bad.reason).slice(0, 120)); }
     });
     if (authResponse) return authResponse;
+    // Instant email: Gmail's notices (signed by Google) and Outlook's (carrying each subscription's secret) say a connected
+    // inbox has new mail, and it's read at once (mail-push.js).
+    const pushResponse = await handleMailPushRoute(request, env, url, ctx);
+    if (pushResponse) return pushResponse;
     if (url.pathname === "/relay/webhooks/shopify" && request.method === "POST") {
       // A shop changed its products: read just that shop again, then check price alerts.
       return receiveShopifyWebhook(request, env, { onCatalogueChange: (shop) => { try { ctx.waitUntil(syncShopSoon(env, shop)); } catch {} } });
