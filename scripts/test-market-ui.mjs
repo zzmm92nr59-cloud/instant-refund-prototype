@@ -104,7 +104,7 @@ assert.equal(await sheet.getByText(/Loading/).count(), 0, "no bare 'Loading…'"
 await sheet.getByText("Merino Wool Scarf").waitFor();
 assert.equal(await sheet.getByRole("button", { name: "Browse" }).getAttribute("aria-pressed"), "true");
 const scarf = sheet.locator(".rl-order", { hasText: "Merino Wool Scarf" });
-assert.match(await scarf.innerText(), /Brindle & Co · Size M · Like new · £25\.00 · Open to swaps · Collect in SW11 or post/);
+assert.match(await scarf.innerText(), /Merino Wool Scarf\s+£25\.00\s+Brindle & Co, size M\s+Like new\s+Open to swaps\s+Collect in SW11 or post/);
 await scarf.getByText("Near you").waitFor();
 assert.equal(await scarf.locator(".rl-mk-near svg").count(), 1, "a drawn pin, not an emoji");
 assert.match(await sheet.locator(".rl-order", { hasText: "Linen Shirt" }).innerText(), /Open to offers[\s\S]*You asked about this: waiting for the seller\./);

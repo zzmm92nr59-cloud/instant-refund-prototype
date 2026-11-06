@@ -56,7 +56,7 @@ await page.getByRole("button", { name: "Food & drink, 130 receipts" }).click();
 const hero = page.locator(".rl-cat-hero");
 await hero.waitFor();
 const spent = food.reduce((n, r) => n + r.totalPence, 0);
-assert.match(await hero.innerText(), new RegExp("130 receipts · £" + (spent / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 }).replace(/[.]/g, "\\.") + " spent · since "));
+assert.match(await hero.innerText(), new RegExp("£" + (spent / 100).toLocaleString("en-GB", { minimumFractionDigits: 2 }).replace(/[.]/g, "\\.") + " across 130 receipts since "));
 const chipNames = await page.locator(".rl-cat-chips button").allInnerTexts();
 assert.equal(chipNames[0], "All"); assert.ok(chipNames.length >= 3, "a filter for each year: " + chipNames);
 assert.ok(!chipNames.includes("Can still return"), "no 'can still return' filter where nothing can go back");

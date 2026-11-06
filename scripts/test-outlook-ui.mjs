@@ -102,7 +102,7 @@ assert.equal(await page.locator(".rl-tile .rl-tile-art svg, .rl-tile .rl-tile-pi
 const cardText = await page.locator(".rl-tiles").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
 // A missing receipt can be added straight from the Receipts page, searching Outlook as you type.
-await page.getByRole("button", { name: "Missing a receipt? Add it" }).click();
+await page.getByRole("button", { name: "Add a missing receipt" }).click();
 await page.getByRole("heading", { name: "Add a receipt" }).waitFor();
 assert.equal(await page.locator("#rl-ar-q").getAttribute("placeholder"), "Search your Outlook");
 await page.getByRole("button", { name: "Back" }).click();
