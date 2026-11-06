@@ -804,7 +804,26 @@
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
     // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
-    ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}";
+    ".rl-back{padding-bottom:var(--rl-kb,0px);transition:padding-bottom .15s}.rl-sheet{max-height:calc(88dvh - var(--rl-kb,0px))}" +
+    // November 2026 polish: a wallet card is one tappable card with no buttons on it (its page, a sheet, has them): what it
+    // is and the price, the shop under it, then the time left to send it back.
+    ".rl-po.rl-tap{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s;padding:14px 16px;gap:12px;border-radius:20px}" +
+    ".rl-po.rl-tap:active{transform:scale(.985)}.rl-po.rl-tap:focus-visible{outline:3px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-po.rl-tap .rl-po-top{gap:12px}.rl-po.rl-tap .rl-po-img{width:64px;height:64px;border-radius:14px}" +
+    ".rl-po.rl-tap h3.rl-po-brand{font-size:17px;font-weight:600;letter-spacing:0}.rl-po.rl-tap .rl-po-price{font-size:17px;font-weight:600}" +
+    ".rl-po.rl-tap .rl-po-meta{font-size:15px;margin-top:1px}.rl-po.rl-tap .rl-po-ship{margin-top:4px}" +
+    ".rl-due{gap:7px;padding:0}.rl-due-t{font-size:15px}.rl-due-t b{font-weight:600}.rl-due-bar{height:4px}" +
+    ".pill.rl-count{background:none;color:var(--rl-text2);padding:0;font-size:15px;font-weight:400}" +
+    ".rl-dt-head{display:flex;gap:14px;align-items:center;margin:0 0 16px}.rl-dt-head h2{margin:0 0 2px}.rl-dt-head .rl-dt-sub{margin:0}.rl-dt-name{min-width:0}" +
+    ".rl-po-img.rl-dt-pic{width:72px;height:72px;border-radius:16px}" +
+    ".rl-dt-acts{display:flex;flex-direction:column;gap:10px;margin:0 0 16px}.rl-dt-acts>*{flex:none;width:100%;min-height:50px;font-size:16px;box-sizing:border-box}" +
+    ".rl-dt-acts .rl-po-mark{display:inline-flex;align-items:center;justify-content:center;background:var(--rl-fill);color:var(--rl-text);border-color:transparent;gap:8px}" +
+    // A shop's logo sits on white in light and dark, like an app icon, so dark logos stay readable.
+    ".rl-po .rl-po-img.rl-has-logo,.rl-dt-head .rl-po-img.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}" +
+    ".rl-dt-facts{margin:16px 0 0;border-radius:16px;background:var(--rl-card);padding:0 16px}" +
+    "@media (prefers-color-scheme: dark){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
+    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}" +
+    ".rl-dt-fact span{color:var(--rl-text2);flex:none}.rl-dt-fact b{font-weight:500;text-align:right;overflow-wrap:anywhere;color:var(--rl-text)}";
   document.head.appendChild(css);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -2453,13 +2472,13 @@
         " " + who + " may give longer.";
     }
     var portal = rt.portalUrl && /^https:\/\//.test(rt.portalUrl) ? rt.portalUrl : null;
-    if (head || rt.address || portal) {
+    if (head || rt.address || (portal && !opts.noPortal)) {
       var rb = el("div", { className: "rl-ret" });
       var polLink = policyLink ? el("a", { className: "rl-ret-go", href: policyLink, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Read " + pol.shop + "'s returns policy" }), jIc("ext", 18)]) : null;
       if (head) rb.appendChild(el("div", { className: "rl-ret-top" }, [el("b", { className: "rl-ret-h", text: head })].concat(leftText && !opts.inRow ? [el("span", { className: "rl-rr-chip " + leftTone, text: leftText })] : [])));
       if (why) rb.appendChild(el("span", { className: "rl-ret-why", text: why }));
       if (rt.address) rb.appendChild(el("span", { className: "rl-ret-why", text: "Send it to " + rt.address }));
-      if (portal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
+      if (portal && !opts.noPortal) rb.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Start a return with " + who }), jIc("ext", 18)]));
       if (polLink) rb.appendChild(polLink);
       card.appendChild(rb);
     } else if (leftText && !opts.inRow) card.appendChild(el("span", { className: "rl-rr-chip " + leftTone, text: leftText, style: "display:inline-block;margin-top:2px" }));
@@ -5854,10 +5873,12 @@
     return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
   }
   // A purchase found in an email receipt: the shop handles the return, so Relay links to it and shows the deadline and parcel.
+  // The card says what it is, where it's from, the price and the time left to send it back; tapping it opens its page
+  // (a sheet) with what you can do: start the return, say you're sending it back, see the receipt.
   function emailCard(x, opts) {
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
-    var card = el("div", { className: "rl-po" });
+    var card = el("div", { className: "rl-po rl-tap" });
     var img = el("div", { className: "rl-po-img" });
     img.setAttribute("aria-hidden", "true");
     receiptPic(img, x, 36, 44);
@@ -5866,60 +5887,72 @@
     var first = one || headlineItem(x) || {};
     var date = x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
     var price = one ? (Number.isInteger(one.pricePence) ? money(one.pricePence * (Number(one.qty) > 1 && !one.lineTotal ? Number(one.qty) : 1), x.currency) : "") : x.totalPence == null ? "" : money(x.totalPence, x.currency);
-    // Big picture, the shop's name, the price; then size and date, and the parcel's news. With the item's photo the picture
-    // says what it is; without one, the item's name joins the small line, so two cards from one shop can be told apart.
     var named = (x.items || []).filter(function (i) { return i && i.name; });
-    var photo = Boolean(named.length <= 1 && x.hasImage && x.id);
     var itemName = one ? one.name : named.length ? receiptTitle(x) : null;
+    var count = one && (x.items || []).length > 1 ? x.items.length : 0;
+    // What it is, with the price; under it the shop. Without an item name, the shop is the title and the order day goes under.
+    var title = itemName || who;
+    var under = itemName ? who + (count ? ", 1 of " + count + " in this order" : "") : date ? "Ordered " + date : "";
     var info = el("div", { className: "rl-po-info" }, [
-      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: who }), el("div", { className: "rl-po-price", text: price })]),
-      el("div", { className: "rl-po-meta", text: [photo ? null : itemName, first.variant, date, one && (x.items || []).length > 1 ? "1 of " + x.items.length + " in this order" : null].filter(Boolean).join(" · ") })]);
-    if (photo && itemName) info.insertBefore(el("span", { className: "rl-sr", text: itemName }), info.childNodes[1]);
-    var dv = x.delivery;
-    if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) info.appendChild(shipLine(dv));
+      el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: title }), el("div", { className: "rl-po-price", text: price })]),
+      el("div", { className: "rl-po-meta", text: under })]);
+    var dv = x.delivery, showShip = Boolean(dv && dv.status && (dv.status === "delivered" || freshDelivery(x)));
+    if (showShip) info.appendChild(shipLine(dv));
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var dl = statedDeadline(x);
     if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
     if (opts.extra) opts.extra(card);
-    var actions = el("div", { className: "rl-po-actions" });
     var portal = x.returns && x.returns.portalUrl;
     if (portal && !/^https:\/\//.test(portal)) portal = null;
-    // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
-    // through the shop's own returns page with the order number and email ready to copy.
     var rp = x.returnPlan;
-    if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
-      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
-        open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
-    else if (opts.actions !== false && portal)
-      actions.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sheet) { returnGuide(sheet, x, who, portal); }); } }));
-    var hasMain = actions.childNodes.length > 0;
-    var details = el("button", { className: "rl-po-secondary rl-po-details", text: "Details", onclick: function () {
+    var dlDay = dl ? new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "UTC" }) : "";
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", [title, itemName ? who : null, price, opts.deadline !== false && dl ? "return by " + dlDay : null].filter(Boolean).join(", "));
+    // Its page: the picture and what it is, what you can do, then the return date, the receipt and the order's details.
+    var details = function () {
       open(function (sheet) {
-        // The shop, then what was bought (the card itself shows only the shop's name), then the details.
-        sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
-        var bought = (one ? [one] : named).map(function (i) { return i.name + (i.variant ? ", " + i.variant : ""); }).join(" · ");
-        sheet.appendChild(el("p", { className: "rl-dt-sub", text: [bought, price, x.orderRef ? "Order " + String(x.orderRef).replace(/^#/, "") : null].filter(Boolean).join(" · ") }));
-        if (dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) sheet.appendChild(shipLine(dv));
-        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true));
+        var pic = el("div", { className: "rl-po-img rl-dt-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, x, 40, 48);
+        sheet.appendChild(el("div", { className: "rl-dt-head" }, [pic, el("div", { className: "rl-dt-name" }, [el("h2", { text: title }), el("p", { className: "rl-dt-sub", text: itemName ? who : date ? "Ordered " + date : "" })])]));
+        if (showShip) sheet.appendChild(shipLine(dv));
+        var acts = el("div", { className: "rl-dt-acts" });
+        // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
+        // through the shop's own returns page with the order number and email ready to copy.
+        if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
+          acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
+            open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
+        else if (opts.actions !== false && portal)
+          acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sh) { returnGuide(sh, x, who, portal); }); } }));
+        // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
+        if (opts.markable && x.id) {
+          var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
+          if (!idxs.length) idxs = [0];
+          var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
+          var mark = el("button", { type: "button", className: "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
+          mark.onclick = function () {
+            if (mark.disabled) return;
+            mark.disabled = true; words.textContent = "Saving…";
+            markItems(x, idxs, undo ? null : "returning").then(function (ok) {
+              if (ok) { close(); if (opts.changed) opts.changed(); } else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
+          };
+          acts.appendChild(mark);
+        }
+        if (acts.childNodes.length) sheet.appendChild(acts);
+        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true, { noPortal: Boolean(portal && opts.actions !== false) }));
+        // The order's details, one to a line.
+        var facts = el("div", { className: "rl-dt-facts" });
+        var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
+        fact("Price", price);
+        if (first.variant) fact("Size or colour", first.variant);
+        if (!one && named.length > 1) fact("In this order", named.map(function (i) { return i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", "));
+        fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);
+        fact("Order number", x.orderRef ? String(x.orderRef).replace(/^#/, "") : null);
+        if (facts.childNodes.length) sheet.appendChild(facts);
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
       });
-    } });
-
-    // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
-    if (opts.markable && x.id) {
-      var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
-      if (!idxs.length) idxs = [0];
-      var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
-      var mark = el("button", { type: "button", className: hasMain ? "rl-po-marklink" : "rl-po-secondary rl-po-mark" }, [jIc(undo ? "back" : "ret", 18), words]);
-      mark.onclick = function () {
-        if (mark.disabled) return;
-        mark.disabled = true; words.textContent = "Saving…";
-        markItems(x, idxs, undo ? null : "returning").then(function (ok) {
-          if (ok && opts.changed) opts.changed(); else { mark.disabled = false; words.textContent = "Couldn't save. Try again"; } });
-      };
-      if (hasMain) { actions.appendChild(details); card.appendChild(actions); card.appendChild(mark); }
-      else { actions.appendChild(mark); actions.appendChild(details); card.appendChild(actions); }
-    } else { actions.appendChild(details); card.appendChild(actions); }
+    };
+    card.onclick = details;
+    card.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); details(); } };
     return card;
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
@@ -6052,7 +6085,7 @@
       });
       items.sort(function (a, b) { return (a.deadline || "9999") < (b.deadline || "9999") ? -1 : 1; });
       grid.textContent = "";
-      head.appendChild(el("span", { className: "pill", text: items.length + " item" + (items.length === 1 ? "" : "s") }));
+      head.appendChild(el("span", { className: "pill rl-count", text: items.length + " item" + (items.length === 1 ? "" : "s") }));
       if (!items.length) grid.appendChild(el("div", { className: "rl-empty", style: "grid-column:1/-1" }, [el("h3", { text: "Nothing to return right now" }),
         el("p", { text: "Anything you can still return or swap shows up here. Everything you've bought is in Receipts." })]));
       items.forEach(function (i) { grid.appendChild(i.node()); });
@@ -6098,9 +6131,9 @@
       orderRows(both[1]).forEach(function (x) {
         var p = x.returnProgress, parts = emailItems(x), marked = parts.filter(function (q) { return q.returning; });
         if (!p && !marked.length) return;
-        var step = !p ? "You're sending this back · Relay will update this when the shop's emails arrive"
-          : p.refundedAt ? "✓ Refund processed" + (p.refundPence != null ? " · " + money(p.refundPence, p.currency || "GBP") : "")
-          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Arrived back at the shop · waiting for the refund" : "Sent back · on its way to the shop";
+        var step = !p ? "You're sending this back. Relay follows it from the shop's emails."
+          : p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
         var progress = function (card) { card.appendChild(el("div", { className: "rl-po-status" + (p && p.refundedAt ? "" : " wait"), text: step }));
           if (x.itemReturnsFrom === "refund") card.appendChild(el("div", { text: "Relay matched the refund amount to this item.", style: "font-size:12px;color:var(--rl-text2);margin-top:6px" })); };
         // A return for an order with several items, and Relay can't tell which: ask once.
@@ -6324,38 +6357,22 @@
     }
     draw();
   }
-  // The return that's due soonest, as a strip that floats above the tab bar (like the song that's playing). Tapping it opens
-  // the receipt. Nothing shows when nothing is due in the next fortnight, or when signed out.
+  // Returns due in the next three days: a red number on the Home tab (index.html relayBadge), the way a phone shows it.
+  // The wallet on Home lists them first, so nothing floats over the page. Nothing shows when signed out.
   function mountNextUp(host) {
-    if (!host) return;
+    if (host) { host.hidden = true; host.textContent = ""; }
+    var setDue = function (n) { window.__relayDue = n; if (window.relayBadge) window.relayBadge(); };
     var s = load();
-    if (!s || !s.token) { host.hidden = true; host.textContent = ""; return; }
+    if (!s || !s.token) { setDue(0); return; }
     var draw = function (rows) {
-      if (!document.body.contains(host)) return;
-      var today = new Date().toISOString().slice(0, 10), best = null;
+      var today = new Date().toISOString().slice(0, 10), n = 0;
       (rows || []).forEach(function (x) {
         if (!x || x.kind === "return_instructions" || isCarrier(x) || x.returnProgress) return;
         if (x.returnable === false && !(x.returnableItems || []).length) return;
         var dl = statedDeadline(x); if (!dl || dl < today) return;
-        var d = daysLeft(dl); if (d === null || d > 14) return;
-        if (!best || dl < best.dl) best = { x: x, dl: dl, d: d };
+        var d = daysLeft(dl); if (d !== null && d <= 3) n++;
       });
-      host.textContent = "";
-      if (!best) { host.hidden = true; return; }
-      var x = best.x, who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
-      // (From a food order, the thing in it that can go back, not the bananas.)
-      var item = x.returnable === false ? (x.items || [])[x.returnableItems[0]] : headlineItem(x);
-      var pic = el("span", { className: "rl-next-pic" }); receiptPic(pic, x, 28, 30);
-      var day = new Date(best.dl + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-      host.appendChild(el("button", { type: "button", className: "rl-next", ariaLabel: "Next return: " + (item ? item.name : who) + ", back to " + who + " by " + day,
-        onclick: function () { open(function (sheet) {
-          sheet.appendChild(el("h2", { text: who, style: "margin:0 0 4px" }));
-          sheet.appendChild(receiptCard(x, function () {}, true));
-          sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:10px", onclick: close }));
-        }); } }, [pic,
-        el("span", { className: "rl-next-t" }, [el("b", { text: item ? item.name : "Order from " + who }), el("span", { className: "rl-next-s", text: "Back to " + who + " by " + day })]),
-        el("span", { className: "rl-next-d" + (best.d <= 3 ? " soon" : ""), text: best.d === 0 ? "Today" : best.d === 1 ? "1 day" : best.d + " days" })]));
-      host.hidden = false;
+      setDue(n);
     };
     if (memo.receipts) draw(memo.receipts.rows);
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)

@@ -44,7 +44,7 @@ const q = ret.locator(".rl-po", { hasText: "Which items did you send back?" });
 assert.equal(await q.getByRole("button", { name: "Save" }).isDisabled(), true);
 await q.getByText("Rain Jacket").click();
 await q.getByRole("button", { name: "Save" }).click();
-await ret.locator(".rl-po", { hasText: "Rain Jacket" }).getByText("Sent back · on its way to the shop").waitFor();
+await ret.locator(".rl-po", { hasText: "Rain Jacket" }).getByText("Sent back, on its way to the shop").waitFor();
 assert.deepEqual(posts[1], [other.id, { items: [{ index: 0, status: "returning" }] }]);
 await page.screenshot({ path: "/tmp/shots/items-returns.png", fullPage: true });
 // Changed your mind: the item goes back to the wallet.

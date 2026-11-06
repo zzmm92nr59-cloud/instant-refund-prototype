@@ -73,7 +73,7 @@ assert.match(basis, /^From your 2026 spending: 89% fashion, 11% digital & subscr
 assert.match(basis, /You're sporty and relaxed, mostly in neutrals\. Usually a size M, UK 8 in shoes\./);
 const picks = panel.locator(".dc-strip [data-card-select]");
 assert.equal(await picks.first().locator("h3").innerText(), "Court Classic Trainers", "the best match comes first");
-assert.equal(await picks.first().locator(".dc-why").innerText(), "You spend most on fashion · You buy from Kick Lane");
+assert.equal(await picks.first().locator(".dc-why").innerText(), "You spend most on fashion\nYou buy from Kick Lane");
 assert.ok(!(await panel.innerText()).includes("Cosy Dog Bed"), "nothing they've never spent on is pushed at them");
 // The list below follows the same order, and the pet shop's product is still there, just later.
 const grid = await page.locator("#catalogResults [data-card-select] h3").allInnerTexts();
