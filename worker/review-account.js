@@ -8,7 +8,7 @@
 //    in the code base. Only a Relay admin can see it (GET /relay/my/admin/review-account).
 //  * Signing in still goes through the ordinary code route and its limits, plus a cap of 20 wrong codes a day.
 //  * Several people share the account, so nothing personal can be attached to it: no inbox, passkey, phone number,
-//    two-step sign-in or card (REVIEW_BLOCKED). Everything else works as for any shopper.
+//    two-step sign-in, card or delivery address (REVIEW_BLOCKED). Everything else works as for any shopper.
 //  * Turning it off deletes the account and everything in it, as "Delete my account" does, which also signs it out
 //    everywhere and cancels any code waiting to be used. Turning it on again makes a new address, code and account.
 import { isAdmin } from "./resale-admin.js";
@@ -24,7 +24,8 @@ export const REVIEW_BLOCKED = new Set([
   "/relay/my/passkeys/options", "/relay/my/passkeys/register",
   "/relay/my/2fa/setup", "/relay/my/2fa/enable", "/relay/my/2fa/text", "/relay/my/2fa/text/send",
   "/relay/my/phone/start", "/relay/my/phone/confirm",
-  "/relay/my/card/setup", "/relay/my/card/confirm"
+  "/relay/my/card/setup", "/relay/my/card/confirm",
+  "/relay/my/delivery"
 ]);
 export const REVIEW_MAX_FAILURES_PER_DAY = 20;
 const encoder = new TextEncoder();
