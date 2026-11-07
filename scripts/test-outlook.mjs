@@ -336,7 +336,18 @@ msRefreshOk = false;
 const busy = await post("/relay/my/gmail/scan", jessToken, {});
 assert.equal(busy.status, 401);
 assert.equal((await busy.json()).error, "gmail_reconnect_needed");
+const olState = async () => (await call("/relay/my/gmail", { token: jessToken })).json();
+assert.equal((await olState()).needsReconnect, true, "the app is told Outlook needs connecting again");
+// Connect again: Microsoft's own page for that same inbox; it comes back connected again, receipts kept.
+const olKept = sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE status <> 'not_receipt'").get().n;
+const againMs = new URL((await (await post("/relay/my/gmail/connect", jessToken, { again: 1 })).json()).url);
+assert.equal(againMs.origin, "https://login.microsoftonline.com");
+assert.equal(againMs.searchParams.get("login_hint"), "jess.tester@outlook.com", "Microsoft suggests that same inbox");
 msRefreshOk = true;
+assert.match(loc(await mscb("code=mail-good&state=" + againMs.searchParams.get("state"))), /#outlook=reconnected$/);
+assert.equal((await olState()).needsReconnect, false);
+assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE status <> 'not_receipt'").get().n, olKept, "receipts kept");
+console.log("ok - Outlook whose access ended says so, and Connect again brings it back with its receipts");
 
 // ---- 10. Disconnect deletes the token and everything captured (no Google call is made) ----
 const d = await (await post("/relay/my/gmail/disconnect", jessToken)).json();

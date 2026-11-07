@@ -14,7 +14,7 @@
 //    MIN_SHOPPERS_PER_SHOP shoppers, and only the admin's own orders in detail.
 import { isAdmin, openReportCount } from "./resale-admin.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
-import { PARSER_VERSION } from "./gmail.js";
+import { PARSER_VERSION, ensureHealthColumns } from "./gmail.js";
 import { chatAvailable } from "./support-chat.js";
 import { answerKey } from "./answer-key.js";
 import { SHARE_DAYS } from "./shared-emails.js";
@@ -33,6 +33,8 @@ export async function handleHealthRoute(path, method, env, cors, shopper, o) {
 
 export async function relayHealth(env, me, now = Date.now()) {
   const db = env.RELAY_DB;
+  // Whether inbox reading is working (gmail.js ensureHealthColumns): there before it's counted below.
+  try { await ensureHealthColumns(db); } catch { /* no inboxes yet */ }
   // A table nobody has used yet doesn't exist yet: its part is simply empty.
   const all = async (sql, ...a) => {
     try { return (await db.prepare(sql).bind(...a).all()).results || []; }
@@ -40,6 +42,7 @@ export async function relayHealth(env, me, now = Date.now()) {
   };
   const one = async (sql, ...a) => (await all(sql, ...a))[0] || {};
   const n = (v) => Number(v) || 0;
+  const CHECKED = "MAX(COALESCE(mail_ok_at, 0), COALESCE(last_scan_at, 0))";
   const d1 = now - DAY, d7 = now - 7 * DAY, d30 = now - 30 * DAY;
   // The last 14 days, today included, as dates.
   const dates = Array.from({ length: 14 }, (_, i) => new Date(now - (13 - i) * DAY).toISOString().slice(0, 10));
@@ -67,7 +70,10 @@ export async function relayHealth(env, me, now = Date.now()) {
     all("SELECT COALESCE(provider, 'google') AS provider, COUNT(*) AS n FROM gmail_connections GROUP BY COALESCE(provider, 'google')"),
     // People with at least one inbox (a shopper's other inboxes are kept as "<id>~<n>").
     one("SELECT COUNT(DISTINCT CASE WHEN instr(shopper_id, '~') > 0 THEN substr(shopper_id, 1, instr(shopper_id, '~') - 1) ELSE shopper_id END) AS n FROM gmail_connections"),
-    one("SELECT SUM(last_scan_at >= ?) AS today, SUM(last_scan_at IS NULL OR last_scan_at < ?) AS stale, MAX(last_scan_at) AS latest, SUM(connected_at >= ?) AS newWeek FROM gmail_connections", d1, d1, d7),
+    // Checked: the last read of an inbox's new mail that worked (mail_ok_at), or the last full read; never a check that failed.
+    // needReconnect: inboxes Google or Microsoft ended Relay's access to (their owners are asked in the app to connect again).
+    one(`SELECT SUM(${CHECKED} >= ?) AS today, SUM(${CHECKED} < ?) AS stale, MAX(${CHECKED}) AS latest, SUM(connected_at >= ?) AS newWeek,
+      SUM(mail_problem = 'reconnect') AS reconnect FROM gmail_connections`, d1, d1, d7),
     all("SELECT state, COUNT(*) AS n FROM mail_scan_jobs WHERE updated_at >= ? GROUP BY state", d7),
     all("SELECT error, COUNT(*) AS n FROM mail_scan_jobs WHERE error IS NOT NULL AND updated_at >= ? GROUP BY error ORDER BY n DESC LIMIT 8", d7),
     one("SELECT COUNT(*) AS looked, SUM(status = 'not_receipt') AS notReceipts, SUM(created_at >= ?) AS week FROM captured_receipts", d7),
@@ -130,7 +136,7 @@ export async function relayHealth(env, me, now = Date.now()) {
     people: { shoppers: n(people.total), newThisWeek: n(people.week), newThisMonth: n(people.month), signedIn: n(sessions.n), signedInThisWeek: n(signIns.n) },
     inboxes: {
       gmail: n((inboxes.find((r) => r.provider === "google") || {}).n), outlook: n((inboxes.find((r) => r.provider === "microsoft") || {}).n),
-      shoppers: n(inboxPeople.n), checkedToday: n(checked.today), notCheckedToday: n(checked.stale),
+      shoppers: n(inboxPeople.n), checkedToday: n(checked.today), notCheckedToday: n(checked.stale), needReconnect: n(checked.reconnect),
       lastChecked: checked.latest ? new Date(n(checked.latest)).toISOString() : null, newThisWeek: n(checked.newWeek),
       scansThisWeek: Object.fromEntries(jobs.map((r) => [r.state, n(r.n)])), scanErrorsThisWeek: jobErrors.map((r) => ({ error: String(r.error).slice(0, 60), count: n(r.n) }))
     },

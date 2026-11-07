@@ -461,11 +461,15 @@ async function checkSandboxBank(){
  }catch(e){if(status)status.textContent="Could not reach the Plaid Sandbox connection: "+e.message}
 }
 function navRender(){const lit=demo||(testing&&page==="wallet")?page:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key)+'</span>'+name+'</button>').join("");relayBadge()}
-// Returns due in the next three days and auction wins to pay for, as a red number on the tab (account.js counts them), the way a phone shows it.
-function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,n=due+pay;for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector&&nav.querySelector('[data-tab="profile"]');if(!b||!b.querySelector)continue;let t=b.querySelector(".tab-badge");
+// Returns due in the next three days and auction wins to pay for, as a red number on the Home tab, and inboxes that need
+// connecting again on the Profile tab (where Email connection is), the way a phone shows it (account.js counts them).
+function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,mail=Number(window.__relayMailFix)||0,home=due+pay;
+ const tabs=[["profile",home,pay?(due?home+" things to do soon":pay+(pay===1?" auction win":" auction wins")+" to pay for"):home+(home===1?" return":" returns")+" due soon"],
+  ["me",mail,(mail===1?"an inbox needs":mail+" inboxes need")+" connecting again"]];
+ for(const [tab,n,said] of tabs)for(const id of ["side","foot"]){const nav=$(id),b=nav&&nav.querySelector&&nav.querySelector('[data-tab="'+tab+'"]');if(!b||!b.querySelector)continue;let t=b.querySelector(".tab-badge");
  if(!n||demo){if(t)t.remove();b.removeAttribute("aria-label");continue}
  if(!t){t=document.createElement("span");t.className="tab-badge";t.setAttribute("aria-hidden","true");(b.querySelector(".ico,.nico")||b).appendChild(t)}
- t.textContent=n>9?"9+":String(n);b.setAttribute("aria-label",b.dataset.name+", "+(pay?(due?n+" things to do soon":pay+(pay===1?" auction win":" auction wins")+" to pay for"):n+(n===1?" return":" returns")+" due soon"))}}
+ t.textContent=n>9?"9+":String(n);b.setAttribute("aria-label",b.dataset.name+", "+said)}}
 window.relayBadge=relayBadge;
 function go(p){if(p==="wallet"&&!demo&&!testing)p="profile";if(p==="wrapped"&&!demo){p="me";window.__relayOpenWrapped=true}if(p==="discover"&&page==="exchange"){exchangeContext=true;storeFilter=selected.merchant==="NORTH & CO."?"North & Co.":selected.merchant;}else if(p!=="discover"){exchangeContext=false;storeFilter="all";}else if(!exchangeContext){storeFilter="all";}if(onTabRoot())TAB_SCROLL[page]=window.scrollY;page=p;retailer=false;render();scrollBack(isTab(p)?TAB_SCROLL[p]||0:0)}
 // Each tab remembers how far down it was scrolled, so switching tabs and coming back lands where you were. Tapping the tab

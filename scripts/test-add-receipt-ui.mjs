@@ -158,7 +158,7 @@ await page.locator(".rl-ar-chip", { hasText: "Harlow & Co" }).click();
 await view.getByText("Nothing in Gmail for “Harlow & Co”. Try the shop's name or the order number.").waitFor();
 assert.equal(st.finds.at(-1), "Harlow & Co"); assert.equal(await q.inputValue(), "Harlow & Co");
 await q.fill("broken"); await page.waitForTimeout(600);
-await view.getByText("Gmail needs reconnecting first: open Profile, then Email connection.").waitFor();
+await view.getByText("Gmail needs connecting again first. Open Profile, then Email connection, and tap Connect again.").waitFor();
 await q.fill(""); await page.waitForTimeout(600);
 assert.equal(await page.locator(".rl-ar-row").count(), 0, "clearing the search clears the list");
 console.log("ok - a shop is one tap away; nothing found and a broken connection are explained");
