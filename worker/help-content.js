@@ -37,7 +37,11 @@ export const HELP_QA = [
   [
     "How do I delete my account?",
     "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."
-  ]
+  ],
+  [
+    "Can the help chat look at one of my receipts?",
+    "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."
+  ],
 ];
 
 // More of how the app works, for questions the Help page doesn't cover. Keep these true to the app as it is.

@@ -1718,6 +1718,34 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   });
 }
 
+// One receipt as the help chat may see it (worker/support-chat.js), only when the shopper chooses to show it: what Relay
+// read and shows on the card, never the email itself, and nothing that identifies the shopper or the order (no order
+// number, address, tracking number, links or who a gift is for). Their own receipts only.
+const HELP_BASIS = { uk_law: "Relay's estimate from UK law's 14 days", window: "from the return window in the shop's email", policy: "from the shop's published returns policy" };
+export async function receiptForHelp(env, shopperId, receiptId) {
+  if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
+  const list = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const c = list.find((r) => r.id === receiptId);
+  if (!c) return null;
+  const clip = (v, n) => String(v || "").replace(/https?:\/\/\S+/gi, "").replace(/[<>{}\[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
+  const all = Array.isArray(c.items) ? c.items : [];
+  const items = all.slice(0, 12).map((i) => ({ name: clip(i.name, 80), qty: Number(i.qty) || 1, pricePence: Number.isFinite(i.pricePence) ? i.pricePence : null }));
+  const said = c.returns && c.returns.deadline ? { date: c.returns.deadline, basis: "the shop's email gives this date" } : null;
+  const guess = c.returnBy && c.returnBy.date ? { date: c.returnBy.date, basis: HELP_BASIS[c.returnBy.basis] || "Relay's estimate" } : null;
+  return {
+    shop: clip(c.retailer && c.retailer.name, 60) || null,
+    date: c.orderDate || null, dateFromEmail: c.orderDateFrom === "email",
+    totalPence: Number.isFinite(c.totalPence) ? c.totalPence : null, currency: c.currency || "GBP",
+    items, moreItems: Math.max(0, all.length - items.length),
+    group: c.category || null,
+    returnBy: said || guess,
+    delivery: c.delivery && c.delivery.status ? { status: String(c.delivery.status).replace(/_/g, " "), at: c.delivery.at || null } : null,
+    checked: c.status === "confirmed" ? "they confirmed it's right" : c.needsShopperConfirmation ? "Relay wasn't sure and asked them to check it" : null,
+    fixed: c.fixed ? ["shop", "total", "date", "items"].filter((k) => c.fixed[k]) : [],
+    aiFilled: Array.isArray(c.aiFilled) ? c.aiFilled.slice(0, 6).map(String) : [],
+  };
+}
+
 // Google redirects the browser here. No bearer token is available, so the single-use
 // state (bound to the shopper who began the flow) is the only thing that identifies them.
 export async function handleGmailCallback(request, env, url, opts) {

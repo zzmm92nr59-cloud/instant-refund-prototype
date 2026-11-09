@@ -25,6 +25,13 @@
   };
   // The app followed the link before this file had loaded.
   if (window.__relayWantHealth) { window.__relayWantHealth = false; wantHealth = true; }
+  // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt). Profile opens it.
+  var openChatAbout = null, wantChatAbout = null;
+  window.relayAskAboutReceipt = function (about) {
+    wantChatAbout = about;
+    if (window.go) window.go("me");
+    setTimeout(function () { if (wantChatAbout && openChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
+  };
   // Logos Relay keeps for well-known UK shops (logos/<domain>.<type>; see scripts/fetch-logos.mjs). Anything else falls back to a live lookup.
   var STORE_LOGOS = {"1password.com":"svg","abelandcole.co.uk":"png","abercrombie.com":"png","accessorize.com":"png","accor.com":"svg","addisonlee.com":"png","adidas.co.uk":"png","adobe.com":"png","aerlingus.com":"png","aesop.com":"png","airbnb.co.uk":"svg","airfrance.co.uk":"png","aldi.co.uk":"svg","aliexpress.com":"png","allbarone.co.uk":"png","allsaints.com":"svg","altontowers.com":"png","amazon.co.uk":"png","anthropic.com":"svg","ao.com":"png","apple.com":"png","appliancesdirect.co.uk":"png","argos.co.uk":"png","arket.com":"png","asda.com":"png","asics.com":"png","asos.com":"png","astridandmiyu.com":"png","atgtickets.com":"png","audible.co.uk":"png","avantiwestcoast.co.uk":"png","avis.co.uk":"png","axs.com":"png","backmarket.co.uk":"png","barbour.com":"png","beautybay.com":"png","beaverbrooks.co.uk":"png","beerhawk.co.uk":"png","bellaitalia.co.uk":"png","benefitcosmetics.com":"png","bensonsforbeds.co.uk":"png","berghaus.com":"png","bershka.com":"png","better.org.uk":"png","bettys.co.uk":"png","birkenstock.com":"svg","blacks.co.uk":"svg","blackwells.co.uk":"png","bloomandwild.com":"png","bmstores.co.uk":"png","boden.com":"png","bolt.eu":"png","bonmarche.co.uk":"png","boohoo.com":"svg","boohooman.com":"png","booking.com":"png","booths.co.uk":"png","boots.com":"png","bose.co.uk":"png","bowsandwhistles.co.uk":"png","box.co.uk":"png","brewdog.com":"svg","britishairways.com":"svg","brittany-ferries.co.uk":"png","bt.com":"svg","bulk.com":"png","bumble.com":"svg","burberry.com":"png","burgerking.co.uk":"png","burton.co.uk":"png","butternutbox.com":"png","buyagift.co.uk":"svg","cadburygiftsdirect.co.uk":"png","caferouge.com":"png","caffenero.com":"png","calm.com":"png","calvinklein.co.uk":"png","canva.com":"png","cardfactory.co.uk":"svg","carpetright.co.uk":"svg","castore.com":"png","chainreactioncycles.com":"png","charlottetilbury.com":"svg","chemist4u.com":"png","chipotle.co.uk":"png","cineworld.co.uk":"png","clarechampion.ie":"png","clarins.co.uk":"png","clarks.co.uk":"png","classpass.com":"png","clinique.co.uk":"png","coastfashion.com":"png","converse.com":"png","coop.co.uk":"png","cos.com":"png","costa.co.uk":"png","costco.co.uk":"png","cote.co.uk":"png","cotswoldco.com":"png","cotswoldoutdoor.com":"png","coxandcox.co.uk":"png","craghoppers.com":"png","crocs.co.uk":"png","crocus.co.uk":"svg","crosscountrytrains.co.uk":"png","ctshirts.com":"svg","cultbeauty.co.uk":"svg","cultfurniture.com":"png","currys.co.uk":"png","danielwellington.com":"png","davidlloyd.co.uk":"svg","dazn.com":"png","debenhams.com":"png","decathlon.co.uk":"png","deezer.com":"png","deliveroo.co.uk":"png","depop.com":"png","detalecph.com":"png","dfds.com":"png","dfs.co.uk":"png","dice.fm":"svg","discord.com":"png","dishoom.com":"svg","disneyplus.com":"svg","diy.com":"png","dobbies.com":"png","dominos.co.uk":"png","dorothyperkins.com":"png","dreams.co.uk":"png","drmartens.com":"svg","dropbox.com":"png","dulux.co.uk":"png","dunelm.com":"png","dunelondon.com":"svg","duolingo.com":"png","dyson.co.uk":"png","easyjet.com":"png","ebay.co.uk":"png","ebuyer.com":"png","economist.com":"png","ee.co.uk":"png","eflorist.co.uk":"png","elemis.com":"png","elevenlabs.io":"svg","emirates.com":"png","emma-sleep.co.uk":"png","endclothing.com":"png","english-heritage.org.uk":"png","enterprise.co.uk":"png","epicgames.com":"png","ernestjones.co.uk":"png","esteelauder.co.uk":"png","etsy.com":"png","europcar.co.uk":"png","eurostar.com":"png","evans.co.uk":"png","evanscycles.com":"png","eventbrite.co.uk":"png","eventim.co.uk":"png","everymancinema.com":"png","expedia.co.uk":"png","expressvpn.com":"png","farfetch.com":"png","farmfoods.co.uk":"png","farrow-ball.com":"png","fatface.com":"png","fenwick.co.uk":"png","firebox.com":"png","fiveguys.co.uk":"svg","flannels.com":"png","footlocker.co.uk":"png","fortnumandmason.com":"png","foyles.co.uk":"png","fragrancedirect.co.uk":"png","francomanca.co.uk":"png","frankieandbennys.com":"png","fredperry.com":"png","freemans.com":"png","freenow.com":"png","frugi.com":"png","fruugo.co.uk":"png","ft.com":"png","funkypigeon.com":"png","furniturevillage.co.uk":"png","gailsbread.co.uk":"svg","game.co.uk":"png","garmin.com":"svg","gbk.co.uk":"png","giffgaff.com":"png","gigantic.com":"png","github.com":"svg","glassesdirect.co.uk":"png","glossier.com":"png","goldsmiths.co.uk":"svg","google.com":"png","gordonramsayrestaurants.com":"png","gousto.co.uk":"png","graze.com":"png","greatbeanbags.com":"png","greeneking.co.uk":"png","greggs.co.uk":"svg","groupon.co.uk":"png","gruum.com":"png","gucci.com":"png","gumtree.com":"png","gwr.com":"png","gymshark.com":"png","habitat.co.uk":"png","halfords.com":"png","hamleys.com":"png","harrods.com":"png","harvester.co.uk":"png","headspace.com":"png","heals.com":"png","hellofresh.co.uk":"png","hertz.co.uk":"png","hilton.com":"png","hinge.co":"png","hm.com":"png","hmv.com":"png","hobbs.com":"png","hobbycraft.co.uk":"png","holidayextras.co.uk":"png","hollandandbarrett.com":"png","hollisterco.com":"png","hollywoodbowl.co.uk":"png","homary.com":"png","homebargains.co.uk":"svg","homebase.co.uk":"png","homesense.com":"svg","honestburgers.co.uk":"png","hotelchocolat.com":"png","hotels.com":"png","houseoffraser.co.uk":"png","howdens.com":"svg","hsamuel.co.uk":"png","hughes.co.uk":"png","hugoboss.com":"png","hunterboots.com":"png","iceland.co.uk":"png","idmobile.co.uk":"png","iguanas.co.uk":"png","ihg.com":"png","ikea.com":"png","interflora.co.uk":"png","inthestyle.com":"png","itsu.com":"png","itv.com":"png","jackjones.com":"png","jbl.com":"png","jdsports.co.uk":"png","jdwetherspoon.com":"png","jdwilliams.co.uk":"png","jessops.com":"png","jet2.com":"svg","jet2holidays.com":"svg","jigsaw-online.com":"png","johnlewis.com":"svg","jojomamanbebe.co.uk":"png","jollyes.co.uk":"png","jomalone.co.uk":"png","josephjoseph.com":"png","joules.com":"png","just-eat.co.uk":"png","justpark.com":"svg","karaca.co.uk":"png","karenmillen.com":"png","kayak.co.uk":"svg","kfc.co.uk":"png","kikocosmetics.com":"svg","klarna.com":"png","klm.com":"png","kobo.com":"png","krispykreme.co.uk":"png","kurtgeiger.com":"png","kwik-fit.com":"png","lacoste.com":"png","laithwaites.co.uk":"png","lakeland.co.uk":"png","laptopsdirect.co.uk":"png","laredoute.co.uk":"png","lastminute.com":"png","lebara.co.uk":"png","lego.com":"png","legoland.co.uk":"png","leon.co":"png","leshuttle.com":"svg","levi.com":"png","li.me":"png","libertylondon.com":"png","lidl.co.uk":"svg","lights4fun.co.uk":"svg","lilyskitchen.co.uk":"png","lindt.co.uk":"png","linkedin.com":"png","littlewoods.com":"png","lner.co.uk":"png","loaf.com":"png","loganair.co.uk":"png","londontheatredirect.com":"png","lookfantastic.com":"png","louisvuitton.com":"png","loveholidays.com":"png","lufthansa.com":"png","lululemon.com":"png","lush.com":"png","lwtheatres.co.uk":"svg","lycamobile.co.uk":"png","lyleandscott.com":"png","maccosmetics.co.uk":"png","made.com":"png","magnet.co.uk":"svg","majestic.co.uk":"png","mamasandpapas.com":"png","mandmdirect.com":"png","mango.com":"png","marksandspencer.com":"png","marriott.com":"png","massimodutti.com":"png","matalan.co.uk":"png","mcdonalds.com":"png","megabus.com":"png","menkind.co.uk":"png","meta.com":"png","microsoft.com":"png","millets.co.uk":"svg","mindfulchef.com":"png","mintvelvet.co.uk":"png","missguided.co.uk":"png","missoma.com":"png","mobiles.co.uk":"png","moltonbrown.co.uk":"svg","monicavinader.com":"png","monsoon.co.uk":"png","montane.com":"png","moonpig.com":"png","morrisons.com":"svg","moss.co.uk":"png","mothercare.com":"png","mountainwarehouse.com":"png","mrporter.com":"png","mulberry.com":"png","musicmagpie.co.uk":"png","myfitnesspal.com":"svg","myprotein.com":"png","mytheresa.com":"png","mytoggle.io":"png","myvue.com":"png","nakedwines.co.uk":"svg","nandos.co.uk":"png","nastygal.com":"png","nationalexpress.com":"svg","nationalrail.co.uk":"svg","nationaltrust.org.uk":"svg","nealsyardremedies.com":"png","neomwellbeing.com":"png","nespresso.com":"png","net-a-porter.com":"png","netflix.com":"png","newbalance.co.uk":"png","newlook.com":"png","next.co.uk":"png","nike.com":"png","ninjakitchen.co.uk":"png","nintendo.com":"png","nkuku.com":"png","nordvpn.com":"png","northernrailway.co.uk":"png","notcutts.co.uk":"png","notion.so":"png","notonthehighstreet.com":"png","nowtv.com":"png","nuffieldhealth.com":"png","o2.co.uk":"png","oakfurnitureland.co.uk":"png","oasis-stores.com":"png","ocado.com":"png","odeon.co.uk":"png","office.co.uk":"png","ohpolly.com":"png","oliverbonas.com":"png","onbuy.com":"png","onepeloton.co.uk":"png","onthebeach.co.uk":"png","openai.com":"svg","overclockers.co.uk":"svg","pactcoffee.com":"png","pandora.net":"png","papajohns.co.uk":"png","paramountplus.com":"png","patagonia.com":"png","patreon.com":"png","paybyphone.co.uk":"png","peacocks.co.uk":"svg","personalisedgiftsshop.co.uk":"png","petplanet.co.uk":"png","pets-corner.co.uk":"png","petsathome.com":"png","pharmacy2u.co.uk":"png","phase-eight.com":"png","picturehouses.com":"png","pizzaexpress.com":"svg","pizzahut.co.uk":"png","pizzapilgrims.co.uk":"png","playstation.com":"png","plusnet.com":"png","poferries.com":"png","poundland.co.uk":"png","premierinn.com":"png","prestigeflowers.co.uk":"png","pret.co.uk":"svg","prettylittlething.com":"png","prezzo.co.uk":"png","primark.com":"png","primevideo.com":"png","primrose.co.uk":"png","pullandbear.com":"png","puma.com":"png","puregym.com":"png","qatarairways.com":"png","qvcuk.com":"png","rains.com":"png","ralphlauren.co.uk":"png","reddragondarts.com":"png","redletterdays.co.uk":"svg","reebok.co.uk":"png","regatta.com":"png","reiss.com":"png","revolutionbeauty.com":"png","richersounds.com":"png","ring.com":"png","ringgo.co.uk":"png","riverford.co.uk":"png","riverisland.com":"png","robertdyas.co.uk":"png","roblox.com":"png","rohan.co.uk":"png","royalmail.com":"png","ryanair.com":"png","ryman.co.uk":"png","sainsburys.co.uk":"png","samsung.com":"png","scan.co.uk":"png","scotrail.co.uk":"png","screwfix.com":"svg","seasaltcornwall.com":"png","seetickets.com":"png","selfridges.com":"png","sephora.co.uk":"png","serenataflowers.com":"png","sevenoakssoundandvision.co.uk":"png","sharkclean.co.uk":"png","shein.com":"png","showcasecinemas.co.uk":"png","silentnight.co.uk":"png","simbasleep.com":"png","simplybe.co.uk":"png","simplycook.com":"png","sixt.co.uk":"png","size.co.uk":"png","skechers.co.uk":"png","skiddle.com":"png","sky.com":"png","skyscanner.net":"png","slugandlettuce.co.uk":"png","smarty.co.uk":"png","smythstoys.com":"png","sofology.co.uk":"png","sonos.com":"png","southernrailway.com":"png","southwesternrailway.com":"png","spacenk.com":"svg","spar.co.uk":"png","specsavers.co.uk":"png","sportsdirect.com":"png","spotify.com":"png","ssense.com":"png","starbucks.co.uk":"svg","steampowered.com":"png","stenaline.co.uk":"png","stonegatepubs.com":"png","stoneisland.com":"png","stories.com":"png","stradivarius.com":"png","strava.com":"png","stubhub.co.uk":"png","studio.co.uk":"png","superdrug.com":"png","superdry.com":"png","surfshark.com":"png","swarovski.com":"png","sweatybetty.com":"png","swooneditions.com":"png","tacobell.co.uk":"png","talktalk.co.uk":"png","tedbaker.com":"png","telegraph.co.uk":"svg","tempur.com":"svg","temu.com":"png","tesco.com":"png","tescomobile.com":"png","tfl.gov.uk":"png","tgifridays.co.uk":"png","thamesclippers.com":"svg","thameslinkrailway.com":"png","thebodyshop.com":"png","theguardian.com":"svg","thegymgroup.com":"png","theinkeylist.com":"png","thenorthface.co.uk":"png","theordinary.com":"png","theperfumeshop.com":"png","thepihut.com":"png","theproteinworks.com":"png","therange.co.uk":"png","thescentreserve.com":"png","thetimes.co.uk":"png","thetoyshop.com":"png","thewhitecompany.com":"png","theworks.co.uk":"png","thompson-morgan.com":"png","thorntons.co.uk":"png","thorpepark.com":"png","thortful.com":"png","three.co.uk":"png","ticketmaster.co.uk":"png","tidal.com":"png","timberland.co.uk":"png","tinder.com":"png","tkmaxx.com":"png","tmlewin.com":"svg","tobycarvery.co.uk":"png","todaytix.com":"png","tommy.com":"png","toolstation.com":"png","topshop.com":"svg","tortilla.co.uk":"png","trainline.com":"png","travelodge.co.uk":"png","trespass.com":"png","tui.co.uk":"png","turtlebay.co.uk":"png","twitch.tv":"png","uber.com":"png","ubereats.com":"png","ugg.com":"png","underarmour.co.uk":"png","uniqlo.com":"png","vans.co.uk":"png","vapeandgo.co.uk":"png","very.co.uk":"png","victorianplumbing.co.uk":"png","viking-direct.co.uk":"png","vinted.co.uk":"png","virginactive.co.uk":"png","virginatlantic.com":"svg","virginexperiencedays.co.uk":"png","virginmedia.com":"png","virginwines.co.uk":"png","visiondirect.co.uk":"png","vodafone.co.uk":"png","voxi.co.uk":"png","wagamama.com":"png","waitrose.com":"png","wallis.co.uk":"png","warehousefashion.com":"png","waterstones.com":"png","wayfair.co.uk":"png","webuy.com":"png","weekday.com":"png","weirdfish.co.uk":"svg","well.co.uk":"png","wexphotovideo.com":"png","whistles.com":"png","whitestuff.com":"png","whsmith.co.uk":"png","wickes.co.uk":"png","wilko.com":"png","wingstop.co.uk":"png","wizzair.com":"png","wordery.com":"png","worldofbooks.com":"svg","xbox.com":"png","yankeecandle.co.uk":"png","yosushi.com":"png","youtube.com":"png","zalando.co.uk":"svg","zara.com":"png","zavvi.com":"png","zipcar.co.uk":"png","zizzi.co.uk":"png","zooplus.co.uk":"png"};
   // Other addresses the same shops send email from (just-eat.com is Just Eat's just-eat.co.uk).
@@ -541,6 +548,7 @@
     ".rl-chat-b.me{align-self:flex-end}.rl-chat-b.me p{background:var(--rl-accent);color:var(--rl-bg);border-bottom-right-radius:6px}" +
     ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;text-align:center}" +
     ".rl-chat-who{font-size:13px;font-weight:600;color:var(--rl-text2);margin:0 4px}" +
+    ".rl-chat-about{border-top:0!important;border-bottom:1px solid var(--rl-line);margin:0 0 10px!important;color:var(--rl-text)!important}" +
     ".rl-chat-typing{flex-direction:row;gap:6px;padding:6px 0}.rl-chat-typing .rl-skel{display:block;width:72px;height:16px;min-height:0;border-radius:999px}.rl-chat-typing .rl-skel+.rl-skel{width:44px}" +
     ".rl-chat-chips{display:flex;flex-wrap:wrap;gap:8px}.rl-chat-chips button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;font-weight:600;transition:transform .12s}" +
     ".rl-chat-chips button:active{transform:scale(.96)}.rl-chat-chips button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
@@ -2862,6 +2870,17 @@
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
           detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+          // Questions about it: Relay's assistant, shown this receipt only when the shopper says so (support-chat.js).
+          var askRow = el("div", { className: "rl-rc-fix", style: "display:none" }, [el("span", { text: "Questions about it?" }),
+            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () {
+              var shopName = (row.retailer && row.retailer.name) || "this shop";
+              ask("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
+                if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: shopName + (row.orderDate ? ", " + shortDate(row.orderDate) : "") });
+              });
+            } })]);
+          detail.appendChild(askRow);
+          (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; }))
+            .then(function (hc) { if (hc && hc.available) askRow.style.display = ""; });
           // What the AI filled in (AI help), for the shopper to check.
           if (row.aiFilled && row.aiFilled.length) {
             var AIP = { total: "total", items: "items", date: "date", number: "order number", shop: "shop" }, ap = row.aiFilled.map(function (k) { return AIP[k] || k; });
@@ -3869,7 +3888,8 @@
     ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
     ["How do I get a copy of my data?", "Open Profile, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
     ["How do I make signing in safer?", "Open Profile, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
-    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
+    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."],
+    ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
   function signedInView(sheet, email, notice, c) {
@@ -4008,6 +4028,11 @@
       chatRow._ai = Boolean(hc.available);
       if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
       chatRow.style.display = "";
+      openChatAbout = function () {
+        if (!chatRow.isConnected || !hc.available || !wantChatAbout) return false;
+        memo.chatAbout = wantChatAbout; page("Help chat", chatPage); return true;
+      };
+      if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
     sheet.appendChild(accGroup("Help & legal", [
       accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
@@ -4628,11 +4653,26 @@
     // Relay's team. The conversation lives only on this screen (and this session): Relay keeps no copy. With the
     // assistant off, it's a message to Relay's team. ----
     function chatPage(b) {
-      var hc = memo.helpChat || {}, ai = Boolean(hc.available), log = memo.chatLog || (memo.chatLog = []);
+      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
+      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
+      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
+      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
+      var log = memo.chatLog || (memo.chatLog = []);
+      var aboutBar = null, foot = null;
+      function noteText() {
+        return !ai ? "Relay's team will see your message and your email address, so they can reply."
+          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
+          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
+      }
+      function stopAbout() {
+        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
+        if (foot) foot.textContent = noteText();
+        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
+      }
       var list = el("div", { className: "rl-chat", role: "log" });
       list.setAttribute("aria-live", "polite");
       var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
       box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
       var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
       var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
@@ -4646,11 +4686,12 @@
       }
       function draw() {
         list.textContent = "";
-        list.appendChild(bubble({ role: "bot", first: true, text: ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
+          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
           : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
         if (ai && !log.length) {
           var chips = el("div", { className: "rl-chat-chips" });
-          ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"].forEach(function (q) {
+          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
             chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
           });
           list.appendChild(chips);
@@ -4674,11 +4715,12 @@
         typing.setAttribute("aria-label", "Relay's assistant is writing");
         list.appendChild(typing); scrollEnd();
         lock(true);
-        api("/relay/my/help/chat", { method: "POST", body: { messages: turns() } }).then(function (r) {
+        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
           lock(false); typing.remove();
           if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
           log.pop(); box.value = q; fit(); draw();
           var e = r.body && r.body.error;
+          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
           say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
             : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
             : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
@@ -4704,13 +4746,19 @@
       box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
       send.onclick = sendQuestion;
       person.onclick = handoff;
+      // Which receipt the assistant can see, and a way to stop showing it.
+      if (about) {
+        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
+          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
+        b.appendChild(aboutBar);
+      }
       // A problem is said just above the box, so it's never hidden behind the tab bar.
       b.appendChild(list);
       b.appendChild(note);
       b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
       if (ai) b.appendChild(person);
-      b.appendChild(el("p", { className: "rl-anote", text: ai ? "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team."
-        : "Relay's team will see your message and your email address, so they can reply." }));
+      foot = el("p", { className: "rl-anote", text: noteText() });
+      b.appendChild(foot);
       draw(); setTimeout(fit, 0);
     }
     function helpPage(b) {
