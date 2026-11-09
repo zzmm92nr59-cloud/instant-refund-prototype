@@ -2,7 +2,7 @@
 // These prove the parser handles these layouts, not that any real retailer's
 // emails parse correctly. Real-world accuracy must be measured on real emails.
 import assert from "node:assert/strict";
-import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls, looksPromotional } from "../worker/receipt-parser.js";
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed++; console.log("ok -", name); };
@@ -645,5 +645,31 @@ t("pay-later email: the shop it paid is the shop, and what's left to pay is not 
   assert.equal(r.retailer.via, "klarna.co.uk");
   assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["Define Jacket *Example", 11800]]);
   assert.equal(r.totalPence, 11800);
+});
+t("'Sub Total' is not the total: 'Total Including Delivery' is, and a sub-total alone is still read", () => {
+  const body = ["Order Reference: 300000000001", "| | Qty | Item | Delivery Address", "1 | Garden Chair Set GC20 | 4 Sample Road | By 09/01/2026 | £ 89.00 |",
+    "| Sub Total | £ 89.00 |", "| Total Discount | £ 0.00 |", "Delivery | £ 3.99 |", "Total Including Delivery | £ 92.99 |"].join("\n");
+  const r = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\n${body}\n`);
+  assert.equal(r.ok, true); assert.equal(r.totalPence, 9299);
+  const onlySub = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\nOrder number: EH-1001\nOak Shelf £40.00\nSub Total £40.00\n`);
+  assert.equal(onlySub.totalPence, 4000, "with no other total the sub-total is still the best figure");
+  const both = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\nOrder number: EH-1002\nSub-total: £40.00\nTotal: £43.50\n`);
+  assert.equal(both.totalPence, 4350);
+});
+t("money off the next order, and a promo code or credit earned by an order, are offers, not receipts", () => {
+  const mk = (subject, body) => `From: "Example Eats" <offers@exampleeats.test>\nSubject: ${subject}\nContent-Type: text/plain\n\n${body}\n`;
+  assert.equal(parseReceiptEmail(mk("Up to £7 off your next order", "Time to re-order\nSave £7 on your next order of £25+\nTotal savings: £12.40\nOrder #: see app")).reason, "promotional");
+  assert.equal(looksPromotional("Save £5 on your first shop", {}, false), true);
+  assert.equal(looksPromotional("Get £10 off when you spend £50", {}, false), true);
+  assert.equal(looksPromotional("Your Example Eats order", {}, false), false);
+  const credit = parseReceiptEmail(`From: "Example Market" <no-reply@examplemarket.test>\nSubject: Here's your promotional credit from your recent Example Market order\nContent-Type: text/plain\n\nThank you for purchasing (Order 202-0000000-0000001). Your order entitles you to a promotional code.\nOrder number: 202-0000000-0000001\nYour promotional code: ABCD-EFGH\nOrder total £60.00\n`);
+  assert.equal(credit.reason, "promotional", "even though it names the order that earned it");
+  const real = parseReceiptEmail(mk("Your order confirmation #EE-2001 - plus £5 off your next order", "Order number: EE-2001\nNoodle Box £8.50\nTotal £8.50"));
+  assert.equal(real.ok, true, "an order confirmation that also offers money off is still a receipt"); assert.equal(real.totalPence, 850);
+});
+t("a receipt sent through an email company (Mandrill, Mailgun…) names the restaurant, never the email company", () => {
+  const r = parseReceiptEmail(`From: "Example Noodles - Example Noodles Leeds" <orders@mandrillapp.com>\nSubject: Your order confirmation #01234\nContent-Type: text/plain\n\nThank you for ordering from Example Noodles - Example Noodles Leeds, your order has been placed.\nOrder reference 01234\nLager | x1 | £4.80\nTotal: | £4.80\n`);
+  assert.equal(r.ok, true); assert.equal(r.retailer.name, "Example Noodles"); assert.equal(r.retailer.via, "mandrillapp.com");
+  assert.notEqual(r.retailer.domain, "mandrillapp.com"); assert.equal(r.totalPence, 480);
 });
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);

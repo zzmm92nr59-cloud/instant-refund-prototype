@@ -91,7 +91,9 @@ const OUTLOOK_FULL_REV = 1;
 // 8: the game named in a game web shop's HTML even when its plain-text part leads with the shop's support line.
 // 9: the shop behind a pay-later, voucher or ticket platform's email (Klarna, GiftPro, Toggle, Ventrata).
 // 10: a supermarket's order summary under its last item ("Trolley cost") is no longer added to that item's price.
-const READER_FULL_REV = 10;
+// 11: "Sub Total" passed over for the real total, money-off and promo-credit emails left out, "Delivered:" notices read as
+// deliveries, and receipts sent through email companies (Mandrill, Mailgun) named after the shop.
+const READER_FULL_REV = 11;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -110,7 +112,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 26;
+export const PARSER_VERSION = 27;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -1034,6 +1036,38 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
 }
 
+// A past year (for Wrapped) is read in every connected inbox, one after the other, the first inbox first. The cursor says
+// which inbox it has got to: the first inbox's is just the date ("2025/03/01", as it always was), another's starts with its
+// number ("b2|2025/03/01", or "b2|" before it starts). An inbox that has already read the year is passed over, unless every
+// inbox has (then asking again reads them all again). An inbox that needs connecting again is passed over too, and the
+// answer says so (skipped), so the others are still read.
+async function yearRound(env, shopperId, fetchImpl, now, year, cursorIn, small) {
+  const o = { ...(small ? { maxFetch: 2 } : {}), year };
+  const boxes = await inboxesOf(env.RELAY_DB, shopperId);
+  if (boxes.length <= 1) return scan(env, shopperId, fetchImpl, now, cursorIn, false, o);
+  const ids = boxes.map(b => b.shopper_id);
+  const done = new Set(((await env.RELAY_DB.prepare("SELECT shopper_id FROM gmail_history_years WHERE (shopper_id = ? OR shopper_id LIKE ?) AND year = ? AND done_at IS NOT NULL")
+    .bind(shopperId, shopperId + "~%", year).all()).results || []).map(x => x.shopper_id));
+  let todo = ids.filter(id => !done.has(id));
+  if (!todo.length) todo = ids;
+  const tagged = /^b(\d{1,2})\|(.*)$/.exec(cursorIn || "");
+  const wanted = tagged ? boxIdOf(shopperId, Number(tagged[1])) : cursorIn ? shopperId : todo[0];
+  const boxId = ids.includes(wanted) ? wanted : todo[0];
+  const dateCursor = tagged && boxId === wanted ? tagged[2] : !tagged && boxId === wanted ? cursorIn : "";
+  const tag = (id, c) => (id === shopperId ? c || "" : "b" + slotOf(id) + "|" + (c || ""));
+  const next = todo.find(id => ids.indexOf(id) > ids.indexOf(boxId));
+  const inboxOf = (id) => { const b = boxes.find(x => x.shopper_id === id); return { mailbox: slotOf(id), provider: b && b.provider === "microsoft" ? "microsoft" : "google" }; };
+  const inbox = inboxOf(boxId);
+  const r = await scan(env, boxId, fetchImpl, now, dateCursor, false, o);
+  if (r.status !== 200) {
+    if (boxId === shopperId || r.status >= 500) return r;
+    const skipped = { ...inbox, error: r.body && r.body.error };
+    return { status: 200, body: { ok: true, added: 0, updated: 0, alreadyCaptured: 0, notReceipts: 0, more: Boolean(next), cursor: next ? tag(next, "") : null, scannedBack: null, inbox, skipped, ...(next ? { reading: inboxOf(next) } : {}) } };
+  }
+  if (r.body.more) return { ...r, body: { ...r.body, cursor: tag(boxId, r.body.cursor), inbox, reading: inbox } };
+  return { ...r, body: { ...r.body, more: Boolean(next), cursor: next ? tag(next, "") : null, inbox, ...(next ? { reading: inboxOf(next) } : {}) } };
+}
+
 // ---- Scans that carry on after the shopper leaves the app ----
 // A scan the shopper starts is kept as a job: where it has got to and how much it has found. While the app is open it asks
 // for the rounds itself (quick, with progress on screen). Once the app is closed (or the phone locks), the scheduled worker
@@ -1910,7 +1944,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
         return json({ error: "bad_year", earliest: thisYear - HISTORY_YEARS }, 400, cors);
       // A past year for Wrapped is read on its own; every other scan is a job that carries on if the shopper leaves the app.
       const r = want
-        ? await scan(env, shopper.id, opts.fetchImpl, opts.now, sb && typeof sb.cursor === "string" ? sb.cursor : "", false, { ...(sb && sb.small === true ? { maxFetch: 2 } : {}), year: want })
+        ? await yearRound(env, shopper.id, opts.fetchImpl, opts.now, want, sb && typeof sb.cursor === "string" ? sb.cursor : "", Boolean(sb && sb.small === true))
         : await appScanRound(env, shopper.id, opts.fetchImpl, opts.now, { full: Boolean(sb && sb.full === true), small: Boolean(sb && sb.small === true), busyWaitMs: opts.busyWaitMs ?? 3000 });
       if (!want) await checkOtherInboxes(env, shopper.id, opts.now, Boolean(sb && sb.full === true));
       return json(r.body, r.status, cors);
@@ -1921,9 +1955,16 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     }
   }
   if (path === "/relay/my/gmail/history" && m === "GET") {
-    const r = await env.RELAY_DB.prepare("SELECT year, done_at AS doneAt FROM gmail_history_years WHERE shopper_id = ? ORDER BY year DESC").bind(shopper.id).all();
+    // A year counts as read once every connected inbox has read it (an inbox added later still needs it).
+    const boxes = (await inboxesOf(env.RELAY_DB, shopper.id)).map(b => b.shopper_id);
+    const ids = boxes.length ? boxes : [shopper.id];
+    const r = await env.RELAY_DB.prepare("SELECT shopper_id AS box, year, done_at AS doneAt FROM gmail_history_years WHERE (shopper_id = ? OR shopper_id LIKE ?) AND done_at IS NOT NULL ORDER BY year DESC")
+      .bind(shopper.id, shopper.id + "~%").all();
+    const byYear = new Map();
+    for (const x of r.results || []) { if (!byYear.has(x.year)) byYear.set(x.year, new Map()); byYear.get(x.year).set(x.box, x.doneAt); }
+    const years = [...byYear].filter(([, done]) => ids.every(id => done.has(id))).map(([year, done]) => ({ year, doneAt: Math.max(...ids.map(id => done.get(id))) }));
     const thisYear = new Date(opts.now).getUTCFullYear();
-    return json({ years: (r.results || []).filter(x => x.doneAt), earliest: thisYear - HISTORY_YEARS, recentFrom: ymd(opts.now - LOOKBACK_DAYS * DAY_MS).replace(/\//g, "-") }, 200, cors);
+    return json({ years, earliest: thisYear - HISTORY_YEARS, recentFrom: ymd(opts.now - LOOKBACK_DAYS * DAY_MS).replace(/\//g, "-") }, 200, cors);
   }
   if (path === "/relay/my/gmail/find" && m === "POST") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);

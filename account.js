@@ -4955,12 +4955,18 @@
       var years = Object.keys(picked).filter(function (k) { return picked[k]; }).map(Number).sort(function (a, b) { return b - a; });
       if (!years.length) return;
       go.disabled = true; Array.prototype.forEach.call(chips.children, function (b) { b.disabled = true; });
-      var found = 0, errors = 0;
+      var found = 0, errors = 0, missed = [];
       function oneYear(k) {
-        if (k >= years.length) { status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "."; setTimeout(function () { done(years[0]); }, 900); return; }
-        var y = years[k];
+        if (k >= years.length) {
+          status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: open Profile, then Email connection." :
+            missed.length ? " Some of your inboxes need connecting again before Relay can read them: open Profile, then Email connection." : "");
+          setTimeout(function () { done(years[0]); }, missed.length ? 4000 : 900); return;
+        }
+        var y = years[k], where = "";
         function round(cursor) {
-          status.textContent = "Reading " + y + (cursor ? " · back to " + cursor.replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2") : "") + "… " + found + " receipts found so far. Keep this page open.";
+          // With more than one inbox the cursor starts with the inbox's number ("b2|2025/03/01"); the date is after it.
+          var day = String(cursor || "").replace(/^b\d{1,2}\|/, "").replace(/^(\d{4})\/(\d{2})\/(\d{2})$/, "$3/$2");
+          status.textContent = "Reading " + y + where + (day ? ", back to " + day : "") + "… " + found + " receipts found so far. Keep this page open.";
           api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
             if (!x.ok) {
               if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."; return; }
@@ -4968,6 +4974,10 @@
               return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
             }
             errors = 0; found += (x.body.added || 0);
+            if (x.body.skipped && missed.indexOf(mailNameOf(x.body.skipped.provider)) === -1) missed.push(mailNameOf(x.body.skipped.provider));
+            // The inbox the next round reads (said only once it isn't the first).
+            var r2 = x.body.reading;
+            where = r2 && r2.mailbox != null ? " in your " + mailNameOf(r2.provider) + " inbox" : "";
             if (x.body.more && x.body.cursor) setTimeout(function () { round(x.body.cursor); }, 800); else oneYear(k + 1);
           }, function () { if (++errors > 8) { status.textContent = "Couldn't reach Relay. Try again in a moment."; go.disabled = false; return; } setTimeout(function () { round(cursor); }, 4000); });
         }

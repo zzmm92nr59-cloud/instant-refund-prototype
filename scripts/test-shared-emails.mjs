@@ -27,12 +27,39 @@ import { runHealthEmails } from "../worker/health-digest.js";
     assert.ok(!out.includes(gone), "hidden: " + gone + "\n" + out);
   for (const kept of ["Hi [name],", "Thank You For Your Order", "#1001", "Brindle & Co", "202-1234567-1234567", "View your order: [link]", "Visa ending 4242",
     "Delivery address\n[address]", "Payment method: Visa", "Billing address: [address]", "Name: [name]", "Merino Wool Scarf x1 £35.00", "Total £45.00",
-    "See you soon, Will. We will be in touch."])
+    "See you soon, Will. We will be in touch.", "Collect from: [address]"])
     assert.ok(out.includes(kept), "kept: " + kept + "\n" + out);
-  assert.deepEqual(hidden, { links: 1, emails: 1, phones: 2, numbers: 1, codes: 3, postcodes: 1, addresses: 2, names: 3 });
+  assert.deepEqual(hidden, { links: 1, emails: 1, phones: 2, numbers: 1, codes: 3, postcodes: 0, addresses: 3, names: 3 });
   assert.equal(hideDetails("We will dispatch it. Will Jones ordered. WILL", namesToHide("Will Jones")).text, "We will dispatch it. [name] [name] ordered. [name]",
     "a name that's also a word is hidden only as a name");
   console.log("ok - links, email addresses, phone numbers, card numbers, codes, postcodes, addresses and the shopper's name are hidden; the rest stays readable");
+}
+
+// Addresses with no heading above them are found by their postcode: in an item row's own cell, under "Billed to" after the
+// card line, as lines above a postcode on its own, and inside a sentence. Item names, prices and dates stay.
+{
+  const rows = hideDetails([
+    "| | Qty | Item | Delivery Address", "1 | Cover Plan Monthly KT55 | 4 Sample Road Leeds LS1 4DY |", "| £ 2.49 |",
+    "1 | Garden Chair Set GC20 | 4 Sample Road Leeds LS1 4DY | By 09/01/2026 | £ 89.00 |", "| Sub Total | £ 91.49 |"].join("\n")).text;
+  for (const gone of ["Sample Road", "LS1 4DY"]) assert.ok(!rows.includes(gone), "hidden: " + gone + "\n" + rows);
+  for (const kept of ["1 | Cover Plan Monthly KT55 | [address] |", "1 | Garden Chair Set GC20 | [address] | By 09/01/2026 | £ 89.00 |", "| £ 2.49 |", "| Sub Total | £ 91.49 |"])
+    assert.ok(rows.includes(kept), "kept: " + kept + "\n" + rows);
+
+  const billed = hideDetails(["BILLED TO", "Visa •••• 4242", "Sam Sample", "7 Example Lane", "Sampleton", "M1 1AE", "United Kingdom", "",
+    "App Store", "Tile Puzzle", "500 Gems", "£1.99"].join("\n")).text;
+  for (const gone of ["Sam Sample", "7 Example Lane", "Sampleton", "M1 1AE"]) assert.ok(!billed.includes(gone), "hidden: " + gone + "\n" + billed);
+  for (const kept of ["BILLED TO\nVisa •••• 4242\n[address]", "Tile Puzzle", "500 Gems", "£1.99"]) assert.ok(billed.includes(kept), "kept: " + kept + "\n" + billed);
+
+  const lines = hideDetails(["Your order is on its way", "", "Sam Sample", "7 Example Lane", "Sampleton", "M1 1AE", "",
+    "We'll deliver to 7 Example Lane, Sampleton M1 1AE on Friday between 7am and 9pm, and send a text before we arrive.",
+    "Oak Desk Lamp £24.00", "Size M1 2XL tee £12.00"].join("\n"));
+  for (const gone of ["Sam Sample", "Example Lane", "Sampleton", "M1 1AE", "M1 2XL"]) assert.ok(!lines.text.includes(gone), "hidden: " + gone + "\n" + lines.text);
+  for (const kept of ["Your order is on its way\n\n[address]\n", "We'll deliver to [address] on Friday between 7am and 9pm", "Oak Desk Lamp £24.00", "Size [postcode] tee £12.00"])
+    assert.ok(lines.text.includes(kept), "kept: " + kept + "\n" + lines.text);
+  assert.equal(lines.hidden.addresses, 2); assert.equal(lines.hidden.postcodes, 1);
+  const town = hideDetails(["Sam Sample", "7 Example Lane", "Sampleton M1 1AE", "", "| Tee Size M1 2XL | £12.00 |", "Thanks for your order", "Tee Size M1 2XL"].join("\n")).text;
+  assert.equal(town, ["[address]", "", "| Tee Size [postcode] | £12.00 |", "Thanks for your order", "Tee Size [postcode]"].join("\n"), "a town before the postcode, under a street line, is an address; a size isn't");
+  console.log("ok - addresses without a heading (in an item row, after a card line, above a postcode, inside a sentence) are hidden; item names and prices stay");
 }
 
 const sqlite = new DatabaseSync(":memory:");

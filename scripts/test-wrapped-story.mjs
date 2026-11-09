@@ -18,7 +18,14 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!u.pathname.startsWith("/relay/")) return route.abort();
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [{ year: 2024, doneAt: 1 }], earliest: 2016 });
-  if (u.pathname === "/relay/my/gmail/scan") { const b = JSON.parse(route.request().postData() || "{}"); scans.push(b); return j(b.cursor ? { ok: true, added: 2, more: false } : { ok: true, added: 1, more: true, cursor: "2025/06/01" }); }
+  // The year is read in the first inbox, then a second (Outlook), then a third that needs connecting again (passed over).
+  if (u.pathname === "/relay/my/gmail/scan") { const b = JSON.parse(route.request().postData() || "{}"); scans.push(b);
+    const outlook = { mailbox: 2, provider: "microsoft" }, third = { mailbox: 3, provider: "google" };
+    return j(({ "": { ok: true, added: 1, more: true, cursor: "2025/06/01" },
+      "2025/06/01": { ok: true, added: 2, more: true, cursor: "b2|", inbox: { mailbox: null, provider: "google" }, reading: outlook },
+      "b2|": { ok: true, added: 1, more: true, cursor: "b2|2025/04/01", inbox: outlook, reading: outlook },
+      "b2|2025/04/01": { ok: true, added: 0, more: true, cursor: "b3|", inbox: outlook, reading: third },
+      "b3|": { ok: true, added: 0, more: false, cursor: null, inbox: third, skipped: { ...third, error: "gmail_reconnect_needed" } } })[b.cursor || ""]); }
   if (u.pathname === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (u.pathname === "/relay/my/gmail") return j({ connected: true, provider: "google", email: "c@example.com" });
   if (u.pathname === "/relay/my/profile") return j({ email: "c@example.com", name: "Cat" });
@@ -67,8 +74,10 @@ const read = page.getByRole("button", { name: "Read these years" });
 assert.equal(await read.isDisabled(), true, "nothing picked, nothing to read");
 await page.locator(".rl-wr-glance .rl-wr-years button", { hasText: /^2025$/ }).click();
 await read.click();
-await page.getByText("Done. Relay found 3 receipts in 2025.").waitFor();
-assert.deepEqual(scans, [{ year: 2025 }, { year: 2025, cursor: "2025/06/01" }], "one year at a time, carrying on from where it got to");
+await page.getByText("Reading 2025 in your Outlook inbox, back to 01/04… 4 receipts found so far. Keep this page open.").waitFor();
+await page.getByText("Done. Relay found 4 receipts in 2025. Your Gmail inbox needs connecting again before Relay can read it: open Profile, then Email connection.").waitFor();
+assert.deepEqual(scans.map(b => b.cursor || ""), ["", "2025/06/01", "b2|", "b2|2025/04/01", "b3|"], "one year at a time, carrying on from where it got to, inbox by inbox");
+assert.ok(scans.every(b => b.year === 2025));
 await page.waitForFunction(() => document.querySelector(".rl-wr-years button.on") && document.querySelector(".rl-wr-years button.on").textContent === "2025");
 assert.deepEqual(errors, []);
 console.log("PASS Wrapped story: every slide, back/forward, close, empty years, safe names, and reading earlier years");

@@ -298,8 +298,12 @@ function fromText(text, refDate) {
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
+  // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
+  // includes delivery ("Total Including Delivery | £315.78") beats a plain one.
+  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
+  const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(text.slice(Math.max(0, m.index - 4), m.index)));
   const totalMatch =
-    text.match(/\b(?:order\s+)?total(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    notSub.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || notSub[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
@@ -471,11 +475,17 @@ function looksLikeReceipt(subject, text) {
 // Promotions have their own place in Relay, so these are not receipts. An email that carries an order number is never treated as a promotion.
 const PROMO_SUBJECT = /\b(you(?:'|’)?ve saved|you saved|\d{1,3}\s?% off|up to \d{1,3}\s?%|sale\b|offers?\b|deals?\b|win\b|rewards?|earn(?:ed)? (?:\d+ )?points|your points|nectar|clubcard|new in\b|back in stock|just for you|don'?t miss|last chance|exclusive|voucher|refer a friend|rate your|how did we do|leave a review|review your|survey|newsletter|wishlist|abandoned|still thinking)\b/i;
 const ORDERISH_SUBJECT = /\b(order (?:confirmation|confirmed|received|number|summary)|your order|your receipt|receipt for|thanks? for your (?:order|purchase)|invoice|payment received)\b/i;
+// Money off the next order ("Up to £7 off your next order", "Save £5 on your first shop").
+const MONEY_OFF_SUBJECT = /(?:^|[\s(])(?:up to |save |get )?£\s?\d{1,4}(?:\.\d{2})?\s+off\b|\boff your (?:next|first)\b|(?:^|\s)save £\s?\d/i;
+// A code or credit to spend next time is an offer even when it names the order that earned it
+// ("Here's your promotional credit from your recent order").
+const PROMO_CREDIT_SUBJECT = /\b(?:promo(?:tional)?|discount) (?:code|credit)s?\b|\bhere(?:'|’)?s your (?:promo|promotional|discount|voucher|reward)\b/i;
 export function looksPromotional(subject, headers, hasOrderRef) {
-  if (hasOrderRef) return false;
   const sub = String(subject || "");
   if (ORDERISH_SUBJECT.test(sub)) return false;
-  if (PROMO_SUBJECT.test(sub)) return true;
+  if (PROMO_CREDIT_SUBJECT.test(sub)) return true;
+  if (hasOrderRef) return false;
+  if (PROMO_SUBJECT.test(sub) || MONEY_OFF_SUBJECT.test(sub)) return true;
   return /^(bulk|list)$/i.test(String((headers && headers.precedence) || "").trim());
 }
 
@@ -695,6 +705,8 @@ export function parseDeliveryEmail(rawEmail) {
   // "Due to be delivered today" is checked first so it is never read as "delivered today".
   if (/\bdue to be delivered\b|\barriving today\b|\bexpected (?:today|on)\b/i.test(subject)) status = "due";
   else if (/\b(has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bwe delivered\b/i.test(both)) status = "delivered";
+  // "Delivered: 1 item | Order # …", or a heading that just says "Delivered today".
+  else if (/^\s*delivered\s*:/i.test(subject) || /^[\s|]*delivered today[.!]?[\s|]*$/im.test(text.slice(0, 4000))) status = "delivered";
   else if (/\bout for delivery\b/i.test(both)) status = "out_for_delivery";
   else if (/\bdue to be delivered\b|\barriving today\b/i.test(both)) status = "due";
   else if (fromCarrier && /\b(on its way|dispatched|in transit|we(?:'|’)?ve got your parcel)\b/i.test(both)) status = "in_transit";

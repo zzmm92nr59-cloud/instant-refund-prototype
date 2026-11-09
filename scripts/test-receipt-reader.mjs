@@ -60,6 +60,8 @@ t("the shop is ranked from every clue: data block, forwarded sender, sender, foo
   assert.equal(dojo.name, "The Crown Inn", "the card-machine company is not the shop");
   assert.equal(rankShop({ senderName: "Liam Hartley", senderDomain: "clarechampion.ie", bodyNames: ["Clare Champion"] }).name, "Clare Champion");
   assert.equal(cleanShopName("noreply"), null);
+  assert.deepEqual(shopNamesInText("We've received your payment for the return of your order.\nPayment made to the refund team."), [], "'the return' and 'the refund team' are not shops");
+  assert.deepEqual(shopNamesInText("Payment received for The Linen Room."), ["The Linen Room"], "a shop whose name starts with 'The' still counts");
 });
 t("groups are scored from the shop, its name and the items", () => {
   assert.equal(c("GreatBeanBags", "greatbeanbags.com", ["Chocolate Brown"]).category, "home", "a colour isn't food");

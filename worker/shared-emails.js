@@ -49,11 +49,90 @@ const ADDRESS_HEAD = /^(\s*(?:[|*•-]\s*)?(?:(?:your\s+)?(?:delivery|shipping|b
 // After one, the lines that carry on the address: short, no prices or quantities, not a sentence, not another label.
 const NOT_ADDRESS = /^\s*(?:payment|paid|order|items?|qty|quantity|price|total|sub-?total|delivery (?:method|option|date)|shipping (?:method|option)|summary|vat|thank|track|return|card|visa|mastercard|amex|paypal|klarna|apple pay|google pay)\b/i;
 const MONEY_OR_QTY = /[£$€]|\b\d+\.\d{2}\b|\bx\s?\d+\b|\bqty\b|\bquantity\b/i;
+// How the shopper paid, written between "Billed to" and the address on some receipts ("Visa •••• 4242").
+const PAY_LINE = /^\s*(?:[|*•-]\s*)?(?:card|visa|mastercard|master card|amex|american express|maestro|debit card|credit card|paypal|klarna|apple pay|google pay)\b/i;
+// A postcode as addresses write it (capitals), for finding an address that has no heading.
+const POSTCODE_CAPS = /\b(?:GIR ?0AA|[A-PR-UWYZ][A-HK-Y]?\d[A-Z\d]? ?\d[ABD-HJLNP-UW-Z]{2})\b/g;
 const addressGoesOn = (line) => {
   const l = line.trim();
   return l.length > 0 && l.length <= 60 && !NOT_ADDRESS.test(l) && !MONEY_OR_QTY.test(l) && !ADDRESS_HEAD.test(l) &&
     !/[.!?:]$/.test(l) && !/:\s/.test(l) && l.split(/\s+/).length <= 7;
 };
+
+// An address with no heading above it, found by its postcode: in a table cell of its own ("1 | Wool Scarf | 12 High Street
+// London SW1A 1AA | £35.00 |"), on a line of its own under the lines that carry it ("Jess Smith / 12 High Street / London /
+// SW1A 1AA"), or inside a longer line ("We'll deliver to 12 High Street, London SW1A 1AA on Friday"). The rest of the row or
+// line (item names, prices, dates) stays. A postcode-like code with no address round it ("Size M1 2XL") is hidden on its own.
+const STREET = /^(?:flat|apartment|apt|unit|suite|floor)\b|^\d+[a-z]?\b|\b(?:street|st|road|rd|avenue|ave|lane|ln|close|drive|dr|way|court|ct|place|pl|crescent|grove|gardens|terrace|square|sq|hill|park|mews|row|walk|green|rise|view|parade|house|cottage|farm|lodge|estate|centre|center|building|wharf|quay|yard|boulevard)\b/i;
+const NAME_OR_TOWN = /^\p{Lu}[\p{L}'’.-]*(?:\s+\p{Lu}[\p{L}'’.-]*){0,2},?$/u;
+const strip = (l) => l.replace(/^[\s|]+|[\s|]+$/g, "");
+function hidePostcodeAddresses(lines, hidden) {
+  const one = new RegExp(POSTCODE_CAPS.source);
+  for (let i = 0; i < lines.length; i++) {
+    if (!one.test(lines[i])) continue;
+    const whole = strip(lines[i]), pm = one.exec(whole);
+    // A postcode on a line (or in a cell) of its own, or after a town ("London SW1A 1AA"): the rest of the address is above.
+    const lone = whole.replace(one, "").trim() === "";
+    const town = !lone && pm.index > 0 && !whole.slice(pm.index + pm[0].length).trim() && NAME_OR_TOWN.test(whole.slice(0, pm.index).trim());
+    let startsLine = lone || town;
+    if (startsLine) {
+      // (decided below, once the lines above have been looked at)
+    } else if (lines[i].includes("|")) {
+      const cells = lines[i].split("|");
+      for (let c = 0; c < cells.length; c++) {
+        const cell = cells[c].trim();
+        if (!one.test(cell)) continue;
+        // The cell keeps whatever isn't the address (a price, an item name round a postcode-like size).
+        cells[c] = " " + hideInLine(cell, hidden) + " ";
+        if (/^ \[address\]/.test(cells[c]) && cells.slice(0, c).every((x) => !x.trim())) startsLine = true;
+      }
+      lines[i] = cells.join("|").trim();
+    } else {
+      lines[i] = hideInLine(lines[i], hidden);
+      startsLine = /^\s*\[address\]/.test(lines[i]);
+    }
+    if (!startsLine) continue;
+    // The lines just above that carry the address's start: back to its street line (and the name just above that), or,
+    // when there's no street line, a town or a name or two.
+    const above = [];
+    for (let k = i - 1; k >= 0 && above.length < 4; k--) {
+      const l = strip(lines[k]);
+      if (!l || /\[address\]/.test(l) || PAY_LINE.test(l) || !addressGoesOn(l)) break;
+      above.push(l);
+    }
+    let take = 0, street = false;
+    for (let d = above.length; d >= 1; d--) if (STREET.test(above[d - 1])) { take = d; street = true; break; }
+    if (take) { if (above[take] && NAME_OR_TOWN.test(above[take])) take++; }
+    else if (!town) while (take < Math.min(2, above.length) && NAME_OR_TOWN.test(above[take])) take++;
+    if (lone || town) {
+      // A town before the postcode needs a street line above to be sure it's an address ("Size M1 2XL" isn't).
+      if (take && (lone || street)) { lines[i] = lines[i].replace(whole, "[address]"); hidden.addresses++; }
+      else { take = 0; lines[i] = lines[i].replace(one, "[postcode]"); hidden.postcodes++; }
+    }
+    if (take) { lines.splice(i - take, take); i -= take; }
+  }
+}
+// The postcode and the address words just before it, back to a column edge, a colon, the end of a sentence, or "to"/"at".
+function hideInLine(line, hidden) {
+  let s = line;
+  for (const m of [...s.matchAll(POSTCODE_CAPS)].reverse()) {
+    const from = Math.max(0, m.index - 80);
+    const before = s.slice(from, m.index);
+    let cut = 0;
+    for (const re of [/[|:;]/g, /[.!?](?:\s|$)/g, /\b(?:to|at)\s/gi]) for (const x of before.matchAll(re)) cut = Math.max(cut, x.index + x[0].length);
+    let at = from + cut;
+    // Never start the hidden part in the middle of a word.
+    if (!cut && from > 0) { const sp = before.search(/\s/); at = sp === -1 ? m.index : from + sp + 1; }
+    const words = s.slice(at, m.index);
+    const isAddress = words.trim() && (/\d|,/.test(words) || STREET.test(words.trim()));
+    if (!isAddress) at = m.index;
+    const head = s.slice(0, at);
+    s = head + (head && !/\s$/.test(head) ? " " : "") + (isAddress ? "[address]" : "[postcode]") + s.slice(m.index + m[0].length);
+    if (isAddress) hidden.addresses++; else hidden.postcodes++;
+  }
+  return s;
+}
+
 // "Hi Jess,", "Dear Mr Smith", "Thanks Sam!": the name after a greeting. (Spelt out in both cases: a name starts with a
 // capital, and with the "any case" flag a capital would match any letter. "Thank You For Your Order" is not a name.)
 const GREETING = /^(\s*(?:[Hh]i|HI|[Hh]ello|HELLO|[Hh]ey|HEY|[Dd]ear|DEAR|[Tt]hanks|THANKS|[Tt]hank you|THANK YOU|[Gg]ood (?:morning|afternoon|evening))[ ,]+)((?:(?:Mr|Mrs|Ms|Miss|Dr|Mx)\.?\s+)?\p{Lu}[\p{L}'’-]+(?:\s+\p{Lu}[\p{L}'’-]+)?)(?=[\s,!.]|$)/gmu;
@@ -89,17 +168,22 @@ export function hideDetails(input, names = []) {
     const rest = m[2].replace(/^[\s|:-]+/, "");
     const inline = Boolean(rest) && !/^(?:(?:delivery|shipping|billing|postal)\s+)?(?:address|details)\b/i.test(rest);
     out.push(m[1] + (inline ? " [address]" : rest ? " " + rest : ""));
-    // The lines that carry it on (up to 6; blank lines before it starts are skipped).
+    // The lines that carry it on (up to 6; blank lines before it starts are skipped). A card line between the heading and
+    // the address ("Billed to / Visa •••• 4242 / Jess Smith / …") stays, and the address after it still goes.
     let taken = 0, j = i + 1;
-    for (; j < lines.length && j <= i + 6; j++) {
+    const kept = [];
+    for (; j < lines.length && j <= i + 6 + kept.length; j++) {
       if (!lines[j].trim()) { if (taken || inline) break; continue; }
+      if (!taken && !inline && !kept.length && PAY_LINE.test(lines[j])) { kept.push(lines[j]); continue; }
       if (!addressGoesOn(lines[j])) break;
       taken++;
     }
+    out.push(...kept);
     if (taken || inline) hidden.addresses++;
     if (taken && !inline) out.push("[address]");
     i = j - 1;
   }
+  hidePostcodeAddresses(out, hidden);
   t = out.join("\n");
   // A code after the words that say it's one.
   const codes = (s) => s.replace(CODE_KEY, (key, at, all) => {

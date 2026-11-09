@@ -162,3 +162,17 @@ const w = [anOrder({ returns: { windowDays: 28, windowFrom: "delivery" }, shipme
 attachDeliveries(w, [{ kind: "delivery_update", status: "delivered", at: "2026-11-02", carrier: "Royal Mail", trackingNumber: "JK000000009GB" }]);
 assert.deepEqual(w[0].returnBy, { date: "2026-11-30", basis: "window", from: "delivery" });
 console.log("ok - safe return dates: 14 days (UK law) or the email's window, from the order date; a delivery-based window from the day it arrived");
+
+// A marketplace's "Delivered: 1 item | Order # …" notice is a delivery update for that order, never a second purchase;
+// "Delivered today" as a heading counts, "due to be delivered today" doesn't.
+{
+  const notice = (subject, lines) => mime({ from: '"Example Market" <shipment-tracking@examplemarket.example>', subject, date: "Sat, 29 Nov 2025 12:00:00 +0000",
+    plain: lines.join("\r\n"), htmlLines: lines });
+  const done = parseDeliveryEmail(notice("Delivered: 1 item | Order # 205-0000000-0000001", ["Your package is here!", "Delivered today", "Parcel was handed to a receptionist.", "Order # 205-0000000-0000001", "Track package"]));
+  assert.equal(done.ok, true); assert.equal(done.status, "delivered"); assert.equal(done.orderRef, "205-0000000-0000001");
+  const card = asCard(notice("Delivered: 1 item | Order # 205-0000000-0000001", ["Your package is here!", "Delivered today", "Order # 205-0000000-0000001"]), "m", 9);
+  assert.equal(card.kind, "delivery_update", "not a purchase");
+  const due = parseDeliveryEmail(notice("Your Example Market delivery", ["Your parcel is due to be delivered today", "Order # 205-0000000-0000002"]));
+  assert.notEqual(due.status, "delivered");
+  console.log("ok - a 'Delivered:' notice is a delivery update for its order, not a purchase");
+}
