@@ -59,6 +59,8 @@ import { runHealthEmails } from "../worker/health-digest.js";
   assert.equal(lines.hidden.addresses, 2); assert.equal(lines.hidden.postcodes, 1);
   const town = hideDetails(["Sam Sample", "7 Example Lane", "Sampleton M1 1AE", "", "| Tee Size M1 2XL | £12.00 |", "Thanks for your order", "Tee Size M1 2XL"].join("\n")).text;
   assert.equal(town, ["[address]", "", "| Tee Size [postcode] | £12.00 |", "Thanks for your order", "Tee Size [postcode]"].join("\n"), "a town before the postcode, under a street line, is an address; a size isn't");
+  assert.equal(hideDetails("| Holding deposit - Flat 9, 3003 Example Tower | £500.00 |\n1 House Salad £6.00\nWe'll deliver to 12 High Street today").text,
+    "| Holding deposit - [address] | £500.00 |\n1 House Salad £6.00\nWe'll deliver to [address] today", "a street or building with no postcode near it; '1 House Salad' stays");
   console.log("ok - addresses without a heading (in an item row, after a card line, above a postcode, inside a sentence) are hidden; item names and prices stay");
 }
 

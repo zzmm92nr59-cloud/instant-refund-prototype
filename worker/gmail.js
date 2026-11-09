@@ -91,8 +91,10 @@ const OUTLOOK_FULL_REV = 1;
 // 8: the game named in a game web shop's HTML even when its plain-text part leads with the shop's support line.
 // 9: the shop behind a pay-later, voucher or ticket platform's email (Klarna, GiftPro, Toggle, Ventrata).
 // 10: a supermarket's order summary under its last item ("Trolley cost") is no longer added to that item's price.
-// 11: "Sub Total" passed over for the real total, money-off and promo-credit emails left out, "Delivered:" notices read as
-// deliveries, and receipts sent through email companies (Mandrill, Mailgun) named after the shop.
+// 11: "Sub Total" passed over for the real total, money-off, promo-credit and bonus-points emails left out, "Delivered:"
+// notices read as deliveries, receipts sent through email companies (Mandrill, Mailgun) named after the shop, "Ordered:",
+// "receipt for" and "order of" subjects, invisible padding and direction marks, "5 GBP" prices, totals "(Including VAT)",
+// booking confirmation numbers, deposits into an account left out, and a payment platform's "Merchant:".
 const READER_FULL_REV = 11;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).

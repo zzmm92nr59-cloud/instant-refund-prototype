@@ -113,6 +113,9 @@ export function rankShop(clues) {
   const senderDomain = c.senderDomain && !isVia(c.senderDomain) && !c.personal ? c.senderDomain : null;
   const shopDomain = c.forwardedDomain || senderDomain || c.linkDomain || null;
   if (c.dataName) add(c.dataName, 8, shopDomain);
+  // A payment platform's receipt that names the business it paid ("Merchant: Example Lettings") outweighs the platform's
+  // own name and footer.
+  if (c.merchantName) add(c.merchantName, 10, null);
   if (c.titleName) add(c.titleName, 6, shopDomain);
   if (c.forwardedName) add(c.forwardedName, 7, c.forwardedDomain);
   // A payment company sending under its own name ("Dojo" from dojo.tech) says nothing about the shop.

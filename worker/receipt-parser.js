@@ -60,12 +60,17 @@ function decodeMimeWords(value) {
     });
 }
 
+// Invisible characters senders pad emails with (zero-width spaces and joiners, direction marks, soft hyphens), written
+// as characters or as entities. They split words and numbers ("Order # \u202B205-…" reads as no order number at all).
+const INVISIBLE = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]|&(?:zwnj|zwj|shy|lrm|rlm);|&#(?:x200[b-f]|x202[a-e]|xad|x34f|xfeff|820[3-7]|823[4-8]|173|847|65279);/gi;
+export const withoutInvisible = (s) => String(s || "").replace(INVISIBLE, "");
+
 function parseHeaders(block) {
   const headers = {};
   const unfolded = block.replace(/\r?\n[ \t]+/g, " ");
   for (const line of unfolded.split(/\r?\n/)) {
     const i = line.indexOf(":");
-    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = decodeMimeWords(line.slice(i + 1).trim());
+    if (i > 0) headers[line.slice(0, i).trim().toLowerCase()] = withoutInvisible(decodeMimeWords(line.slice(i + 1).trim()));
   }
   return headers;
 }
@@ -110,7 +115,7 @@ function collectParts(headers, body, out, depth = 0) {
     }
     return;
   }
-  const decoded = unwrapSafeLinks(decodeBody(headers, body));
+  const decoded = withoutInvisible(unwrapSafeLinks(decodeBody(headers, body)));
   if (/text\/html/i.test(type)) out.html.push(decoded);
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
 }
@@ -293,9 +298,15 @@ export function parseDate(text, refDate) {
 function fromText(text, refDate) {
   // Some plain-text parts write the pound sign as "L" ("L69.00" on its own line). Only whole lines that are just an amount are changed.
   text = text.replace(/^([ \t|]*)L\s?([0-9][0-9,]*\.[0-9]{2})[ \t|]*$/gm, "$1£$2");
+  // Bold written the plain-text way ("| **Total** | **£500.00** |") reads as the words themselves.
+  text = text.replace(/\*\*([^*\n]{1,80})\*\*/g, "$1");
+  // Others write the currency after the amount ("5 GBP", "12.99 GBP"): read as "£5.00", "£12.99" (never "£0.00 GBP" twice).
+  text = text.replace(/(?<![£\d.,])(?<!£ )(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[ \t]?GBP\b/g, (m, n, p) => "£" + n + "." + (p || "00"));
   const ref =
     text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
-    text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i);
+    text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
+    // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
+    text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i);
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
@@ -304,7 +315,9 @@ function fromText(text, refDate) {
   const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(text.slice(Math.max(0, m.index - 4), m.index)));
   const totalMatch =
     notSub.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || notSub[0] || totals[0] ||
-    text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+    text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
+    [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop();
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -317,6 +330,15 @@ function fromText(text, refDate) {
         qty: Number(m[1] || m[3] || 1),
         pricePence: money(m[4]),
       });
+    }
+  }
+
+  // A bulleted name, then its quantity, then its price, each on its own line ("* Linen Notebook / Quantity: 1 / £5.00").
+  // The price is only kept for a quantity of 1 (it isn't said whether it's each or for all of them).
+  if (!items.length) {
+    for (const m of text.matchAll(/^[ \t]*[*•][ \t]+([^\n£]{3,120}?)[ \t]*\n[ \t]*(?:qty|quantity)[ \t]*:?[ \t]*(\d{1,3})[ \t]*\n[ \t]*£[ \t]*([0-9][0-9,]*\.[0-9]{2})[ \t]*$/gim)) {
+      const qty = Number(m[2]);
+      items.push({ name: m[1].trim(), qty, pricePence: qty === 1 ? money(m[3]) : null });
     }
   }
 
@@ -462,7 +484,9 @@ function extractReturns(text, html, orderDate) {
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
-  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s);
+  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s) ||
+    // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b/.test(s);
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
   return { subjectHit, bodyHit };
 }
@@ -479,7 +503,7 @@ const ORDERISH_SUBJECT = /\b(order (?:confirmation|confirmed|received|number|sum
 const MONEY_OFF_SUBJECT = /(?:^|[\s(])(?:up to |save |get )?£\s?\d{1,4}(?:\.\d{2})?\s+off\b|\boff your (?:next|first)\b|(?:^|\s)save £\s?\d/i;
 // A code or credit to spend next time is an offer even when it names the order that earned it
 // ("Here's your promotional credit from your recent order").
-const PROMO_CREDIT_SUBJECT = /\b(?:promo(?:tional)?|discount) (?:code|credit)s?\b|\bhere(?:'|’)?s your (?:promo|promotional|discount|voucher|reward)\b/i;
+const PROMO_CREDIT_SUBJECT = /\b(?:promo(?:tional)?|discount) (?:code|credit)s?\b|\bhere(?:'|’)?s your (?:promo|promotional|discount|voucher|reward)\b|\b\d[\d,]*\s+bonus\s+(?:avios|points|miles)\b/i;
 export function looksPromotional(subject, headers, hasOrderRef) {
   const sub = String(subject || "");
   if (ORDERISH_SUBJECT.test(sub)) return false;
@@ -544,6 +568,8 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     forwardedName: fw?.name || null, forwardedDomain: fw?.domain || null,
     senderName: sender?.name ? fromName : null, senderDomain: domain, personal,
     bodyNames: shopNamesInText(text, subject),
+    // A payment platform's own receipt names the business that was paid ("Merchant: Example Lettings").
+    merchantName: domain && isVia(domain) ? ((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) || [])[1] || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
     titleName: GAME_SHOP.test(domain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
@@ -557,6 +583,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
 
 // "Your booking confirmation for London to Orpington (27 September at 12:54)", "... for return trip London to Nottingham (20 August ...".
 const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L} .'’&-]{1,40}?) to (\p{Lu}[\p{L} .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
+const ACCOUNT_DEPOSIT = /\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
 // An email as the reader sees it: its subject, sender and date, its plain-text part, and its HTML part turned into text the
@@ -597,6 +624,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
     return { ok: false, reason: "payment_problem", source: "shopper_email" };
   }
+  // Money paid into an account to spend later (a deposit credited to a balance) is not a purchase.
+  if (ACCOUNT_DEPOSIT.test(text.slice(0, 3000))) return { ok: false, reason: "account_deposit", source: "shopper_email" };
   const ld = html ? fromJsonLd(html) : null;
   const refDate = headers.date ? new Date(headers.date) : null;
   let txt = fromText(text, refDate);
