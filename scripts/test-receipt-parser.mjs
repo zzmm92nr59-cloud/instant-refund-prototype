@@ -693,6 +693,8 @@ t("receipts named in other ways: 'Your 25 September receipt for 1 item', 'Exampl
   const film = parseReceiptEmail(textMail('"Example Market" <digital-no-reply@examplemarket.test>', "Example Market order of Film Night.",
     "Order details\nOrder #D01-0000000-0000004\nFilm Night\nSold by :Example Digital Ltd\n\u00a35.99\nItem Subtotal: \u00a34.99\nTotal Before Tax: \u00a34.99\nTax Collected: \u00a31.00\nGrand Total: \u00a35.99"));
   assert.equal(film.ok, true); assert.equal(film.orderRef, "D01-0000000-0000004"); assert.equal(film.totalPence, 599, "the grand total, not the total before tax");
+  const sent = textMail('"Example Market" <ship@examplemarket.test>', 'Your Example Market order of "Tea Towels" has been dispatched', "Order #D01-0000000-0000005\nGrand Total: \u00a35.99");
+  assert.equal(parseReceiptEmail(sent).ok, false, "a dispatch notice named that way isn't a second purchase");
 });
 t("a total written only as '£33.76 (Including VAT)'; a booking's confirmation number is its reference", () => {
   const pizza = parseReceiptEmail(textMail('"Example Pizza" <orders@examplepizza.test>', "Order confirmation", "Your order number is 600000001\n1x Large Margherita\nDelivery: \u00a32.99\n\u00a333.76 (Including VAT)"));
