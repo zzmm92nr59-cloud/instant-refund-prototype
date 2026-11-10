@@ -26,6 +26,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .offerbox{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .offerbox label{font-size:12px;font-weight:700;color:var(--muted);display:grid;gap:5px}.offerbox input,.offerbox select{border:1px solid #d9d3c6;border-radius:11px;padding:10px 12px;background:#fff;min-width:120px}
 .offerbox .grow{flex:1;min-width:180px}.offerbox .grow input{width:100%}
+.offerbox .wide{flex:1 1 100%}.offerbox textarea{width:100%;box-sizing:border-box;border:1px solid #d9d3c6;border-radius:11px;padding:10px 12px;background:#fff;font:inherit;font-weight:500;color:var(--ink);min-height:96px;resize:vertical}
 .msg{grid-column:1/-1;font-size:13px;border-radius:12px;padding:10px 12px}.ok{background:#eef6dc;color:#3f6212}.bad{background:#fff0ef;color:#9c3328}
 .empty,.signin{background:#fff;border:1px solid var(--line);border-radius:22px;padding:28px;text-align:center;color:var(--muted)}
 .signin h2{font-family:var(--serif);color:var(--ink);font-weight:600;font-size:26px;margin:0 0 8px}
@@ -134,6 +135,19 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
         <button class="btn ghost hidden" type="button" id="stripeOff">Disconnect</button>
       </div>
       <div class="msg hidden" id="payMsg"></div>
+    </div>
+  </section>
+  <section id="ret" class="hidden">
+    <div class="head"><h2>Your returns</h2><span class="state ended" id="retState">Not set</span></div>
+    <div class="row" style="grid-template-columns:1fr">
+      <p class="meta" style="margin:0;line-height:1.55">Tell Relay how long you take returns for and how you want items sent back. Relay shows this to your customers and never makes it up: with nothing set, your customers see no return-by date, and can ask for a return through Relay for <span id="retLimit">30</span> days after ordering.</p>
+      <form id="retForm" class="offerbox" style="border:0;padding:0" autocomplete="off">
+        <label>Days to return, counted from the day they order<input name="days" type="number" min="1" max="365" step="1" inputmode="numeric" placeholder="For example 30"></label>
+        <label class="wide">How to send an item back (your customers see this when they start a return)<textarea name="how" maxlength="600" rows="4" placeholder="For example: Post it to our returns address, with your order number inside the parcel. We refund within 5 days of getting it back."></textarea></label>
+        <button class="btn dark" type="submit" id="retSave">Save</button>
+      </form>
+      <p class="meta" style="margin:0;line-height:1.55">Relay counts from the order date because it doesn't know when each parcel arrives. If your policy runs from delivery, add your usual delivery time: 28 days from delivery with 3 days' delivery is 31.</p>
+      <div class="msg hidden" id="retMsg"></div>
     </div>
   </section>
   <section id="rm" class="hidden">
@@ -285,7 +299,7 @@ async function load() {
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
-    loadRm(); loadPay(); loadAuctions();
+    loadRet(); loadRm(); loadPay(); loadAuctions();
   } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
 }
 $("items").addEventListener("click", (e) => {
@@ -329,6 +343,34 @@ function rmShow(st) {
   $("rmSave").textContent = on ? "Save changes" : "Check key and turn on";
   $("rmOff").classList.toggle("hidden", !on);
 }
+// ---- The shop's own returns period and how it wants items sent back ----
+const RET_ERR = { invalid_days: "Days must be a whole number from 1 to 365, or left blank.", how_too_long: "That's too long. Keep it under 600 characters.", shopify_only: "This is for Shopify shops for now." };
+function retSay(cls, text) { const m = $("retMsg"); m.className = "msg " + cls; m.textContent = text; }
+function retShow(st) {
+  const f = $("retForm"), days = st && st.days;
+  f.days.value = days || ""; f.how.value = (st && st.how) || "";
+  if (st && st.relayLimitDays) $("retLimit").textContent = st.relayLimitDays;
+  $("retState").textContent = days ? days + " days" : "Not set"; $("retState").className = "state " + (days ? "live" : "ended");
+}
+async function loadRet() {
+  const shopify = demand && demand.platform === "shopify";
+  $("ret").classList.toggle("hidden", !shopify);
+  if (!shopify) return;
+  try { const r = await api("/relay/retailer/returns"); if (r.status === 200) retShow(r.body); } catch { /* shown as Not set */ }
+}
+$("retForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = $("retSave"), raw = f.days.value.trim();
+  const days = raw === "" ? null : Number(raw);
+  if (days !== null && !(Number.isInteger(days) && days >= 1 && days <= 365)) return retSay("bad", RET_ERR.invalid_days);
+  btn.disabled = true;
+  try {
+    const r = await api("/relay/retailer/returns", { method: "POST", body: JSON.stringify({ days, how: f.how.value }) });
+    if (r.status === 200) { retShow(r.body); retSay("ok", r.body.days ? `Saved. Your customers now see a return-by date ${r.body.days} days after they order.` : "Saved. No return-by date is shown to your customers."); }
+    else retSay("bad", RET_ERR[r.body.error] || "That didn't save. Please try again.");
+  } catch { retSay("bad", "Couldn't reach Relay just now."); }
+  btn.disabled = false;
+});
 async function loadRm() {
   const shopify = demand && demand.platform === "shopify";
   $("rm").classList.toggle("hidden", !shopify);

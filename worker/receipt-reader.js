@@ -6,7 +6,7 @@
 // ---- Who sent it on the shop's behalf ---------------------------------------------------------------------------------
 // Payment, ordering and email companies that send receipts for other businesses. Their name and web address say nothing
 // about the shop, so they never count as the shop (the shop's own name in the email does).
-export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|klarna\.(com|co\.uk)|giftpro\.co\.uk|mytoggle\.io|ventrata\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com)$/i;
+export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|klarna\.(com|co\.uk)|giftpro\.co\.uk|mytoggle\.io|ventrata\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com|mandrillapp\.com|mailgun\.(org|net)|sparkpostmail\.com|amazonses\.com|mailjet\.com|sendinblue\.com|postmarkapp\.com|mcdlv\.net|rsgsv\.net)$/i;
 export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCase());
 
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
@@ -113,6 +113,9 @@ export function rankShop(clues) {
   const senderDomain = c.senderDomain && !isVia(c.senderDomain) && !c.personal ? c.senderDomain : null;
   const shopDomain = c.forwardedDomain || senderDomain || c.linkDomain || null;
   if (c.dataName) add(c.dataName, 8, shopDomain);
+  // A payment platform's receipt that names the business it paid ("Merchant: Example Lettings") outweighs the platform's
+  // own name and footer.
+  if (c.merchantName) add(c.merchantName, 10, null);
   if (c.titleName) add(c.titleName, 6, shopDomain);
   if (c.forwardedName) add(c.forwardedName, 7, c.forwardedDomain);
   // A payment company sending under its own name ("Dojo" from dojo.tech) says nothing about the shop.
@@ -151,7 +154,7 @@ export function shopNamesInText(text, subject) {
   const s = String(subject || "");
   const sm = s.match(/\b(?:your|an?) ([A-Z][\w&'’.-]{1,25}(?: [A-Z][\w&'’.-]{1,20}){0,2}) (?:order|receipt)\b/) || s.match(/\b(?:order|receipt) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,]|$| #| -)/);
   if (sm) grab(sm[1]);
-  return out.filter((n) => !/^(the|your|our|this|us|you|an?|order|receipt|all rights)$/i.test(n) && !/^(your|our|this|an?) /i.test(n) && !/^the (order|payment|amount|total|items?|balance)\b/i.test(n)).slice(0, 6);
+  return out.filter((n) => !/^(the|your|our|this|us|you|an?|order|receipt|all rights)$/i.test(n) && !/^(your|our|this|an?) /i.test(n) && !/^the (order|payment|amount|total|items?|balance|returns?|refunds?|goods|products?|delivery|cost|difference|full|remaining|rest|price|value|money|account|card|booking|ticket|subscription)\b/i.test(n)).slice(0, 6);
 }
 
 // A forwarded email names the shop that sent the original: "From: lululemon <orders@e.lululemon.com>". Each email app

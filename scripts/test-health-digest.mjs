@@ -160,4 +160,16 @@ assert.ok(!JSON.stringify(emails).includes("x1@example.com"), "no addresses");
 clock = Date.UTC(2026, 10, 12, 8, 0); emails = []; await run();
 assert.match(emails.find(e => /this morning/.test(e.subject)).text, /- 4 inboxes need connecting again \(their owners see a Connect again button in the app\)\./);
 console.log("ok - only checks that worked count as checked; access ended to every inbox, or to several in an hour, is said plainly");
+// Returns the shop couldn't be emailed about are in "Needs a look" (a count only), with why when Relay is still sending
+// from the mail service's test address.
+const { digestMessage } = await import("../worker/health-digest.js");
+const hNow = await (await call("/relay/my/admin/health", { token: ops })).json();
+assert.deepEqual(hNow.mail, { ownAddress: false, returnsShopNotEmailedThisWeek: 0 });
+assert.ok(!/couldn't email the shop/.test(digestMessage(hNow, []).text), "nothing to say while no shop was missed");
+assert.match(digestMessage({ ...hNow, mail: { ownAddress: false, returnsShopNotEmailedThisWeek: 1 } }, []).text,
+  /- Relay couldn't email the shop about 1 return this week \(it's still listed in the shop's Relay dashboard\)\. Relay is still sending from a test address, which only reaches your own email: it needs a sending address of its own\./);
+assert.match(digestMessage({ ...hNow, mail: { ownAddress: true, returnsShopNotEmailedThisWeek: 2 } }, []).text,
+  /- Relay couldn't email the shop about 2 returns this week \(they're still listed in the shop's Relay dashboard\)\. Check the email address the shop has in Shopify or Square\./);
+assert.ok(!/couldn't email the shop/.test(digestMessage({ ...hNow, mail: undefined }, []).text), "an older health reading without this part still makes a summary");
+console.log("ok - returns the shop couldn't be emailed about are in the morning summary, with why");
 console.log("PASS health emails: morning summary from 8am, counts only, alerts in plain words at most every " + ALERT_GAP_HOURS + " hours, admins only");

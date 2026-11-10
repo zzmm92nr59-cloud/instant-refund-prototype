@@ -144,6 +144,13 @@ let list = await (await call("/relay/my/purchases", { token: alice })).json();
 assert.deepEqual(list.purchases.map(p => p.id), ["shopify:relay-demo.myshopify.com:order:1"]);
 assert.equal(list.purchases[0].items[0].title, "Trainers 1");
 assert.ok(!JSON.stringify(list).includes("example.com"));
+// Each order comes with what it was placed at, and what it comes to now once it has changed (a swap, the shop editing it, a
+// refund); null until then.
+assert.deepEqual([list.purchases[0].amountMinor, list.purchases[0].amountNowMinor], [5000, null]);
+sqlite.prepare("UPDATE retailer_orders SET current_amount_minor = 6500 WHERE id = 'shopify:relay-demo.myshopify.com:order:1'").run();
+list = await (await call("/relay/my/purchases", { token: alice })).json();
+assert.deepEqual([list.purchases[0].amountMinor, list.purchases[0].amountNowMinor], [5000, 6500]);
+sqlite.prepare("UPDATE retailer_orders SET current_amount_minor = NULL").run();
 list = await (await call("/relay/my/purchases", { token: bob })).json();
 assert.deepEqual(list.purchases.map(p => p.id), ["shopify:relay-demo.myshopify.com:order:2"]);
 list = await (await call("/relay/my/purchases", { token: carol })).json();

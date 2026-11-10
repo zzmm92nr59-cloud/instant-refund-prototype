@@ -231,7 +231,8 @@ console.log("PASS the swapped-to line Shopify adds isn't shown twice");
 // 6. The app and dashboard words.
 const app = readFileSync("account.js", "utf8"), dash = readFileSync("retailer.html", "utf8");
 assert.match(app, /will update your order and send you a link to pay the/);
-assert.match(app, /"Pay " \+ absPounds\(d\) \+ " to " \+ shop \+ " →"/);
+assert.match(app, /text: "Pay " \+ absPounds\(d\) \+ " to " \+ shop,/); // the words alone: no arrow as an icon in a button
+assert.doesNotMatch(app, /\+ shop \+ " →"/);
 assert.match(app, /✓ Refunded/);
 assert.match(app, /" still to pay " \+ shopName \+ " for the swap"/);
 assert.match(app, /" difference paid to " \+ shopName/);

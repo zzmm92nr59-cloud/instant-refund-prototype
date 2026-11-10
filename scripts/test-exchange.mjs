@@ -11,7 +11,7 @@ function stmt(sql, args = []) {
   return { bind: (...a) => stmt(sql, a), async run() { sqlite.prepare(sql).run(...args); return {}; }, async first() { return sqlite.prepare(sql).get(...args) ?? null; },
     async all() { return { results: sqlite.prepare(sql).all(...args) }; } };
 }
-const db = { prepare: sql => stmt(sql) };
+const db = { prepare: sql => stmt(sql), batch: async (list) => { for (const st of list) await st.run(); return []; } };
 const SECRET = "unit-test-auth-secret-0123456789";
 const env = { RELAY_DB: db, AUTH_SECRET: SECRET };
 sqlite.exec(`ALTER TABLE retailer_catalog_items ADD COLUMN store_label TEXT; ALTER TABLE retailer_catalog_items ADD COLUMN image_url TEXT;
@@ -98,5 +98,84 @@ assert.equal(purchases[0].items[0].exchangeable, false); assert.equal(purchases[
 const changed = await call(alice, "/relay/my/exchange", { orderId: o502, lineId: "9502", variantKey: conn + ":variant:gid://shopify/ProductVariant/12" });
 assert.equal(changed.status, 200, "exchange works even though the bought variant no longer exists");
 assert.equal(removedLine, "gid://shopify/CalculatedLineItem/9502");
+
+// 7. When Shopify says which line the new item is on, Relay's copy of the order follows: the line moves to the new item's
+// own line (so the shop's refund can be matched to it), what the order comes to now is kept beside its amount (which stays
+// what it came to when it was placed, the figure its confirmation email gives), and the swapped item can still be
+// returned. One swap per item, as before.
+{
+  const { handleReturnRoute } = await import("../worker/returns.js");
+  const { ingestShopifyOrder } = await import("../worker/shopify-webhooks.js");
+  const id = conn + ":order:503";
+  sqlite.prepare("INSERT INTO retailer_orders (id, connection_id, external_order_id, ordered_at, amount_minor, currency, payment_processor, status, raw_identifier_keys) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id, conn, "503", new Date(Date.now() - 2 * 864e5).toISOString(), 4500, "GBP", "shopify", "unverified", "[]");
+  sqlite.prepare("INSERT INTO retailer_order_emails (order_id, email_hash, created_at) VALUES (?,?,?)").run(id, alice.emailHash, 1);
+  sqlite.prepare("INSERT INTO order_items (id, order_id, external_line_item_id, product_id, variant_id, title, quantity, price_minor, currency) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id + ":item:9503", id, "9503", "1", "11", "Logo Cap", 1, 2000, "GBP");
+  sqlite.prepare("INSERT INTO order_items (id, order_id, external_line_item_id, product_id, variant_id, title, quantity, price_minor, currency) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id + ":item:9600", id, "9600", "2", "50", "Canvas Tote", 1, 2500, "GBP");
+  const wasFetch = o.fetchImpl;
+  o.fetchImpl = async (url, init) => {
+    const { query, variables } = JSON.parse(init.body);
+    const ok = (data) => new Response(JSON.stringify({ data }), { status: 200 });
+    if (/RelayExchangeCheck/.test(query)) return ok({ order: { cancelledAt: null, displayFulfillmentStatus: "UNFULFILLED" }, productVariant: { inventoryQuantity: 5, title: "x" } });
+    if (/orderEditBegin/.test(query)) return ok({ orderEditBegin: { calculatedOrder: { id: "gid://shopify/CalculatedOrder/3", lineItems: { nodes: [
+      { id: "gid://shopify/CalculatedLineItem/9600", quantity: 1, variant: { id: "gid://shopify/ProductVariant/50" } },
+      { id: "gid://shopify/CalculatedLineItem/9503", quantity: 1, variant: { id: "gid://shopify/ProductVariant/11" } }] } }, userErrors: [] } });
+    if (/orderEditSetQuantity|orderEditAddVariant/.test(query)) return ok({ orderEditSetQuantity: { userErrors: [] }, orderEditAddVariant: { calculatedLineItem: { id: "gid://shopify/CalculatedLineItem/abc" }, userErrors: [] } });
+    if (/orderEditCommit/.test(query)) {
+      assert.match(query, /currentTotalPriceSet/); assert.match(query, /currentQuantity/);
+      return ok({ orderEditCommit: { order: { id: "gid://shopify/Order/503", currentTotalPriceSet: { shopMoney: { amount: "45.0" } }, lineItems: { nodes: [
+        { id: "gid://shopify/LineItem/9600", currentQuantity: 1, variant: { id: "gid://shopify/ProductVariant/50" } },
+        { id: "gid://shopify/LineItem/9503", currentQuantity: 0, variant: { id: "gid://shopify/ProductVariant/11" } },
+        { id: "gid://shopify/LineItem/8801", currentQuantity: 1, variant: { id: "gid://shopify/ProductVariant/12" } }] } }, userErrors: [] } });
+    }
+    throw Error("unexpected query");
+  };
+  const NAVY = conn + ":variant:gid://shopify/ProductVariant/12";
+  const swapped = await call(alice, "/relay/my/exchange", { orderId: id, lineId: "9503", variantKey: NAVY });
+  assert.equal(swapped.status, 200);
+  const rowsOf = () => sqlite.prepare("SELECT id, external_line_item_id AS line, variant_id AS v, price_minor AS p FROM order_items WHERE order_id = ? ORDER BY line").all(id).map(r => ({ ...r }));
+  assert.deepEqual(rowsOf(), [{ id: id + ":item:8801", line: "8801", v: "12", p: 2000 }, { id: id + ":item:9600", line: "9600", v: "50", p: 2500 }], "the line is now the new item's own");
+  assert.deepEqual({ ...sqlite.prepare("SELECT line_id AS l, from_line_id AS f, from_price_minor AS p FROM relay_exchanges WHERE order_id = ?").get(id) }, { l: "8801", f: "9503", p: 2000 });
+  const amounts = () => ({ ...sqlite.prepare("SELECT amount_minor AS placed, current_amount_minor AS now FROM retailer_orders WHERE id = ?").get(id) });
+  assert.deepEqual(amounts(), { placed: 4500, now: 4500 }, "what Shopify says the order comes to now, beside the amount it was placed at");
+  assert.equal((await call(alice, "/relay/my/exchange", { orderId: id, lineId: "8801", variantKey: conn + ":variant:gid://shopify/ProductVariant/11" })).status, 409, "still one swap per item");
+  // Shopify's own notice about the changed order lists the item taken off it too, and adds it into total_price.
+  const again = await ingestShopifyOrder(env, SHOP, { id: 503, created_at: new Date(Date.now() - 2 * 864e5).toISOString(), currency: "GBP", email: "alice@example.com",
+    total_price: "65.00", current_total_price: "45.00", line_items: [
+      { id: 9600, title: "Canvas Tote", quantity: 1, current_quantity: 1, price: "25.00", product_id: 2, variant_id: 50 },
+      { id: 9503, title: "Logo Cap", quantity: 1, current_quantity: 0, price: "20.00", product_id: 1, variant_id: 11 },
+      { id: 8801, title: "Logo Cap", quantity: 1, current_quantity: 1, price: "20.00", product_id: 1, variant_id: 12 }] }, "evt-503", "orders/paid");
+  assert.equal(again.status, 200);
+  assert.equal(rowsOf().length, 2, "the item that's no longer on the order isn't added back");
+  assert.deepEqual(amounts(), { placed: 4500, now: 4500 }, "neither amount is every item ever on the order (£65)");
+  // The app's view: the new colour on its own line, swapped once, and still returnable.
+  const view = (await enrichPurchases(env, [{ id, retailer: conn, orderedAt: new Date(Date.now() - 2 * 864e5).toISOString(),
+    items: [{ lineId: "8801", productId: "1", variantId: "12", title: "Logo Cap", quantity: 1, priceMinor: 2000 }, { lineId: "9600", productId: "2", variantId: "50", title: "Canvas Tote", quantity: 1, priceMinor: 2500 }] }]))[0].items;
+  assert.deepEqual([view[0].variant, view[0].exchange.fromTitle, view[0].exchange.fromPriceMinor, view[0].exchangeable, view[0].returnable, view[0].returnBy], ["Navy", "Black", 2000, false, true, undefined]);
+  assert.equal(view.length, 2);
+  // Another Navy cap bought on the same order is its own item: it isn't mistaken for the swapped one and hidden.
+  const twoNavy = (await enrichPurchases(env, [{ id, retailer: conn, orderedAt: new Date(Date.now() - 2 * 864e5).toISOString(),
+    items: [{ lineId: "8801", productId: "1", variantId: "12", title: "Logo Cap", quantity: 1, priceMinor: 2000 }, { lineId: "9700", productId: "1", variantId: "12", title: "Logo Cap", quantity: 1, priceMinor: 2000 }] }]))[0].items;
+  assert.deepEqual(twoNavy.map(i => [i.lineId, Boolean(i.exchange), i.exchangeable]), [["8801", true, false], ["9700", false, true]]);
+  const ret = async (lineId, orderId = id) => handleReturnRoute(new Request("https://w.test/relay/my/return", { method: "POST", body: JSON.stringify({ orderId, lineId, reason: "wrong_size" }), headers: { "content-type": "application/json" } }),
+    env, new URL("https://w.test/relay/my/return"), {}, alice, { fetchImpl: async () => new Response("{}", { status: 500 }), listStores: async () => [] });
+  const r1 = await ret("8801");
+  assert.equal(r1.status, 200, "a swapped item can be returned"); assert.equal(sqlite.prepare("SELECT line_id AS l FROM relay_returns WHERE order_id = ?").get(id).l, "8801");
+  // A swap made before Relay kept the new line (order 500 above) still can't be: its line is no longer on the shop's order.
+  sqlite.prepare("UPDATE retailer_orders SET ordered_at = ? WHERE id = ?").run(new Date(Date.now() - 2 * 864e5).toISOString(), o500);
+  const r2 = await ret("9500", o500);
+  assert.equal(r2.status, 409); assert.equal((await r2.json()).error, "already_exchanged");
+  // With the shop's own returns period set, the app is given the shop's date.
+  const { saveShopReturns } = await import("../worker/shop-returns.js");
+  await saveShopReturns(env, SHOP, { days: 28 });
+  const dated = (await enrichPurchases(env, [{ id, retailer: conn, orderedAt: new Date(Date.now() - 2 * 864e5).toISOString(), items: [{ lineId: "9600", productId: "2", variantId: "50", title: "Canvas Tote", quantity: 1 }] }]))[0].items[0];
+  assert.deepEqual(dated.returnBy, { date: new Date(Date.now() + 26 * 864e5).toISOString().slice(0, 10), days: 28 });
+  const late = (await enrichPurchases(env, [{ id, retailer: conn, orderedAt: new Date(Date.now() - 29 * 864e5).toISOString(), items: [{ lineId: "9600", productId: "2", variantId: "50", title: "Canvas Tote", quantity: 1 }] }]))[0].items[0];
+  assert.deepEqual([late.returnable, late.returnBy], [false, undefined], "past the shop's 28 days");
+  o.fetchImpl = wasFetch;
+  console.log("ok - a swap moves Relay's order line to the new item's own line, keeps the right amounts, and the new item can be returned");
+}
 
 console.log("exchange: all checks passed");

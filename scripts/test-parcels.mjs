@@ -155,10 +155,41 @@ assert.equal(estimateReturnBy(anOrder({ returns: { deadline: "2026-11-20" } }), 
 assert.equal(estimateReturnBy(anOrder({ returnBy: { date: "2026-11-14", basis: "uk_law" } }), TODAY), null, "a delivered parcel's date wins");
 assert.equal(estimateReturnBy(anOrder({ delivery: { status: "due" } }), TODAY), null, "a parcel on its way: wait for it to arrive");
 assert.equal(estimateReturnBy(anOrder({ orderRef: null }), TODAY), null, "no order number (likely bought in a shop): no legal date");
+// An order that wasn't paid in pounds may not have been sold under UK law: no date from the law, only one its own email gives.
+assert.equal(estimateReturnBy(anOrder({ currency: "EUR", totalPence: 8000 }), TODAY), null, "in euros: UK law's 14 days isn't assumed");
+assert.equal(estimateReturnBy(anOrder({ currency: "USD", totalPence: 2000 }), TODAY), null);
+assert.deepEqual(estimateReturnBy(anOrder({ currency: "EUR", totalPence: 8000, returns: { windowDays: 30, windowFrom: null } }), TODAY), { date: "2026-12-01", basis: "window", from: "order", estimate: true }, "its own email's window still counts");
+assert.deepEqual(estimateReturnBy(anOrder({ currency: "GBP", totalPence: 8000 }), TODAY), { date: "2026-11-15", basis: "uk_law", from: "order", estimate: true });
+{
+  const eur = [anOrder({ currency: "EUR", totalPence: 8000, shipment: { trackingNumber: "JK000000010GB", carrier: "Royal Mail", status: "shipped" } })];
+  attachDeliveries(eur, [{ kind: "delivery_update", status: "delivered", at: "2026-11-02", carrier: "Royal Mail", trackingNumber: "JK000000010GB" }]);
+  assert.equal(eur[0].delivery.status, "delivered"); assert.equal(eur[0].returnBy, undefined, "delivered, but no date from UK law for an order in euros");
+}
 assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-10-01" }), TODAY), null, "a worked-out date that has passed isn't given");
 assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-12-01" }), TODAY), null, "an order date in the future is a misread");
 // A window that starts at delivery is counted from the day the parcel arrived.
 const w = [anOrder({ returns: { windowDays: 28, windowFrom: "delivery" }, shipment: { trackingNumber: "JK000000009GB", carrier: "Royal Mail", status: "shipped" } })];
 attachDeliveries(w, [{ kind: "delivery_update", status: "delivered", at: "2026-11-02", carrier: "Royal Mail", trackingNumber: "JK000000009GB" }]);
 assert.deepEqual(w[0].returnBy, { date: "2026-11-30", basis: "window", from: "delivery" });
+// Two emails about one order: a total taken from the second comes with its own currency (never euros shown as pounds).
+{
+  const first = { id: "m1", kind: "receipt", status: "confirmed", createdAt: 1, retailer: { name: "Atelier Example", domain: "atelier.example" }, orderRef: "AE-77", orderDate: "2026-11-01", totalPence: null, currency: "GBP", items: [{ name: "Linen Scarf", qty: 1 }] };
+  const second = { id: "m2", kind: "receipt", status: "pending", createdAt: 2, retailer: { name: "Atelier Example", domain: "atelier.example" }, orderRef: "AE-77", orderDate: "2026-11-01", totalPence: 8000, currency: "EUR", items: [] };
+  const merged = mergeOrderEmails([first, second]);
+  assert.equal(merged.length, 1); assert.deepEqual([merged[0].totalPence, merged[0].currency], [8000, "EUR"]);
+}
 console.log("ok - safe return dates: 14 days (UK law) or the email's window, from the order date; a delivery-based window from the day it arrived");
+
+// A marketplace's "Delivered: 1 item | Order # …" notice is a delivery update for that order, never a second purchase;
+// "Delivered today" as a heading counts, "due to be delivered today" doesn't.
+{
+  const notice = (subject, lines) => mime({ from: '"Example Market" <shipment-tracking@examplemarket.example>', subject, date: "Sat, 29 Nov 2025 12:00:00 +0000",
+    plain: lines.join("\r\n"), htmlLines: lines });
+  const done = parseDeliveryEmail(notice("Delivered: 1 item | Order # 205-0000000-0000001", ["Your package is here!", "Delivered today", "Parcel was handed to a receptionist.", "Order # 205-0000000-0000001", "Track package"]));
+  assert.equal(done.ok, true); assert.equal(done.status, "delivered"); assert.equal(done.orderRef, "205-0000000-0000001");
+  const card = asCard(notice("Delivered: 1 item | Order # 205-0000000-0000001", ["Your package is here!", "Delivered today", "Order # 205-0000000-0000001"]), "m", 9);
+  assert.equal(card.kind, "delivery_update", "not a purchase");
+  const due = parseDeliveryEmail(notice("Your Example Market delivery", ["Your parcel is due to be delivered today", "Order # 205-0000000-0000002"]));
+  assert.notEqual(due.status, "delivered");
+  console.log("ok - a 'Delivered:' notice is a delivery update for its order, not a purchase");
+}

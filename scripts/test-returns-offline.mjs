@@ -1,6 +1,7 @@
 // Offline test for returns through Relay. Nothing leaves this machine.
-// Checks: only the order's owner can return, the 7-day window, one return per item, and that Relay never
-// presents a fake postage label (no Royal Mail-style tracking number, no QR data, no carrier).
+// Checks: only the order's owner can return; the shop's own returns period (or Relay's own 30-day limit when the shop
+// hasn't set one, never shown as a date); a return can be started all through its last day; one return per item; and
+// that Relay never presents a fake postage label (no Royal Mail-style tracking number, no QR data, no carrier).
 import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
@@ -32,7 +33,8 @@ function order(ext, who, orderedAt) {
   return id;
 }
 const recent = order(100, alice, new Date(Date.now() - 2 * 864e5).toISOString());
-const old = order(101, alice, new Date(Date.now() - 20 * 864e5).toISOString());
+const old = order(101, alice, new Date(Date.now() - 40 * 864e5).toISOString());
+const middle = order(150, alice, new Date(Date.now() - 20 * 864e5).toISOString());
 
 const call = async (shopper, method, path, body) => {
   const url = new URL("https://w.example" + path);
@@ -52,9 +54,43 @@ for (let i = 0; i < 200; i++) {
 let r = await call(bob, "POST", "/relay/my/return", { orderId: recent, lineId: "L1", reason: "wrong_size" });
 assert.equal(r.status, 404);
 
-// Outside the 7-day window.
+// The shop hasn't set a returns period, so Relay's own limit applies (30 days after ordering), said as Relay's.
 r = await call(alice, "POST", "/relay/my/return", { orderId: old, lineId: "L1" });
-assert.equal(r.status, 409); assert.equal(r.body.error, "outside_return_window");
+assert.equal(r.status, 409); assert.deepEqual(r.body, { error: "outside_return_window", basis: "relay", days: 30 });
+r = await call(alice, "GET", `/relay/my/return/eligibility?orderId=${encodeURIComponent(middle)}&lineId=L1`);
+assert.equal(r.body.eligible, true); assert.equal(r.body.returnBy, null, "no date is made up when the shop hasn't given its period"); assert.equal(r.body.basis, "relay");
+
+// The shop's own returns period (set in Relay for shops): 14 days after ordering. A 20-day-old order is past it, and the
+// answer says it is the shop's period; a 2-day-old one gets the shop's own "return by" date and its instructions.
+{
+  const { saveShopReturns, shopReturns, returnWindow } = await import("../worker/shop-returns.js");
+  assert.deepEqual((await saveShopReturns(env, "kick-lane.myshopify.com", { days: 0 }))[1], { error: "invalid_days" });
+  assert.deepEqual((await saveShopReturns(env, "kick-lane.myshopify.com", { days: 14.5 }))[1], { error: "invalid_days" });
+  assert.deepEqual((await saveShopReturns(env, "kick-lane.myshopify.com", { how: "x".repeat(601) }))[1], { error: "how_too_long" });
+  const HOW = "Post it to Kick Lane Returns, Unit 4, Sample Park, Leeds.\n\n\nInclude your order number.";
+  assert.deepEqual(await saveShopReturns(env, "kick-lane.myshopify.com", { days: 14, how: HOW }),
+    [200, { days: 14, how: "Post it to Kick Lane Returns, Unit 4, Sample Park, Leeds.\n\nInclude your order number.", relayLimitDays: 30 }]);
+  r = await call(alice, "POST", "/relay/my/return", { orderId: middle, lineId: "L1" });
+  assert.equal(r.status, 409); assert.deepEqual(r.body, { error: "outside_return_window", basis: "shop", days: 14 });
+  r = await call(alice, "GET", `/relay/my/return/eligibility?orderId=${encodeURIComponent(recent)}&lineId=L1`);
+  const by = new Date(Date.now() - 2 * 864e5 + 14 * 864e5).toISOString().slice(0, 10);
+  assert.deepEqual([r.body.eligible, r.body.returnBy, r.body.basis, r.body.label, r.body.inStore], [true, by, "shop", false, false]);
+  assert.match(r.body.how, /^Post it to Kick Lane Returns/);
+  // Only the period is cleared; the instructions stay. Then both are cleared for the checks below.
+  assert.deepEqual((await saveShopReturns(env, "kick-lane.myshopify.com", { days: null }))[1].days, null);
+  assert.match((await shopReturns(env, "kick-lane.myshopify.com")).how, /Include your order number/);
+  await saveShopReturns(env, "kick-lane.myshopify.com", { how: "" });
+  assert.deepEqual(await shopReturns(env, "kick-lane.myshopify.com"), { days: null, how: null });
+  assert.equal(returnWindow("not a date", null, Date.now()).open, false);
+  // The date a shopper is shown is one they can act on: a return can be started all through that day, and not after it.
+  const placed = "2026-10-01T15:00:00Z", at = t => Date.parse(t);
+  assert.deepEqual(returnWindow(placed, { days: 28 }, at("2026-10-29T14:00:00Z")), { open: true, basis: "shop", days: 28, by: "2026-10-29", daysSince: 27 });
+  assert.equal(returnWindow(placed, { days: 28 }, at("2026-10-29T23:59:00Z")).open, true, "still open late on the last day, past the hour it was ordered at");
+  assert.equal(returnWindow(placed, { days: 28 }, at("2026-10-30T00:00:01Z")).open, false, "closed once the last day is over");
+  assert.deepEqual(returnWindow(placed, null, at("2026-10-31T20:00:00Z")), { open: true, basis: "relay", days: 30, by: "2026-10-31", daysSince: 30 });
+  assert.equal(returnWindow(placed, { days: null }, at("2026-11-01T00:00:01Z")).open, false, "Relay's own limit ends the same way");
+  console.log("ok - the shop's own returns period and instructions; Relay's own limit when it hasn't set one, never shown as a date");
+}
 
 // Eligible: request is saved, and the response is honest that there is no label and the shop wasn't told.
 r = await call(alice, "GET", `/relay/my/return/eligibility?orderId=${encodeURIComponent(recent)}&lineId=L1`);

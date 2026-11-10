@@ -42,7 +42,47 @@ Send the link from step 1.4 together with the pilot pack. When the shop clicks *
 checks the approval was signed by that shop's own app, stores which app it came through (for token
 renewal and webhooks), and refuses the app for any other shop.
 
+## 4. The shop says how long it takes returns, and how to send them back
+
+In the Relay shop dashboard the shop opens **Your returns** and fills in:
+
+- **How many days it takes returns for**, counted from the order date (for example 28).
+- **How to send something back**, in its own words (up to 600 characters): the address, whether to include the order
+  number, who pays the postage.
+
+Relay never makes these up. Until the shop fills them in:
+
+- shoppers see no "Return by" date for that shop's orders (Relay only shows a date the shop gave);
+- Relay still lets a shopper ask to return something for 30 days from the order date, which is Relay's own limit and is
+  never shown as the shop's deadline;
+- a shopper who starts a return is told the shop hasn't said how it wants returns sent, and to use the shop's usual way.
+
+A shop that makes Royal Mail labels through Relay (docs/ROYAL_MAIL_RETURNS.md) doesn't need the "how to send it back"
+part: the label does that.
+
 ## Checking it worked
 
 - The shop appears in the Relay shop dashboard and its products show up within a few minutes.
 - `scripts/test-shopify-pilot-apps.mjs` covers this flow offline (run in every deploy).
+- The shop's **Your returns** card shows what it saved, and a test order on Home shows "Return by" with the shop's date.
+
+## Before the first pilot shop: Relay's own sending address (one-off)
+
+Relay emails shops when a shopper starts a return or a swap, and emails shoppers their sign-in codes. Until Relay has a
+sending address of its own, those go from the mail service's test address (`onboarding@resend.dev`), and Resend only
+delivers that address's emails to the Resend account's own email. So a pilot shop would not get its return emails, and a
+new shopper could not sign in with an email code. (The app says so honestly when a shop couldn't be emailed, and the
+return is still listed in the shop's dashboard, but the shop would have to look there.)
+
+1. Own a domain for Relay (any registrar).
+2. In Resend → **Domains** → **Add Domain**, enter a subdomain of it for sending, for example `mail.<your domain>`
+   (Resend recommends a subdomain). Resend then lists the DNS records to add.
+3. Add those records where the domain's DNS is managed, exactly as shown. If the DNS is on Cloudflare, switch the proxy
+   (the orange cloud) off for them. Verification usually takes a few minutes and can take up to 72 hours.
+4. In GitHub → the repository → Settings → Secrets and variables → Actions, add the secret `RELAY_EMAIL_FROM` with the
+   value `Relay <hello@mail.<your domain>>` (your own address in place of this one).
+5. In GitHub → Actions → **Deploy Relay Worker** → Run workflow. It hands the address to the Relay server (so does the
+   next change to the server that goes live).
+
+Checking it worked: Profile → Team → Relay health → **Relay's emails** says "From Relay's own address". The morning
+summary also says when Relay couldn't email a shop about a return.

@@ -125,7 +125,7 @@ assert.ok(refs.has("RA-201"), "an email Outlook was too busy to give is read in 
 for (const id of ["0101", "0102", "0103"]) assert.ok(reads.some(x => x.endsWith(id)), "payment, trip and ready-to-collect emails are read: " + id);
 const stuck = captured().find(d => d.unread);
 assert.ok(stuck && stuck.readTries === 3, "an email that never reads is tried 3 times, then left out");
-assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 10, "the whole look-back period was read with the fix");
+assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 12, "the whole look-back period was read with the fix");
 console.log(`ok - busy Outlook: ${refs.size} orders captured in ${rounds} rounds, at most ${maxInFlight} reads open at once, a failing email retried then left out`);
 
 // 2. Even if Outlook refuses some reads (another device is busy with the same mailbox), they are asked again, not lost.
@@ -148,7 +148,7 @@ await scanAll();
 assert.ok(receiptRefs().has("RA-401"), "an older email missed before the fix is found");
 assert.deepEqual(reads, [missed.id], "only the email never read before is fetched");
 assert.ok(Math.min(...listed.map(w => w[0])) <= clock - 499 * DAY, "the whole look-back period was listed again");
-assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 10);
+assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 12);
 listed.length = 0;
 await scanAll();
 assert.ok(Math.min(...listed.map(w => w[0])) >= clock - 40 * DAY, "after that, scans are back to recent mail only");
@@ -161,7 +161,7 @@ sqlite.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = NULL, 
 for (let i = 0; i < 12 && !receiptRefs().has("RA-402"); i++) { clock += 15 * 60 * 1000; await autoScanGmail(env, clock, fetchImpl); }
 assert.ok(receiptRefs().has("RA-402"), "the automatic scan finds it without the app being open");
 for (let i = 0; i < 12 && sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f !== 9; i++) { clock += 15 * 60 * 1000; await autoScanGmail(env, clock, fetchImpl); }
-assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 10, "and records the full read once done");
+assert.equal(sqlite.prepare("SELECT full_rev AS f FROM gmail_connections").get().f, 12, "and records the full read once done");
 console.log("ok - the automatic scan reads older Outlook mail again too");
 
 // 5. Which Outlook emails are worth reading (subject and sender only).

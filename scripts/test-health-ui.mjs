@@ -30,6 +30,7 @@ const HEALTH = {
   returnsAndSwaps: { returns: { requested: 2, refunded: 1 }, swaps: { completed: 3 }, labels: 2, payments: [{ status: "succeeded", test: true, count: 4 }] },
   extras: { gifts: 7, giftGivers: 2, earlierYearsRead: 5, notificationDevices: 4, notificationPeople: 3, priceWatches: 11, watchers: 4 },
   shopsConnected: { shopify: 6, shopifyTest: 6, square: 1 }, security: { wrongCodesToday: 0 },
+  mail: { ownAddress: false, returnsShopNotEmailedThisWeek: 1 },
   sharedEmails: { kept: 3, waiting: 2, thisWeek: 1, people: 2, keptDays: 30 },
   aiReader: { on: true, shoppersOn: 2, reads: 14, thisWeek: 5, failed: 1, notPurchase: 2,
     parts: { shop: { filled: 2, agreed: 8, differed: 0 }, total: { filled: 6, agreed: 3, differed: 1 }, date: { filled: 0, agreed: 0, differed: 0 },
@@ -140,7 +141,10 @@ for (const s of ["Shoppers", "12", "+3 this week", "Inboxes connected", "13", "R
   "Reader version", "4,100 emails read by this version, 110 by older ones", "brindle.example", "22 receipts from 4 people", "2 removed as not theirs", "3 no total",
   "Your own receipts", "fennel.example", "Nothing to fix", "2 receipts were forwarded from a personal address",
   "Inbox needs connecting again", "Other problems", "14 finished, 1 still going, 2 stopped", "Returns: requested", "Swaps: completed", "Swap payments", "0 live, 4 test",
-  "Gifts tagged", "by 2 people", "Shops on Shopify", "6 of them test shops", "Wrong sign-in codes in the last day"])
+  "Gifts tagged", "by 2 people", "Shops on Shopify", "6 of them test shops", "Wrong sign-in codes in the last day",
+  // Relay's own emails: still from the mail service's test address here, and what that means.
+  "Relay's emails", "From a test address", "Only reach your own email, so shops and new shoppers don't get them yet. Relay needs a sending address of its own",
+  "Returns the shop wasn't emailed about"])
   assert.ok(text.toLowerCase().includes(s.toLowerCase()), "the page shows: " + s); // section names are shown in capitals
 for (const code of ["gmail_reconnect_needed", "something_new"]) assert.ok(!text.includes(code), "no error codes on screen: " + code);
 console.log("ok - the page shows the headline numbers, reading quality, shops (from 3 people), the admin's own receipts, inboxes, returns and the rest");

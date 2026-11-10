@@ -2,7 +2,7 @@
 // These prove the parser handles these layouts, not that any real retailer's
 // emails parse correctly. Real-world accuracy must be measured on real emails.
 import assert from "node:assert/strict";
-import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls, looksPromotional, foreignMinor } from "../worker/receipt-parser.js";
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed++; console.log("ok -", name); };
@@ -645,5 +645,135 @@ t("pay-later email: the shop it paid is the shop, and what's left to pay is not 
   assert.equal(r.retailer.via, "klarna.co.uk");
   assert.deepEqual(r.items.map(i => [i.name, i.pricePence]), [["Define Jacket *Example", 11800]]);
   assert.equal(r.totalPence, 11800);
+});
+t("'Sub Total' is not the total: 'Total Including Delivery' is, and a sub-total alone is still read", () => {
+  const body = ["Order Reference: 300000000001", "| | Qty | Item | Delivery Address", "1 | Garden Chair Set GC20 | 4 Sample Road | By 09/01/2026 | £ 89.00 |",
+    "| Sub Total | £ 89.00 |", "| Total Discount | £ 0.00 |", "Delivery | £ 3.99 |", "Total Including Delivery | £ 92.99 |"].join("\n");
+  const r = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\n${body}\n`);
+  assert.equal(r.ok, true); assert.equal(r.totalPence, 9299);
+  const onlySub = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\nOrder number: EH-1001\nOak Shelf £40.00\nSub Total £40.00\n`);
+  assert.equal(onlySub.totalPence, 4000, "with no other total the sub-total is still the best figure");
+  const both = parseReceiptEmail(`From: orders@examplehomestore.test\nSubject: Thank you for your order\nContent-Type: text/plain\n\nOrder number: EH-1002\nSub-total: £40.00\nTotal: £43.50\n`);
+  assert.equal(both.totalPence, 4350);
+});
+t("money off the next order, and a promo code or credit earned by an order, are offers, not receipts", () => {
+  const mk = (subject, body) => `From: "Example Eats" <offers@exampleeats.test>\nSubject: ${subject}\nContent-Type: text/plain\n\n${body}\n`;
+  assert.equal(parseReceiptEmail(mk("Up to £7 off your next order", "Time to re-order\nSave £7 on your next order of £25+\nTotal savings: £12.40\nOrder #: see app")).reason, "promotional");
+  assert.equal(looksPromotional("Save £5 on your first shop", {}, false), true);
+  assert.equal(looksPromotional("Get £10 off when you spend £50", {}, false), true);
+  assert.equal(looksPromotional("Your Example Eats order", {}, false), false);
+  const credit = parseReceiptEmail(`From: "Example Market" <no-reply@examplemarket.test>\nSubject: Here's your promotional credit from your recent Example Market order\nContent-Type: text/plain\n\nThank you for purchasing (Order 202-0000000-0000001). Your order entitles you to a promotional code.\nOrder number: 202-0000000-0000001\nYour promotional code: ABCD-EFGH\nOrder total £60.00\n`);
+  assert.equal(credit.reason, "promotional", "even though it names the order that earned it");
+  const real = parseReceiptEmail(mk("Your order confirmation #EE-2001 - plus £5 off your next order", "Order number: EE-2001\nNoodle Box £8.50\nTotal £8.50"));
+  assert.equal(real.ok, true, "an order confirmation that also offers money off is still a receipt"); assert.equal(real.totalPence, 850);
+});
+t("a receipt sent through an email company (Mandrill, Mailgun…) names the restaurant, never the email company", () => {
+  const r = parseReceiptEmail(`From: "Example Noodles - Example Noodles Leeds" <orders@mandrillapp.com>\nSubject: Your order confirmation #01234\nContent-Type: text/plain\n\nThank you for ordering from Example Noodles - Example Noodles Leeds, your order has been placed.\nOrder reference 01234\nLager | x1 | £4.80\nTotal: | £4.80\n`);
+  assert.equal(r.ok, true); assert.equal(r.retailer.name, "Example Noodles"); assert.equal(r.retailer.via, "mandrillapp.com");
+  assert.notEqual(r.retailer.domain, "mandrillapp.com"); assert.equal(r.totalPence, 480);
+});
+const multiMail = (from, subject, plainText, html) => [`From: ${from}`, `Subject: ${subject}`, "Date: Thu, 25 Sep 2025 10:00:00 +0000", 'Content-Type: multipart/alternative; boundary="b1"', "", "--b1",
+  "Content-Type: text/plain; charset=utf-8", "", plainText, "--b1", "Content-Type: text/html; charset=utf-8", "", html, "--b1--", ""].join("\r\n");
+const textMail = (from, subject, body) => `From: ${from}\r\nSubject: ${subject}\r\nDate: Thu, 25 Sep 2025 10:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`;
+t("a marketplace's 'Ordered:' email: invisible direction marks and padding, '5 GBP' prices, a bulleted item", () => {
+  const r = parseReceiptEmail(multiMail('"Example Market" <auto-confirm@examplemarket.test>', "Ordered: \u2018Linen Notebook A5...\u2019",
+    ["Thanks for your order!", "Arriving tomorrow", "Order #", "301-0000000-0000001", "View or edit order", "* Linen Notebook A5 Ruled", "Quantity: 1", "5 GBP", "Total", "5 GBP",
+      "This e-mail is only an acknowledgement of receipt of your order."].join("\n"),
+    "<p>Thanks for your order!</p><p>Order # \u202B301-0000000-0000001</p><p>Linen Notebook A5 Ruled</p><p>Quantity: 1</p><p>&pound; 5 <sup>00</sup></p><p>Total</p><p>&pound;5.00</p><p>&zwnj;&#8204;&#847;</p>"));
+  assert.equal(r.ok, true); assert.equal(r.orderRef, "301-0000000-0000001"); assert.equal(r.totalPence, 500);
+  assert.deepEqual(r.items.map(i => [i.name, i.qty, i.pricePence]), [["Linen Notebook A5 Ruled", 1, 500]]);
+  const two = parseReceiptEmail(textMail('"Example Market" <auto-confirm@examplemarket.test>', "Ordered: \u2018Tea Towels...\u2019", "Thanks for your order!\nOrder #\n301-0000000-0000002\n* Tea Towels Set\nQuantity: 2\n8 GBP\nTotal\n8 GBP"));
+  assert.deepEqual(two.items.map(i => [i.name, i.qty, i.pricePence]), [["Tea Towels Set", 2, null]], "with 2 of them, it isn't said whether the price is each");
+  assert.equal(parseReceiptEmail(textMail("orders@example.test", "Your order", "Order number: EX-1\nTotal \u00a30.00 GBP")).totalPence, 0, "'£0.00 GBP' isn't read twice");
+});
+t("receipts named in other ways: 'Your 25 September receipt for 1 item', 'Example Market order of Film Night.'", () => {
+  const shop = parseReceiptEmail(textMail('"Example Fresh" <auto-confirm@examplemarket.test>', "Your 25 September receipt for 1 item",
+    "Thank you for shopping with us. Here is the receipt for your recent trip.\nOrder # 302-0000000-0000003 (1 item)\nTotal \u00a39.00"));
+  assert.equal(shop.ok, true); assert.equal(shop.retailer.name, "Example Fresh"); assert.equal(shop.totalPence, 900);
+  const film = parseReceiptEmail(textMail('"Example Market" <digital-no-reply@examplemarket.test>', "Example Market order of Film Night.",
+    "Order details\nOrder #D01-0000000-0000004\nFilm Night\nSold by :Example Digital Ltd\n\u00a35.99\nItem Subtotal: \u00a34.99\nTotal Before Tax: \u00a34.99\nTax Collected: \u00a31.00\nGrand Total: \u00a35.99"));
+  assert.equal(film.ok, true); assert.equal(film.orderRef, "D01-0000000-0000004"); assert.equal(film.totalPence, 599, "the grand total, not the total before tax");
+  const sent = textMail('"Example Market" <ship@examplemarket.test>', 'Your Example Market order of "Tea Towels" has been dispatched', "Order #D01-0000000-0000005\nGrand Total: \u00a35.99");
+  assert.equal(parseReceiptEmail(sent).ok, false, "a dispatch notice named that way isn't a second purchase");
+});
+t("a total written only as '£33.76 (Including VAT)'; a booking's confirmation number is its reference", () => {
+  const pizza = parseReceiptEmail(textMail('"Example Pizza" <orders@examplepizza.test>', "Order confirmation", "Your order number is 600000001\n1x Large Margherita\nDelivery: \u00a32.99\n\u00a333.76 (Including VAT)"));
+  assert.equal(pizza.totalPence, 3376);
+  const table = parseReceiptEmail(textMail('"Example Tables" <no-reply@exampletables.test>', "Your booking confirmation for Example Bistro",
+    "Booking confirmed\nTable for 2 on Monday, 24 July 2023 at 18:30\nConfirmation # : 2100000001\n2 x Tasting Menu\n\u00a392.00\nTotal\n\u00a392.00"));
+  assert.equal(table.orderRef, "2100000001", "so a second email about the same booking is matched to it"); assert.equal(table.totalPence, 9200);
+});
+t("bonus points offers and deposits into an account aren't purchases", () => {
+  assert.equal(parseReceiptEmail(textMail('"Example Airways Club" <club@exampleairways.test>', "3,000 bonus points with your summer wine order", "Order before 21 July and earn 3,000 bonus points.\nTotal savings \u00a320")).reason, "promotional");
+  const dep = parseReceiptEmail(textMail('"Example Games" <support@examplegames.test>', "Deposit Confirmation",
+    "Thank you for making a deposit at Example Games.\nYour deposit of GBP100,00 has now been credited to your account.\nOrder number: 1000000001\nTotal: \u00a3100.00"));
+  assert.equal(dep.ok, false); assert.equal(dep.reason, "account_deposit");
+  const sofa = parseReceiptEmail(textMail("orders@examplesofas.test", "Your order confirmation #ES-1", "Order number: ES-1\nDeposit paid today: \u00a3100.00\nTotal: \u00a3900.00"));
+  assert.equal(sofa.ok, true, "a deposit towards an order is still a purchase");
+});
+t("a payment platform's receipt is named after the business it paid ('Merchant: …'), with plain-text bold read", () => {
+  const r = parseReceiptEmail(textMail('"PayLink Mobile" <receipts@social-commerce.io>', "Thanks for your order to Example Lettings",
+    "PayLink Mobile\nThanks for your order to Example Lettings\n## Merchant: Example Lettings\nOrder Number: **270000001**\n| Purchase details | Price |\n| Holding deposit | \u00a3500.00 |\n| **Total** | **\u00a3500.00** |\n\u00a9 2024 PayLink Mobile. All rights reserved."));
+  assert.equal(r.retailer.name, "Example Lettings"); assert.equal(r.retailer.via, "social-commerce.io");
+  assert.equal(r.totalPence, 50000); assert.equal(r.orderRef, "270000001");
+});
+t("a notice about an order already placed isn't a purchase; one that gives the order's total still is", () => {
+  const market = '"Example Market" <order-update@examplemarket.test>';
+  for (const [subject, body] of [
+    ["Delay in shipping your Example Market order #D01-0000000-0000006", "Hello,\nWe're sorry: there is a delay in shipping your order.\nOrder #D01-0000000-0000006\nTea Towels (set of 3)\nWe'll email you when we have a new delivery date."],
+    ["Example Market - Important information regarding your product order", "We're writing about a product you bought.\nOrder number: D01-0000000-0000007\nPlease read the safety information below."],
+    ["An important message regarding your order", "Order #D01-0000000-0000008\nOne of the items in your order is no longer available."],
+    ["Benefit Confirmation for your Order", "Order #D01-0000000-0000009\nYour benefit has been added to your account."],
+    ["Update on your order", "Order number: EM-1010\nYour order is taking a little longer than usual."],
+    ["Order confirmation: your order is delayed", "Order number: EM-1011\nSorry, your parcel will be with you a few days later than we said."],
+  ]) {
+    const r = parseReceiptEmail(textMail(market, subject, body));
+    assert.equal(r.ok, false, subject); assert.equal(r.reason, "order_notice", subject);
+  }
+  // Worded so that they were never taken for receipts: they still aren't.
+  for (const subject of ["Delay in shipping your Example Market order", "Your order has been delayed #EM-1011"])
+    assert.equal(parseReceiptEmail(textMail(market, subject, "Order #D01-0000000-0000006\nThere is a delay in shipping your order.")).ok, false, subject);
+  // A notice that gives the order's total can be the only record of that order, so it is kept with its total.
+  const withTotal = parseReceiptEmail(textMail(market, "An important message regarding your order", "Order #D01-0000000-0000010\nYour order has changed.\nTea Towels (set of 3)\nOrder total: \u00a312.00"));
+  assert.equal(withTotal.ok, true); assert.equal(withTotal.totalPence, 1200);
+  // An email the shopper picked themselves (Add a missing receipt) is theirs to add.
+  assert.equal(parseReceiptEmail(textMail(market, "An important message regarding your order", "Order #D01-0000000-0000008\nOne of the items in your order is no longer available."), { lenient: true }).ok, true);
+  // Ordinary confirmations with no total read are untouched (a booking's "important information for your stay" too).
+  for (const subject of ["Your Example Market order", "Order confirmation #EM-1012", "Thanks for your order", "Booking confirmation: important information for your stay"])
+    assert.equal(parseReceiptEmail(textMail(market, subject, "Order number: EM-1012\nTea Towels (set of 3)")).ok, true, subject);
+});
+t("a receipt that isn't in pounds keeps its total in its own currency: nothing is converted or guessed", () => {
+  const cloud = '"Example Cloud" <billing@examplecloud.test>';
+  const read = (body, subject = "Your receipt from Example Cloud #2291-0001") => { const r = parseReceiptEmail(textMail(cloud, subject, "Order number: EC-2291\nPro plan (yearly)\n" + body)); return [r.ok, r.totalPence, r.currency]; };
+  assert.deepEqual(read("Subtotal \u20ac 66.67\nVAT \u20ac 13.33\nTotal \u20ac 80.00"), [true, 8000, "EUR"], "the total, not the subtotal, in euros");
+  assert.deepEqual(read("Total: 1.234,56 \u20ac"), [true, 123456, "EUR"], "written the continental way");
+  assert.deepEqual(read("Amount paid\nEUR 80,00"), [true, 8000, "EUR"]);
+  assert.deepEqual(read("Total 80.00 EUR"), [true, 8000, "EUR"]);
+  assert.deepEqual(read("Total (excl. VAT) \u20ac 66.67\nTotal (incl. VAT) \u20ac 80.00"), [true, 8000, "EUR"], "not the total that leaves the VAT out");
+  assert.deepEqual(read("Total savings \u20ac 5.00\nTotal discount: \u20ac 5.00"), [true, null, null], "savings and discounts aren't the total");
+  // Dollars only when the email says which dollars.
+  assert.deepEqual(read("Total $20.00"), [true, null, null], "a bare $ could be several currencies: left unread");
+  assert.deepEqual(read("Total $20.00 USD"), [true, 2000, "USD"]);
+  assert.deepEqual(read("Total: US$1,250.00"), [true, 125000, "USD"]);
+  assert.deepEqual(read("Total CA$ 15.00"), [true, 1500, "CAD"]);
+  assert.deepEqual(read("Prices in USD. Shipped from Canada (CAD on request).\nTotal $20.00"), [true, null, null], "two kinds of dollar named: not guessed");
+  // An email in pounds is read in pounds, whatever else it mentions.
+  assert.deepEqual(read("Total \u00a370.95 (about \u20ac82.00)"), [true, 7095, "GBP"]);
+  assert.deepEqual(read("Free delivery over \u00a350 in the UK.\nTotal \u20ac 80.00"), [true, null, "GBP"], "pounds and euros mixed: the euro total isn't taken");
+  // A euro receipt with no order number is still a receipt (its total says so).
+  const plainEuro = parseReceiptEmail(textMail(cloud, "Your receipt from Example Cloud", "Pro plan (yearly)\nTotal \u20ac 80.00"));
+  assert.deepEqual([plainEuro.ok, plainEuro.totalPence, plainEuro.currency], [true, 8000, "EUR"]);
+  // The currency goes with the amount. The email's order data says euros but gives no amount, and the only total in the
+  // text is in pounds: it is read as pounds, never as euros.
+  const mixed = parseReceiptEmail(htmlMail('"Example Outfitters" <orders@exampleoutfitters.test>', "Your order confirmation #EO-77", "Thu, 25 Sep 2025 10:00:00 +0000",
+    '<html><head><script type="application/ld+json">{"@type":"Order","orderNumber":"EO-77","priceCurrency":"EUR"}</script></head><body><p>Order number: EO-77</p><p>Order total: \u00a370.95</p></body></html>'));
+  assert.deepEqual([mixed.ok, mixed.totalPence, mixed.currency], [true, 7095, "GBP"]);
+  // Order data with its own amount and currency is kept as it is.
+  const ld = parseReceiptEmail(htmlMail('"Example Outfitters" <orders@exampleoutfitters.test>', "Your order confirmation #EO-78", "Thu, 25 Sep 2025 10:00:00 +0000",
+    '<html><head><script type="application/ld+json">{"@type":"Order","orderNumber":"EO-78","priceCurrency":"EUR","price":"80.00"}</script></head><body><p>Order number: EO-78</p></body></html>'));
+  assert.deepEqual([ld.ok, ld.totalPence, ld.currency], [true, 8000, "EUR"]);
+  // Amounts.
+  assert.deepEqual(["80.00", "80,00", "80", "1,234.56", "1.234,56", "1.234.567,89", "80.000"].map(foreignMinor), [8000, 8000, 8000, 123456, 123456, 123456789, 8000000]);
+  assert.deepEqual(["12.345,6", "1,234,56", "1.2", "", "abc", "1,23.456"].map(foreignMinor), [null, null, null, null, null, null]);
 });
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);

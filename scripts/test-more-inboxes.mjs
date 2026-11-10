@@ -39,6 +39,10 @@ const ACCOUNTS = {
   Z: { email: "bob@gmail.com", box: {} },
 };
 const byAccess = token => Object.entries(ACCOUNTS).find(([k]) => token === "Bearer access-" + k);
+// Older emails (for earlier years in Wrapped), listed only when Relay asks for the dates they were sent on.
+const OLD = { A: { o1aaaaaa: { day: "2025/06/10", raw: order("Kestrel Outdoor", "kestreloutdoor.test", "KO-0610", "Rain Jacket", 6400) } },
+  B: { o2bbbbbb: { day: "2025/03/03", raw: order("Harlow and Co", "harlowandco.test", "HC-0303", "Silk Scarf", 3000) } } };
+const oldListed = [];
 // An Outlook.com inbox (Microsoft Graph, FAKED): its emails by Graph id, each with its own Message-ID.
 const OUTLOOK = { email: "alice.home@outlook.com", box: {
   AAMkOutlookMsg0001: { mid: "<sn-88@studionorth.test>", from: "orders@studionorth.test", name: "Studio North", subject: "Your order confirmation #SN-4001", body: "Order number: SN-4001\nOrder date: 14 Oct 2026\nLinen Shirt - Qty 1 - £45.00\nOrder total: £45.00\nReturns accepted within 30 days of purchase.\n" } } };
@@ -89,13 +93,18 @@ const fetchImpl = async (url, init = {}) => {
   if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
     const q = decodeURIComponent(new URL(url).searchParams.get("q") || "");
     const win = /after:(\d{4}\/\d{2}\/\d{2}) before:(\d{4}\/\d{2}\/\d{2})/.exec(q);
-    if (win) { const d = ymd(clock - 2 * 864e5); return Response.json({ messages: d >= win[1] && d < win[2] ? Object.keys(box).map(id => ({ id })) : [] }); }
+    if (win) {
+      const d = ymd(clock - 2 * 864e5);
+      if (win[2] <= "2026/01/01") oldListed.push(acct[0]);
+      const old = Object.entries(OLD[acct[0]] || {}).filter(([, x]) => x.day >= win[1] && x.day < win[2]).map(([id]) => ({ id }));
+      return Response.json({ messages: [...(d >= win[1] && d < win[2] ? Object.keys(box).map(id => ({ id })) : []), ...old] });
+    }
     const word = q.split(/\s+/)[0].toLowerCase();
     return Response.json({ messages: Object.keys(box).filter(id => box[id].toLowerCase().includes(word)).map(id => ({ id })) });
   }
   const m = /messages\/([a-z0-9]+)\?format=(raw|metadata|full)/.exec(url);
   if (m) {
-    const raw = box[m[1]];
+    const raw = box[m[1]] || (OLD[acct[0]] && OLD[acct[0]][m[1]] && OLD[acct[0]][m[1]].raw);
     if (!raw) return new Response("{}", { status: 404 });
     if (m[2] === "raw") return Response.json({ raw: b64url(raw) });
     if (m[2] === "metadata") return Response.json({ internalDate: String(clock - 2 * 864e5), payload: { headers: [{ name: "Subject", value: header(raw, "Subject") }, { name: "From", value: header(raw, "From") }] } });
@@ -247,6 +256,50 @@ assert.equal(st.needsReconnect, false); assert.equal(st.email, "alice.main@gmail
 assert.deepEqual(refsOf(await receiptsOf(alice)), keptBefore, "every receipt kept");
 await runJobs();
 console.log("ok - an inbox whose access ended says so; Connect again keeps its place and receipts, and only its owner can");
+
+// 4d. Earlier years (for Wrapped) are read in every inbox, one after the other; a year counts as read once every inbox has
+// read it, so an inbox added later reads it on its own; an inbox that needs connecting again is passed over and said so.
+const readYear = async (year) => {
+  const answers = []; let c = "", more = true;
+  for (let n = 0; more && n < 60; n++) { const j = await (await post("/relay/my/gmail/scan", alice, { year, ...(c ? { cursor: c } : {}) })).json(); answers.push(j); more = j.more; c = j.cursor; }
+  assert.equal(more, false, "the read finishes"); return answers;
+};
+const yearsRead = async () => (await get("/relay/my/gmail/history", alice)).years.map(y => y.year);
+let answers = await readYear(2025);
+assert.ok(answers.some(a => /^b2\|/.test(a.cursor || "")), "the second inbox's place is marked with its number");
+assert.ok(answers.some(a => a.reading && a.reading.mailbox === 2 && a.reading.provider === "google"), "the app is told which inbox is being read");
+rows = await receiptsOf(alice);
+assert.equal(rows.find(r => r.orderRef === "KO-0610").mailbox, undefined, "the first inbox's 2025 order");
+assert.equal(rows.find(r => r.orderRef === "HC-0303").mailbox, 2, "and the second inbox's");
+assert.deepEqual(sqlite.prepare("SELECT shopper_id AS s FROM gmail_history_years WHERE year = 2025 AND done_at IS NOT NULL ORDER BY s").all().map(x => x.s), [aliceId, aliceId + "~2"]);
+assert.deepEqual(await yearsRead(), [2025]);
+assert.deepEqual((await get("/relay/my/gmail/history", bob)).years, [], "Bob's history is his own");
+// An Outlook inbox added afterwards hasn't read 2025, so it isn't counted as read until it has; then only it is read.
+const ms2 = new URL((await (await post("/relay/my/gmail/connect", alice, { provider: "microsoft", another: true })).json()).url);
+assert.match(loc(await call("/relay/microsoft/callback?code=code-M&state=" + ms2.searchParams.get("state"))), /#outlook=added$/);
+await runJobs();
+assert.deepEqual(await yearsRead(), [], "2025 still needs the Outlook inbox");
+oldListed.length = 0;
+answers = await readYear(2025);
+assert.deepEqual(oldListed, [], "the Gmail inboxes aren't read again for 2025");
+assert.deepEqual([answers[0].inbox.mailbox, answers[0].inbox.provider], [3, "microsoft"]);
+assert.deepEqual(await yearsRead(), [2025]);
+// A Gmail inbox whose access Google ended is passed over for 2024; the others are still read.
+assert.match((await connect(alice, "C", true)).back, /#gmail=added$/);
+ended.add("C");
+answers = await readYear(2024);
+const skipped = answers.find(a => a.skipped);
+assert.ok(skipped && skipped.skipped.mailbox === 4 && skipped.skipped.error === "gmail_reconnect_needed", JSON.stringify(answers.map(a => a.skipped || null)));
+assert.deepEqual(sqlite.prepare("SELECT shopper_id AS s FROM gmail_history_years WHERE year = 2024 AND done_at IS NOT NULL ORDER BY s").all().map(x => x.s), [aliceId, aliceId + "~2", aliceId + "~3"]);
+assert.deepEqual(await yearsRead(), [], "neither year counts as read while the newest inbox hasn't read it");
+ended.delete("C");
+for (const n of [4, 3]) assert.equal((await post("/relay/my/gmail/disconnect", alice, { mailbox: n })).status, 200);
+assert.deepEqual(await yearsRead(), [2025, 2024], "with those two gone, every inbox left has read both years");
+console.log("ok - earlier years are read in every inbox in turn; one added later reads them on its own; one that needs connecting again is passed over");
+// (The rest of these checks count receipts from the look-back period only: the older emails and years are put away.)
+OLD.A = {}; OLD.B = {};
+sqlite.prepare("DELETE FROM captured_receipts WHERE json_extract(details, '$.orderRef') IN ('KO-0610', 'HC-0303')").run();
+sqlite.prepare("DELETE FROM gmail_history_years").run();
 
 // 5. At most five inboxes.
 for (const a of ["C", "D", "E"]) assert.match((await connect(alice, a, true)).back, /#gmail=added$/);

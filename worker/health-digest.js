@@ -77,6 +77,11 @@ export function digestMessage(h, alerts) {
   const reconnect = (ib.scanErrorsThisWeek || []).filter((e) => e.error === "gmail_reconnect_needed").reduce((s, e) => s + e.count, 0);
   if (ib.needReconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(ib.needReconnect, "inbox needs", "inboxes need") + " connecting again (their owners see a Connect again button in the app).");
   else if (reconnect && !alerts.some((a) => a.kind === "reconnects")) look.push(plural(reconnect, "inbox", "inboxes") + " needed connecting again this week (their owners see a prompt in the app).");
+  // Returns Relay couldn't email the shop about. The shopper was told so at the time, and the return is still listed in
+  // the shop's Relay dashboard.
+  const untold = h.mail ? h.mail.returnsShopNotEmailedThisWeek : 0;
+  if (untold) look.push("Relay couldn't email the shop about " + plural(untold, "return", "returns") + " this week (" + (untold === 1 ? "it's" : "they're") + " still listed in the shop's Relay dashboard). " +
+    (h.mail.ownAddress ? "Check the email address the shop has in Shopify or Square." : "Relay is still sending from a test address, which only reaches your own email: it needs a sending address of its own."));
   if (rd.waitingToBeRead >= 20) look.push(plural(rd.waitingToBeRead, "email is", "emails are") + " waiting to be read again.");
   // Emails shoppers sent to Relay because they were read wrong (deleted after 30 days, so worth reading soon).
   if (h.marketReports) look.push(plural(h.marketReports, "Swap & resell report is", "Swap & resell reports are") + " waiting for review (Profile, Team, Review reports).");
