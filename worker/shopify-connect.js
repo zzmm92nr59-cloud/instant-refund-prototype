@@ -200,7 +200,8 @@ async function recordHooks(env, shop, outcome) {
 }
 
 // A shop removed the app (or Shopify asked Relay to erase it): its tokens, dashboard keys and products are deleted, so it
-// disappears from Relay straight away. With everything: true (Shopify's shop/redact, 48 hours later) its offer history goes too.
+// disappears from Relay straight away. With everything: true (Shopify's shop/redact, 48 hours later) its offer history and
+// its own settings go too.
 export async function forgetShopifyShop(env, domain, o = {}) {
   const db = env.RELAY_DB, conn = "shopify:" + domain;
   await ensureShopifyShopSchema(db);
@@ -208,6 +209,11 @@ export async function forgetShopifyShop(env, domain, o = {}) {
   try { await db.prepare("DELETE FROM retailer_keys WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no keys table yet */ }
   await removeShopifyItems(db, conn, null);
   if (o.everything) { try { await db.prepare("DELETE FROM retailer_offers WHERE provider = 'shopify' AND shop_ref = ?").bind(domain).run(); } catch { /* no offers yet */ } }
+  // With everything, the shop's own settings go too: its returns period and instructions (shop-returns.js), its Royal Mail
+  // key and return address (royal-mail.js), and how it takes price differences (shop-payments.js).
+  if (o.everything) for (const t of ["relay_shop_returns", "relay_royal_mail", "relay_shop_pay"]) {
+    try { await db.prepare(`DELETE FROM ${t} WHERE shop = ?`).bind(domain).run(); } catch { /* the shop never set that up */ }
+  }
   // Its auctions (auctions.js): those still running end straight away, without a sale (nobody can be sent an order at a shop
   // that has removed Relay). With everything, the auctions, their photos, bids and offers are deleted.
   try {

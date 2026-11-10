@@ -17,6 +17,9 @@ const fashion = [{ id: "99999999-9999-4999-8999-999999999999", status: "confirme
   items: [{ name: "Long Jacket", qty: 1, pricePence: 9500 }], category: "fashion", categoryLabel: "Fashion", returnable: true, returns: { deadline: day(20) } },
   { id: "88888888-8888-4888-8888-888888888888", status: "pending", kind: "receipt", gmailId: "hat0email01", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-0", orderDate: day(-400), totalPence: 4500, currency: "GBP",
   items: [{ name: "Bucket Hat", qty: 1, pricePence: 4500 }], category: "fashion", categoryLabel: "Fashion", returnable: true, returns: { deadline: day(-370) } }];
+// A subscription paid in euros: its amount is shown as it was charged, and never added to anything in pounds.
+const euro = [{ id: "77777777-7777-4777-8777-777777777777", status: "confirmed", kind: "receipt", retailer: { name: "Example Cloud", domain: "examplecloud.test" }, orderRef: "EC-2291", orderDate: day(-12), totalPence: 8000, currency: "EUR",
+  items: [{ name: "Pro plan (yearly)", qty: 1 }], category: "digital", categoryLabel: "Digital & subscriptions", returnable: false }];
 const asked = [], posted = [];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
@@ -29,7 +32,7 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (m === "POST" && /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/(dismiss|confirm)$/.test(p)) { posted.push([p.split("/").slice(-2).join("/"), route.request().postDataJSON()]); return j({ ok: true }); }
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() });
-  if (p === "/relay/my/receipts") { asked.push(u.search); return j({ receipts: u.searchParams.get("all") === "1" ? [...fashion, ...food] : [...fashion, ...food].slice(0, 100) }); }
+  if (p === "/relay/my/receipts") { asked.push(u.search); return j({ receipts: u.searchParams.get("all") === "1" ? [...fashion, ...euro, ...food] : [...fashion, ...euro, ...food].slice(0, 100) }); }
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Jess Tester", photo: null });
   if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
@@ -118,6 +121,26 @@ await why.getByRole("button", { name: "It's just a promotion" }).click();
 await page.waitForTimeout(300);
 assert.deepEqual(posted, [["88888888-8888-4888-8888-888888888888/dismiss", { reason: "promo" }]], "No, then 'just a promotion' removes it and says why");
 console.log("ok - an opened receipt: View receipt once, its group as a setting, and Is this right? (No asks why and removes it)");
+// A receipt that isn't in pounds: its own amount with its own sign, nothing in pounds made up for its group or month, and
+// a plain line saying it isn't added to the totals.
+await page.getByRole("button", { name: "All groups" }).click();
+await page.getByRole("button", { name: /^Digital & subscriptions, 1 receipt$/ }).click();
+const euroHero = await page.locator(".rl-cat-hero").innerText();
+assert.match(euroHero, /1 receipt since /); assert.ok(!euroHero.includes("£"), "no pounds made up for a group with none: " + euroHero);
+assert.match(await page.locator(".rl-cat-month").first().innerText(), /\s1 receipt$/, "the month gives a count, not £0.00");
+const euroRow = page.locator(".rl-rr").filter({ hasText: "Pro plan (yearly)" });
+assert.match(await euroRow.innerText(), /€80\.00/); assert.ok(!(await euroRow.innerText()).includes("£"));
+await euroRow.locator(".rl-rr-main").click();
+await euroRow.getByText("Paid in euros, so it isn't added to your totals in pounds.").waitFor();
+assert.deepEqual((await measure()).tiny, [], "and that line is a readable size");
+// Fix this receipt keeps the euro sign beside the amount.
+await euroRow.getByRole("button", { name: "Fix details" }).click();
+const fix = page.locator(".rl-fix");
+assert.equal(await fix.locator(".rl-fix-money i").first().innerText(), "€");
+assert.equal(await fix.getByLabel("Total in EUR").inputValue(), "80.00");
+await page.keyboard.press("Escape");
+await page.screenshot({ path: "/tmp/shots/cat-euro.png" });
+console.log("ok - a receipt in euros: its own amount, no pounds made up, and a plain line that it isn't added in");
 // Home only shows what can still go back: never supermarket or takeaway food, even when the email mentions a deadline.
 food[0].returns = { deadline: day(10) };
 await page.evaluate(() => window.go("profile"));

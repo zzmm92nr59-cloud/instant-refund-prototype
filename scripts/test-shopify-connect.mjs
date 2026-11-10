@@ -35,7 +35,7 @@ const shops = {
   "volt-tech.myshopify.com": { name: "Volt Tech", products: [
     { id: "gid://shopify/Product/1", title: "USB-C Charger", img: "https://cdn.shopify.com/s/files/charger.png", variants: [{ id: "gid://shopify/ProductVariant/11", title: "65W", sku: "CUSH-SAGE", price: "39.99", qty: 3 }] }] }
 };
-let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "", shopOrders = {};
+let currencies = { "volt-tech.myshopify.com": "USD" }, hooks = {}, lastProductQuery = "", lastOrdersQuery = "", shopOrders = {};
 // Shops Shopify calls development (test) stores; one says so only through its plan's name, as Shopify has been seen to do.
 const devStores = new Set(), devByName = new Set();
 let tokenCalls = [], apiCalls = [], codeToShop = { "code-oak": "oak-thread.myshopify.com", "code-volt": "volt-tech.myshopify.com" }, grantScope = "read_products,read_inventory";
@@ -66,6 +66,7 @@ globalThis.fetch = async (url, init = {}) => {
     return json({ data: { webhookSubscriptionCreate: { webhookSubscription: { id: "gid://shopify/WebhookSubscription/x" }, userErrors: [] } } });
   }
   if (/orders\(first/.test(q)) {
+    lastOrdersQuery = q;
     assert.match(variables.q, /financial_status:paid/);
     return json({ data: { orders: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: (shopOrders[shop] || []) } } });
   }
@@ -242,17 +243,81 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connec
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM order_items WHERE order_id LIKE 'shopify:oak-thread.myshopify.com:order:7001%'").get().n, 1, "webhook and catch-up never duplicate a line");
 assert.equal(sqlite.prepare("SELECT order_ref FROM retailer_orders WHERE id = 'shopify:oak-thread.myshopify.com:order:7004'").get().order_ref, "#1004", "the catch-up read keeps order numbers too");
 assert.equal(sqlite.prepare("SELECT order_ref FROM retailer_orders WHERE id = 'shopify:oak-thread.myshopify.com:order:7001'").get().order_ref, "#1001", "and never loses one it already had");
+// An order that changed after it was placed (a swap through Relay, the shop editing it, a refund). Shopify's notice still
+// lists the item taken off it and counts it in total_price. Relay keeps the amount the order was placed at (its confirmation
+// email says that, so the order still matches the shopper's receipt), keeps what it comes to now beside it, and doesn't add
+// the item that's no longer on the order.
+{
+  const OAK = "shopify:oak-thread.myshopify.com";
+  // (The column for "what it comes to now" is added the first time it's needed; the shopper's own list does the same.)
+  await (await import("../worker/order-ref.js")).ensureOrderNowColumn(env.RELAY_DB);
+  const amountsOf = n => ({ ...sqlite.prepare("SELECT amount_minor AS placed, current_amount_minor AS now FROM retailer_orders WHERE id = ?").get(OAK + ":order:" + n) });
+  const linesOf = n => sqlite.prepare("SELECT external_line_item_id AS line, quantity AS q FROM order_items WHERE order_id = ? ORDER BY line").all(OAK + ":order:" + n).map(r => ({ ...r }));
+  const order = (id, extra) => ({ id, name: "#" + id, created_at: "2026-10-22T10:00:00Z", currency: "GBP", email: "alice@example.com", customer: null, ...extra });
+  const trainers = (id, extra) => ({ id, title: "Court Trainers", quantity: 1, price: "95.00", product_id: 4, variant_id: 41, ...extra });
+  // Placed at £95, and paid.
+  assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", order(7010, { total_price: "95.00", current_total_price: "95.00", line_items: [trainers(9010, { current_quantity: 1 })] }))).status, 200);
+  assert.deepEqual(amountsOf(7010), { placed: 9500, now: null }, "an order that hasn't changed has nothing beside its amount");
+  // Swapped through Relay for a dearer size: Relay's line has moved to the new item's own line (exchange.js). Then the
+  // shopper pays the extra, and Shopify's notice counts both items (£205) though the order comes to £110.
+  sqlite.prepare("UPDATE order_items SET id = ?, external_line_item_id = '9011', variant_id = '42', price_minor = 11000 WHERE order_id = ?").run(OAK + ":order:7010:item:9011", OAK + ":order:7010");
+  assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", order(7010, { total_price: "205.00", current_total_price: "110.00",
+    line_items: [trainers(9010, { current_quantity: 0 }), trainers(9011, { current_quantity: 1, price: "110.00", variant_id: 42 })] }))).status, 200);
+  assert.deepEqual(amountsOf(7010), { placed: 9500, now: 11000 }, "the amount it was placed at stays; what it comes to now is beside it (never the £205)");
+  assert.deepEqual(linesOf(7010), [{ line: "9011", q: 1 }], "the item taken off the order isn't added back");
+  // An order Relay first hears about after it changed: one item taken off, and one of two of another.
+  assert.equal((await hook("oak-thread.myshopify.com", "orders/paid", order(7011, { total_price: "65.00", current_total_price: "32.50", line_items: [
+    { id: 9020, title: "Canvas Tote", quantity: 1, current_quantity: 0, price: "20.00", product_id: 5, variant_id: 51 },
+    { id: 9021, title: "Logo Cap", quantity: 1, current_quantity: 1, price: "20.00", product_id: 6, variant_id: 61 },
+    { id: 9022, title: "Stoneware Mug", quantity: 2, current_quantity: 1, price: "12.50", product_id: 7, variant_id: 71 }] }))).status, 200);
+  assert.deepEqual(amountsOf(7011), { placed: 3250, now: 3250 }, "the notice can't say what it was placed at, so the amount is what it comes to");
+  assert.deepEqual(linesOf(7011), [{ line: "9021", q: 1 }, { line: "9022", q: 1 }], "only what's still on the order, in the numbers still on it");
+  // The catch-up read does know what each order was placed at, so it puts that right (and an amount that had gone wrong).
+  sqlite.prepare("UPDATE retailer_orders SET amount_minor = 20500 WHERE id = ?").run(OAK + ":order:7010");
+  const before = shopOrders["oak-thread.myshopify.com"];
+  const node = (id, placed, total, now, lines) => ({ legacyResourceId: String(id), name: "#" + id, email: "alice@example.com", createdAt: "2026-10-22T10:00:00Z", processedAt: null, currencyCode: "GBP",
+    totalPriceSet: { shopMoney: { amount: total } }, currentTotalPriceSet: { shopMoney: { amount: now } }, originalTotalPriceSet: { shopMoney: { amount: placed } }, lineItems: { nodes: lines } });
+  const line = (id, title, quantity, currentQuantity, price) => ({ id: "gid://shopify/LineItem/" + id, title, quantity, currentQuantity, originalUnitPriceSet: { shopMoney: { amount: price } }, product: null, variant: null });
+  shopOrders["oak-thread.myshopify.com"] = [
+    node(7010, "95.0", "205.0", "110.0", [line(9010, "Court Trainers", 1, 0, "95.0"), line(9011, "Court Trainers", 1, 1, "110.0")]),
+    node(7011, "65.0", "65.0", "32.5", [line(9020, "Canvas Tote", 1, 0, "20.0"), line(9021, "Logo Cap", 1, 1, "20.0"), line(9022, "Stoneware Mug", 2, 1, "12.5")])];
+  assert.deepEqual(await backfillShopifyOrders(env, "oak-thread.myshopify.com", "token-oak-thread.myshopify.com", { now }), { orders: 2, emailLinked: 2, skipped: 0, error: null });
+  assert.match(lastOrdersQuery, /originalTotalPriceSet/); assert.match(lastOrdersQuery, /currentTotalPriceSet/); assert.match(lastOrdersQuery, /currentQuantity/);
+  assert.deepEqual([amountsOf(7010), amountsOf(7011)], [{ placed: 9500, now: 11000 }, { placed: 6500, now: 3250 }]);
+  assert.deepEqual([linesOf(7010).length, linesOf(7011).length], [1, 2]);
+  // An order that's the same as when it was placed has nothing beside its amount.
+  shopOrders["oak-thread.myshopify.com"] = [node(7004, "12.5", "12.5", "12.5", [line(9004, "Stoneware Mug", 2, 2, "6.25")])];
+  await backfillShopifyOrders(env, "oak-thread.myshopify.com", "token-oak-thread.myshopify.com", { now });
+  assert.deepEqual(amountsOf(7004), { placed: 1250, now: null });
+  shopOrders["oak-thread.myshopify.com"] = before;
+  for (const n of [7010, 7011]) { sqlite.prepare("DELETE FROM order_items WHERE order_id = ?").run(OAK + ":order:" + n); sqlite.prepare("DELETE FROM retailer_order_emails WHERE order_id = ?").run(OAK + ":order:" + n);
+    sqlite.prepare("DELETE FROM retailer_orders WHERE id = ?").run(OAK + ":order:" + n); }
+  console.log("ok - an order that changed keeps the amount it was placed at, with what it comes to now beside it; items taken off it aren't added");
+}
 // Privacy requests are answered.
 for (const t of ["customers/data_request", "customers/redact"]) assert.equal((await hook("oak-thread.myshopify.com", t, { customer: { id: 5 } })).status, 200, t);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE external_customer_id = '5'").get().n, 0, "a redact request deletes that customer's orders");
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_orders WHERE connection_id = 'shopify:oak-thread.myshopify.com'").get().n, 1, "other orders stay");
 // Removing the app: Volt's tokens, dashboard keys and products are deleted and it no longer shows to shoppers.
+// (Volt had also saved settings of its own: its returns period, a Royal Mail key and how it takes price differences.)
+{
+  const { saveShopReturns } = await import("../worker/shop-returns.js"), { ensureRoyalMailTables } = await import("../worker/royal-mail.js"), { ensureShopPayTables } = await import("../worker/shop-payments.js");
+  await saveShopReturns(env, "volt-tech.myshopify.com", { days: 30, how: "Post it back to Volt Tech Returns." });
+  await saveShopReturns(env, "oak-thread.myshopify.com", { days: 14 });
+  await ensureRoyalMailTables(db); await ensureShopPayTables(db);
+  sqlite.prepare("INSERT INTO relay_royal_mail (shop, key_iv, key_data, service_code, name, line1, city, postcode, connected_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)").run("volt-tech.myshopify.com", "iv", "sealed", "TSN", "Volt Tech Returns", "1 Sample Road", "Leeds", "LS1 4DY", 1, 1);
+  sqlite.prepare("INSERT INTO relay_shop_pay (shop, method, updated_at) VALUES (?,?,?)").run("volt-tech.myshopify.com", "shopify", 1);
+}
+const voltSettings = () => ["relay_shop_returns", "relay_royal_mail", "relay_shop_pay"].map(t => sqlite.prepare(`SELECT COUNT(*) n FROM ${t} WHERE shop = 'volt-tech.myshopify.com'`).get().n);
 assert.equal((await hook("volt-tech.myshopify.com", "app/uninstalled", { id: 9 })).status, 200);
+assert.deepEqual(voltSettings(), [1, 1, 1], "kept for now, in case the shop puts Relay straight back");
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopify_shops WHERE domain = 'volt-tech.myshopify.com'").get().n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_keys WHERE shop_ref = 'volt-tech.myshopify.com'").get().n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM retailer_catalog_items WHERE provider = 'shopify:volt-tech.myshopify.com'").get().n, 0);
 assert.ok(!(await shopifyShopsForDisplay(env)).some(x => x.domain === "volt-tech.myshopify.com"));
 assert.equal((await hook("volt-tech.myshopify.com", "shop/redact", { shop_id: 9 })).status, 200);
+assert.deepEqual(voltSettings(), [0, 0, 0], "Shopify's erase request removes the shop's own settings too: returns period, Royal Mail key and address, payment choice");
+assert.equal(sqlite.prepare("SELECT days FROM relay_shop_returns WHERE shop = 'oak-thread.myshopify.com'").get().days, 14, "another shop's settings are untouched");
 // A product the shop deleted while Relay wasn't told is still removed at the next full read.
 shops["oak-thread.myshopify.com"].products = shops["oak-thread.myshopify.com"].products.filter(p => p.title !== "Linen Cushion" && p.title !== "Stoneware Mug").concat([{ id: "gid://shopify/Product/3", title: "Wool Throw", img: null, variants: [{ id: "gid://shopify/ProductVariant/31", title: "Oat", sku: "THR", price: "45.00", qty: 2 }] }]);
 await syncAllShopify(env, { now });

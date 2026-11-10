@@ -556,7 +556,7 @@ function loadReceiptPurchases(){
     mk("div",{className:"eyebrow",textContent:who.toUpperCase()}),
     mk("h3",{textContent:names}),
     mk("div",{className:"small muted",textContent:(x.orderDate?fmt(x.orderDate):"Date not found")+(dl?" · return by "+(dl===legal?"at least ":"")+fmt(dl):"")}),
-    mk("div",{className:"price",textContent:"£"+(x.totalPence/100).toFixed(2)}),
+    mk("div",{className:"price",textContent:(!x.currency||x.currency==="GBP"?"£":x.currency+" ")+(x.totalPence/100).toFixed(2)}),
     mk("span",{className:"relay-status ordered",textContent:note}),
     mk("div",{className:"tile-arrow",textContent:"See in Receipts →"})])]);
   };

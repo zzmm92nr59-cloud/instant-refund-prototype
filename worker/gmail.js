@@ -95,7 +95,9 @@ const OUTLOOK_FULL_REV = 1;
 // notices read as deliveries, receipts sent through email companies (Mandrill, Mailgun) named after the shop, "Ordered:",
 // "receipt for" and "order of" subjects, invisible padding and direction marks, "5 GBP" prices, totals "(Including VAT)",
 // booking confirmation numbers, deposits into an account left out, and a payment platform's "Merchant:".
-const READER_FULL_REV = 11;
+// 12: notices about an order already placed left out (a delay, "important information regarding your order", a benefit
+// confirmed for it), and totals that aren't in pounds read in their own currency, never converted.
+const READER_FULL_REV = 12;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -114,7 +116,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 27;
+export const PARSER_VERSION = 28;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -1394,7 +1396,8 @@ export function mergeOrderEmails(orders) {
     const [lead, ...rest] = g.slice().sort((a, b) => score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
     for (const o of rest) {
-      if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = c.currency || o.currency; }
+      // The currency goes with the amount: a total taken from another email of the order is in that email's currency.
+      if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = o.currency || c.currency; }
       if (!c.orderDate && o.orderDate) c.orderDate = o.orderDate;
       if (!c.items.length && (o.items || []).length) c.items = o.items.map(i => ({ ...i }));
       for (const it of c.items) {
@@ -1489,6 +1492,10 @@ export function attachGifts(orders, gifts) {
 // "your parcel from <shop>") the most recent order from that shop placed in the month before. The furthest-along update wins.
 const STAGE = { shipped: 1, in_transit: 2, due: 3, out_for_delivery: 4, delivered: 5 };
 const letters = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+// UK law's 14 days is only ever Relay's estimate for an order paid in pounds (or with no amount read). An order in euros or
+// dollars may not have been sold under UK law at all, so no date is worked out for it from the law: only one its own
+// email gives.
+const paidInPounds = (o) => !o || !o.currency || o.currency === "GBP";
 export function attachDeliveries(orders, deliveries) {
   for (const o of orders) {
     const t = o.shipment && o.shipment.trackingNumber;
@@ -1512,7 +1519,7 @@ export function attachDeliveries(orders, deliveries) {
     // When the email gives no return deadline, show the least UK law allows for online orders: 14 days after delivery to tell the shop.
     // When it gives a window that starts at delivery ("within 28 days of delivery"), count it from the day it arrived.
     const r = o.returns || {};
-    if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays) {
+    if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays && paidInPounds(o)) {
       const d = new Date(Date.parse(best.at) + 14 * 86400000);
       if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "uk_law" };
     } else if (best.status === "delivered" && best.at && !r.deadline && r.windowFrom === "delivery" && Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365) {
@@ -1530,7 +1537,7 @@ export function estimateReturnBy(o, today) {
   const r = (o && o.returns) || {};
   if (!o || o.returnBy || r.deadline || !/^\d{4}-\d{2}-\d{2}$/.test(o.orderDate || "") || o.orderDate > today) return null;
   const windowDays = Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365 ? r.windowDays : null;
-  const days = windowDays || (o.orderRef && !o.delivery ? 14 : null);
+  const days = windowDays || (o.orderRef && !o.delivery && paidInPounds(o) ? 14 : null);
   if (!days) return null;
   const d = new Date(o.orderDate + "T00:00:00Z");
   if (Number.isNaN(d.getTime())) return null;

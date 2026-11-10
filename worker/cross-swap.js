@@ -89,7 +89,7 @@ const titleOf = (x) => x.product + (x.variant ? " (" + x.variant + ")" : "");
 // GET /relay/my/cross-swap/options?orderId=&lineId=: whether this item can be swapped with another shop, and what's on offer.
 async function options(env, shopper, url) {
   const check = await checkEligibility(env, shopper, url.searchParams.get("orderId"), url.searchParams.get("lineId"));
-  if (!check.eligible) return check.reason === "not_your_order" ? [404, { error: "not_your_order" }] : [200, { eligible: false, reason: check.reason }];
+  if (!check.eligible) return check.reason === "not_your_order" ? [404, { error: "not_your_order" }] : [200, { eligible: false, reason: check.reason, ...(check.basis ? { basis: check.basis, days: check.days } : {}) }];
   if (check.square) return [200, { eligible: false, reason: "retailer_not_supported" }];
   const { fromName, shops } = await shopsFor(env, check.shop);
   const out = [];
@@ -109,7 +109,7 @@ async function start(env, shopper, body, o) {
   const k = ITEM_KEY.exec(String(body && body.toKey || ""));
   if (!k) return [400, { error: "not_an_option" }];
   const check = await checkEligibility(env, shopper, body.orderId, body.lineId);
-  if (!check.eligible) return [check.reason === "not_your_order" ? 404 : 409, { error: check.reason }];
+  if (!check.eligible) return [check.reason === "not_your_order" ? 404 : 409, { error: check.reason, ...(check.basis ? { basis: check.basis, days: check.days } : {}) }];
   if (check.square) return [409, { error: "retailer_not_supported" }];
   const { fromName, shops } = await shopsFor(env, check.shop);
   const to = shops.find(s => s.domain === k[1]);
