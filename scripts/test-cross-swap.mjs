@@ -68,7 +68,7 @@ const order = (shop, ext, who, at, line) => {
 };
 const capLine = { id: "901", product: "1", variant: "11", title: "Logo Cap", price: 2000 };
 const o1 = order(OAK, 1001, alice, daysAgo(2), capLine);
-const o2 = order(OAK, 1002, alice, daysAgo(20), { ...capLine, id: "902" }); // past the 7 days Relay can start returns for
+const o2 = order(OAK, 1002, alice, daysAgo(40), { ...capLine, id: "902" }); // past the 30 days Relay can start returns for (Oak & Thread hasn't set its own period)
 const o3 = order(FERN, 3001, alice, daysAgo(1), { id: "931", product: "4", variant: "41", title: "Test Trainers", price: 6000 });
 
 // Shopify and the email service, as stand-ins.
@@ -117,8 +117,8 @@ assert.deepEqual(opts.body.shops.map(s => [s.name, s.items.map(i => [i.product, 
   "Birch Lane only: in stock, in pounds; no test shops, not Oak & Thread itself, and not Elm Row (it doesn't tell Relay about its orders)");
 assert.equal(opts.body.shops[0].items[1].key, key(BIRCH, 21));
 assert.equal(opts.body.shops[0].items[1].imageUrl, "https://cdn.example/2.png");
-// Past the 7 days: not offered, with the reason.
-assert.deepEqual((await optionsFor(alice, o2, "902")).body, { eligible: false, reason: "outside_return_window" });
+// Past Relay's own limit (the shop hasn't set a returns period): not offered, with the reason and whose limit it is.
+assert.deepEqual((await optionsFor(alice, o2, "902")).body, { eligible: false, reason: "outside_return_window", basis: "relay", days: 30 });
 // A test shop's order is offered other test shops only.
 assert.deepEqual((await optionsFor(alice, o3, "931")).body.shops.map(s => s.name), ["Moss Test"], "not Ash Test either");
 // The app offers the swap only where there's a choice: another shop of the same kind with something in stock.

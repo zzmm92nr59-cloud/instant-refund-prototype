@@ -2,7 +2,7 @@ import { getShopifyStores } from "./shopify.js";
 import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { forgetShopifyShop, removeShopifyItems, shopifyApps } from "./shopify-connect.js";
 import { ensureReturnsTables } from "./returns.js";
-import { saveOrderRef } from "./order-ref.js";
+import { saveOrderRef, saveOrderAmountNow } from "./order-ref.js";
 // Shopify webhooks, every one checked against Shopify's signature before anything happens.
 // - orders/paid (shops set up in the server settings only): private order ingestion. Nothing here exposes consumer purchases.
 // - products/create|update|delete, inventory_levels/update: a shop changed its products or stock, so Relay reads that shop again at once (and checks price alerts).
@@ -219,11 +219,25 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
   if (event.line_items.length > 100) return { status: 413, body: { error: "too_many_lines" } };
   const externalId = String(event.id);
   const orderId = connection + ":order:" + externalId;
-  let statements;
+  let statements, amount, keepAmount, amountNow;
   try {
-    const amount = asMoney(event.total_price);
-    const lines = event.line_items.map(line => {
-      const count = Number(line.quantity);
+    // What the order is now. After an order changes (a swap through Relay, the shop editing it, a refund) Shopify still lists
+    // the items taken off it, and total_price still counts them: current_quantity and current_total_price are the order as
+    // it stands. So an item that's no longer on the order isn't added to the shopper's account.
+    const onNow = (line) => { const q = line && line.current_quantity; return q == null || q === "" || !Number.isInteger(Number(q)) ? null : Number(q); };
+    const given = (v) => (v == null || v === "" ? null : asMoney(v));
+    const total = asMoney(event.total_price), totalNow = given(event.current_total_price);
+    const changed = (totalNow != null && totalNow !== total) || event.line_items.some(l => onNow(l) != null && onNow(l) !== Number(l.quantity));
+    // The order's amount is what it came to when it was placed: its confirmation email says that, so it's what the order is
+    // matched to the shopper's receipt by. A notice about an order that has since changed can't say what that was (only
+    // the catch-up read can: original_total_price), so then the amount Relay already has is kept.
+    const first = given(event.original_total_price) ?? (changed ? null : total);
+    amount = first ?? totalNow ?? total; keepAmount = first == null;
+    // What it comes to now, kept beside it once the order has changed (order-ref.js). An order that hasn't changed has
+    // nothing to keep, so nothing more is written for it.
+    amountNow = changed ? totalNow : null;
+    const lines = event.line_items.filter(line => onNow(line) !== 0).map(line => {
+      const left = onNow(line), count = left > 0 ? left : Number(line.quantity);
       if (!line.id || !line.title || !Number.isInteger(count) || count < 1 || count > 10000)
         throw Error("Invalid order line");
       const price = asMoney(line.price);
@@ -238,9 +252,9 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
         (id,connection_id,external_order_id,external_customer_id,ordered_at,amount_minor,currency,payment_processor,status,raw_identifier_keys)
         VALUES (?,?,?,?,?,?,?,?,?,?)
         ON CONFLICT(connection_id,external_order_id) DO UPDATE SET
-        ordered_at=excluded.ordered_at,amount_minor=excluded.amount_minor,currency=excluded.currency`)
+        ordered_at=excluded.ordered_at,amount_minor=CASE WHEN ? THEN retailer_orders.amount_minor ELSE excluded.amount_minor END,currency=excluded.currency`)
         .bind(orderId, connection, externalId, event.customer?.id == null ? null : String(event.customer.id),
-          String(event.processed_at || event.created_at), amount, "GBP", "shopify", "unverified", "[]"),
+          String(event.processed_at || event.created_at), amount, "GBP", "shopify", "unverified", "[]", keepAmount ? 1 : 0),
       ...lines.map(line => env.RELAY_DB.prepare(`INSERT INTO order_items
         (id,order_id,external_line_item_id,product_id,variant_id,title,quantity,price_minor,currency)
         VALUES (?,?,?,?,?,?,?,?,?)
@@ -270,6 +284,8 @@ export async function ingestShopifyOrder(env, shop, event, sourceId, topic = "or
     await env.RELAY_DB.batch(statements);
     // The number the shop showed its customer ("#1001"), so the order can be found in the shopper's own emails (answer-key.js).
     await saveOrderRef(env.RELAY_DB, orderId, event.name || (event.order_number != null ? "#" + event.order_number : null));
+    // What the order comes to now, when it has changed since it was placed.
+    if (amountNow != null) await saveOrderAmountNow(env.RELAY_DB, orderId, amountNow);
     // Ownership is shown to a shopper only when this order's email matches their own verified sign-in email.
     return { status: 200, body: { received: true, ...(linked ? { emailLinked: true } : {}) } };
   } catch (error) {
@@ -286,8 +302,8 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
   const since = new Date(now - 60 * 86400000).toISOString().slice(0, 10);
   const query = `query RelayOrders($cursor: String, $q: String) { orders(first: 50, after: $cursor, query: $q, sortKey: CREATED_AT, reverse: true) {
     pageInfo { hasNextPage endCursor }
-    nodes { legacyResourceId name email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } }
-      lineItems(first: 100) { nodes { id title quantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
+    nodes { legacyResourceId name email createdAt processedAt currencyCode totalPriceSet { shopMoney { amount } } currentTotalPriceSet { shopMoney { amount } } originalTotalPriceSet { shopMoney { amount } }
+      lineItems(first: 100) { nodes { id title quantity currentQuantity originalUnitPriceSet { shopMoney { amount } } product { legacyResourceId } variant { legacyResourceId } } } } } }`;
   let cursor = null, pages = 0, orders = 0, linked = 0, skipped = 0, error = null;
   try {
     do {
@@ -299,7 +315,9 @@ export async function backfillShopifyOrders(env, shop, token, o = {}) {
       for (const n of page.nodes || []) {
         const event = { id: n.legacyResourceId, name: n.name, created_at: n.createdAt, processed_at: n.processedAt, currency: n.currencyCode, email: n.email,
           total_price: n.totalPriceSet && n.totalPriceSet.shopMoney && n.totalPriceSet.shopMoney.amount, customer: null, // the customer record itself needs extra access Relay doesn't ask for
-          line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity,
+          current_total_price: (n.currentTotalPriceSet && n.currentTotalPriceSet.shopMoney && n.currentTotalPriceSet.shopMoney.amount) ?? null,
+          original_total_price: (n.originalTotalPriceSet && n.originalTotalPriceSet.shopMoney && n.originalTotalPriceSet.shopMoney.amount) ?? null,
+          line_items: ((n.lineItems && n.lineItems.nodes) || []).map(l => ({ id: gidNumber(l.id), title: l.title, quantity: l.quantity, current_quantity: l.currentQuantity ?? null,
             price: l.originalUnitPriceSet && l.originalUnitPriceSet.shopMoney && l.originalUnitPriceSet.shopMoney.amount,
             product_id: l.product ? l.product.legacyResourceId : null, variant_id: l.variant ? l.variant.legacyResourceId : null })) };
         const res = await ingestShopifyOrder(env, shop, event, "backfill:" + event.id, "orders/backfill");

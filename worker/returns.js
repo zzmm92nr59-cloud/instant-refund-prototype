@@ -18,13 +18,15 @@
 // Square shops: the same request and reference; the shop is emailed at its Square location's address, and the refund
 // shows in Relay once Square records it (see syncSquareRefunds in square-orders.js).
 //
-// Eligibility: order confirmed by the shop for this shopper, within 7 days of the order date,
-// and the item must not already have a return or exchange recorded.
+// Eligibility: order confirmed by the shop for this shopper, within the shop's own returns period (set by the shop in Relay
+// for shops, shop-returns.js; until it sets one, Relay's own limit on starting a return, never shown as the shop's), and the
+// item must not already have a return. An item swapped through Relay can still be returned: the return is for the new item.
 
 import { ensureOnce } from "./once.js";
 import { listConnectedShopifyStores } from "./shopify-connect.js";
 import { shopMakesLabels, orderAddress, createReturnLabel, saveLabel, labelResponse } from "./royal-mail.js";
 import { SQUARE_CONNECTION, notifySquareShopOfReturn } from "./square-orders.js";
+import { shopReturns, returnWindow } from "./shop-returns.js";
 
 const API_VERSION = "2026-07";
 export const REASON_TEXT = { wrong_size: "Wrong size or fit", changed_mind: "Changed their mind", faulty: "Faulty or damaged", not_as_described: "Not as described" };
@@ -35,7 +37,6 @@ const json = (body, status = 200, cors = {}) =>
   Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 
 const SHOP = /^shopify:([a-z0-9-]+\.myshopify\.com)$/;
-const RETURN_WINDOW_DAYS = 7;
 
 export function ensureReturnsTables(db) {
   return ensureOnce(db, "returns", async () => {
@@ -156,13 +157,10 @@ export async function checkEligibility(env, shopper, orderId, lineId) {
   const sqr = m ? null : SQUARE_CONNECTION.exec(String(order.retailer || ""));
   if (!m && !sqr) return { eligible: false, reason: "retailer_not_supported" };
 
-  // Check 7-day window from order date
-  const orderedAt = new Date(order.orderedAt).getTime();
-  const now = Date.now();
-  const daysSince = (now - orderedAt) / (1000 * 60 * 60 * 24);
-  if (daysSince > RETURN_WINDOW_DAYS) {
-    return { eligible: false, reason: "outside_return_window", daysSince: Math.floor(daysSince) };
-  }
+  // The shop's own returns period, counted from the order date. Square shops can't set one yet, so they get Relay's limit.
+  const returns = m ? await shopReturns(env, m[1]) : { days: null, how: null };
+  const win = returnWindow(order.orderedAt, returns, Date.now());
+  if (!win.open) return { eligible: false, reason: "outside_return_window", daysSince: win.daysSince, basis: win.basis, days: win.days };
 
   // Get the line item
   const line = await db.prepare(`
@@ -178,13 +176,18 @@ export async function checkEligibility(env, shopper, orderId, lineId) {
   ).bind(order.id, line.lineId).first();
   if (existingReturn) return { eligible: false, reason: "already_returned" };
 
-  // No completed exchange on this line
-  const existingExchange = await db.prepare(
-    "SELECT 1 AS x FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status IN ('done','awaiting_payment')"
-  ).bind(order.id, line.lineId).first();
-  if (existingExchange) return { eligible: false, reason: "already_exchanged" };
+  // An item swapped through Relay can be returned, as long as Relay knows the new item's own line on the shop's order (so
+  // the shop's refund can be matched to it). Swaps made before Relay kept that (no from_line_id) still can't be.
+  let swapped = null;
+  try {
+    swapped = await db.prepare("SELECT from_line_id AS f FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status IN ('done','awaiting_payment') ORDER BY created_at DESC LIMIT 1")
+      .bind(order.id, line.lineId).first();
+  } catch {
+    swapped = await db.prepare("SELECT NULL AS f FROM relay_exchanges WHERE order_id = ? AND line_id = ? AND status IN ('done','awaiting_payment')").bind(order.id, line.lineId).first().catch(() => null);
+  }
+  if (swapped && !swapped.f) return { eligible: false, reason: "already_exchanged" };
 
-  return { eligible: true, order, shop: m ? m[1] : order.retailer, square: Boolean(sqr), line, daysSince: Math.floor(daysSince) };
+  return { eligible: true, order, shop: m ? m[1] : order.retailer, square: Boolean(sqr), line, daysSince: win.daysSince, window: win, returns };
 }
 
 // POST /relay/my/return — start a return; get back a Relay reference, plus a Royal Mail label when the shop has set that up.
@@ -198,7 +201,7 @@ export async function initiateReturn(env, shopper, body, o = {}) {
   const reason = body && body.reason; // "wrong_size", "changed_mind", "faulty", "not_as_described"
 
   const check = await checkEligibility(env, shopper, orderId, lineId);
-  if (!check.eligible) return [check.reason === "not_your_order" ? 404 : 409, { error: check.reason }];
+  if (!check.eligible) return [check.reason === "not_your_order" ? 404 : 409, { error: check.reason, ...(check.basis ? { basis: check.basis, days: check.days } : {}) }];
 
   const returnRef = generateReturnRef();
   const returnId = crypto.randomUUID();
@@ -249,6 +252,8 @@ export async function initiateReturn(env, shopper, body, o = {}) {
     ...(made ? { carrier: "Royal Mail", trackingNumber: made.trackingNumber, serviceName: made.serviceName, hasPdf: Boolean(made.label),
       qrImage: made.qr ? "data:" + made.qr.type + ";base64," + made.qr.data : null } : {}),
     shopNotified,
+    // How the shop wants it sent back, in the shop's own words (only when it has said, and there's no label to use instead).
+    how: !made && check.returns && check.returns.how ? check.returns.how : null,
     item: check.line.title,
     priceMinor: check.line.priceMinor,
     daysSince: check.daysSince,
@@ -274,13 +279,19 @@ async function listReturns(env, shopper) {
 async function checkEligibilityRoute(env, shopper, url) {
   await ensureReturnsTables(env.RELAY_DB);
   const check = await checkEligibility(env, shopper, url.searchParams.get("orderId"), url.searchParams.get("lineId"));
-  if (!check.eligible) return [200, { eligible: false, reason: check.reason }];
+  if (!check.eligible) return [200, { eligible: false, reason: check.reason, ...(check.basis ? { basis: check.basis, days: check.days } : {}) }];
   return [200, {
     eligible: true,
     item: check.line.title,
     priceMinor: check.line.priceMinor,
     daysSince: check.daysSince,
-    daysLeft: RETURN_WINDOW_DAYS - check.daysSince,
+    // A "return by" date only when it is the shop's own period. With no period from the shop there is no date to give.
+    returnBy: check.window.basis === "shop" ? check.window.by : null,
+    basis: check.window.basis,
+    // What will happen, so the app can say it plainly before the shopper confirms.
+    label: !check.square && await shopMakesLabels(env, check.shop).catch(() => false),
+    how: check.returns && check.returns.how ? check.returns.how : null,
+    inStore: Boolean(check.square),
   }];
 }
 

@@ -30,6 +30,7 @@ const shown = () => Object.values(read).map(x => {
 });
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const asks = [], REPLY = "Relay read the total as £60.00. If that's wrong, tap Fix details on the receipt and change it.";
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -43,6 +44,9 @@ await ctx.route("https://**/*", async route => {
     if (b.undo) delete fixes[f[1]]; else fixes[f[1]] = { ...(fixes[f[1]] || {}), ...b };
     return j({ ok: true, fixed: fixes[f[1]] || null });
   }
+  // The help chat (Ask the assistant on a receipt).
+  if (p === "/relay/my/help/chat" && m === "GET") return j({ available: true, handoff: true });
+  if (p === "/relay/my/help/chat" && m === "POST") { asks.push(JSON.parse(route.request().postData() || "{}")); await new Promise(ok => setTimeout(ok, 300)); return j({ reply: REPLY }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL });
   if (p === "/relay/my/receipts") return j({ receipts: shown() });
@@ -140,6 +144,38 @@ assert.equal(await sheet.getByRole("textbox").first().inputValue(), "Larkspur Ho
 await sheet.getByRole("button", { name: "Cancel" }).click();
 await sheet.waitFor({ state: "detached" });
 assert.equal(posts.length, 2, "Cancel sends nothing");
+// 3. Questions about a receipt: the assistant is shown it only once the shopper says so, then with each question, until
+// they stop showing it.
+await page.evaluate(() => window.go("receipts"));
+await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
+await page.waitForTimeout(400);
+// (The Fashion group may still be open from before.)
+if (!(await page.locator(".rl-rr").filter({ hasText: "Linen Shirt" }).count())) await page.locator("#view").getByText("Fashion", { exact: true }).click();
+const askShirt = page.locator(".rl-rr").filter({ hasText: "Linen Shirt" });
+// (Its details may still be open from before: a tap would close them.)
+if (!(await askShirt.locator(".rl-rc-fix").count())) await askShirt.locator(".rl-rr-main").click();
+await askShirt.getByText("Questions about it?").waitFor();
+await polished("receipt details with Ask the assistant", ".rl-rc-fix");
+await askShirt.getByRole("button", { name: "Ask the assistant" }).click();
+await page.getByText("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.").waitFor();
+assert.equal(asks.length, 0, "nothing is sent before they say so");
+await page.getByRole("button", { name: "Show it" }).click();
+const chat = page.locator("#mePage .rl-asub");
+await chat.getByText("About your receipt from Larkspur Home", { exact: false }).waitFor();
+await chat.getByText("I can see what Relay read from this receipt. What would you like to know?", { exact: false }).waitFor();
+await chat.getByText("Your messages, and what Relay read from this receipt, go to Anthropic", { exact: false }).waitFor();
+await chat.getByRole("button", { name: "The total is wrong" }).click();
+await chat.getByText(REPLY).waitFor();
+assert.deepEqual(asks[0], { messages: [{ role: "user", text: "The total is wrong" }], receiptId: ID2 });
+await polished("chat about a receipt", "#mePage .rl-asub");
+await chat.getByRole("button", { name: "Stop showing it" }).click();
+await chat.getByText("The assistant can't see the receipt any more.").waitFor();
+assert.equal(await chat.getByText("About your receipt from", { exact: false }).count(), 0);
+await chat.getByRole("textbox", { name: "Your question for Relay's assistant" }).fill("Thanks, how do I mark it as a gift?");
+await chat.getByRole("button", { name: "Send", exact: true }).click();
+await page.waitForFunction(() => document.querySelectorAll(".rl-chat-b.bot").length >= 3);
+assert.equal(asks.length, 2); assert.equal(asks[1].receiptId, undefined, "once they stop showing it, it isn't sent");
+console.log("ok - Ask the assistant: shown the receipt only after Show it, with each question until Stop showing it");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS fix this receipt UI: from the details or 'Is this right?', checks in plain English, changes only, once, undo (stubbed server)");
 await browser.close(); server.close();

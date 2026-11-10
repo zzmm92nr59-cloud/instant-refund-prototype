@@ -15,6 +15,8 @@ import { listConnectedShopifyStores } from "./shopify-connect.js";
 import { paymentsEnabled, cardOf, holdDifference, takeHeld, releaseHold, moneyText } from "./payments.js";
 import { shopPay } from "./shop-payments.js";
 import { handleSquareExchange } from "./square-orders.js";
+import { shopReturnsMany, returnWindow } from "./shop-returns.js";
+import { saveOrderAmountNow } from "./order-ref.js";
 
 const json = (body, status = 200, cors = {}) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const SHOP = /^shopify:([a-z0-9-]+\.myshopify\.com)$/;
@@ -26,7 +28,13 @@ export function ensureExchangeTables(db) {
       shop TEXT NOT NULL, from_variant TEXT NOT NULL, from_title TEXT, to_variant TEXT NOT NULL, to_title TEXT, quantity INTEGER NOT NULL,
       status TEXT NOT NULL, detail TEXT, created_at INTEGER NOT NULL)`).run();
     await db.prepare("CREATE INDEX IF NOT EXISTS idx_relay_exchanges_order ON relay_exchanges(order_id, line_id)").run();
-  });
+  }).then(() => ensureOnce(db, "exchanges-new-line", async () => {
+    // A swap now moves Relay's copy of the order line to the new item's own line on the shop's order (line_id), and keeps
+    // the line it replaced (from_line_id) and its price. Swaps made before this have no from_line_id: their line_id is the
+    // old, removed line. Added later.
+    for (const col of ["from_line_id TEXT", "from_price_minor INTEGER"])
+      try { await db.prepare("ALTER TABLE relay_exchanges ADD COLUMN " + col).run(); } catch { /* already there */ }
+  }));
 }
 
 const itemKey = (shop, productId) => "shopify:" + shop + ":item:gid://shopify/Product/" + productId;
@@ -48,13 +56,15 @@ export async function enrichPurchases(env, purchases, opt = {}) {
   const db = env.RELAY_DB;
   await ensureExchangeTables(db);
   let stores = null; // the shop's Shopify access, fetched only if a swap still has a balance to check
-  const RETURN_WINDOW_DAYS = 7;
   const now = Date.now();
   const shopOrders = purchases.filter(o => SHOP.test(String(o.retailer || "")));
   const orderIds = shopOrders.map(o => o.id);
   // Swaps done on these orders, newest first.
   const swaps = orderIds.length ? await rowsIn(db, (q) => `SELECT id, order_id AS orderId, line_id AS lineId, to_title AS toTitle, from_title AS fromTitle,
-      to_variant AS toVariant, status, detail, created_at AS at FROM relay_exchanges WHERE status = 'done' AND order_id IN ${q} ORDER BY created_at DESC`, orderIds).catch(() => []) : [];
+      to_variant AS toVariant, status, detail, created_at AS at, from_line_id AS fromLine, from_price_minor AS fromPrice
+      FROM relay_exchanges WHERE status = 'done' AND order_id IN ${q} ORDER BY created_at DESC`, orderIds).catch(() => []) : [];
+  // Each shop's own returns period (shop-returns.js). A shop that hasn't set one has no entry.
+  const periods = await shopReturnsMany(env, shopOrders.map(o => SHOP.exec(o.retailer)[1]));
   const swapOf = new Map(); // "order|line" -> newest swap
   for (const r of swaps) { const k = r.orderId + "|" + r.lineId; if (!swapOf.has(k)) swapOf.set(k, r); }
   // Returns started in Relay on these orders, newest first (the table and some columns only exist once returns have been used).
@@ -85,12 +95,14 @@ export async function enrichPurchases(env, purchases, opt = {}) {
 
   for (const o of purchases) {
     const m = SHOP.exec(String(o.retailer || ""));
-    const daysSinceOrder = o.orderedAt ? (now - new Date(o.orderedAt).getTime()) / (1000 * 60 * 60 * 24) : 999;
-    // When Relay swaps an item, Shopify adds the new item to the order as a line of its own, which arrives with the order's next
-    // update. That line is the swapped item already shown on the original line ("swapped to …"), so it isn't shown twice
-    // (and can't be swapped or returned a second time). One hidden line per swap, only a line with no swap of its own.
+    const win = returnWindow(o.orderedAt, m ? periods.get(m[1]) : null, now);
+    // Swaps made before Relay followed the new item's line (no fromLine): Shopify added the new item to the order as a line
+    // of its own, which arrived with the order's next update. That line is the swapped item already shown on the original
+    // line ("swapped to …"), so it isn't shown twice (and can't be swapped or returned a second time). One hidden line per
+    // such swap, only a line with no swap of its own. A swap that moved the line has nothing to hide: another line of the
+    // same size or colour on that order is something else the shopper bought.
     const swappedTo = new Map();
-    if (m) for (const r of swaps.filter(x => x.orderId === o.id))
+    if (m) for (const r of swaps.filter(x => x.orderId === o.id && !x.fromLine))
       swappedTo.set(String(r.toVariant), { from: String(r.lineId), left: (swappedTo.get(String(r.toVariant))?.left || 0) + 1 });
     const hide = new Set();
     for (const it of o.items || []) {
@@ -122,8 +134,10 @@ export async function enrichPurchases(env, purchases, opt = {}) {
           }
         }
         // The card shows what the shopper has now: the new item's price (the difference was paid or refunded).
+        // (A swap that moved the line already has the new price; the old one was kept with the swap.)
         const nv = variants.get("shopify:" + m[1] + ":variant:" + row.toVariant);
-        if (nv && Number.isFinite(nv.price) && nv.price > 0) { ex.fromPriceMinor = it.priceMinor ?? null; it.priceMinor = nv.price; }
+        if (row.fromLine) ex.fromPriceMinor = Number.isFinite(row.fromPrice) ? row.fromPrice : null;
+        else if (nv && Number.isFinite(nv.price) && nv.price > 0) { ex.fromPriceMinor = it.priceMinor ?? null; it.priceMinor = nv.price; }
         it.exchange = ex; it.variant = ex.toTitle || it.variant;
       }
       it.exchangeable = !ex && Boolean(it.productId);
@@ -131,8 +145,11 @@ export async function enrichPurchases(env, purchases, opt = {}) {
       const ret = retOf.get(k) || null;
       if (ret) it.returnInfo = { status: ret.status, ref: ret.ref, trackingNumber: ret.trackingNumber || null,
         refundMinor: Number.isFinite(ret.refundMinor) ? ret.refundMinor : null, refundedAt: ret.refundedAt || null };
-      // returnable: within window, no completed return, no completed exchange
-      if (daysSinceOrder <= RETURN_WINDOW_DAYS && !ex) it.returnable = !ret;
+      // Can be returned: inside the returns period, no return started yet. A swapped item can be, once Relay knows the new
+      // item's own line on the shop's order (swaps made before that was kept can't).
+      if (win.open && (!ex || row.fromLine)) it.returnable = !ret;
+      // The shop's own "return by" date. With no period from the shop there is no date: Relay doesn't make one up.
+      if (it.returnable && win.basis === "shop") it.returnBy = { date: win.by, days: win.days };
       if (ret) it.exchangeable = false;
     }
     if (hide.size) o.items = o.items.filter(it => !hide.has(it));
@@ -246,10 +263,12 @@ async function doExchange(env, shopper, body, o) {
   const toGid = choice.key.split(":variant:")[1], fromGid = "gid://shopify/ProductVariant/" + owned.line.variantId;
   const fromRow = await db.prepare("SELECT title FROM retailer_catalog_variants WHERE id = ?").bind(variantKey(owned.shop, owned.line.variantId)).first();
   const fromTitle = fromRow && fromRow.title !== "Default Title" ? fromRow.title : null;
-  const record = async (status, detail) => {
-    await db.prepare(`INSERT INTO relay_exchanges (id, shopper_id, order_id, line_id, shop, from_variant, from_title, to_variant, to_title, quantity, status, detail, created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(), shopper.id, owned.order.id, owned.line.lineId, owned.shop, fromGid, fromTitle, toGid, choice.title,
-      owned.line.quantity, status, detail ? String(detail).slice(0, 300) : null, o.now).run();
+  // newLine: the new item's own line on the shop's order once the swap is saved there (null if Shopify didn't say).
+  const record = async (status, detail, newLine = null) => {
+    await db.prepare(`INSERT INTO relay_exchanges (id, shopper_id, order_id, line_id, shop, from_variant, from_title, to_variant, to_title, quantity, status, detail, created_at,
+      from_line_id, from_price_minor) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(), shopper.id, owned.order.id, newLine || owned.line.lineId, owned.shop, fromGid, fromTitle,
+      toGid, choice.title, owned.line.quantity, status, detail ? String(detail).slice(0, 300) : null, o.now, newLine ? String(owned.line.lineId) : null,
+      newLine && Number.isFinite(owned.line.priceMinor) ? owned.line.priceMinor : null).run();
   };
   let hold = null;
   try {
@@ -299,16 +318,21 @@ async function doExchange(env, shopper, body, o) {
       : diff > 0 ? "The new item costs " + moneyText(diff) + " more. Shopify has asked the customer to pay the " + moneyText(diff) + " balance. Please don't send it until it's paid."
       : "The new item costs " + moneyText(-diff) + " less. Relay is refunding the customer " + moneyText(-diff) + " from this order.");
     // Through Shopify: Shopify's own "order updated" email goes to the customer with a link to pay the balance.
-    const commit = await gql(owned.shop, store.token, `mutation RelayEditCommit($id: ID!, $note: String, $notify: Boolean) { orderEditCommit(id: $id, notifyCustomer: $notify, staffNote: $note) { order { id } userErrors { message } } }`,
+    const commit = await gql(owned.shop, store.token, `mutation RelayEditCommit($id: ID!, $note: String, $notify: Boolean) { orderEditCommit(id: $id, notifyCustomer: $notify, staffNote: $note) {
+      order { id currentTotalPriceSet { shopMoney { amount } } lineItems(first: 100) { nodes { id currentQuantity variant { id } } } } userErrors { message } } }`,
       { id: calc.id, note, notify: diff > 0 && !byCard }, f);
     if (!(commit.orderEditCommit && commit.orderEditCommit.order)) throw new Error(firstError(commit.orderEditCommit) || "Shopify didn't save the change");
+    // The order as the shop now has it: the new item is a line of its own, and the total may have changed with it. Relay's
+    // copy follows, so the new item can be returned later (the shop's refund is matched by this line) and what the order
+    // comes to now is right.
+    const moved = await followSwap(db, owned, commit.orderEditCommit.order, toGid, oldLine.id, diff).catch(() => null);
     const orderGid = "gid://shopify/Order/" + owned.order.ext;
     let paid = null, payUrl = null, refunded = null;
     if (hold) paid = await takeHeld(env, hold, o);
     if (diff > 0 && !byCard) payUrl = await balanceLink(owned.shop, store.token, orderGid, f);
     if (diff < 0) refunded = await refundDifference(owned.shop, store.token, orderGid, -diff, owned.line.title + " → " + choice.title, f);
     await record("done", byCard ? (paid ? (hold.destination ? "paid to shop " : "paid ") + diff : "payment not taken " + diff)
-      : diff > 0 ? "shopify balance " + diff : diff < 0 ? (refunded ? "refunded " : "shop to refund ") + (-diff) : null);
+      : diff > 0 ? "shopify balance " + diff : diff < 0 ? (refunded ? "refunded " : "shop to refund ") + (-diff) : null, moved);
     const store_ = store.label || "the shop";
     const message = "Done. Your order now has " + choice.title + " instead. " + (diff === 0 ? "Nothing to pay or refund."
       : byCard ? (paid ? moneyText(diff) + " was taken from your card (test mode, no real money)." : "We couldn't take the " + moneyText(diff) + " from your card, so Relay will be in touch.")
@@ -322,6 +346,31 @@ async function doExchange(env, shopper, body, o) {
     await record("failed", e && e.message);
     console.error("shop_refused", String(e && e.message || e).slice(0, 160)); return [502, { error: "shop_refused" }];
   }
+}
+
+// After a swap is saved at the shop: moves Relay's copy of the order line to the new item's own line there, with its size or
+// colour and price, and keeps what the order comes to now beside its amount (which stays what it came to when it was placed:
+// that's what its confirmation email says, order-ref.js). Returns the new line's id, or null when Shopify's answer doesn't
+// show it (then nothing is changed, and the swap is kept the old way, against the line it replaced).
+const tail = (gid) => String(gid == null ? "" : gid).split("/").pop();
+async function followSwap(db, owned, order, toGid, oldLineGid, diff) {
+  const oldId = tail(oldLineGid);
+  const fresh = ((order.lineItems && order.lineItems.nodes) || []).filter(n => n && n.variant && n.variant.id === toGid && Number(n.currentQuantity) > 0 && /^\d{1,20}$/.test(tail(n.id)) && tail(n.id) !== oldId)
+    .map(n => tail(n.id)).sort((a, b) => (a.length - b.length) || (a < b ? -1 : 1));
+  const newId = fresh[fresh.length - 1];
+  if (!newId) return null;
+  const qty = Number(owned.line.quantity) || 1;
+  const price = Number.isFinite(owned.line.priceMinor) ? owned.line.priceMinor + Math.round((diff || 0) / qty) : null;
+  const total = Math.round(Number(order.currentTotalPriceSet && order.currentTotalPriceSet.shopMoney && order.currentTotalPriceSet.shopMoney.amount) * 100);
+  const steps = [
+    // (Shopify's own notice about the changed order may have added the new line already.)
+    db.prepare("DELETE FROM order_items WHERE order_id = ? AND external_line_item_id = ?").bind(owned.order.id, newId),
+    db.prepare("UPDATE order_items SET id = ?, external_line_item_id = ?, variant_id = ?, price_minor = COALESCE(?, price_minor) WHERE order_id = ? AND external_line_item_id = ?")
+      .bind(owned.order.id + ":item:" + newId, newId, tail(toGid), price, owned.order.id, String(owned.line.lineId)),
+  ];
+  await db.batch(steps);
+  if (Number.isSafeInteger(total) && total >= 0) await saveOrderAmountNow(db, owned.order.id, total);
+  return newId;
 }
 
 // Routes under /relay/my/exchange* for a signed-in shopper.

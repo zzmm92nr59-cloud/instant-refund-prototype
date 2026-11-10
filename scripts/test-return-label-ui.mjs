@@ -22,7 +22,8 @@ const SESSION = 'S'.repeat(43);
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 const H = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' };
 
-async function shopperPage(returnBody) {
+// plan: what Relay says will happen for this shop before the shopper confirms (/relay/my/return/eligibility); none = not known.
+async function shopperPage(returnBody, plan = null, before = /If Kick Lane has set up Royal Mail returns in Relay, you'll get a return label straight away/) {
   const context = await browser.newContext({ viewport: { width: 390, height: 820 }, acceptDownloads: true });
   const posts = [];
   await context.route('https://**/*', route => {
@@ -34,6 +35,7 @@ async function shopperPage(returnBody) {
     if (p === '/relay/my/purchases') return j(200, { purchases: [{ id: 'o1', store: 'Kick Lane', retailer: 'shopify:kick-lane.myshopify.com', orderedAt: new Date().toISOString(),
       items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: false, returnable: true }] }] });
     if (p === '/relay/my/return') return j(200, returnBody);
+    if (p === '/relay/my/return/eligibility') return j(200, plan || {});
     if (p === '/relay/my/return/label') {
       assert.equal(req.headers().authorization, 'Bearer ' + SESSION);
       return route.fulfill({ status: 200, contentType: 'application/pdf', headers: H, body: Buffer.from('%PDF-1.4 label') });
@@ -49,8 +51,11 @@ async function shopperPage(returnBody) {
   await ret.waitFor(); await ret.evaluate(e => e.scrollIntoView({ block: 'center' }));
   await ret.click();
   await page.getByRole('button', { name: 'Wrong size or fit' }).click();
-  await page.getByText(/If Kick Lane has set up Royal Mail returns in Relay, you'll get a return label straight away/).waitFor();
-  await page.getByRole('button', { name: 'Start return →' }).click();
+  await page.getByText(before).waitFor();
+  // Pictures for a look by eye (SHOTS=<folder>): the step before confirming, in light and dark.
+  if (process.env.SHOTS && plan && plan.how) for (const scheme of ['light', 'dark']) { await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(150); await page.screenshot({ path: process.env.SHOTS + '/return-confirm-' + scheme + '.png' }); }
+  if (process.env.SHOTS) await page.emulateMedia({ colorScheme: 'light' });
+  await page.getByRole('button', { name: 'Start return' }).click();
   return { context, page, posts, errors };
 }
 
@@ -78,7 +83,7 @@ async function shopperPage(returnBody) {
   const { context, page, errors } = await shopperPage({ returnId: 'r2', returnRef: 'RLY-JKLM-NPQR', status: 'requested', labelAvailable: false, shopNotified: false, item: 'Logo Cap' });
   await page.getByText('Saved in Relay').waitFor();
   const text = await page.locator('.rl-sheet').last().innerText();
-  assert.match(text, /Kick Lane hasn't set up Royal Mail labels in Relay, so to send the item back, use Kick Lane's own returns process/);
+  assert.match(text, /Kick Lane hasn't told Relay how it wants returns sent, so use Kick Lane's own returns process/);
   assert.match(text, /This is not a postage label or tracking number\./);
   assert.doesNotMatch(text, /QR code|Post Office|TRACKING NUMBER|Download label/);
   assert.equal(await page.locator('.rl-sheet img').count(), 0);
@@ -87,12 +92,39 @@ async function shopperPage(returnBody) {
   console.log('PASS without a label the shopper is pointed to the shop and sees no QR or tracking number');
 }
 
+// 2b. The shop has told Relay how it wants returns sent and how long it takes them: said plainly before the shopper
+// confirms and after, in the shop's own words. Still no QR code or tracking number.
+{
+  const HOW = 'Post it to Kick Lane Returns, Unit 4, Sample Park, Leeds.\nPut your order number inside the parcel.';
+  const by = new Date(Date.now() + 26 * 864e5).toISOString().slice(0, 10);
+  const { context, page, errors } = await shopperPage({ returnId: 'r3', returnRef: 'RLY-STUV-WXYZ', status: 'requested', labelAvailable: false, shopNotified: true, item: 'Logo Cap', how: HOW },
+    { eligible: true, label: false, inStore: false, how: HOW, returnBy: by, basis: 'shop' }, /Relay will tell Kick Lane you're returning this\. Then send it back the way Kick Lane asks\./);
+  await page.getByText('Saved in Relay').waitFor();
+  const text = await page.locator('.rl-sheet').last().innerText();
+  assert.match(text, /We've emailed Kick Lane to say this return is coming\. Send it back the way Kick Lane asks below\./);
+  assert.match(text, /HOW KICK LANE WANTS IT SENT BACK\s+Post it to Kick Lane Returns, Unit 4, Sample Park, Leeds\.\s+Put your order number inside the parcel\./);
+  assert.doesNotMatch(text, /QR code|Post Office|TRACKING NUMBER|Download label|hasn't told Relay/);
+  if (process.env.SHOTS) for (const scheme of ['light', 'dark']) { await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(150); await page.screenshot({ path: process.env.SHOTS + '/return-saved-' + scheme + '.png' }); }
+  assert.deepEqual(errors, []);
+  await context.close();
+  // Before confirming, with the shop's own period: its instructions and its date are both shown.
+  const second = await shopperPage({ returnId: 'r4', returnRef: 'RLY-AAAA-BBBB', status: 'requested', labelAvailable: false, shopNotified: true, item: 'Logo Cap', how: HOW },
+    { eligible: true, label: false, inStore: false, how: HOW, returnBy: by, basis: 'shop' }, /Kick Lane takes returns for this order until \d{1,2} \w{3}/);
+  await second.context.close();
+  // A Royal Mail label is promised only when the shop makes them.
+  const third = await shopperPage({ returnId: 'r5', returnRef: 'RLY-CCCC-DDDD', status: 'requested', labelAvailable: false, shopNotified: true, item: 'Logo Cap' },
+    { eligible: true, label: true, inStore: false, how: null, returnBy: null, basis: 'relay' }, /Relay will tell Kick Lane you're returning this and give you a Royal Mail label to send it back\./);
+  await third.context.close();
+  console.log("PASS the shop's own returns instructions and period are shown before and after starting a return");
+}
+
 // 3. The shop's dashboard: set up Royal Mail, see it on, never see the key again, turn it off.
 {
   const context = await browser.newContext({ viewport: { width: 390, height: 900 } });
   let settings = { connected: false }, saves = [];
   let paySettings = { method: 'shopify', cardPossible: true, testMode: true, stripe: { connected: false, ready: false, detailsSubmitted: false } };
-  await context.route('https://**/*', route => {
+  let retSettings = { days: null, how: null, relayLimitDays: 30 }, retSaves = [];
+  await context.route('https://**/*', async route => {
     const req = route.request(), p = new URL(req.url()).pathname;
     const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: H, body: JSON.stringify(body) });
     if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: H });
@@ -103,6 +135,13 @@ async function shopperPage(returnBody) {
       { at: Date.now(), item: 'Rain Jacket', from: 'M', to: 'L', quantity: 1, valueMinor: 5500, priceDiffMinor: -500, differencePaid: null, orderUrl: null }],
       totals: { swaps: 2, returns: 1, swapValueMinor: 16500, swapShare: 67 },
       returns: [{ at: Date.now(), item: 'Logo Cap', quantity: 1, valueMinor: 2000, reason: 'wrong_size', ref: 'RLY-ABCD-EFGH', emailed: true, trackingNumber: 'TT123456789GB', orderUrl: null }] });
+    if (p === '/relay/retailer/returns' && req.method() === 'GET') return j(200, retSettings);
+    if (p === '/relay/retailer/returns') {
+      const b = JSON.parse(req.postData()); retSaves.push(b);
+      await new Promise(r => setTimeout(r, 300)); // slow enough for a second tap to land while it's saving
+      retSettings = { days: b.days, how: String(b.how || '').trim() || null, relayLimitDays: 30 };
+      return j(200, retSettings);
+    }
     if (p === '/relay/retailer/royal-mail' && req.method() === 'GET') return j(200, settings);
     if (p === '/relay/retailer/royal-mail') {
       const b = JSON.parse(req.postData()); saves.push(b);
@@ -126,6 +165,32 @@ async function shopperPage(returnBody) {
   assert.equal(await page.locator('#platformTag').innerText(), 'Shopify');
   await page.getByRole('heading', { name: 'Swaps and returns' }).waitFor();
   assert.equal(await page.getByText(/development shop|Pilot results|Test shops/).count(), 0);
+  // Your returns: the shop's own returns period and how it wants items sent back. Nothing is set at first, and the page
+  // says what its customers see until it is. A double tap saves once.
+  await page.getByRole('heading', { name: 'Your returns' }).waitFor();
+  assert.equal(await page.locator('#retState').innerText(), 'Not set');
+  await page.locator('#ret').getByText('with nothing set, your customers see no return-by date, and can ask for a return through Relay for 30 days after ordering', { exact: false }).waitFor();
+  const rf = page.locator('#retForm'), retSave = page.locator('#retSave');
+  await rf.locator('[name=days]').fill('400');
+  assert.equal(await rf.locator('[name=days]').evaluate(el => el.validity.valid), false, 'more than a year is refused in the box itself');
+  await retSave.click();
+  assert.equal(retSaves.length, 0, 'nothing is sent while the days are wrong');
+  await rf.locator('[name=days]').fill('28');
+  await rf.locator('[name=how]').fill('Post it to Kick Lane Returns, Unit 4, Mill Yard, Manchester M1 2AB, with your order number inside.');
+  await retSave.dblclick();
+  await page.getByText('Saved. Your customers now see a return-by date 28 days after they order.').waitFor();
+  assert.deepEqual(retSaves, [{ days: 28, how: 'Post it to Kick Lane Returns, Unit 4, Mill Yard, Manchester M1 2AB, with your order number inside.' }], 'saved once');
+  assert.equal(await page.locator('#retState').innerText(), '28 days');
+  if (process.env.SHOTS) await page.locator('#ret').screenshot({ path: process.env.SHOTS + '/retailer-returns.png' });
+  // Leaving the days blank takes the date away again (the instructions stay), and the page says so.
+  await rf.locator('[name=days]').fill('');
+  await retSave.click();
+  await page.getByText('Saved. No return-by date is shown to your customers.').waitFor();
+  assert.equal(retSaves.at(-1).days, null); assert.match(retSaves.at(-1).how, /^Post it to Kick Lane Returns/);
+  assert.equal(await page.locator('#retState').innerText(), 'Not set');
+  // It's still there after a reload.
+  await page.reload(); await page.getByRole('heading', { name: 'Your returns' }).waitFor();
+  await page.waitForFunction(() => document.querySelector('#retForm [name=how]').value.startsWith('Post it to Kick Lane Returns'));
   // Price differences: Shopify checkout by default; instant card can't be picked until the shop's own Stripe is ready.
   await page.getByRole('heading', { name: 'Price differences on swaps' }).waitFor();
   assert.equal(await page.locator('#payState').innerText(), 'Shopify checkout');

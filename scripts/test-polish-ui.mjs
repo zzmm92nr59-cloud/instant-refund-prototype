@@ -187,11 +187,21 @@ await page.locator(".rl-welcome").getByRole("button", { name: "Get started" }).w
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.cache.v1")), null, "nothing of the account left on the device");
 console.log("ok - signing out removes the receipts kept on this device");
 
+// A button placed straight inside a card is as tall as its words. (It used to start from 130px, the width it has in a row of buttons.)
+const cardButton = async name => { const b = page.locator(".rl-po > .rl-po-primary", { hasText: name }).first(); await b.waitFor({ state: "attached" }); return b.evaluate(el => Math.round(el.getBoundingClientRect().height)); };
+await page.evaluate(() => window.go("me"));
+const signInTall = await cardButton("Sign in");
+assert.ok(signInTall >= 44 && signInTall <= 60, "Sign in on the profile card is the size of a button, not a block: " + signInTall + "px");
+await page.evaluate(() => window.tabTap("profile"));
+console.log("ok - the signed-out profile card's Sign in button is button-sized");
+
 // A new shopper (no email connected yet) is shown how to start, not an empty screen.
 state.connected = false;
 await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "N".repeat(43), email: "new.person@example.com" })));
 await page.reload();
 await page.getByRole("heading", { name: "Bring in your receipts" }).waitFor();
+const connectTall = await cardButton("Connect your email");
+assert.ok(connectTall >= 44 && connectTall <= 60, "Connect your email is the size of a button, not a block: " + connectTall + "px");
 await page.getByRole("button", { name: "Connect your email" }).click();
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 console.log("ok - a new shopper's Home starts with how to bring their receipts in");

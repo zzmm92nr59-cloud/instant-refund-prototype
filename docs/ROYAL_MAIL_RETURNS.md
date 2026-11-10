@@ -17,7 +17,7 @@ It is off for every shop until that shop turns it on.
 The key is typed by the shop into its own dashboard. Nobody should paste it into chat or email.
 
 ## What happens on a return
-1. The shopper starts a return in Relay (within 7 days, item not already swapped).
+1. The shopper starts a return in Relay (inside the shop's own returns period, set in Relay for shops; an item swapped through Relay can be returned too).
 2. Relay reads the delivery address from the Shopify order and asks Royal Mail (`POST /returns`) for a label to the shop's return address,
    with the Relay reference as the customer reference.
 3. Only if Royal Mail returns a tracking number does the shopper see the label: Royal Mail's QR code (for a Post Office counter),

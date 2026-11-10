@@ -25,6 +25,13 @@
   };
   // The app followed the link before this file had loaded.
   if (window.__relayWantHealth) { window.__relayWantHealth = false; wantHealth = true; }
+  // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt). Profile opens it.
+  var openChatAbout = null, wantChatAbout = null;
+  window.relayAskAboutReceipt = function (about) {
+    wantChatAbout = about;
+    if (window.go) window.go("me");
+    setTimeout(function () { if (wantChatAbout && openChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
+  };
   // Logos Relay keeps for well-known UK shops (logos/<domain>.<type>; see scripts/fetch-logos.mjs). Anything else falls back to a live lookup.
   var STORE_LOGOS = {"1password.com":"svg","abelandcole.co.uk":"png","abercrombie.com":"png","accessorize.com":"png","accor.com":"svg","addisonlee.com":"png","adidas.co.uk":"png","adobe.com":"png","aerlingus.com":"png","aesop.com":"png","airbnb.co.uk":"svg","airfrance.co.uk":"png","aldi.co.uk":"svg","aliexpress.com":"png","allbarone.co.uk":"png","allsaints.com":"svg","altontowers.com":"png","amazon.co.uk":"png","anthropic.com":"svg","ao.com":"png","apple.com":"png","appliancesdirect.co.uk":"png","argos.co.uk":"png","arket.com":"png","asda.com":"png","asics.com":"png","asos.com":"png","astridandmiyu.com":"png","atgtickets.com":"png","audible.co.uk":"png","avantiwestcoast.co.uk":"png","avis.co.uk":"png","axs.com":"png","backmarket.co.uk":"png","barbour.com":"png","beautybay.com":"png","beaverbrooks.co.uk":"png","beerhawk.co.uk":"png","bellaitalia.co.uk":"png","benefitcosmetics.com":"png","bensonsforbeds.co.uk":"png","berghaus.com":"png","bershka.com":"png","better.org.uk":"png","bettys.co.uk":"png","birkenstock.com":"svg","blacks.co.uk":"svg","blackwells.co.uk":"png","bloomandwild.com":"png","bmstores.co.uk":"png","boden.com":"png","bolt.eu":"png","bonmarche.co.uk":"png","boohoo.com":"svg","boohooman.com":"png","booking.com":"png","booths.co.uk":"png","boots.com":"png","bose.co.uk":"png","bowsandwhistles.co.uk":"png","box.co.uk":"png","brewdog.com":"svg","britishairways.com":"svg","brittany-ferries.co.uk":"png","bt.com":"svg","bulk.com":"png","bumble.com":"svg","burberry.com":"png","burgerking.co.uk":"png","burton.co.uk":"png","butternutbox.com":"png","buyagift.co.uk":"svg","cadburygiftsdirect.co.uk":"png","caferouge.com":"png","caffenero.com":"png","calm.com":"png","calvinklein.co.uk":"png","canva.com":"png","cardfactory.co.uk":"svg","carpetright.co.uk":"svg","castore.com":"png","chainreactioncycles.com":"png","charlottetilbury.com":"svg","chemist4u.com":"png","chipotle.co.uk":"png","cineworld.co.uk":"png","clarechampion.ie":"png","clarins.co.uk":"png","clarks.co.uk":"png","classpass.com":"png","clinique.co.uk":"png","coastfashion.com":"png","converse.com":"png","coop.co.uk":"png","cos.com":"png","costa.co.uk":"png","costco.co.uk":"png","cote.co.uk":"png","cotswoldco.com":"png","cotswoldoutdoor.com":"png","coxandcox.co.uk":"png","craghoppers.com":"png","crocs.co.uk":"png","crocus.co.uk":"svg","crosscountrytrains.co.uk":"png","ctshirts.com":"svg","cultbeauty.co.uk":"svg","cultfurniture.com":"png","currys.co.uk":"png","danielwellington.com":"png","davidlloyd.co.uk":"svg","dazn.com":"png","debenhams.com":"png","decathlon.co.uk":"png","deezer.com":"png","deliveroo.co.uk":"png","depop.com":"png","detalecph.com":"png","dfds.com":"png","dfs.co.uk":"png","dice.fm":"svg","discord.com":"png","dishoom.com":"svg","disneyplus.com":"svg","diy.com":"png","dobbies.com":"png","dominos.co.uk":"png","dorothyperkins.com":"png","dreams.co.uk":"png","drmartens.com":"svg","dropbox.com":"png","dulux.co.uk":"png","dunelm.com":"png","dunelondon.com":"svg","duolingo.com":"png","dyson.co.uk":"png","easyjet.com":"png","ebay.co.uk":"png","ebuyer.com":"png","economist.com":"png","ee.co.uk":"png","eflorist.co.uk":"png","elemis.com":"png","elevenlabs.io":"svg","emirates.com":"png","emma-sleep.co.uk":"png","endclothing.com":"png","english-heritage.org.uk":"png","enterprise.co.uk":"png","epicgames.com":"png","ernestjones.co.uk":"png","esteelauder.co.uk":"png","etsy.com":"png","europcar.co.uk":"png","eurostar.com":"png","evans.co.uk":"png","evanscycles.com":"png","eventbrite.co.uk":"png","eventim.co.uk":"png","everymancinema.com":"png","expedia.co.uk":"png","expressvpn.com":"png","farfetch.com":"png","farmfoods.co.uk":"png","farrow-ball.com":"png","fatface.com":"png","fenwick.co.uk":"png","firebox.com":"png","fiveguys.co.uk":"svg","flannels.com":"png","footlocker.co.uk":"png","fortnumandmason.com":"png","foyles.co.uk":"png","fragrancedirect.co.uk":"png","francomanca.co.uk":"png","frankieandbennys.com":"png","fredperry.com":"png","freemans.com":"png","freenow.com":"png","frugi.com":"png","fruugo.co.uk":"png","ft.com":"png","funkypigeon.com":"png","furniturevillage.co.uk":"png","gailsbread.co.uk":"svg","game.co.uk":"png","garmin.com":"svg","gbk.co.uk":"png","giffgaff.com":"png","gigantic.com":"png","github.com":"svg","glassesdirect.co.uk":"png","glossier.com":"png","goldsmiths.co.uk":"svg","google.com":"png","gordonramsayrestaurants.com":"png","gousto.co.uk":"png","graze.com":"png","greatbeanbags.com":"png","greeneking.co.uk":"png","greggs.co.uk":"svg","groupon.co.uk":"png","gruum.com":"png","gucci.com":"png","gumtree.com":"png","gwr.com":"png","gymshark.com":"png","habitat.co.uk":"png","halfords.com":"png","hamleys.com":"png","harrods.com":"png","harvester.co.uk":"png","headspace.com":"png","heals.com":"png","hellofresh.co.uk":"png","hertz.co.uk":"png","hilton.com":"png","hinge.co":"png","hm.com":"png","hmv.com":"png","hobbs.com":"png","hobbycraft.co.uk":"png","holidayextras.co.uk":"png","hollandandbarrett.com":"png","hollisterco.com":"png","hollywoodbowl.co.uk":"png","homary.com":"png","homebargains.co.uk":"svg","homebase.co.uk":"png","homesense.com":"svg","honestburgers.co.uk":"png","hotelchocolat.com":"png","hotels.com":"png","houseoffraser.co.uk":"png","howdens.com":"svg","hsamuel.co.uk":"png","hughes.co.uk":"png","hugoboss.com":"png","hunterboots.com":"png","iceland.co.uk":"png","idmobile.co.uk":"png","iguanas.co.uk":"png","ihg.com":"png","ikea.com":"png","interflora.co.uk":"png","inthestyle.com":"png","itsu.com":"png","itv.com":"png","jackjones.com":"png","jbl.com":"png","jdsports.co.uk":"png","jdwetherspoon.com":"png","jdwilliams.co.uk":"png","jessops.com":"png","jet2.com":"svg","jet2holidays.com":"svg","jigsaw-online.com":"png","johnlewis.com":"svg","jojomamanbebe.co.uk":"png","jollyes.co.uk":"png","jomalone.co.uk":"png","josephjoseph.com":"png","joules.com":"png","just-eat.co.uk":"png","justpark.com":"svg","karaca.co.uk":"png","karenmillen.com":"png","kayak.co.uk":"svg","kfc.co.uk":"png","kikocosmetics.com":"svg","klarna.com":"png","klm.com":"png","kobo.com":"png","krispykreme.co.uk":"png","kurtgeiger.com":"png","kwik-fit.com":"png","lacoste.com":"png","laithwaites.co.uk":"png","lakeland.co.uk":"png","laptopsdirect.co.uk":"png","laredoute.co.uk":"png","lastminute.com":"png","lebara.co.uk":"png","lego.com":"png","legoland.co.uk":"png","leon.co":"png","leshuttle.com":"svg","levi.com":"png","li.me":"png","libertylondon.com":"png","lidl.co.uk":"svg","lights4fun.co.uk":"svg","lilyskitchen.co.uk":"png","lindt.co.uk":"png","linkedin.com":"png","littlewoods.com":"png","lner.co.uk":"png","loaf.com":"png","loganair.co.uk":"png","londontheatredirect.com":"png","lookfantastic.com":"png","louisvuitton.com":"png","loveholidays.com":"png","lufthansa.com":"png","lululemon.com":"png","lush.com":"png","lwtheatres.co.uk":"svg","lycamobile.co.uk":"png","lyleandscott.com":"png","maccosmetics.co.uk":"png","made.com":"png","magnet.co.uk":"svg","majestic.co.uk":"png","mamasandpapas.com":"png","mandmdirect.com":"png","mango.com":"png","marksandspencer.com":"png","marriott.com":"png","massimodutti.com":"png","matalan.co.uk":"png","mcdonalds.com":"png","megabus.com":"png","menkind.co.uk":"png","meta.com":"png","microsoft.com":"png","millets.co.uk":"svg","mindfulchef.com":"png","mintvelvet.co.uk":"png","missguided.co.uk":"png","missoma.com":"png","mobiles.co.uk":"png","moltonbrown.co.uk":"svg","monicavinader.com":"png","monsoon.co.uk":"png","montane.com":"png","moonpig.com":"png","morrisons.com":"svg","moss.co.uk":"png","mothercare.com":"png","mountainwarehouse.com":"png","mrporter.com":"png","mulberry.com":"png","musicmagpie.co.uk":"png","myfitnesspal.com":"svg","myprotein.com":"png","mytheresa.com":"png","mytoggle.io":"png","myvue.com":"png","nakedwines.co.uk":"svg","nandos.co.uk":"png","nastygal.com":"png","nationalexpress.com":"svg","nationalrail.co.uk":"svg","nationaltrust.org.uk":"svg","nealsyardremedies.com":"png","neomwellbeing.com":"png","nespresso.com":"png","net-a-porter.com":"png","netflix.com":"png","newbalance.co.uk":"png","newlook.com":"png","next.co.uk":"png","nike.com":"png","ninjakitchen.co.uk":"png","nintendo.com":"png","nkuku.com":"png","nordvpn.com":"png","northernrailway.co.uk":"png","notcutts.co.uk":"png","notion.so":"png","notonthehighstreet.com":"png","nowtv.com":"png","nuffieldhealth.com":"png","o2.co.uk":"png","oakfurnitureland.co.uk":"png","oasis-stores.com":"png","ocado.com":"png","odeon.co.uk":"png","office.co.uk":"png","ohpolly.com":"png","oliverbonas.com":"png","onbuy.com":"png","onepeloton.co.uk":"png","onthebeach.co.uk":"png","openai.com":"svg","overclockers.co.uk":"svg","pactcoffee.com":"png","pandora.net":"png","papajohns.co.uk":"png","paramountplus.com":"png","patagonia.com":"png","patreon.com":"png","paybyphone.co.uk":"png","peacocks.co.uk":"svg","personalisedgiftsshop.co.uk":"png","petplanet.co.uk":"png","pets-corner.co.uk":"png","petsathome.com":"png","pharmacy2u.co.uk":"png","phase-eight.com":"png","picturehouses.com":"png","pizzaexpress.com":"svg","pizzahut.co.uk":"png","pizzapilgrims.co.uk":"png","playstation.com":"png","plusnet.com":"png","poferries.com":"png","poundland.co.uk":"png","premierinn.com":"png","prestigeflowers.co.uk":"png","pret.co.uk":"svg","prettylittlething.com":"png","prezzo.co.uk":"png","primark.com":"png","primevideo.com":"png","primrose.co.uk":"png","pullandbear.com":"png","puma.com":"png","puregym.com":"png","qatarairways.com":"png","qvcuk.com":"png","rains.com":"png","ralphlauren.co.uk":"png","reddragondarts.com":"png","redletterdays.co.uk":"svg","reebok.co.uk":"png","regatta.com":"png","reiss.com":"png","revolutionbeauty.com":"png","richersounds.com":"png","ring.com":"png","ringgo.co.uk":"png","riverford.co.uk":"png","riverisland.com":"png","robertdyas.co.uk":"png","roblox.com":"png","rohan.co.uk":"png","royalmail.com":"png","ryanair.com":"png","ryman.co.uk":"png","sainsburys.co.uk":"png","samsung.com":"png","scan.co.uk":"png","scotrail.co.uk":"png","screwfix.com":"svg","seasaltcornwall.com":"png","seetickets.com":"png","selfridges.com":"png","sephora.co.uk":"png","serenataflowers.com":"png","sevenoakssoundandvision.co.uk":"png","sharkclean.co.uk":"png","shein.com":"png","showcasecinemas.co.uk":"png","silentnight.co.uk":"png","simbasleep.com":"png","simplybe.co.uk":"png","simplycook.com":"png","sixt.co.uk":"png","size.co.uk":"png","skechers.co.uk":"png","skiddle.com":"png","sky.com":"png","skyscanner.net":"png","slugandlettuce.co.uk":"png","smarty.co.uk":"png","smythstoys.com":"png","sofology.co.uk":"png","sonos.com":"png","southernrailway.com":"png","southwesternrailway.com":"png","spacenk.com":"svg","spar.co.uk":"png","specsavers.co.uk":"png","sportsdirect.com":"png","spotify.com":"png","ssense.com":"png","starbucks.co.uk":"svg","steampowered.com":"png","stenaline.co.uk":"png","stonegatepubs.com":"png","stoneisland.com":"png","stories.com":"png","stradivarius.com":"png","strava.com":"png","stubhub.co.uk":"png","studio.co.uk":"png","superdrug.com":"png","superdry.com":"png","surfshark.com":"png","swarovski.com":"png","sweatybetty.com":"png","swooneditions.com":"png","tacobell.co.uk":"png","talktalk.co.uk":"png","tedbaker.com":"png","telegraph.co.uk":"svg","tempur.com":"svg","temu.com":"png","tesco.com":"png","tescomobile.com":"png","tfl.gov.uk":"png","tgifridays.co.uk":"png","thamesclippers.com":"svg","thameslinkrailway.com":"png","thebodyshop.com":"png","theguardian.com":"svg","thegymgroup.com":"png","theinkeylist.com":"png","thenorthface.co.uk":"png","theordinary.com":"png","theperfumeshop.com":"png","thepihut.com":"png","theproteinworks.com":"png","therange.co.uk":"png","thescentreserve.com":"png","thetimes.co.uk":"png","thetoyshop.com":"png","thewhitecompany.com":"png","theworks.co.uk":"png","thompson-morgan.com":"png","thorntons.co.uk":"png","thorpepark.com":"png","thortful.com":"png","three.co.uk":"png","ticketmaster.co.uk":"png","tidal.com":"png","timberland.co.uk":"png","tinder.com":"png","tkmaxx.com":"png","tmlewin.com":"svg","tobycarvery.co.uk":"png","todaytix.com":"png","tommy.com":"png","toolstation.com":"png","topshop.com":"svg","tortilla.co.uk":"png","trainline.com":"png","travelodge.co.uk":"png","trespass.com":"png","tui.co.uk":"png","turtlebay.co.uk":"png","twitch.tv":"png","uber.com":"png","ubereats.com":"png","ugg.com":"png","underarmour.co.uk":"png","uniqlo.com":"png","vans.co.uk":"png","vapeandgo.co.uk":"png","very.co.uk":"png","victorianplumbing.co.uk":"png","viking-direct.co.uk":"png","vinted.co.uk":"png","virginactive.co.uk":"png","virginatlantic.com":"svg","virginexperiencedays.co.uk":"png","virginmedia.com":"png","virginwines.co.uk":"png","visiondirect.co.uk":"png","vodafone.co.uk":"png","voxi.co.uk":"png","wagamama.com":"png","waitrose.com":"png","wallis.co.uk":"png","warehousefashion.com":"png","waterstones.com":"png","wayfair.co.uk":"png","webuy.com":"png","weekday.com":"png","weirdfish.co.uk":"svg","well.co.uk":"png","wexphotovideo.com":"png","whistles.com":"png","whitestuff.com":"png","whsmith.co.uk":"png","wickes.co.uk":"png","wilko.com":"png","wingstop.co.uk":"png","wizzair.com":"png","wordery.com":"png","worldofbooks.com":"svg","xbox.com":"png","yankeecandle.co.uk":"png","yosushi.com":"png","youtube.com":"png","zalando.co.uk":"svg","zara.com":"png","zavvi.com":"png","zipcar.co.uk":"png","zizzi.co.uk":"png","zooplus.co.uk":"png"};
   // Other addresses the same shops send email from (just-eat.com is Just Eat's just-eat.co.uk).
@@ -387,6 +394,8 @@
     ".rl-due.soon .rl-due-bar i{background:#D47B1F}.rl-due.urgent .rl-due-bar i{background:#E0446E}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid var(--rl-text);text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:var(--rl-card);color:var(--rl-text)}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
+    // Straight inside a card (a column), a button is as tall as its words, not the 130px it starts from in a row of buttons.
+    ".rl-po>.rl-po-primary,.rl-po>.rl-po-secondary{flex:0 0 auto}" +
     "button.rl-po-primary,button.rl-po-secondary{font:inherit;font-weight:700;font-size:14px}.rl-po-primary:active,.rl-po-secondary:active,.rl-rg-row:active{transform:scale(.97)}" +
     ".rl-rg-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'l c' 'v c';align-items:center;column-gap:12px;row-gap:1px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid var(--rl-line);border-radius:14px;background:var(--rl-card);font:inherit;text-align:left;cursor:pointer;color:var(--rl-text)}" +
     ".rl-rg-l{grid-area:l;font-size:13px;color:var(--rl-text2)}.rl-rg-row b{grid-area:v;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{grid-area:c;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--rl-accent)}" +
@@ -541,6 +550,7 @@
     ".rl-chat-b.me{align-self:flex-end}.rl-chat-b.me p{background:var(--rl-accent);color:var(--rl-bg);border-bottom-right-radius:6px}" +
     ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;text-align:center}" +
     ".rl-chat-who{font-size:13px;font-weight:600;color:var(--rl-text2);margin:0 4px}" +
+    ".rl-chat-about{border-top:0!important;border-bottom:1px solid var(--rl-line);margin:0 0 10px!important;color:var(--rl-text)!important}" +
     ".rl-chat-typing{flex-direction:row;gap:6px;padding:6px 0}.rl-chat-typing .rl-skel{display:block;width:72px;height:16px;min-height:0;border-radius:999px}.rl-chat-typing .rl-skel+.rl-skel{width:44px}" +
     ".rl-chat-chips{display:flex;flex-wrap:wrap;gap:8px}.rl-chat-chips button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;font-weight:600;transition:transform .12s}" +
     ".rl-chat-chips button:active{transform:scale(.96)}.rl-chat-chips button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
@@ -1118,7 +1128,7 @@
   // shopper's words then show instead of what was read (worker/gmail.js), and which parts were wrong is counted for the
   // Relay health page. "Go back to what Relay read" undoes it. done() runs after a save or an undo.
   function fixSheet(x, done) {
-    var gbp = !x.currency || x.currency === "GBP", sym = gbp ? "£" : x.currency;
+    var gbp = !x.currency || x.currency === "GBP", sym = moneySign(x.currency).trim();
     var shopNow = (x.retailer && (x.retailer.name || x.retailer.domain)) || "";
     var today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
     var toMoney = function (p) { return Number.isInteger(p) ? (p / 100).toFixed(2) : ""; };
@@ -2449,7 +2459,14 @@
     }
     render();
   }
-  function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + (cur === "GBP" || !cur ? "£" : cur + " ") + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
+  // An amount in its own currency ("£12.00", "€80.00", "US$20.00"). Relay never converts one currency into another, and
+  // only pounds are ever added up.
+  var MONEY_SIGN = { GBP: "£", EUR: "€", USD: "US$", CAD: "CA$", AUD: "A$" }, MONEY_NAME = { EUR: "euros", USD: "US dollars", CAD: "Canadian dollars", AUD: "Australian dollars" };
+  function moneyName(cur) { return MONEY_NAME[cur] || cur; }
+  // A receipt whose amount isn't in pounds (and has one).
+  function notPounds(x) { return Boolean(x && x.totalPence != null && x.currency && x.currency !== "GBP"); }
+  function moneySign(cur) { return !cur ? "£" : MONEY_SIGN[cur] || cur + " "; }
+  function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + moneySign(cur) + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
   function consentView(sheet, email, c) {
     var msg = el("div", { className: "rl-msg" });
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
@@ -2846,6 +2863,8 @@
           if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
           detail = el("div", { className: "rl-rr-detail" });
           if (names && named.length > 1) detail.appendChild(el("p", { className: "rl-rr-items", text: names }));
+          // Not in pounds: shown as it was charged, and left out of anything Relay adds up. Said once, here.
+          if (notPounds(row)) detail.appendChild(el("p", { className: "rl-rr-items", text: "Paid in " + moneyName(row.currency) + ", so it isn't added to your totals in pounds." }));
           detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
           // Its group, as a quiet setting: pick another and Relay moves it (and remembers that for this shop).
           var keys = GROUP_KEYS.indexOf(row.category) >= 0 || !groupNames[row.category] ? GROUP_KEYS : GROUP_KEYS.concat([row.category]);
@@ -2862,6 +2881,17 @@
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
           detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+          // Questions about it: Relay's assistant, shown this receipt only when the shopper says so (support-chat.js).
+          var askRow = el("div", { className: "rl-rc-fix", style: "display:none" }, [el("span", { text: "Questions about it?" }),
+            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () {
+              var shopName = (row.retailer && row.retailer.name) || "this shop";
+              ask("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
+                if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: shopName + (row.orderDate ? ", " + shortDate(row.orderDate) : "") });
+              });
+            } })]);
+          detail.appendChild(askRow);
+          (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; }))
+            .then(function (hc) { if (hc && hc.available) askRow.style.display = ""; });
           // What the AI filled in (AI help), for the shopper to check.
           if (row.aiFilled && row.aiFilled.length) {
             var AIP = { total: "total", items: "items", date: "date", number: "order number", shop: "shop" }, ap = row.aiFilled.map(function (k) { return AIP[k] || k; });
@@ -3869,7 +3899,8 @@
     ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
     ["How do I get a copy of my data?", "Open Profile, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
     ["How do I make signing in safer?", "Open Profile, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
-    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."]
+    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."],
+    ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
   function signedInView(sheet, email, notice, c) {
@@ -4008,6 +4039,11 @@
       chatRow._ai = Boolean(hc.available);
       if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
       chatRow.style.display = "";
+      openChatAbout = function () {
+        if (!chatRow.isConnected || !hc.available || !wantChatAbout) return false;
+        memo.chatAbout = wantChatAbout; page("Help chat", chatPage); return true;
+      };
+      if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
     sheet.appendChild(accGroup("Help & legal", [
       accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
@@ -4183,8 +4219,12 @@
       if (!orders.length) b.appendChild(el("p", { className: "rl-anote", text: "None yet. An order shows up here when a shop that uses Relay confirms one placed with " + email + "." }));
       orders.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
+        // What the order comes to now. After a swap, or the shop changing or refunding it, that isn't what it was placed at
+        // (amountNowMinor, order-ref.js on the server), so both are said.
+        var changed = Number.isInteger(o.amountNowMinor) && o.amountNowMinor !== o.amountMinor;
         b.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
-          el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
+          el("span", { text: money(changed ? o.amountNowMinor : o.amountMinor, o.currency) + (o.store ? " at " + o.store : "") + " on " +
+            new Date(o.orderedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (changed ? ". It was " + money(o.amountMinor, o.currency) + " when you ordered." : "") })]));
       });
     }
     // The sign-in for Shopify's reviewers (worker/review-account.js): turn it on, copy the address and code into the App
@@ -4461,7 +4501,9 @@
           row("Price watches", N(ex.priceWatches), ex.watchers ? plural(ex.watchers, "person", "people") : null),
           row("Shops on Shopify", N(sh.shopify), sh.shopifyTest ? N(sh.shopifyTest) + " of them test shops" : null),
           row("Shops on Square", N(sh.square)),
-          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))].concat(h.helpChat ? [
+          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))].concat(h.mail ? [
+          row("Relay's emails", h.mail.ownAddress ? "From Relay's own address" : "From a test address", h.mail.ownAddress ? null : "Only reach your own email, so shops and new shoppers don't get them yet. Relay needs a sending address of its own"),
+          row("Returns the shop wasn't emailed about", N(h.mail.returnsShopNotEmailedThisWeek), "This week")] : []).concat(h.helpChat ? [
           row("Help chat", h.helpChat.on ? "On" : "Off", h.helpChat.on ? null : "Comes on once the AI key is added in Cloudflare"),
           row("Help chat messages this week", N(h.helpChat.messagesThisWeek), plural(h.helpChat.peopleThisWeek, "person", "people") + ", " + N(h.helpChat.handoffsThisWeek) + " asked for a person")] : []))]));
       }
@@ -4628,11 +4670,26 @@
     // Relay's team. The conversation lives only on this screen (and this session): Relay keeps no copy. With the
     // assistant off, it's a message to Relay's team. ----
     function chatPage(b) {
-      var hc = memo.helpChat || {}, ai = Boolean(hc.available), log = memo.chatLog || (memo.chatLog = []);
+      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
+      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
+      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
+      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
+      var log = memo.chatLog || (memo.chatLog = []);
+      var aboutBar = null, foot = null;
+      function noteText() {
+        return !ai ? "Relay's team will see your message and your email address, so they can reply."
+          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
+          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
+      }
+      function stopAbout() {
+        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
+        if (foot) foot.textContent = noteText();
+        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
+      }
       var list = el("div", { className: "rl-chat", role: "log" });
       list.setAttribute("aria-live", "polite");
       var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
       box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
       var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
       var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
@@ -4646,11 +4703,12 @@
       }
       function draw() {
         list.textContent = "";
-        list.appendChild(bubble({ role: "bot", first: true, text: ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
+          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
           : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
         if (ai && !log.length) {
           var chips = el("div", { className: "rl-chat-chips" });
-          ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"].forEach(function (q) {
+          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
             chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
           });
           list.appendChild(chips);
@@ -4674,11 +4732,12 @@
         typing.setAttribute("aria-label", "Relay's assistant is writing");
         list.appendChild(typing); scrollEnd();
         lock(true);
-        api("/relay/my/help/chat", { method: "POST", body: { messages: turns() } }).then(function (r) {
+        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
           lock(false); typing.remove();
           if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
           log.pop(); box.value = q; fit(); draw();
           var e = r.body && r.body.error;
+          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
           say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
             : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
             : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
@@ -4704,13 +4763,19 @@
       box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
       send.onclick = sendQuestion;
       person.onclick = handoff;
+      // Which receipt the assistant can see, and a way to stop showing it.
+      if (about) {
+        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
+          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
+        b.appendChild(aboutBar);
+      }
       // A problem is said just above the box, so it's never hidden behind the tab bar.
       b.appendChild(list);
       b.appendChild(note);
       b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
       if (ai) b.appendChild(person);
-      b.appendChild(el("p", { className: "rl-anote", text: ai ? "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team."
-        : "Relay's team will see your message and your email address, so they can reply." }));
+      foot = el("p", { className: "rl-anote", text: noteText() });
+      b.appendChild(foot);
       draw(); setTimeout(fit, 0);
     }
     function helpPage(b) {
@@ -5080,7 +5145,10 @@
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
       b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
-      if (w.coverage.noTotal) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts. " + w.coverage.noTotal + " had no amount Relay could read." }));
+      // What isn't in the figure, said plainly: receipts with no amount read, and receipts that weren't in pounds.
+      var unread = w.coverage.noTotal || 0, abroad = w.coverage.otherCurrency || 0;
+      if (unread || abroad) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts." +
+        (unread ? " " + unread + " had no amount Relay could read." : "") + (abroad ? " " + abroad + (abroad === 1 ? " wasn't in pounds, so it isn't" : " weren't in pounds, so they aren't") + " added in." : "") }));
     } });
     // 3. Where it went: every kind of shopping as one bar, then a line each.
     var kinds = (w.industries || []).filter(function (k) { return k.spentPence > 0 || k.receipts > 0; });
@@ -5498,7 +5566,13 @@
   }
   // ---- Purchases the shop confirmed (orders placed with the shopper's Relay email), with exchanges done through Relay. ----
   var RETURN_REASONS = [["wrong_size", "Wrong size or fit"], ["changed_mind", "Changed my mind"], ["faulty", "Faulty or damaged"], ["not_as_described", "Not as described"]];
-  var RETURN_ERR = { outside_return_window: "This order is outside the 7-day return window.", already_returned: "A return has already been started for this item.", already_exchanged: "This item was exchanged — it can't also be returned.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
+  // Past the returns period. The shop's own period is said as the shop's; with none set, it is Relay's own limit.
+  function pastReturns(body, shop) {
+    var days = body && body.days, who = shop || "the shop";
+    return body && body.basis === "shop" && days ? who + " takes returns for " + days + " days after you order, and that has passed for this order. If something is wrong with the item, contact " + who + "."
+      : "Relay can start a return for " + (days || 30) + " days after you order. For this order, contact " + who + " directly.";
+  }
+  var RETURN_ERR = { already_returned: "A return has already been started for this item.", already_exchanged: "This item was swapped before Relay could follow swaps on the shop's order, so it can't be returned here. Contact the shop to return it.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
 
   function openReturn(o, it, done) {
     // Shown as a proper sheet over the page (same look as the other Relay sheets), above the bottom bar on phones.
@@ -5510,6 +5584,14 @@
     var msg = el("div", { className: "rl-msg" });
     var step = "reason";
     var selectedReason = null;
+    // What will happen for this shop (a Royal Mail label, the shop's own instructions, or its usual process), asked once.
+    var plan = null;
+    api("/relay/my/return/eligibility?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) { if (r.ok && r.body && r.body.eligible) plan = r.body; }, function () {});
+    function howCard(shop, how) {
+      return el("div", { className: "card", style: "background:var(--surface2,var(--rl-fill));margin:12px 0 16px" }, [
+        el("div", { className: "eyebrow", text: "HOW " + String(shop).toUpperCase() + " WANTS IT SENT BACK" }),
+        el("p", { className: "small", style: "margin:6px 0 0;white-space:pre-line", text: how })]);
+    }
 
     // A Royal Mail label is shown only when Royal Mail actually made one (the shop connected its own Click & Drop account).
     function showLabel(result) {
@@ -5553,13 +5635,15 @@
       var inner = el("div", { className: "sheet-inner" });
       inner.appendChild(el("div", { className: "eyebrow", text: "RETURN REQUEST SAVED" }));
       inner.appendChild(el("h2", { text: "Saved in Relay" }));
-      inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
+      inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it can't also be swapped." }));
       inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,var(--rl-fill));margin:12px 0 16px" }, [
         el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
         el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") +
           (result.inStore ? "Take the item back to " + shop + " and show them your Relay reference, or send it using their own returns process. Your refund comes from " + shop + ", and Relay will show it here once they've refunded it."
-            : shop + " hasn't set up Royal Mail labels in Relay, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + ".") })
+            : result.how ? "Send it back the way " + shop + " asks below. Your refund comes from " + shop + ", and Relay will show it here once they've refunded it."
+            : shop + " hasn't told Relay how it wants returns sent, so use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + ".") })
       ]));
+      if (result.how && !result.inStore) inner.appendChild(howCard(shop, result.how));
       inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
         el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
         el("div", { style: "font-family:monospace;font-size:18px;letter-spacing:2px;margin:4px 0", text: result.returnRef }),
@@ -5584,16 +5668,23 @@
             var inner2 = el("div", { className: "sheet-inner" });
             inner2.appendChild(el("div", { className: "eyebrow", text: "CONFIRM RETURN" }));
             inner2.appendChild(el("h2", { text: it.title }));
-            inner2.appendChild(el("p", { className: "small muted", text: "Relay will note this return on your account. If " + (o.store || "the shop") + " has set up Royal Mail returns in Relay, you'll get a return label straight away; if not, you'll send it back using their own returns process." }));
+            var shopN = o.store || "the shop";
+            inner2.appendChild(el("p", { className: "small muted", text: !plan ? "Relay will tell " + shopN + " you're returning this. If " + shopN + " has set up Royal Mail returns in Relay, you'll get a return label straight away; if not, you'll send it back using their own returns process."
+              : plan.inStore ? "Relay will tell " + shopN + " you're returning this. Then take it back to " + shopN + " with your Relay reference."
+              : plan.label ? "Relay will tell " + shopN + " you're returning this and give you a Royal Mail label to send it back."
+              : plan.how ? "Relay will tell " + shopN + " you're returning this. Then send it back the way " + shopN + " asks."
+              : "Relay will tell " + shopN + " you're returning this. " + shopN + " hasn't told Relay how it wants returns sent, so you'll use its own returns process." }));
+            if (plan && plan.how && !plan.label && !plan.inStore) inner2.appendChild(howCard(shopN, plan.how));
+            if (plan && plan.returnBy) inner2.appendChild(el("p", { className: "small", text: shopN + " takes returns for this order until " + shortDate(plan.returnBy) + "." }));
             inner2.appendChild(el("p", { className: "small", text: "Reason: " + r[1] }));
             inner2.appendChild(el("p", { className: "small", text: "Item price: " + money(it.priceMinor, it.currency) }));
             inner2.appendChild(msg);
-            var confirmBtn = el("button", { className: "rl-btn", text: "Start return →", onclick: function() {
+            var confirmBtn = el("button", { className: "rl-btn", text: "Start return", onclick: function() {
               confirmBtn.disabled = true; msg.textContent = "";
               api("/relay/my/return", { method: "POST", body: { orderId: o.id, lineId: it.lineId, reason: selectedReason } }).then(function(res) {
                 confirmBtn.disabled = false;
                 if (res.ok) { showSaved(res.body); }
-                else { say(msg, RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
+                else { say(msg, res.body && res.body.error === "outside_return_window" ? pastReturns(res.body, o.store) : RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
               }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
             }});
             inner2.appendChild(confirmBtn);
@@ -5611,15 +5702,16 @@
 
   var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
-    already_exchanged: "This item has already been exchanged.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
+    already_exchanged: "This item has already been swapped once, so it can't be swapped again here.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
     card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
-    price_changed: "The price has just changed. Close this and look again.", outside_window: "It's more than 7 days since you bought this, so it can't be swapped through Relay.",
+    price_changed: "The price has just changed. Close this and look again.", outside_window: "It's more than 30 days since you bought this, so it can't be swapped through Relay.",
     order_not_complete: "This order isn't finished at the shop yet, so it can't be swapped." };
   function absPounds(m) { return "£" + (Math.abs(m) / 100).toFixed(2); }
+  var PAY_URL = new RegExp("^https://");
   function openExchange(o, it, done) {
     open(function (sheet) {
-      sheet.appendChild(el("h2", { text: "Exchange " + it.title, style: "margin:0 0 4px" }));
-      sheet.appendChild(el("p", { className: "small muted", text: (o.store || "The shop") + " · you have " + (it.variant || "this item") + ". Choose what you'd like instead." }));
+      sheet.appendChild(el("h2", { text: "Swap " + it.title, style: "margin:0 0 4px" }));
+      sheet.appendChild(el("p", { className: "small muted", text: "You have " + (it.variant || "this item") + " from " + (o.store || "the shop") + ". Choose what you'd like instead." }));
       var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
       var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
       api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
@@ -5629,9 +5721,10 @@
         var shop = o.store || "The shop", card = r.body.card;
         opts.forEach(function (x) {
           var d = x.priceDiffMinor || 0;
-          var price = d > 0 ? " · " + absPounds(d) + " more" : d < 0 ? " · " + absPounds(d) + " less" : "";
-          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available && !x.needsCard, style: "margin:6px 0;text-align:left",
-            text: x.title + (x.available ? price + (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
+          // The size or colour, then what it costs against what they have and how many are left, on a line of its own.
+          var facts = x.available ? [d > 0 ? absPounds(d) + " more" : d < 0 ? absPounds(d) + " less" : null, Number(x.quantity) <= 5 ? "Only " + x.quantity + " left" : "In stock"].filter(Boolean).join(". ") : x.reason;
+          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available && !x.needsCard, style: "margin:6px 0;text-align:left;height:auto;min-height:52px;padding-top:8px;padding-bottom:8px",
+            ariaLabel: x.title + ". " + facts }, [el("span", { text: x.title, style: "display:block" }), el("span", { text: facts, style: "display:block;font-weight:500;font-size:14px;opacity:.85" })]);
           b.onclick = function () {
             if (x.needsCard) {
               list.textContent = ""; list.appendChild(el("p", { text: "Add a card to pay the " + absPounds(d) + " difference. Saving it charges nothing." }));
@@ -5649,11 +5742,17 @@
               say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
               api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key, agreedDiffMinor: d } }).then(function (res) {
                 if (res.ok) {
-                  say(msg, res.body.message); list.textContent = "";
+                  // Done: the sheet now says only that, and closing it any way (Done, or a tap outside) updates what's behind it.
+                  var finish = function () { close(); if (done) done(); };
+                  var layer = sheet.parentNode;
+                  if (layer) layer.addEventListener("click", function (e) { if (e.target === layer && done) done(); });
+                  sheet.textContent = "";
+                  sheet.appendChild(el("h2", { text: "Swapped for " + x.title, style: "margin:0 0 6px" }));
+                  sheet.appendChild(el("p", { className: "small", style: "margin:0 0 12px", text: String(res.body.message || "").replace(/^Done\.\s*/, "") }));
                   // Shopify's own payment page for the extra, on the shop's checkout (opens in a new tab).
-                  if (res.body.payUrl && /^https:\/\//.test(res.body.payUrl))
-                    list.appendChild(el("a", { className: "rl-btn", href: res.body.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + absPounds(d) + " to " + shop + " →", style: "text-align:center;text-decoration:none;margin-bottom:8px" }));
-                  list.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } }));
+                  if (res.body.payUrl && PAY_URL.test(res.body.payUrl))
+                    sheet.appendChild(el("a", { className: "rl-btn", href: res.body.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + absPounds(d) + " to " + shop, style: "text-align:center;text-decoration:none;margin-bottom:8px" }));
+                  sheet.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: finish }));
                   return;
                 }
                 say(msg, EXCHANGE_ERR[res.body && res.body.error] || "The shop didn't accept the change. Please try again, or contact the shop.", true);
@@ -5791,7 +5890,7 @@
   // Relay starts the return at the first shop and opens the second shop's own checkout with the new item in the basket. The
   // shopper pays the second shop there, and the first shop refunds them once the item is back: Relay takes no money
   // (worker/cross-swap.js). The second shop's order shows the swap as done once it reaches Relay.
-  var CROSS_ERR = { not_your_order: "Relay couldn't match this order to you.", outside_return_window: "It's more than 7 days since you bought this, so Relay can't start a return for it.",
+  var CROSS_ERR = { not_your_order: "Relay couldn't match this order to you.",
     already_returned: "A return has already been started for this item.", already_exchanged: "This item has already been swapped for another size or colour.",
     retailer_not_supported: "Swaps with another shop work for orders from shops on Relay through Shopify.", reason_needed: "Pick why you're sending it back.",
     not_an_option: "That item isn't available for a swap any more. Pick another.", out_of_stock: "That one has just sold out. Pick another.",
@@ -5846,7 +5945,7 @@
       var draw = function (r) {
         list.textContent = ""; list.removeAttribute("aria-busy");
         if (!r.ok) return say(msg, CROSS_ERR[r.body && r.body.error] || "Couldn't load what other shops have. Check your connection and try again.", true);
-        if (!r.body.eligible) return say(msg, CROSS_ERR[r.body.reason] || "This item can't be swapped with another shop.", true);
+        if (!r.body.eligible) return say(msg, r.body.reason === "outside_return_window" ? pastReturns(r.body, shopA) : CROSS_ERR[r.body.reason] || "This item can't be swapped with another shop.", true);
         var shops = r.body.shops || [];
         if (!shops.length) return list.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Nothing to swap to yet" }),
           el("p", { text: "No other shop on Relay has something in stock right now. You can still return it to " + shopA + " for a refund." })]));
@@ -5892,7 +5991,7 @@
           if (r.ok) { started = true; return finished(r.body); }
           var e = r.body && r.body.error;
           if (e === "price_changed" && Number.isInteger(r.body.priceMinor)) return review(r.body.priceMinor, picked.shop + " now charges " + money(r.body.priceMinor, "GBP") + " for it. Check the swap again.");
-          go.disabled = false; say(msg, CROSS_ERR[e] || "Couldn't start the swap. Please try again.", true);
+          go.disabled = false; say(msg, e === "outside_return_window" ? pastReturns(r.body, shopA) : CROSS_ERR[e] || "Couldn't start the swap. Please try again.", true);
         }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
       } });
       sheet.appendChild(msg); sheet.appendChild(go);
@@ -5974,7 +6073,7 @@
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
     var shopName = o.store || "the shop";
-    if (deadline) card.appendChild(dueBar(deadline, "Swap or return by ", String(o.orderedAt || "").slice(0, 10)));
+    if (deadline) card.appendChild(dueBar(deadline, "Return by ", String(o.orderedAt || "").slice(0, 10)));
     if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
     else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
     var actions = el("div", { className: "rl-po-actions" });
@@ -6149,6 +6248,8 @@
         var facts = el("div", { className: "rl-dt-facts" });
         var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
         fact("Price", price);
+        // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
+        if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
         if (first.variant) fact("Size or colour", first.variant);
         if (!one && named.length > 1) fact("In this order", named.map(function (i) { return i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", "));
         fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);
@@ -6741,8 +6842,11 @@
       foot.textContent = "";
       var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
-        if (!it.returnable && !it.exchangeable) return;
-        items.push({ deadline: new Date(Date.parse(o.orderedAt) + 7 * 864e5).toISOString().slice(0, 10), node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
+        // What can still be returned or swapped, and a swap that still has its difference to pay.
+        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid);
+        if (!it.returnable && !it.exchangeable && !owes) return;
+        // A "return by" date only when it's the shop's own (it.returnBy): Relay never makes one up.
+        items.push({ deadline: it.returnBy && it.returnBy.date ? it.returnBy.date : null, node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
       }); });
       orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
         if (isCarrier(x)) return;
