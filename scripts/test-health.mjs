@@ -121,7 +121,7 @@ assert.equal(h.reading.purchases.noTotal, 2); assert.equal(h.reading.purchases.n
 assert.equal(h.reading.emailsLookedAt, 15); assert.equal(h.reading.notReceipts, 2); assert.equal(h.reading.waitingToBeRead, 1);
 assert.equal(h.reading.kinds.return_update, 1);
 assert.deepEqual(h.reading.byReader.map(v => [v.version, v.emails]), [[26, 14], [25, 1]]);
-assert.equal(h.reading.readerVersion, 27);
+assert.equal(h.reading.readerVersion, 28);
 assert.deepEqual(h.reading.shoppersTaught, { groupsChanged: 1, shopsMarkedPromotions: 1, people: 2 });
 const today = h.reading.days[13];
 assert.equal(today.day, new Date(now).toISOString().slice(0, 10));
