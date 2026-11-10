@@ -97,6 +97,12 @@ assert.ok(!JSON.stringify(d).includes("ZAR-USD-1"), "items in another currency n
 assert.equal(d.watchedItems[0].imageUrl, "https://images.example/scarf.png");
 const text = JSON.stringify(d);
 for (const secret of ["alice", "bob", "cara", "dan", "erin", "fay", "gus", "HBC-CND-250", "Argan"]) assert.ok(!text.includes(secret), "Zara's figures never show " + secret);
+// The address a shop gives its customers ("Tell your customers" in the dashboard): where Relay's app is, which follows
+// Relay to its own web address once that is set, never carrying anything after a "#".
+assert.equal(d.relayUrl, "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/");
+env.RELAY_APP_URL = "https://relay.example/app/#signin=abc";
+assert.equal((await (await call("/relay/retailer/demand", { key: zara })).json()).relayUrl, "https://relay.example/app/");
+delete env.RELAY_APP_URL;
 
 const offer0 = (key, body) => call("/relay/retailer/offers", { method: "POST", key, body });
 // 4. Health & Beauty only sees its own item.

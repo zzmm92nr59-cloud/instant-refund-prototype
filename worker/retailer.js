@@ -18,6 +18,10 @@ import { shopReturnsSettings, saveShopReturns } from "./shop-returns.js";
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
 export const PRIVACY_MIN = 3;
+// Where shoppers open Relay: what a shop gives its customers (the dashboard's "Tell your customers" card). The same
+// address as in Relay's own emails (auth.js), so it follows Relay to its own web address when that is set.
+const DEFAULT_APP_URL = "https://zzmm92nr59-cloud.github.io/instant-refund-prototype/";
+export const relayAppUrl = (env) => String((env && env.RELAY_APP_URL) || DEFAULT_APP_URL).split("#")[0];
 // A count a shop may see: the number itself from 3 upwards; below that only "fewer than 3" (0 stays 0 where it's shown at all).
 const shown = (n) => (n >= PRIVACY_MIN ? n : null);
 const shownText = (n) => (n >= PRIVACY_MIN ? String(n) : n > 0 ? "Fewer than " + PRIVACY_MIN : "0");
@@ -118,7 +122,7 @@ export async function shopDemand(env, shop, now = Date.now()) {
   const notUk = variants.length ? null : await otherCurrency(db, shop);
   return { store: label, platform: shop.provider === "shopify" ? "shopify" : "square", currency: "GBP", generatedAt: new Date(now).toISOString(), privacyMinimum: PRIVACY_MIN,
     followers: shown(followers), followersText: shownText(followers), shoppersWatchingItems: shown(people.size), shoppersWatchingItemsText: shownText(people.size),
-    itemsInCatalogue: variants.length, watchedItems: list, ...(notUk ? { notUkCurrency: notUk } : {}) };
+    itemsInCatalogue: variants.length, watchedItems: list, relayUrl: relayAppUrl(env), ...(notUk ? { notUkCurrency: notUk } : {}) };
 }
 
 async function listOffers(db, shop, now) {

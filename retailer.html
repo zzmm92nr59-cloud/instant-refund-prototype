@@ -22,7 +22,7 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .row h3{margin:0 0 3px;font-size:16px}.row .meta{color:var(--muted);font-size:13px}.row .meta+.meta{margin-top:4px}
 .count{text-align:right}.count strong{font-family:var(--serif);font-size:30px;font-weight:600;display:block;line-height:1}.count span{font-size:12px;color:var(--muted)}.count strong.few{font-family:inherit;font-size:15px;font-weight:700;line-height:1.3}
 .chip{display:inline-block;margin-top:6px;background:#eef6dc;color:#3f6212;border-radius:99px;padding:3px 9px;font-size:11px;font-weight:800}
-.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.dark{background:var(--navy);color:#fff}.limebtn{background:var(--lime);color:#1d2911}.ghost{background:#fff;border:1px solid #d9d3c6}
+.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800}.btn:active{transform:translateY(1px)}.btn:disabled{opacity:.55;cursor:not-allowed}.btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--navy);outline-offset:2px}.dark{background:var(--navy);color:#fff}.limebtn{background:var(--lime);color:#1d2911}.ghost{background:#fff;border:1px solid #d9d3c6}
 .offerbox{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
 .offerbox label{font-size:12px;font-weight:700;color:var(--muted);display:grid;gap:5px}.offerbox input,.offerbox select{border:1px solid #d9d3c6;border-radius:11px;padding:10px 12px;background:#fff;min-width:120px}
 .offerbox .grow{flex:1;min-width:180px}.offerbox .grow input{width:100%}
@@ -44,6 +44,9 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
 .thumbs{display:flex;gap:8px;flex-wrap:wrap}.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
 .aform .acts{display:flex;gap:10px;flex-wrap:wrap}.aform .acts .btn{min-height:44px}
 .alink{color:var(--navy);font-weight:700;font-size:13px;text-decoration:none;white-space:nowrap}
+.row.tell{grid-template-columns:1fr 200px;gap:22px;align-items:start}.tell .offerbox{border:0;padding:0;margin-top:14px}.tell .offerbox input{width:100%;box-sizing:border-box;font-weight:500;color:var(--ink)}
+.tell .btn{min-height:44px}.tellqr{display:grid;gap:10px;justify-items:center;text-align:center}.tellqr canvas{width:168px;height:168px;border:1px solid var(--line);border-radius:10px;background:#fff}
+@media(max-width:640px){.row.tell{grid-template-columns:1fr}}
 @media(max-width:640px){.aform .two,.aform .kinds{grid-template-columns:1fr}}
 .choice{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.5;padding:10px 12px;border:1px solid var(--line);border-radius:14px;cursor:pointer}
 .choice input{margin-top:4px;accent-color:var(--navy)}.choice.dim{opacity:.55;cursor:not-allowed}
@@ -81,8 +84,28 @@ h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,50px);line-
     </div>
     <div class="list offers" id="activity"></div>
     <p class="fine" style="margin-top:10px" id="resultsNote"></p>
-    <div class="head"><h2>Demand</h2></div>
   </section>
+  <section id="tell" class="hidden">
+    <div class="head"><h2>Tell your customers</h2></div>
+    <div class="row tell">
+      <div>
+        <p class="meta" style="margin:0;line-height:1.55">Your customers find their orders from you in Relay once they sign up with the email they ordered with. Put this where they'll see it: your order emails, a card in the parcel, your returns page.</p>
+        <div class="offerbox">
+          <label class="grow">Link to Relay<input id="tellLink" readonly></label>
+          <button class="btn ghost" type="button" id="tellLinkCopy">Copy link</button>
+          <label class="wide">A line for your order emails<textarea id="tellLine" readonly rows="4"></textarea></label>
+          <button class="btn ghost" type="button" id="tellLineCopy">Copy wording</button>
+        </div>
+        <div class="msg hidden" id="tellMsg" style="margin-top:12px"></div>
+      </div>
+      <div class="tellqr" id="tellQrBox">
+        <canvas id="tellQr" width="8" height="8" role="img" aria-label="QR code that opens Relay"></canvas>
+        <button class="btn ghost" type="button" id="tellQrSave">Download QR code</button>
+        <span class="meta">For a card in the parcel. Print it at least 2 cm wide.</span>
+      </div>
+    </div>
+  </section>
+  <div class="head hidden" id="demandHead"><h2>Demand</h2></div>
   <div class="stats">
     <div class="stat"><strong id="sWatch">–</strong><span>shoppers watching your items</span></div>
     <div class="stat l"><strong id="sItems">–</strong><span>items being watched</span></div>
@@ -264,6 +287,7 @@ let results = null;
 function showResults(r) {
   results = r;
   $("results").classList.toggle("hidden", !r || !r.supported);
+  $("demandHead").classList.toggle("hidden", !r || !r.supported);
   if (!r || !r.supported) return;
   const t = r.totals;
   $("rSwaps").textContent = t.swaps;
@@ -271,7 +295,7 @@ function showResults(r) {
   $("rReturns").textContent = t.returns;
   const all = r.swaps.map(x => ({ ...x, kind: "swap" })).concat(r.returns.map(x => ({ ...x, kind: "return" }))).sort((a, b) => b.at - a.at);
   $("activity").innerHTML = all.length ? all.map(activityRow).join("")
-    : `<div class="empty">No swaps or returns yet. When a customer swaps a size or colour, or starts a return in Relay, it shows up here.</div>`;
+    : `<div class="empty">No swaps or returns yet. When a customer swaps a size or colour, or starts a return in Relay, it shows up here. To get the first ones, tell your customers about Relay with the link below.</div>`;
   const back = t.swapsThenReturned || 0;
   $("resultsNote").textContent = (t.swapShare != null ? `${t.swapShare}% of the customers who came to Relay with an unwanted item swapped it rather than returning it. ` : "") +
     (back ? `${back === 1 ? "1 swapped item has" : back + " swapped items have"} since had a return started, so ${back === 1 ? "it's counted as a return, not a swap" : "they're counted as returns, not swaps"}. ` : "") +
@@ -303,7 +327,7 @@ async function load() {
       : `<div class="empty">Nobody is watching your items yet. When Relay shoppers tap “Watch price” on one of your products, it shows up here.</div>`;
     const offers = o.body.offers || [];
     $("offers").innerHTML = offers.length ? offers.map(offerRow).join("") : `<div class="empty">No offers yet.</div>`;
-    loadRet(); loadRm(); loadPay(); loadAuctions();
+    tellDraw(); loadRet(); loadRm(); loadPay(); loadAuctions();
   } catch (e) { if (String(e.message) !== "signed_out") $("items").innerHTML = `<div class="empty">Couldn't reach Relay just now. Try Refresh.</div>`; }
 }
 $("items").addEventListener("click", (e) => {
@@ -347,6 +371,159 @@ function rmShow(st) {
   $("rmSave").textContent = on ? "Save changes" : "Check key and turn on";
   $("rmOff").classList.toggle("hidden", !on);
 }
+// ---- Tell your customers: the link to Relay, a line for order emails, and a QR code for a card in the parcel ----
+// >>> qr
+// A QR code for a short piece of text (a web address), as rows of true (dark) and false (light) squares.
+// Byte mode, error correction level M (up to about 15% of the code can be damaged or covered), versions 1 to 10
+// (213 bytes at most). Follows ISO/IEC 18004: Reed-Solomon blocks, the eight masks scored by the standard's four
+// penalty rules, format and version information. Returns null when the text is too long.
+function qrMatrix(text) {
+  const bytes = [...new TextEncoder().encode(String(text))];
+  // Per version at level M: error-correction codewords per block, then [blocks, data codewords each] groups.
+  const M = [null, [10, [1, 16]], [16, [1, 28]], [26, [1, 44]], [18, [2, 32]], [24, [2, 43]], [16, [4, 27]], [18, [4, 31]],
+    [22, [2, 38], [2, 39]], [22, [3, 36], [2, 37]], [26, [4, 43], [1, 44]]];
+  const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+  const dataWords = (v) => M[v].slice(1).reduce((n, g) => n + g[0] * g[1], 0);
+  let version = 0;
+  for (let v = 1; v <= 10 && !version; v++) if (bytes.length <= Math.floor((dataWords(v) * 8 - 4 - (v < 10 ? 8 : 16)) / 8)) version = v;
+  if (!version) return null;
+
+  // The message as bits: mode (byte), length, the bytes, a terminator, then padding to fill the data codewords.
+  const total = dataWords(version), bits = [];
+  const put = (value, length) => { for (let i = length - 1; i >= 0; i--) bits.push((value >>> i) & 1); };
+  put(4, 4); put(bytes.length, version < 10 ? 8 : 16);
+  for (const b of bytes) put(b, 8);
+  put(0, Math.min(4, total * 8 - bits.length));
+  while (bits.length % 8) bits.push(0);
+  const words = [];
+  for (let i = 0; i < bits.length; i += 8) words.push(bits.slice(i, i + 8).reduce((n, b) => (n << 1) | b, 0));
+  for (let pad = 0xec; words.length < total; pad ^= 0xec ^ 0x11) words.push(pad);
+
+  // Reed-Solomon over GF(256), polynomial x^8 + x^4 + x^3 + x^2 + 1.
+  const exp = new Array(512), log = new Array(256);
+  for (let i = 0, x = 1; i < 255; i++) { exp[i] = x; log[x] = i; x <<= 1; if (x & 256) x ^= 0x11d; }
+  for (let i = 255; i < 512; i++) exp[i] = exp[i - 255];
+  const mul = (a, b) => (a && b ? exp[log[a] + log[b]] : 0);
+  const ecLen = M[version][0];
+  let gen = [1];
+  for (let i = 0; i < ecLen; i++) { const next = new Array(gen.length + 1).fill(0); gen.forEach((c, j) => { next[j] ^= c; next[j + 1] ^= mul(c, exp[i]); }); gen = next; }
+  const ecOf = (data) => {
+    const rem = new Array(ecLen).fill(0);
+    for (const d of data) { const f = d ^ rem.shift(); rem.push(0); for (let j = 0; j < ecLen; j++) rem[j] ^= mul(gen[j + 1], f); }
+    return rem;
+  };
+  const blocks = [];
+  let at = 0;
+  for (const [count, size] of M[version].slice(1)) for (let i = 0; i < count; i++) { const data = words.slice(at, at + size); at += size; blocks.push({ data, ec: ecOf(data) }); }
+  const stream = [];
+  for (let i = 0; i < Math.max(...blocks.map(b => b.data.length)); i++) for (const b of blocks) if (i < b.data.length) stream.push(b.data[i]);
+  for (let i = 0; i < ecLen; i++) for (const b of blocks) stream.push(b.ec[i]);
+
+  // The grid: finder, timing and alignment patterns first, and which squares they (and the format squares) take up.
+  const n = 17 + 4 * version;
+  const grid = Array.from({ length: n }, () => new Array(n).fill(false)), taken = Array.from({ length: n }, () => new Array(n).fill(false));
+  const set = (r, c, dark) => { if (r >= 0 && r < n && c >= 0 && c < n) { grid[r][c] = dark; taken[r][c] = true; } };
+  const finder = (r, c) => { for (let y = -1; y <= 7; y++) for (let x = -1; x <= 7; x++) set(r + y, c + x, y >= 0 && y <= 6 && x >= 0 && x <= 6 && (y === 0 || y === 6 || x === 0 || x === 6 || (y >= 2 && y <= 4 && x >= 2 && x <= 4))); };
+  finder(0, 0); finder(0, n - 7); finder(n - 7, 0);
+  for (let i = 8; i < n - 8; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  const centres = ALIGN[version];
+  for (const r of centres) for (const c of centres) {
+    if ((r === 6 && c === 6) || (r === 6 && c === n - 7) || (r === n - 7 && c === 6)) continue;
+    for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) set(r + y, c + x, Math.max(Math.abs(y), Math.abs(x)) !== 1);
+  }
+  set(n - 8, 8, true); // the square that is always dark
+  for (let i = 0; i < 9; i++) { if (!taken[8][i]) set(8, i, false); if (!taken[i][8]) set(i, 8, false); }
+  for (let i = 0; i < 8; i++) { set(8, n - 1 - i, false); if (i < 7) set(n - 1 - i, 8, false); }
+  if (version >= 7) {
+    let rem = version;
+    for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1f25);
+    const info = (version << 12) | rem;
+    for (let i = 0; i < 18; i++) { const dark = ((info >>> i) & 1) === 1, a = Math.floor(i / 3), b = n - 11 + (i % 3); set(a, b, dark); set(b, a, dark); }
+  }
+
+  // The codewords, zigzagging up and down in pairs of columns from the bottom right, skipping the timing column.
+  const free = [];
+  for (let right = n - 1, up = true; right >= 1; right -= 2, up = !up) {
+    if (right === 6) right = 5;
+    for (let i = 0; i < n; i++) { const r = up ? n - 1 - i : i; for (const c of [right, right - 1]) if (!taken[r][c]) free.push([r, c]); }
+  }
+  free.forEach(([r, c], i) => { grid[r][c] = i < stream.length * 8 && ((stream[i >>> 3] >>> (7 - (i & 7))) & 1) === 1; });
+
+  // Try each of the eight masks, and keep the one the standard's penalty rules like best.
+  const MASKS = [(r, c) => (r + c) % 2 === 0, (r) => r % 2 === 0, (r, c) => c % 3 === 0, (r, c) => (r + c) % 3 === 0,
+    (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0, (r, c) => ((r * c) % 2) + ((r * c) % 3) === 0,
+    (r, c) => (((r * c) % 2) + ((r * c) % 3)) % 2 === 0, (r, c) => (((r + c) % 2) + ((r * c) % 3)) % 2 === 0];
+  const withMask = (m) => {
+    const g = grid.map(row => row.slice());
+    for (const [r, c] of free) if (MASKS[m](r, c)) g[r][c] = !g[r][c];
+    let rem = m; // level M is 00, so the five format bits are just the mask number
+    for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const format = ((m << 10) | rem) ^ 0x5412, bit = (i) => ((format >>> i) & 1) === 1;
+    for (let i = 0; i <= 5; i++) g[i][8] = bit(i);
+    g[7][8] = bit(6); g[8][8] = bit(7); g[8][7] = bit(8);
+    for (let i = 9; i < 15; i++) g[8][14 - i] = bit(i);
+    for (let i = 0; i < 8; i++) g[8][n - 1 - i] = bit(i);
+    for (let i = 8; i < 15; i++) g[n - 15 + i][8] = bit(i);
+    return g;
+  };
+  const penalty = (g) => {
+    let score = 0, dark = 0;
+    const lines = [];
+    for (let i = 0; i < n; i++) { lines.push(g[i]); lines.push(g.map(row => row[i])); }
+    for (const line of lines) {
+      for (let i = 0, run = 1; i < n; i++) { if (i + 1 < n && line[i + 1] === line[i]) run++; else { if (run >= 5) score += run - 2; run = 1; } }
+      const s = line.map(x => (x ? "1" : "0")).join("");
+      for (let i = 0; i + 11 <= n; i++) { const w = s.substr(i, 11); if (w === "10111010000" || w === "00001011101") score += 40; }
+    }
+    for (let r = 0; r < n - 1; r++) for (let c = 0; c < n - 1; c++) if (g[r][c] === g[r][c + 1] && g[r][c] === g[r + 1][c] && g[r][c] === g[r + 1][c + 1]) score += 3;
+    for (const row of g) for (const x of row) if (x) dark++;
+    return score + Math.floor(Math.abs(dark * 20 - n * n * 10) / (n * n)) * 10;
+  };
+  let best = null;
+  for (let m = 0; m < 8; m++) { const g = withMask(m), p = penalty(g); if (!best || p < best.p) best = { g, p }; }
+  return best.g;
+}
+// <<< qr
+// The line says only what is true for this shop: a swap before the order is sent, and the shop's own returns period
+// when it has set one (otherwise no number of days at all).
+let tellDays = null;
+function tellSay(cls, text) { const m = $("tellMsg"); m.className = "msg " + (text ? cls : "hidden"); m.textContent = text; }
+function tellDraw() {
+  const url = demand && demand.platform === "shopify" && /^https:\/\/[^\s"'<>]{4,200}$/.test(demand.relayUrl || "") ? demand.relayUrl : null;
+  $("tell").classList.toggle("hidden", !url);
+  if (!url) return;
+  $("tellLink").value = url;
+  $("tellLine").value = `Need a different size, or want to send something back? Open Relay at ${url} and sign up with the email you ordered with. You can swap an item before we send it, or start a return${tellDays ? ` within ${tellDays} days of ordering` : ""}.`;
+  // Black on white with a clear border of four squares, the way phone cameras read it best. Drawn large so it prints sharply.
+  const m = qrMatrix(url), c = $("tellQr");
+  $("tellQrBox").classList.toggle("hidden", !m || !c.getContext);
+  if (!m || !c.getContext) return;
+  const quiet = 4, across = m.length + quiet * 2, px = Math.max(4, Math.floor(1024 / across));
+  c.width = c.height = across * px;
+  const g = c.getContext("2d");
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.fillStyle = "#000";
+  m.forEach((row, r) => row.forEach((dark, col) => { if (dark) g.fillRect((col + quiet) * px, (r + quiet) * px, px, px); }));
+  $("tellQrSave").classList.toggle("hidden", !c.toBlob);
+}
+async function tellCopy(field, btn) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(field.value); ok = true; }
+  catch { try { field.focus(); field.select(); ok = document.execCommand("copy"); } catch { ok = false; } }
+  if (!ok) { field.focus(); field.select(); return tellSay("bad", "Couldn't copy it for you. It's selected above: press Ctrl+C, or Cmd+C on a Mac."); }
+  tellSay("", "");
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.textContent = "Copied"; clearTimeout(btn.timer); btn.timer = setTimeout(() => { btn.textContent = btn.dataset.label; }, 2000);
+}
+$("tellLinkCopy").addEventListener("click", (e) => tellCopy($("tellLink"), e.currentTarget));
+$("tellLineCopy").addEventListener("click", (e) => tellCopy($("tellLine"), e.currentTarget));
+$("tellQrSave").addEventListener("click", () => {
+  $("tellQr").toBlob((blob) => {
+    if (!blob) return tellSay("bad", "Couldn't make the picture. Right-click the code and choose Save image instead.");
+    const a = document.createElement("a"), href = URL.createObjectURL(blob);
+    a.href = href; a.download = "relay-qr-code.png"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 10000);
+  }, "image/png");
+});
 // ---- The shop's own returns period and how it wants items sent back ----
 const RET_ERR = { invalid_days: "Days must be a whole number from 1 to 365, or left blank.", how_too_long: "That's too long. Keep it under 600 characters.", shopify_only: "This is for Shopify shops for now." };
 function retSay(cls, text) { const m = $("retMsg"); m.className = "msg " + cls; m.textContent = text; }
@@ -355,6 +532,7 @@ function retShow(st) {
   f.days.value = days || ""; f.how.value = (st && st.how) || "";
   if (st && st.relayLimitDays) $("retLimit").textContent = st.relayLimitDays;
   $("retState").textContent = days ? days + " days" : "Not set"; $("retState").className = "state " + (days ? "live" : "ended");
+  tellDays = Number.isInteger(days) && days > 0 ? days : null; tellDraw();
 }
 async function loadRet() {
   const shopify = demand && demand.platform === "shopify";
