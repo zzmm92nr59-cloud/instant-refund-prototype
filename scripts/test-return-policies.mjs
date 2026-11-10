@@ -131,7 +131,7 @@ assert.deepEqual(card("HM-100").returnBy, { date: plus(day(-2), 30), basis: "pol
 assert.equal(card("ZA-200").returnPolicy.shop, "Zara");
 assert.deepEqual(card("ZA-200").returnBy, { date: plus(day(-5), 30), basis: "policy", from: "order", estimate: true }, "from when it's sent: at least 30 days from the order");
 assert.equal(card("HM-300").returnPolicy, undefined, "an order in euros gets no UK policy");
-assert.equal(card("HM-300").returnBy.basis, "uk_law");
+assert.equal(card("HM-300").returnBy, undefined, "and no date from UK law's 14 days either: an order that wasn't in pounds may not have been sold under it");
 assert.equal(card("HM-400").returnPolicy, undefined, "the email's own window wins");
 assert.equal(card("HM-400").returnBy.basis, "window");
 assert.equal(card("HM-500").returnPolicy, undefined, "the email's own date wins");

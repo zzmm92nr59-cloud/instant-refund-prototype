@@ -47,7 +47,7 @@ for (let k = 0; k < 20; k++) {
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-for (const re of [/Your 2026, one receipt at a time/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\./,
+for (const re of [/Your 2026, one receipt at a time/, /In 2026 you spent/, /£122\.00/, /Added up from 3 of 5 receipts\. 1 had no amount Relay could read\. 1 wasn't in pounds, so it isn't added in\./,
   /Your top shops\s+1\s+Zara/, /Your busiest month\s+March/, /Your biggest treat/, /£59\.90/, /Fashion regular/, /MY 2026 ON RELAY/])
   assert.match(story, re);
 assert.equal(texts.length, 7, "7 slides for a year with no chapters: year, total, top shops, busiest month, biggest treat, style, summary");

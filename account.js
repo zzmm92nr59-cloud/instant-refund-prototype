@@ -1128,7 +1128,7 @@
   // shopper's words then show instead of what was read (worker/gmail.js), and which parts were wrong is counted for the
   // Relay health page. "Go back to what Relay read" undoes it. done() runs after a save or an undo.
   function fixSheet(x, done) {
-    var gbp = !x.currency || x.currency === "GBP", sym = gbp ? "£" : x.currency;
+    var gbp = !x.currency || x.currency === "GBP", sym = moneySign(x.currency).trim();
     var shopNow = (x.retailer && (x.retailer.name || x.retailer.domain)) || "";
     var today = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
     var toMoney = function (p) { return Number.isInteger(p) ? (p / 100).toFixed(2) : ""; };
@@ -2459,7 +2459,14 @@
     }
     render();
   }
-  function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + (cur === "GBP" || !cur ? "£" : cur + " ") + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
+  // An amount in its own currency ("£12.00", "€80.00", "US$20.00"). Relay never converts one currency into another, and
+  // only pounds are ever added up.
+  var MONEY_SIGN = { GBP: "£", EUR: "€", USD: "US$", CAD: "CA$", AUD: "A$" }, MONEY_NAME = { EUR: "euros", USD: "US dollars", CAD: "Canadian dollars", AUD: "Australian dollars" };
+  function moneyName(cur) { return MONEY_NAME[cur] || cur; }
+  // A receipt whose amount isn't in pounds (and has one).
+  function notPounds(x) { return Boolean(x && x.totalPence != null && x.currency && x.currency !== "GBP"); }
+  function moneySign(cur) { return !cur ? "£" : MONEY_SIGN[cur] || cur + " "; }
+  function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + moneySign(cur) + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
   function consentView(sheet, email, c) {
     var msg = el("div", { className: "rl-msg" });
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
@@ -2856,6 +2863,8 @@
           if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
           detail = el("div", { className: "rl-rr-detail" });
           if (names && named.length > 1) detail.appendChild(el("p", { className: "rl-rr-items", text: names }));
+          // Not in pounds: shown as it was charged, and left out of anything Relay adds up. Said once, here.
+          if (notPounds(row)) detail.appendChild(el("p", { className: "rl-rr-items", text: "Paid in " + moneyName(row.currency) + ", so it isn't added to your totals in pounds." }));
           detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
           // Its group, as a quiet setting: pick another and Relay moves it (and remembers that for this shop).
           var keys = GROUP_KEYS.indexOf(row.category) >= 0 || !groupNames[row.category] ? GROUP_KEYS : GROUP_KEYS.concat([row.category]);
@@ -5136,7 +5145,10 @@
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
       b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
-      if (w.coverage.noTotal) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts. " + w.coverage.noTotal + " had no amount Relay could read." }));
+      // What isn't in the figure, said plainly: receipts with no amount read, and receipts that weren't in pounds.
+      var unread = w.coverage.noTotal || 0, abroad = w.coverage.otherCurrency || 0;
+      if (unread || abroad) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts." +
+        (unread ? " " + unread + " had no amount Relay could read." : "") + (abroad ? " " + abroad + (abroad === 1 ? " wasn't in pounds, so it isn't" : " weren't in pounds, so they aren't") + " added in." : "") }));
     } });
     // 3. Where it went: every kind of shopping as one bar, then a line each.
     var kinds = (w.industries || []).filter(function (k) { return k.spentPence > 0 || k.receipts > 0; });
@@ -6236,6 +6248,8 @@
         var facts = el("div", { className: "rl-dt-facts" });
         var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
         fact("Price", price);
+        // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
+        if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
         if (first.variant) fact("Size or colour", first.variant);
         if (!one && named.length > 1) fact("In this order", named.map(function (i) { return i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", "));
         fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);

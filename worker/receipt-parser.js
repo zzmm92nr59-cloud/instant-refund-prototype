@@ -189,6 +189,44 @@ function money(str) {
   return Number.isFinite(pence) ? pence : null;
 }
 
+// ---- Totals that aren't in pounds ---------------------------------------------------------------------------------------
+// A receipt in euros or dollars has its total read as it is written, in its own currency. Relay never converts it and
+// never guesses the currency: "€" and "EUR" are euros; a dollar amount is read only when the email itself says which
+// dollars (USD, US$, CAD, CA$, AUD, A$). Nothing that adds up pounds counts these (wrapped.js and the app add up GBP only).
+// Only tried when the email has no pound amounts at all.
+const F_LABEL = "(?:(?:order\\s+|grand\\s+)?total(?:\\s+(?:including|incl\\.?|inc\\.?)\\s+(?:delivery|postage|shipping|vat|tax|p&p))?(?:\\s+(?:paid|amount|charged|cost|price|to pay|due))?|amount\\s+(?:paid|charged|due)|you\\s+paid)";
+const F_NUM = "((?:\\d{1,3}(?:[.,]\\d{3})+|\\d+)(?:[.,]\\d{2})?)(?![\\d.,]*\\d)";
+const F_GAP = "(?:\\s*\\([^)\\n]{1,40}\\))?\\s*(?:[:|]\\s*){0,3}";
+const F_BEFORE = new RegExp("\\b" + F_LABEL + F_GAP + "(€|EUR|US\\$|USD|CA\\$|CAD|AU?\\$|AUD|\\$)[ \\t]?" + F_NUM, "gi");
+const F_AFTER = new RegExp("\\b" + F_LABEL + F_GAP + F_NUM + "[ \\t]?(€|EUR\\b|USD\\b|CAD\\b|AUD\\b)", "gi");
+const DOLLARS = [["USD", /\bUSD\b|US\$|\bU\.?S\.? dollars?\b/i], ["CAD", /\bCAD\b|CA\$|\bCanadian dollars?\b/i], ["AUD", /\bAUD\b|(?<![A-Za-z])AU?\$|\bAustralian dollars?\b/i]];
+// "80.00", "80,00", "1,234.56" and "1.234,56" all read; anything else (three decimals, mixed-up separators) doesn't.
+export function foreignMinor(raw) {
+  const m = /^(\d{1,3}(?:[.,]\d{3})+|\d+)(?:([.,])(\d{2}))?$/.exec(String(raw == null ? "" : raw));
+  if (!m) return null;
+  const groups = m[1].match(/[.,]/g) || [];
+  if (new Set(groups).size > 1 || (m[2] && groups.includes(m[2]))) return null;
+  const n = Number(m[1].replace(/[.,]/g, "")) * 100 + Number(m[3] || 0);
+  return Number.isSafeInteger(n) ? n : null;
+}
+function foreignTotal(text) {
+  if (/£|\bGBP\b/.test(text)) return null;
+  const found = [];
+  for (const m of text.matchAll(F_BEFORE)) found.push({ index: m.index, label: m[0], sign: m[1], amount: m[2] });
+  for (const m of text.matchAll(F_AFTER)) found.push({ index: m.index, label: m[0], sign: m[2], amount: m[1] });
+  found.sort((a, b) => a.index - b.index);
+  // Not a "Sub Total", and not a total that says it leaves something out ("Total (excl. VAT)", "Total (before tax)").
+  const notSub = found.filter((f) => !/sub[-\s]?$/i.test(text.slice(Math.max(0, f.index - 4), f.index)) && !/\((?:excl|ex\b|excluding|before|net\b|without)/i.test(f.label));
+  const pick = notSub.find((f) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(f.label) || /^grand\s/i.test(f.label)) || notSub[0];
+  if (!pick) return null;
+  const sign = pick.sign.toUpperCase();
+  let currency = sign === "€" || sign === "EUR" ? "EUR" : sign === "US$" || sign === "USD" ? "USD" : sign === "CA$" || sign === "CAD" ? "CAD" : /^(AU?\$|AUD)$/.test(sign) ? "AUD" : null;
+  // A bare "$": only when the email names exactly one kind of dollar.
+  if (!currency && sign === "$") { const named = DOLLARS.filter(([, re]) => re.test(text)).map(([c]) => c); if (named.length === 1) currency = named[0]; }
+  const minor = foreignMinor(pick.amount);
+  return currency && minor != null ? { currency, minor } : null;
+}
+
 function retailerFromFrom(fromHeader) {
   if (!fromHeader) return null;
   const name = fromHeader.match(/^\s*"?([^"<]+?)"?\s*</);
@@ -388,6 +426,8 @@ function fromText(text, refDate) {
   // (Lines that are only money words, such as "You've saved £30.89", are not items: they don't stop the table being read.)
   if (!cleanItems(items).length) items.splice(0, items.length, ...itemsFromCells(text));
   const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+  // Not in pounds: the total as it's written, in its own currency (never converted).
+  const foreign = totalMatch ? null : foreignTotal(text);
 
   return {
     method: "text",
@@ -395,8 +435,8 @@ function fromText(text, refDate) {
     retailerName: null,
     orderRef: ref ? ref[1] : null,
     orderDate: parseDate(text, refDate),
-    currency: /£|GBP/.test(text) ? "GBP" : null,
-    totalPence: totalMatch ? money(totalMatch[1]) : null,
+    currency: /£|GBP/.test(text) ? "GBP" : foreign ? foreign.currency : null,
+    totalPence: totalMatch ? money(totalMatch[1]) : foreign ? foreign.minor : null,
     items,
   };
 }
@@ -487,7 +527,8 @@ function receiptSignals(subject, text) {
   const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s) ||
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}£|£.*\btotal\b/i.test(text);
+  // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -583,6 +624,17 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
 
 // "Your booking confirmation for London to Orpington (27 September at 12:54)", "... for return trip London to Nottingham (20 August ...".
 const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L} .'’&-]{1,40}?) to (\p{Lu}[\p{L} .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
+// A message about an order that was already placed is not its receipt: a delay ("Delay in shipping your … order"), a notice
+// ("Important information regarding your product order", "An important message regarding your order", "Update on your
+// order") or a benefit confirmed for it ("Benefit Confirmation for your Order").
+const ORDER_NOTICE_SUBJECT = new RegExp([
+  "\\bdelay(?:ed)?\\b[^\\n]{0,24}\\b(?:shipping|dispatch(?:ing)?|deliver(?:y|ing)|sending)\\b",
+  "\\b(?:orders?|delivery|deliveries|parcels?|items?)\\b[^\\n]{0,24}\\b(?:is|are|has been|have been|will be) delayed\\b",
+  "\\bdelay (?:to|with|on) your\\b",
+  "\\b(?:important|urgent)\\s+(?:message|information|notice|update|news)\\s+(?:regarding|about|on|concerning|for)\\b[^\\n]{0,40}\\border\\b",
+  "\\b(?:update|message|news)\\s+(?:regarding|about|on|concerning)\\s+your\\b[^\\n]{0,30}\\border\\b",
+  "\\bbenefit confirmation\\b",
+].join("|"), "i");
 const ACCOUNT_DEPOSIT = /\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
@@ -645,7 +697,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     retailer: shopOf({ ld, sender, fromName, subject, text, html, otherText: text === fromHtml ? plain : fromHtml }),
     orderRef: chosen.orderRef ?? txt.orderRef,
     orderDate: chosen.orderDate ?? txt.orderDate,
-    currency: chosen.currency ?? txt.currency,
+    // The currency goes with the amount: whichever reading gave the total says what it is in.
+    currency: chosen.totalPence == null && txt.totalPence != null ? txt.currency ?? chosen.currency : chosen.currency ?? txt.currency,
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
@@ -661,6 +714,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
+  }
+  // A notice about an order placed earlier, with no total of its own, is not a purchase. (One that does give the order's
+  // total is kept: it can be the only record of that order.)
+  if (!opts.lenient && result.totalPence == null && ORDER_NOTICE_SUBJECT.test(subject || "")) {
+    return { ok: false, reason: "order_notice", source: "shopper_email" };
   }
   if (opts.lenient && !result.orderRef && result.totalPence == null && !result.items.length) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length, nothingFound: true } };
