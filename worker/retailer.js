@@ -171,24 +171,47 @@ async function sendOffer(env, shop, body, o) {
 // swap: "paid N" (taken by card, owed to the shop), "paid to shop N" (by card, paid into the shop's Stripe account),
 // "payment not taken N", "shopify balance N" (the customer was asked by Shopify to pay it), "shopify paid N" (and has paid it), "refunded N" (Relay refunded it
 // in Shopify) or "shop to refund N".
+// A swapped item the customer then started a return for (thenReturned) stays in the list, because the shop's order was
+// changed, but it ended as a return: it isn't counted as a swap, in the value, or as a swap in the share.
 export async function shopResults(env, shop) {
   const db = env.RELAY_DB, out = { store: shop.store_label, supported: shop.provider === "shopify", swaps: [], returns: [],
-    totals: { swaps: 0, swapValueMinor: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" };
+    totals: { swaps: 0, swapValueMinor: 0, swapsThenReturned: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" };
   if (!out.supported) return out;
   const domain = shop.shop_ref, handle = String(domain).replace(/\.myshopify\.com$/, "");
   const orderUrl = (ext) => (/^\d{1,20}$/.test(String(ext || "")) ? "https://admin.shopify.com/store/" + handle + "/orders/" + ext : null);
+  // When a return (not cancelled) was started for each order line. Looked up apart from the list of returns below, which
+  // stops at the newest 200.
+  const returnStarted = new Map();
   try {
-    const rows = (await db.prepare(`SELECT x.created_at AS at, x.from_title AS fromTitle, x.to_title AS toTitle, x.quantity AS qty, x.detail AS detail,
+    for (const r of (await db.prepare("SELECT order_id AS orderId, line_id AS lineId, MAX(created_at) AS at FROM relay_returns WHERE shop = ? AND status != 'cancelled' GROUP BY order_id, line_id").bind(domain).all()).results || [])
+      returnStarted.set(r.orderId + "|" + r.lineId, r.at);
+  } catch { /* no returns yet on this database */ }
+  try {
+    // The line the swapped item was on before (from_line_id) and its price were added later: without them every swap is
+    // read the older way.
+    const swapsSql = (later) => `SELECT x.created_at AS at, x.from_title AS fromTitle, x.to_title AS toTitle, x.quantity AS qty, x.detail AS detail,
+        x.order_id AS orderId, x.line_id AS lineId, ${later},
         o.external_order_id AS ext, i.title AS title, i.price_minor AS price, i.currency AS currency
       FROM relay_exchanges x LEFT JOIN retailer_orders o ON o.id = x.order_id
       LEFT JOIN order_items i ON i.order_id = x.order_id AND i.external_line_item_id = x.line_id
-      WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`).bind(domain).all()).results || [];
+      WHERE x.shop = ? AND x.status = 'done' ORDER BY x.created_at DESC LIMIT 200`;
+    let rows;
+    try { rows = (await db.prepare(swapsSql("x.from_line_id AS fromLine, x.from_price_minor AS fromPrice")).bind(domain).all()).results || []; }
+    catch { rows = (await db.prepare(swapsSql("NULL AS fromLine, NULL AS fromPrice")).bind(domain).all()).results || []; }
     out.swaps = rows.map(r => {
       const m = /^(paid|paid to shop|payment not taken|shopify balance|shopify paid|refunded|shop to refund) (\d{1,9})$/.exec(String(r.detail || ""));
       const diff = !m ? 0 : (m[1] === "shop to refund" || m[1] === "refunded") ? -Number(m[2]) : Number(m[2]);
-      const price = Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null;
-      return { at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: Number(r.qty) || 1,
-        valueMinor: price == null ? null : price + (m && m[1] === "payment not taken" ? 0 : diff),
+      const qty = Number(r.qty) || 1, notTaken = Boolean(m) && m[1] === "payment not taken";
+      const price = Number.isFinite(r.price) ? r.price * qty : null;
+      // A swap Relay followed onto the new item's own line (fromLine) is priced there already, so the difference must not be
+      // added again; one from before that still sits on the old item's line, at the old price. When the difference was
+      // never taken from the card, the shop has what the old item cost and no more.
+      const value = price == null ? null
+        : r.fromLine ? (notTaken ? (Number.isFinite(r.fromPrice) ? r.fromPrice * qty : price - diff) : price)
+        : price + (notTaken ? 0 : diff);
+      const back = returnStarted.get(r.orderId + "|" + r.lineId);
+      return { at: r.at, item: r.title || null, from: r.fromTitle || null, to: r.toTitle || null, quantity: qty,
+        valueMinor: value, thenReturned: back != null && back >= r.at,
         priceDiffMinor: diff, differencePaid: !m ? null : (m[1] === "paid" || m[1] === "paid to shop" || m[1] === "shopify paid") ? true : (m[1] === "payment not taken" || m[1] === "shopify balance") ? false : null,
         differenceHow: !m ? null : { "paid": "card_owed", "paid to shop": "card_to_shop", "payment not taken": "card_failed", "shopify balance": "shopify", "shopify paid": "shopify_paid",
           "refunded": "refunded", "shop to refund": "shop_to_refund" }[m[1]],
@@ -215,9 +238,9 @@ export async function shopResults(env, shop) {
     out.returns = rows.map(r => ({ at: r.at, item: r.item || null, quantity: Number(r.qty) || 1, valueMinor: Number.isFinite(r.price) ? r.price * (Number(r.qty) || 1) : null,
       reason: r.reason || null, ref: r.ref, emailed: Boolean(r.notifiedAt), trackingNumber: tracking.get(r.ref) || null, orderUrl: orderUrl(r.ext) }));
   } catch { /* no returns yet on this database */ }
-  const t = out.totals;
-  t.swaps = out.swaps.length; t.returns = out.returns.length;
-  t.swapValueMinor = out.swaps.reduce((n, x) => n + (x.valueMinor || 0), 0);
+  const t = out.totals, kept = out.swaps.filter(x => !x.thenReturned);
+  t.swaps = kept.length; t.swapsThenReturned = out.swaps.length - kept.length; t.returns = out.returns.length;
+  t.swapValueMinor = kept.reduce((n, x) => n + (x.valueMinor || 0), 0);
   t.returnValueMinor = out.returns.reduce((n, x) => n + (x.valueMinor || 0), 0);
   t.swapShare = t.swaps + t.returns ? Math.round((100 * t.swaps) / (t.swaps + t.returns)) : null;
   out.currency = (out.swaps.find(x => x.currency) || {}).currency || "GBP";

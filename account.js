@@ -6080,7 +6080,8 @@
     if (it.exchange && it.exchange.balance) {
       var bal = it.exchange.balance;
       if (bal.paid) status("✓ " + money(bal.owedMinor, it.currency) + " difference paid to " + shopName, true);
-      else {
+      // Once it's being returned, the difference isn't asked for any more: the shopper isn't keeping the item.
+      else if (!it.returnInfo) {
         status(money(bal.owedMinor, it.currency) + " still to pay " + shopName + " for the swap" + (bal.payUrl ? "." : ". Use the link in " + shopName + "'s email."), false);
         if (bal.payUrl && /^https:\/\//.test(bal.payUrl)) actions.appendChild(el("a", { className: "rl-po-primary", href: bal.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + money(bal.owedMinor, it.currency) + " to " + shopName }));
       }
@@ -6843,7 +6844,7 @@
       var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
         // What can still be returned or swapped, and a swap that still has its difference to pay.
-        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid);
+        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo);
         if (!it.returnable && !it.exchangeable && !owes) return;
         // A "return by" date only when it's the shop's own (it.returnBy): Relay never makes one up.
         items.push({ deadline: it.returnBy && it.returnBy.date ? it.returnBy.date : null, node: function () { return confirmedCard(o, it, refresh, this.deadline); } });

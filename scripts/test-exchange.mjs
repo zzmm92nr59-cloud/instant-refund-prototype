@@ -163,6 +163,18 @@ assert.equal(removedLine, "gid://shopify/CalculatedLineItem/9502");
     env, new URL("https://w.test/relay/my/return"), {}, alice, { fetchImpl: async () => new Response("{}", { status: 500 }), listStores: async () => [] });
   const r1 = await ret("8801");
   assert.equal(r1.status, 200, "a swapped item can be returned"); assert.equal(sqlite.prepare("SELECT line_id AS l FROM relay_returns WHERE order_id = ?").get(id).l, "8801");
+  // Once a return has started, the item isn't offered for a swap as well (the swap itself would be refused): the cap that
+  // was swapped and is now going back, and the tote, which was never swapped.
+  const both = () => enrichPurchases(env, [{ id, retailer: conn, orderedAt: new Date(Date.now() - 2 * 864e5).toISOString(),
+    items: [{ lineId: "8801", productId: "1", variantId: "12", title: "Logo Cap", quantity: 1, priceMinor: 2000 }, { lineId: "9600", productId: "2", variantId: "50", title: "Canvas Tote", quantity: 1, priceMinor: 2500 }] }]).then(p => p[0].items);
+  sqlite.prepare("INSERT INTO relay_returns (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason, return_ref, status, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run("ret-tote", alice.id, id, "9600", SHOP, "Canvas Tote", 1, 2500, "changed_mind", "RLY-TTTT-TTTT", "requested", Date.now());
+  assert.deepEqual((await both()).map(i => [i.lineId, Boolean(i.returnInfo), i.returnable, i.exchangeable]), [["8801", true, false, false], ["9600", true, false, false]]);
+  const refused = await call(alice, "/relay/my/exchange", { orderId: id, lineId: "9600", variantKey: conn + ":variant:gid://shopify/ProductVariant/50" });
+  assert.deepEqual([refused.status, (await refused.json()).error], [409, "already_returned"], "and the swap is refused if asked for anyway");
+  // A return the shopper cancelled puts the swap back on offer.
+  sqlite.prepare("UPDATE relay_returns SET status = 'cancelled' WHERE id = 'ret-tote'").run();
+  assert.deepEqual((await both()).map(i => [i.lineId, Boolean(i.returnInfo), i.exchangeable]), [["8801", true, false], ["9600", false, true]]);
   // A swap made before Relay kept the new line (order 500 above) still can't be: its line is no longer on the shop's order.
   sqlite.prepare("UPDATE retailer_orders SET ordered_at = ? WHERE id = ?").run(new Date(Date.now() - 2 * 864e5).toISOString(), o500);
   const r2 = await ret("9500", o500);

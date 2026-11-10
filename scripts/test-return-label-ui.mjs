@@ -132,9 +132,12 @@ async function shopperPage(returnBody, plan = null, before = /If Kick Lane has s
     if (p === '/relay/retailer/demand') return j(200, { store: 'Kick Lane', platform: 'shopify', currency: 'GBP', watchedItems: [], shoppersWatchingItems: 0, followers: 0 });
     if (p === '/relay/retailer/offers') return j(200, { offers: [] });
     if (p === '/relay/retailer/results') return j(200, { supported: true, currency: 'GBP', swaps: [{ at: Date.now(), item: 'Cloud Runner Trainers', from: 'UK 8', to: 'UK 7', quantity: 1, valueMinor: 11000, priceDiffMinor: 1500, differencePaid: true, orderUrl: null },
-      { at: Date.now(), item: 'Rain Jacket', from: 'M', to: 'L', quantity: 1, valueMinor: 5500, priceDiffMinor: -500, differencePaid: null, orderUrl: null }],
-      totals: { swaps: 2, returns: 1, swapValueMinor: 16500, swapShare: 67 },
-      returns: [{ at: Date.now(), item: 'Logo Cap', quantity: 1, valueMinor: 2000, reason: 'wrong_size', ref: 'RLY-ABCD-EFGH', emailed: true, trackingNumber: 'TT123456789GB', orderUrl: null }] });
+      { at: Date.now(), item: 'Rain Jacket', from: 'M', to: 'L', quantity: 1, valueMinor: 5500, priceDiffMinor: -500, differencePaid: null, orderUrl: null },
+      // Swapped, and then the customer started a return for the new item: listed, but not counted as a swap.
+      { at: Date.now() - 60000, item: 'Court Trainer', from: 'UK 8', to: 'UK 9', quantity: 1, valueMinor: 7000, priceDiffMinor: 500, differencePaid: false, differenceHow: 'shopify', thenReturned: true, orderUrl: null }],
+      totals: { swaps: 2, swapsThenReturned: 1, returns: 2, swapValueMinor: 16500, swapShare: 50 },
+      returns: [{ at: Date.now(), item: 'Logo Cap', quantity: 1, valueMinor: 2000, reason: 'wrong_size', ref: 'RLY-ABCD-EFGH', emailed: true, trackingNumber: 'TT123456789GB', orderUrl: null },
+        { at: Date.now() - 30000, item: 'Court Trainer', quantity: 1, valueMinor: 7000, reason: 'wrong_size', ref: 'RLY-JKLM-NPQR', emailed: true, trackingNumber: null, orderUrl: null }] });
     if (p === '/relay/retailer/returns' && req.method() === 'GET') return j(200, retSettings);
     if (p === '/relay/retailer/returns') {
       const b = JSON.parse(req.postData()); retSaves.push(b);
@@ -165,6 +168,19 @@ async function shopperPage(returnBody, plan = null, before = /If Kick Lane has s
   assert.equal(await page.locator('#platformTag').innerText(), 'Shopify');
   await page.getByRole('heading', { name: 'Swaps and returns' }).waitFor();
   assert.equal(await page.getByText(/development shop|Pilot results|Test shops/).count(), 0);
+  // A swap the customer then asked to return is listed with a plain note and no value of its own (its return carries the
+  // value), and the totals leave it out: two swaps worth £165.00, not three.
+  const swapRows = page.locator('#activity .row.act').filter({ has: page.locator('.kind.swap') });
+  assert.equal(await swapRows.count(), 3);
+  const sentBack = swapRows.filter({ hasText: 'Court Trainer' });
+  await sentBack.getByText("The customer has since started a return for this item, so it's counted as a return, not a swap.").waitFor();
+  assert.equal((await sentBack.locator('.val').innerText()).trim(), '', 'no value on a swap that ended as a return');
+  assert.equal((await swapRows.filter({ hasText: 'Rain Jacket' }).locator('.val').innerText()).trim(), '£55.00');
+  assert.equal(await page.locator('#rSwaps').innerText(), '2'); assert.equal(await page.locator('#rKept').innerText(), '£165.00'); assert.equal(await page.locator('#rReturns').innerText(), '2');
+  const note = await page.locator('#resultsNote').innerText();
+  assert.match(note, /^50% of the customers who came to Relay with an unwanted item swapped it rather than returning it\. 1 swapped item has since had a return started, so it's counted as a return, not a swap\./);
+  assert.match(note, /you refund them yourself: Relay never refunds a return\.$/);
+  if (process.env.SHOTS) await page.locator('#results').screenshot({ path: process.env.SHOTS + '/retailer-results.png' });
   // Your returns: the shop's own returns period and how it wants items sent back. Nothing is set at first, and the page
   // says what its customers see until it is. A double tap saves once.
   await page.getByRole('heading', { name: 'Your returns' }).waitFor();
