@@ -223,6 +223,26 @@ async function balanceLink(shop, token, orderGid, f) {
   return b ? b.payUrl : null;
 }
 
+// Why the shop can no longer change an order, from Shopify's own status for it: null while nothing has been sent or
+// started, "already_sent" once all or part of it has gone, "being_sent" for anything in between (picked, on hold,
+// scheduled). Only an order nothing has happened to yet is changed.
+const sentState = (status) => (status === "UNFULFILLED" ? null : status === "FULFILLED" || status === "PARTIALLY_FULFILLED" ? "already_sent" : "being_sent");
+// Asked when the shopper opens the swap sheet, so they are told before choosing a size, not after: "order_cancelled",
+// "already_sent" or "being_sent", or null when the order can still be changed. Also null when the shop can't be asked
+// just now or gives no status: the swap itself asks again and refuses then.
+async function swapBlocked(env, owned, o) {
+  try {
+    const stores = await (o.listStores ? o.listStores() : listConnectedShopifyStores(env, o));
+    const store = (stores || []).find(s => s.domain === owned.shop);
+    if (!store) return null;
+    const live = await gql(owned.shop, store.token, `query RelayExchangeOpen($o: ID!) { order(id: $o) { cancelledAt displayFulfillmentStatus } }`,
+      { o: "gid://shopify/Order/" + owned.order.ext }, o.fetchImpl || ((...a) => fetch(...a)));
+    if (!live.order) return null;
+    if (live.order.cancelledAt) return "order_cancelled";
+    return live.order.displayFulfillmentStatus ? sentState(String(live.order.displayFulfillmentStatus)) : null;
+  } catch { return null; }
+}
+
 // Refunds an amount to the payment the customer made on this order. True only if Shopify created the refund.
 // Needs the shop's permission to change orders ("write_orders"); without it Shopify refuses and the shop refunds by hand.
 async function refundDifference(shop, token, orderGid, amountMinor, label, f) {
@@ -276,7 +296,7 @@ async function doExchange(env, shopper, body, o) {
     const live = await gql(owned.shop, store.token, `query RelayExchangeCheck($o: ID!, $v: ID!) { order(id: $o) { cancelledAt displayFulfillmentStatus }
       productVariant(id: $v) { inventoryQuantity title } }`, { o: "gid://shopify/Order/" + owned.order.ext, v: toGid }, f);
     if (!live.order || live.order.cancelledAt) return [409, { error: "order_cancelled" }];
-    if (live.order.displayFulfillmentStatus !== "UNFULFILLED") return [409, { error: "already_sent" }];
+    if (live.order.displayFulfillmentStatus !== "UNFULFILLED") return [409, { error: sentState(String(live.order.displayFulfillmentStatus || "")) }];
     if (!live.productVariant || !(Number(live.productVariant.inventoryQuantity) >= owned.line.quantity)) return [409, { error: "out_of_stock" }];
     // Dearer: hold the difference on the saved card before touching the order. Nothing is taken until the order is changed.
     const byCard = diff > 0 && pay.method === "card";
@@ -386,7 +406,11 @@ export async function handleExchangeRoute(request, env, url, cors, shopper, o) {
     if (!owned) return json({ error: "not_your_order" }, 404, cors);
     const pay = await shopPay(env, owned.shop);
     const card = pay.method === "card" ? await cardOf(env, shopper.id).catch(() => null) : null;
-    return json({ product: owned.line.title, priceMinor: owned.line.priceMinor, options: await options(env, owned, card, pay),
+    // An order the shop has sent, started on or cancelled can't be swapped: say so now ("blocked"), and the app shows
+    // that instead of the choices. The choices are still listed, so a copy of the app from before this was added carries
+    // on as it did (it is told when the swap is asked for) rather than saying the item comes in nothing else.
+    const blocked = await swapBlocked(env, owned, o);
+    return json({ product: owned.line.title, priceMinor: owned.line.priceMinor, options: await options(env, owned, card, pay), ...(blocked ? { blocked } : {}),
       card: card ? { brand: card.brand, last4: card.last4, wallet: card.wallet } : null, payments: pay.method === "card", payBy: pay.method }, 200, cors);
   }
   if (path === "/relay/my/exchange" && request.method === "POST") {
