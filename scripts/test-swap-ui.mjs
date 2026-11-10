@@ -63,11 +63,11 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
 // 1. With a saved Apple Pay card: prices are shown, the dearer swap says exactly what will be taken and when.
 {
   const { context, page, posts, errors } = await run({ card: { brand: 'visa', last4: '4242', wallet: 'apple_pay' } });
-  await page.getByRole('button', { name: /Large · £5\.00 more/ }).waitFor();
-  await page.getByRole('button', { name: /Kids · £5\.00 less/ }).waitFor();
-  await page.getByRole('button', { name: /^Navy · in stock/ }).waitFor();
+  await page.getByRole('button', { name: /Large\. £5\.00 more/ }).waitFor();
+  await page.getByRole('button', { name: /Kids\. £5\.00 less/ }).waitFor();
+  await page.getByRole('button', { name: /^Navy\. In stock/ }).waitFor();
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-options.png' });
-  await page.getByRole('button', { name: /Large · £5\.00 more/ }).click();
+  await page.getByRole('button', { name: /Large\. £5\.00 more/ }).click();
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-confirm.png' });
   const box = await page.locator('.rl-sheet').last().innerText();
   assert.match(box, /costs £5\.00 more\. We'll take £5\.00 from your Apple Pay · Visa ending 4242 only once the shop has updated your order\. \(Test mode: no real money\.\)/);
@@ -76,7 +76,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   assert.deepEqual(posts.find(x => x.p === '/relay/my/exchange').body, { orderId: 'o1', lineId: 'L1', variantKey: 'k14', agreedDiffMinor: 500 });
   // The cheaper one says the shop refunds, and nothing is taken.
   await page.reload(); await page.getByRole('button', { name: 'Swap', exact: true }).click();
-  await page.getByRole('button', { name: /Kids · £5\.00 less/ }).click();
+  await page.getByRole('button', { name: /Kids\. £5\.00 less/ }).click();
   assert.match(await page.locator('.rl-sheet').last().innerText(), /costs £5\.00 less\. Kick Lane will refund the £5\.00 to how you paid\./);
   assert.deepEqual(errors, []);
   await context.close();
@@ -86,7 +86,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
 // 2. No card yet: the dearer option offers to add one with a £0.00 check, then the swap screen comes back.
 {
   const { context, page, posts, errors } = await run({ card: null });
-  const large = page.getByRole('button', { name: /Large · Costs £5\.00 more: add a card/ });
+  const large = page.getByRole('button', { name: /Large\. Costs £5\.00 more: add a card/ });
   await large.waitFor(); assert.equal(await large.isEnabled(), true);
   await large.click();
   await page.getByText('Add a card to pay the £5.00 difference. Saving it charges nothing.').waitFor();
@@ -98,7 +98,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   assert.equal(await page.evaluate(() => window.__confirmedSecret), 'seti_test000001_secret_x');
   assert.deepEqual(posts.find(x => x.p === '/relay/my/card/confirm').body, { setupIntentId: 'seti_test000001' });
   // Comes back to the swap screen, where Large is now available.
-  await page.getByRole('button', { name: /Large · £5\.00 more/ }).waitFor({ timeout: 5000 });
+  await page.getByRole('button', { name: /Large\. £5\.00 more/ }).waitFor({ timeout: 5000 });
   assert.equal(posts.filter(x => x.p === '/relay/my/exchange').length, 0, 'saving a card never swaps by itself');
   assert.deepEqual(errors, []);
   await context.close();
@@ -107,7 +107,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
 // 3. The shop takes the difference through its own Shopify checkout: no card asked for, and a link to pay the shop afterwards.
 {
   const { context, page, posts, errors } = await run({ card: null, mode: 'shopify' });
-  await page.getByRole('button', { name: /Large · £5\.00 more/ }).click();
+  await page.getByRole('button', { name: /Large\. £5\.00 more/ }).click();
   const box = await page.locator('.rl-sheet').last().innerText();
   assert.match(box, /costs £5\.00 more\. Kick Lane will update your order and send you a link to pay the £5\.00, using any way of paying Kick Lane accepts\./);
   assert.doesNotMatch(box, /card/i);
@@ -142,7 +142,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   await page.getByText('£5.00 still to pay Kick Lane for the swap.').waitFor();
   const pay = page.getByRole('link', { name: 'Pay £5.00 to Kick Lane' });
   assert.equal(await pay.getAttribute('href'), 'https://kick-lane.myshopify.com/1/invoices/abc');
-  if (process.env.SHOTS) await page.locator('.card.product').first().screenshot({ path: process.env.SHOTS + '/swap-balance-owed.png' });
+  if (process.env.SHOTS) await page.locator('.rl-po').first().screenshot({ path: process.env.SHOTS + '/swap-balance-owed.png' });
   assert.deepEqual(errors, []);
   await context.close();
   const n = await run({ card: null, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: null } } });
@@ -154,6 +154,91 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   assert.equal(await p.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
   await p.context.close();
   console.log('PASS swap balance: still to pay (with or without link), then paid');
+}
+
+// 6. Home after a swap: the card is redrawn from the shop's order however the sheet is closed, the swapped item is still
+// there to return, a "return by" date shows only when it is the shop's own, and a swap with money still to pay is on Home.
+{
+  const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
+  const by = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+  const byText = new Date(by + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  let swapped = false;
+  await context.route('https://**/*', route => {
+    const req = route.request(), u = new URL(req.url()), p = u.pathname;
+    const j = (status, body) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' }, body: JSON.stringify(body) });
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' } });
+    if (!p.startsWith('/relay/')) return route.abort();
+    const now = new Date().toISOString();
+    if (p === '/relay/my/purchases') return j(200, { purchases: [
+      // Kick Lane has set its returns period: its own date is shown. After the swap the line is the new item's own.
+      { id: 'o1', store: 'Kick Lane', retailer: 'shopify:kick-lane.myshopify.com', orderedAt: now, amountMinor: 2000, amountNowMinor: swapped ? 2000 : null, currency: 'GBP', items: [swapped
+        ? { title: 'Logo Cap', lineId: 'L9', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Navy', exchangeable: false, returnable: true, returnBy: { date: by, days: 28 },
+            exchange: { fromTitle: 'Black', toTitle: 'Navy', status: 'done', at: Date.now(), fromPriceMinor: 2000 } }
+        : { title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: true, returnable: true, returnBy: { date: by, days: 28 } }] },
+      // Fern Street hasn't: no date is made up for it.
+      { id: 'o2', store: 'Fern Street', retailer: 'shopify:fern-street.myshopify.com', orderedAt: now, amountMinor: 1800, amountNowMinor: null, currency: 'GBP', items: [
+        { title: 'Wool Beanie', lineId: 'L2', quantity: 1, priceMinor: 1800, currency: 'GBP', variant: 'Grey', exchangeable: false, returnable: true }] },
+      // A swap with its difference still to pay: nothing to return or swap, but it stays on Home until it's paid.
+      // It was placed at £85 and comes to £90 now: the Shop orders page says both.
+      { id: 'o3', store: 'Oak & Thread', retailer: 'shopify:oak-thread.myshopify.com', orderedAt: '2026-01-05T10:00:00Z', amountMinor: 8500, amountNowMinor: 9000, currency: 'GBP', items: [
+        { title: 'Field Jacket', lineId: 'L3', quantity: 1, priceMinor: 9000, currency: 'GBP', variant: 'Large', exchangeable: false, returnable: false,
+          exchange: { fromTitle: 'Medium', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://oak-thread.myshopify.com/1/invoices/xyz' } } }] }] });
+    if (p === '/relay/my/exchange/options') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: false, payBy: 'shopify', card: null, options: [
+      { key: 'k12', title: 'Navy', priceMinor: 2000, quantity: 3, priceDiffMinor: 0, available: true, reason: null, needsCard: false }] });
+    if (p === '/relay/my/exchange' && req.method() === 'POST') { swapped = true; return j(200, { exchanged: true, to: 'Navy', priceDiffMinor: 0, message: 'Done. Your order now has Navy instead. Nothing to pay or refund.' }); }
+    // What the Profile page asks for.
+    if (p === '/relay/my/consent') return j(200, { version: 'v5', accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
+    if (p === '/relay/my/gmail') return j(200, { connected: true, provider: 'google', email: 'alice@example.com', lastScanAt: Date.now() - 6e5 });
+    if (p === '/relay/my/profile') return j(200, { email: 'alice@example.com', name: 'Alice Tester', photo: null });
+    if (p === '/relay/my/receipts') return j(200, { receipts: [] });
+    if (p === '/relay/my/alerts/status') return j(200, { devices: 0, watches: [], stores: [] });
+    if (p === '/relay/my/2fa') return j(200, { app: false, text: false });
+    if (p === '/relay/my/admin/me') return j(200, { admin: false });
+    return j(200, {});
+  });
+  const page = await context.newPage();
+  const errors = []; page.on('pageerror', e => errors.push(String(e)));
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
+  await page.goto(origin + '/index.html');
+  const card = (shop) => page.locator('.rl-po').filter({ hasText: shop });
+  await card('Kick Lane').getByText('Return by ' + byText).waitFor();
+  assert.equal(await page.getByText(/Swap or return by/).count(), 0);
+  assert.equal(await card('Fern Street').getByText(/Return by|days left/).count(), 0, "no date for a shop that hasn't given its returns period");
+  await card('Fern Street').getByRole('button', { name: 'Return', exact: true }).waitFor();
+  await card('Oak & Thread').getByText('£5.00 still to pay Oak & Thread for the swap.').waitFor();
+  assert.equal(await card('Oak & Thread').getByRole('link', { name: 'Pay £5.00 to Oak & Thread' }).getAttribute('href'), 'https://oak-thread.myshopify.com/1/invoices/xyz');
+  // Swap Black for Navy, then close the finished sheet by tapping outside it.
+  await card('Kick Lane').getByRole('button', { name: 'Swap', exact: true }).click();
+  const option = page.getByRole('button', { name: 'Navy. Only 3 left' });
+  await option.waitFor();
+  await page.getByRole('heading', { name: 'Swap Logo Cap' }).waitFor(); // the same word as the button that opened it
+  assert.equal(await page.locator('.rl-sheet').last().getByText('·').count(), 0, 'no facts glued together with dots');
+  await option.click();
+  await page.getByRole('button', { name: 'Yes, swap it' }).click();
+  const sheet = page.locator('.rl-sheet').last();
+  await sheet.getByRole('heading', { name: 'Swapped for Navy' }).waitFor();
+  await sheet.getByText('Your order now has Navy instead. Nothing to pay or refund.').waitFor();
+  assert.deepEqual(await sheet.getByRole('button').allInnerTexts(), ['Done'], 'one way out, said once');
+  if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-finished.png' });
+  await page.mouse.click(195, 30);
+  await card('Kick Lane').getByText('✓ Swapped from Black to Navy').waitFor();
+  await card('Kick Lane').getByRole('button', { name: 'Return', exact: true }).waitFor();
+  assert.equal(await card('Kick Lane').getByRole('button', { name: 'Swap', exact: true }).count(), 0, 'one swap per item');
+  await card('Kick Lane').getByText('Return by ' + byText).waitFor();
+  if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/home-after-swap.png', fullPage: true });
+  // Profile, Shop orders: what each order comes to now, and what it was placed at when that has changed.
+  await page.evaluate(() => window.go('me'));
+  await page.locator('.rl-ptile', { hasText: 'Shop orders' }).click();
+  const rows = page.locator('.rl-order');
+  await rows.filter({ hasText: 'Field Jacket' }).getByText('£90.00 at Oak & Thread on 5 Jan 2026. It was £85.00 when you ordered.').waitFor();
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  await rows.filter({ hasText: 'Logo Cap' }).getByText('£20.00 at Kick Lane on ' + today, { exact: true }).waitFor();
+  await rows.filter({ hasText: 'Wool Beanie' }).getByText('£18.00 at Fern Street on ' + today, { exact: true }).waitFor();
+  assert.equal(await rows.getByText('·').count(), 0, 'no facts glued together with dots');
+  if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/shop-orders.png', fullPage: true });
+  assert.deepEqual(errors, []);
+  await context.close();
+  console.log("PASS Home after a swap: redrawn however the sheet closes, still returnable, the shop's own date only, money still to pay shown, both amounts on Shop orders");
 }
 
 await browser.close(); server.close();

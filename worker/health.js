@@ -21,6 +21,10 @@ import { SHARE_DAYS } from "./shared-emails.js";
 import { aiAvailable } from "./ai-reader.js";
 
 export const MIN_SHOPPERS_PER_SHOP = 3;
+// Whether Relay sends its emails (sign-in codes, a shop's return and swap emails) from an address of its own. Until it
+// does, they go from the mail service's test address, which only delivers to the mail account's own email: shops and new
+// shoppers don't get them.
+export const sendsFromOwnAddress = (env) => { const m = /@([a-z0-9.-]+)/i.exec(String((env && env.RELAY_EMAIL_FROM) || "")); return Boolean(m && !/(^|\.)resend\.dev$/i.test(m[1])); };
 const DAY = 864e5;
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 
@@ -117,6 +121,8 @@ export async function relayHealth(env, me, now = Date.now()) {
     one(`SELECT COUNT(*) AS n, SUM(created_at >= ?) AS week, SUM(fields IS NULL) AS failed, SUM(not_purchase) AS notPurchase,
       ${["shop", "total", "date", "number", "items"].map((k) => `SUM(${k} = 1) AS ${k}1, SUM(${k} = 2) AS ${k}2, SUM(${k} = 3) AS ${k}3`).join(", ")} FROM receipt_ai_reads`, d7)
   ]);
+  // Returns this week whose shop Relay couldn't email (no address for the shop, or the email wasn't accepted).
+  const notEmailed = await one("SELECT COUNT(*) AS n FROM relay_returns WHERE created_at >= ? AND shop_notified_at IS NULL AND status != 'cancelled'", d7);
   // A problem working this part out never takes the rest of the page with it (the page says it couldn't be checked).
   const checkedByShops = await answerKey(env, me, now, { minShoppers: MIN_SHOPPERS_PER_SHOP })
     .catch((e) => { console.error("Answer key failed", String(e && e.message || e).slice(0, 160)); return null; });
@@ -164,6 +170,7 @@ export async function relayHealth(env, me, now = Date.now()) {
       notificationDevices: n(pushes.n), notificationPeople: n(pushes.people), priceWatches: n(watches.n), watchers: n(watches.people) },
     shopsConnected: { shopify: n(shopify.n), shopifyTest: n(shopifyTest.n), square: n(square.n) },
     security: { wrongCodesToday: n(codeFails.n) },
+    mail: { ownAddress: sendsFromOwnAddress(env), returnsShopNotEmailedThisWeek: n(notEmailed.n) },
     helpChat: { on: chatAvailable(env), messagesToday: n(chat.today), messagesThisWeek: n(chat.m), handoffsThisWeek: n(chat.h), peopleThisWeek: n(chat.people) },
     sharedEmails: { kept: n(shared.kept), waiting: n(shared.waiting), thisWeek: n(shared.week), people: n(shared.people), keptDays: SHARE_DAYS },
     aiReader: { on: aiAvailable(env), shoppersOn: n(aiOn.n), reads: n(ai.n), thisWeek: n(ai.week), failed: n(ai.failed), notPurchase: n(ai.notPurchase),

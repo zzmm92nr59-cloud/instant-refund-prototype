@@ -53,6 +53,26 @@ assert.equal(empty.reading.purchases.receipts, 0, "works before anything has bee
 assert.equal(empty.reading.days.length, 14);
 console.log("ok - only Relay admins can see the health page, and it works on an empty database");
 
+// Relay's own emails: from an address of its own, or still from the mail service's test address (which only reaches the
+// mail account's own email). And how many returns this week the shop couldn't be emailed about.
+const { sendsFromOwnAddress } = await import("../worker/health.js");
+const { ensureReturnsTables } = await import("../worker/returns.js");
+assert.deepEqual(empty.mail, { ownAddress: false, returnsShopNotEmailedThisWeek: 0 }, "no address of its own yet, and no returns table yet");
+assert.equal(sendsFromOwnAddress({}), false); assert.equal(sendsFromOwnAddress({ RELAY_EMAIL_FROM: "Relay <onboarding@resend.dev>" }), false, "the test address isn't Relay's own");
+assert.equal(sendsFromOwnAddress({ RELAY_EMAIL_FROM: "Relay <hello@mail.relay-app.example>" }), true); assert.equal(sendsFromOwnAddress({ RELAY_EMAIL_FROM: "not an address" }), false);
+await ensureReturnsTables(db);
+const ret = (id, at, told, status) => sqlite.prepare("INSERT INTO relay_returns (id, shopper_id, order_id, line_id, shop, item_title, quantity, price_minor, reason, return_ref, status, created_at, shop_notified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+  .run(id, "someone", "o-" + id, "l-" + id, "made-up-shop.myshopify.com", "Made-up Item", 1, 1200, "changed_mind", "RLY-TEST-" + id, status, at, told);
+ret("r1", now - 2 * 864e5, null, "requested");          // not emailed, this week: counted
+ret("r2", now - 864e5, now - 864e5, "requested");       // emailed
+ret("r3", now - 3 * 864e5, null, "cancelled");          // cancelled: nothing to tell the shop
+ret("r4", now - 20 * 864e5, null, "requested");         // not emailed, but weeks ago
+env.RELAY_EMAIL_FROM = "Relay <hello@mail.relay-app.example>";
+const mailNow = (await (await call("/relay/my/admin/health", { token: boss })).json()).mail;
+assert.deepEqual(mailNow, { ownAddress: true, returnsShopNotEmailedThisWeek: 1 }, "only this week's returns that weren't cancelled");
+delete env.RELAY_EMAIL_FROM; sqlite.exec("DELETE FROM relay_returns");
+console.log("ok - the health page says whether Relay sends from its own address, and counts returns the shop wasn't emailed about");
+
 // Made-up activity.
 await call("/relay/my/receipts", { token: boss }); // makes the receipt tables
 let k = 0;

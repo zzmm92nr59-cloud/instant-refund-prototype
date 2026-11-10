@@ -10,6 +10,7 @@ import { normaliseEmail, emailHash, ensureAuthTables } from "./auth.js";
 import { squareHost, squareIsProduction, squareShopName } from "./square-env.js";
 import { ensureOnce } from "./once.js";
 import { ensureReturnsTables, REASON_TEXT, esc, clean } from "./returns.js";
+import { RELAY_RETURN_LIMIT_DAYS } from "./shop-returns.js";
 
 export const SQUARE_ORDER = /^square:sandbox:order:([A-Za-z0-9_-]{4,64})$/;
 export const SQUARE_CONNECTION = /^square:sandbox:([A-Za-z0-9_-]{4,64})$/;
@@ -201,8 +202,9 @@ export async function handleSquareTestRoute(request, env, url, cors, shopper, o 
 }
 
 // Square orders in the wallet: the shop's name, the size/colour and picture of each item (from the catalogue Relay already
-// read), and whether it can be returned (within 7 days, no return or swap yet) or already has a return.
-const RETURN_WINDOW_DAYS = 7;
+// read), and whether it can be returned (no return or swap yet) or already has a return. Square shops can't set their own
+// returns period in Relay yet, so this is Relay's own limit on starting a return (shop-returns.js): no date is shown for it.
+const RETURN_WINDOW_DAYS = RELAY_RETURN_LIMIT_DAYS;
 export async function enrichSquarePurchases(env, purchases, o = {}) {
   const sqOrders = purchases.filter(p => SQUARE_CONNECTION.test(String(p.retailer || "")));
   if (!sqOrders.length) return purchases;

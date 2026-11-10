@@ -394,6 +394,8 @@
     ".rl-due.soon .rl-due-bar i{background:#D47B1F}.rl-due.urgent .rl-due-bar i{background:#E0446E}" +
     ".rl-po-primary,.rl-po-secondary{flex:1 1 130px;min-height:44px;padding:10px 14px;border-radius:999px;font-weight:700;font-size:14px;border:1.5px solid var(--rl-text);text-align:center;text-decoration:none;cursor:pointer}" +
     ".rl-po-primary{background:#101828;color:#fff}.rl-po-secondary{background:var(--rl-card);color:var(--rl-text)}.rl-po-primary:disabled,.rl-po-secondary:disabled{opacity:.6}" +
+    // Straight inside a card (a column), a button is as tall as its words, not the 130px it starts from in a row of buttons.
+    ".rl-po>.rl-po-primary,.rl-po>.rl-po-secondary{flex:0 0 auto}" +
     "button.rl-po-primary,button.rl-po-secondary{font:inherit;font-weight:700;font-size:14px}.rl-po-primary:active,.rl-po-secondary:active,.rl-rg-row:active{transform:scale(.97)}" +
     ".rl-rg-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'l c' 'v c';align-items:center;column-gap:12px;row-gap:1px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid var(--rl-line);border-radius:14px;background:var(--rl-card);font:inherit;text-align:left;cursor:pointer;color:var(--rl-text)}" +
     ".rl-rg-l{grid-area:l;font-size:13px;color:var(--rl-text2)}.rl-rg-row b{grid-area:v;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{grid-area:c;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--rl-accent)}" +
@@ -4208,8 +4210,12 @@
       if (!orders.length) b.appendChild(el("p", { className: "rl-anote", text: "None yet. An order shows up here when a shop that uses Relay confirms one placed with " + email + "." }));
       orders.forEach(function (o) {
         var names = o.items.map(function (i) { return i.quantity + " × " + i.title; }).join(", ");
+        // What the order comes to now. After a swap, or the shop changing or refunding it, that isn't what it was placed at
+        // (amountNowMinor, order-ref.js on the server), so both are said.
+        var changed = Number.isInteger(o.amountNowMinor) && o.amountNowMinor !== o.amountMinor;
         b.appendChild(el("div", { className: "rl-order" }, [el("b", { text: names || "Order" }),
-          el("span", { text: (o.store ? o.store + " · " : "") + money(o.amountMinor, o.currency) + " · " + new Date(o.orderedAt).toLocaleDateString("en-GB") })]));
+          el("span", { text: money(changed ? o.amountNowMinor : o.amountMinor, o.currency) + (o.store ? " at " + o.store : "") + " on " +
+            new Date(o.orderedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (changed ? ". It was " + money(o.amountMinor, o.currency) + " when you ordered." : "") })]));
       });
     }
     // The sign-in for Shopify's reviewers (worker/review-account.js): turn it on, copy the address and code into the App
@@ -4486,7 +4492,9 @@
           row("Price watches", N(ex.priceWatches), ex.watchers ? plural(ex.watchers, "person", "people") : null),
           row("Shops on Shopify", N(sh.shopify), sh.shopifyTest ? N(sh.shopifyTest) + " of them test shops" : null),
           row("Shops on Square", N(sh.square)),
-          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))].concat(h.helpChat ? [
+          row("Wrong sign-in codes in the last day", N(h.security.wrongCodesToday))].concat(h.mail ? [
+          row("Relay's emails", h.mail.ownAddress ? "From Relay's own address" : "From a test address", h.mail.ownAddress ? null : "Only reach your own email, so shops and new shoppers don't get them yet. Relay needs a sending address of its own"),
+          row("Returns the shop wasn't emailed about", N(h.mail.returnsShopNotEmailedThisWeek), "This week")] : []).concat(h.helpChat ? [
           row("Help chat", h.helpChat.on ? "On" : "Off", h.helpChat.on ? null : "Comes on once the AI key is added in Cloudflare"),
           row("Help chat messages this week", N(h.helpChat.messagesThisWeek), plural(h.helpChat.peopleThisWeek, "person", "people") + ", " + N(h.helpChat.handoffsThisWeek) + " asked for a person")] : []))]));
       }
@@ -5546,7 +5554,13 @@
   }
   // ---- Purchases the shop confirmed (orders placed with the shopper's Relay email), with exchanges done through Relay. ----
   var RETURN_REASONS = [["wrong_size", "Wrong size or fit"], ["changed_mind", "Changed my mind"], ["faulty", "Faulty or damaged"], ["not_as_described", "Not as described"]];
-  var RETURN_ERR = { outside_return_window: "This order is outside the 7-day return window.", already_returned: "A return has already been started for this item.", already_exchanged: "This item was exchanged — it can't also be returned.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
+  // Past the returns period. The shop's own period is said as the shop's; with none set, it is Relay's own limit.
+  function pastReturns(body, shop) {
+    var days = body && body.days, who = shop || "the shop";
+    return body && body.basis === "shop" && days ? who + " takes returns for " + days + " days after you order, and that has passed for this order. If something is wrong with the item, contact " + who + "."
+      : "Relay can start a return for " + (days || 30) + " days after you order. For this order, contact " + who + " directly.";
+  }
+  var RETURN_ERR = { already_returned: "A return has already been started for this item.", already_exchanged: "This item was swapped before Relay could follow swaps on the shop's order, so it can't be returned here. Contact the shop to return it.", retailer_not_supported: "This retailer doesn't support Relay returns yet.", not_your_order: "We couldn't find this order on your account." };
 
   function openReturn(o, it, done) {
     // Shown as a proper sheet over the page (same look as the other Relay sheets), above the bottom bar on phones.
@@ -5558,6 +5572,14 @@
     var msg = el("div", { className: "rl-msg" });
     var step = "reason";
     var selectedReason = null;
+    // What will happen for this shop (a Royal Mail label, the shop's own instructions, or its usual process), asked once.
+    var plan = null;
+    api("/relay/my/return/eligibility?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) { if (r.ok && r.body && r.body.eligible) plan = r.body; }, function () {});
+    function howCard(shop, how) {
+      return el("div", { className: "card", style: "background:var(--surface2,var(--rl-fill));margin:12px 0 16px" }, [
+        el("div", { className: "eyebrow", text: "HOW " + String(shop).toUpperCase() + " WANTS IT SENT BACK" }),
+        el("p", { className: "small", style: "margin:6px 0 0;white-space:pre-line", text: how })]);
+    }
 
     // A Royal Mail label is shown only when Royal Mail actually made one (the shop connected its own Click & Drop account).
     function showLabel(result) {
@@ -5601,13 +5623,15 @@
       var inner = el("div", { className: "sheet-inner" });
       inner.appendChild(el("div", { className: "eyebrow", text: "RETURN REQUEST SAVED" }));
       inner.appendChild(el("h2", { text: "Saved in Relay" }));
-      inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it won't be offered for exchange." }));
+      inner.appendChild(el("p", { className: "small", text: "Relay has noted that you're returning " + (result.item || it.title) + ", so it can't also be swapped." }));
       inner.appendChild(el("div", { className: "card", style: "background:var(--surface2,var(--rl-fill));margin:12px 0 16px" }, [
         el("div", { className: "eyebrow", text: "WHAT TO DO NEXT" }),
         el("p", { className: "small", style: "margin:6px 0 0", text: (result.shopNotified ? "We've emailed " + shop + " to say this return is coming. " : "Relay hasn't been able to contact " + shop + " about this. ") +
           (result.inStore ? "Take the item back to " + shop + " and show them your Relay reference, or send it using their own returns process. Your refund comes from " + shop + ", and Relay will show it here once they've refunded it."
-            : shop + " hasn't set up Royal Mail labels in Relay, so to send the item back, use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + ".") })
+            : result.how ? "Send it back the way " + shop + " asks below. Your refund comes from " + shop + ", and Relay will show it here once they've refunded it."
+            : shop + " hasn't told Relay how it wants returns sent, so use " + shop + "'s own returns process (usually in your order confirmation email or on their website). Your refund comes from " + shop + ".") })
       ]));
+      if (result.how && !result.inStore) inner.appendChild(howCard(shop, result.how));
       inner.appendChild(el("div", { className: "card", style: "margin:0 0 16px" }, [
         el("div", { className: "eyebrow", text: "RELAY REFERENCE" }),
         el("div", { style: "font-family:monospace;font-size:18px;letter-spacing:2px;margin:4px 0", text: result.returnRef }),
@@ -5632,16 +5656,23 @@
             var inner2 = el("div", { className: "sheet-inner" });
             inner2.appendChild(el("div", { className: "eyebrow", text: "CONFIRM RETURN" }));
             inner2.appendChild(el("h2", { text: it.title }));
-            inner2.appendChild(el("p", { className: "small muted", text: "Relay will note this return on your account. If " + (o.store || "the shop") + " has set up Royal Mail returns in Relay, you'll get a return label straight away; if not, you'll send it back using their own returns process." }));
+            var shopN = o.store || "the shop";
+            inner2.appendChild(el("p", { className: "small muted", text: !plan ? "Relay will tell " + shopN + " you're returning this. If " + shopN + " has set up Royal Mail returns in Relay, you'll get a return label straight away; if not, you'll send it back using their own returns process."
+              : plan.inStore ? "Relay will tell " + shopN + " you're returning this. Then take it back to " + shopN + " with your Relay reference."
+              : plan.label ? "Relay will tell " + shopN + " you're returning this and give you a Royal Mail label to send it back."
+              : plan.how ? "Relay will tell " + shopN + " you're returning this. Then send it back the way " + shopN + " asks."
+              : "Relay will tell " + shopN + " you're returning this. " + shopN + " hasn't told Relay how it wants returns sent, so you'll use its own returns process." }));
+            if (plan && plan.how && !plan.label && !plan.inStore) inner2.appendChild(howCard(shopN, plan.how));
+            if (plan && plan.returnBy) inner2.appendChild(el("p", { className: "small", text: shopN + " takes returns for this order until " + shortDate(plan.returnBy) + "." }));
             inner2.appendChild(el("p", { className: "small", text: "Reason: " + r[1] }));
             inner2.appendChild(el("p", { className: "small", text: "Item price: " + money(it.priceMinor, it.currency) }));
             inner2.appendChild(msg);
-            var confirmBtn = el("button", { className: "rl-btn", text: "Start return →", onclick: function() {
+            var confirmBtn = el("button", { className: "rl-btn", text: "Start return", onclick: function() {
               confirmBtn.disabled = true; msg.textContent = "";
               api("/relay/my/return", { method: "POST", body: { orderId: o.id, lineId: it.lineId, reason: selectedReason } }).then(function(res) {
                 confirmBtn.disabled = false;
                 if (res.ok) { showSaved(res.body); }
-                else { say(msg, RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
+                else { say(msg, res.body && res.body.error === "outside_return_window" ? pastReturns(res.body, o.store) : RETURN_ERR[res.body && res.body.error] || "Couldn't start the return. Please try again.", true); }
               }).catch(function() { confirmBtn.disabled = false; say(msg, "Connection error. Please try again.", true); });
             }});
             inner2.appendChild(confirmBtn);
@@ -5659,15 +5690,16 @@
 
   var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
-    already_exchanged: "This item has already been exchanged.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
+    already_exchanged: "This item has already been swapped once, so it can't be swapped again here.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
     card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
-    price_changed: "The price has just changed. Close this and look again.", outside_window: "It's more than 7 days since you bought this, so it can't be swapped through Relay.",
+    price_changed: "The price has just changed. Close this and look again.", outside_window: "It's more than 30 days since you bought this, so it can't be swapped through Relay.",
     order_not_complete: "This order isn't finished at the shop yet, so it can't be swapped." };
   function absPounds(m) { return "£" + (Math.abs(m) / 100).toFixed(2); }
+  var PAY_URL = new RegExp("^https://");
   function openExchange(o, it, done) {
     open(function (sheet) {
-      sheet.appendChild(el("h2", { text: "Exchange " + it.title, style: "margin:0 0 4px" }));
-      sheet.appendChild(el("p", { className: "small muted", text: (o.store || "The shop") + " · you have " + (it.variant || "this item") + ". Choose what you'd like instead." }));
+      sheet.appendChild(el("h2", { text: "Swap " + it.title, style: "margin:0 0 4px" }));
+      sheet.appendChild(el("p", { className: "small muted", text: "You have " + (it.variant || "this item") + " from " + (o.store || "the shop") + ". Choose what you'd like instead." }));
       var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
       var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
       api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
@@ -5677,9 +5709,10 @@
         var shop = o.store || "The shop", card = r.body.card;
         opts.forEach(function (x) {
           var d = x.priceDiffMinor || 0;
-          var price = d > 0 ? " · " + absPounds(d) + " more" : d < 0 ? " · " + absPounds(d) + " less" : "";
-          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available && !x.needsCard, style: "margin:6px 0;text-align:left",
-            text: x.title + (x.available ? price + (Number(x.quantity) <= 5 ? " · only " + x.quantity + " left" : " · in stock") : " · " + x.reason) });
+          // The size or colour, then what it costs against what they have and how many are left, on a line of its own.
+          var facts = x.available ? [d > 0 ? absPounds(d) + " more" : d < 0 ? absPounds(d) + " less" : null, Number(x.quantity) <= 5 ? "Only " + x.quantity + " left" : "In stock"].filter(Boolean).join(". ") : x.reason;
+          var b = el("button", { className: x.available ? "rl-btn" : "rl-btn ghost", disabled: !x.available && !x.needsCard, style: "margin:6px 0;text-align:left;height:auto;min-height:52px;padding-top:8px;padding-bottom:8px",
+            ariaLabel: x.title + ". " + facts }, [el("span", { text: x.title, style: "display:block" }), el("span", { text: facts, style: "display:block;font-weight:500;font-size:14px;opacity:.85" })]);
           b.onclick = function () {
             if (x.needsCard) {
               list.textContent = ""; list.appendChild(el("p", { text: "Add a card to pay the " + absPounds(d) + " difference. Saving it charges nothing." }));
@@ -5697,11 +5730,17 @@
               say(msg, "Asking " + (o.store || "the shop") + " to update your order…");
               api("/relay/my/exchange", { method: "POST", body: { orderId: o.id, lineId: it.lineId, variantKey: x.key, agreedDiffMinor: d } }).then(function (res) {
                 if (res.ok) {
-                  say(msg, res.body.message); list.textContent = "";
+                  // Done: the sheet now says only that, and closing it any way (Done, or a tap outside) updates what's behind it.
+                  var finish = function () { close(); if (done) done(); };
+                  var layer = sheet.parentNode;
+                  if (layer) layer.addEventListener("click", function (e) { if (e.target === layer && done) done(); });
+                  sheet.textContent = "";
+                  sheet.appendChild(el("h2", { text: "Swapped for " + x.title, style: "margin:0 0 6px" }));
+                  sheet.appendChild(el("p", { className: "small", style: "margin:0 0 12px", text: String(res.body.message || "").replace(/^Done\.\s*/, "") }));
                   // Shopify's own payment page for the extra, on the shop's checkout (opens in a new tab).
-                  if (res.body.payUrl && /^https:\/\//.test(res.body.payUrl))
-                    list.appendChild(el("a", { className: "rl-btn", href: res.body.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + absPounds(d) + " to " + shop + " →", style: "text-align:center;text-decoration:none;margin-bottom:8px" }));
-                  list.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: function () { close(); if (done) done(); } }));
+                  if (res.body.payUrl && PAY_URL.test(res.body.payUrl))
+                    sheet.appendChild(el("a", { className: "rl-btn", href: res.body.payUrl, target: "_blank", rel: "noopener noreferrer", text: "Pay " + absPounds(d) + " to " + shop, style: "text-align:center;text-decoration:none;margin-bottom:8px" }));
+                  sheet.appendChild(el("button", { className: res.body.payUrl ? "rl-btn ghost" : "rl-btn", text: "Done", onclick: finish }));
                   return;
                 }
                 say(msg, EXCHANGE_ERR[res.body && res.body.error] || "The shop didn't accept the change. Please try again, or contact the shop.", true);
@@ -5839,7 +5878,7 @@
   // Relay starts the return at the first shop and opens the second shop's own checkout with the new item in the basket. The
   // shopper pays the second shop there, and the first shop refunds them once the item is back: Relay takes no money
   // (worker/cross-swap.js). The second shop's order shows the swap as done once it reaches Relay.
-  var CROSS_ERR = { not_your_order: "Relay couldn't match this order to you.", outside_return_window: "It's more than 7 days since you bought this, so Relay can't start a return for it.",
+  var CROSS_ERR = { not_your_order: "Relay couldn't match this order to you.",
     already_returned: "A return has already been started for this item.", already_exchanged: "This item has already been swapped for another size or colour.",
     retailer_not_supported: "Swaps with another shop work for orders from shops on Relay through Shopify.", reason_needed: "Pick why you're sending it back.",
     not_an_option: "That item isn't available for a swap any more. Pick another.", out_of_stock: "That one has just sold out. Pick another.",
@@ -5894,7 +5933,7 @@
       var draw = function (r) {
         list.textContent = ""; list.removeAttribute("aria-busy");
         if (!r.ok) return say(msg, CROSS_ERR[r.body && r.body.error] || "Couldn't load what other shops have. Check your connection and try again.", true);
-        if (!r.body.eligible) return say(msg, CROSS_ERR[r.body.reason] || "This item can't be swapped with another shop.", true);
+        if (!r.body.eligible) return say(msg, r.body.reason === "outside_return_window" ? pastReturns(r.body, shopA) : CROSS_ERR[r.body.reason] || "This item can't be swapped with another shop.", true);
         var shops = r.body.shops || [];
         if (!shops.length) return list.appendChild(el("div", { className: "rl-empty" }, [el("h3", { text: "Nothing to swap to yet" }),
           el("p", { text: "No other shop on Relay has something in stock right now. You can still return it to " + shopA + " for a refund." })]));
@@ -5940,7 +5979,7 @@
           if (r.ok) { started = true; return finished(r.body); }
           var e = r.body && r.body.error;
           if (e === "price_changed" && Number.isInteger(r.body.priceMinor)) return review(r.body.priceMinor, picked.shop + " now charges " + money(r.body.priceMinor, "GBP") + " for it. Check the swap again.");
-          go.disabled = false; say(msg, CROSS_ERR[e] || "Couldn't start the swap. Please try again.", true);
+          go.disabled = false; say(msg, e === "outside_return_window" ? pastReturns(r.body, shopA) : CROSS_ERR[e] || "Couldn't start the swap. Please try again.", true);
         }, function () { go.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
       } });
       sheet.appendChild(msg); sheet.appendChild(go);
@@ -6022,7 +6061,7 @@
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var status = function (text, done) { card.appendChild(el("div", { className: "rl-po-status" + (done ? "" : " wait"), text: text })); };
     var shopName = o.store || "the shop";
-    if (deadline) card.appendChild(dueBar(deadline, "Swap or return by ", String(o.orderedAt || "").slice(0, 10)));
+    if (deadline) card.appendChild(dueBar(deadline, "Return by ", String(o.orderedAt || "").slice(0, 10)));
     if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
     else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
     var actions = el("div", { className: "rl-po-actions" });
@@ -6789,8 +6828,11 @@
       foot.textContent = "";
       var purchases = both[0], receipts = both[1], today = new Date().toISOString().slice(0, 10), items = [];
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
-        if (!it.returnable && !it.exchangeable) return;
-        items.push({ deadline: new Date(Date.parse(o.orderedAt) + 7 * 864e5).toISOString().slice(0, 10), node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
+        // What can still be returned or swapped, and a swap that still has its difference to pay.
+        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid);
+        if (!it.returnable && !it.exchangeable && !owes) return;
+        // A "return by" date only when it's the shop's own (it.returnBy): Relay never makes one up.
+        items.push({ deadline: it.returnBy && it.returnBy.date ? it.returnBy.date : null, node: function () { return confirmedCard(o, it, refresh, this.deadline); } });
       }); });
       orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
         if (isCarrier(x)) return;

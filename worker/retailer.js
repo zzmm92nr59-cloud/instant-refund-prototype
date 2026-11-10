@@ -13,6 +13,7 @@ import { ensurePushTables, sendPush, subsOf, priceText } from "./push.js";
 import { royalMailSettings, saveRoyalMail, removeRoyalMail } from "./royal-mail.js";
 import { handleShopPayRoute } from "./shop-payments.js";
 import { handleRetailerAuctionRoute } from "./auctions.js";
+import { shopReturnsSettings, saveShopReturns } from "./shop-returns.js";
 
 const enc = new TextEncoder();
 const MAX_KEYS_PER_SHOP = 5, OFFERS_PER_DAY = 10, MAX_HOURS = 168;
@@ -256,6 +257,17 @@ export async function handleRetailerRoute(request, env, url, cors = {}, o = {}) 
   if (path === "/relay/retailer/auctions" || path.startsWith("/relay/retailer/auctions/")) {
     const res = await handleRetailerAuctionRoute(request, env, url, cors, shop, { ...o, now });
     if (res) return res;
+  }
+  // The shop's own returns period and how it wants items sent back (Shopify shops only for now).
+  if (path === "/relay/retailer/returns") {
+    if (shop.provider !== "shopify") return json({ error: "shopify_only" }, 400, cors);
+    if (request.method === "GET") return json(await shopReturnsSettings(env, shop.shop_ref), 200, cors);
+    if (request.method === "POST") {
+      const text = await request.text();
+      let body = null; try { body = text.length < 4000 ? JSON.parse(text) : null; } catch { body = null; }
+      const [st, out] = await saveShopReturns(env, shop.shop_ref, body, now);
+      return json(out, st, cors);
+    }
   }
   // Royal Mail return labels on the shop's own Click & Drop account (Shopify shops only). The key is never sent back.
   if (path === "/relay/retailer/royal-mail" || path === "/relay/retailer/royal-mail/remove") {

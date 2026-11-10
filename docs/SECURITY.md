@@ -69,7 +69,7 @@ found" (404) where even saying it exists would tell too much.
 | Resale requests and messages | | Only the two members in a conversation; report one | Reviews reported conversations, without seeing who the members are; dismiss, remove a listing, block a member | | | |
 | In-shop purchases (Square) | | Own: claim a card payment from a receipt; answer "is this yours?" | As a shopper | | | Suggest new in-shop payments to their owners |
 | Shop figures | | | | Own shop only: how many watch each item, offers sent, results. Counts under 3 show as "fewer than 3" | | |
-| Shop settings (payments, Royal Mail labels) | | | | Own shop only. The Royal Mail key is stored encrypted and never sent back | | |
+| Shop settings (payments, Royal Mail labels, returns period and how to send items back: `/relay/retailer/returns`) | | | | Own shop only. The Royal Mail key is stored encrypted and never sent back. The returns period (1 to 365 days) and the shop's own instructions (up to 600 characters) are shown to that shop's customers as plain text | | |
 | Catalogue (products, prices, stock) | Read (public product data) | Read | Read | Kept in the shop's own Square or Shopify | Report product and stock changes (signed) | Refresh it |
 | List of connected shops | Read names | Read | Read | | | |
 | Shops' websites, a catalogue preview (`/relay/web-shops`) | Read: public product details that shops publish on their own websites, and how each website answered. The app asks for it only in Relay's testing tools | Read | Read | | | Every minute: up to 2 shops due, each about once a day, read as RelayBot (`relaybot.html`) only where the shop's robots.txt allows it; pounds and UK delivery only; products hidden 3 days after they were read (`worker/web-shops.js`) |

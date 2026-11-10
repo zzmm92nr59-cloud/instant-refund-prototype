@@ -131,6 +131,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/retailer/royal-mail": { fields: { serviceCode: str(40), apiKey: str(400),
     address: obj({ name: text(150), company: text(250), line1: text(250), line2: text(250), city: text(100), postcode: str(16) }) } },
   "/relay/retailer/royal-mail/remove": NOTHING,
+  "/relay/retailer/returns": { fields: { days: int(1, 365), how: text(600) } },
   // Starting an auction: an item from the shop's catalogue, or a one-off with up to 4 photos (made smaller on the shop's
   // device first; auctions.js checks what each photo really is).
   "/relay/retailer/auctions": { limit: 2600 * KB, tooLarge: "photos_too_big", fields: { kind: one("catalogue", "oneoff"), variantKey: str(200), title: text(120),

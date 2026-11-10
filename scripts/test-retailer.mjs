@@ -167,4 +167,24 @@ await my("alice-id", "/relay/my/alerts/mode", { mode: "watchlist" });
 sqlite.prepare("UPDATE retailer_catalog_variants SET price_minor = 1999 WHERE sku = 'ZAR-SKT-S'").run();
 pushes = []; await runPriceAlerts(env, { now, fetchImpl });
 assert.equal(pushes.length, 0, "back on watchlist-only: unwatched items stay quiet");
+// The shop's own returns period and instructions: its own shop only, Shopify shops only for now, nothing without a key.
+{
+  const oak = await issueRetailerKey(env, { provider: "shopify", shopRef: "oak-thread.myshopify.com", storeLabel: "Oak & Thread" }, now);
+  const birch = await issueRetailerKey(env, { provider: "shopify", shopRef: "birch-lane.myshopify.com", storeLabel: "Birch Lane" }, now);
+  assert.equal((await call("/relay/retailer/returns")).status, 401);
+  assert.equal((await call("/relay/retailer/returns", { method: "POST", body: { days: 30 } })).status, 401);
+  assert.deepEqual(await (await call("/relay/retailer/returns", { key: oak })).json(), { days: null, how: null, relayLimitDays: 30 });
+  let r = await call("/relay/retailer/returns", { method: "POST", key: oak, body: { days: 28, how: "Post it to Oak & Thread Returns, with your order number inside." } });
+  assert.equal(r.status, 200); assert.deepEqual(await r.json(), { days: 28, how: "Post it to Oak & Thread Returns, with your order number inside.", relayLimitDays: 30 });
+  assert.deepEqual(await (await call("/relay/retailer/returns", { key: birch })).json(), { days: null, how: null, relayLimitDays: 30 }, "another shop's settings are its own");
+  for (const bad of [{ days: 0 }, { days: 366 }, { days: 2.5 }, { days: "30" }, { how: "x".repeat(601) }, { days: 30, shop: "birch-lane.myshopify.com" }])
+    assert.equal((await call("/relay/retailer/returns", { method: "POST", key: oak, body: bad })).status, 400, JSON.stringify(bad).slice(0, 40));
+  assert.deepEqual(await (await call("/relay/retailer/returns", { key: oak })).json(), { days: 28, how: "Post it to Oak & Thread Returns, with your order number inside.", relayLimitDays: 30 }, "a refused change changes nothing");
+  r = await call("/relay/retailer/returns", { method: "POST", key: oak, body: { days: null } });
+  assert.equal((await r.json()).days, null, "left blank: back to no date");
+  const sq = await issueRetailerKey(env, { provider: "square", shopRef: "MSQ77", storeLabel: "Fern Street" }, now);
+  assert.deepEqual(await (await call("/relay/retailer/returns", { key: sq })).json(), { error: "shopify_only" });
+  console.log("ok - a shop sets its own returns period and instructions; only its own; strict checks");
+}
+
 console.log("retailer: all checks passed");

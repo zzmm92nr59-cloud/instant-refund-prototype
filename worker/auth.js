@@ -39,6 +39,7 @@ import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, han
 import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 import { tellShopper } from "./security-mail.js";
+import { ensureOrderNowColumn } from "./order-ref.js";
 import { REVIEW_TABLE_SQL, REVIEW_MAX_FAILURES_PER_DAY, isReviewAddress, reviewBlocked, reviewCode, handleReviewAdminRoute } from "./review-account.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -522,9 +523,12 @@ async function microsoftCallback(request, env, url, opts) {
 async function listPurchases(env, shopper, orderId) {
   const where = orderId ? "AND o.id = ?" : "";
   const params = orderId ? [shopper.emailHash, orderId] : [shopper.emailHash];
+  // amountMinor: what the order came to when it was placed (what its confirmation email says). amountNowMinor: what it
+  // comes to now, when it has changed since (a swap, the shop editing it, a refund); null when it hasn't (order-ref.js).
+  const hasNow = await ensureOrderNowColumn(env.RELAY_DB).then(() => true, () => false);
   const orders = await env.RELAY_DB.prepare(
     `SELECT o.id AS id, o.connection_id AS retailer, o.ordered_at AS orderedAt,
-            o.amount_minor AS amountMinor, o.currency AS currency, o.status AS status
+            o.amount_minor AS amountMinor, ${hasNow ? "o.current_amount_minor" : "NULL"} AS amountNowMinor, o.currency AS currency, o.status AS status
      FROM retailer_orders o JOIN retailer_order_emails e ON e.order_id = o.id
      WHERE e.email_hash = ? ${where} ORDER BY o.ordered_at DESC LIMIT 100`).bind(...params).all();
   // Order lines and shop names for all the orders at once (asking once per order was slow).
