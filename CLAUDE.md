@@ -22,6 +22,7 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 17. Say things once and plainly: no facts glued together with dots ("A · B · C"), no underlined links, no grey explaining line under every heading.
 18. Back is a drawn chevron and a word in the accent colour (class rl-navback, with data-back). An inner screen shows its own bar, not the tab's big title.
 19. Nothing floats over the page except the tab bar and sheets. Something urgent is a red number on its tab.
+20. Nothing asks Relay's server on a timer. A screen asks when it's opened or pulled down, and reuses what it just loaded (api() in account.js). The few screens that must stay current while they're open (an auction, a conversation) use keepFresh in account.js: only while on screen, never with Relay in the background, and they stop when there's nothing left to wait for. Every request made on opening the app has to be worth making every time: nothing for test shops without testing tools. scripts/test-quiet-ui.mjs counts the requests.
 
 Also: index.html and relay-app-v2.html must stay identical. Bump VERSION in sw.js when the app shell changes.
 

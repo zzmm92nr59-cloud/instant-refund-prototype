@@ -67,8 +67,10 @@ await page.evaluate(() => window.go("profile")); await page.waitForTimeout(900);
 assert.ok(count("/relay/my/receipts", t3) + count("/relay/my/profile", t3) >= 1, "after a change, the next read goes to Relay");
 console.log("ok - after a change, reads go to Relay again");
 
-// The catalogue was asked for once, a few seconds after start, and opening Discover doesn't ask again.
-assert.equal(catalogue(t0), 2, "Square and Shopify catalogues, once each");
+// The catalogue was asked for once, a few seconds after start, and opening Discover doesn't ask again. Only the shops'
+// own catalogue: Relay's Square test shop is asked for only in the demo or with testing tools (scripts/test-quiet-ui.mjs).
+assert.equal(catalogue(t0), 1, "the shops' catalogue, once");
+assert.equal(calls.filter(c => c.p === "/relay/live-test/products").length, 0, "Relay's Square test shop isn't asked for without testing tools");
 const t4 = Date.now();
 await page.evaluate(() => window.go("discover")); await page.waitForTimeout(600);
 assert.equal(catalogue(t4), 0);
@@ -76,7 +78,7 @@ assert.equal(catalogue(t4), 0);
 const t5 = Date.now();
 await page.reload(); await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
 await page.evaluate(() => window.go("discover")); await page.waitForTimeout(800);
-assert.equal(catalogue(t5), 2, "Discover opened early loads the catalogue there and then");
+assert.equal(catalogue(t5), 1, "Discover opened early loads the catalogue there and then");
 console.log("ok - the shop catalogue loads once: when Discover opens, or a few seconds after start");
 assert.deepEqual(errors, []);
 await browser.close(); server.close();

@@ -72,6 +72,10 @@
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
   // them all, so nothing out of date shows after an edit. fresh: true asks Relay regardless.
   var READ_REUSE_MS = 60 * 1000, reads = {};
+  // What only the shopper changes (their name, address, phone, card, how they sign in, what they've agreed to, whether
+  // they're on Relay's team) is reused for ten minutes instead of one. Their own change forgets everything, so the only
+  // way these go out of date is a change made on another device, which pulling down picks up at once.
+  var OWN_REUSE_MS = 10 * 60 * 1000, OWN_READS = { "/relay/my/profile": 1, "/relay/my/delivery": 1, "/relay/my/phone": 1, "/relay/my/card": 1, "/relay/my/2fa": 1, "/relay/my/consent": 1, "/relay/my/admin/me": 1 };
   // Relay answers from the nearest copy of its database and hands back a bookmark with each answer. Sending the newest one
   // back means no answer is ever older than one already seen, so a change just made always shows. It's only sent once
   // Relay has given one (a server that doesn't give them wouldn't expect it).
@@ -86,7 +90,7 @@
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
-    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < READ_REUSE_MS)) return hit.answer.then(copyAnswer);
+    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return hit.answer.then(copyAnswer);
     inflight++;
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
@@ -114,6 +118,21 @@
       setTimeout(finish, max || 8000);
       setTimeout(function () { if (!inflight) finish(); else idleWaiters.push(finish); }, 150);
     });
+  }
+  // The few screens that have to keep themselves up to date while they're open (an auction's price, a conversation) ask
+  // again every `ms`, but only while that screen is still there and Relay is the app in front: nothing is asked for in
+  // the background. Coming back to Relay asks once straight away if a turn was missed. It stops for good once the screen
+  // has gone, or once more() says there is nothing left to wait for. Everything else in Relay asks when it's opened or
+  // pulled down, never on a timer.
+  function keepFresh(node, ms, ask, more) {
+    var last = Date.now(), timer = setInterval(tick, ms);
+    function over() { return !document.body.contains(node) || Boolean(more && !more()); }
+    function stop() { clearInterval(timer); document.removeEventListener("visibilitychange", back); }
+    function tick() { if (over()) return stop(); if (document.hidden) return; last = Date.now(); ask(); }
+    // Back in front after missing a turn: ask now, and count the next turn from now (not two close together).
+    function back() { if (over()) return stop(); if (!document.hidden && Date.now() - last >= ms) { clearInterval(timer); timer = setInterval(tick, ms); tick(); } }
+    document.addEventListener("visibilitychange", back);
+    return stop;
   }
   // Pull to refresh: everything is asked for again. What's on screen (and the copy kept on this device) stays until the
   // new answer arrives, so nothing goes blank.
@@ -1751,19 +1770,28 @@
   // progress). The count shows on every step until the shopper leaves the journey.
   function journeyScan(sheet, st) {
     if (st.scanner) return st.scanner;
-    var listeners = [], last = st.scan || null, stopped = false, done = false;
+    var listeners = [], last = st.scan || null, stopped = false, done = false, fails = 0;
     function tell() { listeners.forEach(function (f) { try { f(last, done); } catch (e) {} }); }
+    // A round that didn't work is tried again after 5 seconds, then 10, 20, 40 and at most every minute: Relay reads on
+    // by itself meanwhile, so there is no hurry.
+    function again() { fails++; setTimeout(step, Math.min(60000, 5000 * Math.pow(2, fails - 1))); }
     function step() {
       if (stopped || !document.body.contains(sheet)) return;
+      // With Relay in the background there's no one to show the count to: wait until it's on screen again.
+      if (document.hidden) {
+        var back = function () { if (document.hidden) return; document.removeEventListener("visibilitychange", back); step(); };
+        return document.addEventListener("visibilitychange", back);
+      }
       api("/relay/my/gmail/scan", { method: "POST", body: {} }).then(function (x) {
         if (stopped || !document.body.contains(sheet)) return;
-        if (!x.ok) return setTimeout(step, 5000);
+        if (!x.ok) return again();
+        fails = 0;
         last = x.body.job || last;
         if (last && last.state === "failed") { done = true; tell(); return; }
         if (x.body.busy) { tell(); return setTimeout(step, x.body.retryAfterMs || 4000); }
         if (x.body.more) { tell(); return step(); }
         done = true; memo.receipts = null; memo.gmail = null; tell();
-      }, function () { setTimeout(step, 5000); });
+      }, function () { again(); });
     }
     st.scanner = { on: function (f) { listeners.push(f); f(last, done); }, stop: function () { stopped = true; } };
     step();
@@ -3177,6 +3205,9 @@
         function step(small) {
           // The shopper went to another page: Relay carries on by itself.
           if (!document.body.contains(status)) { scanning = false; return; }
+          // The same when Relay itself is in the background: nothing is asked for until it's on screen again, when the
+          // page picks the reading up where Relay has got to (__relayScanResume below).
+          if (document.hidden) { scanning = false; scanBtn.disabled = false; return; }
           return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
             if (x.status === 401) return finish(owner + " has ended Relay's access to your " + MB + ". Tap Connect again at the top of this page. Your receipts stay as they are.", true, true);
             if (!x.ok) return retry();
@@ -3540,13 +3571,14 @@
       el("p", { text: "Posting: Relay doesn't handle payments, so never pay a stranger in advance by bank transfer. Collecting in person is the safer way.", style: "margin:4px 0" }),
       el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
     [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
-    var timer = null, isOpen = false;
-    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    var stopFresh = null, isOpen = false, loaded = false;
+    function stop() { if (stopFresh) { stopFresh(); stopFresh = null; } }
     function load() {
       if (!document.body.contains(sheet)) return stop();
-      api("/relay/my/resale/requests/" + requestId + "/messages").then(function (r) {
+      // Asked of Relay itself each time (not a copy from the last minute), or a reply could sit unseen.
+      api("/relay/my/resale/requests/" + requestId + "/messages", { fresh: true }).then(function (r) {
         if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
-        var b = r.body; isOpen = b.open;
+        var b = r.body; isOpen = b.open; loaded = true;
         head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Relay doesn't handle payment or postage, so agree them here.";
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
@@ -3578,7 +3610,9 @@
     };
     keepDraft(input, "msg:" + requestId);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.onclick(); });
-    load(); timer = setInterval(load, 8000);
+    load();
+    // New messages are looked for every 30 seconds while the conversation is open and on screen, and never once it has ended.
+    stopFresh = keepFresh(sheet, 30000, load, function () { return !loaded || isOpen; });
   }
   function resaleView(sheet, onBack, focusReceipt, startTab) {
     var body = el("div"), msg = el("div", { className: "rl-msg" });
@@ -6740,12 +6774,16 @@
       body.appendChild(el("button", { type: "button", className: leading ? "rl-btn" : "rl-btn ghost", text: leading ? "Done" : "Back to the auction", onclick: refresh }));
     }
     get().then(draw);
-    // While it's open, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
-    var poll = setInterval(function () {
-      if (!document.body.contains(body)) return clearInterval(poll);
+    // While it's open and on screen, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
+    // Once the auction is over there's nothing to keep up with: it carries on for ten minutes past the end, so a winner
+    // sees the shop's link to pay arrive, then stops (opening the page again, or coming back to Relay, asks afresh).
+    keepFresh(body, 20000, function () {
       if (body.querySelector("#rl-au-max") || body.querySelector("#rl-dl-firstName")) return;
       get(true).then(function (y) { if (y && document.body.contains(body) && !body.querySelector("#rl-au-max") && !body.querySelector("#rl-dl-firstName")) draw(y); });
-    }, 20000);
+    }, function () {
+      var a = shown && shown.a;
+      return !a || a.status === "live" || a.status === "ending" || (a.status !== "cancelled" && Date.now() < (Number(a.endsAt) || 0) + 600000);
+    });
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
   function copyText(text) {
@@ -6974,7 +7012,16 @@
   }
 
   // ---- Bought in a shop: card-only purchases Relay thinks are yours ("Is this yours?"), and adding one from its receipt. ----
+  // Square shops are still on Square's test system, so for now "Is this yours?" can only be about a test purchase. It is
+  // asked for only when there are real Square shops, or with testing tools on; which of those it is is remembered for
+  // five minutes, so an ordinary shopper's Home doesn't ask about in-store purchases every time it's opened.
   function mountInstore(host, done, part) {
+    cachedGet("instoreShops", "/relay/my/instore/shops").then(function (sh) {
+      if (!(sh.ok && sh.body && (sh.body.live || testingOn()))) return;
+      instoreNow(host, done, part);
+    }, function () {});
+  }
+  function instoreNow(host, done, part) {
     api("/relay/my/instore/suggestions").then(function (r) {
       if (!r.ok) return;
       var list = part === "box" ? [] : (r.body && r.body.suggestions) || [];
