@@ -60,11 +60,27 @@ Relay never makes these up. Until the shop fills them in:
 A shop that makes Royal Mail labels through Relay (docs/ROYAL_MAIL_RETURNS.md) doesn't need the "how to send it back"
 part: the label does that.
 
+## 5. The shop tells its customers
+
+A shop's customers only find Relay if the shop tells them. In the Relay shop dashboard, **Tell your customers** gives the
+shop three things, each with its own button:
+
+- **The link to Relay**, to put on its returns page or anywhere else.
+- **A line for its order emails.** It says a customer can swap an item before the shop sends it, or start a return. It
+  gives a number of days only when the shop has set its own returns period (step 4), and changes when that does.
+- **A QR code** of the same link, as a picture to print on a card that goes in the parcel (at least 2 cm wide).
+
+Customers must sign up with the email they ordered with: that is how Relay matches them to their orders.
+
+Before a shop hands any of this out, do both one-off jobs at the bottom of this page. Without Relay's own sending
+address a new customer can't get a sign-in code, and the link and the QR code point at wherever Relay's app is today.
+
 ## Checking it worked
 
 - The shop appears in the Relay shop dashboard and its products show up within a few minutes.
 - `scripts/test-shopify-pilot-apps.mjs` covers this flow offline (run in every deploy).
 - The shop's **Your returns** card shows what it saved, and a test order on Home shows "Return by" with the shop's date.
+- **Tell your customers** shows Relay's address, and scanning its QR code with a phone opens Relay.
 
 ## Before the first pilot shop: Relay's own sending address (one-off)
 
@@ -86,3 +102,19 @@ return is still listed in the shop's dashboard, but the shop would have to look 
 
 Checking it worked: Profile → Team → Relay health → **Relay's emails** says "From Relay's own address". The morning
 summary also says when Relay couldn't email a shop about a return.
+
+## Before the first pilot shop: Relay's own web address for the app (one-off, not set up yet)
+
+The link and the QR code in **Tell your customers**, and the links in Relay's emails, point at wherever Relay's app is.
+Today that is `https://zzmm92nr59-cloud.github.io/instant-refund-prototype/`, which reads like a prototype. The Relay
+server takes the app's address from `RELAY_APP_URL`, but moving the app there has not been done or rehearsed yet. It
+needs, at least: the web address pointed at the app's pages (GitHub Pages custom domain), `RELAY_APP_URL` handed to the
+server on every deploy (as `RELAY_EMAIL_FROM` is), and a check of every sign-in route afterwards.
+
+Two things to know before choosing when:
+
+- Passkeys (Face ID, fingerprint or screen lock sign-in) are tied to the app's address. After a move, everyone who has
+  one sets it up again. So move before pilot shoppers sign up, not after.
+- A QR code that's already printed keeps the old address. GitHub normally passes people on from the old address to the
+  new one, but check that once the move is done, and don't rely on it for printed codes: move first, then let shops print.
+

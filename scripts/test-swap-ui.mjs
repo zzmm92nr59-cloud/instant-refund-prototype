@@ -22,7 +22,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   elements: function () { return { create: function () { return { mount: function (n) { n.textContent = '[card field]'; } }; } }; },
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
-async function run({ card, mode = "card", returnInfo = null, exchange = null }) {
+async function run({ card, mode = "card", returnInfo = null, exchange = null, blocked = null, returnable = false }) {
   const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
   const posts = [];
   let saved = card;
@@ -35,7 +35,12 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
     if (!p.startsWith('/relay/')) return route.abort();
     if (req.method() === 'POST') posts.push({ p, body: JSON.parse(req.postData() || '{}') });
     if (p === '/relay/my/purchases') return j(200, { purchases: [{ id: 'o1', store: 'Kick Lane', retailer: 'shopify:kick-lane.myshopify.com', orderedAt: '2026-10-29T10:00:00Z',
-      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: !returnInfo && !exchange, returnable: false, returnInfo, exchange }] }] });
+      items: [{ title: 'Logo Cap', lineId: 'L1', quantity: 1, priceMinor: 2000, currency: 'GBP', variant: 'Black', exchangeable: !returnInfo && !exchange, returnable, returnInfo, exchange }] }] });
+    // The shop has already sent the order, started on it or cancelled it. The server still lists the choices (for older
+    // copies of the app); this app shows the reason instead of them.
+    if (p === '/relay/my/exchange/options' && blocked) return j(200, { product: 'Logo Cap', priceMinor: 2000, blocked, card: null, payments: false, payBy: 'shopify', options: [
+      { key: 'k12', title: 'Navy', priceMinor: 2000, quantity: 9, priceDiffMinor: 0, available: true, reason: null, needsCard: false }] });
+    if (p === '/relay/my/return/eligibility') return j(200, { eligible: true, basis: 'relay', how: null, label: false, inStore: false });
     if (p === '/relay/my/exchange/options' && mode === 'shopify') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: false, payBy: 'shopify', card: null, options: [
       { key: 'k14', title: 'Large', priceMinor: 2500, quantity: 4, priceDiffMinor: 500, available: true, reason: null, needsCard: false, payBy: 'shopify' }] });
     if (p === '/relay/my/exchange' && mode === 'shopify') return j(200, { exchanged: true, payBy: 'shopify', payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc',
@@ -153,7 +158,21 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   await p.page.getByText('✓ £5.00 difference paid to Kick Lane').waitFor();
   assert.equal(await p.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
   await p.context.close();
-  console.log('PASS swap balance: still to pay (with or without link), then paid');
+  // Once the shopper has started a return for the swapped item, the difference isn't asked for any more: they aren't
+  // keeping it. A difference already paid still shows as paid.
+  const back = { status: 'requested', ref: 'RLY-EEEE-FFFF', trackingNumber: null, refundMinor: null, refundedAt: null };
+  const r = await run({ card: null, returnInfo: back, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://kick-lane.myshopify.com/1/invoices/abc' } } });
+  await r.page.getByText('Return started · ref RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
+  assert.equal(await r.page.getByText(/still to pay/).count(), 0, 'no difference asked for on an item going back');
+  assert.equal(await r.page.getByRole('link', { name: /Pay £5\.00/ }).count(), 0);
+  if (process.env.SHOTS) await r.page.locator('.rl-po').first().screenshot({ path: process.env.SHOTS + '/swap-balance-then-return.png' });
+  assert.deepEqual(r.errors, []);
+  await r.context.close();
+  const rp = await run({ card: null, returnInfo: back, exchange: { fromTitle: 'Black', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: true, payUrl: null } } });
+  await rp.page.getByText('✓ £5.00 difference paid to Kick Lane').waitFor();
+  await rp.page.getByText('Return started · ref RLY-EEEE-FFFF. Waiting for Kick Lane to refund.').waitFor();
+  await rp.context.close();
+  console.log('PASS swap balance: still to pay (with or without link), then paid; not asked for once a return has started');
 }
 
 // 6. Home after a swap: the card is redrawn from the shop's order however the sheet is closed, the swapped item is still
@@ -182,7 +201,13 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
       // It was placed at £85 and comes to £90 now: the Shop orders page says both.
       { id: 'o3', store: 'Oak & Thread', retailer: 'shopify:oak-thread.myshopify.com', orderedAt: '2026-01-05T10:00:00Z', amountMinor: 8500, amountNowMinor: 9000, currency: 'GBP', items: [
         { title: 'Field Jacket', lineId: 'L3', quantity: 1, priceMinor: 9000, currency: 'GBP', variant: 'Large', exchangeable: false, returnable: false,
-          exchange: { fromTitle: 'Medium', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://oak-thread.myshopify.com/1/invoices/xyz' } } }] }] });
+          exchange: { fromTitle: 'Medium', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 500, paid: false, payUrl: 'https://oak-thread.myshopify.com/1/invoices/xyz' } } }] },
+      // The same, but the shopper has since started a return for it: nothing left to do, so it isn't on Home (it's on the
+      // Returns & swaps page).
+      { id: 'o4', store: 'Mill & Loom', retailer: 'shopify:mill-loom.myshopify.com', orderedAt: '2026-01-06T10:00:00Z', amountMinor: 3000, amountNowMinor: 3700, currency: 'GBP', items: [
+        { title: 'Cord Shirt', lineId: 'L4', quantity: 1, priceMinor: 3700, currency: 'GBP', variant: 'Large', exchangeable: false, returnable: false,
+          exchange: { fromTitle: 'Medium', toTitle: 'Large', status: 'done', at: Date.now(), balance: { owedMinor: 700, paid: false, payUrl: 'https://mill-loom.myshopify.com/1/invoices/qrs' } },
+          returnInfo: { status: 'requested', ref: 'RLY-GGGG-HHHH', trackingNumber: null, refundMinor: null, refundedAt: null } }] }] });
     if (p === '/relay/my/exchange/options') return j(200, { product: 'Logo Cap', priceMinor: 2000, payments: false, payBy: 'shopify', card: null, options: [
       { key: 'k12', title: 'Navy', priceMinor: 2000, quantity: 3, priceDiffMinor: 0, available: true, reason: null, needsCard: false }] });
     if (p === '/relay/my/exchange' && req.method() === 'POST') { swapped = true; return j(200, { exchanged: true, to: 'Navy', priceDiffMinor: 0, message: 'Done. Your order now has Navy instead. Nothing to pay or refund.' }); }
@@ -207,6 +232,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   await card('Fern Street').getByRole('button', { name: 'Return', exact: true }).waitFor();
   await card('Oak & Thread').getByText('£5.00 still to pay Oak & Thread for the swap.').waitFor();
   assert.equal(await card('Oak & Thread').getByRole('link', { name: 'Pay £5.00 to Oak & Thread' }).getAttribute('href'), 'https://oak-thread.myshopify.com/1/invoices/xyz');
+  assert.equal(await card('Mill & Loom').count(), 0, 'a swapped item that is now being returned has nothing left to do on Home');
   // Swap Black for Navy, then close the finished sheet by tapping outside it.
   await card('Kick Lane').getByRole('button', { name: 'Swap', exact: true }).click();
   const option = page.getByRole('button', { name: 'Navy. Only 3 left' });
@@ -239,6 +265,37 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null }) 
   assert.deepEqual(errors, []);
   await context.close();
   console.log("PASS Home after a swap: redrawn however the sheet closes, still returnable, the shop's own date only, money still to pay shown, both amounts on Shop orders");
+}
+
+// 7. An order the shop has already sent can't be swapped. The sheet says so as soon as it opens, before there's anything
+// to choose, and offers the return instead when the item can still be returned.
+{
+  const { context, page, posts, errors } = await run({ card: null, blocked: 'already_sent', returnable: true });
+  const sheet = page.locator('.rl-sheet').last();
+  await sheet.getByText("Kick Lane has already sent this order, so it can't be swapped here. You can return it instead.").waitFor();
+  await sheet.getByText('You have Black from Kick Lane.', { exact: true }).waitFor();
+  assert.equal(await sheet.getByText("Choose what you'd like instead", { exact: false }).count(), 0, 'nothing to choose, so it does not ask');
+  assert.deepEqual(await sheet.getByRole('button').allInnerTexts(), ['Return it', 'Close'], 'no sizes to pick: the return, or close');
+  if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-already-sent.png' });
+  await sheet.getByRole('button', { name: 'Return it' }).click();
+  await page.getByRole('heading', { name: 'Return: Logo Cap' }).waitFor();
+  await page.getByText("What's the reason for the return?").waitFor();
+  assert.equal(posts.filter(x => x.p === '/relay/my/exchange').length, 0, 'no swap was asked for');
+  assert.deepEqual(errors, []);
+  await context.close();
+  // Past the returns period (or already being returned): the same plain answer, without offering a return that isn't there.
+  const late = await run({ card: null, blocked: 'already_sent', returnable: false });
+  await late.page.locator('.rl-sheet').last().getByText("Kick Lane has already sent this order, so it can't be swapped here.", { exact: true }).waitFor();
+  assert.deepEqual(await late.page.locator('.rl-sheet').last().getByRole('button').allInnerTexts(), ['Close']);
+  await late.context.close();
+  const busy = await run({ card: null, blocked: 'being_sent', returnable: true });
+  await busy.page.locator('.rl-sheet').last().getByText("Kick Lane is already getting this order ready, so it can't be changed here. You can return it instead.").waitFor();
+  await busy.context.close();
+  const off = await run({ card: null, blocked: 'order_cancelled', returnable: true });
+  await off.page.locator('.rl-sheet').last().getByText("This order was cancelled, so there's nothing to swap.", { exact: true }).waitFor();
+  assert.deepEqual(await off.page.locator('.rl-sheet').last().getByRole('button').allInnerTexts(), ['Close']);
+  await off.context.close();
+  console.log('PASS an order already sent, being got ready or cancelled: said when the swap sheet opens, with the return offered when it can be');
 }
 
 await browser.close(); server.close();

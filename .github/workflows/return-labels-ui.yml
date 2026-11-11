@@ -7,6 +7,9 @@ on:
       - retailer.html
       - index.html
       - scripts/test-return-label-ui.mjs
+      - scripts/test-shop-invite.mjs
+      - scripts/fixtures/qr-pinned.json
+      - scripts/fixtures/qr-relay-example.txt
       - .github/workflows/return-labels-ui.yml
   pull_request:
   workflow_dispatch:
@@ -21,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: The QR code in the shop dashboard's Tell your customers card (pinned answers)
+        run: node scripts/test-shop-invite.mjs
       - name: Install test browser
         run: |
           npm install --no-save playwright
