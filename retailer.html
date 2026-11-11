@@ -675,7 +675,9 @@ async function loadAuctions() {
 function fillAucForm() {
   if (!auc || $("aucCondition").options.length) return;
   $("aucCondition").innerHTML = Object.entries(auc.conditions).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("");
-  $("aucHours").innerHTML = auc.durations.map(h => `<option value="${h}"${h === 72 ? " selected" : ""}>${h === 24 ? "1 day" : h === 168 ? "1 week" : h / 24 + " days"}</option>`).join("");
+  // Lengths are in hours. The server also lists a length in minutes for Relay's own shops only (and takes it only from them).
+  const short = (auc.shortMinutes || []).map(m => `<option value="m${Number(m)}">${Number(m)} minutes</option>`).join("");
+  $("aucHours").innerHTML = short + auc.durations.map(h => `<option value="${h}"${h === 72 ? " selected" : ""}>${h === 24 ? "1 day" : h === 168 ? "1 week" : h / 24 + " days"}</option>`).join("");
 }
 function aucKind() { return document.querySelector('#aucForm input[name=kind]:checked').value; }
 function aucKindShow() {
@@ -725,7 +727,8 @@ $("aucForm").addEventListener("submit", async (e) => {
   const f = e.target, btn = $("aucGo");
   if (btn.disabled) return;
   const kind = aucKind();
-  const body = { kind, condition: f.condition.value, startMinor: penceOf(f.start.value), deliveryMinor: penceOf(f.delivery.value || "0"), hours: Number(f.hours.value), agree: f.agree.checked, photos: aucPhotos };
+  const length = f.hours.value, howLong = length[0] === "m" ? { minutes: Number(length.slice(1)) } : { hours: Number(length) };
+  const body = { kind, condition: f.condition.value, startMinor: penceOf(f.start.value), deliveryMinor: penceOf(f.delivery.value || "0"), ...howLong, agree: f.agree.checked, photos: aucPhotos };
   if (kind === "catalogue") { body.variantKey = $("aucItem").value; if (!body.variantKey) return aucSay("aucFormMsg", "bad", AUC_ERR.not_your_item); }
   else { body.title = f.title.value; body.size = f.size.value; body.description = f.description.value; }
   if (!f.agree.checked) return aucSay("aucFormMsg", "bad", AUC_ERR.agree_needed);

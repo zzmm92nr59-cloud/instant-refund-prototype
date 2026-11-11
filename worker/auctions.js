@@ -27,6 +27,12 @@
 //  * A seller may not bid on its own auction unless that was announced (Sale of Goods Act 1979, s.57(4)). Relay never
 //    announces it: the shop's dashboard and Relay's terms say a shop, its staff and anyone for it can't bid.
 //
+// Trying it out. Relay's own test shops (Shopify development stores) can also start a 10-minute auction, so Relay's team can
+// run one from both sides in a sitting. The dashboard is offered that length only when the server says the shop is one, and
+// the server refuses it from any other shop. Everything else is a real auction's, including the 24 hours to pay (the app,
+// the dashboard and Relay's terms all state it, so it's the same everywhere). An unpaid win at a test shop doesn't count
+// towards the pause on bidding: the team leaves wins unpaid there on purpose, to see the item go to the next bidder.
+//
 // Kept: auctions and their photos; each bidder's maximum until 90 days after the auction ends; the offers to winners (with
 // the shopper replaced by "deleted" when they delete their account).
 import { ensureOnce } from "./once.js";
@@ -38,6 +44,7 @@ import { ensureShopPlanTable } from "./shopify.js";
 const HOUR = 3600e3, DAY = 24 * HOUR, MINUTE = 60e3;
 const API_VERSION = "2026-07";
 export const DURATIONS = [24, 72, 120, 168]; // hours: a day, 3 days, 5 days, a week
+export const TEST_MINUTES = [10]; // minutes: only for Relay's own test shops ("Trying it out", above)
 export const PAY_HOURS = 24;
 export const EXTEND_MS = 2 * MINUTE;
 export const MAX_LIVE_PER_SHOP = 20, MAX_NEW_PER_DAY = 30, MAX_PHOTOS = 4, MAX_PHOTO_BYTES = 450 * 1024;
@@ -238,6 +245,13 @@ async function canOrder(db, domain) {
   const conn = await db.prepare("SELECT scopes FROM shopify_shops WHERE domain = ?").bind(domain).first().catch(() => null);
   return Boolean(conn && String(conn.scopes || "").split(",").map(x => x.trim()).includes("write_orders"));
 }
+// Whether this is one of Relay's own test shops (a Shopify development store, shopify.js): the same rule that keeps their
+// auctions, products and orders out of real shoppers' sight. A shop Relay hasn't checked yet isn't one.
+async function isTestShop(db, domain) {
+  await ensureShopPlanTable(db);
+  const plan = await db.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = ?").bind(domain).first().catch(() => null);
+  return Boolean(plan && Number(plan.test_shop) === 1);
+}
 
 // ---- After an auction ends ----
 // Offers the item to the best bidder who hasn't been offered it yet, at what they'd pay against the bidders left. After the
@@ -383,11 +397,14 @@ async function expire(env, a, offer, now, o, f) {
       catch (e) { console.error("auction_cancel_failed", a.id, String(e && e.message || e).slice(0, 80)); }
     }
   }
-  // Only the winner's own unpaid win counts against them: an item offered later, which they didn't ask for, doesn't.
-  if (offer.rank === 1 && offer.shopper_id !== "deleted")
+  // Only the winner's own unpaid win counts against them: an item offered later, which they didn't ask for, doesn't. Nor
+  // does a win at one of Relay's own test shops, where the team leaves wins unpaid on purpose ("Trying it out", above).
+  const counts = offer.rank === 1 && offer.shopper_id !== "deleted" && !a.test_shop;
+  if (counts)
     await db.prepare("INSERT OR IGNORE INTO auction_strikes (shopper_id, auction_id, at) VALUES (?,?,?)").bind(offer.shopper_id, a.id, now).run();
   await tell(env, offer.shopper_id, { title: "Time ran out", body: a.title + " wasn't paid for in time, so it's gone to the next bidder.", url: "./#open=auction&id=" + a.id },
-    offer.rank === 1 ? { id: a.id, subject: "Time ran out: " + a.title, text: a.title + " wasn't paid for within " + PAY_HOURS + " hours, so the order was cancelled and it's gone to the next bidder. Not paying for two wins in 90 days stops bidding for 30 days." } : null, o);
+    offer.rank === 1 ? { id: a.id, subject: "Time ran out: " + a.title, text: a.title + " wasn't paid for within " + PAY_HOURS + " hours, so the order was cancelled and it's gone to the next bidder." +
+      (counts ? " Not paying for two wins in 90 days stops bidding for 30 days." : "") } : null, o);
   await offerNext(env, a, now, o);
 }
 
@@ -428,7 +445,9 @@ export async function handleRetailerAuctionRoute(request, env, url, cors, shop, 
   if (path === "/relay/retailer/auctions" && m === "GET") {
     const rows = ((await db.prepare("SELECT * FROM auctions WHERE provider = ? AND shop_ref = ? ORDER BY (status = 'live') DESC, created_at DESC LIMIT 100").bind(shop.provider, shop.shop_ref).all()).results || []);
     const offers = rows.length ? ((await db.prepare(`SELECT * FROM auction_offers WHERE auction_id IN (${rows.map(() => "?").join(",")}) ORDER BY rank`).bind(...rows.map(r => r.id)).all()).results || []) : [];
-    return json({ store: shop.store_label, canOrder: await canOrder(db, shop.shop_ref), durations: DURATIONS, conditions: CONDITIONS,
+    // shortMinutes is only ever sent to Relay's own test shops: a real shop's dashboard has nothing to offer it from.
+    return json({ store: shop.store_label, canOrder: await canOrder(db, shop.shop_ref), durations: DURATIONS,
+      ...((await isTestShop(db, shop.shop_ref)) ? { shortMinutes: TEST_MINUTES } : {}), conditions: CONDITIONS,
       auctions: rows.map(a => shopView(a, offers.filter(x => x.auction_id === a.id), now)) }, 200, cors);
   }
   if (path === "/relay/retailer/auctions/catalogue" && m === "GET") return json({ items: await shopCatalogue(db, shop) }, 200, cors);
@@ -459,7 +478,11 @@ async function createAuction(env, shop, b, now) {
   if (!Number.isInteger(b.startMinor) || b.startMinor < START_MIN || b.startMinor > START_MAX) return [400, { error: "bad_start", min: START_MIN, max: START_MAX }];
   const delivery = b.deliveryMinor == null ? 0 : b.deliveryMinor;
   if (!Number.isInteger(delivery) || delivery < 0 || delivery > DELIVERY_MAX) return [400, { error: "bad_delivery", max: DELIVERY_MAX }];
-  if (!DURATIONS.includes(b.hours)) return [400, { error: "bad_duration" }];
+  // How long it runs: a day to a week, in hours. Relay's own test shops may ask in minutes instead (TEST_MINUTES); from any
+  // other shop that's refused like any length Relay doesn't offer, so a real auction can never be shorter than a day.
+  const short = b.minutes !== undefined && b.minutes !== null;
+  if (short ? (b.hours != null || !TEST_MINUTES.includes(b.minutes) || !(await isTestShop(db, shop.shop_ref))) : !DURATIONS.includes(b.hours))
+    return [400, { error: "bad_duration" }];
   const photos = [];
   for (const raw of Array.isArray(b.photos) ? b.photos.slice(0, MAX_PHOTOS + 1) : []) {
     const p = decodePhoto(raw);
@@ -488,11 +511,9 @@ async function createAuction(env, shop, b, now) {
   if (Number(live && live.n) >= MAX_LIVE_PER_SHOP) return [429, { error: "too_many_live", max: MAX_LIVE_PER_SHOP }];
   const today = await db.prepare("SELECT COUNT(*) AS n FROM auctions WHERE provider = ? AND shop_ref = ? AND created_at > ?").bind(shop.provider, shop.shop_ref, now - DAY).first();
   if (Number(today && today.n) >= MAX_NEW_PER_DAY) return [429, { error: "too_many_today", max: MAX_NEW_PER_DAY }];
-  await ensureShopPlanTable(db);
-  const plan = await db.prepare("SELECT test_shop FROM shopify_shop_plan WHERE domain = ?").bind(shop.shop_ref).first().catch(() => null);
-  const a = { id: crypto.randomUUID(), provider: shop.provider, shop_ref: shop.shop_ref, store_label: shop.store_label, test_shop: plan && Number(plan.test_shop) === 1 ? 1 : 0,
+  const a = { id: crypto.randomUUID(), provider: shop.provider, shop_ref: shop.shop_ref, store_label: shop.store_label, test_shop: (await isTestShop(db, shop.shop_ref)) ? 1 : 0,
     kind, variant_key: variantKey, title, variant, size: TEXT(b.size, 40) || null, description: LONG(b.description, 1000) || null, condition: b.condition, image_url: imageUrl,
-    photos: photos.length, start_minor: b.startMinor, delivery_minor: delivery, currency: "GBP", starts_at: now, ends_at: now + b.hours * HOUR, status: "live",
+    photos: photos.length, start_minor: b.startMinor, delivery_minor: delivery, currency: "GBP", starts_at: now, ends_at: now + (short ? b.minutes * MINUTE : b.hours * HOUR), status: "live",
     price_minor: null, bids: 0, leader_id: null, outcome: null, version: 0, created_at: now, ended_at: null };
   await db.batch([
     db.prepare(`INSERT INTO auctions (id, provider, shop_ref, store_label, test_shop, kind, variant_key, title, variant, size, description, condition, image_url, photos,

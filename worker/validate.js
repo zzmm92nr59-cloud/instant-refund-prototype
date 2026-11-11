@@ -133,10 +133,11 @@ const ROUTES = new Map(Object.entries({
   "/relay/retailer/royal-mail/remove": NOTHING,
   "/relay/retailer/returns": { fields: { days: int(1, 365), how: text(600) } },
   // Starting an auction: an item from the shop's catalogue, or a one-off with up to 4 photos (made smaller on the shop's
-  // device first; auctions.js checks what each photo really is).
+  // device first; auctions.js checks what each photo really is). How long it runs is in hours; minutes is the short length
+  // auctions.js takes only from Relay's own test shops and refuses from every other shop.
   "/relay/retailer/auctions": { limit: 2600 * KB, tooLarge: "photos_too_big", fields: { kind: one("catalogue", "oneoff"), variantKey: str(200), title: text(120),
     size: text(40), description: text(1000), condition: str(20), startMinor: int(0, 100000000), deliveryMinor: int(0, 100000000), hours: int(0, 1000),
-    photos: list(4, str(620000)), agree: bool } },
+    minutes: int(0, 1000), photos: list(4, str(620000)), agree: bool } },
   // Relay inside Shopify admin: signs in with Shopify's token in the Authorization header, nothing in the body.
   "/relay/shopify/embedded/session": NOTHING,
   // The bank-link demo in the testing tools (Plaid's sandbox).
