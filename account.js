@@ -5700,7 +5700,8 @@
     showReasonPicker();
   }
 
-  var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be changed here. Use the shop's returns process instead.",
+  var EXCHANGE_ERR = { out_of_stock: "That one has just sold out. Pick another.", already_sent: "This order has already been sent, so it can't be swapped here.",
+    being_sent: "The shop is already getting this order ready, so it can't be changed here.",
     different_price: "That option costs a different amount, which Relay can't handle yet.", shop_not_connected: "This shop isn't connected to Relay any more.",
     already_exchanged: "This item has already been swapped once, so it can't be swapped again here.", already_returned: "You've started a return for this item, so it can't also be swapped.", not_your_order: "Relay couldn't match this order to you.", order_cancelled: "This order was cancelled.",
     card_needed: "Add a card first to pay the difference.", card_declined: "Your card didn't go through, so nothing changed. Try another card.",
@@ -5711,11 +5712,24 @@
   function openExchange(o, it, done) {
     open(function (sheet) {
       sheet.appendChild(el("h2", { text: "Swap " + it.title, style: "margin:0 0 4px" }));
-      sheet.appendChild(el("p", { className: "small muted", text: "You have " + (it.variant || "this item") + " from " + (o.store || "the shop") + ". Choose what you'd like instead." }));
+      var have = "You have " + (it.variant || "this item") + " from " + (o.store || "the shop") + ".";
+      var intro = el("p", { className: "small muted", text: have + " Choose what you'd like instead." }); sheet.appendChild(intro);
       var list = el("div", {}, [el("p", { text: "Checking what the shop has in stock…" })]); sheet.appendChild(list);
       var msg = el("div", { className: "rl-msg" }); sheet.appendChild(msg);
       api("/relay/my/exchange/options?orderId=" + encodeURIComponent(o.id) + "&lineId=" + encodeURIComponent(it.lineId)).then(function (r) {
         list.textContent = "";
+        // The shop has sent the order, started on it or cancelled it: said now, before there's anything to choose, with
+        // the way to return it instead when that's still open.
+        var stop = r.ok && r.body && r.body.blocked;
+        if (stop) {
+          var shopN = o.store || "The shop", back = Boolean(it.returnable) && stop !== "order_cancelled";
+          intro.textContent = have;
+          list.appendChild(el("p", { text: (stop === "order_cancelled" ? "This order was cancelled, so there's nothing to swap."
+            : stop === "being_sent" ? shopN + " is already getting this order ready, so it can't be changed here."
+            : shopN + " has already sent this order, so it can't be swapped here.") + (back ? " You can return it instead." : "") }));
+          if (back) list.appendChild(el("button", { className: "rl-btn", text: "Return it", onclick: function () { close(); openReturn(o, it, done); } }));
+          return;
+        }
         var opts = (r.ok && r.body && r.body.options) || [];
         if (!opts.length) { list.appendChild(el("p", { text: r.ok ? "This product has no other sizes or colours." : "Couldn't load the options." })); return; }
         var shop = o.store || "The shop", card = r.body.card;

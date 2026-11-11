@@ -37,12 +37,18 @@ const order = (ext, who) => {
 };
 const o500 = order(500, alice), o501 = order(501, alice), o502 = order(502, alice);
 
-let calls = [], fulfilment = { "500": "UNFULFILLED", "501": "FULFILLED", "502": "UNFULFILLED" }, refuseAdd = false, removedLine = null;
+let calls = [], fulfilment = { "500": "UNFULFILLED", "501": "FULFILLED", "502": "UNFULFILLED" }, refuseAdd = false, removedLine = null, cancelled = new Set(), shopDown = false;
 const fetchImpl = async (url, init) => {
   assert.equal(String(url), "https://" + SHOP + "/admin/api/2026-07/graphql.json");
   assert.equal(init.headers["X-Shopify-Access-Token"], "tok");
   const { query, variables } = JSON.parse(init.body); calls.push({ query, variables });
   const ok = (data) => new Response(JSON.stringify({ data }), { status: 200 });
+  // Asked when the swap sheet opens: can this order still be changed?
+  if (/RelayExchangeOpen/.test(query)) {
+    if (shopDown) return new Response("{}", { status: 503 });
+    const ext = variables.o.split("/").pop();
+    return ok({ order: { cancelledAt: cancelled.has(ext) ? "2026-11-01T10:00:00Z" : null, displayFulfillmentStatus: fulfilment[ext] } });
+  }
   if (/RelayExchangeCheck/.test(query)) return ok({ order: { cancelledAt: null, displayFulfillmentStatus: fulfilment[variables.o.split("/").pop()] }, productVariant: { inventoryQuantity: variables.v.endsWith("/12") ? 5 : 0, title: "x" } });
   // Order 502: the shop has since changed the product's variants, so Shopify no longer links the bought line to a variant.
   if (/orderEditBegin/.test(query) && variables.id.endsWith("/502")) return ok({ orderEditBegin: { calculatedOrder: { id: "gid://shopify/CalculatedOrder/2", lineItems: { nodes: [
@@ -69,12 +75,38 @@ const opts = (await (await call(alice, "/relay/my/exchange/options?orderId=" + e
 assert.deepEqual(opts.map(x => [x.title, x.available, x.reason, x.payBy]), [["Large", true, null, "shopify"], ["Navy", true, null, null], ["Red", false, "Out of stock", null]]);
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: conn + ":variant:gid://shopify/ProductVariant/13" })).status, 409, "out of stock is refused");
 assert.equal((await call(alice, "/relay/my/exchange", { orderId: o500, lineId: "9500", variantKey: "made-up" })).status, 400);
-assert.equal(calls.length, 0);
+// Opening the swap sheet asks the shop one thing (can the order still be changed?) and changes nothing.
+assert.deepEqual(calls.map(c => /query (\w+)/.exec(c.query)[1]), ["RelayExchangeOpen"]);
+assert.deepEqual(calls[0].variables, { o: "gid://shopify/Order/500" });
 
 // 3. An order already sent can't be edited; Relay says so and changes nothing.
 const sent = await call(alice, "/relay/my/exchange", { orderId: o501, lineId: "9501", variantKey: conn + ":variant:gid://shopify/ProductVariant/12" });
 assert.equal(sent.status, 409); assert.equal((await sent.json()).error, "already_sent");
 assert.ok(!calls.some(c => /mutation/.test(c.query)), "no edit is attempted on a sent order");
+// The shopper is told as soon as the swap sheet opens, before choosing anything: sent (all or part), started on by the
+// shop, or cancelled. (The choices are still listed for a copy of the app from before this: it shows them as it always
+// did, rather than saying the item comes in nothing else.)
+const sheet = async (orderId, lineId) => (await call(alice, "/relay/my/exchange/options?orderId=" + encodeURIComponent(orderId) + "&lineId=" + lineId)).json();
+assert.equal((await sheet(o501, "9501")).blocked, "already_sent");
+assert.ok((await sheet(o501, "9501")).options.length > 0);
+fulfilment["501"] = "PARTIALLY_FULFILLED"; assert.equal((await sheet(o501, "9501")).blocked, "already_sent");
+for (const status of ["IN_PROGRESS", "ON_HOLD", "SCHEDULED"]) {
+  fulfilment["501"] = status;
+  assert.equal((await sheet(o501, "9501")).blocked, "being_sent", status);
+  const tried = await call(alice, "/relay/my/exchange", { orderId: o501, lineId: "9501", variantKey: conn + ":variant:gid://shopify/ProductVariant/12" });
+  assert.deepEqual([tried.status, (await tried.json()).error], [409, "being_sent"], "and the swap itself gives the same reason");
+}
+fulfilment["501"] = "UNFULFILLED"; cancelled.add("501");
+assert.equal((await sheet(o501, "9501")).blocked, "order_cancelled");
+cancelled.clear();
+const open = await sheet(o501, "9501");
+assert.equal("blocked" in open, false); assert.ok(open.options.length > 0, "an order nothing has happened to yet can be swapped");
+// When the shop can't be asked just now, or gives no status, the choices are still shown: the swap itself asks again.
+shopDown = true; const unsure = await sheet(o501, "9501"); shopDown = false;
+assert.equal("blocked" in unsure, false); assert.ok(unsure.options.length > 0);
+delete fulfilment["501"]; assert.equal("blocked" in (await sheet(o501, "9501")), false);
+fulfilment["501"] = "FULFILLED";
+assert.ok(!calls.some(c => /mutation/.test(c.query)), "looking never changes an order");
 
 // 4. If the shop refuses part-way, nothing is committed and the attempt is recorded as failed.
 refuseAdd = true; calls = [];
