@@ -2,8 +2,9 @@
 // Checks: a Shopify shop sees Auctions with its own auctions and what happened to each, in words, with links to its own
 // orders; starting one from the catalogue (search, pick, condition, starting bid, delivery, how long, the promise not to
 // bid) sends exactly that, once; a one-off needs a photo, which is made smaller on the device first; plain words for every
-// refusal; an auction nobody has bid on can be cancelled; without Shopify's permission to create orders the shop is told
-// how to give it; Square shops don't see auctions.
+// refusal; an auction nobody has bid on can be cancelled; a shop is offered a day to a week and nothing shorter, except
+// Relay's own test shops, which are also offered 10 minutes (sent in minutes, not hours); without Shopify's permission to
+// create orders the shop is told how to give it; Square shops don't see auctions.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
@@ -18,7 +19,7 @@ const conditions = { new_tags: "New with tags", new: "New without tags", returne
 const view = (o) => ({ id: o.id, shop: "Hollow Pine", title: "Wool Beanie", variant: "Navy", size: null, condition: "new_tags", conditionText: "New with tags", fromCatalogue: true,
   pictures: ["https://cdn.shop.test/71.jpg"], startMinor: 1000, priceMinor: null, nextMinor: 1000, bids: 0, deliveryMinor: 395, currency: "GBP", endsAt: now + day, status: "live", outcome: null, offers: [], ...o });
 const st = {
-  platform: "shopify", canOrder: true, posts: [],
+  platform: "shopify", canOrder: true, posts: [], shortMinutes: null,
   auctions: [
     view({ id: "a1111111-1111-4111-8111-111111111111", priceMinor: 3100, bids: 4 }),
     view({ id: "a2222222-2222-4222-8222-222222222222" }),
@@ -44,12 +45,14 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/retailer/results") return j({ supported: st.platform === "shopify", swaps: [], returns: [], totals: { swaps: 0, swapValueMinor: 0, returns: 0, returnValueMinor: 0, swapShare: null }, currency: "GBP" });
   if (p === "/relay/retailer/payments") return j({ method: "shopify", stripe: { connected: false, ready: false }, cardPossible: false });
   if (p === "/relay/retailer/royal-mail") return j({ connected: false, services: [] });
-  if (p === "/relay/retailer/auctions" && m === "GET") return st.platform === "shopify" ? j({ store: "Hollow Pine", canOrder: st.canOrder, durations: [24, 72, 120, 168], conditions, auctions: st.auctions }) : j({ error: "shopify_only" }, 400);
+  // As the server does: a length in minutes is listed only for Relay's own test shops.
+  if (p === "/relay/retailer/auctions" && m === "GET") return st.platform === "shopify" ? j({ store: "Hollow Pine", canOrder: st.canOrder, durations: [24, 72, 120, 168],
+    ...(st.shortMinutes ? { shortMinutes: st.shortMinutes } : {}), conditions, auctions: st.auctions }) : j({ error: "shopify_only" }, 400);
   if (p === "/relay/retailer/auctions/catalogue") return j({ items: st.items });
   if (p === "/relay/retailer/auctions" && m === "POST") {
     const b = JSON.parse(req.postData() || "{}"); st.posts.push(b); await new Promise(r => setTimeout(r, 200));
     if (st.answer) { const a = st.answer; st.answer = null; return j(a.body, a.status); }
-    const made = view({ id: "a6666666-6666-4666-8666-66666666666" + st.posts.length, title: b.title || "Wool Beanie", endsAt: now + b.hours * 3600e3 });
+    const made = view({ id: "a6666666-6666-4666-8666-66666666666" + st.posts.length, title: b.title || "Wool Beanie", endsAt: now + (b.minutes ? b.minutes * 60e3 : b.hours * 3600e3) });
     st.auctions.unshift(made); return j({ auction: made });
   }
   const cancel = /^\/relay\/retailer\/auctions\/([0-9a-f-]{36})\/cancel$/.exec(p);
@@ -81,6 +84,8 @@ console.log("ok - the shop sees each auction and what happened to it in words, w
 await page.getByRole("button", { name: "Start an auction" }).click();
 const form = page.locator("#aucForm");
 await form.locator("#aucItem option", { hasText: "Wool Beanie" }).waitFor({ state: "attached" });
+assert.deepEqual(await form.locator("#aucHours option").allInnerTexts(), ["1 day", "3 days", "5 days", "1 week"], "a shop is offered a day to a week, and nothing shorter");
+assert.equal(await form.locator("#aucHours").inputValue(), "72", "3 days to begin with");
 await page.locator("#aucFind").fill("tee");
 assert.deepEqual(await form.locator("#aucItem option").allInnerTexts(), ["Field Tee (£35.00, 0 in stock)"]);
 await page.locator("#aucFind").fill("");
@@ -138,14 +143,49 @@ assert.ok(st.posts.some(x => x.cancel));
 await list.getByText("Cancelled before anyone bid.").first().waitFor();
 console.log("ok - an auction nobody has bid on can be cancelled");
 
-// 5. Without Shopify's permission to create orders: told how to give it, and can't start one.
+// 5. One of Relay's own test shops (the server says so by listing a length in minutes) is also offered 10 minutes. It's
+// sent in minutes with no hours beside it, the other lengths still go in hours, and nothing on the page calls it a test.
+st.shortMinutes = [10];
+await page.reload();
+await page.getByRole("heading", { name: "Auctions" }).waitFor();
+await list.getByText("Wool Beanie, Navy").first().waitFor();
+await page.getByRole("button", { name: "Start an auction" }).click();
+await form.locator("#aucItem option", { hasText: "Wool Beanie" }).waitFor({ state: "attached" });
+assert.deepEqual(await form.locator("#aucHours option").allInnerTexts(), ["10 minutes", "1 day", "3 days", "5 days", "1 week"]);
+assert.equal(await form.locator("#aucHours").inputValue(), "72", "3 days is still what's chosen to begin with");
+assert.ok(!/\b(tests?|testing|demo|sandbox)\b/i.test(await page.locator("#auc").innerText()), "no test, demo or sandbox wording in the auctions section");
+await form.locator("#aucItem").selectOption({ label: "Wool Beanie, Navy (£28.00, 4 in stock)" });
+await form.locator("select[name=hours]").selectOption({ label: "10 minutes" });
+await form.locator("input[name=start]").fill("5");
+await form.locator("input[name=agree]").check();
+await form.screenshot({ path: "/tmp/shots/retailer-auctions-form-10-minutes.png" });
+const postsBefore = st.posts.length;
+await page.getByRole("button", { name: "Start auction" }).dblclick();
+await page.getByText(/^Started\. Wool Beanie is up for auction until /).waitFor();
+assert.equal(st.posts.length, postsBefore + 1, "started once for a double click");
+assert.deepEqual(st.posts.at(-1), { kind: "catalogue", condition: "new_tags", startMinor: 500, deliveryMinor: 0, minutes: 10, agree: true, photos: [],
+  variantKey: "shopify:hollow-pine.myshopify.com:variant:gid://shopify/ProductVariant/71" }, "10 minutes is sent as minutes, with no hours beside it");
+const endsAt = await page.evaluate(t => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }), now + 10 * 60e3);
+assert.match(await list.locator(".row").first().innerText(), new RegExp("No bids yet\\. Starts at £10\\.00\\. Ends .+ at " + endsAt + "\\."), "the row says when it ends, ten minutes on");
+// The usual lengths are still sent in hours from this shop.
+await page.getByRole("button", { name: "Start an auction" }).click();
+await form.locator("#aucItem").selectOption({ label: "Wool Beanie, Navy (£28.00, 4 in stock)" });
+await form.locator("select[name=hours]").selectOption({ label: "1 day" });
+await form.locator("input[name=start]").fill("5");
+await form.locator("input[name=agree]").check();
+await page.getByRole("button", { name: "Start auction" }).click();
+await page.getByText(/^Started\. Wool Beanie is up for auction until /).waitFor();
+assert.equal(st.posts.at(-1).hours, 24); assert.ok(!("minutes" in st.posts.at(-1)), "a day is sent in hours, with no minutes beside it");
+console.log("ok - one of Relay's own test shops is also offered 10 minutes, sent in minutes; every other shop sees a day to a week");
+
+// 6. Without Shopify's permission to create orders: told how to give it, and can't start one.
 st.canOrder = false;
 await page.getByRole("button", { name: "Refresh" }).click();
 await page.getByText("To run auctions, Relay needs your permission to create orders in Shopify", { exact: false }).waitFor();
 assert.equal(await page.getByRole("button", { name: "Start an auction" }).isDisabled(), true);
 console.log("ok - without permission to create orders, the shop is told how to give it");
 
-// 6. Square shops (still on Square's test system) don't see auctions.
+// 7. Square shops (still on Square's test system) don't see auctions.
 st.platform = "square";
 await page.reload();
 await page.locator("#shop").getByText("Hollow Pine").waitFor();

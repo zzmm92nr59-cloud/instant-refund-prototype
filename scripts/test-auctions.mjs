@@ -1,10 +1,11 @@
 // Offline test for auctions (worker/auctions.js): prices, starting and cancelling an auction, bidding, the end of an auction,
-// the winner's order at the shop, paying, not paying, and what shops and shoppers can see. The shop's Shopify and the email
-// service are stand-ins: nothing leaves this machine. Made-up shops, people, addresses and products.
+// the winner's order at the shop, paying, not paying, what shops and shoppers can see, and the 10-minute length only Relay's
+// own test shops get. The shop's Shopify and the email service are stand-ins: nothing leaves this machine. Made-up shops,
+// people, addresses and products.
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import { increment, standing, nextMinimum, publicAuction, orderInput, ensureAuctionTables, placeBid, runAuctions, handleRetailerAuctionRoute,
-  handleAuctionPublicRoute, handleAuctionShopperRoute, forgetAuctionBidder, auctionsForExport, DURATIONS, EXTEND_MS, PAY_HOURS, MAX_LIVE_PER_SHOP } from "../worker/auctions.js";
+  handleAuctionPublicRoute, handleAuctionShopperRoute, forgetAuctionBidder, auctionsForExport, DURATIONS, TEST_MINUTES, EXTEND_MS, PAY_HOURS, MAX_LIVE_PER_SHOP } from "../worker/auctions.js";
 import { ensureDeliveryTables } from "../worker/delivery.js";
 import { ensureShopPlanTable } from "../worker/shopify.js";
 import { REVIEW_BLOCKED } from "../worker/review-account.js";
@@ -105,6 +106,9 @@ const anyone = async (path) => {
 };
 const bid = (who, auctionId, maxMinor) => asShopper(who, "POST", "/relay/my/auctions/bid", { auctionId, maxMinor });
 const base = { kind: "catalogue", variantKey: WOOL, condition: "new_tags", startMinor: 1000, deliveryMinor: 395, hours: 24, agree: true };
+// The same auction with no length given, for asking in minutes instead; and Relay's own test shop.
+const { hours: lengthLeftOut, ...noLength } = base;
+const devShop = { provider: "shopify", shop_ref: TESTSHOP, store_label: "Relay Dev" };
 
 // 2. Starting auctions: only from the shop's own catalogue or with its own photos; plain errors for everything else.
 assert.equal((await asShop("POST", "/relay/retailer/auctions", base, { provider: "square", shop_ref: "M1", store_label: "Sq" })).body.error, "shopify_only");
@@ -184,6 +188,7 @@ const everyone = JSON.stringify([shopList, (await (await anyone("/relay/auctions
 for (const secret of ["ana@", "ben@", "cat@", "\"a\"", "\"b\"", "\"c\"", "leader", "shopper", "maxMinor", "max_minor", "\"you\""]) assert.ok(!everyone.includes(secret), "never shown: " + secret);
 assert.ok(!/:8000[,}]/.test(everyone) && !/:7000[,}]/.test(everyone), "nobody's maximum, in any field");
 assert.equal(shopList.canOrder, true); assert.deepEqual(shopList.durations, DURATIONS);
+assert.ok(!("shortMinutes" in shopList), "a real shop's dashboard is given the four lengths in days and nothing shorter");
 const mineB = (await asShopper("b", "GET", "/relay/my/auctions")).body;
 assert.equal(mineB.canBid, true);
 assert.deepEqual(mineB.auctions.map(y => [y.auction.id, y.you.state, y.you.maxMinor]), [[A.id, "leading", 8000]], "your own maximum, only to you");
@@ -234,6 +239,7 @@ assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE sho
 const offers = sqlite.prepare("SELECT shopper_id, rank, price_minor, status FROM auction_offers WHERE auction_id = ? ORDER BY rank").all(A.id);
 assert.deepEqual(offers.map(y => [y.shopper_id, y.rank, y.price_minor, y.status]), [["b", 1, 7200, "expired"], ["a", 2, 6200, "awaiting_payment"]]);
 assert.deepEqual(calls.emails.map(e => [e.to[0], e.subject]), [["ben@example.com", "Time ran out: Wool Beanie"], ["ana@example.com", "Yours if you want it: Wool Beanie"]]);
+assert.match(calls.emails[0].text, /wasn't paid for within 24 hours, .+ Not paying for two wins in 90 days stops bidding for 30 days\.$/m, "Ben is told it counts");
 assert.equal((await asShopper("a", "GET", "/relay/my/auctions")).body.auctions[0].you.state, "offered");
 assert.equal((await asShopper("b", "GET", "/relay/my/auctions")).body.auctions[0].you.state, "expired");
 // 8. Ana pays at the shop: Relay notices, and the auction is sold.
@@ -355,6 +361,9 @@ assert.ok((await check("/relay/retailer/auctions", { ...base, photos: [jpeg] }))
 assert.equal((await check("/relay/retailer/auctions", { ...base, photos: [jpeg, jpeg, jpeg, jpeg, jpeg] })).response.status, 400, "four photos at most");
 assert.equal((await check("/relay/retailer/auctions", null, JSON.stringify({ ...base, photos: ["x".repeat(700000)] }))).response.status, 400);
 assert.ok(schemaFor("/relay/retailer/auctions/" + A.id + "/cancel"), "cancelling takes nothing");
+assert.ok((await check("/relay/retailer/auctions", { ...noLength, minutes: 10 })).request, "a length in minutes is a field the route takes (auctions.js decides who may use it: 17, below)");
+assert.equal((await check("/relay/retailer/auctions", { ...noLength, minutes: 10.5 })).response.status, 400, "whole minutes only");
+assert.equal((await check("/relay/retailer/auctions", { ...noLength, minutes: "10" })).response.status, 400, "a number, not text");
 const key = await issueRetailerKey(env, { provider: "shopify", shopRef: DOMAIN, storeLabel: "Hollow Pine" }, NOW);
 const viaKey = await handleRetailerRoute(new Request("https://api.relay.test/relay/retailer/auctions", { headers: { Authorization: "Bearer " + key } }), env, new URL("https://api.relay.test/relay/retailer/auctions"), {}, { now: NOW });
 assert.equal(viaKey.status, 200); assert.equal((await viaKey.json()).store, "Hollow Pine");
@@ -362,7 +371,71 @@ const noKey = await handleRetailerRoute(new Request("https://api.relay.test/rela
 assert.equal(noKey.status, 401);
 console.log("ok - the new routes take only their own fields, and the shop's routes need the shop's key");
 
-// 17. A shop that removes Relay: its running auctions end without a sale; Shopify's erase request deletes them all.
+// 17. Trying it out: Relay's own test shops can run a 10-minute auction, so the team can try one from both sides in a
+// sitting. No other shop is offered that length, or gets it by asking.
+assert.deepEqual(TEST_MINUTES, [10]);
+const devList = (await asShop("GET", "/relay/retailer/auctions", null, devShop)).body;
+assert.deepEqual(devList.shortMinutes, [10], "the test shop's dashboard is offered 10 minutes"); assert.deepEqual(devList.durations, DURATIONS, "as well as the usual lengths");
+assert.ok(!("shortMinutes" in (await asShop("GET", "/relay/retailer/auctions")).body), "a real shop's dashboard isn't offered it");
+const realBefore = sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE shop_ref = ?").get(DOMAIN).n;
+assert.deepEqual((await asShop("POST", "/relay/retailer/auctions", { ...noLength, minutes: 10 })).body, { error: "bad_duration" }, "a real shop that asks anyway is refused, like any length Relay doesn't offer");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE shop_ref = ?").get(DOMAIN).n, realBefore, "and nothing was started");
+// A shop Relay hasn't checked yet (no plan on record) isn't a test shop either.
+sqlite.prepare("INSERT INTO shopify_shops VALUES ('unchecked-shop.myshopify.com', 'Unchecked', 'read_products,write_orders')").run();
+const unchecked = { provider: "shopify", shop_ref: "unchecked-shop.myshopify.com", store_label: "Unchecked" };
+assert.ok(!("shortMinutes" in (await asShop("GET", "/relay/retailer/auctions", null, unchecked)).body));
+assert.deepEqual((await asShop("POST", "/relay/retailer/auctions", { kind: "oneoff", title: "Sample scarf", photos: [jpeg], condition: "sample", startMinor: 1000, minutes: 10, agree: true }, unchecked)).body, { error: "bad_duration" });
+// The test shop: only the length on the list, and hours or minutes, never both.
+for (const [change, why] of [[{ minutes: 5 }, "a length that isn't offered"], [{ minutes: 0 }, "no time at all"], [{ minutes: 1440 }, "a day, in minutes"], [{ minutes: 10, hours: 24 }, "both at once"]])
+  assert.deepEqual((await asShop("POST", "/relay/retailer/auctions", { ...noLength, variantKey: DEVITEM, ...change }, devShop)).body, { error: "bad_duration" }, why);
+const day24 = (await asShop("POST", "/relay/retailer/auctions", { ...base, variantKey: DEVITEM, minutes: null }, devShop)).body.auction;
+assert.equal(day24.endsAt, NOW + 24 * 3600e3, "minutes left out (null) means the length in hours, as before");
+const quick = await asShop("POST", "/relay/retailer/auctions", { ...noLength, variantKey: DEVITEM, minutes: 10 }, devShop);
+assert.equal(quick.status, 200);
+const Q = quick.body.auction;
+assert.equal(Q.endsAt, NOW + 10 * 60e3, "it ends ten minutes after it starts"); assert.equal(Q.test, true); assert.equal(Q.status, "live");
+// Like any test shop's auction, real shoppers never see it; bidding is the same, late bids included.
+assert.ok(!(await (await anyone("/relay/auctions")).json()).auctions.some(y => y.id === Q.id));
+assert.ok((await (await anyone("/relay/auctions?test=1")).json()).auctions.some(y => y.id === Q.id));
+assert.equal((await bid("c", Q.id, 2000)).body.you.leading, true);
+NOW = Q.endsAt - 30e3;
+x = await bid("d", Q.id, 3000);
+assert.equal(x.body.you.leading, true); assert.equal(x.body.auction.priceMinor, 2100);
+assert.equal(x.body.auction.endsAt, NOW + EXTEND_MS, "a late bid still gives everyone two more minutes");
+// The every-minute run ends it and makes the winner's order at the test shop, as a test order. The time to pay is the same
+// 24 hours as everywhere: the app, the dashboard and Relay's terms all say 24 hours, so a shorter one here would make them wrong.
+NOW += EXTEND_MS + 1000; calls.emails.length = 0;
+const ordersBeforeQuick = calls.orders.length;
+ran = await runAuctions(env, O());
+assert.equal(ran.ended, 1); assert.equal(ran.offered, 1); assert.equal(calls.orders.length, ordersBeforeQuick + 1);
+assert.equal(calls.orders.at(-1).shop, TESTSHOP); assert.equal(calls.orders.at(-1).order.test, true, "the order at a test shop is a test order");
+assert.equal(calls.orders.at(-1).order.email, "dev@example.com");
+const devWin = (await asShopper("d", "GET", "/relay/my/auctions")).body.auctions.find(y => y.auction.id === Q.id).you;
+assert.equal(devWin.state, "pay"); assert.equal(devWin.totalMinor, 2495); assert.equal(devWin.payBy, NOW + PAY_HOURS * 3600e3, "the winner has the same 24 hours to pay");
+assert.match(calls.emails[0].text, /Pay Relay Dev £24\.95 including delivery by .+ at their own checkout/);
+// Left unpaid on purpose: it goes to the next bidder as usual, but it doesn't count towards the pause on bidding, and the
+// email doesn't warn of one.
+NOW += PAY_HOURS * 3600e3 + 1000; calls.emails.length = 0;
+ran = await runAuctions(env, O());
+assert.equal(ran.expired, 1);
+assert.equal(sqlite.prepare("SELECT status FROM auction_offers WHERE auction_id = ? AND shopper_id = 'd'").get(Q.id).status, "expired");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE auction_id = ?").get(Q.id).n, 0, "an unpaid win at a test shop isn't counted");
+const timeUp = calls.emails.find(e => e.subject === "Time ran out: Test Jacket");
+assert.ok(timeUp, "the winner is still told the time ran out"); assert.match(timeUp.text, /wasn't paid for within 24 hours, so the order was cancelled and it's gone to the next bidder\.$/m);
+assert.ok(!/stops bidding/.test(timeUp.text), "with no warning about a pause that isn't coming");
+assert.equal((await asShopper("c", "GET", "/relay/my/auctions")).body.auctions.find(y => y.auction.id === Q.id).you.state, "offered", "Cat, next highest, is offered it");
+// A second unpaid win straight after: at a real shop that pauses bidding for 30 days (11, above). At the test shop it doesn't.
+const Q2 = (await asShop("POST", "/relay/retailer/auctions", { ...noLength, variantKey: DEVITEM, minutes: 10 }, devShop)).body.auction;
+assert.equal((await bid("d", Q2.id, 1500)).status, 200);
+NOW = Q2.endsAt + 1000; await runAuctions(env, O());
+NOW += PAY_HOURS * 3600e3 + 1000; await runAuctions(env, O());
+assert.equal(sqlite.prepare("SELECT status FROM auction_offers WHERE auction_id = ? AND shopper_id = 'd'").get(Q2.id).status, "expired");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auction_strikes WHERE shopper_id = 'd'").get().n, 0);
+assert.equal((await asShopper("d", "GET", "/relay/my/auctions")).body.canBid, true, "two unpaid wins at the test shop don't pause bidding");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM auctions WHERE test_shop = 0 AND ends_at - starts_at < 86400000").get().n, 0, "and no real shop's auction has ever run for less than a day");
+console.log("ok - Relay's own test shops can run a 10-minute auction (no other shop is offered it or can ask for it); the time to pay stays 24 hours; unpaid wins there don't count");
+
+// 18. A shop that removes Relay: its running auctions end without a sale; Shopify's erase request deletes them all.
 const G = (await asShop("POST", "/relay/retailer/auctions", { ...base, startMinor: 1000, hours: 24 })).body.auction;
 assert.equal(sqlite.prepare("SELECT status FROM auctions WHERE id = ?").get(G.id).status, "live");
 await forgetShopifyShop(env, DOMAIN, { now: NOW });
