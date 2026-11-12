@@ -4313,8 +4313,9 @@
     (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; })).then(function (hc) {
       if (!hc || !(hc.available || hc.handoff)) return;
       chatRow._ai = Boolean(hc.available);
-      if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
-      chatRow.style.display = "";
+      if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); chatRow.style.display = ""; }
+      else if (askOn()) chatRow.remove();
+      else chatRow.style.display = "";
       // Asking the assistant about a receipt lands on Profile's first screen and opens the chat from there.
       openChatAbout = function () {
         if (!head.isConnected || !hc.available || !wantChatAbout) return false;
