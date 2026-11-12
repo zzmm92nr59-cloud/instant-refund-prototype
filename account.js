@@ -944,7 +944,14 @@
     ".rl-wr-door:active{transform:scale(.985);opacity:.9}.rl-wr-door:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#c7f567;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
     ".rl-wr-door-t b{font-size:19px;line-height:24px;font-weight:700;color:#fff}.rl-wr-door-t span{font-size:14px;line-height:19px;color:#d4d4e5}.rl-wr-door .rl-arow-c{flex:none;color:#c7f567}" +
-    "@media(prefers-reduced-motion:reduce){.rl-wr-door{transition:none}.rl-wr-door:active{transform:none}}";
+    "@media(prefers-reduced-motion:reduce){.rl-wr-door{transition:none}.rl-wr-door:active{transform:none}}" +
+    ".rl-calm-bar{display:flex;gap:8px;align-items:center;margin:0 0 2px}" +
+    ".rl-calm-filter{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:10px;padding:0 12px 0 14px;border-radius:12px;background:var(--rl-card);color:var(--rl-text);font-size:16px;font-weight:600;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-calm-filter>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}.rl-calm-filter .rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2);transform:rotate(90deg)}" +
+    ".rl-calm-fi{flex:none;display:inline-flex;color:var(--rl-text)}" +
+    ".rl-calm-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--rl-card);color:var(--rl-text);transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-search+div>.rl-calm-bar{margin-top:-6px}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -3032,7 +3039,7 @@
         var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
         var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
-        list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All groups" })]));
+        list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All receipts" })]));
         // One search box: in a group, the group's own (the page's search steps aside until you're back).
         if (list.parentNode) list.parentNode.classList.add("rl-in-cat");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
@@ -3106,7 +3113,9 @@
         // An email from a shop on Relay is the same purchase as its shop order, which is already under "Shop orders".
         if (onPage && shopRows.length) { var dup = {}; shopRows.forEach(function (x) { dup[label(x[0].store) + "|" + x[0].amountMinor] = true; });
           rows = rows.filter(function (r) { return !dup[label(r.retailer && r.retailer.name) + "|" + r.totalPence]; }); }
-        if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." })); return; }
+        if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." }));
+          if (onPage) list.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
+          return; }
         // Soonest deadline first, then no deadline, then expired.
         var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
         var sorted = rows.slice().sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
@@ -3114,7 +3123,7 @@
         var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return (a === "other") - (b === "other") || na - nb || by[b].length - by[a].length; });
         if (memo.openCat === "shop" && shopRows.length) {
-          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All groups", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
+          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All receipts", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
           list.appendChild(el("h3", { style: "font-size:20px;margin:14px 0 8px;color:var(--rl-text);display:flex;align-items:center;gap:10px" }, [catIcon("shop", 32), el("span", { text: "Shop orders (" + shopRows.length + ")" })]));
           list.lastChild.firstChild.style.background = "#101828";
           var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:15px;background:var(--rl-card);font-family:inherit" });
@@ -3132,28 +3141,52 @@
           return;
         }
         memo.openCat = null;
-        var grid = el("div", { className: "rl-tiles" });
-        // Opening a group starts at its top; coming back lands where the groups were.
-        var open = function (k) { return function () { memo.catY = window.scrollY || 0; memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); }; };
-        // This year's Wrapped comes first, as soon as there's a receipt from this year.
-        var year = new Date().getFullYear();
-        if (rows.some(function (r) { return String(r.orderDate || "").slice(0, 4) === String(year); }))
-          grid.appendChild(el("button", { type: "button", className: "rl-tile rl-year", ariaLabel: "Your " + year + " Wrapped", onclick: function () { if (window.go) window.go("wrapped"); } },
-            [el("span", { className: "rl-year-n", text: String(year) }), el("b", { text: "Wrapped" })]));
-        if (giftRows.length) {
-          var giftPic = giftRows.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
-            .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
-          grid.appendChild(tile("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), giftPic, 0, open("gifts")));
-        }
-        if (shopRows.length) grid.appendChild(tile("shop", "Shop orders", shopRows.length + " item" + (shopRows.length === 1 ? "" : "s"), null, 0, open("shop")));
-        keys.forEach(function (k) {
-          var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length;
-          // The tile's picture: the newest photo of something bought in this group (only a receipt's own item photo).
-          var photo = by[k].slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
-            .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
-          grid.appendChild(tile(k, groupNames[k] || "Other", by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), photo, soon, open(k)));
-        });
-        list.appendChild(grid);
+        // Calm layout: no tiles. One Filter control and one small Add control, then the receipts themselves, newest first,
+        // under month headings. Kinds of shopping, gifts and shop orders are in the Filter sheet, on the pages they had.
+        var openK = function (k) { memo.catY = window.scrollY || 0; memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); };
+        var yearN = {}; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y)) yearN[y] = (yearN[y] || 0) + 1; });
+        var yearList = Object.keys(yearN).sort().reverse();
+        if (memo.calmYear && !yearN[memo.calmYear]) memo.calmYear = null;
+        var counted = function (n) { return n + (n === 1 ? " receipt" : " receipts"); };
+        var kindRow = function (k, label, detail, onclick) { var row = accRow("doc", label, detail, onclick), chip = catIcon(k, 30); if (k === "shop") chip.style.background = "#101828"; row.replaceChild(chip, row.firstChild); return row; };
+        var filterSheet = function (sheet) {
+          sheet.setAttribute("aria-label", "Filter receipts");
+          sheet.appendChild(el("h2", { text: "Filter" }));
+          var pick = function (fn) { return function () { close(); fn(); }; };
+          var kinds = [accRow("doc", "All receipts", counted(rows.length), pick(function () { memo.calmYear = null; drawList(); }))];
+          keys.forEach(function (k) { kinds.push(kindRow(k, groupNames[k] || "Other", counted(by[k].length), pick(function () { openK(k); }))); });
+          if (giftRows.length) kinds.push(kindRow("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), pick(function () { openK("gifts"); })));
+          if (shopRows.length) kinds.push(kindRow("shop", "Shop orders", shopRows.length + (shopRows.length === 1 ? " item" : " items"), pick(function () { openK("shop"); })));
+          sheet.appendChild(accGroup("", kinds));
+          if (yearList.length > 1) sheet.appendChild(accGroup("Year", yearList.map(function (y) { return accRow("doc", y, counted(yearN[y]), pick(function () { memo.calmYear = y; drawList(); })); })));
+          sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+        };
+        list.appendChild(el("div", { className: "rl-calm-bar" }, [
+          el("button", { type: "button", className: "rl-calm-filter", ariaLabel: "Filter receipts, showing " + (memo.calmYear || "all receipts"), onclick: function () { open(filterSheet); } },
+            [accIc("filter", 20, "rl-calm-fi"), el("span", { text: memo.calmYear || "All receipts" }), accIc("chev", 16, "rl-arow-c")]),
+          el("button", { type: "button", className: "rl-calm-add", ariaLabel: "Add a missing receipt", onclick: function () { open(function (sheet) { addReceiptView(sheet, close); }); } }, [accIc("plus", 22, "rl-calm-fi")])]));
+        var newest = rows.slice().sort(function (x, y) { return String(y.orderDate || "").localeCompare(String(x.orderDate || "")); });
+        if (memo.calmYear) newest = newest.filter(function (r) { return String(r.orderDate || "").slice(0, 4) === memo.calmYear; });
+        var months = el("div"); list.appendChild(months);
+        var shownN = 30;
+        var drawMonths = function () {
+          months.textContent = "";
+          if (!newest.length) { months.appendChild(el("p", { className: "rl-calm-none", text: "No receipts from your email yet. Orders from shops on Relay are under Filter." })); return; }
+          var month = null, card = null;
+          newest.slice(0, shownN).forEach(function (r) {
+            var m = r.orderDate ? r.orderDate.slice(0, 7) : "none";
+            if (m !== month) {
+              month = m;
+              var inMonth = newest.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
+              months.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
+                el("span", { text: tot ? money(tot, "GBP") : counted(inMonth.length) })]));
+              card = el("div", { className: "rl-cat-list" }); months.appendChild(card);
+            }
+            card.appendChild(receiptRow(r));
+          });
+          if (newest.length > shownN) months.appendChild(loadAhead(el("button", { type: "button", className: "rl-po-secondary rl-cat-more", text: "Show " + Math.min(40, newest.length - shownN) + " more of " + (newest.length - shownN), onclick: function () { shownN += 40; drawMonths(); } })));
+        };
+        drawMonths();
       }
       // One kind of shopping as a tile: its colour, a tinted photo of something bought there (or its drawing), its name, and
       // how many return deadlines are coming up.
@@ -3293,8 +3326,8 @@
         box.appendChild(el("div", { className: "rl-recstat" }, [status]));
         // Pulling the page down checks the inbox now (relay-gestures.js through checkInbox), so there's no button for it.
         window.__relayCheckNow = function () { if (document.body.contains(status) && !scanBtn.disabled) scanBtn.onclick(); };
-        // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
-        box.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
+        // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks): the small
+        // Add control beside Filter (drawList).
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
@@ -3867,6 +3900,8 @@
   // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
+    filter: '<path d="M4 7h8.5M19.5 7h.5M4 17h.5M11.5 17H20"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9.5 4V3h5v1M9.5 10h5M9.5 14h5"/>',
