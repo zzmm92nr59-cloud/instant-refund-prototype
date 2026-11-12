@@ -6629,6 +6629,28 @@
   // The Auctions page: what's live, and the shopper's own bids and wins.
   function openAuctions(tab) { if (!load()) return show(); open(function (sheet) { auctionsView(sheet, tab || "live"); }); }
   function openAuction(id) { if (!load()) return show(); open(function (sheet) { auctionView(sheet, id, function () { auctionsView(sheet, "live"); }); }); }
+  // Calm layout: live auctions inside Discover. A card opens that auction's page (a sheet); bids already made are one row.
+  function mountAuctions(host) {
+    host.textContent = "";
+    if (!load()) return;
+    var body = el("div"); host.appendChild(body);
+    for (var i = 0; i < 3; i++) body.appendChild(el("div", { className: "rl-skel rl-au-skel" }));
+    // Opened on purpose, so it asks for the latest: prices and wins change while the app is closed.
+    Promise.all([auctionsLive(true), auctionsMine(true)]).then(function (rs) {
+      if (!host.isConnected) return;
+      body.textContent = "";
+      var rows = rs[0] || [], mine = (rs[1] && rs[1].auctions) || [], youOf = {};
+      mine.forEach(function (r) { youOf[r.auction.id] = r.you; });
+      if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No auctions right now" }),
+        el("p", { text: "When shops on Relay put clothes up for auction, they show here. You bid the most you'd pay, and Relay bids for you only as much as it takes to stay ahead." })]));
+      rows.forEach(function (a) { body.appendChild(auCard(a, youOf[a.id], function () { open(function (sheet) { auctionView(sheet, a.id, close); }); })); });
+      if (mine.length) {
+        var todo = mine.filter(function (r) { return AU_TODO[r.you.state]; }).length;
+        body.appendChild(accGroup("", [accRow("gavel", "Your bids", todo ? todo + " to pay for" : "", function () { openAuctions("mine"); })]));
+      }
+      auTick(body);
+    });
+  }
   function auctionsView(sheet, tab) {
     sheet.textContent = ""; sheet.setAttribute("aria-label", "Auctions");
     try { sheet.scrollTop = 0; } catch (e) {}
@@ -7397,7 +7419,7 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
-    openAuctions: openAuctions, openAuction: openAuction, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
+    openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
