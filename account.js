@@ -954,7 +954,7 @@
     ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}" +
     // Draft 2: Home's feed. One flick moves one card: the page snaps to each card's top edge (Home only, html.h2-snap).
-    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px);scroll-padding-bottom:calc(env(safe-area-inset-bottom) + 96px)}" +
+    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px);scroll-padding-bottom:calc(var(--rl-tab-top,84px) + 12px)}" +
     // Sizes and spacing follow a phone-shopping feed's proportions (measured in points on a 402 by 874 screen); the
     // colours, drawings, glass and words are Relay's. Home's edges are 16px (the page's are 18).
     ".h2-home{margin:0 -2px}" +
@@ -993,10 +993,12 @@
     "@media(prefers-color-scheme:dark){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
     ".h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(8,12,22,.5)!important;color:#fff!important}.h2-feed.tint .h2-card.has-c .h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.24)}}" +
     // Draft 2: Ask. The page is at least a screen tall, so the box rests just above the tab bar from the start.
-    ".rl-asktab{display:flex;flex-direction:column;min-height:calc(100vh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}}" +
+    ".rl-asktab{display:flex;flex-direction:column;min-height:calc(100vh - env(safe-area-inset-top) - 83px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 83px - var(--rl-tab-top,84px))}}" +
+    "@media(max-width:760px){.rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}}" +
     ".rl-asktab .rl-chat{margin-top:0}.rl-asktab .rl-chat-bar{margin-top:auto}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-anote{margin:2px 2px 12px}.rl-asktab .rl-msg:empty{display:none}" +
     ".rl-ask-lead{margin:0 2px 2px;font-size:16px;line-height:22px;color:var(--rl-text2)}.rl-ask-q{min-height:52px}.rl-ask-q .rl-arow-t b{font-weight:600}" +
-    ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}";
+    ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}" +
+    ".rl-arow-t b{font-weight:600}.rl-arow-d{font-size:14px}.rl-rr-mid b{font-size:16px;font-weight:600}.rl-rr-mid span{font-size:14px}.rl-rr-end b{font-size:16px;font-weight:600}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -7356,11 +7358,21 @@
       if (testingOn()) { var t = el("div", { className: "h2-tools" }); feed.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
       firstScreen();
     };
+    // Which cards are stopping places. The page rests at its very top; whatever sits right under the chips (any small
+    // notices, then the first order's card) shows there already, so it is not a stop of its own and the first flick goes
+    // to the second card. If that first card is too tall to show whole (bigger text), it is a stop, so none of it is ever
+    // out of reach. Measured without the nudge pull to refresh gives the page while it works.
     var firstScreen = function () {
       if (!document.body.contains(feed)) return;
       var bar = document.getElementById("foot"), br = bar && bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
-      var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0;
-      Array.prototype.forEach.call(feed.children, function (c) { var r = c.getBoundingClientRect(); c.classList.toggle("h2-nosnap", r.bottom + y <= limit && r.top + y < 200); });
+      var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0, nudge = 0;
+      try { var mm = /matrix\(([^)]+)\)/.exec(getComputedStyle(document.querySelector("main.main")).transform || ""); if (mm) nudge = parseFloat(mm[1].split(",")[5]) || 0; } catch (e) {}
+      var leading = true;
+      Array.prototype.forEach.call(feed.children, function (c) {
+        var fits = c.getBoundingClientRect().bottom - nudge + y <= limit;
+        c.classList.toggle("h2-nosnap", leading && fits);
+        if (!c.classList.contains("small") && !c.classList.contains("h2-start")) leading = false;
+      });
     };
     // Bigger text, a photo arriving or the phone turning changes what fits: a card that no longer fits the first screen
     // becomes a stopping place again, so no part of it is ever out of reach.
