@@ -939,7 +939,12 @@
     ".rl-crow-e{flex:none;max-width:42%;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);text-align:right}.rl-crow-e.urgent{color:var(--rl-danger)}.rl-crow-e.soon{color:var(--rl-warn)}" +
     ".rl-crow .rl-arow-c{flex:none;color:var(--rl-text2)}" +
     ".rl-calm-none{margin:0;padding:20px 16px;font-size:16px;line-height:22px;color:var(--rl-text2)}" +
-    ".rl-calm-door{margin-top:28px}";
+    ".rl-calm-door{margin-top:28px}" +
+    ".rl-wr-door{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;margin-top:14px;padding:16px 16px 16px 18px;border-radius:20px;background:#101828;border:1px solid rgba(255,255,255,.1);color:#fff;transition:transform .15s,opacity .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-wr-door:active{transform:scale(.985);opacity:.9}.rl-wr-door:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#c7f567;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
+    ".rl-wr-door-t b{font-size:19px;line-height:24px;font-weight:700;color:#fff}.rl-wr-door-t span{font-size:14px;line-height:19px;color:#d4d4e5}.rl-wr-door .rl-arow-c{flex:none;color:#c7f567}" +
+    "@media(prefers-reduced-motion:reduce){.rl-wr-door{transition:none}.rl-wr-door:active{transform:none}}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -3927,9 +3932,9 @@
     return el("section", { className: "rl-agroup" }, (title ? [el("h3", { text: title })] : []).concat([card]));
   }
   // The bar across the top: Back on the left (on inner pages), the page name, and Done on the right.
-  function accBar(sheet, title, onBack) {
+  function accBar(sheet, title, onBack, backWord) {
     // On the Profile page the same sections sit in the page itself: no Done button, and the page already has its title.
-    var inPage = sheet.classList.contains("rl-inpage"), home = inPage ? "Profile" : "Account";
+    var inPage = sheet.classList.contains("rl-inpage"), home = backWord || (inPage ? "Profile" : "Account");
     if (inPage && !onBack) return;
     var bar = el("div", { className: "rl-abar" }, [
       onBack ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back to " + home, "data-back": "", onclick: onBack }, [accIc("back", 20, "rl-ab-i"), el("span", { text: home })]) : el("span"),
@@ -3961,13 +3966,20 @@
     // On the Profile page, an inner page starts at its top and Back lands where Profile was.
     function home() { signedInView(sheet, email, null, c); if (inPage) scrollBackTo(profileY); }
     // An inner page with the top bar. Each section keeps its own heading out of the way: the bar already names it.
+    // Calm layout: two of Profile's rows open a page of rows (hub). While one of that page's own rows is open, backTo is
+    // the page, so Back returns one level and names it, not all the way to Profile.
+    var backTo = null;
     function page(title, build) {
-      if (inPage) profileY = window.scrollY || 0;
+      if (inPage && !backTo) profileY = window.scrollY || 0;
       sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {}
       if (inPage) window.scrollTo(0, 0);
-      accBar(sheet, title, home);
+      accBar(sheet, title, backTo || home, backTo ? backTo.word : null);
       var body = el("div", { className: "rl-asub" }); sheet.appendChild(body);
       build(body);
+    }
+    function hub(title, word, build) {
+      var again = function () { backTo = null; page(title, build); backTo = again; };
+      again.word = word; again();
     }
     // Screens that bring their own heading and Back button.
     function screen(view) { sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {} view(sheet); }
@@ -3994,28 +4006,32 @@
     var review = isReview();
     if (notice) say(msg, notice.text, notice.bad);
 
-    // The everyday things, as colourful tiles like the Receipts page (settings stay as lists below). The reviewer account
-    // (isReview) can't have an inbox, delivery details or bids, so those tiles, and Wrapped (made from inbox receipts), are
-    // left out for it.
-    var tiles = [];
-    var mailRow = accTile("mail", "Email connection", "", function () { page("Email connection", mailPage); });
-    if (!review) tiles.push(mailRow);
-    var deliveryRow = null, auctionRow = null, alertRow = null;
+    // Calm layout: Profile is who you are, this year's Wrapped as one card, then a short list. Each thing has one home:
+    // Price alerts, Swap & resell and Auctions are on Discover; adding a missing receipt and shop orders are on Receipts.
+    // The reviewer account (isReview) can't have an inbox or delivery details, so those rows, and Wrapped (made from inbox
+    // receipts), are left out for it.
+    if (inPage && !review) {
+      var wr = el("div", { id: "rl-wrapped" }); sheet.appendChild(wr);
+      var openWrapped = function (y) { page("Wrapped", function (b) { mountWrapped(b, y); }); };
+      wrappedDoor(wr, openWrapped);
+      if (window.__relayOpenWrapped) { window.__relayOpenWrapped = false; setTimeout(function () { if (head.isConnected) openWrapped(); }, 0); }
+    }
+    var rows = [];
+    var mailRow = accRow("mail", "Inboxes", "", function () { page("Inboxes", mailPage); });
+    if (!review) rows.push(mailRow);
+    var deliveryRow = null;
     if (!review) {
       // The delivery details Relay fills in at shops' checkouts.
-      deliveryRow = accTile("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
+      deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
         deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
-      tiles.push(deliveryRow);
+      rows.push(deliveryRow);
     }
-    // Price alerts (only where the app's pages are here to open).
-    if (window.go) { alertRow = accTile("bell", "Price alerts", "", function () { close(); window.go("radar"); }); tiles.push(alertRow); }
-    if (marketOn()) tiles.push(accTile("swap", "Swap & resell", "", function () { openResale(); }));
-    // Auctions: bids and wins (a win to pay for comes first, in words).
-    if (!review) { auctionRow = accTile("gavel", "Auctions", "", function () { openAuctions("mine"); }); tiles.push(auctionRow); }
-    if (!review) tiles.push(accTile("paste", "Add a missing receipt", "", function () { openFind(); }));
-    var ordersRow = accTile("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
-    tiles.push(ordersRow);
-    sheet.appendChild(el("div", { className: "rl-tiles rl-ptiles" }, tiles));
+    // The reviewer account has no inbox, so its orders from shops stay one tap away here. Everyone else finds them on Receipts.
+    var ordersRow = accRow("bag", "Shop orders", "None yet", function () { page("Shop orders", ordersPage); });
+    if (review) rows.push(ordersRow);
+    rows.push(accRow("lock", "Security and privacy", "", function () { hub("Security and privacy", "Security", secHub); }));
+    rows.push(accRow("help", "Help and legal", "", function () { hub("Help and legal", "Back", helpHub); }));
+    sheet.appendChild(accGroup("", rows));
     var mailState = null;
     api("/relay/my/gmail").then(function (g) {
       if (g.ok) rememberMailbox(g.body);
@@ -4028,57 +4044,46 @@
     api(purchasesPath()).then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       orders = (r.ok && r.body && r.body.purchases) || [];
-      if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders")); }
+      if (orders.length) ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders"));
     }).catch(function () {});
-    if (alertRow) alertStatus().then(function (st) {
-      var n = st && st.watches ? st.watches.length : 0;
-      alertRow.setDetail(n ? n + " watched" : "");
-    });
     if (deliveryRow) api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? r.body.delivery.postcode : "Add your address"); }).catch(function () {});
-    if (auctionRow) auctionsMine().then(function (b) {
-      var rows = (b && b.auctions) || [], todo = rows.filter(function (r) { return AU_TODO[r.you.state]; }).length;
-      var live = rows.filter(function (r) { return r.auction.status === "live" || r.auction.status === "ending"; }).length;
-      auctionRow.setDetail(todo ? todo + " to pay for" : live ? "Bidding on " + live : "");
-    });
-    // This year's Wrapped, under the tiles.
-    if (inPage && !review) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
 
-    // Sign-in & security
-    var secRows = [];
-    if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
-    var openTwoStep = function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); };
-    // Shown once Relay can send texts (or when a number is already on the account).
-    var phoneRow = accRow("phone", "Phone number", "", function () { page("Phone number", function (b) { phoneSection(b, openTwoStep); }); });
-    phoneRow.style.display = "none"; secRows.push(phoneRow);
-    var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
-    secRows.push(twoRow);
-    var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
-    secRows.push(devicesRow);
-    var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
-    cardRow.style.display = "none"; secRows.push(cardRow);
-    sheet.appendChild(accGroup("Sign-in & security", review ? [devicesRow] : secRows));
-    if (review) sheet.appendChild(el("p", { className: "rl-anote", text: "This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it." }));
-    api("/relay/my/2fa").then(function (r) {
-      if (!r.ok || !r.body) return;
-      var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
-    }).catch(function () {});
-    api("/relay/my/phone").then(function (r) {
-      if (!r.ok || !r.body || !(r.body.available || r.body.ending)) return;
-      phoneRow.style.display = ""; phoneRow.setDetail(r.body.ending ? "Ending " + r.body.ending : "Add one for sign-in codes");
-    }).catch(function () {});
-    api("/relay/my/card").then(function (r) {
-      if (!r.ok || !r.body || !r.body.enabled) return;
-      if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
-      cardRow.style.display = ""; cardRow.setDetail(r.body.card ? cardText(r.body.card) : "None saved");
-    }).catch(function () {});
+    // Security and privacy: signing in, and what Relay keeps. Asked for when the page is opened, so it is current each time.
+    function secHub(b) {
+      var secRows = [];
+      if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
+      var openTwoStep = function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); };
+      // Shown once Relay can send texts (or when a number is already on the account).
+      var phoneRow = accRow("phone", "Phone number", "", function () { page("Phone number", function (b) { phoneSection(b, openTwoStep); }); });
+      phoneRow.style.display = "none"; secRows.push(phoneRow);
+      var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
+      secRows.push(twoRow);
+      var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
+      secRows.push(devicesRow);
+      var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
+      cardRow.style.display = "none"; secRows.push(cardRow);
+      b.appendChild(accGroup("Sign-in & security", review ? [devicesRow] : secRows));
+      if (review) b.appendChild(el("p", { className: "rl-anote", text: "This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it." }));
+      api("/relay/my/2fa").then(function (r) {
+        if (!r.ok || !r.body) return;
+        var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
+      }).catch(function () {});
+      api("/relay/my/phone").then(function (r) {
+        if (!r.ok || !r.body || !(r.body.available || r.body.ending)) return;
+        phoneRow.style.display = ""; phoneRow.setDetail(r.body.ending ? "Ending " + r.body.ending : "Add one for sign-in codes");
+      }).catch(function () {});
+      api("/relay/my/card").then(function (r) {
+        if (!r.ok || !r.body || !r.body.enabled) return;
+        if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
+        cardRow.style.display = ""; cardRow.setDetail(r.body.card ? cardText(r.body.card) : "None saved");
+      }).catch(function () {});
+      b.appendChild(accGroup("Privacy & data", (review ? [] : [
+        accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
+        accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
+        accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
+    }
 
-    // Privacy & data
-    sheet.appendChild(accGroup("Privacy & data", (review ? [] : [
-      accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
-      accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
-      accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
-
-    // Help & legal
+    // Help and legal
     // The help chat: shown once Relay says it's on (an AI assistant), or that a person can be reached by email.
     var chatRow = accRow("chat", "Chat with us", "Ask Relay's assistant, or a person", function () { page(chatRow._ai ? "Help chat" : "Contact us", chatPage); });
     chatRow.style.display = "none";
@@ -4087,16 +4092,19 @@
       chatRow._ai = Boolean(hc.available);
       if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
       chatRow.style.display = "";
+      // Asking the assistant about a receipt lands on Profile's first screen and opens the chat from there.
       openChatAbout = function () {
-        if (!chatRow.isConnected || !hc.available || !wantChatAbout) return false;
+        if (!head.isConnected || !hc.available || !wantChatAbout) return false;
         memo.chatAbout = wantChatAbout; page("Help chat", chatPage); return true;
       };
       if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
-    sheet.appendChild(accGroup("Help & legal", [
-      accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
-      accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
-      accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
+    function helpHub(b) {
+      b.appendChild(accGroup("", [
+        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
+        accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
+        accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
+    }
 
     // Reviewing member reports: only for the people who do that.
     var abox = el("div"); sheet.appendChild(abox);
@@ -4994,6 +5002,23 @@
   function memoDrop(prefix) { Object.keys(memo).forEach(function (k) { if (k.indexOf(prefix) === 0) delete memo[k]; }); }
   // Wrapped is one story a year: the year's total, how it split, then a chapter for each kind of shopping. It lives on the
   // Profile page as a card: this year's (and earlier years' that have receipts), with Play.
+  // Calm layout: on Profile, Wrapped is one card and one tap, shown only when a year has receipts. Its page holds the story,
+  // the other years and adding an earlier year (mountWrapped).
+  function wrappedDoor(host, onTap) {
+    var s = load();
+    if (!s || !s.token) return;
+    var year = new Date().getFullYear();
+    cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
+      if (!host.isConnected || !r.ok || !r.body) return;
+      var w = r.body, had = (w.years || []).filter(function (y) { return y.receipts > 0; }).sort(function (x, y) { return y.year - x.year; });
+      if (!w.receipts && !had.length) return;
+      var show = w.receipts ? year : had[0].year, n = w.receipts || had[0].receipts;
+      host.textContent = "";
+      host.appendChild(el("button", { type: "button", className: "rl-wr-door", ariaLabel: "Relay Wrapped " + show + ", " + n + (n === 1 ? " receipt" : " receipts"), onclick: function () { onTap(show); } }, [
+        el("span", { className: "rl-wr-door-t" }, [el("i", { text: "RELAY WRAPPED " + show }), el("b", { text: "Your " + show + " in purchases" }), el("span", { text: n + (n === 1 ? " receipt" : " receipts") })]),
+        accIc("chev", 18, "rl-arow-c")]));
+    }).catch(function () {});
+  }
   function mountWrapped(host, year) {
     host.textContent = "";
     var s = load();
