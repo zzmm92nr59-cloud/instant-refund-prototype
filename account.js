@@ -7071,14 +7071,18 @@
       if (!state.both || !document.body.contains(needBox)) return;
       var purchases = state.both[0], receipts = state.both[1], today = new Date().toISOString().slice(0, 10);
       var needs = [], rest = 0, recent = [];
-      state.mail.forEach(function (m) {
-        var name = mailNameOf(m.provider);
-        needs.push({ rank: 0, when: "", row: function () { return calmRow(calmIcon("mail", true), "Connect " + name + " again", "Relay can't read it at the moment", "", "", function () { if (window.go) window.go("me"); }); } });
-      });
-      state.wins.forEach(function (w) {
-        var a = w.auction || {};
-        needs.push({ rank: 0, when: "", row: function () { return calmRow(calmIcon("gavel", true), "Pay for your auction win", a.title || "", "", "", function () { openAuctions("mine"); }); } });
-      });
+      // Inboxes to connect again are one row, and so are auctions waiting on the shopper, so neither can crowd out what
+      // is in the wallet. The row opens Receipts, where the Connect again button is at the top.
+      if (state.mail.length) {
+        var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
+        needs.push({ rank: -2, when: "", row: function () { return calmRow(calmIcon("mail", true), oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again",
+          oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment", "", "", function () { if (window.go) window.go("receipts"); }); } });
+      }
+      if (state.wins.length) {
+        var nWin = state.wins.length, win0 = state.wins[0], st0 = win0.you && win0.you.state, a0 = win0.auction || {};
+        var winTitle = nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win";
+        needs.push({ rank: -1, when: "", row: function () { return calmRow(calmIcon("gavel", true), winTitle, nWin > 1 ? "" : (a0.title || ""), "", "", function () { openAuctions("mine"); }); } });
+      }
       purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
         var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo);
         var dl = it.returnBy && it.returnBy.date ? it.returnBy.date : null, shop = o.store || "Shop";
@@ -7093,10 +7097,10 @@
           if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; img.appendChild(ph); } else drawIt();
           return img;
         };
-        if (owes) needs.push({ rank: 0, when: "", row: function () { return calmRow(pic(), "Pay " + money(it.exchange.balance.owedMinor, it.currency) + " to finish your swap", shop + ", " + it.title, "", "", openIt); } });
+        if (owes) needs.push({ wallet: true, rank: 0, when: "", row: function () { return calmRow(pic(), "Pay " + money(it.exchange.balance.owedMinor, it.currency) + " to finish your swap", shop + ", " + it.title, "", "", openIt); } });
         else if (it.returnable || it.exchangeable) {
           var d = dl ? daysLeft(dl) : null;
-          if (dl && d !== null && d >= 0 && d <= 7) needs.push({ rank: 1, when: dl, row: function () { return calmRow(pic(), it.title, "Return to " + shop + " by " + dayWords(dl), leftWords(d), d <= 3 ? "urgent" : "soon", openIt); } });
+          if (dl && d !== null && d >= 0 && d <= 7) needs.push({ wallet: true, rank: 1, when: dl, row: function () { return calmRow(pic(), it.title, "Return to " + shop + " by " + dayWords(dl), leftWords(d), d <= 3 ? "urgent" : "soon", openIt); } });
           else rest++;
         }
         recent.push({ at: String(o.orderedAt || "").slice(0, 10), row: function () { return calmRow(pic(), it.title, shop + ", " + dayWords(o.orderedAt), money(it.priceMinor, it.currency), "", openIt); } });
@@ -7117,7 +7121,7 @@
         if (x.returnProgress) return;
         // Only a date the shop itself gave counts as a deadline here (statedDeadline): Relay never makes one up.
         var shown = statedDeadline(x), d = shown ? daysLeft(shown) : null;
-        if (shown && d !== null && d >= 0 && d <= 7) needs.push({ rank: 1, when: shown, row: function () { return calmRow(pic(), title, "Return to " + who + " by " + dayWords(shown), leftWords(d), d <= 3 ? "urgent" : "soon", openX); } });
+        if (shown && d !== null && d >= 0 && d <= 7) needs.push({ wallet: true, rank: 1, when: shown, row: function () { return calmRow(pic(), title, "Return to " + who + " by " + dayWords(shown), leftWords(d), d <= 3 ? "urgent" : "soon", openX); } });
         else rest++;
       });
       needs.sort(function (a, b) { return a.rank - b.rank || (a.when < b.when ? -1 : a.when > b.when ? 1 : 0); });
@@ -7125,8 +7129,10 @@
       var oldPill = needHead.querySelector(".pill"); if (oldPill) oldPill.remove();
       if (!needs.length) needBox.appendChild(el("p", { className: "rl-calm-none", text: "Nothing needs you today." }));
       needs.slice(0, 3).forEach(function (n) { needBox.appendChild(n.row()); });
-      var more = Math.max(0, needs.length - 3) + rest;
-      if (more) needBox.appendChild(calmRow(calmIcon("bag"), "See everything you can still return", "", String(needs.length + rest), "", seeAll));
+      // The number is what can still go back (the wallet), never the inbox or auction rows above; anything of the
+      // shopper's that didn't fit in the three rows is said, so a closing return date is never hidden without a word.
+      var hiddenN = Math.max(0, needs.length - 3), inWallet = needs.filter(function (n) { return n.wallet; }).length + rest;
+      if (hiddenN || rest) needBox.appendChild(calmRow(calmIcon("bag"), "See everything you can still return", hiddenN ? hiddenN + " more to do" : "", String(inWallet), "", seeAll));
       recent.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
       recentBox.textContent = "";
       if (!recent.length) recentBox.appendChild(el("p", { className: "rl-calm-none", text: "What you buy shows up here as Relay finds the receipts." }));
