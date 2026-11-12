@@ -176,13 +176,26 @@ body.typing .footnav,body.typing .nextup{display:none}
 .dc-why{background:none;padding:0;margin-top:2px;font-weight:600;color:var(--rl-accent);white-space:pre-line}
 .dc-bar{gap:8px;margin:0 0 8px}
 #dcRoot{position:relative}
-.h2-top{display:flex;gap:8px;align-items:center;margin:2px 52px 12px 0}
-.h2-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:0 14px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text2)}
-.h2-search input{flex:1;min-width:0;min-height:44px;border:0;outline:0;margin:0;padding:0;background:transparent;box-shadow:none;font:inherit;font-size:16px;color:var(--rl-text)}
+.h2-top{display:flex;gap:8px;align-items:center;margin:2px -2px 5px}
+.h2-me{all:unset;box-sizing:border-box;flex:none;width:44px;height:44px;margin:0 -4px;display:grid;place-items:center;border-radius:50%;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+.h2-top .h2-me .avatar{width:36px;height:36px;border-radius:50%;font-size:13px;font-weight:700;display:grid;place-items:center;background-color:var(--rl-fill);color:var(--rl-text);background-size:cover;background-position:center}
+.h2-me:active{transform:scale(.94)}.h2-me:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px}
+html.h2-snap .topline .avatar{display:none}
+.h2-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:44px;margin:0;padding:0 14px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text2)}
+.h2-search input{flex:1;min-width:0;height:44px;border:0;outline:0;margin:0;padding:0;background:transparent;box-shadow:none;font:inherit;font-size:16px;color:var(--rl-text)}
 .h2-search:focus-within{outline:2px solid var(--rl-text);outline-offset:1px}
 .h2-search.b2-search{margin:0 0 16px;border-radius:14px}
-.h2-bell{all:unset;box-sizing:border-box;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--rl-fill);color:var(--rl-text);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
-.h2-bell .ico-i{width:22px;height:22px}.h2-bell:active{transform:scale(.94)}.h2-bell:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}
+.h2-bell{all:unset;box-sizing:border-box;flex:none;width:44px;height:44px;margin:0 -2px;display:grid;place-items:center;border-radius:50%;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+.h2-bell-c{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}
+.h2-bell .ico-i{width:20px;height:20px}.h2-bell:active{transform:scale(.94)}.h2-bell:focus-visible{outline:2px solid var(--rl-text);outline-offset:1px}
+/* The tab bar: a compact glass pill in the middle of the bottom edge, icons only. Each tab is still a 44px target and keeps
+   its name for screen readers (the words are there, just not drawn); the open tab has Relay's tint behind its icon. With
+   the testing tools' extra tabs the pill simply grows. */
+.footnav{left:50%;right:auto;width:auto;max-width:calc(100% - 24px);transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 28px);height:56px;padding:6px 7px;gap:6px;align-items:center;justify-content:center;border-radius:28px}
+.footnav button{flex:0 0 44px;width:44px;min-width:44px;height:44px;min-height:44px;padding:0;border-radius:22px;display:grid;place-items:center}
+.footnav .ico{margin:0;display:grid;place-items:center}.footnav .ico svg{width:24px;height:24px}
+.footnav .tab-name{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+.footnav .tab-badge{top:-7px;left:calc(50% + 4px)}
 html.on-me .topline .avatar{display:none}#view:has(#mePage>.rl-abar)>.rl-navback{display:none}#dcRoot.dc-detail>.rl-navback{display:none}
 .dc-bell{all:unset;box-sizing:border-box;position:absolute;top:-4px;right:54px;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;background:var(--rl-fill);color:var(--rl-text);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .12s}
 .dc-bell .ico-i{width:22px;height:22px}.dc-bell:active{transform:scale(.94)}.dc-bell:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}
@@ -503,7 +516,7 @@ async function checkSandboxBank(){
   if(status)status.innerHTML='Plaid Sandbox is responding. <a class="darkbtn" style="display:inline-block;margin-top:8px" target="_blank" rel="noopener noreferrer" href="'+API+'/plaid/connect?user=relay_demo_001">Open secure Sandbox connection ↗</a>';
  }catch(e){if(status)status.textContent="Could not reach the Plaid Sandbox connection: "+e.message}
 }
-function navRender(){const lit=demo||(testing&&page==="wallet")?page:page==="me"?meFrom:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key==="discover"&&!demo?"browse":key)+'</span>'+name+'</button>').join("");relayBadge()}
+function navRender(){const lit=demo||(testing&&page==="wallet")?page:page==="me"?meFrom:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key==="discover"&&!demo?"browse":key)+'</span>'+(id==="foot"?'<span class="tab-name">'+name+'</span>':name)+'</button>').join("");relayBadge()}
 // Returns due in the next three days and auction wins to pay for, as a red number on the Home tab, and inboxes that need
 // connecting again on the Profile tab (where Email connection is), the way a phone shows it (account.js counts them).
 function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,mail=Number(window.__relayMailFix)||0,home=due+pay;
@@ -1079,8 +1092,8 @@ function profileView(){
  // Signed in, but the account code is still loading: show the page's shape and fill it in a moment.
  if(!ready){profileWaitStart=profileWaitStart||Date.now();if(Date.now()-profileWaitStart>12000)return '<h1 class="title">Home</h1><div class="card"><h2>Couldn&#39;t load your account</h2><p class="sub">Check your connection, then reload Relay.</p><button class="darkbtn" onclick="location.reload()">Reload</button></div>';if(typeof setTimeout==="function")setTimeout(()=>{if(page==="profile")render()},120);return '<h1 class="title">Home</h1><div class="skel" style="height:120px;border-radius:22px"></div><div class="skel" style="height:160px;border-radius:22px"></div>'}
  const nw=shownWatches().length;
- return '<div class="h2-top"><form class="h2-search" role="search" onsubmit="return homeSearch(event)"><span class="dc-sic" aria-hidden="true">'+SEARCH_IC+'</span><input id="homeQuery" type="search" placeholder="Search your receipts" aria-label="Search your receipts" enterkeyhint="search" autocomplete="off"></form>'
-  +'<button type="button" class="h2-bell" aria-label="Price alerts'+(nw?', '+nw+' watched':'')+'" onclick="go(\'radar\')">'+ic("bell")+'</button></div><div id="homePage"></div>'+toolsCard();
+ return '<div class="h2-top"><button type="button" class="h2-me" aria-label="Profile" onclick="go(\'me\')"><span class="avatar" aria-hidden="true"></span></button><form class="h2-search" role="search" onsubmit="return homeSearch(event)"><span class="dc-sic" aria-hidden="true">'+SEARCH_IC+'</span><input id="homeQuery" type="search" placeholder="Search your receipts" aria-label="Search your receipts" enterkeyhint="search" autocomplete="off"></form>'
+  +'<button type="button" class="h2-bell" aria-label="Price alerts'+(nw?', '+nw+' watched':'')+'" onclick="go(\'radar\')"><span class="h2-bell-c">'+ic("bell")+'</span></button></div><div id="homePage"></div>'+toolsCard();
 }
 function demoProfileView(){
  return '<h1 class="title">Profile</h1><div class="card"><div class="eyebrow">DEMO PROFILE</div><h2>'+safe(activeShopper())+'</h2><p class="sub">Fictional browser profile. Secure customer accounts are not connected yet.</p><label for="demoShopper">Try another demo wallet</label> <select id="demoShopper" onchange="switchShopper(this.value)">'+["Ava","Ben","Cara","Dylan"].map(n=>'<option'+(n===activeShopper()?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+planBanner()+bankConnectBlock()+'<div class="card"><h2>Your activity</h2>'+readDemoLog().filter(r=>r.customer===activeShopper()).map(r=>'<p>'+safe(r.originalProduct)+' · '+safe(r.type)+' · simulated</p>').join('')+'<p class="small muted">No money moves in this demo.</p></div><a class="link" href="./testing.html">Open testing tools →</a>';
