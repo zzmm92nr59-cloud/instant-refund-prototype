@@ -954,18 +954,18 @@
     ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}" +
     // Draft 2: Home's feed. One flick moves one card: the page snaps to each card's top edge (Home only, html.h2-snap).
-    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px)}" +
+    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px);scroll-padding-bottom:calc(env(safe-area-inset-bottom) + 92px)}" +
     ".h2-chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 12px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
     ".h2-chip{all:unset;box-sizing:border-box;flex:none;min-height:44px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;font-size:16px;font-weight:600;color:var(--rl-text2);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .15s,color .15s}" +
     ".h2-chip[aria-pressed=true]{background:var(--rl-text);color:var(--rl-bg)}.h2-chip:active{opacity:.7}.h2-chip:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
-    ".h2-feed{display:flex;flex-direction:column;gap:14px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}html.h2-snap .h2-top{scroll-snap-align:start}" +
+    ".h2-feed{display:flex;flex-direction:column;gap:14px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}html.h2-snap .h2-top{scroll-snap-align:start;scroll-margin-top:60px}" +
     ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:26px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
     ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:26px;background:var(--rl-card);color:var(--rl-text)}" +
     ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
     ".h2-logo.rl-has-logo{background:#fff}.h2-logo-i{display:inline-flex}.h2-head-t{min-width:0;display:flex;flex-direction:column}.h2-head-t b{font-size:17px;line-height:22px;font-weight:650;overflow-wrap:anywhere}.h2-head-t span{font-size:15px;line-height:19px;color:var(--rl-text2)}" +
     ".h2-tiles{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
     ".h2-tile{flex:none;width:150px;min-width:0;display:flex;flex-direction:column;gap:6px;scroll-snap-align:start}.h2-tiles.one .h2-tile{width:100%}" +
-    ".h2-pic{position:relative;display:block;height:150px;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.h2-tiles.one .h2-pic{height:188px}" +
+    ".h2-pic{position:relative;display:block;height:120px;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.h2-pic:has(.rl-has-photo){height:150px}.h2-tiles.one .h2-pic:has(.rl-has-photo){height:188px}" +
     ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{width:100%;height:100%;object-fit:cover}.h2-art>img.rl-logo-img{object-fit:contain}.h2-art.rl-has-logo{background:#fff}" +
     ".h2-price{position:absolute;left:10px;top:10px;z-index:1;padding:4px 10px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:14px;line-height:18px;font-weight:650}" +
     ".h2-name{font-size:15px;line-height:20px;font-weight:550;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
@@ -7166,6 +7166,7 @@
   // Every line on a card is something Relay knows: the shop's own return date (statedDeadline), the parcel's latest news
   // (shipWords), how far a return has got. A strip under a card is only ever days left on a return. Nothing is made up.
   var HOME_TINT = false;   // true: each card takes its kind of shopping's colour (TILE_COLOURS). One class on the feed.
+  var homeSizes = null;    // watches the feed's size, so the first screen is worked out again when text or pictures change it
   function feedEntries(purchases, receipts, refresh) {
     var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
     var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
@@ -7178,8 +7179,9 @@
       var dl = dates[0] || null;
       var e = { key: "o" + o.id, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2 };
       e.tiles = items.slice(0, 6).map(function (it) { return { name: it.title, price: Number.isInteger(it.priceMinor) ? money(it.priceMinor, it.currency) : "", draw: function (box) {
-        var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 64); };
-        if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; box.appendChild(ph); } else drawIt(); } }; });
+        var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 76); };
+        // The shop's own photo of the item gets the tall picture area; a drawing gets the short one.
+        if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); box.classList.remove("rl-has-photo"); drawIt(); }; box.classList.add("rl-has-photo"); box.appendChild(ph); } else drawIt(); } }; });
       if (owe) { e.line = "Pay " + money(owe.exchange.balance.owedMinor, owe.currency) + " to finish your swap"; e.rank = 0; e.swaps = true; e.owes = true; }
       else if (back) { var done = back.returnInfo.status === "refunded";
         e.line = done ? "Refunded" + (back.returnInfo.refundMinor ? " " + money(back.returnInfo.refundMinor, back.currency) : "") : "Return started, waiting for the refund"; e.rank = done ? 2 : 1; e.swaps = !done; }
@@ -7204,8 +7206,8 @@
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2 };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
-          draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 64); } }; })
-        : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 72, 96); } }];
+          draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 72); } }; })
+        : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 80, 88); } }];
       if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
           : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
         e.swaps = !p.refundedAt; e.rank = p.refundedAt ? 2 : 1; }
@@ -7312,7 +7314,7 @@
       if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
         var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
         feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
-            draw: function (box) { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 72); } }],
+            draw: function (box) { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 80); } }],
           line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
           open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
       });
@@ -7328,10 +7330,14 @@
       firstScreen();
     };
     var firstScreen = function () {
+      if (!document.body.contains(feed)) return;
       var bar = document.getElementById("foot"), br = bar && bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
       var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0;
       Array.prototype.forEach.call(feed.children, function (c) { c.classList.toggle("h2-nosnap", c.getBoundingClientRect().bottom + y <= limit); });
     };
+    // Bigger text, a photo arriving or the phone turning changes what fits: a card that no longer fits the first screen
+    // becomes a stopping place again, so no part of it is ever out of reach.
+    try { if (homeSizes) homeSizes.disconnect(); homeSizes = window.ResizeObserver ? new ResizeObserver(firstScreen) : null; if (homeSizes) homeSizes.observe(feed); } catch (e) { homeSizes = null; }
     if (!isReview()) cachedGet("gmail", "/relay/my/gmail").then(function (g) {
       if (!g.ok || !g.body) return;
       state.connected = Boolean(g.body.connected); state.mail = inboxesToFix(g.body); draw();
