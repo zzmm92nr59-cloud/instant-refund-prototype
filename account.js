@@ -929,9 +929,9 @@
   document.head.appendChild(css);
   // The calm layout (draft): quiet rows in place of tiles. One job per tab; everything else is one tap deeper.
   var calmCss = document.createElement("style");
-  calmCss.textContent = ".rl-calm-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 2px 10px}.rl-calm-h h2{margin:0;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}" +
+  calmCss.textContent = ".rl-calm-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:24px 2px 10px}.rl-calm-h h2{margin:0;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}" +
     ".rl-calm-h.first{margin-top:10px}" +
-    ".rl-crow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:68px;display:flex;align-items:center;gap:12px;padding:11px 14px;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-crow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:64px;display:flex;align-items:center;gap:12px;padding:9px 14px;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
     ".rl-crow+.rl-crow{border-top:1px solid var(--rl-line)}.rl-crow:active{background:var(--rl-fill)}.rl-crow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
     ".rl-crow .rl-po-img{flex:none;width:46px;height:46px;border-radius:12px;overflow:hidden}.rl-crow .rl-po-img img{width:100%;height:100%;object-fit:cover}" +
     ".rl-crow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.rl-crow-t b{font-size:16px;line-height:21px;font-weight:650;color:var(--rl-text);overflow-wrap:anywhere}" +
@@ -939,7 +939,7 @@
     ".rl-crow-e{flex:none;max-width:42%;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);text-align:right}.rl-crow-e.urgent{color:var(--rl-danger)}.rl-crow-e.soon{color:var(--rl-warn)}" +
     ".rl-crow .rl-arow-c{flex:none;color:var(--rl-text2)}" +
     ".rl-calm-none{margin:0;padding:20px 16px;font-size:16px;line-height:22px;color:var(--rl-text2)}" +
-    ".rl-calm-door{margin-top:28px}" +
+    ".rl-calm-door{margin-top:16px}" +
     ".rl-wr-door{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;margin-top:14px;padding:16px 16px 16px 18px;border-radius:20px;background:#101828;border:1px solid rgba(255,255,255,.1);color:#fff;transition:transform .15s,opacity .15s;-webkit-tap-highlight-color:transparent}" +
     ".rl-wr-door:active{transform:scale(.985);opacity:.9}.rl-wr-door:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#c7f567;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
@@ -951,7 +951,7 @@
     ".rl-calm-fi{flex:none;display:inline-flex;color:var(--rl-text)}" +
     ".rl-calm-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--rl-card);color:var(--rl-text);transition:background .15s;-webkit-tap-highlight-color:transparent}" +
     ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
-    ".rl-search+div>.rl-calm-bar{margin-top:-6px}";
+    ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -3148,7 +3148,7 @@
         var yearList = Object.keys(yearN).sort().reverse();
         if (memo.calmYear && !yearN[memo.calmYear]) memo.calmYear = null;
         var counted = function (n) { return n + (n === 1 ? " receipt" : " receipts"); };
-        var kindRow = function (k, label, detail, onclick) { var row = accRow("doc", label, detail, onclick), chip = catIcon(k, 30); if (k === "shop") chip.style.background = "#101828"; row.replaceChild(chip, row.firstChild); return row; };
+        var kindRow = function (k, label, detail, onclick) { var row = accRow("doc", label, detail, onclick), chip = catIcon(k, 30); if (k === "shop") chip.style.background = TILE_COLOURS.shop; row.replaceChild(chip, row.firstChild); return row; };
         var filterSheet = function (sheet) {
           sheet.setAttribute("aria-label", "Filter receipts");
           sheet.appendChild(el("h2", { text: "Filter" }));
@@ -3322,8 +3322,8 @@
         search.style.cssText = "";
         var mag = el("span"); mag.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
         box.appendChild(el("label", { className: "rl-search" }, [mag, search]));
+        box.appendChild(el("div", { className: "rl-recstat rl-recstat-top" }, [status]));
         box.appendChild(list);
-        box.appendChild(el("div", { className: "rl-recstat" }, [status]));
         // Pulling the page down checks the inbox now (relay-gestures.js through checkInbox), so there's no button for it.
         window.__relayCheckNow = function () { if (document.body.contains(status) && !scanBtn.disabled) scanBtn.onclick(); };
         // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks): the small
