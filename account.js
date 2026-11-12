@@ -981,6 +981,10 @@
     ".h2-feed.tint .h2-card.has-c .h2-go{background:rgba(255,255,255,.24);color:#fff}.h2-feed.tint .h2-card.has-c .h2-logo{background:#fff;color:#101828}" +
     ".h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:inset 0 0 0 400px rgba(0,0,0,.28);color:#fff}" +
     "@media(prefers-reduced-motion:reduce){.h2-item,.h2-chip{transition:none}.h2-item:active{transform:none}}" +
+    // Dark screens (rule 11): a drawing sits on a dark tile, as Home's pictures do today, never on a pale panel. A real
+    // photo still fills the area, and a shop's logo keeps the white it was made for.
+    "@media(prefers-color-scheme:dark){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
+    ".h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(8,12,22,.5)!important;color:#fff!important}.h2-feed.tint .h2-card.has-c .h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.24)}}" +
     // Draft 2: Ask. The page is at least a screen tall, so the box rests just above the tab bar from the start.
     ".rl-asktab{display:flex;flex-direction:column;min-height:calc(100vh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}}" +
     ".rl-asktab .rl-chat{margin-top:0}.rl-asktab .rl-chat-bar{margin-top:auto}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-anote{margin:2px 2px 12px}.rl-asktab .rl-msg:empty{display:none}" +
@@ -7237,6 +7241,7 @@
     item.setAttribute("role", "button");
     var card = el("div", { className: "h2-card" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : "") });
     if (e.cat && TILE_COLOURS[e.cat]) item.style.setProperty("--h2-c", TILE_COLOURS[e.cat]);
+    item.style.setProperty("--h2-ink", e.cat && e.cat !== "shop" && e.cat !== "other" && TILE_COLOURS[e.cat] ? TILE_COLOURS[e.cat] : "#C9D0DF");
     if (e.shop) {
       var logo = el("span", { className: "h2-logo", text: String(e.shop).trim().charAt(0).toUpperCase() }); logo.setAttribute("aria-hidden", "true");
       if (e.icon) { logo.textContent = ""; logo.appendChild(accIc(e.icon, 20, "h2-logo-i")); } else if (e.dom) shopLogo(logo, e.dom, 26);
