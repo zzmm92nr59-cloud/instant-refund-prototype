@@ -954,16 +954,21 @@
     ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}" +
     // Draft 2: Home's feed. One flick moves one card: the page snaps to each card's top edge (Home only, html.h2-snap).
-    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px);scroll-padding-bottom:calc(var(--rl-tab-top,84px) + 12px)}" +
+    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:var(--h2-band,calc(env(safe-area-inset-top) + 118px));scroll-padding-bottom:calc(var(--rl-tab-top,84px) + 12px)}" +
     // Sizes and spacing follow a phone-shopping feed's proportions (measured in points on a 402 by 874 screen); the
     // colours, drawings, glass and words are Relay's. Home's edges are 16px (the page's are 18).
     ".h2-home{margin:0 -2px}" +
+    // The pinned band (phones): it starts at the top of the screen, under the status bar, and carries the page's own
+    // background, a little see-through where the phone can blur what passes behind it.
+    "@media(max-width:760px){.h2-band{position:sticky;top:0;z-index:7;margin:calc(-1*(env(safe-area-inset-top) + 10px)) -18px 0;padding:calc(env(safe-area-inset-top) + 12px) 16px 6px;background:var(--rl-bg)}" +
+    ".h2-band .h2-top{margin:0 0 5px}.h2-band .h2-chips{margin:0 -16px;padding:0 16px}}" +
+    "@supports((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){@media(max-width:760px){.h2-band{background:color-mix(in srgb,var(--rl-bg) 88%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}}}" +
     // Chips: a 38px pill for the chosen one inside a 44px button (rule 4), the others plain words.
     ".h2-chips{display:flex;gap:4px;overflow-x:auto;margin:0 -16px 6px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
     ".h2-chip{all:unset;box-sizing:border-box;flex:none;height:44px;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
     ".h2-chip>span{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2);white-space:nowrap;transition:background .15s,color .15s}" +
     ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
-    ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}html.h2-snap .h2-top{scroll-snap-align:start;scroll-margin-top:60px}" +
+    ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}" +
     ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:28px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
     ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:28px;background:var(--rl-card);color:var(--rl-text)}" +
     ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
@@ -7298,7 +7303,12 @@
     mountInstore(top, refresh, "suggest");
     var chips = el("div", { className: "h2-chips", role: "group", ariaLabel: "What to show" });
     var feed = el("div", { className: "h2-feed" + (HOME_TINT ? " tint" : "") });
-    host.appendChild(chips); host.appendChild(feed);
+    // The pinned band: Home's top row (drawn by the page) and the chips, kept at the top of the screen like the tab bar
+    // is kept at the bottom. It is made once around the top row and reused when Home is drawn again.
+    var topRow = document.querySelector("#view .h2-top"), band = topRow && topRow.parentNode && topRow.parentNode.classList.contains("h2-band") ? topRow.parentNode : null;
+    if (topRow && !band) { band = el("div", { className: "h2-band" }); topRow.parentNode.insertBefore(band, topRow); band.appendChild(topRow); }
+    if (band) { Array.prototype.forEach.call(band.querySelectorAll(".h2-chips"), function (old) { old.remove(); }); band.appendChild(chips); } else host.appendChild(chips);
+    host.appendChild(feed);
     for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
     var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
     var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product; }); } catch (e) { return []; } };
@@ -7358,25 +7368,29 @@
       if (testingOn()) { var t = el("div", { className: "h2-tools" }); feed.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
       firstScreen();
     };
-    // Which cards are stopping places. The page rests at its very top; whatever sits right under the chips (any small
-    // notices, then the first order's card) shows there already, so it is not a stop of its own and the first flick goes
-    // to the second card. If that first card is too tall to show whole (bigger text), it is a stop, so none of it is ever
-    // out of reach. Measured without the nudge pull to refresh gives the page while it works.
+    // Which cards are stopping places. The band stays pinned, so a card at rest sits just under it (the page's scroll
+    // padding is the band's height). The first thing in the feed is the stop at the very top of the page, which pull to
+    // refresh needs; any small notices after it, and the first order's card, are not stops of their own while they show
+    // whole on that first screen; every card after that is a stop. A card too tall to show whole (bigger text) is always
+    // a stop, so none of it is out of reach. Measured without the nudge pull to refresh gives the page while it works.
     var firstScreen = function () {
       if (!document.body.contains(feed)) return;
+      var bandH = band && document.body.contains(band) ? Math.ceil(band.getBoundingClientRect().height) : 0;
+      if (bandH) document.documentElement.style.setProperty("--h2-band", bandH + "px");
       var bar = document.getElementById("foot"), br = bar && bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
       var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0, nudge = 0;
       try { var mm = /matrix\(([^)]+)\)/.exec(getComputedStyle(document.querySelector("main.main")).transform || ""); if (mm) nudge = parseFloat(mm[1].split(",")[5]) || 0; } catch (e) {}
-      var leading = true;
-      Array.prototype.forEach.call(feed.children, function (c) {
+      var feedTop = feed.getBoundingClientRect().top - nudge + y, leading = true;
+      Array.prototype.forEach.call(feed.children, function (c, i) {
         var fits = c.getBoundingClientRect().bottom - nudge + y <= limit;
-        c.classList.toggle("h2-nosnap", leading && fits);
+        c.classList.toggle("h2-nosnap", i > 0 && leading && fits);
+        c.style.scrollMarginTop = i === 0 ? Math.max(0, Math.ceil(feedTop - bandH)) + 4 + "px" : "";
         if (!c.classList.contains("small") && !c.classList.contains("h2-start")) leading = false;
       });
     };
     // Bigger text, a photo arriving or the phone turning changes what fits: a card that no longer fits the first screen
     // becomes a stopping place again, so no part of it is ever out of reach.
-    try { if (homeSizes) homeSizes.disconnect(); homeSizes = window.ResizeObserver ? new ResizeObserver(firstScreen) : null; if (homeSizes) homeSizes.observe(feed); } catch (e) { homeSizes = null; }
+    try { if (homeSizes) homeSizes.disconnect(); homeSizes = window.ResizeObserver ? new ResizeObserver(firstScreen) : null; if (homeSizes) { homeSizes.observe(feed); if (band) homeSizes.observe(band); } } catch (e) { homeSizes = null; }
     if (!isReview()) cachedGet("gmail", "/relay/my/gmail").then(function (g) {
       if (!g.ok || !g.body) return;
       state.connected = Boolean(g.body.connected); state.mail = inboxesToFix(g.body); draw();
