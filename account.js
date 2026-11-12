@@ -959,10 +959,10 @@
     // colours, drawings, glass and words are Relay's. Home's edges are 16px (the page's are 18).
     ".h2-home{margin:0 -2px}" +
     // The pinned band (phones): it starts at the top of the screen, under the status bar, and carries the page's own
-    // background, a little see-through where the phone can blur what passes behind it.
+    // background. It is solid on purpose: a see-through, blurred band was tried and made the search hint and the
+    // unchosen chip words harder to read whenever a card passed behind them.
     "@media(max-width:760px){.h2-band{position:sticky;top:0;z-index:7;margin:calc(-1*(env(safe-area-inset-top) + 10px)) -18px 0;padding:calc(env(safe-area-inset-top) + 12px) 16px 6px;background:var(--rl-bg)}" +
     ".h2-band .h2-top{margin:0 0 5px}.h2-band .h2-chips{margin:0 -16px;padding:0 16px}}" +
-    "@supports((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){@media(max-width:760px){.h2-band{background:color-mix(in srgb,var(--rl-bg) 88%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.5);backdrop-filter:blur(18px) saturate(1.5)}}}" +
     // Chips: a 38px pill for the chosen one inside a 44px button (rule 4), the others plain words.
     ".h2-chips{display:flex;gap:4px;overflow-x:auto;margin:0 -16px 6px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
     ".h2-chip{all:unset;box-sizing:border-box;flex:none;height:44px;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
