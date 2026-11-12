@@ -927,6 +927,20 @@
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
     ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
   document.head.appendChild(css);
+  // The calm layout (draft): quiet rows in place of tiles. One job per tab; everything else is one tap deeper.
+  var calmCss = document.createElement("style");
+  calmCss.textContent = ".rl-calm-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 2px 10px}.rl-calm-h h2{margin:0;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}" +
+    ".rl-calm-h.first{margin-top:10px}" +
+    ".rl-crow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:68px;display:flex;align-items:center;gap:12px;padding:11px 14px;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-crow+.rl-crow{border-top:1px solid var(--rl-line)}.rl-crow:active{background:var(--rl-fill)}.rl-crow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
+    ".rl-crow .rl-po-img{flex:none;width:46px;height:46px;border-radius:12px;overflow:hidden}.rl-crow .rl-po-img img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-crow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.rl-crow-t b{font-size:16px;line-height:21px;font-weight:650;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".rl-crow-t span{font-size:14px;line-height:19px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".rl-crow-e{flex:none;max-width:42%;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);text-align:right}.rl-crow-e.urgent{color:var(--rl-danger)}.rl-crow-e.soon{color:var(--rl-warn)}" +
+    ".rl-crow .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    ".rl-calm-none{margin:0;padding:20px 16px;font-size:16px;line-height:22px;color:var(--rl-text2)}" +
+    ".rl-calm-door{margin-top:28px}";
+  document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
     Object.keys(props || {}).forEach(function (k) { if (k === "text") n.textContent = props[k]; else if (k.indexOf("data-") === 0) n.setAttribute(k, props[k]); else n[k] = props[k]; });
@@ -6932,6 +6946,131 @@
     if (memo.walletPurchases && memo.receipts) drawBoth([memo.walletPurchases, memo.receipts.rows]);
     loadBoth().then(function (both) { if (document.body.contains(grid)) drawBoth(both); });
   }
+  // One quiet row: a picture or icon, what it is, one line under it, something short on the right, and a chevron.
+  function calmRow(pic, title, sub, end, endClass, onTap) {
+    var kids = [];
+    if (pic) kids.push(pic);
+    kids.push(el("span", { className: "rl-crow-t" }, [el("b", { text: title })].concat(sub ? [el("span", { text: sub })] : [])));
+    if (end) kids.push(el("span", { className: "rl-crow-e" + (endClass ? " " + endClass : ""), text: end }));
+    kids.push(accIc("chev", 18, "rl-arow-c"));
+    return el("button", { type: "button", className: "rl-crow", onclick: onTap }, kids);
+  }
+  function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.background = ACC_TINT[name]; } return i; }
+  function leftWords(d) { return d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left"; }
+  function dayWords(day) { return new Date(String(day).slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); }
+  // Home (calm, draft): only what needs you (something with a date on it, or something to do), then the last three
+  // purchases. Everything else is one tap deeper: the full list of what can still go back, and Returns & swaps.
+  function mountHome(host) {
+    if (!host) return;
+    var s = load();
+    if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
+    host.textContent = "";
+    var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
+    var top = el("div"); host.appendChild(top);
+    mountInstore(top, refresh, "suggest");
+    var start = el("div"); host.appendChild(start);
+    var state = { both: null, mail: [], wins: [] };
+    var needHead = el("div", { className: "rl-calm-h first" }, [el("h2", { text: "Needs you" })]);
+    var needBox = el("div", { className: "rl-acard" });
+    var recentHead = el("div", { className: "rl-calm-h" }, [el("h2", { text: "Recent" })]);
+    var recentBox = el("div", { className: "rl-acard" });
+    var doors = el("div", { className: "rl-acard rl-calm-door" }, [calmRow(calmIcon("swap"), "Returns and swaps", "", "", "", function () { if (window.go) window.go("returns"); })]);
+    [needHead, needBox, recentHead, recentBox, doors].forEach(function (n) { host.appendChild(n); });
+    for (var k = 0; k < 2; k++) { needBox.appendChild(el("div", { className: "rl-skel", style: "min-height:68px;margin:0;border-radius:0" })); recentBox.appendChild(el("div", { className: "rl-skel", style: "min-height:68px;margin:0;border-radius:0" })); }
+    var seeAll = function () {
+      open(function (sheet) {
+        sheet.classList.add("rl-full");
+        var box = el("div"); sheet.appendChild(box);
+        mountWallet(box, { title: "Still returnable" });
+        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+      });
+    };
+    var draw = function () {
+      if (!state.both || !document.body.contains(needBox)) return;
+      var purchases = state.both[0], receipts = state.both[1], today = new Date().toISOString().slice(0, 10);
+      var needs = [], rest = 0, recent = [];
+      state.mail.forEach(function (m) {
+        var name = mailNameOf(m.provider);
+        needs.push({ rank: 0, when: "", row: function () { return calmRow(calmIcon("mail", true), "Connect " + name + " again", "Relay can't read it at the moment", "", "", function () { if (window.go) window.go("me"); }); } });
+      });
+      state.wins.forEach(function (w) {
+        var a = w.auction || {};
+        needs.push({ rank: 0, when: "", row: function () { return calmRow(calmIcon("gavel", true), "Pay for your auction win", a.title || "", "", "", function () { openAuctions("mine"); }); } });
+      });
+      purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
+        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo);
+        var dl = it.returnBy && it.returnBy.date ? it.returnBy.date : null, shop = o.store || "Shop";
+        var openIt = function () { open(function (sheet) {
+          sheet.appendChild(el("h2", { text: shop }));
+          sheet.appendChild(confirmedCard(o, it, function () { close(); refresh(); }, dl));
+          sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+        }); };
+        var pic = function () {
+          var img = el("div", { className: "rl-po-img" }); img.setAttribute("aria-hidden", "true");
+          var drawIt = function () { illustrate(img, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 26); };
+          if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; img.appendChild(ph); } else drawIt();
+          return img;
+        };
+        if (owes) needs.push({ rank: 0, when: "", row: function () { return calmRow(pic(), "Pay " + money(it.exchange.balance.owedMinor, it.currency) + " to finish your swap", shop + ", " + it.title, "", "", openIt); } });
+        else if (it.returnable || it.exchangeable) {
+          var d = dl ? daysLeft(dl) : null;
+          if (dl && d !== null && d >= 0 && d <= 7) needs.push({ rank: 1, when: dl, row: function () { return calmRow(pic(), it.title, "Return to " + shop + " by " + dayWords(dl), leftWords(d), d <= 3 ? "urgent" : "soon", openIt); } });
+          else rest++;
+        }
+        recent.push({ at: String(o.orderedAt || "").slice(0, 10), row: function () { return calmRow(pic(), it.title, shop + ", " + dayWords(o.orderedAt), money(it.priceMinor, it.currency), "", openIt); } });
+      }); });
+      orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
+        if (isCarrier(x)) return;
+        var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
+        var named = (x.items || []).some(function (i) { return i && i.name; });
+        var title = named ? receiptTitle(x) : who;
+        var pic = function () { var img = el("div", { className: "rl-po-img" }); img.setAttribute("aria-hidden", "true"); receiptPic(img, x, 26, 32); return img; };
+        var card = null, openX = function () { card = card || emailCard(x, { markable: true, changed: refresh }); card.onclick(); };
+        if (/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) recent.push({ at: x.orderDate, row: function () {
+          return calmRow(pic(), title, (named ? who + ", " : "") + dayWords(x.orderDate), x.totalPence == null ? "" : money(x.totalPence, x.currency), "", openX); } });
+        var only = x.returnable === false ? (x.returnableItems || []) : null;
+        if (only && !only.length) return;
+        var dl = deadlineOf(x), onWay = freshDelivery(x);
+        if (!((dl && dl >= today) || (onWay && !dl))) return;
+        if (x.returnProgress) return;
+        // Only a date the shop itself gave counts as a deadline here (statedDeadline): Relay never makes one up.
+        var shown = statedDeadline(x), d = shown ? daysLeft(shown) : null;
+        if (shown && d !== null && d >= 0 && d <= 7) needs.push({ rank: 1, when: shown, row: function () { return calmRow(pic(), title, "Return to " + who + " by " + dayWords(shown), leftWords(d), d <= 3 ? "urgent" : "soon", openX); } });
+        else rest++;
+      });
+      needs.sort(function (a, b) { return a.rank - b.rank || (a.when < b.when ? -1 : a.when > b.when ? 1 : 0); });
+      needBox.textContent = "";
+      var oldPill = needHead.querySelector(".pill"); if (oldPill) oldPill.remove();
+      if (!needs.length) needBox.appendChild(el("p", { className: "rl-calm-none", text: "Nothing needs you today." }));
+      needs.slice(0, 3).forEach(function (n) { needBox.appendChild(n.row()); });
+      var more = Math.max(0, needs.length - 3) + rest;
+      if (more) needBox.appendChild(calmRow(calmIcon("bag"), "See everything you can still return", "", String(needs.length + rest), "", seeAll));
+      recent.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+      recentBox.textContent = "";
+      if (!recent.length) recentBox.appendChild(el("p", { className: "rl-calm-none", text: "What you buy shows up here as Relay finds the receipts." }));
+      recent.slice(0, 3).forEach(function (r) { recentBox.appendChild(r.row()); });
+    };
+    if (isReview()) start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+      el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
+      el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
+    else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      if (!g.ok || !g.body || !document.body.contains(start)) return;
+      if (!g.body.connected) {
+        start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+          el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
+          el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and fills in your wallet.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+          el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } })]));
+        return;
+      }
+      state.mail = inboxesToFix(g.body); if (state.mail.length) draw();
+    }, function () {});
+    if (memo.walletPurchases && memo.receipts) { state.both = [memo.walletPurchases, memo.receipts.rows]; draw(); }
+    loadBoth().then(function (both) { state.both = both; draw(); });
+    // A win to pay for: asked only of someone who has bid before, as the tab's red number is.
+    var bid = false; try { bid = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {}
+    if (bid) auctionsMine().then(function (b) { state.wins = ((b && b.auctions) || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }); draw(); });
+    if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); host.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
+  }
   function whichItems(x, parts, done) {
     var who = (x.retailer && x.retailer.name) || "this shop";
     var card = el("div", { className: "rl-po" }, [el("div", { className: "rl-po-shop", text: who }), el("h3", { text: "Which items did you send back?", style: "margin:4px 0 6px" }),
@@ -7224,7 +7363,7 @@
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)
     cachedGet("nextUp", "/relay/my/receipts").then(function (r) { if (r.ok && r.body) draw(r.body.receipts || []); }, function () {});
   }
-  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
+  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountHome: mountHome, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
     storySong: storySong,
