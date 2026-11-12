@@ -4067,7 +4067,10 @@
       if (wantHealth) setTimeout(function () { if (wantHealth && openHealthPage()) wantHealth = false; }, 0);
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
-        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
+        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow,
+        // The new layout, for Relay's team to try on their own phones (next.html lets nobody else in). Nothing is
+        // remembered: opening Relay always shows this layout.
+        accRow("devices", "Try the new layout", "Only Relay's team can open it", function () { location.href = "next.html"; })]));
       abox.appendChild(teamTesting());
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
