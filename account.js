@@ -28,6 +28,7 @@
   // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt). Profile opens it.
   var openChatAbout = null, wantChatAbout = null;
   window.relayAskAboutReceipt = function (about) {
+    if (askOn() && window.go) { memo.chatAbout = about; window.go("ask"); return; }
     wantChatAbout = about;
     if (window.go) window.go("me");
     setTimeout(function () { if (wantChatAbout && openChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
@@ -951,7 +952,40 @@
     ".rl-calm-fi{flex:none;display:inline-flex;color:var(--rl-text)}" +
     ".rl-calm-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--rl-card);color:var(--rl-text);transition:background .15s;-webkit-tap-highlight-color:transparent}" +
     ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
-    ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}";
+    ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}" +
+    // Draft 2: Home's feed. One flick moves one card: the page snaps to each card's top edge (Home only, html.h2-snap).
+    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:calc(env(safe-area-inset-top) + 10px)}" +
+    ".h2-chips{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 12px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
+    ".h2-chip{all:unset;box-sizing:border-box;flex:none;min-height:44px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;font-size:16px;font-weight:600;color:var(--rl-text2);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background .15s,color .15s}" +
+    ".h2-chip[aria-pressed=true]{background:var(--rl-text);color:var(--rl-bg)}.h2-chip:active{opacity:.7}.h2-chip:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".h2-feed{display:flex;flex-direction:column;gap:14px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}html.h2-snap .h2-top{scroll-snap-align:start}" +
+    ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:26px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
+    ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:26px;background:var(--rl-card);color:var(--rl-text)}" +
+    ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
+    ".h2-logo.rl-has-logo{background:#fff}.h2-logo-i{display:inline-flex}.h2-head-t{min-width:0;display:flex;flex-direction:column}.h2-head-t b{font-size:17px;line-height:22px;font-weight:650;overflow-wrap:anywhere}.h2-head-t span{font-size:15px;line-height:19px;color:var(--rl-text2)}" +
+    ".h2-tiles{display:flex;gap:10px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
+    ".h2-tile{flex:none;width:150px;min-width:0;display:flex;flex-direction:column;gap:6px;scroll-snap-align:start}.h2-tiles.one .h2-tile{width:100%}" +
+    ".h2-pic{position:relative;display:block;height:150px;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.h2-tiles.one .h2-pic{height:188px}" +
+    ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{width:100%;height:100%;object-fit:cover}.h2-art>img.rl-logo-img{object-fit:contain}.h2-art.rl-has-logo{background:#fff}" +
+    ".h2-price{position:absolute;left:10px;top:10px;z-index:1;padding:4px 10px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:14px;line-height:18px;font-weight:650}" +
+    ".h2-name{font-size:15px;line-height:20px;font-weight:550;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
+    ".h2-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.h2-line-t{min-width:0;display:flex;flex-direction:column;gap:2px}.h2-line-t b{font-size:23px;line-height:28px;font-weight:750;letter-spacing:-.01em;overflow-wrap:anywhere}" +
+    ".h2-line-t span{font-size:15px;line-height:20px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".h2-go{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.h2-go-i{display:inline-flex}" +
+    ".h2-strip{margin-top:-26px;padding:37px 16px 11px;border-radius:0 0 26px 26px;background:var(--rl-fill);font-size:15px;line-height:20px;font-weight:650;text-align:center;color:var(--rl-text)}.h2-strip.urgent{color:var(--rl-danger)}.h2-strip.soon{color:var(--rl-warn)}" +
+    ".h2-item.small .h2-card{padding:14px 16px;border-radius:22px;gap:10px}.h2-item.small{border-radius:22px}.h2-item.small .h2-head{display:none}.h2-item.small .h2-line-t b{font-size:18px;line-height:23px;font-weight:650}" +
+    ".h2-item.small .h2-line{justify-content:flex-start}.h2-item.small .h2-line-t{flex:1}.h2-item.small .h2-go{order:-1;background:var(--rl-fill)}" +
+    ".h2-none{background:var(--rl-card);border-radius:22px}.h2-start{scroll-snap-stop:always}" +
+    // Variant A: each card in its kind of shopping's colour, text in that tile's own colours.
+    ".h2-feed.tint .h2-card.has-c{background:var(--h2-c);color:#fff}.h2-feed.tint .h2-card.has-c .h2-head-t span,.h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.9)}" +
+    ".h2-feed.tint .h2-card.has-c .h2-go{background:rgba(255,255,255,.24);color:#fff}.h2-feed.tint .h2-card.has-c .h2-logo{background:#fff;color:#101828}" +
+    ".h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:inset 0 0 0 400px rgba(0,0,0,.28);color:#fff}" +
+    "@media(prefers-reduced-motion:reduce){.h2-item,.h2-chip{transition:none}.h2-item:active{transform:none}}" +
+    // Draft 2: Ask. The page is at least a screen tall, so the box rests just above the tab bar from the start.
+    ".rl-asktab{display:flex;flex-direction:column;min-height:calc(100vh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - 176px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}}" +
+    ".rl-asktab .rl-chat{margin-top:0}.rl-asktab .rl-chat-bar{margin-top:auto}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-anote{margin:2px 2px 12px}.rl-asktab .rl-msg:empty{display:none}" +
+    ".rl-ask-lead{margin:0 2px 2px;font-size:16px;line-height:22px;color:var(--rl-text2)}.rl-ask-q{min-height:52px}.rl-ask-q .rl-arow-t b{font-weight:600}" +
+    ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
@@ -2705,13 +2739,16 @@
     return card;
   }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
-  function shipLine(dv) {
+  function shipWords(dv, short) {
     var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
-    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier ? " with " + dv.carrier : "";
-    var said = done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
+    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier && !short ? " with " + dv.carrier : "";
+    return done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
       : dv.status === "out_for_delivery" ? "Out for delivery" + by
       : dv.status === "due" ? (dv.at && dv.at !== today ? "Arriving " + day(dv.at) : "Arriving today") + by : "On its way" + by;
-    return el("div", { className: "rl-po-ship" + (done ? " done" : "") }, [jIc(done ? "check" : "parcel", 17), el("span", { text: said })]);
+  }
+  function shipLine(dv) {
+    var done = dv.status === "delivered";
+    return el("div", { className: "rl-po-ship" + (done ? " done" : "") }, [jIc(done ? "check" : "parcel", 17), el("span", { text: shipWords(dv) })]);
   }
   function disconnectGmail(done, msg) {
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
@@ -2887,7 +2924,7 @@
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
         var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
         var subOf = function () { return [named.length ? who : ref, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
-          row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt"; };
+          row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
@@ -3158,6 +3195,7 @@
           if (giftRows.length) kinds.push(kindRow("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), pick(function () { openK("gifts"); })));
           if (shopRows.length) kinds.push(kindRow("shop", "Shop orders", shopRows.length + (shopRows.length === 1 ? " item" : " items"), pick(function () { openK("shop"); })));
           sheet.appendChild(accGroup("", kinds));
+          if (window.go) sheet.appendChild(accGroup("", [accRow("swap", "Returns and swaps", "What you've sent back, and where each one has got to", pick(function () { window.go("returns"); }))]));
           if (yearList.length > 1) sheet.appendChild(accGroup("Year", yearList.map(function (y) { return accRow("doc", y, counted(yearN[y]), pick(function () { memo.calmYear = y; drawList(); })); })));
           sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
         };
@@ -3322,6 +3360,10 @@
         search.style.cssText = "";
         var mag = el("span"); mag.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
         box.appendChild(el("label", { className: "rl-search" }, [mag, search]));
+        if (window.__relayFindReceipts != null) {
+          var found = String(window.__relayFindReceipts || ""); window.__relayFindReceipts = null;
+          if (found) { search.value = found; query = found.toLowerCase(); } else setTimeout(function () { try { search.focus(); } catch (e) {} }, 0);
+        }
         box.appendChild(el("div", { className: "rl-recstat rl-recstat-top" }, [status]));
         box.appendChild(list);
         // Pulling the page down checks the inbox now (relay-gestures.js through checkInbox), so there's no button for it.
@@ -3900,6 +3942,7 @@
   // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     filter: '<path d="M4 7h8.5M19.5 7h.5M4 17h.5M11.5 17H20"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
@@ -3991,6 +4034,156 @@
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
+  // The help chat's screen (worker/support-chat.js answers it; its rules are there). It is Profile's "Contact us" page while
+  // the assistant is off, and the Ask tab while it is on (opts.tab): same screen, same routes, same wording about who answers.
+  function chatPage(b, opts) {
+      opts = opts || {};
+      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
+      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
+      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
+      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
+      var log = memo.chatLog || (memo.chatLog = []);
+      var aboutBar = null, foot = null;
+      function noteText() {
+        return !ai ? "Relay's team will see your message and your email address, so they can reply."
+          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
+          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
+      }
+      function stopAbout() {
+        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
+        if (foot) foot.textContent = noteText();
+        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
+      }
+      var list = el("div", { className: "rl-chat", role: "log" });
+      list.setAttribute("aria-live", "polite");
+      var note = el("p", { className: "rl-msg" });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
+      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
+      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
+      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
+      var busy = false;
+      function bubble(t) {
+        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
+        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
+        // Said once, over its first message: who's answering, and that it's an AI.
+        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
+        return n;
+      }
+      function draw() {
+        list.textContent = "";
+        if (opts.tab && ai && !about && !log.length) {
+          list.appendChild(el("p", { className: "rl-ask-lead", text: "Relay's assistant is an AI, so it can get things wrong. Ask it anything about using Relay." }));
+          list.appendChild(el("div", { className: "rl-acard rl-ask-qs" }, ["How do I return something?", "How does a swap work?", "Why is a receipt missing?", "How does Relay find my receipts?"].map(function (q) {
+            return el("button", { type: "button", className: "rl-arow rl-ask-q", onclick: function () { box.value = q; sendQuestion(); } }, [el("span", { className: "rl-arow-t" }, [el("b", { text: q })]), accIc("chev", 18, "rl-arow-c")]);
+          })));
+          return;
+        }
+        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
+          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
+        if (ai && !log.length) {
+          var chips = el("div", { className: "rl-chat-chips" });
+          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
+            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
+          });
+          list.appendChild(chips);
+        }
+        log.forEach(function (t) { list.appendChild(bubble(t)); });
+      }
+      function turns(extra) {
+        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
+        if (extra) out.push({ role: "user", text: extra });
+        return out.slice(-24);
+      }
+      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
+      function sendQuestion() {
+        var q = box.value.replace(/\s+$/, "").trim();
+        if (busy || !q) return;
+        if (!ai) return handoff();
+        say(note, "");
+        log.push({ role: "user", text: q }); box.value = ""; draftSet("help-chat", ""); fit();
+        draw();
+        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
+        typing.setAttribute("aria-label", "Relay's assistant is writing");
+        list.appendChild(typing); scrollEnd();
+        lock(true);
+        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
+          lock(false); typing.remove();
+          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
+          log.pop(); box.value = q; fit(); draw();
+          var e = r.body && r.body.error;
+          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
+          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
+            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
+            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
+        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      function handoff() {
+        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
+        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
+        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
+          lock(true); say(note, "");
+          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
+            lock(false);
+            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
+            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
+            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
+            draw(); scrollEnd();
+          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        });
+      }
+      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
+      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
+      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
+      send.onclick = sendQuestion;
+      person.onclick = handoff;
+      // Which receipt the assistant can see, and a way to stop showing it.
+      if (about) {
+        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
+          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
+        b.appendChild(aboutBar);
+      }
+      // A problem is said just above the box, so it's never hidden behind the tab bar.
+      b.appendChild(list);
+      foot = el("p", { className: "rl-anote", text: noteText() });
+      if (opts.tab) { b.appendChild(foot); if (ai) b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); }
+      else { b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); if (ai) b.appendChild(person); b.appendChild(foot); }
+      draw(); setTimeout(fit, 0);
+    }
+  // Whether the assistant is on: asked once each time Relay is opened, and the last answer is remembered on this phone so
+  // the tab doesn't turn up late. Signing out forgets it.
+  var ASK_KEY = "relay.ask.v1", askAsked = false;
+  function helpChatState() {
+    return memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; });
+  }
+  function askOn() {
+    var s = load();
+    if (!s || !s.token) return false;
+    var was = false; try { was = localStorage.getItem(ASK_KEY) === "1"; } catch (e) {}
+    if (!askAsked) { askAsked = true; helpChatState().then(function (hc) {
+      if (!hc) return;
+      var on = Boolean(hc.available);
+      try { localStorage.setItem(ASK_KEY, on ? "1" : "0"); } catch (e) {}
+      if (on !== was && window.relayNavChanged) window.relayNavChanged();
+    }); }
+    return memo.helpChat ? Boolean(memo.helpChat.available) : was;
+  }
+  try { window.addEventListener("relay:session", function () { askAsked = false; if (!load()) { try { localStorage.removeItem(ASK_KEY); } catch (e) {} } }); } catch (e) {}
+  function mountAsk(host) {
+    if (!host) return;
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) { host.appendChild(el("div", { className: "rl-po" }, [el("h3", { text: "Sign in to ask Relay", style: "margin:0" }), el("button", { className: "rl-po-primary", text: "Sign in", style: "max-width:220px", onclick: show })])); return; }
+    host.classList.add("rl-asktab");
+    for (var i = 0; i < 4; i++) host.appendChild(el("div", { className: "rl-skel", style: "height:52px;border-radius:14px;margin:0 0 8px" }));
+    helpChatState().then(function (hc) {
+      if (!host.isConnected) return;
+      host.textContent = "";
+      if (!hc || !hc.available) { host.appendChild(el("p", { className: "rl-calm-none", text: "Relay's assistant is off at the moment. To write to Relay's team, tap your picture at the top, then Help and legal." })); return; }
+      chatPage(host, { tab: true });
+    });
+  }
   function signedInView(sheet, email, notice, c) {
     sheet.textContent = "";
     var inPage = sheet.classList.contains("rl-inpage");
@@ -4041,16 +4234,11 @@
     var review = isReview();
     if (notice) say(msg, notice.text, notice.bad);
 
-    // Calm layout: Profile is who you are, this year's Wrapped as one card, then a short list. Each thing has one home:
-    // Price alerts, Swap & resell and Auctions are on Discover; adding a missing receipt and shop orders are on Receipts.
+    // Draft 2: Profile opens from the avatar and is who you are, then a short list. Each thing has one home: Wrapped,
+    // Swap & resell and Auctions are on Browse; price alerts are Home's bell; adding a missing receipt and shop orders are
+    // on Receipts; the assistant is the Ask tab.
     // The reviewer account (isReview) can't have an inbox or delivery details, so those rows, and Wrapped (made from inbox
     // receipts), are left out for it.
-    if (inPage && !review) {
-      var wr = el("div", { id: "rl-wrapped" }); sheet.appendChild(wr);
-      var openWrapped = function (y) { page("Wrapped", function (b) { mountWrapped(b, y); }); };
-      wrappedDoor(wr, openWrapped);
-      if (window.__relayOpenWrapped) { window.__relayOpenWrapped = false; setTimeout(function () { if (head.isConnected) openWrapped(); }, 0); }
-    }
     var rows = [];
     var mailRow = accRow("mail", "Inboxes", "", function () { page("Inboxes", mailPage); });
     if (!review) rows.push(mailRow);
@@ -4136,9 +4324,9 @@
     });
     function helpHub(b) {
       b.appendChild(accGroup("", [
-        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
+        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat(chatRow._ai ? [] : [chatRow], [
         accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
-        accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
+        accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })])));
     }
 
     // Reviewing member reports: only for the people who do that.
@@ -4760,115 +4948,6 @@
     // ---- The help chat (worker/support-chat.js): Relay's AI assistant, and "Talk to a person", which emails the chat to
     // Relay's team. The conversation lives only on this screen (and this session): Relay keeps no copy. With the
     // assistant off, it's a message to Relay's team. ----
-    function chatPage(b) {
-      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
-      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
-      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
-      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
-      var log = memo.chatLog || (memo.chatLog = []);
-      var aboutBar = null, foot = null;
-      function noteText() {
-        return !ai ? "Relay's team will see your message and your email address, so they can reply."
-          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
-          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
-      }
-      function stopAbout() {
-        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
-        if (foot) foot.textContent = noteText();
-        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
-      }
-      var list = el("div", { className: "rl-chat", role: "log" });
-      list.setAttribute("aria-live", "polite");
-      var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
-      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
-      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
-      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
-      var busy = false;
-      function bubble(t) {
-        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
-        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
-        // Said once, over its first message: who's answering, and that it's an AI.
-        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
-        return n;
-      }
-      function draw() {
-        list.textContent = "";
-        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
-          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
-          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
-        if (ai && !log.length) {
-          var chips = el("div", { className: "rl-chat-chips" });
-          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
-            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
-          });
-          list.appendChild(chips);
-        }
-        log.forEach(function (t) { list.appendChild(bubble(t)); });
-      }
-      function turns(extra) {
-        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
-        if (extra) out.push({ role: "user", text: extra });
-        return out.slice(-24);
-      }
-      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
-      function sendQuestion() {
-        var q = box.value.replace(/\s+$/, "").trim();
-        if (busy || !q) return;
-        if (!ai) return handoff();
-        say(note, "");
-        log.push({ role: "user", text: q }); box.value = ""; draftSet("help-chat", ""); fit();
-        draw();
-        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
-        typing.setAttribute("aria-label", "Relay's assistant is writing");
-        list.appendChild(typing); scrollEnd();
-        lock(true);
-        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
-          lock(false); typing.remove();
-          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
-          log.pop(); box.value = q; fit(); draw();
-          var e = r.body && r.body.error;
-          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
-          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
-            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
-            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
-        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-      }
-      function handoff() {
-        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
-        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
-        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
-          lock(true); say(note, "");
-          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
-            lock(false);
-            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
-            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
-            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
-            draw(); scrollEnd();
-          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-        });
-      }
-      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
-      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
-      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
-      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
-      send.onclick = sendQuestion;
-      person.onclick = handoff;
-      // Which receipt the assistant can see, and a way to stop showing it.
-      if (about) {
-        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
-          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
-        b.appendChild(aboutBar);
-      }
-      // A problem is said just above the box, so it's never hidden behind the tab bar.
-      b.appendChild(list);
-      b.appendChild(note);
-      b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
-      if (ai) b.appendChild(person);
-      foot = el("p", { className: "rl-anote", text: noteText() });
-      b.appendChild(foot);
-      draw(); setTimeout(fit, 0);
-    }
     function helpPage(b) {
       HELP.forEach(function (q) {
         b.appendChild(el("details", { className: "rl-faq" }, [el("summary", { text: q[0] }), el("p", { text: q[1] })]));
@@ -5054,7 +5133,48 @@
         accIc("chev", 18, "rl-arow-c")]));
     }).catch(function () {});
   }
+  // Draft 2: Browse's own screen. One Wrapped card, then the kinds of shopping as colour tiles (each opens that kind's
+  // receipts), then three doors. Everything on it is the shopper's own: nothing is recommended or made up.
+  function mountBrowse(host, opts) {
+    opts = opts || {};
+    if (!host) return;
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) return;
+    var hero = el("div", { id: "rl-wrapped" }); host.appendChild(hero);
+    if (!isReview()) wrappedDoor(hero, function (y) { memo.wrappedYear = y; if (window.go) window.go("wrapped"); });
+    var cats = el("div"); host.appendChild(cats);
+    var NAMES = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other" };
+    var openCat = function (k) { return function () { memo.openCat = k; memo.catFilter = null; if (window.go) window.go("receipts"); }; };
+    var drawCats = function (rows) {
+      if (!document.body.contains(cats)) return;
+      cats.textContent = "";
+      var by = {}; orderRows(rows).forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
+      var keys = Object.keys(by).sort(function (a, b) { return (a === "other") - (b === "other") || by[b].length - by[a].length; });
+      if (!keys.length) return;
+      cats.appendChild(el("div", { className: "rl-calm-h" }, [el("h2", { text: "Your categories" })]));
+      var grid = el("div", { className: "rl-tiles" });
+      keys.forEach(function (k) {
+        // "Due soon" only when the shop's own return date is within a week (statedDeadline): never a date Relay worked out.
+        var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length, n = by[k].length;
+        var t = el("button", { type: "button", className: "rl-tile", ariaLabel: (NAMES[k] || "Other") + ", " + n + (n === 1 ? " receipt" : " receipts") + (soon ? ", " + soon + " due soon" : ""), onclick: openCat(k), style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) });
+        var art = el("span", { className: "rl-tile-art" });
+        art.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (CAT_ICONS[k] || CAT_ICONS.other)[2] + "</svg>";
+        t.appendChild(art);
+        if (soon) t.appendChild(el("span", { className: "rl-tile-badge", text: soon + " due soon" }));
+        t.appendChild(el("b", { text: NAMES[k] || "Other" }));
+        grid.appendChild(t);
+      });
+      cats.appendChild(grid);
+    };
+    if (memo.receipts) drawCats(memo.receipts.rows); else for (var i = 0; i < 2; i++) cats.appendChild(el("div", { className: "rl-skel", style: "height:112px;border-radius:20px;margin:14px 0 0" }));
+    api("/relay/my/receipts?all=1").then(function (r) { if (r.ok && r.body) drawCats(r.body.receipts || []); else if (!memo.receipts) cats.textContent = ""; }, function () { if (!memo.receipts) cats.textContent = ""; });
+    var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
+    var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
+    host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));
+  }
   function mountWrapped(host, year) {
+    year = year || memo.wrappedYear || undefined; memo.wrappedYear = null;
     host.textContent = "";
     var s = load();
     if (!s || !s.token) return;
@@ -7040,8 +7160,104 @@
   function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.background = ACC_TINT[name]; } return i; }
   function leftWords(d) { return d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left"; }
   function dayWords(day) { return new Date(String(day).slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); }
-  // Home (calm, draft): only what needs you (something with a date on it, or something to do), then the last three
-  // purchases. Everything else is one tap deeper: the full list of what can still go back, and Returns & swaps.
+  // ---- Draft 2: Home is a feed, one card for each order ----
+  // What needs the shopper comes first (money owed for a swap, a return date inside a week), then orders still in play (on
+  // the way, a return under way, still returnable), then the newest. A card is one tap and opens that order's page.
+  // Every line on a card is something Relay knows: the shop's own return date (statedDeadline), the parcel's latest news
+  // (shipWords), how far a return has got. A strip under a card is only ever days left on a return. Nothing is made up.
+  var HOME_TINT = false;   // true: each card takes its kind of shopping's colour (TILE_COLOURS). One class on the feed.
+  function feedEntries(purchases, receipts, refresh) {
+    var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
+    var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
+    purchases.forEach(function (o) {
+      var items = (o.items || []).filter(Boolean); if (!items.length) return;
+      var shop = o.store || "Shop", at = String(o.orderedAt || "").slice(0, 10);
+      var owe = items.filter(function (it) { return it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo; })[0];
+      var back = items.filter(function (it) { return it.returnInfo; })[0], swapped = items.filter(function (it) { return it.exchange; })[0];
+      var dates = items.map(function (it) { return (it.returnable || it.exchangeable) && !it.returnInfo && it.returnBy && it.returnBy.date ? it.returnBy.date : null; }).filter(function (d) { return d && d >= today; }).sort();
+      var dl = dates[0] || null;
+      var e = { key: "o" + o.id, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2 };
+      e.tiles = items.slice(0, 6).map(function (it) { return { name: it.title, price: Number.isInteger(it.priceMinor) ? money(it.priceMinor, it.currency) : "", draw: function (box) {
+        var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 64); };
+        if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; box.appendChild(ph); } else drawIt(); } }; });
+      if (owe) { e.line = "Pay " + money(owe.exchange.balance.owedMinor, owe.currency) + " to finish your swap"; e.rank = 0; e.swaps = true; e.owes = true; }
+      else if (back) { var done = back.returnInfo.status === "refunded";
+        e.line = done ? "Refunded" + (back.returnInfo.refundMinor ? " " + money(back.returnInfo.refundMinor, back.currency) : "") : "Return started, waiting for the refund"; e.rank = done ? 2 : 1; e.swaps = !done; }
+      else if (dl) { e.line = "Return by " + dayWords(dl); soon(e, dl); }
+      else if (swapped) e.line = "Swapped to " + swapped.exchange.toTitle;
+      else e.line = at ? "Bought " + dayWords(at) : "From " + shop;
+      // Its page: every item of the order, the one that needs something first.
+      var lead = owe || back || items.filter(function (it) { return dl && it.returnBy && it.returnBy.date === dl; })[0] || items[0];
+      e.open = function () { open(function (sheet) {
+        sheet.appendChild(el("h2", { text: shop }));
+        [lead].concat(items.filter(function (it) { return it !== lead; })).forEach(function (it) { sheet.appendChild(confirmedCard(o, it, function () { close(); refresh(); }, it.returnBy && it.returnBy.date)); });
+        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+      }); };
+      out.push(e);
+    });
+    orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
+      if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
+      var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
+      var named = (x.items || []).filter(function (i) { return i && i.name; });
+      var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
+      var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
+      var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2 };
+      e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
+          price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
+          draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 64); } }; })
+        : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 72, 96); } }];
+      if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
+        e.swaps = !p.refundedAt; e.rank = p.refundedAt ? 2 : 1; }
+      else if (canGoBack && stated && daysLeft(stated) <= 7) { e.line = "Return by " + dayWords(stated); soon(e, stated); }
+      else if (freshDelivery(x)) { e.line = shipWords(dv, true); e.onWay = true; e.rank = 1; }
+      else if (canGoBack && stated) { e.line = "Return by " + dayWords(stated); e.rank = 1; }
+      // No date from the shop: Relay never shows one of its own as a deadline, only that it can still surely go back.
+      else if (canGoBack) { e.line = "Can still be returned"; e.rank = 1; }
+      else if (dv && dv.status === "delivered" && dv.at) e.line = shipWords(dv, true);
+      else e.line = "Bought " + dayWords(x.orderDate);
+      // Nothing open on it: the newest things that could ever have gone back come before a coffee from this morning.
+      if (e.rank === 2) e.quiet = !(x.returnable !== false && x.orderDate >= fresh);
+      var card = null;
+      e.open = function () { card = card || emailCard(x, { markable: true, changed: refresh }); card.onclick(); };
+      out.push(e);
+    });
+    return out.sort(function (a, b) {
+      return a.rank - b.rank || (a.rank === 0 ? Number(Boolean(b.owes)) - Number(Boolean(a.owes)) || (a.when < b.when ? -1 : a.when > b.when ? 1 : 0) : 0) || (a.rank === 1 ? Number(Boolean(b.onWay)) - Number(Boolean(a.onWay)) || Number(Boolean(b.swaps)) - Number(Boolean(a.swaps)) : 0)
+        || (a.rank === 1 && a.when !== b.when ? (!a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1) : 0) || (a.rank === 2 ? Number(Boolean(a.quiet)) - Number(Boolean(b.quiet)) : 0) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+    });
+  }
+  // One card: the shop and the day, what was bought as large tiles with the price on each, one big line, and (only for a
+  // return date inside a week) the days left as a strip under it. The whole card is one tap.
+  function feedCard(e) {
+    var item = el("div", { className: "h2-item" + (e.small ? " small" : ""), tabIndex: 0 });
+    item.setAttribute("role", "button");
+    var card = el("div", { className: "h2-card" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : "") });
+    if (e.cat && TILE_COLOURS[e.cat]) item.style.setProperty("--h2-c", TILE_COLOURS[e.cat]);
+    if (e.shop) {
+      var logo = el("span", { className: "h2-logo", text: String(e.shop).trim().charAt(0).toUpperCase() }); logo.setAttribute("aria-hidden", "true");
+      if (e.icon) { logo.textContent = ""; logo.appendChild(accIc(e.icon, 20, "h2-logo-i")); } else if (e.dom) shopLogo(logo, e.dom, 26);
+      card.appendChild(el("div", { className: "h2-head" }, [logo, el("span", { className: "h2-head-t" }, [el("b", { text: e.shop })].concat(e.at ? [el("span", { text: dayWords(e.at) })] : []))]));
+    }
+    if (e.tiles && e.tiles.length) {
+      var row = el("div", { className: "h2-tiles" + (e.tiles.length === 1 ? " one" : "") });
+      e.tiles.forEach(function (t) {
+        var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); t.draw(art);
+        var pic = el("span", { className: "h2-pic" }, [art].concat(t.price ? [el("span", { className: "h2-price", text: t.price })] : []));
+        row.appendChild(el("span", { className: "h2-tile" }, [pic, el("span", { className: "h2-name", text: t.name })]));
+      });
+      card.appendChild(row);
+    }
+    var go = el("span", { className: "h2-go" }, [accIc("arrow", 20, "h2-go-i")]); go.setAttribute("aria-hidden", "true");
+    card.appendChild(el("div", { className: "h2-line" }, [el("span", { className: "h2-line-t" }, [el("b", { text: e.line })].concat(e.sub ? [el("span", { text: e.sub })] : [])), go]));
+    item.appendChild(card);
+    if (e.strip) item.appendChild(el("div", { className: "h2-strip " + (e.stripKind || ""), text: e.strip }));
+    item.setAttribute("aria-label", [e.shop, e.tiles && e.tiles.length ? e.tiles.map(function (t) { return t.name; }).join(", ") : null, e.line, e.strip].filter(Boolean).join(". "));
+    var busy = false, tap = function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); e.open(); };
+    item.onclick = tap;
+    item.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tap(); } };
+    return item;
+  }
   function mountHome(host) {
     if (!host) return;
     var s = load();
@@ -7050,114 +7266,81 @@
     var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
     var top = el("div"); host.appendChild(top);
     mountInstore(top, refresh, "suggest");
-    var start = el("div"); host.appendChild(start);
-    var state = { both: null, mail: [], wins: [] };
-    var needHead = el("div", { className: "rl-calm-h first" }, [el("h2", { text: "Needs you" })]);
-    var needBox = el("div", { className: "rl-acard" });
-    var recentHead = el("div", { className: "rl-calm-h" }, [el("h2", { text: "Recent" })]);
-    var recentBox = el("div", { className: "rl-acard" });
-    var doors = el("div", { className: "rl-acard rl-calm-door" }, [calmRow(calmIcon("swap"), "Returns and swaps", "", "", "", function () { if (window.go) window.go("returns"); })]);
-    [needHead, needBox, recentHead, recentBox, doors].forEach(function (n) { host.appendChild(n); });
-    for (var k = 0; k < 2; k++) { needBox.appendChild(el("div", { className: "rl-skel", style: "min-height:68px;margin:0;border-radius:0" })); recentBox.appendChild(el("div", { className: "rl-skel", style: "min-height:68px;margin:0;border-radius:0" })); }
-    var seeAll = function () {
-      open(function (sheet) {
-        sheet.classList.add("rl-full");
-        var box = el("div"); sheet.appendChild(box);
-        mountWallet(box, { title: "Still returnable" });
-        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
-      });
+    var chips = el("div", { className: "h2-chips", role: "group", ariaLabel: "What to show" });
+    var feed = el("div", { className: "h2-feed" + (HOME_TINT ? " tint" : "") });
+    host.appendChild(chips); host.appendChild(feed);
+    for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:380px;border-radius:26px;margin:0" }));
+    var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
+    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product; }); } catch (e) { return []; } };
+    // A brand-new account: one card that says what to do first.
+    var startCard = function () {
+      return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+        el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and shows them here.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+        el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } }),
+        el("button", { className: "rl-po-secondary", text: "Add a missing receipt", style: "max-width:280px", onclick: function () { open(function (sheet) { addReceiptView(sheet, function () { close(); refresh(); }); }); } })]);
     };
     var draw = function () {
-      if (!state.both || !document.body.contains(needBox)) return;
-      var purchases = state.both[0], receipts = state.both[1], today = new Date().toISOString().slice(0, 10);
-      var needs = [], rest = 0, recent = [];
-      // Inboxes to connect again are one row, and so are auctions waiting on the shopper, so neither can crowd out what
-      // is in the wallet. The row opens Receipts, where the Connect again button is at the top.
-      if (state.mail.length) {
-        var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
-        needs.push({ rank: -2, when: "", row: function () { return calmRow(calmIcon("mail", true), oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again",
-          oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment", "", "", function () { if (window.go) window.go("receipts"); }); } });
-      }
-      if (state.wins.length) {
-        var nWin = state.wins.length, win0 = state.wins[0], st0 = win0.you && win0.you.state, a0 = win0.auction || {};
-        var winTitle = nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win";
-        needs.push({ rank: -1, when: "", row: function () { return calmRow(calmIcon("gavel", true), winTitle, nWin > 1 ? "" : (a0.title || ""), "", "", function () { openAuctions("mine"); }); } });
-      }
-      purchases.forEach(function (o) { (o.items || []).forEach(function (it) {
-        var owes = Boolean(it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo);
-        var dl = it.returnBy && it.returnBy.date ? it.returnBy.date : null, shop = o.store || "Shop";
-        var openIt = function () { open(function (sheet) {
-          sheet.appendChild(el("h2", { text: shop }));
-          sheet.appendChild(confirmedCard(o, it, function () { close(); refresh(); }, dl));
-          sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
-        }); };
-        var pic = function () {
-          var img = el("div", { className: "rl-po-img" }); img.setAttribute("aria-hidden", "true");
-          var drawIt = function () { illustrate(img, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 26); };
-          if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); drawIt(); }; img.appendChild(ph); } else drawIt();
-          return img;
-        };
-        if (owes) needs.push({ wallet: true, rank: 0, when: "", row: function () { return calmRow(pic(), "Pay " + money(it.exchange.balance.owedMinor, it.currency) + " to finish your swap", shop + ", " + it.title, "", "", openIt); } });
-        else if (it.returnable || it.exchangeable) {
-          var d = dl ? daysLeft(dl) : null;
-          if (dl && d !== null && d >= 0 && d <= 7) needs.push({ wallet: true, rank: 1, when: dl, row: function () { return calmRow(pic(), it.title, "Return to " + shop + " by " + dayWords(dl), leftWords(d), d <= 3 ? "urgent" : "soon", openIt); } });
-          else rest++;
-        }
-        recent.push({ at: String(o.orderedAt || "").slice(0, 10), row: function () { return calmRow(pic(), it.title, shop + ", " + dayWords(o.orderedAt), money(it.priceMinor, it.currency), "", openIt); } });
-      }); });
-      orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
-        if (isCarrier(x)) return;
-        var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
-        var named = (x.items || []).some(function (i) { return i && i.name; });
-        var title = named ? receiptTitle(x) : who;
-        var pic = function () { var img = el("div", { className: "rl-po-img" }); img.setAttribute("aria-hidden", "true"); receiptPic(img, x, 26, 32); return img; };
-        var card = null, openX = function () { card = card || emailCard(x, { markable: true, changed: refresh }); card.onclick(); };
-        if (/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) recent.push({ at: x.orderDate, row: function () {
-          return calmRow(pic(), title, (named ? who + ", " : "") + dayWords(x.orderDate), x.totalPence == null ? "" : money(x.totalPence, x.currency), "", openX); } });
-        var only = x.returnable === false ? (x.returnableItems || []) : null;
-        if (only && !only.length) return;
-        var dl = deadlineOf(x), onWay = freshDelivery(x);
-        if (!((dl && dl >= today) || (onWay && !dl))) return;
-        if (x.returnProgress) return;
-        // Only a date the shop itself gave counts as a deadline here (statedDeadline): Relay never makes one up.
-        var shown = statedDeadline(x), d = shown ? daysLeft(shown) : null;
-        if (shown && d !== null && d >= 0 && d <= 7) needs.push({ wallet: true, rank: 1, when: shown, row: function () { return calmRow(pic(), title, "Return to " + who + " by " + dayWords(shown), leftWords(d), d <= 3 ? "urgent" : "soon", openX); } });
-        else rest++;
+      if (!state.both || !document.body.contains(feed)) return;
+      var all = feedEntries(state.both[0], state.both[1], refresh), watched = watches();
+      var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
+      // "To return" runs soonest date first; the others keep the feed's order.
+      sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
+      if (!sets[state.pick] || (state.pick !== "you" && !sets[state.pick].length)) state.pick = "you";
+      chips.textContent = "";
+      [["you", "For you"], ["back", "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"], ["watch", "Watching"]].forEach(function (c) {
+        if (c[0] !== "you" && !sets[c[0]].length) return;
+        var b = el("button", { type: "button", className: "h2-chip", text: c[1], onclick: function () { if (state.pick === c[0]) return; state.pick = memo.homeChip = c[0]; draw(); try { window.scrollTo(0, 0); } catch (e) {} } });
+        b.setAttribute("aria-pressed", state.pick === c[0] ? "true" : "false");
+        chips.appendChild(b);
       });
-      needs.sort(function (a, b) { return a.rank - b.rank || (a.when < b.when ? -1 : a.when > b.when ? 1 : 0); });
-      needBox.textContent = "";
-      var oldPill = needHead.querySelector(".pill"); if (oldPill) oldPill.remove();
-      if (!needs.length) needBox.appendChild(el("p", { className: "rl-calm-none", text: "Nothing needs you today." }));
-      needs.slice(0, 3).forEach(function (n) { needBox.appendChild(n.row()); });
-      // The number is what can still go back (the wallet), never the inbox or auction rows above; anything of the
-      // shopper's that didn't fit in the three rows is said, so a closing return date is never hidden without a word.
-      var hiddenN = Math.max(0, needs.length - 3), inWallet = needs.filter(function (n) { return n.wallet; }).length + rest;
-      if (hiddenN || rest) needBox.appendChild(calmRow(calmIcon("bag"), "See everything you can still return", hiddenN ? hiddenN + " more to do" : "", String(inWallet), "", seeAll));
-      recent.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
-      recentBox.textContent = "";
-      if (!recent.length) recentBox.appendChild(el("p", { className: "rl-calm-none", text: "What you buy shows up here as Relay finds the receipts." }));
-      recent.slice(0, 3).forEach(function (r) { recentBox.appendChild(r.row()); });
-    };
-    if (isReview()) start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
-      el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
-      el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
-    else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
-      if (!g.ok || !g.body || !document.body.contains(start)) return;
-      if (!g.body.connected) {
-        start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
-          el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
-          el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and fills in your wallet.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
-          el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } })]));
-        return;
+      chips.style.display = chips.children.length > 1 ? "" : "none";
+      feed.textContent = "";
+      if (state.pick === "you") {
+        if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+          el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
+          el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
+        else if (state.connected === false) feed.appendChild(startCard());
+        // Inboxes to connect again and auctions waiting on the shopper come before any order: one small card each.
+        if (state.mail.length) { var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
+          feed.appendChild(feedCard({ small: true, icon: "mail", line: oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again", sub: oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment",
+            open: function () { if (window.go) window.go("receipts"); } })); }
+        if (state.wins.length) { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
+          feed.appendChild(feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
+            sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }
       }
-      state.mail = inboxesToFix(g.body); if (state.mail.length) draw();
+      if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
+        var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
+        feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
+            draw: function (box) { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 72); } }],
+          line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
+          open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
+      });
+      else {
+        // For you: everything that needs something or is still in play, then the newest, about eight in all.
+        var list = sets[state.pick], open2 = list.filter(function (e) { return e.rank < 2; });
+        var shown = state.pick === "you" ? open2.slice(0, 8).concat(list.filter(function (e) { return e.rank === 2; }).slice(0, Math.max(0, 8 - open2.length))) : list.slice(0, 12);
+        shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
+        if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
+      }
+      if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
+      if (testingOn()) { var t = el("div", { className: "h2-tools" }); feed.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
+      firstScreen();
+    };
+    var firstScreen = function () {
+      var bar = document.getElementById("foot"), br = bar && bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
+      var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0;
+      Array.prototype.forEach.call(feed.children, function (c) { c.classList.toggle("h2-nosnap", c.getBoundingClientRect().bottom + y <= limit); });
+    };
+    if (!isReview()) cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      if (!g.ok || !g.body) return;
+      state.connected = Boolean(g.body.connected); state.mail = inboxesToFix(g.body); draw();
     }, function () {});
     if (memo.walletPurchases && memo.receipts) { state.both = [memo.walletPurchases, memo.receipts.rows]; draw(); }
     loadBoth().then(function (both) { state.both = both; draw(); });
     // A win to pay for: asked only of someone who has bid before, as the tab's red number is.
     var bid = false; try { bid = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {}
     if (bid) auctionsMine().then(function (b) { state.wins = ((b && b.auctions) || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }); draw(); });
-    if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); host.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
   }
   function whichItems(x, parts, done) {
     var who = (x.retailer && x.retailer.name) || "this shop";
@@ -7460,7 +7643,7 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
-    openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
+    openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
