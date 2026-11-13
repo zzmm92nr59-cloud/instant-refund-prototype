@@ -102,6 +102,7 @@ st.interests["jess@example.com"] = ["fashion"];
   await page.waitForTimeout(500);
   await tip(page).getByRole("button", { name: /^Done/ }).click();
   await tip(page).waitFor({ state: "detached" });
+  for (let i = 0; i < 50 && (st.tips["jess@example.com"] || []).length < 4; i++) await page.waitForTimeout(100);
   assert.deepEqual([...st.tips["jess@example.com"]].sort(), ["ask", "browse", "home", "receipts"], "kept with the account as each was shown");
   // Opened again: not shown again, and Relay isn't asked about tips.
   const gets = st.tipGets;
@@ -128,6 +129,7 @@ console.log("ok - straight away when there's no interests sheet: four tips, tab 
   // Escape is Skip: they all go, and stay gone.
   await page.keyboard.press("Escape");
   await tip(page).waitFor({ state: "detached" });
+  for (let i = 0; i < 50 && (st.tips["jess@example.com"] || []).length < 4; i++) await page.waitForTimeout(100); // (sent in order, a moment later)
   assert.deepEqual([...st.tips["jess@example.com"]].sort(), ["ask", "browse", "home", "receipts"], "skipping counts them all as seen");
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -149,6 +151,7 @@ st.ai = false;
   await checkTip(page, "Browse");
   await page.waitForTimeout(500); await tip(page).getByRole("button", { name: "Skip" }).click();
   await tip(page).waitFor({ state: "detached" });
+  for (let i = 0; i < 50 && (st.tips["sam@example.com"] || []).length < 3; i++) await page.waitForTimeout(100);
   assert.deepEqual([...st.tips["sam@example.com"]].sort(), ["browse", "home", "receipts"], "Skip: the ones left count as seen");
   assert.deepEqual(errors, []);
   await ctx.close();

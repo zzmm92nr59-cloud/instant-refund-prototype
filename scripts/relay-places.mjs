@@ -127,3 +127,11 @@ const firstRunDone = (what) => {
 export async function skipInterests(ctx) { await ctx.addInitScript(firstRunDone, { interests: true, tips: true }); }
 // For tests about interests but not the tips: the tips have been seen.
 export async function skipTips(ctx) { await ctx.addInitScript(firstRunDone, { tips: true }); }
+
+// Opens a page. If the app was still finishing a step of its own (going back a step in history after a sheet closed)
+// the browser can drop the test's own navigation ("net::ERR_ABORTED"): then it simply goes again, as a person would.
+export async function goTo(page, url) {
+  for (let i = 0; ; i++) {
+    try { return await page.goto(url); } catch (e) { if (i === 2 || !/ERR_ABORTED/.test(String(e && e.message))) throw e; await page.waitForTimeout(300); }
+  }
+}
