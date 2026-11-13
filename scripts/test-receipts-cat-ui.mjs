@@ -8,6 +8,7 @@ import { createRequire } from "node:module"; import { createServer } from "node:
 import { skipInterests } from "./relay-places.mjs";
 // A group is chosen from Receipts' filter sheet; its row says how many receipts are in it.
 const openGroup = async (page, name, count) => {
+  await page.waitForTimeout(450); // (the app ignores a second tap on the same button within 400ms)
   await page.locator("#view .rl-calm-filter").first().click();
   const row = page.locator(".rl-sheet[aria-label='Filter receipts'] .rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first();
   assert.match((await row.innerText()).replace(/\s+/g, " "), new RegExp(name.replace(/[&]/g, "\\$&") + " " + count + "$"));

@@ -5,7 +5,7 @@
 // from the account; the keyboard space is tracked; no raw error text.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeShows, homeCard, profileButton, openProfile, openAccountRow, openShops } from "./relay-places.mjs";
+import { skipInterests, homeShows, homeCard, profileButton, tapPicture, openProfile, openAccountRow, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -74,7 +74,7 @@ for (const pg of ["profile", "receipts", "discover", "radar", "wrapped", "me"]) 
   assert.deepEqual(m.symbols, [], pg + ": no symbol characters used as icons in buttons");
   assert.deepEqual(m.purple, [], pg + ": no purple");
 }
-await page.evaluate(() => window.go("receipts")); await profileButton(page).click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
+await page.evaluate(() => window.go("receipts")); await tapPicture(page); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
 // Every page of Profile, its two sections included (the rows under them open from there).
 for (const sub of [null, "Email connection", "Security and privacy", "Email permission", "Download my data", "Delete my account", "Help and legal", "Help", "Two-step sign-in"]) {
   if (sub) { await openProfile(page); await openAccountRow(page, sub); await page.locator("#view [data-back]:visible").first().waitFor(); await page.waitForTimeout(300); }
@@ -184,7 +184,7 @@ console.log("ok - watches come back from the account when this device lost them"
 
 // Signing out removes the copy kept on this device.
 assert.ok(await page.evaluate(() => !!localStorage.getItem("relay.cache.v1")));
-await profileButton(page).click();
+await tapPicture(page);
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.locator(".rl-welcome").getByRole("button", { name: "Get started" }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.cache.v1")), null, "nothing of the account left on the device");

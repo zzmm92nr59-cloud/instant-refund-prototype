@@ -48,7 +48,17 @@ export async function openProfile(page) {
   await page.locator("#mePage .rl-arow:visible", { hasText: "Security and privacy" }).first().waitFor();
 }
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
-export const profileButton = (page) => page.locator(".h2-me, .topline .avatar").filter({ visible: true }).first();
+// (Home's own picture comes after the page's top line in the page, so the last one showing is Home's when on Home.)
+export const profileButton = (page) => page.locator(".topline .avatar, .h2-me").filter({ visible: true }).last();
+// Taps the picture to open Profile, as a person would: once the picture is drawn, and again if the tap landed just as the
+// screen was being drawn (a busy machine can do that).
+export async function tapPicture(page) {
+  await page.waitForFunction(() => [...document.querySelectorAll(".h2-me, .topline .avatar")].some(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== "hidden" && c.display !== "none"; }), null, { timeout: 20000 });
+  for (let i = 0; ; i++) {
+    try { await profileButton(page).click({ timeout: 8000 }); await page.locator("#mePage .rl-arow").first().waitFor({ timeout: 8000 }); return; }
+    catch (e) { if (i === 2) throw e; await page.waitForTimeout(450); }
+  }
+}
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
   name = RENAMED[name] || name;
@@ -57,7 +67,7 @@ export async function openAccountRow(page, name) {
   if (hub && !(await page.locator("#mePage .rl-arow:visible", { hasText: name }).count())) {
     // The app's double-tap guard ignores a second tap on the same spot within 400ms, so a test that has just tapped the
     // section (then gone back) waits as long as a person would.
-    await page.waitForTimeout(450);
+    await waitOutDoubleTap(page);
     await page.locator("#mePage .rl-arow:visible", { hasText: hub }).first().click();
   }
   const row = page.locator("#mePage .rl-arow:visible", { hasText: name }).first();
@@ -72,6 +82,12 @@ export async function openShops(page) {
   await page.evaluate(() => { window.go("discover"); if (window.dcShow) window.dcShow("shops"); });
   await page.locator("#catalogResults").waitFor({ state: "attached" });
 }
+// The app ignores a second tap on the same button, in the same spot, within 400ms (the shell's double-tap guard: a
+// double tap must never do the thing twice). A person never taps the same control twice that fast on purpose, but a
+// test on a fast machine does: Filter, then a kind, then Filter again in under 400ms, and the second Filter is (rightly)
+// ignored. So the helpers below wait that long before tapping a control a test may just have tapped.
+export const GUARD_MS = 450;
+export const waitOutDoubleTap = (page) => page.waitForTimeout(GUARD_MS);
 // Receipts: a list by month. A kind (Fashion, Gifts, Shop orders…), a year or "Returns and swaps" is chosen from its
 // filter sheet (the button at the top of the list); the receipts of that kind then show in the list.
 export async function openReceiptKind(page, name) {
@@ -80,6 +96,7 @@ export async function openReceiptKind(page, name) {
   }
   // A group already open: back to the whole list first.
   if (await page.locator("#view .rl-cat-back:visible").count()) await page.locator("#view .rl-cat-back").first().click();
+  await waitOutDoubleTap(page);
   await page.locator("#view .rl-calm-filter").first().click();
   const sheet = page.locator(".rl-sheet[aria-label='Filter receipts']").last();
   await sheet.locator(".rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first().click();
@@ -89,18 +106,40 @@ export async function openReceiptKind(page, name) {
 // would on a phone.
 export async function goTab(page, name) {
   await page.evaluate(() => { const a = document.activeElement; if (a && a.blur) a.blur(); });
+  await waitOutDoubleTap(page);
   await tab(page, name).click();
 }
-// For tests that aren't about interests: this phone has already said "Not now" to "What do you shop for?" for whoever
-// is signed in, so neither the one-time sheet on Home nor the sign-up step gets in the way. (scripts/test-signup-ui.mjs
-// and scripts/test-layout-ui.mjs test those.)
-export async function skipInterests(ctx) {
-  await ctx.addInitScript(() => {
+// For tests that aren't about the first-run prompts: this phone has already said "Not now" to "What do you shop for?"
+// and seen the four first-run tips, for whoever is signed in, so neither the one-time sheet on Home, the sign-up step nor
+// the tips get in the way. (scripts/test-signup-ui.mjs, scripts/test-layout-ui.mjs and scripts/test-tips-ui.mjs test those.)
+// (Whoever signs in, whenever: also when the test signs in after the page has opened.)
+const firstRunDone = (what) => {
+  const mark = () => {
     try {
-      const s = JSON.parse(localStorage.getItem("relay.session.v1") || "null"), k = "relay.interests-later.v1";
+      const s = JSON.parse(localStorage.getItem("relay.session.v1") || "null");
       if (!s || !s.email) return;
-      const l = JSON.parse(localStorage.getItem(k) || "[]");
-      if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
+      if (what.interests) {
+        const k = "relay.interests-later.v1", l = JSON.parse(localStorage.getItem(k) || "[]");
+        if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
+      }
+      if (what.tips) {
+        const t = JSON.parse(localStorage.getItem("relay.tips.v1") || "{}");
+        if (!t[s.email]) { t[s.email] = ["home", "ask", "browse", "receipts"]; localStorage.setItem("relay.tips.v1", JSON.stringify(t)); }
+      }
     } catch (e) { /* storage blocked: nothing to do */ }
-  });
+  };
+  mark();
+  const set = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (k, v) { set.call(this, k, v); if (k === "relay.session.v1") mark(); };
+};
+export async function skipInterests(ctx) { await ctx.addInitScript(firstRunDone, { interests: true, tips: true }); }
+// For tests about interests but not the tips: the tips have been seen.
+export async function skipTips(ctx) { await ctx.addInitScript(firstRunDone, { tips: true }); }
+
+// Opens a page. If the app was still finishing a step of its own (going back a step in history after a sheet closed)
+// the browser can drop the test's own navigation ("net::ERR_ABORTED"): then it simply goes again, as a person would.
+export async function goTo(page, url) {
+  for (let i = 0; ; i++) {
+    try { return await page.goto(url); } catch (e) { if (i === 2 || !/ERR_ABORTED/.test(String(e && e.message))) throw e; await page.waitForTimeout(300); }
+  }
 }

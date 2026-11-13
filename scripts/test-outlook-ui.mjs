@@ -37,9 +37,6 @@ await ctx.route("https://**/*", route => {
     orderRef: "OL-1", orderDate: "2026-10-14", totalPence: 5900, currency: "GBP", items: [{ name: "Wool jumper", qty: 1, pricePence: 5900 }], outlookId: "AQMkADAwATM0MDAAMS1-receipt1", category: "fashion", categoryLabel: "Fashion" }] : [] });
   if (u.pathname === "/relay/my/receipts/" + RID + "/original") return j({ html: "<p>Order OL-1</p>", extraImages: [], links: [] });
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
-  // What they shop for: nothing chosen yet, as the real server answers a new account (and saving keeps the list).
-  if (u.pathname === "/relay/my/interests" && m === "GET") return j({ interests: [], updatedAt: null });
-  if (u.pathname === "/relay/my/interests" && m === "PUT") { let b = {}; try { b = JSON.parse(route.request().postData() || "{}"); } catch {} return j({ interests: b.interests || [], updatedAt: Date.now() }); }
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
