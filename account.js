@@ -4668,7 +4668,7 @@
 
     // Two switches for Relay's team, each changing only what this device shows (so they also work in the app on the home
     // screen, which a link can't reach). Shoppers never see them.
-    //  * Shops' websites: the preview from shops' own websites in Discover and search by photo. Real products only.
+    //  * Shops' websites: the preview from shops' own websites in Browse and search by photo. Real products only.
     //  * Testing tools: Relay's test shops, test orders and sample items (the same as opening Relay with ?testtools=1).
     function teamSwitch(title, label, text, key) {
       var box = el("div", { className: "rl-aih" });
@@ -4688,8 +4688,8 @@
     }
     function teamTesting() {
       var box = el("div");
-      box.appendChild(teamSwitch("Shops' websites in Discover", "Shops' websites in Discover on this device",
-        "Real products and prices from shops' own websites, read once a day, in Discover and search by photo. Only Relay's team sees them.", "relay-web-preview"));
+      box.appendChild(teamSwitch("Shops' websites in Browse", "Shops' websites in Browse on this device",
+        "Real products and prices from shops' own websites, read once a day, in Browse and search by photo. Only Relay's team sees them.", "relay-web-preview"));
       box.appendChild(teamSwitch("Testing tools", "Testing tools on this device",
         "Relay's test shops, test orders and sample items, for trying things out. Off shows Relay as shoppers see it.", "relay-testing-tools"));
       return box;

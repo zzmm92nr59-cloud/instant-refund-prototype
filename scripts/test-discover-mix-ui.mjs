@@ -241,10 +241,10 @@ console.log("ok - the shops' websites switch: real shops only; clothes are fashi
 // 9. The team's two switches, and a device that had testing tools on moves to the shops' websites once.
 st.admin = { admin: false, signInAgain: true };
 await openProfile();
-const webSw = me.getByRole("switch", { name: "Shops' websites in Discover on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
+const webSw = me.getByRole("switch", { name: "Shops' websites in Browse on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
 assert.equal(await webSw.getAttribute("aria-checked"), "true");
 assert.equal(await testSw.getAttribute("aria-checked"), "false");
-assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Discover" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Discover and search by photo\. Only Relay's team sees them\./);
+assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Browse" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Browse and search by photo\. Only Relay's team sees them\./);
 await polished("team switches", "#mePage");
 await testSw.click();
 st.purchaseAsks = [];
