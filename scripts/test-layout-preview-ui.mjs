@@ -18,7 +18,7 @@
 //    its tile, covers it, and the photo's own middle is at the tile's middle on the screen; a logo lies wholly inside
 //    its tile on white (or on the logo's own background colour), with no ring; one item has its name and price beside
 //    its square and several have the price on each; on Ask the day is under the tile. In light and dark;
-//  * the three colour looks behind look-q, look-n and look-s: none on by default; with each, card words at 4.5 to 1;
+//  * the three colour looks behind look-q, look-n and look-s: look-s on by default; with each, card words at 4.5 to 1;
 //  * the service worker never keeps next.html or account-next.js (a changed copy shows on the very next open), and
 //    with no connection next.html goes back to the current app. It asks for the two files past the browser's own
 //    short-lived copies too; the test browser keeps none while a test answers for the server, so that is read from sw.js.
@@ -459,7 +459,8 @@ console.log("ok - an offered question has no search under it; the heading opens 
   await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: "/tmp/shots/layout-preview-home-pictures.png" });
   // The three colour looks (look-q, look-n, look-s): none is on by default, and with each, in light and dark, every
   // card's words read at 4.5 to 1 or better on the card's own colour, and the pictures still sit right.
-  assert.deepEqual(await page.evaluate(() => [...document.documentElement.classList].filter(c => /^look-/.test(c))), [], "no look is on by default");
+  assert.deepEqual(await page.evaluate(() => [...document.documentElement.classList].filter(c => /^look-/.test(c))), ["look-s"], "the softer colours (look-s) are on by default");
+  await page.evaluate(() => document.documentElement.classList.remove("look-s"));
   const lowest = () => page.evaluate(() => { const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true }), px = () => [...c.getImageData(0, 0, 1, 1).data].slice(0, 3);
     const L = a => { const f = x => { x /= 255; return x <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); }; return .2126 * f(a[0]) + .7152 * f(a[1]) + .0722 * f(a[2]); };
     let low = 99;
@@ -476,6 +477,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
     }
     await page.evaluate(l => document.documentElement.classList.remove("look-" + l), look);
   }
+  await page.evaluate(() => document.documentElement.classList.add("look-s"));
   await page.emulateMedia({ colorScheme: "light" });
 
   // Ask: the same rules at 115px, and the day under the tile, never on it.
