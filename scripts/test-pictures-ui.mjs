@@ -2,7 +2,7 @@
 // drawing of what was most likely bought (from the item, then the shop's name, then the kind of shop). Stubbed server.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".svg" ? "image/svg+xml" : extname(p) === ".ico" ? "image/x-icon" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -61,24 +61,25 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: "jess@example.com", expiresAt: Date.now() + 864e5 })));
 await page.reload();
-await page.evaluate(() => window.go("receipts"));
-await page.locator(".rl-tiles .rl-tile:not(.rl-year)").first().waitFor();
-// Open every group and read each row's picture.
+// Open every group (Browse's tiles open each kind's receipts) and read each row's picture.
+const browseTiles = page.locator("#browsePage .rl-tiles .rl-tile");
+await page.evaluate(() => window.go("discover"));
+await browseTiles.first().waitFor();
 const seen = {};
-const groups = await page.locator(".rl-tiles .rl-tile:not(.rl-year)").allInnerTexts();
+const groups = await browseTiles.allInnerTexts();
 for (let g = 0; g < groups.length; g++) {
-  await page.locator(".rl-tiles .rl-tile:not(.rl-year)").nth(g).click();
+  if (g) { await page.evaluate(() => window.go("discover")); await browseTiles.first().waitFor(); }
+  await browseTiles.nth(g).click();
   await page.locator(".rl-rr").first().waitFor();
   await page.waitForTimeout(700);
   for (const row of await page.locator(".rl-rr").all()) {
-    const shop = (await row.locator(".rl-rr-mid span").innerText()).split(" · ")[0];
+    const shop = (await row.locator(".rl-rr-mid span").innerText()).split(/ · |, /)[0];
     const title = await row.locator(".rl-rr-mid b").innerText();
     const pic = row.locator(".rl-rr-pic");
     const info = { ill: await pic.getAttribute("data-ill"), logo: await pic.locator("img.rl-logo-img").count(), photo: await pic.evaluate(n => n.classList.contains("rl-has-photo")), text: (await pic.innerText()).trim(),
       src: (await pic.locator("img.rl-logo-img").count()) ? await pic.locator("img.rl-logo-img").first().getAttribute("src") : null };
     seen[title] = info; if (!/^Order /.test(shop)) seen[shop] = info;
   }
-  await page.getByRole("button", { name: "All groups" }).click();
 }
 const logoOf = Object.fromEntries(receipts.map(r => [r.retailer.name, r.retailer.logoDomain]));
 for (const [shop, key] of Object.entries(expect)) {
@@ -96,20 +97,21 @@ assert.ok(!logoAsks.includes("gmail.com"), "a forwarded receipt never asks for G
 assert.equal(seen["LNER on board service"].src, bundledFile("lner.co.uk") || seen["LNER on board service"].src, "a shop with no address of its own uses its known address for the logo");
 console.log("ok - photo, then logo, then a drawing of the item, shop or kind of shop; no initials; no logo asked for a mailbox");
 // The drawing draws itself in and moves; with reduced motion it simply appears.
-await page.locator(".rl-tiles").getByRole("button", { name: /Fashion/ }).click();
+await openReceiptKind(page, "Fashion");
 const shoe = page.locator('.rl-rr-pic[data-ill="shoe"] svg path').first();
 assert.notEqual(await shoe.evaluate(e => getComputedStyle(e).animationName), "none");
 await page.emulateMedia({ reducedMotion: "reduce" });
-await page.getByRole("button", { name: "All groups" }).click(); await page.locator(".rl-tiles").getByRole("button", { name: /Fashion/ }).click();
+await page.locator("#view .rl-cat-back").click(); await openReceiptKind(page, "Fashion");
 assert.equal(await page.locator('.rl-rr-pic[data-ill="shoe"] svg path').first().evaluate(e => getComputedStyle(e).animationName), "none", "no movement when the phone asks for less motion");
 await page.emulateMedia({ reducedMotion: "no-preference" });
 console.log("ok - drawings animate, and stay still for reduced motion");
-// Home: the wallet card for the trainers (no logo) gets the drawing too.
+// Home: the card for the trainers (no logo) gets the drawing too.
 await page.evaluate(() => window.go("profile"));
-await page.locator("#walletPage .rl-po-img").first().waitFor();
+const trainersArt = page.locator("#homePage .h2-feed > .h2-item", { hasText: /Trainers/i }).first().locator(".h2-art");
+await trainersArt.waitFor();
 await page.waitForTimeout(600);
-assert.equal(await page.locator("#walletPage .rl-po-img").first().getAttribute("data-ill"), "shoe");
-console.log("ok - Home's wallet cards use the same pictures");
+assert.equal(await trainersArt.getAttribute("data-ill"), "shoe");
+console.log("ok - Home's cards use the same pictures");
 // A sheet of every drawing, for a look.
 const keys = await page.evaluate(() => window.RelayAccount.drawing.keys());
 assert.ok(keys.length >= 45, "a drawing for each kind of thing: " + keys.length);

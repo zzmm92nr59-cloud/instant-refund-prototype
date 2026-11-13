@@ -75,9 +75,11 @@ export async function openShops(page) {
 // Receipts: a list by month. A kind (Fashion, Gifts, Shop orders…), a year or "Returns and swaps" is chosen from its
 // filter sheet (the button at the top of the list); the receipts of that kind then show in the list.
 export async function openReceiptKind(page, name) {
-  if (!(await page.locator("#view .rl-calm-filter:visible").count())) {
+  if (!(await page.locator("#view .rl-calm-filter:visible").count()) && !(await page.locator("#view .rl-cat-back:visible").count())) {
     await page.evaluate(() => window.go("receipts"));
   }
+  // A group already open: back to the whole list first.
+  if (await page.locator("#view .rl-cat-back:visible").count()) await page.locator("#view .rl-cat-back").first().click();
   await page.locator("#view .rl-calm-filter").first().click();
   const sheet = page.locator(".rl-sheet[aria-label='Filter receipts']").last();
   await sheet.locator(".rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first().click();
