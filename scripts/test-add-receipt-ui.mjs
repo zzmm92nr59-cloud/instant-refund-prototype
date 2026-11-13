@@ -1,6 +1,6 @@
 // Browser test: adding a missing receipt. Stubbed Relay server, made-up person and invented shops; the inbox search,
 // adding and pasting are FAKED here (the real reading is checked in test-gmail).
-// Checks: Profile's "Add a missing receipt" opens one page; typing searches the inbox by itself once typing pauses (not on
+// Checks: Receipts' "Add a missing receipt" (+) opens one page; typing searches the inbox by itself once typing pauses (not on
 // every letter), and an older, slower search never replaces a newer one; the shopper's own shops are one tap away; Add adds
 // once even on a double tap; an email that isn't an order says so; Paste reads what was copied in one tap and shows what
 // was added, and when the phone won't share the clipboard a box to paste into appears; forwarding from another inbox names
@@ -89,7 +89,7 @@ const measure = scope => page.evaluate(scope => {
   if (document.documentElement.scrollWidth > innerWidth + 1) out.wide.push(document.documentElement.scrollWidth);
   return out;
 }, scope);
-const polished = async (where, scope = "#mePage") => {
+const polished = async (where, scope = ".rl-back .rl-sheet") => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(80);
     assert.deepEqual(await measure(scope), { small: [], tiny: [], symbols: [], faint: [], wide: [] }, where + " (" + scheme + ")");
@@ -102,17 +102,17 @@ const signedIn = async () => {
   await page.evaluate(([e, t]) => { localStorage.clear(); localStorage.setItem("relay.session.v1", JSON.stringify({ token: t, email: e, expiresAt: 9e12 })); }, [EMAIL, TOKEN]);
   await page.reload();
 };
-const view = page.locator("#mePage");
+const view = page.locator(".rl-back .rl-sheet").last();
 
-// 1. Profile -> Add a missing receipt: one page, with the shopper's own shops one tap away.
+// 1. Receipts -> Add a missing receipt (the + at the top): one page, with the shopper's own shops one tap away.
 await signedIn();
-await page.evaluate(() => window.go("receipts")); await page.locator(".rl-tile").first().waitFor();
-await page.evaluate(() => window.go("me"));
-await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor();
-const row = page.locator(".rl-ptile", { hasText: "Add a missing receipt" });
-assert.equal(await row.getAttribute("aria-label"), "Add a missing receipt", "a tile on Profile, like the Receipts page");
+await page.evaluate(() => window.go("receipts"));
+const row = page.getByRole("button", { name: "Add a missing receipt" });
+await row.waitFor();
+assert.ok((await row.boundingBox()).height >= 44, "a 44px button");
+assert.equal(await row.locator("svg").count(), 1, "a drawn plus, not a symbol");
 await row.click();
-await page.getByRole("button", { name: "Back to Profile" }).waitFor();
+await view.getByRole("heading", { name: "Add a receipt" }).waitFor();
 await view.getByText("Relay brings your receipts in by itself. Missing one? Find it here.").waitFor();
 const q = page.locator("#rl-ar-q");
 await q.waitFor();
@@ -121,7 +121,7 @@ assert.deepEqual(await page.locator(".rl-ar-chip").allInnerTexts(), ["Kestrel Ou
 await view.getByText("Add that inbox to Relay as well, or forward the email to " + EMAIL + ".").waitFor();
 await view.getByRole("button", { name: "Add a Gmail inbox" }).waitFor();
 await polished("page");
-console.log("ok - Profile's Add a missing receipt opens one page: search, the shopper's own shops, paste, forward");
+console.log("ok - Receipts' Add a missing receipt opens one page: search, the shopper's own shops, paste, forward");
 
 // 2. Typing searches by itself once typing pauses; a slower, older answer never replaces a newer one.
 await q.pressSequentially("kes", { delay: 70 });
@@ -159,7 +159,7 @@ await page.locator(".rl-ar-chip", { hasText: "Harlow & Co" }).click();
 await view.getByText("Nothing in Gmail for “Harlow & Co”. Try the shop's name or the order number.").waitFor();
 assert.equal(st.finds.at(-1), "Harlow & Co"); assert.equal(await q.inputValue(), "Harlow & Co");
 await q.fill("broken"); await page.waitForTimeout(600);
-await view.getByText("Gmail needs connecting again first. Open Profile, then Email connection, and tap Connect again.").waitFor();
+await view.getByText("Gmail needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again.").waitFor();
 await q.fill(""); await page.waitForTimeout(600);
 assert.equal(await page.locator(".rl-ar-row").count(), 0, "clearing the search clears the list");
 console.log("ok - a shop is one tap away; nothing found and a broken connection are explained");
