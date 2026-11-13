@@ -122,6 +122,21 @@ const signIn = async token => {
 const tabs = () => page.evaluate(() => [...document.querySelectorAll("#foot button")].map(b => (b.getAttribute("aria-label") || b.innerText || "").trim().replace(/\s+/g, " ")));
 const profileRows = async () => { await page.locator("#mePage .rl-arow").first().waitFor(); await page.locator("#mePage .rl-arow", { hasText: "Two-step sign-in" }).waitFor(); await page.waitForTimeout(500); };
 
+// Everything tappable under 44px either way, and every bit of text under 13px (capitals may be 12px), on the page as it stands.
+const sizes = () => page.evaluate(() => {
+  const vis = e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== "hidden" && c.display !== "none" && Number(c.opacity) > 0; };
+  const small = [], tiny = new Set();
+  for (const e of document.querySelectorAll("#view button, #view a, #view [role=button], #view input, #view textarea, #foot button")) {
+    if (!vis(e)) continue; const r = e.getBoundingClientRect();
+    if (r.height < 43.5 || r.width < 43.5) small.push((e.getAttribute("aria-label") || e.innerText || e.placeholder || e.className).trim().replace(/\s+/g, " ").slice(0, 40) + " " + Math.round(r.width) + "x" + Math.round(r.height));
+  }
+  const walk = document.createTreeWalker(document.querySelector("#view"), NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) { const e = n.parentElement; if (!n.textContent.trim() || !e || !vis(e) || e.closest(".rl-sr")) continue;
+    const c = getComputedStyle(e), px = parseFloat(c.fontSize); if (px < 13 && !(c.textTransform === "uppercase" && px >= 12)) tiny.add(n.textContent.trim().slice(0, 30) + " " + px); }
+  return { small, tiny: [...tiny] };
+});
+const bothSchemes = async what => { for (const scheme of ["light", "dark"]) { await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(120); assert.deepEqual(await sizes(), { small: [], tiny: [] }, what + ": nothing tappable under 44px, no text under 13px (" + scheme + ")"); } await page.emulateMedia({ colorScheme: "light" }); };
+const dayWords = d => page.evaluate(d => { const t = new Date(d), o = { day: "numeric", month: "short" }; if (t.getFullYear() !== new Date().getFullYear()) o.year = "numeric"; return t.toLocaleDateString("en-GB", o); }, d);
 const openAsk = async () => {
   await page.goto(origin + "/index.html");
   await page.waitForFunction(() => document.querySelectorAll("#foot button").length === 4);
@@ -399,7 +414,6 @@ console.log("ok - an offered question has no search under it; the heading opens 
 console.log("ok - interests: asked once, saved once, not asked again; Profile shows and changes them; Shops on Relay puts matching shops first, normal order when nothing matches");
 console.log("ok - pictures: photos fill their squares with their middle in the middle, logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
 assert.deepEqual(errors, [], "no script errors");
-await ctx.close();
 
 // 16. next.html, the old try-out address: anyone is sent to the app, keeping what came after it, and the service worker
 //     fetches it past the browser's own copies (so an old copy of the gated try-out never shows again).
@@ -410,10 +424,13 @@ assert.ok(!(await readFile("account-next.js").then(() => true, () => false)), "t
 await signIn(SHOPPER);
 await page.goto(origin + "/next.html?x=1#open=receipts");
 await page.waitForURL(u => new URL(u).pathname === "/" || new URL(u).pathname === "/index.html", { timeout: 15000 });
-await page.locator("#receiptsPage").waitFor();
+await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
+assert.equal(await page.evaluate(() => window.page), "receipts", "the link after it still opens Receipts");
+assert.equal(new URL(page.url()).search, "?x=1", "and what came after the address is kept");
 assert.equal(await page.locator("html.rl-gate").count(), 0, "no gate");
 console.log("ok - next.html sends anyone to the app, keeping the link, and is never kept by the service worker");
-assert.deepEqual(errors.filter(e => !/Service worker is disabled/.test(e)), [], "no script errors");
+assert.deepEqual(errors, [], "no script errors");
+await ctx.close();
 
 await browser.close(); server.close();
 console.log("PASS the layout for everyone: its Ask tab, pictures in their tiles, the three looks, interests, and the old next.html address (stubbed server)");
