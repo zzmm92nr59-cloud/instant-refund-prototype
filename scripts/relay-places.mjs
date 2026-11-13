@@ -48,7 +48,7 @@ export async function openProfile(page) {
   await page.locator("#mePage .rl-arow:visible", { hasText: "Security and privacy" }).first().waitFor();
 }
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
-export const profileButton = (page) => page.locator(".h2-me:visible, .topline .avatar:visible").first();
+export const profileButton = (page) => page.locator(".h2-me, .topline .avatar").filter({ visible: true }).first();
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
   name = RENAMED[name] || name;
