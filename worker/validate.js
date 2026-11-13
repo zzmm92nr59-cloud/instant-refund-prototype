@@ -18,6 +18,7 @@
 // The route then gets a fresh copy of the request carrying the cleaned body, and reads it as it always has.
 // A route that isn't listed here takes no fields at all. scripts/test-validation.mjs checks that every route is covered,
 // and that every request the app made during the browser tests passes this table, so a change can't slip past by accident.
+import { INTEREST_IDS } from "./interest-list.js";
 
 const KB = 1024;
 const DEFAULT_LIMIT = 8 * KB;
@@ -60,6 +61,8 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/devices/sign-out-others": NOTHING,
   "/relay/my/delete": NOTHING,
   "/relay/my/profile": { limit: 300 * KB, tooLarge: "photo_too_big", fields: { name: text(100), photo: str(290 * KB) } },
+  // What the shopper shops for: up to 12 ids from the fixed list in interests.js (which checks them again).
+  "/relay/my/interests": { fields: { interests: list(12, one(...INTEREST_IDS)) } },
   // Delivery details (delivery.js checks each one properly: a UK postcode, a UK phone number), removing them, and starting a
   // checkout at a shop's website with them filled in.
   "/relay/my/delivery": { fields: { firstName: text(100), lastName: text(100), line1: text(200), line2: text(200), town: text(120), county: text(120), postcode: str(20), phone: str(40) } },

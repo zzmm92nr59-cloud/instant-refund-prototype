@@ -826,27 +826,38 @@ function relaySearchFor(text){dcShow("shops");const q=$("query");if(!q)return;q.
 // When Relay last read a shop's website: "today at 14:05", "yesterday at 09:10" or "on 3 November".
 function checkedWhen(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return"recently";const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),n=(day(new Date())-day(d))/864e5,t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});return n<1?"today at "+t:n<2?"yesterday at "+t:"on "+d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})}
 function dcChip(label,on,attr){return '<button type="button" class="dc-chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" '+attr+'>'+label+'</button>'}
+// Interests (Profile, Your interests): shops of the kinds the shopper picked come first in Shops on Relay. A shop's kind is
+// the one Relay's server gives it (shopCategory); a shop it can't tell about is never moved. Receipts come first once there
+// are any: interests only break ties then.
+let interestsAsked=false;
+function interestCats(){return Array.isArray(window.__relayInterestCats)?window.__relayInterestCats:[]}
+function interestHit(g){const c=g&&g.lead&&g.lead.shopCategory;return c&&interestCats().includes(c)?1:0}
+window.relayInterestsChanged=()=>{if(page==="discover"&&dcMode==="shops"&&$("catalogResults"))renderCatalog()};
 function renderShopperCatalog(root){
  dcAuctionsCheck();
+ if(!interestsAsked&&dcSigned()&&window.RelayAccount&&RelayAccount.interests){interestsAsked=true;RelayAccount.interests().catch(()=>{})}
  {const r=$("dcRoot");if(r&&r.classList&&r.classList.remove)r.classList.remove("dc-detail")}
  if(personalise&&!discoverSpendAsked&&window.RelayAccount&&RelayAccount.spendProfile){discoverSpendAsked=true;RelayAccount.spendProfile().then(p=>{discoverSpend=p;if(page==="discover")renderCatalog()})}
  const query=($("query")?.value||"").trim().toLowerCase(),sort=$("filter")?.value||"all";
  const all=dcGroups(shownProducts());
  // Shops and kinds to filter by, each with how many products it has.
  const shopCount=new Map();for(const g of all)shopCount.set(g.store,(shopCount.get(g.store)||0)+1);
+ const shopHits=new Map();for(const g of all)if(interestHit(g))shopHits.set(g.store,1);const shopHit=n=>shopHits.has(n)?1:0;
  if(storeFilter!=="all"&&![...shopCount.keys()].some(n=>sameStore(n,storeFilter)))storeFilter="all";
  const inShop=all.filter(g=>storeFilter==="all"||sameStore(g.store,storeFilter));
  const kindCount=new Map();for(const g of inShop)kindCount.set(g.kind,(kindCount.get(g.kind)||0)+1);
  if(discoverKind!=="all"&&!kindCount.has(discoverKind))discoverKind="all";
  const shopsEl=$("dcShops"),kindsEl=$("dcKinds");
- if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>b[1]-a[1]).map(([n])=>dcChip(safe(n),sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
+ if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>shopHit(b[0])-shopHit(a[0])||b[1]-a[1]).map(([n])=>dcChip(safe(n),sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
  if(kindsEl)kindsEl.innerHTML=kindCount.size>1?dcChip("Everything",discoverKind==="all",'data-kind="all"')+[...kindCount.keys()].sort((a,b)=>(a==="other")-(b==="other")||kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
  let groups=inShop.filter(g=>(discoverKind==="all"||g.kind===discoverKind)&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
  const forYou=$("dcForYou");if(forYou)forYou.innerHTML=query||storeFilter!=="all"||discoverKind!=="all"?"":dcForYou(all);
  if(sort==="low")groups.sort((a,b)=>a.min-b.min);else if(sort==="high")groups.sort((a,b)=>b.max-a.max);
  else{if(storeFilter==="all")groups=dcMix(groups);
+  const receiptsSay=!!(personalise&&discoverSpend&&discoverSpend.kinds&&discoverSpend.kinds.length);
+  if(!receiptsSay&&interestCats().length)groups=groups.map((g,i)=>[g,i]).sort((a,b)=>interestHit(b[0])-interestHit(a[0])||a[1]-b[1]).map(x=>x[0]);
   if(personalise&&discoverSpend){const order=new Map(dcPicks(groups).map((x,i)=>[x.g.key,i])),sh=k=>{const x=discoverSpend.kinds.find(y=>y.category===k);return x?x.share:0};
-  groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||a[1]-b[1]).map(x=>x[0])}}
+  groups=groups.map((g,i)=>[g,i]).sort((a,b)=>(order.has(a[0].key)?order.get(a[0].key):99)-(order.has(b[0].key)?order.get(b[0].key):99)||sh(b[0].kind)-sh(a[0].kind)||interestHit(b[0])-interestHit(a[0])||a[1]-b[1]).map(x=>x[0])}}
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  {const fb=$("dcFilt");if(fb&&fb.classList)fb.classList.toggle("on",storeFilter!=="all"||discoverKind!=="all"||sort!=="all")}
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
