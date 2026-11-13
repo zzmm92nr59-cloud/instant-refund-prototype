@@ -959,11 +959,14 @@
     // Slide to bid: a round handle dragged to the end of a 56px pill. Relay's navy and lime, whichever the phone's setting.
     ".rl-slide{position:relative;height:56px;border-radius:28px;background:#101828;color:#fff;margin:14px 0 4px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}" +
     "@media(prefers-color-scheme:dark){.rl-slide{background:#26324a}}" +
-    ".rl-slide-fill{position:absolute;left:0;top:0;bottom:0;width:56px;border-radius:28px;background:rgba(199,245,103,.28)}" +
-    ".rl-slide-t{position:absolute;inset:0;display:grid;place-items:center;padding:0 60px;font-size:17px;font-weight:600;text-align:center;line-height:1.2;pointer-events:none}" +
+    ".rl-slide-fill{position:absolute;left:0;top:0;bottom:0;width:56px;border-radius:28px;background:#3d5a1f}" +
+    ".rl-slide-t{position:absolute;top:0;bottom:0;left:56px;right:0;display:flex;align-items:center;justify-content:center;padding:0 12px;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;pointer-events:none}" +
+    ".rl-slide-tl{left:0;right:auto;justify-content:center;padding:0 0 0 12px;color:#fff}.rl-slide-t[hidden]{display:none}" +
+    ".rl-slide-m{position:absolute;visibility:hidden;white-space:nowrap;font-size:17px;font-weight:600;left:0;top:0;pointer-events:none}" +
     ".rl-slide-k{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:#c7f567;color:#101828;display:grid;place-items:center;cursor:grab;touch-action:none}" +
     ".rl-slide-k:active{cursor:grabbing}.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:transform .28s cubic-bezier(.2,.9,.3,1.2),width .28s cubic-bezier(.2,.9,.3,1.2)}" +
     ".rl-slide.busy .rl-slide-k,.rl-slide.off .rl-slide-k{cursor:default}.rl-slide.off{opacity:.55}.rl-slide.done{background:#c7f567;color:#101828}.rl-slide.done .rl-slide-fill{opacity:0}" +
+    ".rl-slide-k .rl-jic{color:#101828!important;margin:0}" +
     "@media(prefers-reduced-motion:reduce){.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:none}}" +
     // For screen readers and keyboards: the same bid as an ordinary button, shown when it has the keyboard's focus.
     ".rl-kbonly{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:0;padding:0;border:0}" +
@@ -1628,14 +1631,35 @@
   // it can be slid now; o.send(done) does the thing, then calls done(true) to show it done or done(false) to start again.
   // It doesn't start the browser's own gestures (a swipe back, pull to refresh, a sheet's swipe down: .rl-noswipe/.rl-noptr).
   function slider(o) {
-    var t = el("span", { className: "rl-slide-t" }), fill = el("span", { className: "rl-slide-fill" });
+    // Two places for the words, so the amount can always be read: ahead of the handle ("Slide to bid £50.00", then just
+    // "£50.00" as the room runs out), and behind it on the fill near the end ("Release to bid £50.00").
+    var t = el("span", { className: "rl-slide-t" }), tl = el("span", { className: "rl-slide-t rl-slide-tl" }), fill = el("span", { className: "rl-slide-fill" });
     var knob = el("span", { className: "rl-slide-k" }, [jIc("next", 24)]);
-    var box = el("div", { className: "rl-slide rl-noswipe rl-noptr" }, [fill, t, knob]);
+    var box = el("div", { className: "rl-slide rl-noswipe rl-noptr" }, [fill, tl, t, knob]);
     box.setAttribute("aria-hidden", "true"); // the button beside it is the way in for screen readers and keyboards
     var x = 0, max = 0, drag = null, state = "idle";
-    // The words fade as the handle passes over them.
-    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; t.style.opacity = state === "idle" && max ? String(Math.max(0, 1 - v / (max * 0.6))) : ""; };
-    var show = function () { t.textContent = state === "busy" ? "Bidding…" : state === "done" ? (o.doneText || "Done") : o.label(); box.classList.toggle("off", state === "idle" && !o.ok()); };
+    // How wide some words are on the pill, measured off screen (a centred line that's too long spills both ways, so the
+    // line itself can't be asked).
+    var meas = el("span", { className: "rl-slide-m" }); box.appendChild(meas);
+    var fits = function (n, text, room) { meas.textContent = text; var ok = room > 0 && meas.offsetWidth <= room; if (ok) n.textContent = text; return ok; };
+    var words = function () {
+      var w = box.getBoundingClientRect().width || 0;
+      t.style.left = ""; t.style.right = ""; tl.style.width = ""; tl.hidden = true; t.hidden = false;
+      if (state !== "idle") { t.style.left = "0px"; t.style.right = "0px"; t.textContent = state === "busy" ? "Bidding…" : (o.doneText || "Done"); return; }
+      var full = o.label(), amount = o.amount ? o.amount() : "", behind = o.release ? o.release() : "";
+      // Behind the handle, once there's room for all of it.
+      tl.style.width = Math.max(0, x) + "px";
+      if (x > 0 && behind && fits(tl, behind, x - 20)) { tl.hidden = false; t.hidden = true; return; }
+      // Ahead of it: all of it, or the amount alone.
+      t.style.left = (x + 56) + "px"; t.style.right = "0px";
+      var room = w - (x + 56) - 24;
+      if (!w || x === 0 || fits(t, full, room)) { t.textContent = full; if (x === 0) { t.style.left = "56px"; } return; }
+      if (amount && fits(t, amount, room)) return;
+      // No room ahead and not yet enough behind for all the words: the amount alone, behind the handle.
+      t.hidden = true; tl.hidden = false; tl.textContent = amount;
+    };
+    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; words(); };
+    var show = function () { words(); box.classList.toggle("off", state === "idle" && !o.ok()); };
     var back = function () { box.classList.add("back"); put(0); setTimeout(function () { box.classList.remove("back"); }, 300); };
     var api = {
       el: box,
@@ -1660,10 +1684,10 @@
       var d = drag; drag = null;
       // Sent only from the very end, and only for exactly the amount the pill showed when the slide began.
       if (x < max - 2 || d.label !== o.label() || !o.ok()) { back(); show(); return; }
-      state = "busy"; put(max); t.style.opacity = ""; box.classList.add("busy"); show();
+      state = "busy"; put(max); box.classList.add("busy"); show();
       o.send(function (ok) {
         if (!box.isConnected) return;
-        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); t.style.opacity = ""; knob.textContent = ""; knob.appendChild(jIc("check", 24)); show(); }
+        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); knob.textContent = ""; knob.appendChild(jIc("check", 24)); show(); }
         else api.reset();
       });
     };
@@ -7458,6 +7482,8 @@
       var go = el("button", { type: "button", className: "rl-btn rl-kbonly" });
       var pence = function () { var n = Number(String(input.value).replace(/[£,\s]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) : NaN; };
       var slide = slider({ label: function () { var p = pence(); return isNaN(p) ? "Type the most you'd pay" : "Slide to bid " + money(p, "GBP"); },
+        amount: function () { var p = pence(); return isNaN(p) ? "" : money(p, "GBP"); },
+        release: function () { var p = pence(); return isNaN(p) ? "" : "Release to bid " + money(p, "GBP"); },
         ok: function () { var p = pence(); return !isNaN(p) && p >= least; }, doneText: "Bid placed",
         refuse: function () { say(msg, "Bid " + money(least, "GBP") + " or more.", true); },
         send: function (done) { send(pence(), done); } });

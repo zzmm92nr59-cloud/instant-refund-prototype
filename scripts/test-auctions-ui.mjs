@@ -181,9 +181,33 @@ await polished("bid too low", ".rl-sheet");
 await max.fill("50");
 await page.evaluate(() => document.activeElement && document.activeElement.blur());
 await picture("resting");
+// The amount can be read at every point of the slide: ahead of the handle, then behind it ("Release to bid £50.00"),
+// never under it, and at 4.5 to 1 on the pill or on the fill, in light and dark.
+const amountShows = (where) => page.evaluate(where => {
+  const c = document.createElement("canvas").getContext("2d"), rgb = v => { c.clearRect(0, 0, 1, 1); c.fillStyle = "#000"; c.fillStyle = v; c.fillRect(0, 0, 1, 1); return [...c.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+  const L = a => { const f = x => { x /= 255; return x <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); }; return .2126 * f(a[0]) + .7152 * f(a[1]) + .0722 * f(a[2]); };
+  const box = document.querySelector(".rl-back .rl-sheet .rl-slide"), knob = box.querySelector(".rl-slide-k").getBoundingClientRect();
+  const shown = [...box.querySelectorAll(".rl-slide-t")].filter(t => !t.hidden && getComputedStyle(t).display !== "none");
+  if (shown.length !== 1) return where + ": " + shown.length + " labels showing";
+  const t = shown[0], r = document.createRange(); r.selectNodeContents(t); const words = r.getBoundingClientRect();
+  if (!/£50\.00/.test(t.textContent)) return where + ": no amount in " + JSON.stringify(t.textContent);
+  if (words.right > knob.left + 1 && words.left < knob.right - 1) return where + ": the words are under the handle " + JSON.stringify([Math.round(words.left), Math.round(words.right), Math.round(knob.left), Math.round(knob.right), t.style.left, t.textContent]);
+  if (t.scrollWidth > t.clientWidth + 1) return where + ": the words are cut off";
+  const behind = t.classList.contains("rl-slide-tl"), bg = rgb(getComputedStyle(behind ? box.querySelector(".rl-slide-fill") : box).backgroundColor);
+  const a = L(rgb(getComputedStyle(t).color)), b = L(bg), ratio = (Math.max(a, b) + .05) / (Math.min(a, b) + .05);
+  return ratio >= 4.5 ? "ok " + t.textContent : where + ": " + ratio.toFixed(2) + " to 1";
+}, where);
+for (const part of [0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]) {
+  await slideTo(part, { release: false });
+  for (const sc of ["light", "dark"]) { await page.emulateMedia({ colorScheme: sc }); await page.waitForTimeout(60); const got = await amountShows(sc + " at " + part); assert.match(got, /^ok /, got); }
+  await page.emulateMedia({ colorScheme: "light" });
+  if (part === 0.45) await picture("half-way");
+  if (part === 0.9) { assert.match(await amountShows("near the end"), /^ok Release to bid £50\.00$/, "near the end it says to let go"); await picture("near-the-end"); }
+  await page.mouse.move(10, 10); await page.mouse.up(); await page.waitForTimeout(400); // let go away from the end: it springs back
+  assert.equal(st.bids.length, 0, "let go before the end (" + part + "): nothing sent");
+}
 // Let go half-way: nothing is sent, and it springs back.
 await slideTo(0.5, { release: false });
-await picture("half-way");
 await page.mouse.up();
 await page.waitForTimeout(500);
 assert.equal(st.bids.length, 0, "let go early: nothing sent");
@@ -195,7 +219,9 @@ await page.mouse.up();
 // Sent once, for exactly the amount on the pill; a second slide while it's being sent does nothing.
 await knob.locator("svg").waitFor();
 await sheet.getByText("Bid placed").waitFor();
-if (process.env.SHOTS) { await page.screenshot({ path: process.env.SHOTS + "/slide-placed-light.png" }); await page.emulateMedia({ colorScheme: "dark" }); await page.screenshot({ path: process.env.SHOTS + "/slide-placed-dark.png" }); await page.emulateMedia({ colorScheme: "light" }); }
+for (const sc of ["light", "dark"]) { await page.emulateMedia({ colorScheme: sc }); assert.equal(await knob.evaluate(k => getComputedStyle(k.querySelector(".rl-jic")).color), "rgb(16, 24, 40)", sc + ": the tick shows in navy on the lime"); }
+await page.emulateMedia({ colorScheme: "light" });
+if (process.env.SHOTS) { await page.screenshot({ path: process.env.SHOTS + "/slide-placed-light.png" }); await page.emulateMedia({ colorScheme: "dark" }); await page.waitForTimeout(50); await page.screenshot({ path: process.env.SHOTS + "/slide-placed-dark.png" }); await page.emulateMedia({ colorScheme: "light" }); }
 await slideTo(1).catch(() => {});
 await sheet.getByRole("heading", { name: "You're the highest bidder" }).waitFor();
 await sheet.getByText("The price is £32.00. If anyone else bids, Relay bids for you, up to £50.00. With notifications on, Relay tells you if you're outbid.").waitFor();
