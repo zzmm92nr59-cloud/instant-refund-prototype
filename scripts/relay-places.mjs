@@ -28,6 +28,13 @@ export async function openHomeCard(page, text) {
   await page.locator(".rl-back .rl-sheet").last().waitFor();
   return page.locator(".rl-back .rl-sheet").last();
 }
+// Closes the sheet on top, the way a person does: a tap on the dimmed page above it.
+export async function closeSheet(page) {
+  const back = page.locator(".rl-back").last();
+  if (!(await back.count())) return;
+  await back.click({ position: { x: 10, y: 10 } });
+  await back.waitFor({ state: "detached" });
+}
 
 // Profile: opens from the picture. Its rows, and the rows one level down.
 const UNDER = {
@@ -64,6 +71,17 @@ export const sectionOf = (name) => Object.keys(UNDER).find((h) => UNDER[h].inclu
 export async function openShops(page) {
   await page.evaluate(() => { window.go("discover"); if (window.dcShow) window.dcShow("shops"); });
   await page.locator("#catalogResults").waitFor({ state: "attached" });
+}
+// Receipts: a list by month. A kind (Fashion, Gifts, Shop orders…), a year or "Returns and swaps" is chosen from its
+// filter sheet (the button at the top of the list); the receipts of that kind then show in the list.
+export async function openReceiptKind(page, name) {
+  if (!(await page.locator("#view .rl-calm-filter:visible").count())) {
+    await page.evaluate(() => window.go("receipts"));
+  }
+  await page.locator("#view .rl-calm-filter").first().click();
+  const sheet = page.locator(".rl-sheet[aria-label='Filter receipts']").last();
+  await sheet.locator(".rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first().click();
+  await sheet.waitFor({ state: "detached" }).catch(() => {});
 }
 // Taps a tab. The tab bar steps aside while the keyboard is up (someone typing), so the keyboard goes first, as it
 // would on a phone.

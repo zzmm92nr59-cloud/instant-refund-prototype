@@ -1,11 +1,11 @@
-// Browser test: the wallet on Home only shows what can still go back, and every card has a picture.
+// Browser test: Home's cards only say what's still true, and every card has a picture.
 // Stubbed Relay server, made-up account. Checks: an order from over a year ago whose only delivery email said "shipped"
-// doesn't sit in the wallet as "On its way"; a delivery company's own email (Royal Mail) is never shown as a shop;
+// doesn't sit on Home as "On its way" (Home is a feed of what you bought, so it's there as bought, not as on its way); a delivery company's own email (Royal Mail) is never shown as a shop;
 // a recent order still on its way, and one with a return deadline ahead, are shown; a card with no product photo shows
 // the shop's logo instead of initials; old "On its way" lines aren't shown in Receipts either.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".ico" ? "image/x-icon" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -46,35 +46,40 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
-const wallet = page.locator("#walletPage");
-await wallet.getByText("Court Classic Trainers").waitFor();
+const home = page.locator("#homePage");
+await homeCard(page, "Court Classic Trainers").waitFor();
 await page.waitForTimeout(800);
-const text = await wallet.innerText();
-assert.ok(!/Red Dragon Darts/.test(text), "a year-old order that only ever said 'shipped' isn't in the wallet");
+const text = await home.innerText();
+const darts = homeCard(page, "Red Dragon Darts");
+assert.ok(!(await darts.count()) || !/On its way|Arriving|Out for delivery/.test(await darts.innerText()), "a year-old order that only ever said 'shipped' isn't shown as on its way");
 assert.ok(!/Order from Royal Mail|^Royal Mail$/im.test(text), "a delivery company isn't shown as a shop: " + text.slice(0, 300));
+assert.equal(await homeCard(page, "Royal Mail").count(), 0, "no card for the delivery company");
 assert.ok(/Desk Lamp/.test(text), "an order with a return deadline ahead is shown");
-assert.match(text, /2 items/);
-const cards = wallet.locator(".rl-po");
-const kick = cards.filter({ hasText: "Court Classic Trainers" }), lamp = cards.filter({ hasText: "Desk Lamp" });
-assert.match(await kick.innerText(), /On its way with Royal Mail/, "a recent parcel still shows it's on its way");
+const kick = homeCard(page, "Court Classic Trainers"), lamp = homeCard(page, "Desk Lamp");
+assert.match(await kick.innerText(), /On its way/, "a recent parcel still shows it's on its way");
+assert.match(await lamp.innerText(), /Return by/);
 assert.ok(!/Arriving |On its way|Out for delivery/.test(await lamp.innerText()), "an old delivery line isn't shown: " + await lamp.innerText());
 // Pictures: no product photo, so the shop's logo (a known one from Relay's own set, or fetched once) instead of initials.
-await kick.locator(".rl-po-img.rl-has-logo img").waitFor();
-await lamp.locator(".rl-po-img.rl-has-logo img").waitFor();
-assert.equal(await lamp.locator(".rl-po-img img").getAttribute("src"), "logos/amazon.co.uk.png", "Relay's own copy of a well-known shop's logo");
+await kick.locator(".h2-art.rl-has-logo img").waitFor();
+await lamp.locator(".h2-art.rl-has-logo img").waitFor();
+assert.equal(await lamp.locator(".h2-art img").getAttribute("src"), "logos/amazon.co.uk.png", "Relay's own copy of a well-known shop's logo");
 assert.deepEqual(logoAsks, ["kicklane.example"], "other shops' logos come from Relay, once");
+// Its page says who's bringing it.
+const sh = await openHomeCard(page, "Court Classic Trainers");
+await sh.getByText(/On its way with Royal Mail/).first().waitFor();
+await closeSheet(page);
 await page.screenshot({ path: "/tmp/shots/wallet-fresh.png" });
-console.log("ok - wallet: old 'shipped' orders and delivery companies left out; recent and returnable shown, each with the shop's logo");
+console.log("ok - Home: old 'shipped' orders not shown as on their way, no delivery companies as shops; recent and returnable shown, each with the shop's logo");
 // Receipts: the year-old order is still there (it's a receipt), but without a stale "On its way".
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 await page.waitForTimeout(800);
 const r = await page.locator("#view").innerText();
 assert.ok(!/On its way with Royal Mail[\s\S]*Red Dragon|Red Dragon[\s\S]{0,200}On its way/.test(r), "no stale delivery line in Receipts");
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 await page.locator("#view").getByText("F&F Denim Jacket + 1 more").waitFor();
 assert.ok(!/Finest Sourdough \+ 1 more/.test(await page.locator("#view").innerText()), "a card is named after the costliest thing of the receipt's own kind, not the first line");
 console.log("ok - receipts keep old orders without an out-of-date delivery line; each card is named after its main thing");
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS wallet freshness: only what can still go back, no delivery companies as shops, logos when there's no photo");
+console.log("PASS Home freshness: nothing shown as on its way that isn't, no delivery companies as shops, logos when there's no photo");
 await browser.close(); server.close();
