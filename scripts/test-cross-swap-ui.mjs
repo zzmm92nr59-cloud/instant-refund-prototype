@@ -6,7 +6,7 @@
 // appears only with testing on. Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, homeReady } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -111,12 +111,17 @@ const sheet = page.locator(".rl-xs");
 
 // 1. Offered only where another shop has something in stock.
 st.otherShops = false;
+// (An order's card on Home opens its page, with what can be done: Return, Swap, Swap with another shop.)
+const orderPage = async () => { await homeReady(page); await page.locator("#homePage .h2-feed > .h2-item").first().click(); return page.locator(".rl-back .rl-sheet").last(); };
 await signIn(origin + "/index.html");
-await page.getByRole("button", { name: "Return", exact: true }).first().waitFor();
+let op = await orderPage();
+await op.getByRole("button", { name: "Return", exact: true }).first().waitFor();
+await page.waitForTimeout(800);
 assert.equal(await page.getByRole("button", { name: "Swap with another shop" }).count(), 0, "not offered when no other shop has anything");
 st.otherShops = true;
 await page.reload();
-const offer = page.getByRole("button", { name: "Swap with another shop" }).first();
+op = await orderPage();
+const offer = op.getByRole("button", { name: "Swap with another shop" }).first();
 await offer.waitFor();
 console.log("ok - offered only where another shop has something in stock");
 
