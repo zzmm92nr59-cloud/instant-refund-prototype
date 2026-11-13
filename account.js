@@ -386,6 +386,21 @@
   css.textContent = ".rl-back{position:fixed;inset:0;background:rgba(15,27,51,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999}" +
     // Whatever is behind a sheet dims so the eye goes to the sheet; on a dark screen it has to dim further to show.
     "@media (prefers-color-scheme: dark){.rl-back{background:rgba(0,0,0,.62)}}" +
+    // Frosted (a preview, off until a class is put on the page: frost-soft or frost-strong). The page behind a sheet blurs
+    // and dims instead of the flat layer, and the sheet lets a little of it through. Full-page steps (sign-in) stay solid.
+    // Where blur isn't supported, @supports leaves the flat dim above.
+    "@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr)),html.frost-strong .rl-back:not(:has(>.rl-jr)){background:transparent}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))::before,html.frost-strong .rl-back:not(:has(>.rl-jr))::before{content:\"\";position:fixed;inset:0;z-index:-1;pointer-events:none}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.2);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3)}" +
+      "html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.34);-webkit-backdrop-filter:blur(24px) saturate(1.3);backdrop-filter:blur(24px) saturate(1.3)}" +
+      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.36)}html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.52)}}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 94%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
+      "html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 88%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
+      // Over a see-through sheet the grey words need more ink to stay at 4.5 to 1 (light mode; dark already passes).
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(60,60,67,.84)}" +
+      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(235,235,245,.7)}}" +
+    "}" +
     "@media(min-width:640px){.rl-back{align-items:center}}" +
     ".rl-sheet{background:var(--rl-sheet);width:100%;max-width:420px;border-radius:28px 28px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.18);max-height:88vh;overflow:auto;font-family:inherit;color:var(--rl-text)}" +
     "@media(min-width:640px){.rl-sheet{border-radius:28px}}" +
