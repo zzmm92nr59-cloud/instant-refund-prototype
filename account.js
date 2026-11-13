@@ -6622,6 +6622,10 @@
     if (deadline) card.appendChild(dueBar(deadline, "Return by ", String(o.orderedAt || "").slice(0, 10)));
     if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
     else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
+    // After a swap, or the shop changing or refunding it, the order doesn't come to what it was placed at
+    // (amountNowMinor, order-ref.js on the server), so both are said.
+    if (Number.isInteger(o.amountNowMinor) && Number.isInteger(o.amountMinor) && o.amountNowMinor !== o.amountMinor)
+      status("The order now comes to " + money(o.amountNowMinor, o.currency) + ". It was " + money(o.amountMinor, o.currency) + " when you ordered.", true);
     var actions = el("div", { className: "rl-po-actions" });
     if (it.exchange && it.exchange.balance) {
       var bal = it.exchange.balance;

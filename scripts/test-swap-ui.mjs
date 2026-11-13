@@ -58,7 +58,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   const page = await context.newPage();
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
-  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); // (after the session, so it knows who's signed in)
   await page.goto(origin + '/index.html');
   // Returns and swaps already started live on the Returns & swaps page; an order's card on Home opens its page, with Swap.
   if (returnInfo || exchange) await page.evaluate(() => window.go('returns'));
@@ -230,7 +230,7 @@ async function openSwap(page) {
   });
   const page = await context.newPage();
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
-  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); // (after the session, so it knows who's signed in)
   await page.goto(origin + '/index.html');
   // Home: one card for each order; tapping it opens the order's page, with its items and what you can do.
   const card = (shop) => homeCard(page, shop);
@@ -273,12 +273,16 @@ async function openSwap(page) {
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/home-after-swap.png', fullPage: true });
   // Receipts, Shop orders: what each order comes to now, and what it was placed at when that has changed.
   await openReceiptKind(page, 'Shop orders');
-  const rows = page.locator('.rl-order');
-  await rows.filter({ hasText: 'Field Jacket' }).getByText('£90.00 at Oak & Thread on 5 Jan 2026. It was £85.00 when you ordered.').waitFor();
-  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  await rows.filter({ hasText: 'Logo Cap' }).getByText('£20.00 at Kick Lane on ' + today, { exact: true }).waitFor();
-  await rows.filter({ hasText: 'Wool Beanie' }).getByText('£18.00 at Fern Street on ' + today, { exact: true }).waitFor();
-  assert.equal(await rows.getByText('·').count(), 0, 'no facts glued together with dots');
+  const rows = page.locator('#view .rl-po');
+  await rows.filter({ hasText: 'Field Jacket' }).getByText('The order now comes to £90.00. It was £85.00 when you ordered.').waitFor();
+  assert.match(await rows.filter({ hasText: 'Field Jacket' }).locator('.rl-po-price').innerText(), /£90\.00/);
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  for (const [what, price] of [['Logo Cap', '£20.00'], ['Wool Beanie', '£18.00']]) {
+    const r = rows.filter({ hasText: what });
+    assert.equal(await r.locator('.rl-po-price').innerText(), price);
+    assert.match(await r.locator('.rl-po-meta').innerText(), new RegExp(today));
+    assert.equal(await r.getByText(/when you ordered/).count(), 0, 'one amount when it hasn\'t changed');
+  }
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/shop-orders.png', fullPage: true });
   assert.deepEqual(errors, []);
   await context.close();
