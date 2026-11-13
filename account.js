@@ -1428,7 +1428,7 @@
       var e = r.body && r.body.error;
       return e === "no_email" ? "This receipt was pasted in, so there's no email to send."
         : e === "gmail_not_connected" ? "The inbox this receipt came from isn't connected any more."
-        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Open Profile, then Email connection, and tap Connect again."
+        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
         : e === "email_not_found" ? "That email is no longer in your inbox, so it can't be sent."
         : e === "consent_required" ? "Relay needs your permission to read your email first."
         : r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh."
@@ -3494,7 +3494,7 @@
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
       if (!r.ok) {
-        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
+        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
           : r.status === 404 ? "That email is no longer in your " + MB + ", so it can't be shown."
           : r.status === 409 ? "Connect your email again to open the original."
           : "Couldn't load the original email. Try again in a moment.";
@@ -3587,8 +3587,8 @@
         if (mine !== seq) return;
         list.textContent = "";
         if (!r.ok) {
-          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
-            : r.status === 409 ? "Connect your email first: open Profile, then Email connection." : "Couldn't search " + MB + " just now. Try again in a moment.";
+          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
+            : r.status === 409 ? "Connect your email first: tap your picture at the top of the screen, then Inboxes." : "Couldn't search " + MB + " just now. Try again in a moment.";
           return;
         }
         var rows = (r.body && r.body.results) || [];
@@ -4122,14 +4122,14 @@
   }
   var HELP = [
     ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
-    ["I shop with more than one email address. Can Relay read them all?", "Yes. Open Profile, then Email connection, and add a Gmail or Outlook inbox. Relay reads up to five and puts all their receipts together. Disconnecting one deletes only the receipts it brought in."],
-    ["A receipt is missing. What can I do?", "Open Profile and choose Add a missing receipt. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
+    ["I shop with more than one email address. Can Relay read them all?", "Yes. Tap your picture at the top of the screen, then Inboxes, and add a Gmail or Outlook inbox. Relay reads up to five and puts all their receipts together. Disconnecting one deletes only the receipts it brought in."],
+    ["A receipt is missing. What can I do?", "Open Receipts and tap the plus beside All receipts. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
-    ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
-    ["How do I get a copy of my data?", "Open Profile, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
-    ["How do I make signing in safer?", "Open Profile, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
-    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."],
+    ["How do I stop Relay reading my email?", "Tap your picture at the top of the screen, then Inboxes, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Security and privacy, Email permission."],
+    ["How do I get a copy of my data?", "Tap your picture at the top of the screen, then Security and privacy, then Download my data. You get one file with everything Relay keeps about you."],
+    ["How do I make signing in safer?", "Tap your picture at the top of the screen, then Security and privacy, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
+    ["How do I delete my account?", "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in and everything linked to it are deleted, and it can't be undone."],
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
@@ -4737,7 +4737,7 @@
       b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
       b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
       b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay." }));
-      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Email connection", mailPage); }); }
+      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Inboxes", mailPage); }); }
       function disconnectInbox(x, next) {
         if (!x.mailbox && !next) return disconnectGmail(again, note);
         var who = x.email || inboxName(x.provider);
@@ -5292,8 +5292,8 @@
     if (adding && result === "failed") return { text: "Couldn't add that inbox. Please try again.", bad: true };
     // Connecting an inbox again that didn't go ahead: Relay still can't read it, and says so plainly.
     var again = false; try { again = sessionStorage.getItem("relay.reconnecting") === "1"; sessionStorage.removeItem("relay.reconnecting"); } catch (e) {}
-    if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from Profile, then Email connection.", bad: true };
-    if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from Profile, then Email connection.", bad: true };
+    if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from your picture at the top of the screen, then Inboxes.", bad: true };
+    if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from your picture at the top of the screen, then Inboxes.", bad: true };
     return { text: notes[result][0], bad: notes[result][1] };
   }
   function completeGmail() {
@@ -5526,8 +5526,8 @@
       var found = 0, errors = 0, missed = [];
       function oneYear(k) {
         if (k >= years.length) {
-          status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: open Profile, then Email connection." :
-            missed.length ? " Some of your inboxes need connecting again before Relay can read them: open Profile, then Email connection." : "");
+          status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: tap your picture at the top of the screen, then Inboxes." :
+            missed.length ? " Some of your inboxes need connecting again before Relay can read them: tap your picture at the top of the screen, then Inboxes." : "");
           setTimeout(function () { done(years[0]); }, missed.length ? 4000 : 900); return;
         }
         var y = years[k], where = "";
@@ -5537,7 +5537,7 @@
           status.textContent = "Reading " + y + where + (day ? ", back to " + day : "") + "… " + found + " receipts found so far. Keep this page open.";
           api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
             if (!x.ok) {
-              if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."; return; }
+              if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."; return; }
               if (++errors > 8) { status.textContent = mailName() + " is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
               return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
             }

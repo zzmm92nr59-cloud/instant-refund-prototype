@@ -84,7 +84,7 @@ export function digestMessage(h, alerts) {
     (h.mail.ownAddress ? "Check the email address the shop has in Shopify or Square." : "Relay is still sending from a test address, which only reaches your own email: it needs a sending address of its own."));
   if (rd.waitingToBeRead >= 20) look.push(plural(rd.waitingToBeRead, "email is", "emails are") + " waiting to be read again.");
   // Emails shoppers sent to Relay because they were read wrong (deleted after 30 days, so worth reading soon).
-  if (h.marketReports) look.push(plural(h.marketReports, "Swap & resell report is", "Swap & resell reports are") + " waiting for review (Profile, Team, Review reports).");
+  if (h.marketReports) look.push(plural(h.marketReports, "Swap & resell report is", "Swap & resell reports are") + " waiting for review (your picture at the top of the screen, then Team, Review reports).");
   if (h.sharedEmails && h.sharedEmails.waiting) look.push(plural(h.sharedEmails.waiting, "email", "emails") + " that shoppers sent to Relay " + (h.sharedEmails.waiting === 1 ? "is" : "are") + " waiting to be read.");
   const fixed = rd.fixedByShoppers || { receipts: 0, thisWeek: 0 };
   const groups = [

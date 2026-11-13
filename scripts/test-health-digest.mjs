@@ -129,7 +129,7 @@ sqlite.prepare("INSERT INTO resale_listing_reports (id, listing_id, reporter_id,
 sqlite.prepare("INSERT INTO resale_reports (id, request_id, reporter_id, reason, created_at) VALUES (?,?,?,?,?)").run("r2", "q1", "someone", "Rude", clock);
 clock = Date.UTC(2026, 10, 9, 8, 0); emails = []; await run();
 const withReports = emails.find(e => /this morning/.test(e.subject));
-assert.match(withReports.text, /- 2 Swap & resell reports are waiting for review \(Profile, Team, Review reports\)\./);
+assert.match(withReports.text, /- 2 Swap & resell reports are waiting for review \(your picture at the top of the screen, then Team, Review reports\)\./);
 assert.ok(!/Counterfeit|Rude/.test(withReports.text), "never what a report says");
 sqlite.prepare("INSERT INTO resale_report_reviews (report_id, outcome, reviewed_at) VALUES ('r1','dismiss',1), ('r2','dismiss',1)").run();
 clock = Date.UTC(2026, 10, 10, 8, 0); emails = []; await run();
