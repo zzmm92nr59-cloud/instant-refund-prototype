@@ -1,10 +1,10 @@
-// Browser test: returning something bought online, from the wallet on Home. Relay can't send a return to a shop by itself
+// Browser test: returning something bought online, from its card on Home. Relay can't send a return to a shop by itself
 // (the shop's own returns page does that), so it makes that page quick: Start return shows the order number and the email
 // address the page asks for, one tap to copy each, and opens the page with the order number already copied. Once the
 // shop's return email has arrived, the card's main button shows the return QR code instead. Stubbed server, made-up orders.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, homeCard } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".svg" ? "image/svg+xml" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -52,8 +52,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
-const wallet = page.locator("#walletPage");
-const lulu = wallet.locator(".rl-po", { hasText: "Align High-Rise Pant" });
+const lulu = homeCard(page, "Align High-Rise Pant");
 await lulu.waitFor();
 
 // 1. Start return: what the shop's page asks for, ready to copy.
@@ -90,7 +89,7 @@ await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - the shop's returns page opens with the order number copied, and Relay says what happens next");
 
 // The email address offered is the one the shop sent the order to (here a Hide My Email address).
-await wallet.locator(".rl-po", { hasText: "Long Jacket" }).click();
+await homeCard(page, "Long Jacket").click();
 await sheet.getByRole("button", { name: "Start return" }).click();
 await sheet.getByRole("button", { name: "Copy your email address, quiet_fox_12@privaterelay.appleid.com" }).waitFor();
 assert.equal(await sheet.getByRole("button", { name: /^Copy your email address/ }).count(), 1, "one address: the one the shop knows");
@@ -98,7 +97,7 @@ await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - the email address offered is the one the order was sent to");
 
 // 3. The shop's return email has arrived: the main button on the card's page shows the QR code from it.
-const kl = wallet.locator(".rl-po", { hasText: "Court Classic Trainers" });
+const kl = homeCard(page, "Court Classic Trainers");
 await kl.click();
 await page.locator(".rl-sheet").getByRole("button", { name: "Show return QR code" }).click();
 await page.locator(".rl-sheet").getByRole("heading", { name: "Your return QR code" }).waitFor();
