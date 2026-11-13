@@ -11,7 +11,7 @@
 // Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -105,7 +105,7 @@ const signIn = async (url) => {
 // The grid's cards, in order: [shop, product].
 const grid = () => page.$$eval("#catalogResults .dc-card", cards => cards.map(c => [c.querySelector(".dc-shop").textContent.replace(/ · TEST$/, ""), c.querySelector("h3").textContent]));
 const discover = async (waitFor) => {
-  await page.evaluate(() => window.go("discover"));
+  await openShops(page); // products are under Browse, Shops on Relay
   await page.locator("#catalogResults .dc-card").first().waitFor();
   if (waitFor) await page.locator("#catalogResults .dc-card", { hasText: waitFor }).first().waitFor();
 };
@@ -124,7 +124,8 @@ assert.ok(!SHOPPER_NEVER_SEES.test(await page.locator(".main").innerText()), "no
 await polished("shoppers", ".main");
 console.log("ok - shoppers: every shop near the top, each in its own order");
 
-// 2. Lowest and Highest price still sort across every shop.
+// 2. Lowest and Highest price still sort across every shop (Sort is behind "Sort and filter").
+if (await page.locator("#dcFilt").getAttribute("aria-expanded") !== "true") await page.locator("#dcFilt").click();
 await page.selectOption("#filter", "low");
 cards = await grid();
 assert.deepEqual(cards.slice(0, 2), [["Pebble & Co", "Pebble Mug"], ["Big Barn", "Barn Jumper 1"]], "cheapest first, whichever shop");
@@ -221,6 +222,7 @@ await page.locator(".dc-preview").waitFor();
 const shopNames = await page.$$eval("#dcShops [data-shop]", bs => bs.map(b => b.dataset.shop).filter(s => s !== "all").sort());
 assert.deepEqual(shopNames, ["Big Barn", "Cocoa Cottage", "Fern Row", "Hollow Pine", "Pebble & Co", "Velvet Row"], "real shops and shops' websites only: no test shops");
 assert.equal(await page.locator("#catalogResults .dc-shop", { hasText: "TEST" }).count(), 0);
+if (await page.locator("#dcFilt").getAttribute("aria-expanded") !== "true") await page.locator("#dcFilt").click(); // kinds are behind "Sort and filter"
 await page.locator("#dcKinds [data-kind='food']").click();
 assert.deepEqual((await grid()).map(c => c[1]), ["Dark Chocolate Truffles - Gift Box"], "only food is food");
 await page.locator("#dcKinds [data-kind='fashion']").click();
