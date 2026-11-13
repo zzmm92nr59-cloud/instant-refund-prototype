@@ -114,8 +114,10 @@ const openProfileHere = async () => {
   // The picture is there once the screen has drawn its top row.
   await page.waitForFunction(() => [...document.querySelectorAll(".h2-me, .topline .avatar")].some(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== "hidden" && c.display !== "none" && Number(c.opacity) > 0.5; }), null, { timeout: 15000 });
   for (let i = 0; i < 3; i++) {
-    await profileButton(page).click();
-    try { await page.locator("#mePage .rl-arow").first().waitFor({ timeout: 4000 }); return; } catch (e) { if (i === 2) throw e; await page.waitForTimeout(450); }
+    try {
+      await profileButton(page).click({ timeout: 8000 });
+      await page.locator("#mePage .rl-arow").first().waitFor({ timeout: 6000 }); return;
+    } catch (e) { if (i === 2) throw e; await page.waitForTimeout(450); }
   }
 };
 const settle = () => page.waitForTimeout(250);
