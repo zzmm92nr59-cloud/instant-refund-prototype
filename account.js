@@ -1810,7 +1810,9 @@
   // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
   function providerStep(sheet, kind) {
     var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: 3, at: 1,
+    // A new account goes on to its name, what it shops for, then "You're all set": four steps. Someone coming back usually
+    // has those already (before signing in Relay can't tell), so three.
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: signInOpts.returning ? 3 : 4, at: 1,
       title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
     var points = el("div", { className: "rl-jcard" });
     [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
@@ -1934,8 +1936,9 @@
         var steps = [];
         if (!p.name && !fl.nameSkipped) steps.push("name");
         if (!st.connected && !fl.mailLater && !isReview()) steps.push("mail");
-        // What they shop for, after the inbox: so Browse can show shops they'll like first (interests.js).
-        if (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()) steps.push("interests");
+        // What they shop for, after the inbox: so Browse can show shops they'll like first (interests.js). Only as part of
+        // getting started: someone already set up who signs in again goes straight in (Home asks them once instead).
+        if ((steps.length || st.justConnected) && r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()) steps.push("interests");
         if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
         steps.push("done");
         runJourney(sheet, st, steps, 0);
