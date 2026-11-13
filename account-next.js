@@ -999,11 +999,48 @@
     // photo still fills the area, and a shop's logo keeps the white it was made for.
     "@media(prefers-color-scheme:dark){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
     ".h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(8,12,22,.5)!important;color:#fff!important}.h2-feed.tint .h2-card.has-c .h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.24)}}" +
-    // Draft 2: Ask. The page is at least a screen tall, so the box rests just above the tab bar from the start.
-    ".rl-asktab{display:flex;flex-direction:column;min-height:calc(100vh - env(safe-area-inset-top) - 83px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 83px - var(--rl-tab-top,84px))}}" +
-    "@media(max-width:760px){.rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}}" +
-    ".rl-asktab .rl-chat{margin-top:0}.rl-asktab .rl-chat-bar{margin-top:auto}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-anote{margin:2px 2px 12px}.rl-asktab .rl-msg:empty{display:none}" +
-    ".rl-ask-lead{margin:0 2px 2px;font-size:16px;line-height:22px;color:var(--rl-text2)}.rl-ask-q{min-height:52px}.rl-ask-q .rl-arow-t b{font-weight:600}" +
+    // Ask. No big title and no avatar; the page is exactly a screen tall, so the box rests 16px above the tab bar from
+    // the start (and just above the keyboard while typing, when the tab bar steps aside).
+    // (The page's hidden live region sits a pixel below everything; on Ask it is moved to the top so the page can't scroll.)
+    "html.on-ask .topline .avatar{display:none}html.on-ask body>.rl-sr{top:0}" +
+    ".rl-asktab{display:flex;flex-direction:column;margin:0 -2px;min-height:calc(100vh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}}" +
+    "@media(max-width:760px){.rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}html.on-ask .main{padding-bottom:calc(var(--rl-tab-top,84px) + 16px)}html.on-ask body.typing .main{padding-bottom:calc(8px + var(--rl-kb,0px))}" +
+    ".rl-asktab .rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 16px)}body.typing .rl-asktab .rl-chat-bar{bottom:calc(8px + var(--rl-kb,0px))}body.typing .rl-asktab{min-height:calc(100vh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}" +
+    "@supports(height:100dvh){body.typing .rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}}}" +
+    ".rl-asktab .rl-chat{margin-top:12px}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-msg:empty{display:none}" +
+    // The box: one pill 56px tall with a 40px round send button inside it (the button itself is 44px, rule 4).
+    ".rl-asktab .rl-chat-bar{margin:auto 4px 0;padding:0 6px 0 8px;gap:4px;min-height:56px;border-radius:28px;align-items:flex-end}" +
+    ".rl-asktab .rl-chat-in{min-height:56px;padding:17px 12px 18px;border-radius:24px;background:transparent;line-height:21px}.rl-asktab .rl-chat-in:focus-visible{outline:0}" +
+    ".rl-asktab .rl-chat-bar:focus-within{box-shadow:0 0 0 2px var(--rl-accent),0 6px 20px rgba(0,0,0,.08)}" +
+    ".rl-asktab .rl-chat-send{width:44px;height:44px;margin:0 0 6px;background:none}.rl-asktab .rl-chat-send .rl-jic{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--rl-accent);color:var(--rl-bg)}" +
+    // Before anything is asked. Sizes and spacing follow a phone-shopping app's chat page (measured in points on a 402 by
+    // 874 screen): 115px square tiles 8px apart, 20px headings, 64px rows with a 48px tile. The tiles, drawings,
+    // colours and words are Relay's.
+    ".rl-chat.rl-ask-open{display:block;margin:0}.rl-ask-rec{margin:0 0 18px}" +
+    ".rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 16px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
+    ".rl-ask-hb{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:opacity .12s}.rl-ask-hb:active{opacity:.55}.rl-ask-hb:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:10px}" +
+    ".rl-ask-chev{flex:none;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}" +
+    ".rl-ask-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.rl-ask-tiles::-webkit-scrollbar{display:none}" +
+    ".rl-ask-tile{all:unset;box-sizing:border-box;cursor:pointer;position:relative;flex:none;display:block;width:115px;height:115px;border-radius:24px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start;transition:transform .12s}" +
+    ".rl-ask-tile:active{transform:scale(.96)}.rl-ask-tile:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    // The day it was bought sits on the tile (as the price does on Home's tiles), with the drawing or logo nudged down to
+    // clear it. The shop is in the picture when Relay has its logo, and always in the tile's spoken name.
+    ".rl-ask-tile.dated .h2-art.rl-ill,.rl-ask-tile.dated .h2-art.rl-has-logo{padding-top:12px}" +
+    ".rl-ask-tile-d{position:absolute;left:10px;top:10px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600;white-space:nowrap}" +
+    "@media(prefers-color-scheme:dark){.rl-ask-tile:has(.rl-ill) .rl-ask-tile-d{background:rgba(255,255,255,.18)}}" +
+    ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
+    ".rl-ask-q b{flex:1;min-width:0;font-size:16px;line-height:21px;font-weight:500;color:var(--rl-text)}" +
+    ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
+    // Said quietly at the end: it's an AI, what is kept, and the way to a person.
+    ".rl-ask-ai{margin:12px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-asktab.rl-ask-opening .rl-anote{margin:6px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-asktab.rl-ask-opening .rl-chat-person{display:inline-flex;align-items:center;align-self:flex-start;width:auto;min-height:44px;margin:0;padding:0;border-radius:0;font-size:15px;font-weight:600}" +
+    // On a short phone the AI line moves above the questions, so it is still on the first screen.
+    "@media(max-height:760px){.rl-chat.rl-ask-open{display:flex;flex-direction:column;gap:0}.rl-ask-open .rl-ask-rec{order:0}.rl-ask-open .rl-ask-h2{order:1;margin-bottom:6px}.rl-ask-open .rl-ask-ai{order:2;margin:0 0 6px}.rl-ask-open .rl-ask-qs{order:3}}" +
+    // After a question typed into the box: the same words can be looked for in Receipts instead.
+    ".rl-ask-find{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-end;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--rl-accent);font-size:15px;font-weight:600;text-align:right;transition:opacity .12s}.rl-ask-find:active{opacity:.55}.rl-ask-find:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px;border-radius:10px}" +
+    // Outlines while the page is being worked out.
+    ".rl-ask-sk .rl-skel{display:block;min-height:0;margin:0;border:0}.rl-ask-sk-t{display:flex;gap:8px;margin:0 0 20px}.rl-ask-sk-r{display:flex;align-items:center;gap:12px;height:64px}" +
     ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}" +
     ".rl-arow-t b{font-weight:600}.rl-arow-d{font-size:14px}.rl-rr-mid b{font-size:16px;font-weight:600}.rl-rr-mid span{font-size:14px}.rl-rr-end b{font-size:16px;font-weight:600}";
   document.head.appendChild(calmCss);
@@ -2994,12 +3031,7 @@
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
           // Questions about it: Relay's assistant, shown this receipt only when the shopper says so (support-chat.js).
           var askRow = el("div", { className: "rl-rc-fix", style: "display:none" }, [el("span", { text: "Questions about it?" }),
-            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () {
-              var shopName = (row.retailer && row.retailer.name) || "this shop";
-              ask("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
-                if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: shopName + (row.orderDate ? ", " + shortDate(row.orderDate) : "") });
-              });
-            } })]);
+            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () { askAssistantAbout(row); } })]);
           detail.appendChild(askRow);
           (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; }))
             .then(function (hc) { if (hc && hc.available) askRow.style.display = ""; });
@@ -4054,6 +4086,17 @@
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
+  // Asking the assistant about one receipt: it is shown that receipt only once the shopper says so (support-chat.js), and
+  // nothing goes anywhere until they send a question. The same from the receipt itself and from its tile on the Ask tab,
+  // where the question names the receipt because it isn't the thing on screen.
+  function askAssistantAbout(row, named) {
+    var shop = (row.retailer && row.retailer.name) || "", label = (shop || "this shop") + (row.orderDate ? ", " + shortDate(row.orderDate) : "");
+    ask((named && shop ? "Show Relay's assistant your receipt from " + label + "?" : "Show this receipt to Relay's assistant?") + " It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
+      if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: label });
+    });
+  }
+  // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
+  var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
   // The help chat's screen (worker/support-chat.js answers it; its rules are there). It is Profile's "Contact us" page while
   // the assistant is off, and the Ask tab while it is on (opts.tab): same screen, same routes, same wording about who answers.
   function chatPage(b, opts) {
@@ -4069,33 +4112,73 @@
           : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
           : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
       }
+      // What the box says it is for. In the Ask tab it takes a question, and what was typed can then be looked for in
+      // Receipts instead (the control under the message).
+      var HINT = opts.tab ? "Search receipts or ask about Relay" : "Ask about Relay";
       function stopAbout() {
-        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
+        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = HINT;
         if (foot) foot.textContent = noteText();
         log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
       }
       var list = el("div", { className: "rl-chat", role: "log" });
       list.setAttribute("aria-live", "polite");
       var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? HINT : "Write your question", value: draftGet("help-chat") });
       box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
-      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
+      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", opts.tab ? 20 : 22)]);
       var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
       var busy = false;
-      function bubble(t) {
+      function bubble(t, findable) {
         var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
         var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
         // Said once, over its first message: who's answering, and that it's an AI.
         if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
+        // Under the newest thing the shopper typed: look for the same words in Receipts instead.
+        if (findable) n.appendChild(el("button", { type: "button", className: "rl-ask-find", text: "Search your receipts for this instead", onclick: function () {
+          window.__relayFindReceipts = String(t.text).replace(/\s+/g, " ").trim().slice(0, 80); if (window.go) window.go("receipts");
+        } }));
         return n;
       }
+      // The Ask tab's newest receipts, to ask about one: what the app already has, brought up to date once if that is old.
+      var recHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
+      function drawTiles() {
+        if (!recHost) return;
+        recHost.textContent = "";
+        var rows = orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }).slice(0, 6);
+        recHost.style.display = rows.length ? "" : "none";
+        list.classList.toggle("no-rec", !rows.length);
+        if (!rows.length) return;
+        var head = el("button", { type: "button", className: "rl-ask-hb", onclick: function () { if (window.go) window.go("receipts"); } }, [el("span", { text: "Ask about a receipt" }), accIc("chev", 12, "rl-ask-chev")]);
+        head.setAttribute("aria-label", "Ask about a receipt. See all your receipts");
+        recHost.appendChild(el("h2", { className: "rl-ask-h" }, [head]));
+        var strip = el("div", { className: "rl-ask-tiles" });
+        rows.forEach(function (x) {
+          var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
+          var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
+          var day = when ? el("span", { className: "rl-ask-tile-d", text: when }) : null; if (day) day.setAttribute("aria-hidden", "true");
+          var tile = el("button", { type: "button", className: "rl-ask-tile" + (when ? " dated" : ""), onclick: function () { askAssistantAbout(x, true); } }, [art].concat(day ? [day] : []));
+          tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
+          tile.setAttribute("data-receipt", x.id);
+          if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
+          strip.appendChild(tile);
+        });
+        recHost.appendChild(strip);
+      }
+      function opening() { return Boolean(opts.tab && ai && !about && !log.length); }
       function draw() {
         list.textContent = "";
-        if (opts.tab && ai && !about && !log.length) {
-          list.appendChild(el("p", { className: "rl-ask-lead", text: "Relay's assistant is an AI, so it can get things wrong. Ask it anything about using Relay." }));
-          list.appendChild(el("div", { className: "rl-acard rl-ask-qs" }, ["How do I return something?", "How does a swap work?", "Why is a receipt missing?", "How does Relay find my receipts?"].map(function (q) {
-            return el("button", { type: "button", className: "rl-arow rl-ask-q", onclick: function () { box.value = q; sendQuestion(); } }, [el("span", { className: "rl-arow-t" }, [el("b", { text: q })]), accIc("chev", 18, "rl-arow-c")]);
+        var first = opening();
+        list.classList.toggle("rl-ask-open", first);
+        if (opts.tab) b.classList.toggle("rl-ask-opening", first);
+        recHost = null;
+        if (first) {
+          recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
+          list.appendChild(el("h2", { className: "rl-ask-h2", text: "Try asking" }));
+          list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
+            var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[q[1]] ? accIc(q[1], 24, "rl-ask-qi-i") : jIc(q[1], 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.background = q[2];
+            return el("button", { type: "button", className: "rl-ask-q", onclick: function () { box.value = q[0]; sendQuestion(true); } }, [pic, el("b", { text: q[0] })]);
           })));
+          list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
           return;
         }
         list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
@@ -4104,11 +4187,12 @@
         if (ai && !log.length) {
           var chips = el("div", { className: "rl-chat-chips" });
           (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
-            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
+            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(true); } }));
           });
           list.appendChild(chips);
         }
-        log.forEach(function (t) { list.appendChild(bubble(t)); });
+        var newest = -1; if (opts.tab && !about) log.forEach(function (t, i) { if (t.role === "user") newest = i; });
+        log.forEach(function (t, i) { list.appendChild(bubble(t, i === newest && t.typed === true)); });
       }
       function turns(extra) {
         var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
@@ -4116,12 +4200,13 @@
         return out.slice(-24);
       }
       function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
-      function sendQuestion() {
+      // offered: one of the page's own questions was tapped, not typed (the button and the Enter key pass something else).
+      function sendQuestion(offered) {
         var q = box.value.replace(/\s+$/, "").trim();
         if (busy || !q) return;
         if (!ai) return handoff();
         say(note, "");
-        log.push({ role: "user", text: q }); box.value = ""; draftSet("help-chat", ""); fit();
+        log.push({ role: "user", text: q, typed: offered !== true }); box.value = ""; draftSet("help-chat", ""); fit();
         draw();
         var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
         typing.setAttribute("aria-label", "Relay's assistant is writing");
@@ -4152,11 +4237,14 @@
           }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
         });
       }
-      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
+      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(opts.tab ? 56 : 48, box.scrollHeight)) + "px"; }
       function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
       box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
       box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
       send.onclick = sendQuestion;
+      // Pressing send leaves the cursor in the box: the keyboard stays up for the next question, and the box doesn't
+      // slide away from under a mouse as the page settles back.
+      send.addEventListener("mousedown", function (e) { e.preventDefault(); });
       person.onclick = handoff;
       // Which receipt the assistant can see, and a way to stop showing it.
       if (about) {
@@ -4170,6 +4258,12 @@
       if (opts.tab) { b.appendChild(foot); if (ai) b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); }
       else { b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); if (ai) b.appendChild(person); b.appendChild(foot); }
       draw(); setTimeout(fit, 0);
+      // The tiles show what the app already has; if that is more than a few minutes old, ask once and redraw them.
+      if (opening() && !memoFresh(memo.receipts)) api("/relay/my/receipts").then(function (r) {
+        if (!r.ok || !r.body || !list.isConnected) return;
+        var rows = r.body.receipts || []; if (JSON.stringify(rows) === JSON.stringify(recRows)) return;
+        recRows = rows; drawTiles();
+      }, function () {});
     }
   // Whether the assistant is on: asked once each time Relay is opened, and the last answer is remembered on this phone so
   // the tab doesn't turn up late. Signing out forgets it.
@@ -4196,7 +4290,10 @@
     var s = load();
     if (!s || !s.token) { host.appendChild(el("div", { className: "rl-po" }, [el("h3", { text: "Sign in to ask Relay", style: "margin:0" }), el("button", { className: "rl-po-primary", text: "Sign in", style: "max-width:220px", onclick: show })])); return; }
     host.classList.add("rl-asktab");
-    for (var i = 0; i < 4; i++) host.appendChild(el("div", { className: "rl-skel", style: "height:52px;border-radius:14px;margin:0 0 8px" }));
+    var bone = function (w, h, r, m) { return el("div", { className: "rl-skel", style: "width:" + w + "px;height:" + h + "px;border-radius:" + r + "px" + (m ? ";margin:" + m : "") }); };
+    var bones = el("div", { className: "rl-ask-sk" }, [bone(180, 22, 8, "13px 0 17px"), el("div", { className: "rl-ask-sk-t" }, [bone(115, 115, 24), bone(115, 115, 24), bone(115, 115, 24)]), bone(110, 22, 8, "0 0 17px")]);
+    for (var i = 0; i < 4; i++) bones.appendChild(el("div", { className: "rl-ask-sk-r" }, [bone(48, 48, 12), bone(170 + (i % 2) * 40, 16, 8)]));
+    bones.setAttribute("aria-hidden", "true"); host.appendChild(bones);
     helpChatState().then(function (hc) {
       if (!host.isConnected) return;
       host.textContent = "";
