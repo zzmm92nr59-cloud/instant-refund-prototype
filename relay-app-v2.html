@@ -1004,7 +1004,7 @@ function reviewAccount(){try{return !!(window.RelayAccount&&RelayAccount.isRevie
 function toggleTestTools(){try{localStorage.setItem("relay-testing-tools",testTools()?"0":"1")}catch(e){}if(catalogAsked)loadCatalog();render()}
 // The Testing tools or shops' websites switch (Profile → Team) changed on this device: the tabs and the testing link
 // follow it, and the catalogue loads again with or without Relay's test shops and the preview from shops' own websites.
-function testToolsChanged(){navRender();{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}if(catalogAsked)loadCatalog()}
+function testToolsChanged(){navRender();{const tl=$("testingLink");if(tl)tl.style.display=testTools()?"":"none"}if(catalogAsked)loadCatalog();if(showDemo())loadVerified()}
 // Signed in on this device? (Read straight from storage so the first screen doesn't wait for the account code.)
 function hasSession(){try{const x=JSON.parse(localStorage.getItem("relay.session.v1")||"null");return !!(x&&x.token)}catch(e){return false}}
 function shownWatches(){return Object.entries(watch).filter(([sku])=>showDemo()||/^shopify:/.test(sku)||liveProduct(catalog.find(x=>x.sku===sku)))}
@@ -1061,10 +1061,12 @@ let catalogReady=false;
 var catalogAsked;function needCatalog(){if(catalogAsked)return;catalogAsked=true;loadCatalog()}
 async function loadCatalog(manual=false){
  let next=demoProducts(),squareError=null;try{
- const squareAsk=fetchWithin(API+"/relay/live-test/products",10000),shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
+ // Relay's Square test shop is only ever shown in the demo or with testing tools (shownProducts), so an ordinary
+ // shopper's app doesn't ask for it at all.
+ const squareAsk=showDemo()?fetchWithin(API+"/relay/live-test/products",10000):null,shopifyAsk=fetchWithin(API+"/relay/shopify/catalogue"+(testTools()||reviewAccount()?"?test=1":""),10000);
  const webAsk=testTools()||webPreview()?fetchWithin(API+"/relay/web-shops",10000):null;
- squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});if(webAsk)webAsk.catch(()=>{});
- try{
+ if(squareAsk)squareAsk.catch(()=>{});shopifyAsk.catch(()=>{});if(webAsk)webAsk.catch(()=>{});
+ if(squareAsk)try{
   const response=await squareAsk;
   if(!response.ok)throw Error("Square catalogue HTTP "+response.status);
   const data=await response.json();
@@ -1130,6 +1132,6 @@ if(navigator.serviceWorker&&navigator.serviceWorker.addEventListener)navigator.s
 window.addEventListener("hashchange",()=>{if(/[#&]open=/.test(location.hash))openLink(location.href)});
 Object.defineProperties(window,{page:{get:()=>page,set:v=>{page=v}},reason:{get:()=>reason,set:v=>{reason=v}},retailer:{get:()=>retailer,set:v=>{retailer=v}},demo:{get:()=>demo,set:v=>{demo=!!v}},exchangeContext:{get:()=>exchangeContext,set:v=>{exchangeContext=!!v}}});if(typeof document.addEventListener==="function"){const what=b=>b.id||[...b.attributes].filter(a=>/^data-|^onclick$|^href$/.test(a.name)).map(a=>a.name+"="+a.value).join("|")||(b.textContent||"").trim();let last={t:0,x:-99,y:-99,k:""};document.addEventListener("click",e=>{const b=e.target&&e.target.closest&&e.target.closest("button,a,[role=button],summary");if(!b||!e.isTrusted||demo)return;const t=Date.now(),k=what(b);if(t-last.t<400&&k===last.k&&Math.abs(e.clientX-last.x)<30&&Math.abs(e.clientY-last.y)<30){e.stopImmediatePropagation();e.preventDefault();return}last={t,x:e.clientX,y:e.clientY,k}},true);for(const ev of ["input","change"])document.addEventListener(ev,()=>{last.k=""},true)}
 window.addEventListener("relay:session",()=>{profileWaitStart=0;watchesRestored=false;if(!retailer)render()});window.addEventListener("storage",event=>{if(event.key==="relay-test-store-orders-v1"||event.key==="relay-demo-active-customer-v1"){if(page==="wallet"&&!retailer)render()}if(event.key===WALLET_RESET_KEY){walletCutover=localStorage.getItem(WALLET_RESET_KEY)||walletCutover;if(page==="wallet"&&!retailer)render()}if(event.key==="relay-retailer-inventory-v3"){try{inventoryChanges=JSON.parse(localStorage.getItem(demoInventoryKey)||"{}")||{}}catch{}catalog=catalog.filter(p=>!p.fixture).concat(demoProducts());if(page==="discover")renderCatalog();if(page==="radar")showRadar()}});
- catalog=demoProducts();if(demo){const t=$("modeToggle");t.textContent="✦ Demo on";t.classList.remove("hidden");t.classList.add("on");t.removeAttribute("aria-hidden")}render();loadVerified();if(typeof setTimeout==="function")setTimeout(needCatalog,4000);if(/[#&]open=/.test(location.hash))openLink(location.href);
+ catalog=demoProducts();if(demo){const t=$("modeToggle");t.textContent="✦ Demo on";t.classList.remove("hidden");t.classList.add("on");t.removeAttribute("aria-hidden")}render();if(showDemo())loadVerified();if(typeof setTimeout==="function")setTimeout(needCatalog,4000);if(/[#&]open=/.test(location.hash))openLink(location.href);
  
 }catch(e){console.error("Relay startup error",e);const root=document.getElementById("view");if(root)root.innerHTML="<div class=\"card\"><h2>Something went wrong</h2><p class=\"sub\">Please reload Relay. If it keeps happening, try again in a few minutes.</p><button class=\"darkbtn\" onclick=\"location.reload()\">Reload</button></div>"}})();</script></body></html>

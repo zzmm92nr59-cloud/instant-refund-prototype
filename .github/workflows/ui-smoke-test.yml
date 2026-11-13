@@ -59,6 +59,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-look-ui.mjs
       - name: Test speed (one request per thing, tabs reuse what was just loaded, the catalogue waits for Discover)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-speed-ui.mjs
+      - name: Test Relay stays quiet (nothing asked for while a tab is left open or Relay is in the background; an open auction or conversation only while on screen)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-quiet-ui.mjs
       - name: Test receipt groups (every receipt, header, filters, months, rows)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipts-cat-ui.mjs
       - name: Test returns from the wallet (order number and email to copy, the shop's page, then the QR code)
