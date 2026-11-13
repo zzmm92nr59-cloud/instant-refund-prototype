@@ -7501,6 +7501,9 @@
       if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
       var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
       var named = (x.items || []).filter(function (i) { return i && i.name; });
+      // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
+      var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
+      if (keep.length) named = keep.concat(named.filter(function (i) { return keep.indexOf(i) < 0; }));
       var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
@@ -7516,7 +7519,7 @@
       else if (freshDelivery(x)) { e.line = shipWords(dv, true); e.onWay = true; e.rank = 1; }
       else if (canGoBack && stated) { e.line = "Return by " + dayWords(stated); e.rank = 1; }
       // No date from the shop: Relay never shows one of its own as a deadline, only that it can still surely go back.
-      else if (canGoBack) { e.line = "Can still be returned"; e.rank = 1; }
+      else if (canGoBack) { e.line = keep.length === 1 ? keep[0].name + " can still be returned" : keep.length ? "Some of it can still be returned" : "Can still be returned"; e.rank = 1; }
       else if (dv && dv.status === "delivered" && dv.at) e.line = shipWords(dv, true);
       else e.line = "Bought " + dayWords(x.orderDate);
       // Nothing open on it: the newest things that could ever have gone back come before a coffee from this morning.

@@ -1,14 +1,14 @@
 // Browser test: return dates for more of what you buy. Stubbed Relay server, made-up account and items.
-// Checks: a food order with a kettle in it puts just the kettle in the wallet, and its page says the food can't go back but
-// the kettle can; when an email says nothing about returns, Relay never shows a date it worked out as a deadline (no
+// Checks: a food order with a kettle in it leads with the kettle on Home and says only the kettle can go back, and its page
+// says the food can't go back but the kettle can; when an email says nothing about returns, Relay never shows a date it worked out as a deadline (no
 // countdown, no "back by" strip): the page says the email gives no date and what UK law guarantees; "30 days to return"
 // with no start date says so, with the least it can be counted from the order; a worked-out date that has passed isn't
-// shown as "Deadline passed"; a plain food order stays out of the wallet; when Relay has read the shop's own returns policy,
+// shown as "Deadline passed" or as returnable; when Relay has read the shop's own returns policy,
 // the page gives it for most items, the least that means for this order (never a countdown) and a link to the policy.
 // Every new line passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, homeCard, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -108,25 +108,28 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
 
-// 1. The wallet: the kettle from the weekly shop, the trainers and the shirt; not the food, and not the coat whose date passed.
-const wallet = page.locator("#walletPage");
-await wallet.getByText("Glass Kettle 1.7L").waitFor();
+// 1. Home: the kettle leads its food order's card, and only it is said to go back; the coat whose worked-out date passed
+//    isn't shown as returnable; no date Relay worked out is shown as a deadline.
+await homeCard(page, "Glass Kettle 1.7L").waitFor();
 await page.waitForTimeout(600);
-const text = await wallet.innerText();
-for (const thing of ["Court Classic Trainers", "Linen Shirt", "Desk Lamp", "Cord Trousers", "Silk Scarf"]) assert.ok(text.includes(thing), thing + " is in the wallet");
-for (const thing of ["Bananas", "Kitchen Roll", "Semi Skimmed Milk", "Wool Coat"]) assert.ok(!text.includes(thing), thing + " isn't in the wallet");
-assert.match(text, /7 items/);
-const kettle = wallet.locator(".rl-po").filter({ hasText: "Glass Kettle 1.7L" });
-assert.match(await kettle.innerText(), /1 of 3 in this order/);
+const card = name => homeCard(page, name);
+for (const thing of ["Court Classic Trainers", "Linen Shirt", "Desk Lamp", "Cord Trousers", "Silk Scarf"]) assert.match(await card(thing).innerText(), /Can still be returned/, thing + " can still go back");
+const kettle = card("Glass Kettle 1.7L");
+assert.equal(await kettle.locator(".h2-line-t b").innerText(), "Glass Kettle 1.7L can still be returned", "only the kettle is said to go back");
+assert.match(await kettle.getAttribute("aria-label"), /^Tesco\. Glass Kettle 1\.7L, /, "the kettle leads the order's card");
+assert.ok(!/Bananas|Kitchen Roll|Milk/.test(await kettle.locator(".h2-line-t").innerText()), "the food isn't said to go back");
 assert.ok(!/return by|days? left/i.test(await kettle.innerText()), "a date Relay worked out isn't shown as a deadline: " + await kettle.innerText());
+assert.ok(!/returned|Return by|days? left/i.test(await card("Wool Coat").innerText()), "the coat whose worked-out date passed isn't shown as returnable");
+for (const t of await page.locator("#homePage .h2-feed > .h2-item").allInnerTexts()) assert.ok(!/days? left|Return by/.test(t), "no countdown or return date Relay worked out: " + t);
 // No "back by" strip above the tab bar either: none of these dates came from a shop.
 await page.waitForTimeout(400);
 assert.equal(await page.locator(".rl-next").count(), 0, "no countdown strip for dates Relay worked out");
-console.log("ok - wallet: the kettle from a food order (not the food), the order with no return wording, the '30 days' order; not a passed worked-out date; no made-up countdowns");
+console.log("ok - Home: the kettle leads its food order and only it is said to go back; a passed worked-out date isn't returnable; no made-up countdowns");
 
 // 2. The kettle's page: the food can't go back, the kettle can; the date is counted from the order date, and it says so.
 await kettle.click();
 const sheet = page.locator(".rl-sheet");
+await sheet.getByText(/1 of 3 in this order|Glass Kettle 1\.7L/).first().waitFor();
 await sheet.getByText("The food can't go back, but you can usually return the Glass Kettle 1.7L.").waitFor();
 assert.equal(await sheet.getByText("Usually can't be returned").count(), 0, "not the blanket 'can't be returned' label");
 await sheet.getByText("No return date in Tesco's email", { exact: true }).waitFor();
@@ -136,19 +139,19 @@ await polished("food order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 3. The trainers: the same safe date, worded the same way.
-await wallet.locator(".rl-po").filter({ hasText: "Court Classic Trainers" }).click();
+await card("Court Classic Trainers").click();
 await sheet.getByText("No return date in Kick Lane's email", { exact: true }).waitFor();
 await sheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders. Relay adds the date once it arrives. Kick Lane may give longer.").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 
 // 4. The shirt: "30 days to return", counted from the order date.
-await wallet.locator(".rl-po").filter({ hasText: "Linen Shirt" }).click();
+await card("Linen Shirt").click();
 await sheet.getByText("30 days to return", { exact: true }).waitFor();
 await sheet.getByText("Studio North's email doesn't say from when. Counting from your order, that's until at least " + wdDay(day(20)) + ".").waitFor();
 await polished("window order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 // 4b. The lamp: delivered, so the legal minimum's date is given, beside the delivery it counts from (and still no countdown).
-const lamp = wallet.locator(".rl-po").filter({ hasText: "Desk Lamp" });
+const lamp = card("Desk Lamp");
 assert.ok(!/return by|days? left/i.test(await lamp.innerText()), "no countdown on the card: " + await lamp.innerText());
 await lamp.click();
 await sheet.getByText("No return date in Fernway's email", { exact: true }).waitFor();
@@ -157,7 +160,7 @@ await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - each page says what the email gives: no date (and what UK law guarantees, dated only from a known delivery), or its 30 days and the least that means");
 
 // 4c. The trousers: the shop's own policy, dated from the delivery as the least it allows for most items, with its link.
-const trousers = wallet.locator(".rl-po").filter({ hasText: "Cord Trousers" });
+const trousers = card("Cord Trousers");
 assert.ok(!/return by|days? left/i.test(await trousers.innerText()), "a policy is never a countdown: " + await trousers.innerText());
 await trousers.click();
 await sheet.getByText("30 days to return most items", { exact: true }).waitFor();
@@ -169,13 +172,13 @@ assert.ok(!/days? left|Return by|No return date|UK law/.test(await sheet.innerTe
 await polished("policy order page");
 await sheet.getByRole("button", { name: "Close" }).click();
 // 4d. The scarf: a policy counted from when it's sent, so the least it can be is counted from the order.
-await wallet.locator(".rl-po").filter({ hasText: "Silk Scarf" }).click();
+await card("Silk Scarf").click();
 await sheet.getByText("Pellow's returns policy gives 30 days from when it's sent for most items. Counting from your order, that's until at least " + wdDay(day(26)) + ".").waitFor();
 await sheet.getByRole("link", { name: "Read Pellow's returns policy" }).waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
 // 4e. The throw: bought in the shop's Christmas dates, so the extension's date.
 const dmy = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-await wallet.locator(".rl-po").filter({ hasText: "Wool Throw" }).click();
+await card("Wool Throw").click();
 await sheet.getByText("28 days to return most items", { exact: true }).waitFor();
 await sheet.getByText("Brindle's returns policy gives 28 days from purchase for most items. Bought between " + dmy(day(-20)) + " and " + dmy(day(30)) + ", so it can go back until at least " + wdDay(day(60)) + ".").waitFor();
 await sheet.getByRole("button", { name: "Close" }).click();
@@ -184,7 +187,7 @@ console.log("ok - with the shop's own policy: what it gives for most items, the 
 // 5. Receipts: the coat whose worked-out date passed shows no 'Deadline passed'; the food group shows the kettle order's countdown.
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 const coat = page.locator(".rl-rr").filter({ hasText: "Wool Coat" });
 await coat.waitFor();
 assert.ok(!/days? left|Deadline passed|Return today/.test(await coat.innerText()), "no countdown for a worked-out date that passed: " + await coat.innerText());
