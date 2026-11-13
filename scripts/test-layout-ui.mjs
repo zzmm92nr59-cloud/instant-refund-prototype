@@ -21,6 +21,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { readFileSync } from "node:fs"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
+import { skipTips } from "./relay-places.mjs";
 import { samplePictures, MARK_COLOUR, LOGO_GREY } from "./sample-pictures.mjs";
 const TYPES = { ".js": "text/javascript", ".png": "image/png", ".webmanifest": "application/manifest+json", ".svg": "image/svg+xml" };
 // The page server.
@@ -111,7 +112,7 @@ const stub = async ctx => {
 };
 const browser = await chromium.launch();
 PICS = await samplePictures(browser, { marks: true });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipTips(ctx); // (the tips are scripts/test-tips-ui.mjs)
 await stub(ctx);
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 const pathOf = () => new URL(page.url()).pathname;

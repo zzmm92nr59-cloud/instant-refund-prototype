@@ -4372,7 +4372,12 @@
   function tipsMark(ids) {
     var all = tipsLocal().concat(ids).filter(function (x, i, a) { return a.indexOf(x) === i; });
     tipsLocalSet(all);
-    if (tipsServer) { tipsServer = all; api("/relay/my/tips", { method: "PUT", body: { seen: all } }).catch(function () {}); }
+    if (tipsServer) { tipsServer = all; tipsPut(); }
+  }
+  // One change at a time, each with everything seen so far, so a later one never arrives before an earlier one.
+  var tipsQueue = Promise.resolve();
+  function tipsPut() {
+    tipsQueue = tipsQueue.then(function () { return api("/relay/my/tips", { method: "PUT", body: { seen: tipsLocal() } }); }).catch(function () {});
   }
   function tipTab(key) {
     var navs = ["foot", "side"].map(function (id) { return document.getElementById(id); });
@@ -4439,7 +4444,7 @@
   function tipsAgain() {
     tipsLocalSet([]);
     var go = function () { tipsChecked = false; if (window.go) window.go("profile"); setTimeout(tipsMaybe, 700); };
-    if (tipsServer !== null || load()) api("/relay/my/tips", { method: "PUT", body: { seen: [] } }).then(go, go); else go();
+    tipsServer = []; tipsPut(); tipsQueue.then(go, go);
   }
   // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
   var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];

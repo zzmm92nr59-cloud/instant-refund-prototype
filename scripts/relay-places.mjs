@@ -48,7 +48,8 @@ export async function openProfile(page) {
   await page.locator("#mePage .rl-arow:visible", { hasText: "Security and privacy" }).first().waitFor();
 }
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
-export const profileButton = (page) => page.locator(".h2-me, .topline .avatar").filter({ visible: true }).first();
+// (Home's own picture comes after the page's top line in the page, so the last one showing is Home's when on Home.)
+export const profileButton = (page) => page.locator(".topline .avatar, .h2-me").filter({ visible: true }).last();
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
   name = RENAMED[name] || name;
@@ -94,15 +95,26 @@ export async function goTab(page, name) {
 // For tests that aren't about the first-run prompts: this phone has already said "Not now" to "What do you shop for?"
 // and seen the four first-run tips, for whoever is signed in, so neither the one-time sheet on Home, the sign-up step nor
 // the tips get in the way. (scripts/test-signup-ui.mjs, scripts/test-layout-ui.mjs and scripts/test-tips-ui.mjs test those.)
-export async function skipInterests(ctx) {
-  await ctx.addInitScript(() => {
+// (Whoever signs in, whenever: also when the test signs in after the page has opened.)
+const firstRunDone = (what) => {
+  const mark = () => {
     try {
-      const s = JSON.parse(localStorage.getItem("relay.session.v1") || "null"), k = "relay.interests-later.v1";
+      const s = JSON.parse(localStorage.getItem("relay.session.v1") || "null");
       if (!s || !s.email) return;
-      const l = JSON.parse(localStorage.getItem(k) || "[]");
-      if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
-      const t = JSON.parse(localStorage.getItem("relay.tips.v1") || "{}");
-      if (!t[s.email]) { t[s.email] = ["home", "ask", "browse", "receipts"]; localStorage.setItem("relay.tips.v1", JSON.stringify(t)); }
+      if (what.interests) {
+        const k = "relay.interests-later.v1", l = JSON.parse(localStorage.getItem(k) || "[]");
+        if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
+      }
+      if (what.tips) {
+        const t = JSON.parse(localStorage.getItem("relay.tips.v1") || "{}");
+        if (!t[s.email]) { t[s.email] = ["home", "ask", "browse", "receipts"]; localStorage.setItem("relay.tips.v1", JSON.stringify(t)); }
+      }
     } catch (e) { /* storage blocked: nothing to do */ }
-  });
-}
+  };
+  mark();
+  const set = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (k, v) { set.call(this, k, v); if (k === "relay.session.v1") mark(); };
+};
+export async function skipInterests(ctx) { await ctx.addInitScript(firstRunDone, { interests: true, tips: true }); }
+// For tests about interests but not the tips: the tips have been seen.
+export async function skipTips(ctx) { await ctx.addInitScript(firstRunDone, { tips: true }); }
