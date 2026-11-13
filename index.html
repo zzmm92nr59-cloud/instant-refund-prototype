@@ -519,7 +519,7 @@ async function checkSandboxBank(){
 }
 function navRender(){const lit=demo||(testing&&page==="wallet")?page:page==="me"?meFrom:(NAV_HOME[page]||page);for(const id of ["side","foot"])$(id).innerHTML=navItems().map(([key,name])=>'<button class="'+(lit===key?"active":"")+(id==="side"?" navbtn":"")+'"'+(lit===key?' aria-current="page"':'')+' data-tab="'+key+'" data-name="'+name+'" onclick="tabTap(\''+key+'\')"><span class="'+(id==="foot"?"ico":"nico")+'">'+navIcon(key==="discover"&&!demo?"browse":key)+'</span>'+(id==="foot"?'<span class="tab-name">'+name+'</span>':name)+'</button>').join("");relayBadge()}
 // Returns due in the next three days and auction wins to pay for, as a red number on the Home tab, and inboxes that need
-// connecting again on the Profile tab (where Email connection is), the way a phone shows it (account.js counts them).
+// connecting again on the Receipts tab (Profile isn't a tab), the way a phone shows it (account.js counts them).
 function relayBadge(){const due=Number(window.__relayDue)||0,pay=Number(window.__relayPayDue)||0,mail=Number(window.__relayMailFix)||0,home=due+pay;
  const tabs=[["profile",home,pay?(due?home+" things to do soon":pay+(pay===1?" auction win":" auction wins")+" to pay for"):home+(home===1?" return":" returns")+" due soon"],
   ["receipts",mail,(mail===1?"an inbox needs":mail+" inboxes need")+" connecting again"]];
