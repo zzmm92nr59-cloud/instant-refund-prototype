@@ -955,7 +955,19 @@
     ".rl-dt-fact.rl-au-desc{flex-direction:column;align-items:flex-start;gap:4px}.rl-au-desc b{white-space:pre-line;font-weight:400;text-align:left}" +
     ".rl-au-small{font-size:13px;line-height:1.45;color:var(--rl-text2);margin:14px 0 0}" +
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
-    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
+    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}" +
+    // Slide to bid: a round handle dragged to the end of a 56px pill. Relay's navy and lime, whichever the phone's setting.
+    ".rl-slide{position:relative;height:56px;border-radius:28px;background:#101828;color:#fff;margin:14px 0 4px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}" +
+    "@media(prefers-color-scheme:dark){.rl-slide{background:#26324a}}" +
+    ".rl-slide-fill{position:absolute;left:0;top:0;bottom:0;width:56px;border-radius:28px;background:rgba(199,245,103,.28)}" +
+    ".rl-slide-t{position:absolute;inset:0;display:grid;place-items:center;padding:0 60px;font-size:17px;font-weight:600;text-align:center;line-height:1.2;pointer-events:none}" +
+    ".rl-slide-k{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:#c7f567;color:#101828;display:grid;place-items:center;cursor:grab;touch-action:none}" +
+    ".rl-slide-k:active{cursor:grabbing}.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:transform .28s cubic-bezier(.2,.9,.3,1.2),width .28s cubic-bezier(.2,.9,.3,1.2)}" +
+    ".rl-slide.busy .rl-slide-k,.rl-slide.off .rl-slide-k{cursor:default}.rl-slide.off{opacity:.55}.rl-slide.done{background:#c7f567;color:#101828}.rl-slide.done .rl-slide-fill{opacity:0}" +
+    "@media(prefers-reduced-motion:reduce){.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:none}}" +
+    // For screen readers and keyboards: the same bid as an ordinary button, shown when it has the keyboard's focus.
+    ".rl-kbonly{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:0;padding:0;border:0}" +
+    ".rl-kbonly:focus,.rl-kbonly:focus-visible{position:static!important;width:100%;height:auto;clip:auto;clip-path:none;white-space:normal;padding:14px 18px;margin-top:10px}";
   document.head.appendChild(css);
   // The calm layout (draft): quiet rows in place of tiles. One job per tab; everything else is one tap deeper.
   var calmCss = document.createElement("style");
@@ -1576,6 +1588,7 @@
   // link signs you in, and then you connect your inbox once. Either way the first scan starts at once and you see it
   // counting while you add your name, so the first screen after is full, not empty.
   var JI = {
+    next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     check: '<path d="m5 12.5 4.2 4.2L19 7"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
@@ -1599,6 +1612,53 @@
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
     s.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 20) + '" height="' + (px || 20) + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + JI[n] + "</svg>";
     return s;
+  }
+  // Slide to confirm: a round handle dragged to the end of a pill. send() runs only when it reaches the end; let go early
+  // and it springs back. o.label() is what the pill says (and must name exactly what will be sent); o.ok() says whether
+  // it can be slid now; o.send(done) does the thing, then calls done(true) to show it done or done(false) to start again.
+  // It doesn't start the browser's own gestures (a swipe back, pull to refresh, a sheet's swipe down: .rl-noswipe/.rl-noptr).
+  function slider(o) {
+    var t = el("span", { className: "rl-slide-t" }), fill = el("span", { className: "rl-slide-fill" });
+    var knob = el("span", { className: "rl-slide-k" }, [jIc("next", 24)]);
+    var box = el("div", { className: "rl-slide rl-noswipe rl-noptr" }, [fill, t, knob]);
+    box.setAttribute("aria-hidden", "true"); // the button beside it is the way in for screen readers and keyboards
+    var x = 0, max = 0, drag = null, state = "idle";
+    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; };
+    var show = function () { t.textContent = state === "busy" ? "Bidding…" : state === "done" ? (o.doneText || "Done") : o.label(); box.classList.toggle("off", state === "idle" && !o.ok()); };
+    var back = function () { box.classList.add("back"); put(0); setTimeout(function () { box.classList.remove("back"); }, 300); };
+    var api = {
+      el: box,
+      reset: function () { state = "idle"; box.classList.remove("busy", "done"); drag = null; back(); show(); },
+      refresh: function () { if (state === "idle") { if (x) back(); show(); } },
+      busy: function () { return state !== "idle"; }
+    };
+    knob.addEventListener("pointerdown", function (e) {
+      if (state !== "idle" || !o.ok()) { if (state === "idle" && o.refuse) o.refuse(); return; }
+      max = box.getBoundingClientRect().width - 56;
+      drag = { start: e.clientX - x, id: e.pointerId, label: o.label() };
+      try { knob.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault(); e.stopPropagation();
+    });
+    knob.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      put(Math.max(0, Math.min(max, e.clientX - drag.start)));
+      e.preventDefault();
+    });
+    var end = function (e) {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      var d = drag; drag = null;
+      // Sent only from the very end, and only for exactly the amount the pill showed when the slide began.
+      if (x < max - 2 || d.label !== o.label() || !o.ok()) { back(); show(); return; }
+      put(max); state = "busy"; box.classList.add("busy"); show();
+      o.send(function (ok) {
+        if (!box.isConnected) return;
+        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); show(); }
+        else api.reset();
+      });
+    };
+    knob.addEventListener("pointerup", end); knob.addEventListener("pointercancel", function (e) { if (drag && e.pointerId === drag.id) { drag = null; back(); show(); } });
+    show();
+    return api;
   }
   // The frame of every step: progress dots (when there is more than one step), Back or Close, then the step itself.
   function jFrame(sheet, o) {
@@ -7263,34 +7323,49 @@
       // What's wrong with a bid shows right under it.
       var msg = el("div", { className: "rl-msg", role: "status" });
       body.appendChild(msg);
-      var go = el("button", { type: "button", className: "rl-btn" });
+      // Slide to bid (the pill), or the same bid as an ordinary button for screen readers and keyboards.
+      var go = el("button", { type: "button", className: "rl-btn rl-kbonly" });
       var pence = function () { var n = Number(String(input.value).replace(/[£,\s]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) : NaN; };
-      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Bid" : "Bid up to " + money(p, "GBP"); };
-      input.addEventListener("input", label); label();
+      var slide = slider({ label: function () { var p = pence(); return isNaN(p) ? "Type the most you'd pay" : "Slide to bid " + money(p, "GBP"); },
+        ok: function () { var p = pence(); return !isNaN(p) && p >= least; }, doneText: "Bid placed",
+        refuse: function () { say(msg, "Bid " + money(least, "GBP") + " or more.", true); },
+        send: function (done) { send(pence(), done); } });
+      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Place bid" : "Place bid " + money(p, "GBP"); slide.refresh(); };
+      input.addEventListener("input", label);
       body.appendChild(el("p", { className: "rl-au-small", text: "Plus " + (a.deliveryMinor ? money(a.deliveryMinor, "GBP") + " delivery" : "free delivery") + " if you win. You pay " + a.shop + " within 24 hours at its own checkout." }));
       var ERR = { bid_too_low: function (b) { return "Bid " + money(b.nextMinor || least, "GBP") + " or more."; }, bid_not_higher: function (b) { return "The most you'd pay is already " + money(b.maxMinor, "GBP") + ". Type more than that."; },
         bid_too_high: function () { return "That's more than Relay takes for one bid."; }, auction_ended: function () { return "This auction has ended."; },
         bidding_paused: function () { return "Two auctions you won weren't paid for, so bidding is paused for now."; }, delivery_details_needed: function () { return "Add your delivery details first."; } };
-      go.onclick = function () {
-        if (go.disabled) return;
-        var p = pence();
-        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
-        go.disabled = true; go.textContent = "Bidding…"; say(msg, "");
+      // One bid at a time: the button and the slider are both locked while it's being sent.
+      var sending = false;
+      function send(p, done) {
+        if (sending) return;
+        sending = true; go.disabled = true; input.disabled = true; say(msg, "");
+        var finish = function (ok) { sending = false; go.disabled = false; input.disabled = false; label(); if (done) done(ok); };
         api("/relay/my/auctions/bid", { method: "POST", body: { auctionId: a.id, maxMinor: p } }).then(function (r) {
-          go.disabled = false; label();
           if (r.ok && r.body && r.body.auction) {
             try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {}
             auLive.at = 0;
-            bidDone(r.body.auction, r.body.you.leading, p);
+            finish(true);
+            // "Bid placed" on the pill for a moment, then whether they're winning.
+            setTimeout(function () { if (body.isConnected) bidDone(r.body.auction, r.body.you.leading, p); }, done ? 900 : 0);
             return;
           }
+          finish(false);
           var e = r.body && r.body.error;
           if (e === "delivery_details_needed") { x.canBid = false; x.why = e; return bidView(x); }
           say(msg, ERR[e] ? ERR[e](r.body) : "Couldn't place your bid. Try again.", true);
-        }, function () { go.disabled = false; label(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+        }, function () { finish(false); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      go.onclick = function () {
+        if (go.disabled || sending || slide.busy()) return;
+        var p = pence();
+        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
+        go.textContent = "Bidding…";
+        send(p);
       };
       input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.onclick(); });
-      body.appendChild(go); body.appendChild(backToIt);
+      body.appendChild(slide.el); body.appendChild(go); body.appendChild(backToIt); label();
       setTimeout(function () { try { input.focus(); input.select(); } catch (e) {} }, 60);
     }
     // After a bid: whether they're winning, in words, then back to the auction (or straight into bidding again).

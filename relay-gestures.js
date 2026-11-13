@@ -107,6 +107,8 @@
     D.addEventListener("touchstart", function (e) {
       t = null;
       if (e.touches.length !== 1 || e.touches[0].clientX > 24) return;
+      // Something with a drag of its own (the slider to bid) keeps its drag: it isn't a swipe back.
+      if (e.target.closest && e.target.closest(".rl-noswipe")) return;
       var act = backAction();
       if (!act) return;
       var el = act.layer ? (act.layer.querySelector(".rl-sheet") || act.layer) : D.querySelector("main.main");

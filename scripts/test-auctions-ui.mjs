@@ -44,6 +44,7 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/auctions") return j({ canBid: st.canBid && !!st.delivery, ...(st.delivery ? {} : { why: "delivery_details_needed" }), auctions: st.mine });
   if (p === "/relay/my/auctions/bid") {
     const b = body(); st.bids.push(b); await new Promise(r => setTimeout(r, 250));
+    if (st.bidFail) return j({ error: "server_busy" }, 503);
     const a = st.live.find(x => x.id === b.auctionId);
     if (!st.delivery) return j({ error: "delivery_details_needed" }, 409);
     if (b.maxMinor < a.nextMinor) return j({ error: "bid_too_low", nextMinor: a.nextMinor }, 400);
@@ -151,17 +152,51 @@ const max = page.getByLabel(/^The most you'd pay \(£32\.00 or more\)$/);
 await max.waitFor();
 assert.equal(await max.inputValue(), "32.00"); assert.equal(st.deliverySaves, 1);
 await polished("bid", ".rl-sheet");
+// Slide to bid: a round handle dragged to the end of a 56px pill that names the amount; the same bid is an ordinary
+// button for screen readers and keyboards (it shows when it has the keyboard's focus).
+const pill = sheet.locator(".rl-slide"), knob = sheet.locator(".rl-slide-k");
+const knobAt = () => knob.evaluate(k => Math.round(new DOMMatrix(getComputedStyle(k).transform).m41));
+const slideTo = async (part, { release = true } = {}) => {
+  const k = await knob.boundingBox(), p = await pill.boundingBox();
+  await page.mouse.move(k.x + k.width / 2, k.y + k.height / 2); await page.mouse.down();
+  const end = k.x + k.width / 2 + (p.width - 56) * part;
+  for (let i = 1; i <= 8; i++) await page.mouse.move(k.x + k.width / 2 + (end - k.x - k.width / 2) * i / 8, k.y + k.height / 2);
+  if (release) await page.mouse.up();
+};
+assert.equal((await pill.boundingBox()).height, 56, "a 56px pill");
+assert.equal(await pill.getAttribute("aria-hidden"), "true", "screen readers get the button instead");
+assert.equal((await pill.innerText()).trim(), "Slide to bid £32.00", "the pill names the amount");
+const placeBtn = sheet.getByRole("button", { name: "Place bid £32.00" });
+await placeBtn.focus();
+assert.ok((await placeBtn.boundingBox()).height >= 44, "with the keyboard's focus the button shows, 44px tall");
+// Too low, by keyboard: said plainly, nothing sent.
 await max.fill("20");
-await sheet.getByRole("button", { name: "Bid up to £20.00" }).click();
+assert.equal((await pill.innerText()).trim(), "Slide to bid £20.00", "the pill follows the amount");
+await sheet.getByRole("button", { name: "Place bid £20.00" }).focus(); await page.keyboard.press("Enter");
 await sheet.getByText("Bid £32.00 or more.").waitFor();
 assert.equal(st.bids.length, 0, "nothing sent for a bid that's too low");
 await polished("bid too low", ".rl-sheet");
 await max.fill("50");
-await sheet.getByRole("button", { name: "Bid up to £50.00" }).dblclick();
+await page.evaluate(() => document.activeElement && document.activeElement.blur());
+// Let go half-way: nothing is sent, and it springs back.
+await slideTo(0.5);
+await page.waitForTimeout(500);
+assert.equal(st.bids.length, 0, "let go early: nothing sent");
+assert.equal(await knobAt(), 0, "and the handle springs back");
+// Held at the end without letting go: still nothing sent (it's sent on letting go at the end).
+await slideTo(1, { release: false }); await page.waitForTimeout(300);
+assert.equal(st.bids.length, 0, "not sent until let go at the end");
+if (process.env.SHOTS) for (const sc of ["light", "dark"]) { await page.emulateMedia({ colorScheme: sc }); await page.waitForTimeout(100); await page.screenshot({ path: process.env.SHOTS + "/slide-end-held-" + sc + ".png" }); }
+await page.emulateMedia({ colorScheme: "light" });
+await page.mouse.up();
+// Sent once, for exactly the amount on the pill; a second slide while it's being sent does nothing.
+await knob.locator("svg").waitFor();
+await sheet.getByText("Bid placed").waitFor();
+await slideTo(1).catch(() => {});
 await sheet.getByRole("heading", { name: "You're the highest bidder" }).waitFor();
 await sheet.getByText("The price is £32.00. If anyone else bids, Relay bids for you, up to £50.00. With notifications on, Relay tells you if you're outbid.").waitFor();
-assert.equal(st.bids.length, 1, "one bid for a double tap");
-assert.deepEqual(st.bids[0], { auctionId: A1, maxMinor: 5000 });
+assert.equal(st.bids.length, 1, "one bid for a slide, and none for a second slide while it was sent");
+assert.deepEqual(st.bids[0], { auctionId: A1, maxMinor: 5000 }, "exactly the amount the pill showed");
 await polished("bid done", ".rl-sheet");
 await sheet.getByRole("button", { name: "Done" }).click();
 await sheet.getByText("You're winning. The most you'd pay is £50.00.").waitFor();
@@ -173,13 +208,26 @@ await sheet.getByRole("button", { name: "Back to auctions" }).click();
 await sheet.getByRole("button", { name: /^Sample wax jacket/ }).click();
 await sheet.getByRole("button", { name: "Place a bid" }).click();
 await page.getByLabel(/^The most you'd pay/).fill("55");
-await sheet.getByRole("button", { name: "Bid up to £55.00" }).click();
+// A failure: plain words with what to do next, and the pill is ready again.
+st.bidFail = true;
+await page.evaluate(() => document.activeElement && document.activeElement.blur());
+await slideTo(1);
+await sheet.getByText("Couldn't place your bid. Try again.").waitFor();
+await page.waitForTimeout(400);
+assert.equal(await knobAt(), 0, "after a failure the handle is back at the start");
+assert.equal((await pill.innerText()).trim(), "Slide to bid £55.00");
+assert.equal(st.bids.length, 2, "the failed one was sent once");
+st.bidFail = false;
+// By keyboard, a double press sends one bid.
+await sheet.getByRole("button", { name: "Place bid £55.00" }).focus();
+await page.keyboard.press("Enter"); await page.keyboard.press("Enter");
 await sheet.getByRole("heading", { name: "Someone bid more" }).waitFor();
 await sheet.getByText("Their maximum is higher than yours, so the price is now £60.00. You can bid again.").waitFor();
+assert.equal(st.bids.length, 3, "a double press of the button sent one bid");
 await sheet.getByRole("button", { name: "Bid again" }).waitFor();
 await sheet.getByRole("button", { name: "Back to the auction" }).click();
 await sheet.getByText("You've been outbid. Bid again to win it.").waitFor();
-console.log("ok - bidding asks for delivery details first, then the most you'd pay; too low is said plainly; one bid per tap; winning or outbid in words");
+console.log("ok - bidding asks for delivery details first, then the most you'd pay; slide to bid sends one bid of the amount shown only at the end (early let-go and a second slide send nothing; a failure resets); the button does the same for keyboards; winning or outbid in words");
 
 // 4. Your bids: a win to pay for comes first, with the shop's own link to pay; the row says so, and Home's tab has a red number.
 st.mine.push({ auction: auction(A3, { title: "Field Tee", variant: null, status: "ended", priceMinor: 7200, nextMinor: null, bids: 6, endsAt: now - 3600e3 }),
