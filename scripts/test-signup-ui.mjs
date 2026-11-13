@@ -194,7 +194,8 @@ console.log("ok - Google: one visit signs in and connects Gmail, the scan counts
 
 // 2. Someone already set up who signs in again goes straight to Home: no journey.
 await page.evaluate(() => localStorage.clear()); reset({ name: "Jess Tester", accepted: true, connected: true, provider: "google" });
-await page.goto(origin + "/index.html");
+// A blank page first, so nothing still loading on the last screen (pictures, the read) can cut this load short.
+await page.goto("about:blank"); await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.setItem("relay_gnonce", "N".repeat(43)));
 await page.goto(origin + "/index.html#signin=" + LINK);
 await homeShows(page, "JT");
