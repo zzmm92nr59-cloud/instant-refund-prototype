@@ -19,6 +19,8 @@
 //    its tile on white (or on the logo's own background colour), with no ring; one item has its name and price beside
 //    its square and several have the price on each; on Ask the day is under the tile. In light and dark;
 //  * the three colour looks behind look-q, look-n and look-s: look-s on by default; with each, card words at 4.5 to 1;
+//  * interests: the sheet "What do you shop for?" shows once, saves once, isn't shown again (nor after Not now); the
+//    Profile row shows and changes them; Shops on Relay puts shops of matching kinds first, the normal order otherwise;
 //  * the service worker never keeps next.html or account-next.js (a changed copy shows on the very next open), and
 //    with no connection next.html goes back to the current app. It asks for the two files past the browser's own
 //    short-lived copies too; the test browser keeps none while a test answers for the server, so that is read from sw.js.
@@ -43,7 +45,7 @@ await mkdir("/tmp/shots", { recursive: true });
 // Three made-up accounts, told apart by their sign-in: on the team, a shopper, and on the team but needing to sign in again.
 const TEAM = "T".repeat(43), SHOPPER = "S".repeat(43), AGAIN = "A".repeat(43);
 const EMAILS = { [TEAM]: "ops@example.com", [SHOPPER]: "member@example.com", [AGAIN]: "ops2@example.com" };
-const st = { hold: 0, down: false, receipts: false, pictures: false };
+const st = { hold: 0, down: false, receipts: false, pictures: false, interests: { ["T".repeat(43)]: ["home"] }, interestPuts: [], shops: false }; // the team account has interests saved until part 15, so the sheet stays out of the way
 const asked = []; // every request to Relay's server: which page asked, and for what
 const chats = []; // what was sent to the assistant
 // Made-up receipts for the Ask page: eight purchases out of date order, and an "on its way" email, which isn't one.
@@ -67,6 +69,11 @@ const pictured = () => RECEIPTS.map(r => { const n = Number(r.id.slice(7, 8)); i
   return x; })
   .concat([{ ...bought(9), id: "aaaa0009-1111-4111-8111-000000000009", retailer: { name: "Larkspur Beauty", domain: "larkspur.example", logoDomain: "larkspur.example" }, items: [{ name: "Hand Balm", pricePence: 900, qty: 1 }], category: "beauty", categoryLabel: "beauty", hasImage: false, returnBy: { date: dayAhead(12), basis: "policy" } }]);
 const CDN = "https://pictures.relay-samples.example/";
+// Two made-up shops on Relay for part 15: a home shop with three products and a tech shop with two. Their categories are
+// the ones the server sends (shopCategory).
+const shopItem = (n, store, cat, title, minor) => ({ product: title, variation: "One size", catalogueId: "shopify:" + store + ":variant:" + n, sku: "shopify:" + store + ":variant:" + n, priceMinor: minor, currency: "GBP", provider: "shopify", storeName: store, store, shopDomain: store.toLowerCase().replace(/\W+/g, "-") + ".example", shopCategory: cat, quantity: 5, inStock: true, imageUrl: null });
+const SHOP_PRODUCTS = [shopItem(1, "Larch House", "home", "Oak Side Table", 12000), shopItem(2, "Larch House", "home", "Linen Cushion", 2500), shopItem(3, "Larch House", "home", "Stoneware Vase", 3400),
+  shopItem(4, "Voltline", "electronics", "USB-C Charger", 2900), shopItem(5, "Voltline", "electronics", "Desk Speaker", 6500)];
 const thing = (id, title, minor, pic) => ({ title, lineId: id, quantity: 1, priceMinor: minor, currency: "GBP", variant: "One size", exchangeable: true, returnable: true, productId: id, returnBy: { date: dayAhead(20) }, imageUrl: CDN + pic + ".png" });
 const ORDERS = [{ id: "o1", store: "Marlow Lane", retailer: "shopify:marlow-lane.example", orderedAt: new Date(Date.now() - 3 * 864e5).toISOString(), amountMinor: 8500, currency: "GBP", items: [thing("L1", "Court Trainers", 8500, "photo-wide")] },
   { id: "o2", store: "Northfold Supply", retailer: "shopify:northfold.example", orderedAt: new Date(Date.now() - 6 * 864e5).toISOString(), amountMinor: 14300, currency: "GBP", items: [thing("L2", "Waxed Field Jacket", 6400, "photo-tall"), thing("L3", "Enamel Camp Mug", 1400, "photo-square"), thing("L4", "Trail Runner", 6500, "photo-wide")] }];
@@ -105,7 +112,9 @@ const stub = async ctx => {
     if (p === "/relay/my/help/chat" && m === "POST") { chats.push(JSON.parse(req.postData() || "{}")); return j({ reply: "A stand-in answer from the test." }); }
     if (p === "/relay/my/auctions") return j({ canBid: true, auctions: [] });
     if (p === "/relay/auctions") return j({ auctions: [] });
-    if (p === "/relay/shopify/catalogue") return j({ published: true, products: [] });
+    if (p === "/relay/my/interests" && m === "GET") return j({ interests: st.interests[token] || [], updatedAt: null });
+    if (p === "/relay/my/interests" && m === "PUT") { const b = JSON.parse(req.postData() || "{}"); st.interestPuts.push(b); st.interests[token] = b.interests; return j({ interests: b.interests, updatedAt: Date.now() }); }
+    if (p === "/relay/shopify/catalogue") return j({ published: true, products: st.shops ? SHOP_PRODUCTS : [] });
     return j({});
   });
   // Written down by the page itself as it goes: whether next.html ever let anything show. It outlives the move to ./ .
@@ -498,6 +507,61 @@ console.log("ok - an offered question has no search under it; the heading opens 
   await page.emulateMedia({ colorScheme: "light" });
   await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: "/tmp/shots/layout-preview-ask-pictures.png" });
   st.pictures = false; }
+// 15. Interests: asked once, saved, not asked again; Profile shows them; Browse puts matching shops first.
+{ st.interests = {}; st.interestPuts = []; st.shops = true; st.receipts = false; st.pictures = false;
+  await signIn(TEAM);
+  await page.goto(origin + "/next.html");
+  const sheet = page.locator(".rl-int-sheet");
+  await sheet.waitFor({ timeout: 15000 });
+  assert.equal((await sheet.locator(".rl-int-h").innerText()).trim(), "What do you shop for?");
+  assert.match(await sheet.innerText(), /Pick a few and Relay shows shops you'll like first\./);
+  assert.equal(await sheet.locator(".rl-int").count(), 12, "twelve interests");
+  assert.equal(await sheet.locator(".rl-int-save").isDisabled(), true, "Save waits until one is chosen");
+  await sheet.locator('.rl-int[data-interest="tech"]').click();
+  await sheet.locator('.rl-int[data-interest="home"]').click();
+  await sheet.locator('.rl-int[data-interest="home"]').click(); // tap again to undo
+  await sheet.locator('.rl-int[data-interest="gaming"]').click();
+  assert.deepEqual(await sheet.locator('.rl-int[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute("data-interest"))), ["tech", "gaming"]);
+  for (const scheme of ["light", "dark"]) { await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(120);
+    const m = await sheet.evaluate(sh => { const out = { small: [], tiny: [] }; for (const b of sh.querySelectorAll("button")) { const r = b.getBoundingClientRect(); if (r.height < 43.5) out.small.push(b.innerText.trim() + " " + r.height); }
+      for (const e of sh.querySelectorAll("*")) { if (![...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) continue; const f = parseFloat(getComputedStyle(e).fontSize); if (f < 13) out.tiny.push(e.textContent.trim() + " " + f); } return out; });
+    assert.deepEqual(m, { small: [], tiny: [] }, "the sheet: nothing tappable under 44px, no text under 13px (" + scheme + ")"); }
+  await page.emulateMedia({ colorScheme: "light" });
+  await sheet.locator(".rl-int-save").dblclick(); // a double tap saves once
+  await sheet.waitFor({ state: "detached" });
+  await page.waitForTimeout(400);
+  assert.deepEqual(st.interestPuts, [{ interests: ["tech", "gaming"] }], "saved once, with what was chosen");
+  // Opening the new layout again doesn't ask again.
+  await page.goto(origin + "/next.html"); await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate")); await page.waitForTimeout(2500);
+  assert.equal(await page.locator(".rl-int-sheet").count(), 0, "not asked again once saved");
+  // Profile shows them, and can change them.
+  await page.locator(".h2-me").click();
+  const row = page.locator('#mePage [data-row="interests"]'); await row.waitFor();
+  assert.equal((await row.innerText()).replace(/\s+/g, " ").trim(), "Your interests Tech and Games and apps", "the Profile row says what was chosen");
+  await row.click();
+  await page.locator('#mePage .rl-int[data-interest="travel"]').click();
+  await page.locator("#mePage .rl-int-save").click();
+  await page.locator('#mePage [data-row="interests"]').waitFor();
+  assert.equal((await page.locator('#mePage [data-row="interests"]').innerText()).replace(/\s+/g, " ").trim(), "Your interests Tech, Games and apps and 1 more");
+  assert.deepEqual(st.interestPuts[1], { interests: ["tech", "gaming", "travel"] });
+  // Browse: Shops on Relay puts the tech shop first; the shop chips too.
+  const order = async () => { await page.evaluate(() => { window.go("discover"); window.dcShow("shops"); }); await page.locator("#catalogResults [data-card-select]").first().waitFor(); await page.waitForTimeout(400);
+    return page.locator("#catalogResults [data-card-select]").evaluateAll(cs => cs.map(c => /Larch House|Voltline/.exec(c.getAttribute("aria-label") || "")[0])); };
+  assert.deepEqual(await order(), ["Voltline", "Voltline", "Larch House", "Larch House", "Larch House"], "shops matching the interests come first");
+  // Nothing matching: the normal order (the shops mixed, the one with more products first).
+  st.interests[TEAM] = ["travel"]; await page.evaluate(() => localStorage.removeItem("relay.interests.v1"));
+  await page.goto(origin + "/next.html"); await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate"));
+  assert.deepEqual(await order(), ["Larch House", "Voltline", "Larch House", "Voltline", "Larch House"], "nothing matching: the normal order");
+  // Another account on this phone, with none saved: "Not now" means it isn't shown again on this phone.
+  st.interests[TEAM] = [];
+  await signIn(TEAM); await page.goto(origin + "/next.html");
+  await page.locator(".rl-int-sheet").waitFor({ timeout: 15000 });
+  await page.locator(".rl-int-later").click(); await page.locator(".rl-int-sheet").waitFor({ state: "detached" });
+  await page.goto(origin + "/next.html"); await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate")); await page.waitForTimeout(2500);
+  assert.equal(await page.locator(".rl-int-sheet").count(), 0, "after Not now it isn't shown again on this phone");
+  assert.equal(st.interestPuts.length, 2, "Not now saves nothing");
+  st.shops = false; }
+console.log("ok - interests: asked once, saved once, not asked again; Profile shows and changes them; Shops on Relay puts matching shops first, normal order when nothing matches");
 console.log("ok - pictures: photos fill their squares with their middle in the middle, logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
 assert.deepEqual(errors, [], "no script errors");
 await ctx.close();
@@ -537,4 +601,4 @@ assert.deepEqual(errors2, [], "no script errors with the service worker running"
 console.log("ok - the service worker never keeps the try-out's files; a new copy shows at once; no connection goes back to the current app");
 
 await browser.close(); server.close();
-console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, its Ask page, pictures in their tiles, the three looks, and the service worker (stubbed server)");
+console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, its Ask page, pictures in their tiles, the three looks, interests, and the service worker (stubbed server)");

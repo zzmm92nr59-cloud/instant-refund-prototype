@@ -7563,7 +7563,8 @@
     var s = load();
     if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
     host.textContent = ""; host.classList.add("h2-home"); paintAvatars();
-    setTimeout(interestsMaybeAsk, 700);
+    // Asked only while Home is still the screen (never over another tab the shopper has moved to).
+    setTimeout(function () { if (host.isConnected) interestsMaybeAsk(); }, 700);
     var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
     var top = el("div"); host.appendChild(top);
     mountInstore(top, refresh, "suggest");
