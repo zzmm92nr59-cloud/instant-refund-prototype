@@ -294,9 +294,10 @@ console.log("ok - Ask before anything is asked: newest receipts as tiles, four q
 
 // 11. A tile: asks first and names the receipt, attaches exactly that one, and nothing goes anywhere until a question is sent.
 { const pick = newest[2], label = pick.retailer.name + ", " + await dayWords(pick.orderDate), n0 = asked.length, c0 = chats.length;
-  await page.locator('.rl-ask-tile[data-receipt="' + pick.id + '"]').click();
+  await page.locator('.rl-ask-tile[data-receipt="' + pick.id + '"]').dblclick(); // a double tap asks once
   const sheet = page.locator(".rl-sheet").last();
   await sheet.getByRole("button", { name: "Show it" }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Show it" }).count(), 1, "a double tap on a tile opens one sheet");
   assert.match(await sheet.innerText(), new RegExp("^Show Relay's assistant your receipt from " + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\? It sees what Relay read from it \\(the shop, date, total, items and return date\\), not the email itself\\."), "the sheet names the receipt and says what the assistant will see");
   assert.equal(await page.locator(".rl-chat-about").count(), 0, "nothing is attached until Show it");
   await sheet.getByRole("button", { name: "Show it" }).click();
@@ -345,9 +346,10 @@ console.log("ok - a typed question can be looked for in Receipts instead, and a 
 
 // 13. A question the page offered is sent as it is, with no search under it; the heading's chevron opens Receipts.
 { await openAsk(); const c0 = chats.length;
-  await page.locator(".rl-ask-q", { hasText: "How does a swap work?" }).click();
+  await page.locator(".rl-ask-q", { hasText: "How does a swap work?" }).dblclick(); // a double tap asks once
   await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
-  assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "How does a swap work?" }] }]);
+  await page.waitForTimeout(400);
+  assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "How does a swap work?" }] }], "an offered question is sent once, even on a double tap");
   assert.equal(await page.locator(".rl-ask-find").count(), 0, "an offered question isn't offered as a search");
   await openAsk();
   await Promise.all([page.locator("#receiptsPage").waitFor(), page.locator(".rl-ask-hb").click()]);

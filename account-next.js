@@ -1243,7 +1243,9 @@
     if (input) card.appendChild(input);
     card.appendChild(el("button", { className: "rl-btn", text: yesLabel || "Yes, continue", onclick: function () { var v = input ? input.value : true; done(); onYes(v); } }));
     card.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: done }));
-    layer.addEventListener("click", function (e) { if (e.target === layer) done(); });
+    // A tap outside closes it, but not the second half of the double tap that opened it.
+    var born = Date.now();
+    layer.addEventListener("click", function (e) { if (e.target === layer && Date.now() - born > 400) done(); });
     document.addEventListener("keydown", onKey);
     document.body.appendChild(layer);
     (input || card.querySelector("button")).focus();
