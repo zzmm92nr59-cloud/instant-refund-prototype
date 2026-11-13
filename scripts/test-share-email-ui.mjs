@@ -6,7 +6,7 @@
 // deletes one. Everything passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -106,7 +106,7 @@ await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify
 await page.reload();
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 const fixSheet = page.getByRole("dialog", { name: "Fix this receipt" }), shareSheet = page.getByRole("dialog", { name: "Send this email to Relay" });
 
 // 1. Only a receipt that came from an inbox can be sent: a pasted one can't.
