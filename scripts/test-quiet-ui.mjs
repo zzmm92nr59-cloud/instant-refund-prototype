@@ -17,7 +17,7 @@
 //     on every visit to Profile.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeShows } from "./relay-places.mjs";
+import { skipInterests, homeShows, goTab } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -103,8 +103,10 @@ const TEN_MINUTES = 600000;
   await homeShows(page, "J");
   await pass(page, 6000);   // Discover's catalogue is fetched a few seconds after the start, so that tab opens at once
   await until(page, () => count(/shopify\/catalogue/) === 1, "the catalogue");
-  assert.deepEqual([...log].sort(), ["GET /relay/my/alerts/status", "GET /relay/my/gmail", "GET /relay/my/instore/shops", "GET /relay/my/profile", "GET /relay/my/purchases", "GET /relay/my/receipts", "GET /relay/shopify/catalogue"],
-    "opening Relay asks for these seven things, once each. If this list has to grow, make sure it's worth a request every time someone opens the app.");
+  // (help/chat: whether Relay's assistant is on, which decides whether the Ask tab is there. The tab bar is drawn at once
+  // from the answer kept on the phone, and this one request keeps it right.)
+  assert.deepEqual([...log].sort(), ["GET /relay/my/alerts/status", "GET /relay/my/gmail", "GET /relay/my/help/chat", "GET /relay/my/instore/shops", "GET /relay/my/profile", "GET /relay/my/purchases", "GET /relay/my/receipts", "GET /relay/shopify/catalogue"],
+    "opening Relay asks for these eight things, once each. If this list has to grow, make sure it's worth a request every time someone opens the app.");
   let mark = log.length;
   await pass(page, TEN_MINUTES);
   assert.deepEqual(log.slice(mark), [], "Home, left open for ten minutes, asks for nothing");
@@ -136,7 +138,7 @@ const TEN_MINUTES = 600000;
   assert.deepEqual(log.filter(x => TEST_ONLY.test(x)), [], "an ordinary shopper's app never asks for test-shop data");
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - an ordinary shopper: seven requests to open, none for test-shop data, and nothing at all while a tab is left open or Relay is in the background");
+  console.log("ok - an ordinary shopper: eight requests to open, none for test-shop data, and nothing at all while a tab is left open or Relay is in the background");
 }
 
 // 2. With testing tools on, the test-shop data is still asked for.
@@ -216,8 +218,8 @@ const TEN_MINUTES = 600000;
   const { ctx, page, errors } = await shopper();
   await homeShows(page, "J");
   const asks = () => count(/GET \/relay\/my\/resale\/requests\/.*\/messages/);
-  await page.locator(".avatar").click();
-  await page.getByRole("button", { name: "Swap & resell", exact: true }).click();
+  await goTab(page, "Browse");
+  await page.locator("#browsePage .rl-b2-doors .rl-arow", { hasText: "Swap & resell" }).click();
   await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
   await page.locator('[data-tab="mine"]').click();
   await page.getByRole("button", { name: "Open messages" }).click();
@@ -295,17 +297,22 @@ const TEN_MINUTES = 600000;
   const { ctx, page, errors } = await shopper();
   await homeShows(page, "J");
   const OWN = /GET \/relay\/my\/(profile|delivery|phone|card|2fa|consent|admin\/me)$/;
-  await page.evaluate(() => window.tabTap("me")); await pass(page, 3000); await settle(page, 500);
+  // Profile, and its Security and privacy (where the phone, card and sign-in settings are).
+  const visit = async () => {
+    await page.evaluate(() => window.go("me")); await pass(page, 3000); await settle(page, 500);
+    await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click(); await pass(page, 3000); await settle(page, 500);
+  };
+  await visit();
   const first = log.filter(x => OWN.test(x)).sort();
-  assert.deepEqual(first, ["GET /relay/my/2fa", "GET /relay/my/admin/me", "GET /relay/my/card", "GET /relay/my/consent", "GET /relay/my/delivery", "GET /relay/my/phone", "GET /relay/my/profile"], "each asked for once when Profile first opens");
+  assert.deepEqual(first, ["GET /relay/my/2fa", "GET /relay/my/admin/me", "GET /relay/my/card", "GET /relay/my/consent", "GET /relay/my/delivery", "GET /relay/my/phone", "GET /relay/my/profile"], "each asked for once when Profile (and its Security and privacy) first opens");
   let mark = log.length;
   await page.evaluate(() => window.tabTap("profile")); await pass(page, 2 * 60000);
-  await page.evaluate(() => window.tabTap("me")); await pass(page, 3000); await settle(page, 500);
+  await visit();
   assert.deepEqual(log.slice(mark).filter(x => OWN.test(x)), [], "two minutes later, Profile doesn't ask for them again");
   assert.ok(log.slice(mark).some(x => x === "GET /relay/my/purchases"), "but it does look again at what a shop could have changed");
   mark = log.length;
   await page.evaluate(() => window.tabTap("profile")); await pass(page, 9 * 60000);
-  await page.evaluate(() => window.tabTap("me")); await pass(page, 3000); await settle(page, 500);
+  await visit();
   // (What they agreed to is also kept by the page that asks for it, so it's left out of this count.)
   const notAgreement = x => OWN.test(x) && !/consent/.test(x);
   assert.deepEqual(log.slice(mark).filter(notAgreement).sort(), first.filter(notAgreement), "after ten minutes they are asked for again, once each");
