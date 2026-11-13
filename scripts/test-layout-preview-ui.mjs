@@ -13,12 +13,18 @@
 //    until a question is sent; the question then goes with that receipt and no other;
 //  * a typed question gets "Search your receipts for this instead" under it, which opens Receipts with those words in
 //    its search; a question the page offered doesn't; and a chat puts nothing new on the phone;
+//  * pictures, with made-up photos and logos (scripts/sample-pictures.mjs) that arrive after the page is drawn, the way
+//    Relay's server and the shops' own picture servers send them: every tile is a square; a photo's box lies inside
+//    its tile, covers it, and the photo's own middle is at the tile's middle on the screen; a logo lies wholly inside
+//    its tile on white (or on the logo's own background colour), with no ring; one item has its name and price beside
+//    its square and several have the price on each; on Ask the day is under the tile. In light and dark;
 //  * the service worker never keeps next.html or account-next.js (a changed copy shows on the very next open), and
 //    with no connection next.html goes back to the current app. It asks for the two files past the browser's own
 //    short-lived copies too; the test browser keeps none while a test answers for the server, so that is read from sw.js.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { readFileSync } from "node:fs"; import { resolve, extname } from "node:path";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
+import { samplePictures, MARK_COLOUR, LOGO_GREY } from "./sample-pictures.mjs";
 const TYPES = { ".js": "text/javascript", ".png": "image/png", ".webmanifest": "application/manifest+json", ".svg": "image/svg+xml" };
 // The page server. build marks a new release of next.html; down is the phone having no connection (the server hangs up).
 const site = { build: 1, down: false };
@@ -36,7 +42,7 @@ await mkdir("/tmp/shots", { recursive: true });
 // Three made-up accounts, told apart by their sign-in: on the team, a shopper, and on the team but needing to sign in again.
 const TEAM = "T".repeat(43), SHOPPER = "S".repeat(43), AGAIN = "A".repeat(43);
 const EMAILS = { [TEAM]: "ops@example.com", [SHOPPER]: "member@example.com", [AGAIN]: "ops2@example.com" };
-const st = { hold: 0, down: false, receipts: false };
+const st = { hold: 0, down: false, receipts: false, pictures: false };
 const asked = []; // every request to Relay's server: which page asked, and for what
 const chats = []; // what was sent to the assistant
 // Made-up receipts for the Ask page: eight purchases out of date order, and an "on its way" email, which isn't one.
@@ -45,17 +51,39 @@ const SHOPS = [["Fernhill Outfitters", "fernhill.example", "fashion", "Cord Trou
 const bought = n => { const sh = SHOPS[n % 4]; return { id: "aaaa000" + n + "-1111-4111-8111-00000000000" + n, status: "confirmed", kind: "receipt", retailer: { name: sh[0], domain: sh[1] }, orderRef: "R-" + (500 + n), orderDate: dayAgo(n), totalPence: 1000 + n * 100, currency: "GBP",
   items: [{ name: sh[3], pricePence: 1000 + n * 100, qty: 1 }], category: sh[2], categoryLabel: sh[2], returnable: true, returns: null, source: "shopper_email", parserVersion: 28 }; };
 const RECEIPTS = [5, 2, 8, 1, 7, 3, 6, 4].map(bought).concat([{ ...bought(0), id: "bbbb0001-1111-4111-8111-000000000001", kind: "delivery_update", totalPence: null, items: [] }]);
+// Pictures (part 14), drawn by scripts/sample-pictures.mjs with its test marks on. Which made-up shop has which logo (one
+// has none, so Relay draws for it), which receipts have a checked photo of the one thing bought, and two shop orders
+// whose items come with the shop's own photos: one thing, and three things in the three shapes.
+let PICS = {};
+const dayAhead = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const LOGOS = { "fernhill.example": "logo-wide", "brindle.example": "logo-white-a", "quillon.example": "logo-grey", "ashbyhome.example": "logo-clear" };
+const PHOTOS = { [bought(1).id]: "photo-tall", [bought(2).id]: "photo-square", [bought(3).id]: "photo-wide" };
+const LONG_NAME = "A Made-Up Thing With A Name So Long That It Runs On Well Past Three Whole Lines Beside Its Picture On Any Phone";
+const pictured = () => RECEIPTS.map(r => { const n = Number(r.id.slice(7, 8)); if (r.kind !== "receipt") return r;
+  const x = { ...r, retailer: { ...r.retailer, logoDomain: r.retailer.domain }, hasImage: Boolean(PHOTOS[r.id]), returnBy: { date: dayAhead(2 + n), basis: "policy" } };
+  if (n === 5) x.items = [{ ...x.items[0], name: LONG_NAME }];
+  if (n === 8) x.items = [{ name: "Wool Throw", pricePence: 6500, qty: 1 }, { name: "Stoneware Mug Set", pricePence: 2800, qty: 1 }, { name: "Desk Lamp", pricePence: 3900, qty: 1 }];
+  return x; })
+  .concat([{ ...bought(9), id: "aaaa0009-1111-4111-8111-000000000009", retailer: { name: "Larkspur Beauty", domain: "larkspur.example", logoDomain: "larkspur.example" }, items: [{ name: "Hand Balm", pricePence: 900, qty: 1 }], category: "beauty", categoryLabel: "beauty", hasImage: false, returnBy: { date: dayAhead(12), basis: "policy" } }]);
+const CDN = "https://pictures.relay-samples.example/";
+const thing = (id, title, minor, pic) => ({ title, lineId: id, quantity: 1, priceMinor: minor, currency: "GBP", variant: "One size", exchangeable: true, returnable: true, productId: id, returnBy: { date: dayAhead(20) }, imageUrl: CDN + pic + ".png" });
+const ORDERS = [{ id: "o1", store: "Marlow Lane", retailer: "shopify:marlow-lane.example", orderedAt: new Date(Date.now() - 3 * 864e5).toISOString(), amountMinor: 8500, currency: "GBP", items: [thing("L1", "Court Trainers", 8500, "photo-wide")] },
+  { id: "o2", store: "Northfold Supply", retailer: "shopify:northfold.example", orderedAt: new Date(Date.now() - 6 * 864e5).toISOString(), amountMinor: 14300, currency: "GBP", items: [thing("L2", "Waxed Field Jacket", 6400, "photo-tall"), thing("L3", "Enamel Camp Mug", 1400, "photo-square"), thing("L4", "Trail Runner", 6500, "photo-wide")] }];
 const stub = async ctx => {
   await ctx.route("https://**/*", async route => {
     const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
     const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
     if (m === "OPTIONS") return route.fulfill({ status: 204, headers: H });
+    // A picture is handed over half a second after it is asked for, so it always arrives after the page is drawn.
+    const picture = async name => { await new Promise(r => setTimeout(r, 500)); return st.pictures && PICS[name] ? route.fulfill({ status: 200, contentType: "image/png", headers: H, body: PICS[name] }) : route.fulfill({ status: 404, headers: H, body: "" }); };
+    if (u.origin + "/" === CDN) return picture(p.slice(1).replace(/\.png$/, ""));
     if (!p.startsWith("/relay/")) return route.abort();
     let from = ""; try { from = new URL(req.frame().url()).pathname; } catch { from = ""; }
     asked.push({ from, method: m, path: p, bookmark: await req.headerValue("x-d1-bookmark") });
     const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: H, body: JSON.stringify(b) });
     const token = ((await req.headerValue("authorization")) || "").replace(/^Bearer /, "");
-    if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: H, body: "" });
+    if (p.startsWith("/relay/my/logo/")) return st.pictures ? picture(LOGOS[p.split("/").pop()] || "none") : route.fulfill({ status: 404, headers: H, body: "" });
+    { const photo = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(p); if (photo) return picture(PHOTOS[photo[1]] || "none"); }
     if (p === "/relay/my/admin/me") {
       if (st.down) return route.abort();
       if (st.hold) await new Promise(r => setTimeout(r, st.hold));
@@ -66,8 +94,8 @@ const stub = async ctx => {
     if (p === "/relay/my/profile") return j({ email: EMAILS[token] || "", name: token === TEAM ? "Ops" : "Member", photo: null });
     if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
     if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAILS[token] || "", others: [] });
-    if (p === "/relay/my/receipts") return j({ receipts: st.receipts && token === TEAM ? RECEIPTS : [] });
-    if (p === "/relay/my/purchases") return j({ purchases: [] });
+    if (p === "/relay/my/receipts") return j({ receipts: st.receipts && token === TEAM ? (st.pictures ? pictured() : RECEIPTS) : [] });
+    if (p === "/relay/my/purchases") return j({ purchases: st.pictures && token === TEAM ? ORDERS : [] });
     if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
     if (p === "/relay/my/2fa") return j({ required: true, enrolled: true, verified: true, methods: ["passkey"], app: true, text: false });
     if (p === "/relay/my/phone") return j({ available: false });
@@ -93,6 +121,7 @@ const stub = async ctx => {
   });
 };
 const browser = await chromium.launch();
+PICS = await samplePictures(browser, { marks: true });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
 await stub(ctx);
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
@@ -268,7 +297,7 @@ assert.equal(await page.locator(".topline .avatar").isVisible(), false, "no avat
 assert.equal((await page.locator(".rl-ask-hb").innerText()).trim(), "Ask about a receipt");
 assert.deepEqual(await page.locator(".rl-ask-tile").evaluateAll(ts => ts.map(t => t.getAttribute("data-receipt"))), newest.map(r => r.id), "the six newest purchases, newest first, and never the 'on its way' email");
 assert.equal(await page.locator(".rl-ask-tile").first().getAttribute("aria-label"), "Ask about your receipt from " + newest[0].retailer.name + ", " + await dayWords(newest[0].orderDate));
-assert.equal((await page.locator(".rl-ask-tile .rl-ask-tile-d").first().innerText()).trim(), await dayWords(newest[0].orderDate), "each tile carries the day it was bought");
+assert.equal((await page.locator(".rl-ask-tile .rl-ask-day").first().innerText()).trim(), await dayWords(newest[0].orderDate), "each tile has the day it was bought under it");
 assert.equal((await page.locator(".rl-ask-h2").innerText()).trim(), "Try asking");
 assert.deepEqual(await page.locator(".rl-ask-q").evaluateAll(qs => qs.map(q => q.innerText.trim())), ["How do I return something?", "How does a swap work?", "Why is a receipt missing?", "How does Relay find my receipts?"], "the same four questions, with no second line");
 assert.equal((await page.locator(".rl-ask-ai").innerText()).trim(), "Relay's assistant is an AI, so it can get things wrong.");
@@ -278,7 +307,7 @@ assert.ok(await page.locator("#askPage .rl-chat-person", { hasText: "Talk to a p
 assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Search receipts or ask about Relay");
 assert.equal(await page.locator("#askPage .rl-chat-about, #askPage .rl-chat-b").count(), 0, "no earlier chat is listed or shown");
 // The measured arrangement.
-{ const t0 = await box(".rl-ask-tile"), t1 = await page.locator(".rl-ask-tile").nth(1).evaluate(e => e.getBoundingClientRect().left);
+{ const t0 = await box(".rl-ask-sq"), t1 = await page.locator(".rl-ask-tile").nth(1).evaluate(e => e.getBoundingClientRect().left);
   assert.deepEqual([t0.w, t0.h, t0.radius, t1 - (t0.x + t0.w)], [115, 115, "24px", 8], "tiles are 115px squares with a 24px corner, 8px apart");
   const h = await box(".rl-ask-h2"), chev = await box(".rl-ask-chev"), row = await box(".rl-ask-q"), pic = await box(".rl-ask-qi"), words = await box(".rl-ask-q b");
   assert.deepEqual([h.font, h.weight, chev.w, chev.h], ["20px", "700", 20, 20], "headings are 20px bold; the round chevron is 20px");
@@ -362,6 +391,91 @@ console.log("ok - a typed question can be looked for in Receipts instead, and a 
   assert.ok(await page.locator(".rl-ask-h2", { hasText: "Try asking" }).isVisible());
   await bothSchemes("Ask with no receipts"); }
 console.log("ok - an offered question has no search under it; the heading opens Receipts; with no receipts the block is left out");
+
+// 14. Pictures: photos and logos in their tiles, on Home and on Ask.
+{ st.receipts = true; st.pictures = true;
+  // Every picture box on the page: its tile, what kind of picture is in it, where the picture shows (an image fitted
+  // whole shows smaller than its box), and how much of the tile it covers.
+  const tiles = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].map(t => {
+    const r = t.getBoundingClientRect(), art = t.querySelector(".h2-art") || t, img = art.querySelector("img"), inner = img || art.querySelector("svg"); if (!inner) return { kind: "empty" };
+    const b = inner.getBoundingClientRect(), look = img ? getComputedStyle(img) : null; let s = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
+    if (img && look.objectFit === "contain" && img.naturalWidth) { const k = Math.min(b.width / img.naturalWidth, b.height / img.naturalHeight), w = img.naturalWidth * k, h = img.naturalHeight * k; s = { left: b.left + (b.width - w) / 2, top: b.top + (b.height - h) / 2, right: b.left + (b.width + w) / 2, bottom: b.top + (b.height + h) / 2 }; }
+    const ix = Math.max(0, Math.min(s.right, r.right) - Math.max(s.left, r.left)), iy = Math.max(0, Math.min(s.bottom, r.bottom) - Math.max(s.top, r.top)), back = getComputedStyle(art);
+    return { kind: !img ? "drawing" : img.classList.contains("rl-logo-img") ? "logo" : "photo", w: r.width, h: r.height, radius: getComputedStyle(t).borderRadius, covers: Math.round(100 * ix * iy / (r.width * r.height)),
+      inside: s.left >= r.left - .5 && s.top >= r.top - .5 && s.right <= r.right + .5 && s.bottom <= r.bottom + .5, margin: Math.round(Math.min(s.left - r.left, s.top - r.top, r.right - s.right, r.bottom - s.bottom)),
+      fit: look && look.objectFit, at: look && look.objectPosition, back: back.backgroundColor, ring: back.boxShadow, loaded: !img || (img.complete && img.naturalWidth > 0), price: Boolean(t.querySelector(".h2-price")) }; }), sel);
+  // The colour on the screen at the middle of an element (it is scrolled to the middle of the screen first).
+  const middle = async loc => { await loc.evaluate(e => e.scrollIntoView({ block: "center", inline: "center" })); await page.waitForTimeout(120);
+    const r = await loc.evaluate(e => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    const shot = await page.screenshot({ clip: { x: Math.round(r.x) - 1, y: Math.round(r.y) - 1, width: 3, height: 3 } });
+    return page.evaluate(async b64 => { const im = new Image(); im.src = "data:image/png;base64," + b64; await im.decode(); const c = document.createElement("canvas"); c.width = im.width; c.height = im.height; const g = c.getContext("2d"); g.drawImage(im, 0, 0); return [...g.getImageData(im.width >> 1, im.height >> 1, 1, 1).data].slice(0, 3); }, shot.toString("base64")); };
+  const marked = c => Math.abs(c[0] - MARK_COLOUR[0]) + Math.abs(c[1] - MARK_COLOUR[1]) + Math.abs(c[2] - MARK_COLOUR[2]) < 60;
+  const WHITE = "rgb(255, 255, 255)", GREY = "rgb(" + LOGO_GREY.join(", ") + ")";
+  const sitRight = (list, side, radius, where) => {
+    for (const t of list) {
+      assert.deepEqual([t.w, t.h, t.radius], [side, side, radius], where + ": every tile is a " + side + "px square");
+      if (t.kind === "photo") assert.ok(t.inside && t.covers >= 80 && t.fit === "cover" && t.at === "50% 50%", where + ": a photo's box lies inside its tile, covers it and is centred " + JSON.stringify(t));
+      if (t.kind === "logo") { assert.ok(t.inside && t.margin >= 12 && t.fit === "contain", where + ": a logo lies wholly inside its tile with room around it " + JSON.stringify(t));
+        assert.ok((t.back === WHITE || t.back === GREY) && t.ring === "none", where + ": a logo sits on white, or on its own background colour, with no ring " + JSON.stringify(t)); }
+    }
+  };
+
+  await page.goto(origin + "/next.html");
+  await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate"));
+  await page.locator(".h2-feed .h2-pic").first().waitFor();
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll(".h2-feed img")].filter(i => i.complete && i.naturalWidth).length), 0, "the page is drawn before any picture has arrived");
+  // "To return" lists every one of them (For you stops at eight cards).
+  await page.locator(".h2-chip", { hasText: "To return" }).click();
+  await page.waitForFunction(() => { const all = [...document.querySelectorAll(".h2-feed .h2-pic img")]; return all.length >= 11 && all.every(i => i.complete && i.naturalWidth) && document.querySelectorAll(".h2-feed .h2-logo.rl-has-logo").length >= 7; }, null, { timeout: 30000 });
+  await page.waitForTimeout(700); // the shop with no logo has had its answer too, and has its drawing
+  // The pinned top row and the tab bar are put aside for this part, so nothing lies over a tile's middle.
+  await page.addStyleTag({ content: ".h2-band,#foot{visibility:hidden!important}html{scroll-snap-type:none!important}" });
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(150);
+    const home = await tiles(".h2-feed .h2-pic");
+    assert.deepEqual([home.filter(t => t.kind === "photo").length, home.filter(t => t.kind === "logo").length, home.filter(t => t.kind === "drawing").length, home.filter(t => t.kind === "empty" || !t.loaded).length], [7, 4, 4, 0],
+      "Home (" + scheme + "): three checked photos, a shop order's one photo and another's three; four logos; one receipt's three drawings and one for the shop with no logo");
+    sitRight(home, 140, "22px", "Home (" + scheme + ")");
+    assert.deepEqual(home.filter(t => t.kind === "logo").map(t => t.back).sort(), [GREY, WHITE, WHITE, WHITE].sort(), "Home (" + scheme + "): the logo with its own pale grey sits on that grey; the others, the see-through one too, on white");
+    // On the screen: the photo's own middle is at the tile's middle (it was far below the tile).
+    const photos = page.locator(".h2-feed .h2-pic:has(img:not(.rl-logo-img))");
+    for (let i = 0; i < await photos.count(); i++) assert.ok(marked(await middle(photos.nth(i))), "Home (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile");
+    // The header's logo: a circle in the logo's own white or grey, no ring, the logo whole inside it.
+    const heads = await page.locator(".h2-feed .h2-logo.rl-has-logo").evaluateAll(cs => cs.map(c => { const r = c.getBoundingClientRect(), i = c.querySelector("img").getBoundingClientRect(), look = getComputedStyle(c), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      return { back: look.backgroundColor, ring: look.boxShadow, round: look.borderRadius, whole: [[i.left, i.top], [i.right, i.top], [i.left, i.bottom], [i.right, i.bottom]].every(p => Math.hypot(p[0] - cx, p[1] - cy) <= r.width / 2 + .5) }; }));
+    assert.ok(heads.length >= 7 && heads.every(h => (h.back === WHITE || h.back === GREY) && h.ring === "none" && h.round === "50%" && h.whole), "Home (" + scheme + "): each header logo is whole inside a white (or its own colour) circle with no ring " + JSON.stringify(heads.filter(h => !h.whole || h.ring !== "none")));
+    // One thing: its square, then its name (three lines at most) and price beside it, and no price on the picture.
+    const ones = await page.locator(".h2-feed .h2-one").evaluateAll(os => os.map(o => { const pic = o.querySelector(".h2-pic").getBoundingClientRect(), n = o.querySelector(".h2-one-n"), pr = o.querySelector(".h2-one-p"), nl = getComputedStyle(n), pl = pr && getComputedStyle(pr);
+      return { beside: n.getBoundingClientRect().left >= pic.right + 8 && n.getBoundingClientRect().top >= pic.top - 1 && n.getBoundingClientRect().bottom <= pic.bottom + 1, name: nl.fontSize, lines: Math.round(n.getBoundingClientRect().height / parseFloat(nl.lineHeight)), price: pl && [pl.fontSize, pl.fontWeight], pill: Boolean(o.querySelector(".h2-price")), long: n.textContent.length > 80 }; }));
+    assert.ok(ones.length >= 8 && ones.every(o => o.beside && o.name === "16px" && o.lines <= 3 && !o.pill && o.price && o.price[0] === "16px" && o.price[1] === "600"), "Home (" + scheme + "): one thing has its name and price beside its square, 16px, and no price on the picture " + JSON.stringify(ones.filter(o => !o.beside || o.lines > 3)));
+    assert.ok(ones.some(o => o.long && o.lines === 3), "Home (" + scheme + "): a very long name stops at three lines");
+    // Several things: a row of squares with the price on each, and the name under the row.
+    const rows = await page.locator(".h2-feed .h2-tiles").evaluateAll(rs => rs.map(r => ({ squares: r.querySelectorAll(".h2-pic").length, priced: r.querySelectorAll(".h2-pic .h2-price").length, name: Boolean(r.nextElementSibling && r.nextElementSibling.classList.contains("h2-name")) })));
+    assert.deepEqual(rows, [{ squares: 3, priced: 3, name: true }, { squares: 3, priced: 3, name: true }], "Home (" + scheme + "): several things are squares in a row with the price on each and the name under them");
+    assert.deepEqual(await sizes(), { small: [], tiny: [] }, "Home with pictures: nothing tappable under 44px, no text under 13px (" + scheme + ")");
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: "/tmp/shots/layout-preview-home-pictures.png" });
+
+  // Ask: the same rules at 115px, and the day under the tile, never on it.
+  await page.evaluate(() => window.tabTap("ask"));
+  await page.locator(".rl-ask-sq").first().waitFor();
+  await page.waitForFunction(() => { const all = [...document.querySelectorAll(".rl-ask-sq img")]; return all.length === 6 && all.every(i => i.complete && i.naturalWidth); }, null, { timeout: 30000 });
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(150);
+    const ask = await tiles(".rl-ask-sq");
+    assert.deepEqual(ask.map(t => t.kind), ["photo", "photo", "photo", "logo", "logo", "logo"], "Ask (" + scheme + "): the three newest have photos, the next three logos");
+    sitRight(ask, 115, "24px", "Ask (" + scheme + ")");
+    const photos = page.locator(".rl-ask-sq:has(img:not(.rl-logo-img))");
+    for (let i = 0; i < 3; i++) assert.ok(marked(await middle(photos.nth(i))), "Ask (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile");
+    const days = await page.locator(".rl-ask-tile").evaluateAll(ts => ts.map(t => { const sq = t.querySelector(".rl-ask-sq").getBoundingClientRect(), d = t.querySelector(".rl-ask-day"), r = d.getBoundingClientRect(); return { under: r.top >= sq.bottom, font: getComputedStyle(d).fontSize, text: d.innerText.trim().length > 0, onPicture: Boolean(t.querySelector(".rl-ask-sq .rl-ask-day")) }; }));
+    assert.ok(days.every(d => d.under && d.font === "13px" && d.text && !d.onPicture), "Ask (" + scheme + "): the day is a 13px line under the tile and never over the picture");
+    assert.deepEqual(await sizes(), { small: [], tiny: [] }, "Ask with pictures: nothing tappable under 44px, no text under 13px (" + scheme + ")");
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: "/tmp/shots/layout-preview-ask-pictures.png" });
+  st.pictures = false; }
+console.log("ok - pictures: photos fill their squares with their middle in the middle, logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
 assert.deepEqual(errors, [], "no script errors");
 await ctx.close();
 
@@ -400,4 +514,4 @@ assert.deepEqual(errors2, [], "no script errors with the service worker running"
 console.log("ok - the service worker never keeps the try-out's files; a new copy shows at once; no connection goes back to the current app");
 
 await browser.close(); server.close();
-console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, its Ask page, and the service worker (stubbed server)");
+console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, its Ask page, pictures in their tiles, and the service worker (stubbed server)");

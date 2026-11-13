@@ -15,6 +15,7 @@ on:
       - account-next.js
       - sw.js
       - scripts/test-layout-preview-ui.mjs
+      - scripts/sample-pictures.mjs
       - scripts/test-swap-ui.mjs
       - .github/workflows/ui-smoke-test.yml
   pull_request:
@@ -107,7 +108,7 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
       - name: Test auctions in the app (a tile while live, one-tap cards, delivery details first, one bid per tap, a win to pay for first with the shop's own link)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-auctions-ui.mjs
-      - name: Test the new layout as a team-only try-out (the way in and out, nothing shows to anyone else, its Ask page, never kept by the service worker)
+      - name: Test the new layout as a team-only try-out (the way in and out, nothing shows to anyone else, its Ask page, pictures in their tiles, never kept by the service worker)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-layout-preview-ui.mjs
       - name: Test auctions in the shop's dashboard (what happened to each in words, started once, photos made smaller first, plain refusals)
         run: node scripts/test-retailer-auctions-ui.mjs
