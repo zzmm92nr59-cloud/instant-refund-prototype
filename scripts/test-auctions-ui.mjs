@@ -29,7 +29,9 @@ const st = {
   mine: [], canBid: true, why: null, delivery: null, bids: [], bidAnswer: null, deliverySaves: 0
 };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
+// (SHOTS=<folder>: pictures of slide to bid, life-size on a 402 by 874 phone at 3x.)
+const ctx = await browser.newContext(process.env.SHOTS ? { viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, serviceWorkers: "block" } : { viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
+const picture = async name => { if (!process.env.SHOTS) return; for (const sc of ["light", "dark"]) { await page.emulateMedia({ colorScheme: sc }); await page.waitForTimeout(120); await page.screenshot({ path: process.env.SHOTS + "/slide-" + name + "-" + sc + ".png" }); } await page.emulateMedia({ colorScheme: "light" }); };
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -178,20 +180,22 @@ assert.equal(st.bids.length, 0, "nothing sent for a bid that's too low");
 await polished("bid too low", ".rl-sheet");
 await max.fill("50");
 await page.evaluate(() => document.activeElement && document.activeElement.blur());
+await picture("resting");
 // Let go half-way: nothing is sent, and it springs back.
-await slideTo(0.5);
+await slideTo(0.5, { release: false });
+await picture("half-way");
+await page.mouse.up();
 await page.waitForTimeout(500);
 assert.equal(st.bids.length, 0, "let go early: nothing sent");
 assert.equal(await knobAt(), 0, "and the handle springs back");
 // Held at the end without letting go: still nothing sent (it's sent on letting go at the end).
 await slideTo(1, { release: false }); await page.waitForTimeout(300);
 assert.equal(st.bids.length, 0, "not sent until let go at the end");
-if (process.env.SHOTS) for (const sc of ["light", "dark"]) { await page.emulateMedia({ colorScheme: sc }); await page.waitForTimeout(100); await page.screenshot({ path: process.env.SHOTS + "/slide-end-held-" + sc + ".png" }); }
-await page.emulateMedia({ colorScheme: "light" });
 await page.mouse.up();
 // Sent once, for exactly the amount on the pill; a second slide while it's being sent does nothing.
 await knob.locator("svg").waitFor();
 await sheet.getByText("Bid placed").waitFor();
+if (process.env.SHOTS) { await page.screenshot({ path: process.env.SHOTS + "/slide-placed-light.png" }); await page.emulateMedia({ colorScheme: "dark" }); await page.screenshot({ path: process.env.SHOTS + "/slide-placed-dark.png" }); await page.emulateMedia({ colorScheme: "light" }); }
 await slideTo(1).catch(() => {});
 await sheet.getByRole("heading", { name: "You're the highest bidder" }).waitFor();
 await sheet.getByText("The price is £32.00. If anyone else bids, Relay bids for you, up to £50.00. With notifications on, Relay tells you if you're outbid.").waitFor();

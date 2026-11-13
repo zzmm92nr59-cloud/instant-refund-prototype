@@ -1633,7 +1633,8 @@
     var box = el("div", { className: "rl-slide rl-noswipe rl-noptr" }, [fill, t, knob]);
     box.setAttribute("aria-hidden", "true"); // the button beside it is the way in for screen readers and keyboards
     var x = 0, max = 0, drag = null, state = "idle";
-    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; };
+    // The words fade as the handle passes over them.
+    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; t.style.opacity = state === "idle" && max ? String(Math.max(0, 1 - v / (max * 0.6))) : ""; };
     var show = function () { t.textContent = state === "busy" ? "Bidding…" : state === "done" ? (o.doneText || "Done") : o.label(); box.classList.toggle("off", state === "idle" && !o.ok()); };
     var back = function () { box.classList.add("back"); put(0); setTimeout(function () { box.classList.remove("back"); }, 300); };
     var api = {
@@ -1659,10 +1660,10 @@
       var d = drag; drag = null;
       // Sent only from the very end, and only for exactly the amount the pill showed when the slide began.
       if (x < max - 2 || d.label !== o.label() || !o.ok()) { back(); show(); return; }
-      put(max); state = "busy"; box.classList.add("busy"); show();
+      state = "busy"; put(max); t.style.opacity = ""; box.classList.add("busy"); show();
       o.send(function (ok) {
         if (!box.isConnected) return;
-        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); show(); }
+        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); t.style.opacity = ""; knob.textContent = ""; knob.appendChild(jIc("check", 24)); show(); }
         else api.reset();
       });
     };
@@ -7439,7 +7440,7 @@
         refuse: function () { say(msg, "Bid " + money(least, "GBP") + " or more.", true); },
         send: function (done) { send(pence(), done); } });
       var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Place bid" : "Place bid " + money(p, "GBP"); slide.refresh(); };
-      input.addEventListener("input", label);
+      input.addEventListener("input", function () { say(msg, ""); label(); }); // a new amount: the old message no longer applies
       body.appendChild(el("p", { className: "rl-au-small", text: "Plus " + (a.deliveryMinor ? money(a.deliveryMinor, "GBP") + " delivery" : "free delivery") + " if you win. You pay " + a.shop + " within 24 hours at its own checkout." }));
       var ERR = { bid_too_low: function (b) { return "Bid " + money(b.nextMinor || least, "GBP") + " or more."; }, bid_not_higher: function (b) { return "The most you'd pay is already " + money(b.maxMinor, "GBP") + ". Type more than that."; },
         bid_too_high: function () { return "That's more than Relay takes for one bid."; }, auction_ended: function () { return "This auction has ended."; },
