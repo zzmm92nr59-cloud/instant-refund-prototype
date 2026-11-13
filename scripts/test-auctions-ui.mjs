@@ -1,9 +1,9 @@
 // Browser test: shops' auctions in the app. Stubbed Relay server, made-up person, shop and products; nothing reaches a shop.
-// Checks: Discover shows an Auctions tile only while auctions are live; the Auctions page lists them as one-tap cards with the
+// Checks: Browse's Auctions door says how many are live (and nothing when none are); the Auctions page lists them as one-tap cards with the
 // price and time left; an auction's page has its photos, condition, price, bids and delivery; bidding asks for delivery
 // details first (then carries on), says plainly when a bid is too low, sends one bid for a double tap, and says whether you're
-// winning; Your bids puts a win to pay for first, with the shop's own link to pay; Profile has Auctions under Shopping, and
-// a win to pay for is a red number on the Profile tab; a link from a notification opens the auction. Passes the polish rules
+// winning; Your bids puts a win to pay for first, with the shop's own link to pay; Your bids says how many to pay for, and
+// a win to pay for is a red number on the Home tab; a link from a notification opens the auction. Passes the polish rules
 // in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
@@ -104,25 +104,26 @@ const polished = async (where, scope) => {
 await page.goto(origin + "/index.html");
 await page.evaluate(e => { localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })); }, EMAIL);
 await page.reload();
-await page.locator("#walletPage").waitFor();
+await page.locator("#homePage .h2-feed > *, #homePage .h2-none").first().waitFor();
 
-// 1. Discover: a tile while auctions are live, and the Auctions page.
+// 1. Browse: the Auctions door says how many are live, and opens the Auctions page (a page of Browse).
 await page.evaluate(() => window.go("discover"));
-const tile = page.locator(".dc-sc", { hasText: "Auctions" });
-await tile.waitFor();
-assert.equal((await tile.innerText()).replace(/\s+/g, " ").trim(), "Auctions 2 live");
-assert.equal(await tile.locator("svg").count(), 1, "a drawn icon, not a symbol");
+const tile = page.locator('#browsePage [data-door="auctions"]');
+await tile.getByText("2 live now").waitFor();
+assert.equal((await tile.innerText()).replace(/\s+/g, " ").trim(), "Auctions 2 live now");
+assert.equal(await tile.locator("svg").count(), 2, "drawn icons (the gavel and the chevron), not symbols");
 await polished("discover", "#dcRoot");
 await tile.click();
-const sheet = page.locator(".rl-sheet");
-await sheet.getByRole("heading", { name: "Auctions" }).waitFor();
+// The list is a page of Browse; an auction, bidding and Your bids open over it in a sheet. Whichever is on top:
+const sheet = page.locator("#dcAlt, .rl-back .rl-sheet").last();
+await page.getByRole("heading", { name: "Auctions" }).waitFor(); // its bar
 const card1 = sheet.getByRole("button", { name: /^Wool Beanie, Hollow Pine, £31\.00, 4 bids/ });
 await card1.waitFor();
 assert.match(await card1.innerText(), /Wool Beanie, Navy\s+Hollow Pine\s+£31\.00, 4 bids\s+Ends in 3 hours/);
 assert.match(await sheet.getByRole("button", { name: /^Sample wax jacket/ }).innerText(), /Starts at £25\.00\s+Ends in 2 days/);
 assert.equal(await card1.locator("button").count(), 0, "one tap, no buttons on the card");
-await polished("list", ".rl-sheet");
-console.log("ok - Discover shows Auctions while any are live; the page lists them as one-tap cards with the price and time left");
+await polished("list", "#dcAlt");
+console.log("ok - Browse shows how many auctions are live; the page lists them as one-tap cards with the price and time left");
 
 // 2. An auction's page.
 await sheet.getByRole("button", { name: /^Sample wax jacket/ }).click();
@@ -180,11 +181,13 @@ await sheet.getByRole("button", { name: "Back to the auction" }).click();
 await sheet.getByText("You've been outbid. Bid again to win it.").waitFor();
 console.log("ok - bidding asks for delivery details first, then the most you'd pay; too low is said plainly; one bid per tap; winning or outbid in words");
 
-// 4. Your bids: a win to pay for comes first, with the shop's own link to pay; Profile and the tab's red number.
+// 4. Your bids: a win to pay for comes first, with the shop's own link to pay; the row says so, and Home's tab has a red number.
 st.mine.push({ auction: auction(A3, { title: "Field Tee", variant: null, status: "ended", priceMinor: 7200, nextMinor: null, bids: 6, endsAt: now - 3600e3 }),
   you: { maxMinor: 8000, state: "pay", priceMinor: 7200, totalMinor: 7595, payBy: now + 20 * 3600e3, payUrl: "https://hollow-pine.myshopify.com/pay/9001" } });
 await sheet.getByRole("button", { name: "Back to auctions" }).click();
-await sheet.getByRole("button", { name: "Your bids" }).click();
+const yourBids = page.locator("#dcAlt .rl-arow", { hasText: "Your bids" });
+await yourBids.getByText("1 to pay for").waitFor();
+await yourBids.click();
 const firstMine = sheet.locator(".rl-au-card").first();
 await firstMine.getByText(/^You won\. Pay £75\.95 to Hollow Pine by /).waitFor();
 assert.match(await firstMine.innerText(), /^Field Tee\s+Hollow Pine\s+Ended/);
@@ -196,16 +199,12 @@ assert.equal(await pay.getAttribute("href"), "https://hollow-pine.myshopify.com/
 await polished("pay", ".rl-sheet");
 await sheet.getByRole("button", { name: "Back to auctions" }).click();
 await sheet.getByRole("button", { name: "Close" }).click();
-await page.evaluate(() => window.go("me"));
-const row = page.locator("#mePage .rl-ptile", { hasText: "Auctions" });
-await row.getByText("1 to pay for").waitFor();
-assert.equal(await row.getAttribute("aria-label"), "Auctions, 1 to pay for");
 await page.evaluate(() => window.go("profile"));
-const badge = page.locator('#foot [data-tab="profile"] .tab-badge');
+const badge = page.locator('#foot [data-name="Home"] .tab-badge');
 await badge.waitFor();
 assert.equal(await badge.textContent(), "1");
-assert.match(await page.locator('#foot [data-tab="profile"]').getAttribute("aria-label"), /1 auction win to pay for$/);
-console.log("ok - Your bids puts a win to pay for first, with the shop's own link to pay; Profile's Auctions tile says so, and the tab shows a red number");
+assert.match(await page.locator('#foot [data-name="Home"]').getAttribute("aria-label"), /^Home, 1 auction win to pay for$/);
+console.log("ok - Your bids puts a win to pay for first, with the shop's own link to pay; its row says so, and the Home tab shows a red number");
 
 // 5. A link from a notification opens that auction.
 await page.evaluate(id => { location.hash = "open=auction&id=" + id; }, A2);
@@ -214,19 +213,20 @@ await sheet.getByRole("button", { name: "Back to auctions" }).click();
 await sheet.getByRole("button", { name: "Close" }).click();
 console.log("ok - a link from a notification opens the auction");
 
-// 6. No auctions: no tile (and the page, if opened, says what happens there).
+// 6. No auctions: the door doesn't say any are live (and the page says what happens there).
 st.live = [];
 await page.evaluate(() => { window.go("profile"); });
 await page.evaluate(() => window.RelayAccount.auctionsLive(true));
 await page.evaluate(() => window.go("discover"));
 await page.waitForTimeout(400);
-assert.equal(await page.locator(".dc-sc", { hasText: "Auctions" }).count(), 0, "no tile when nothing is live");
+await page.locator('#browsePage [data-door="auctions"]').waitFor();
+assert.equal((await page.locator('#browsePage [data-door="auctions"]').innerText()).trim(), "Auctions", "nothing said to be live when nothing is");
 await page.evaluate(() => window.RelayAccount.openAuctions("live"));
 await sheet.getByText("When shops on Relay put clothes up for auction, they show here.", { exact: false }).waitFor();
 await polished("empty", ".rl-sheet");
 const words = await page.evaluate(() => document.body.innerText);
 assert.ok(!/\b(test|sandbox|demo)\b/i.test(words), "no test wording for shoppers");
-console.log("ok - with nothing live there's no tile, and the page says what will show there");
+console.log("ok - with nothing live the door says none are, and the page says what will show there");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS auctions in the app");
 await browser.close(); server.close();
