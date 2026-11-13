@@ -519,6 +519,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
   assert.equal(await sheet.locator(".rl-int-save").isDisabled(), true, "Save waits until one is chosen");
   await sheet.locator('.rl-int[data-interest="tech"]').click();
   await sheet.locator('.rl-int[data-interest="home"]').click();
+  await page.waitForTimeout(500); // (two taps within 400ms count as one: the app's double-tap guard)
   await sheet.locator('.rl-int[data-interest="home"]').click(); // tap again to undo
   await sheet.locator('.rl-int[data-interest="gaming"]').click();
   assert.deepEqual(await sheet.locator('.rl-int[aria-pressed="true"]').evaluateAll(bs => bs.map(b => b.getAttribute("data-interest"))), ["tech", "gaming"]);
