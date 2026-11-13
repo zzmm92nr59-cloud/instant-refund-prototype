@@ -192,12 +192,14 @@ st.photoOn = false; st.answer = "web";
 await page.goto(origin + "/index.html?testing=1");
 await discover();
 await page.locator(".dc-preview").waitFor();
-assert.match(await page.locator(".dc-preview").innerText(), /^Preview: products from 2 shops' own websites\. Relay reads their public product lists once a day\. These shops haven't joined Relay, so shoppers don't see them\. Tap a product to buy it on the shop's website\.$/);
+assert.match(await page.locator(".dc-preview").innerText(), /^Products from 2 shops' own websites, as Relay last read them\. Only Relay's team sees these\.$/);
 assert.ok(st.webAsked >= 1);
 const beanie = page.locator(".dc-cardwrap").filter({ hasText: "Wool Beanie" });
 assert.equal(await beanie.locator("[data-watch]").count(), 0, "no price alerts for shops' websites");
 assert.doesNotMatch(await beanie.innerText(), /Out of stock|left/, "one colour sold out, another can be bought: not out of stock, and no count Relay doesn't know");
-assert.match(await page.locator(".dc-cardwrap").filter({ hasText: "Linen Scarf" }).innerText(), /Out of stock/, "every colour sold out: out of stock");
+// A website's stock is only what it said when Relay read it, so a tile never says it undated: the product's page says it,
+// with when Relay checked (below).
+assert.doesNotMatch(await page.locator(".dc-cardwrap").filter({ hasText: "Linen Scarf" }).innerText(), /Out of stock|Sold out|left/, "every colour sold out: no undated stock words on the tile");
 assert.doesNotMatch(await page.locator(".dc-cardwrap").filter({ hasText: "Canvas Tote Bag" }).innerText(), /Out of stock|left/);
 await polished("discover preview", ".main");
 await beanie.locator(".dc-card").click();
@@ -211,6 +213,12 @@ await page.getByRole("button", { name: /^Navy/ }).click();
 assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web[0].productUrl, "a sold-out colour opens its own page, not a checkout");
 assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Sold out on Hollow Pine's website when Relay checked (today|yesterday) at " + when + "\\."));
 await polished("website product", ".main");
+// Every colour sold out: its page says so, with where it came from and when.
+await page.getByRole("button", { name: "Back" }).click();
+await page.locator(".dc-cardwrap").filter({ hasText: "Linen Scarf" }).locator(".dc-card").click();
+await page.locator(".dc-page h2", { hasText: "Linen Scarf" }).waitFor();
+assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Sold out on Hollow Pine's website when Relay checked (today|yesterday) at " + when + "\\."));
+assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web.find(w => w.product === "Linen Scarf").productUrl);
 console.log("ok - testing tools: shops' websites in Discover, no price alerts, bought on the shop's website, with when Relay checked");
 
 // 8. Testing tools while photo search is off: the camera explains what turns it on; nothing is picked or sent.

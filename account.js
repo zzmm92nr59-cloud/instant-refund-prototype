@@ -962,6 +962,10 @@
     ".rl-ys-logo{flex:none;border-radius:50%;display:grid;place-items:center;font-weight:700;overflow:hidden;box-sizing:border-box}.rl-ys-logo.rl-has-logo{background:#fff!important;border:1px solid var(--rl-line)}" +
     ".rl-ys-name{font-size:13px;line-height:16px;text-align:center;color:var(--rl-text);max-width:78px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}" +
     ".rl-ys-head{display:flex;align-items:center;gap:14px;margin:4px 0 10px}.rl-ys-head h2{margin:0}.rl-ys-count{margin:0;font-size:17px;color:var(--rl-text)}.rl-ys-last{margin:2px 0 14px;font-size:15px;color:var(--rl-text2)}" +
+    ".rl-ys-webh{margin:4px 0 10px;font-size:20px}.rl-ys-web{display:flex;gap:12px;overflow-x:auto;margin:0 -18px;padding:0 18px 4px;scroll-padding-inline:18px;scrollbar-width:none}.rl-ys-web::-webkit-scrollbar{display:none}" +
+    ".rl-ys-webp{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:140px;display:flex;flex-direction:column;gap:4px;transition:transform .12s}.rl-ys-webp:active{transform:scale(.97)}.rl-ys-webp:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:16px}" +
+    ".rl-ys-webpic{width:140px;height:140px;border-radius:16px;overflow:hidden;background:var(--rl-fill)}.rl-ys-webpic img{width:100%;height:100%;object-fit:cover;display:block}" +
+    ".rl-ys-webn{font-size:14px;line-height:18px;color:var(--rl-text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.rl-ys-webp b{font-size:15px;color:var(--rl-text)}.rl-ys-webd{font-size:13px;color:var(--rl-text2);margin:8px 0 16px}" +
     ".rl-ys-acts{display:grid;gap:10px;margin:0 0 16px}.rl-ys-acts .rl-btn{margin:0;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;min-height:44px}" +
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
     ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
@@ -5538,6 +5542,18 @@
       if (shop.domain) acts.appendChild(el("a", { className: "rl-btn ghost", href: "https://" + shop.domain + "/", target: "_blank", rel: "noopener noreferrer", text: "Visit their website" }));
       if (shop.relay && window.relayOpenShop) acts.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "See them on Shops on Relay", onclick: function () { close(); window.relayOpenShop(shop.relay); } }));
       if (acts.childNodes.length) sheet.appendChild(acts);
+      // Relay's team: the shop's products from its own website, when Relay has read it.
+      var web = window.relayWebProductsFor ? window.relayWebProductsFor(shop.domain, shop.name) : [];
+      if (web.length) {
+        sheet.appendChild(el("h3", { className: "rl-ys-webh", text: "From their website" }));
+        sheet.appendChild(el("div", { className: "rl-ys-web" }, web.slice(0, 12).map(function (w) {
+          var pic = el("span", { className: "rl-ys-webpic" });
+          if (/^https:\/\//.test(w.imageUrl || "")) pic.appendChild(el("img", { alt: "", loading: "lazy", referrerPolicy: "no-referrer", src: w.imageUrl }));
+          return el("button", { type: "button", className: "rl-ys-webp", ariaLabel: w.product + ", " + w.price, onclick: function () { close(); if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } },
+            [pic, el("span", { className: "rl-ys-webn", text: w.product }), el("b", { text: w.price })]);
+        })));
+        sheet.appendChild(el("p", { className: "rl-ys-webd", text: "Prices from " + shop.name + "'s website on " + ysWhen(String(web[0].checkedAt || "").slice(0, 10)) + "." }));
+      }
       sheet.appendChild(accGroup(shop.count === 1 ? "Your receipt" : "Your receipts", shop.buys.map(function (b) {
         return accRow("doc", b.title, [ysWhen(b.at), b.total].filter(Boolean).join(", "), function () {
           if (b.kind === "receipt") { var card = emailCard(b.x, { markable: true }); card.onclick(); }
@@ -8156,7 +8172,7 @@
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)
     cachedGet("nextUp", "/relay/my/receipts").then(function (r) { if (r.ok && r.body) draw(r.body.receipts || []); }, function () {});
   }
-  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountHome: mountHome, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
+  window.RelayAccount = { shopBadge: function (name, domain, cat, px) { return ysLogo({ name: String(name || "?"), logo: String(domain || "").replace(/^www\./, ""), cat: cat || "other" }, px || 56); }, mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountHome: mountHome, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
     storySong: storySong,

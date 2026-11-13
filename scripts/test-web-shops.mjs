@@ -144,7 +144,7 @@ const call = async (now, method = "GET") => { const req = new Request("https://w
 let page = await call(NOW + 3e5);
 assert.equal(page.cache, "public, max-age=120");
 assert.deepEqual(page.body.products.map(p => [p.storeName, p.product]), [["Alder", "Alder Shirt"], ["Birch", "Birch Jumper"], ["Alder", "Alder Tote"]], "shops mixed, newest first");
-assert.deepEqual(page.body.products[0], { sku: "web:a.test:10", product: "Alder Shirt", variation: null, priceMinor: 4500, currency: "GBP", imageUrl: "https://cdn.shopify.com/s/files/1/0001/files/1.jpg?v=1&width=600",
+assert.deepEqual(page.body.products[0], { sku: "web:a.test:10", shopCategory: "fashion", product: "Alder Shirt", variation: null, priceMinor: 4500, currency: "GBP", imageUrl: "https://cdn.shopify.com/s/files/1/0001/files/1.jpg?v=1&width=600",
   quantity: null, inStock: true, storeName: "Alder", shopDomain: "a.test", productUrl: "https://a.test/products/alder-shirt?variant=10", kind: "Shirts", checkedAt: new Date(NOW).toISOString(), webShop: true });
 assert.deepEqual(page.body.shops.map(s => [s.name, s.status, s.products]), [["Alder", "ok", 2], ["Birch", "ok", 1], ["Cedar", "not_gbp", 0]]);
 assert.equal(page.body.preview, true);

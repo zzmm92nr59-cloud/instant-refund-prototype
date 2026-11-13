@@ -104,6 +104,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-discover-mix-ui.mjs
       - name: Test Browse's Your shops (from the shopper's own receipts; one per shop however it's spelt, website only when known, test shops only with testing tools, See all with a search)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-your-shops-ui.mjs
+      - name: Test Browse's real shops for Relay's team (shops' websites only with the team switch or testing tools; logos, square tiles, when Relay last checked, View on their website)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-real-shops-ui.mjs
       - name: Test two-step sign-in for everyone (protect the account first, once per tap, the last can't go, team signs in again, passkey finish)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-second-step-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)

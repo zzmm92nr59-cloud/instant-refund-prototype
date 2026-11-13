@@ -13,6 +13,8 @@
 // (awin-feed.js). WEB_SHOPS = "off" (a Worker variable) stops the reading.
 
 // UK shops on Shopify, by what they sell. A shop that isn't (or no longer is) readable is recorded with why, and skipped.
+import { shopCategory } from "./interests.js";
+
 export const WEB_SHOPS = [
   // Clothes and shoes
   { domain: "finisterre.com", label: "Finisterre" },
@@ -251,7 +253,11 @@ export async function webShopProducts(env, now = Date.now()) {
   const rows = (await db.prepare(`SELECT i.id, i.domain, i.product, i.variation, i.price_minor, i.available, i.image_url, i.product_url, i.kind, i.checked_at, s.label
       FROM web_shop_items i JOIN web_shops s ON s.domain = i.domain
       WHERE i.checked_at > ? ORDER BY i.position, s.label, i.rowid LIMIT ${MAX_SHOWN}`).bind(now - SHOW_FOR).all()).results || [];
-  return rows.map(r => ({ sku: r.id, product: r.product, variation: r.variation, priceMinor: r.price_minor, currency: "GBP", imageUrl: r.image_url,
+  // Each shop's kind, as Relay already sorts shops (interests.js): Browse's "Your interests" uses it. Never guessed.
+  const titles = new Map();
+  for (const r of rows) { if (!titles.has(r.domain)) titles.set(r.domain, { label: r.label, names: [] }); titles.get(r.domain).names.push(r.product); }
+  const kinds = new Map([...titles].map(([d, t]) => [d, shopCategory({ label: t.label, domain: d }, t.names)]));
+  return rows.map(r => ({ sku: r.id, ...(kinds.get(r.domain) ? { shopCategory: kinds.get(r.domain) } : {}), product: r.product, variation: r.variation, priceMinor: r.price_minor, currency: "GBP", imageUrl: r.image_url,
     quantity: r.available === 0 ? 0 : null, inStock: r.available === 1 ? true : r.available === 0 ? false : null,
     storeName: r.label, shopDomain: r.domain, productUrl: r.product_url, kind: r.kind, checkedAt: new Date(r.checked_at).toISOString(), webShop: true }));
 }
