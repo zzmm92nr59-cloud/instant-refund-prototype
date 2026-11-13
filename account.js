@@ -4275,8 +4275,9 @@
     var c = interestsCached();
     if (c && !fresh) { interestsPublish(c); return Promise.resolve(c); }
     return api("/relay/my/interests", fresh ? { fresh: true } : undefined).then(function (r) {
-      if (!r.ok || !r.body) return c || null;
-      var list = (r.body.interests || []).filter(function (x) { return INTEREST_BY[x]; }); interestsRemember(list); return list;
+      // An answer without a list says nothing about what they chose, so it never counts as "nothing chosen".
+      if (!r.ok || !r.body || !Array.isArray(r.body.interests)) return c || null;
+      var list = r.body.interests.filter(function (x) { return INTEREST_BY[x]; }); interestsRemember(list); return list;
     }, function () { return c || null; });
   }
   function interestsLater(say) {
@@ -4324,13 +4325,22 @@
   }
   // Once: the first time the new layout opens for an account with none saved, unless "Not now" was said on this phone.
   var interestsAsked = false;
-  function interestsMaybeAsk() {
+  // Asked once, on Home, and only into a still screen: if the shopper has tapped, typed or scrolled since Home opened,
+  // or has moved on, the sheet waits for the next time Home opens rather than appearing under their finger.
+  // The first-run tips come after the interests sheet, or straight away when it isn't shown (on the same terms).
+  function interestsMaybeAsk(host) {
     var s = load(); if (!s || !s.token || isReview()) return;
-    // The first-run tips come after the interests sheet, or straight away when it isn't shown.
-    if (interestsAsked || interestsLater()) return tipsMaybe();
-    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return tipsMaybe(); }
+    if (interestsAsked || interestsLater()) return tipsMaybe(host);
+    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return tipsMaybe(host); }
     interestsAsked = true;
-    interestsLoad(true).then(function (list) { if (list && !list.length && !interestsLater() && !document.querySelector(".rl-back")) interestsSheet(); else tipsMaybe(); });
+    var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
+    evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
+    interestsLoad(true).then(function (list) {
+      evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
+      var still = host && host.isConnected && !acted && !document.querySelector(".rl-back, .rl-sheet");
+      if (!still) { interestsAsked = false; return; }
+      if (list && !list.length && !interestsLater()) interestsSheet(); else tipsMaybe(host);
+    });
   }
   function interestsSheet() {
     var chosen = [];
@@ -4384,13 +4394,20 @@
     for (var i = 0; i < navs.length; i++) { var b = navs[i] && navs[i].querySelector('[data-tab="' + key + '"]'); if (b) { var r = b.getBoundingClientRect(); if (r.width > 0 && r.height > 0) return b; } }
     return null;
   }
-  function tipsMaybe() {
+  function tipsMaybe(host) {
     var s = load();
     if (tipsChecked || tipsOpen || !s || !s.token || isReview() || window.page !== "profile") return;
     tipsChecked = true;
-    tipsSeen().then(function (seen) {
+    // Like the interests sheet, only into a still screen: a tap, key or scroll in the moment before means next time.
+    var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
+    evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
+    tipsSeen().then(function (seen) { return new Promise(function (ok) { setTimeout(function () { ok(seen); }, 300); }); }).then(function (seen) {
+      evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
       var list = TIPS.filter(function (t) { return seen.indexOf(t[0]) < 0 && tipTab(t[1]); });
-      if (list.length && window.page === "profile" && !document.querySelector(".rl-back")) tipsShow(list);
+      if (!list.length) return;
+      var still = !acted && window.page === "profile" && (!host || host.isConnected) && !document.querySelector(".rl-back, .rl-sheet");
+      if (!still) { tipsChecked = false; return; }
+      tipsShow(list);
     });
   }
   function tipsShow(list) {
@@ -7794,7 +7811,7 @@
     if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
     host.textContent = ""; host.classList.add("h2-home"); paintAvatars();
     // Asked only while Home is still the screen (never over another tab the shopper has moved to).
-    setTimeout(function () { if (host.isConnected) interestsMaybeAsk(); }, 700);
+    setTimeout(function () { if (host.isConnected) interestsMaybeAsk(host); }, 700);
     var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
     var top = el("div"); host.appendChild(top);
     mountInstore(top, refresh, "suggest");

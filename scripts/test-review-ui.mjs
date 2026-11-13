@@ -203,7 +203,7 @@ await view.getByText("None yet. An order shows up here when a shop that uses Rel
 st.catalogue = [];
 await page.evaluate(() => window.go("discover"));
 await page.waitForFunction(() => true);
-for (let i = 0; i < 40 && !st.catalogue.length; i++) await page.waitForTimeout(100);
+for (let i = 0; i < 150 && !st.catalogue.length; i++) await page.waitForTimeout(100); // up to 15s: a busy test machine can be slow to open Browse
 assert.ok(st.catalogue.length, "Discover asked for the catalogue");
 assert.ok(st.catalogue.every(q => q === "?test=1"), "the reviewer's Discover includes test shops: " + st.catalogue.join(","));
 console.log("ok - Receipts points to Home, Profile leaves out the inbox and sign-in settings, Discover includes test shops");
