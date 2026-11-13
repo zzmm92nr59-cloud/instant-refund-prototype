@@ -38,7 +38,7 @@ const stub = async ctx => {
     if (m === "OPTIONS") return route.fulfill({ status: 204, headers: H });
     if (!p.startsWith("/relay/")) return route.abort();
     let from = ""; try { from = new URL(req.frame().url()).pathname; } catch { from = ""; }
-    asked.push({ from, method: m, path: p });
+    asked.push({ from, method: m, path: p, bookmark: await req.headerValue("x-d1-bookmark") });
     const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: H, body: JSON.stringify(b) });
     const token = ((await req.headerValue("authorization")) || "").replace(/^Bearer /, "");
     if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: H, body: "" });
@@ -130,6 +130,8 @@ console.log("ok - the current app: only a team account has Try the new layout");
 
 // 2. It opens next.html, which shows nothing until Relay's server has answered.
 st.hold = 900;
+await page.evaluate(() => localStorage.setItem("relay.bookmark.v1", "bookmark-0000000123"));
+const before2 = asked.length;
 await Promise.all([page.waitForURL(u => new URL(u).pathname === "/next.html"), way.click()]);
 await page.waitForLoadState("domcontentloaded");
 const waiting = await page.evaluate(() => ({ gate: document.documentElement.classList.contains("rl-gate"), opacity: getComputedStyle(document.body).opacity, taps: getComputedStyle(document.body).pointerEvents, inert: document.body.hasAttribute("inert") }));
@@ -137,6 +139,7 @@ assert.deepEqual(waiting, { gate: true, opacity: "0", taps: "none", inert: true 
 assert.equal(await page.evaluate(() => sessionStorage.getItem("test-shown")), null, "nothing showed before the answer");
 await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate") && getComputedStyle(document.body).opacity === "1", null, { timeout: 15000 });
 assert.equal(await page.evaluate(() => document.body.hasAttribute("inert")), false, "once open, the page can be used");
+assert.equal((asked.slice(before2).find(a => a.from === "/next.html" && a.path === "/relay/my/admin/me") || {}).bookmark, "bookmark-0000000123", "the team check is asked with the newest bookmark, as the app asks");
 st.hold = 0;
 await page.locator("#homePage.h2-home").waitFor();
 await page.waitForFunction(() => document.querySelectorAll("#foot button").length === 4);

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en" class="rl-gate"><head><meta charset="utf-8"><style>html.rl-gate body{opacity:0!important;pointer-events:none!important}</style><script>
+<!doctype html><html lang="en" class="rl-gate"><head><meta charset="utf-8"><meta name="robots" content="noindex"><style>html.rl-gate body{opacity:0!important;pointer-events:none!important}</style><script>
 // Relay's team only. Nothing here shows until Relay's server says this is a team account (the same answer the Team page
 // goes by). Signed out, not on the team, or no answer: back to the current app.
 (function(){var API="https://relay-square-api2.9pts72cy5j.workers.dev",KEY="relay.session.v1",root=document.documentElement,passed=null;
@@ -9,7 +9,10 @@ function show(){root.classList.remove("rl-gate");if(document.body)document.body.
 function leave(){window.__relayLeaving=true;shut();try{location.replace("./")}catch(e){location.href="./"}}
 function check(){var t=token();if(!t){leave();return}if(t===passed)return;passed=null;shut();
  var stop=typeof AbortController==="function"?new AbortController():null,timer=setTimeout(function(){if(stop)stop.abort()},12000);
- fetch(API+"/relay/my/admin/me",{headers:{Authorization:"Bearer "+t},cache:"no-store",signal:stop?stop.signal:undefined})
+ // Asked the way the app asks everything: the sign-in, and the newest bookmark Relay has handed this device, so the
+ // answer is never older than one already seen (someone who signed in a moment ago isn't turned away).
+ var head={Authorization:"Bearer "+t};try{var mark=localStorage.getItem("relay.bookmark.v1");if(mark&&/^[0-9A-Za-z._:-]{8,160}$/.test(mark))head["X-D1-Bookmark"]=mark}catch(e){}
+ fetch(API+"/relay/my/admin/me",{headers:head,signal:stop?stop.signal:undefined})
   .then(function(r){return r.ok?r.json():null})
   .then(function(b){clearTimeout(timer);if(token()!==t){check();return}if(b&&b.admin===true){passed=t;show()}else leave()})
   .catch(function(){clearTimeout(timer);leave()})}
