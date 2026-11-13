@@ -1031,7 +1031,7 @@
     ".h2-strip{margin-top:-28px;height:64px;padding:28px 16px 0;box-sizing:border-box;border-radius:0 0 28px 28px;background:var(--rl-fill);font-size:14px;line-height:36px;font-weight:600;text-align:center;color:var(--rl-text)}.h2-strip.urgent{color:var(--rl-danger)}.h2-strip.soon{color:var(--rl-warn)}" +
     ".h2-item.small .h2-card{padding:12px 16px;border-radius:22px}.h2-item.small{border-radius:22px}.h2-item.small .h2-line-t b{font-size:16px;line-height:21px;font-weight:600}" +
     ".h2-item.small .h2-line{justify-content:flex-start}.h2-item.small .h2-line-t{flex:1}.h2-item.small .h2-go{order:-1;background:var(--rl-fill)}" +
-    ".h2-none{background:var(--rl-card);border-radius:22px}.h2-start{scroll-snap-stop:always}" +
+    ".h2-shopbox{margin-top:16px}.h2-shopbox:empty{display:none}.h2-none{background:var(--rl-card);border-radius:22px}.h2-start{scroll-snap-stop:always}" +
     // Look A: each card in its kind of shopping's colour (deepened where white text needs it, cardColour), text white.
     ".h2-feed.tint .h2-card.has-c{background:var(--h2-c);color:#fff}.h2-feed.tint .h2-card.has-c .h2-head-t span,.h2-feed.tint .h2-card.has-c .h2-line-t span{color:#fff}" +
     ".h2-feed.tint .h2-card.has-c .h2-go{background:rgba(255,255,255,.24);color:#fff}.h2-feed.tint .h2-card.has-c .h2-logo{background:#fff;color:#101828}" +
@@ -7586,6 +7586,9 @@
     if (topRow && !band) { band = el("div", { className: "h2-band" }); topRow.parentNode.insertBefore(band, topRow); band.appendChild(topRow); }
     if (band) { Array.prototype.forEach.call(band.querySelectorAll(".h2-chips"), function (old) { old.remove(); }); band.appendChild(chips); } else host.appendChild(chips);
     host.appendChild(feed);
+    // Bought in a shop: adding a purchase from its receipt (only once shops on Relay take card payments in person, or with
+    // testing tools). It sat under the wallet before; it goes after the cards.
+    var shopBox = el("div", { className: "h2-shopbox" }); host.appendChild(shopBox); mountInstore(shopBox, refresh, "box");
     for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
     var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
     var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product; }); } catch (e) { return []; } };
