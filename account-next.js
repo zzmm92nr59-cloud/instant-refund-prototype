@@ -177,12 +177,26 @@
   // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
   // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
   // onMiss runs when the shop has no logo Relay can show (no address, none found, or the picture won't load).
+  // A logo sits on white, like an app icon. When the logo's own picture has a solid background of another colour (a
+  // pale grey square, say), its box takes that colour instead, so the picture's square edge never shows inside the box.
+  // The new layout's tiles and circles use it (--logo-bg); nothing else does.
+  function logoBack(box, pic) {
+    var back = "#fff";
+    try {
+      var c = document.createElement("canvas"); c.width = c.height = 8;
+      var g = c.getContext("2d"); g.drawImage(pic, 0, 0, 8, 8);
+      var d = g.getImageData(0, 0, 8, 8).data, at = function (x, y) { var i = (y * 8 + x) * 4; return [d[i], d[i + 1], d[i + 2], d[i + 3]]; };
+      var k = [at(0, 0), at(7, 0), at(0, 7), at(7, 7)];
+      if (k.every(function (q) { return q[3] > 250 && Math.abs(q[0] - k[0][0]) + Math.abs(q[1] - k[0][1]) + Math.abs(q[2] - k[0][2]) < 12; })) back = "rgb(" + k[0][0] + "," + k[0][1] + "," + k[0][2] + ")";
+    } catch (e) { back = "#fff"; }
+    box.style.setProperty("--logo-bg", back);
+  }
   function shopLogo(box, dom, px, onMiss) {
     var miss = function () { if (onMiss) onMiss(); };
     if (!box || !dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return miss();
     var put = function (src) {
       var pic = el("img", { alt: "", className: "rl-logo-img", style: "width:" + px + "px;height:" + px + "px;object-fit:contain" });
-      pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); box.appendChild(pic); };
+      pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); logoBack(box, pic); box.appendChild(pic); };
       pic.onerror = miss;
       pic.src = src;
     };
@@ -974,12 +988,17 @@
     ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:28px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
     ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:28px;background:var(--rl-card);color:var(--rl-text)}" +
     ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
-    ".h2-logo.rl-has-logo{background:#fff}.h2-logo-i{display:inline-flex}.h2-head-t{min-width:0;display:flex;flex-direction:column;gap:1px}.h2-head-t b{font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.h2-head-t span{font-size:14px;line-height:18px;color:var(--rl-text2)}" +
-    // Pictures: 140px tiles. Several things are squares in a sideways row; one thing is one tile the full width, with its
-    // photo or the shop's logo fitted inside whole.
+    ".h2-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-logo.rl-has-logo>img{width:30px!important;height:30px!important;object-fit:contain}.h2-logo-i{display:inline-flex}.h2-head-t{min-width:0;display:flex;flex-direction:column;gap:1px}.h2-head-t b{font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.h2-head-t span{font-size:14px;line-height:18px;color:var(--rl-text2)}" +
+    // Pictures: always 140px squares. A photo is pinned to the square's four edges and fills it (it is never laid out
+    // inside it: a photo whose height depended on a row that took its height from the photo ended up far below the
+    // square). A logo sits whole on white with 16px around it. Several things are squares in a sideways row with the
+    // price on each; one thing has its square on the left and its name and price beside it.
     ".h2-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
-    ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}.h2-tiles.one .h2-pic{width:100%}" +
-    ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{width:100%;height:100%;object-fit:cover}.h2-tiles.one .h2-art>img{object-fit:contain}.h2-art>img.rl-logo-img{object-fit:contain}.h2-art.rl-has-logo{background:#fff}" +
+    ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}" +
+    ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{position:absolute;left:0;top:0;width:100%!important;height:100%!important;object-fit:cover;object-position:center}" +
+    ".h2-art.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-art>img.rl-logo-img{left:16px;top:16px;width:calc(100% - 32px)!important;height:calc(100% - 32px)!important;object-fit:contain}" +
+    ".h2-one{display:flex;align-items:center;gap:12px;min-width:0}.h2-one-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}" +
+    ".h2-one-n{font-size:16px;line-height:21px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.h2-one-p{font-size:16px;line-height:21px;font-weight:600}" +
     ".h2-price{position:absolute;left:12px;top:12px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600}" +
     ".h2-name{font-size:14px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
     ".h2-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.h2-line-t{min-width:0;display:flex;flex-direction:column;gap:2px}" +
@@ -1019,24 +1038,24 @@
     // Before anything is asked. Sizes and spacing follow a phone-shopping app's chat page (measured in points on a 402 by
     // 874 screen): 115px square tiles 8px apart, 20px headings, 64px rows with a 48px tile. The tiles, drawings,
     // colours and words are Relay's.
-    ".rl-chat.rl-ask-open{display:block;margin:0}.rl-ask-rec{margin:0 0 18px}" +
-    ".rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 16px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
+    ".rl-chat.rl-ask-open{display:block;margin:0}.rl-ask-rec{margin:0 0 14px}" +
+    ".rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 14px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
     ".rl-ask-hb{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:opacity .12s}.rl-ask-hb:active{opacity:.55}.rl-ask-hb:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:10px}" +
     ".rl-ask-chev{flex:none;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}" +
     ".rl-ask-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.rl-ask-tiles::-webkit-scrollbar{display:none}" +
-    ".rl-ask-tile{all:unset;box-sizing:border-box;cursor:pointer;position:relative;flex:none;display:block;width:115px;height:115px;border-radius:24px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start;transition:transform .12s}" +
-    ".rl-ask-tile:active{transform:scale(.96)}.rl-ask-tile:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}" +
-    // The day it was bought sits on the tile (as the price does on Home's tiles), with the drawing or logo nudged down to
-    // clear it. The shop is in the picture when Relay has its logo, and always in the tile's spoken name.
-    ".rl-ask-tile.dated .h2-art.rl-ill,.rl-ask-tile.dated .h2-art.rl-has-logo{padding-top:12px}" +
-    ".rl-ask-tile-d{position:absolute;left:10px;top:10px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600;white-space:nowrap}" +
-    "@media(prefers-color-scheme:dark){.rl-ask-tile:has(.rl-ill) .rl-ask-tile-d{background:rgba(255,255,255,.18)}}" +
+    ".rl-ask-tile{all:unset;box-sizing:border-box;cursor:pointer;flex:none;display:flex;flex-direction:column;gap:4px;width:115px;scroll-snap-align:start;transition:transform .12s}" +
+    ".rl-ask-sq{position:relative;display:block;width:115px;height:115px;border-radius:24px;overflow:hidden;background:var(--rl-fill)}" +
+    ".rl-ask-tile:active{transform:scale(.96)}.rl-ask-tile:focus-visible .rl-ask-sq{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-ask-sq .h2-art>img.rl-logo-img{left:14px;top:14px;width:calc(100% - 28px)!important;height:calc(100% - 28px)!important}" +
+    ".rl-ask-day{padding:0 2px;font-size:13px;line-height:16px;color:var(--rl-text2)}" +
+    // The day it was bought is a line under the tile, so it never covers a photo or a logo. The shop is in the picture when
+    // Relay has its logo, and always in the tile's spoken name.
     ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
     ".rl-ask-q b{flex:1;min-width:0;font-size:16px;line-height:21px;font-weight:500;color:var(--rl-text)}" +
     ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
     // Said quietly at the end: it's an AI, what is kept, and the way to a person.
-    ".rl-ask-ai{margin:12px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
-    ".rl-asktab.rl-ask-opening .rl-anote{margin:6px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-ask-ai{margin:10px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-asktab.rl-ask-opening .rl-anote{margin:4px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
     ".rl-asktab.rl-ask-opening .rl-chat-person{display:inline-flex;align-items:center;align-self:flex-start;width:auto;min-height:44px;margin:0;padding:0;border-radius:0;font-size:15px;font-weight:600}" +
     // On a short phone the AI line moves above the questions, so it is still on the first screen.
     "@media(max-height:760px){.rl-chat.rl-ask-open{display:flex;flex-direction:column;gap:0}.rl-ask-open .rl-ask-rec{order:0}.rl-ask-open .rl-ask-h2{order:1;margin-bottom:6px}.rl-ask-open .rl-ask-ai{order:2;margin:0 0 6px}.rl-ask-open .rl-ask-qs{order:3}}" +
@@ -4160,8 +4179,8 @@
         rows.forEach(function (x) {
           var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
           var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
-          var day = when ? el("span", { className: "rl-ask-tile-d", text: when }) : null; if (day) day.setAttribute("aria-hidden", "true");
-          var tile = el("button", { type: "button", className: "rl-ask-tile" + (when ? " dated" : ""), onclick: function () { askAssistantAbout(x, true); } }, [art].concat(day ? [day] : []));
+          var day = el("span", { className: "rl-ask-day", text: when || "\u00a0" }); day.setAttribute("aria-hidden", "true");
+          var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), day]);
           tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
           tile.setAttribute("data-receipt", x.id);
           if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
@@ -7379,12 +7398,17 @@
       if (e.icon) { logo.textContent = ""; logo.appendChild(accIc(e.icon, 20, "h2-logo-i")); } else if (e.dom) shopLogo(logo, e.dom, 28);
       card.appendChild(el("div", { className: "h2-head" }, [logo, el("span", { className: "h2-head-t" }, [el("b", { text: e.shop })].concat(e.at ? [el("span", { text: dayWords(e.at) })] : []))]));
     }
-    if (e.tiles && e.tiles.length) {
-      var row = el("div", { className: "h2-tiles" + (e.tiles.length === 1 ? " one" : "") });
-      e.tiles.forEach(function (t) {
-        var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); t.draw(art);
-        row.appendChild(el("span", { className: "h2-pic" }, [art].concat(t.price ? [el("span", { className: "h2-price", text: t.price })] : [])));
-      });
+    var square = function (t, pill) {
+      var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); t.draw(art);
+      return el("span", { className: "h2-pic" }, [art].concat(pill && t.price ? [el("span", { className: "h2-price", text: t.price })] : []));
+    };
+    if (e.tiles && e.tiles.length === 1) {
+      // One thing: its square, and beside it what it is (up to three lines) and what it cost. No price on the picture.
+      var one = e.tiles[0];
+      card.appendChild(el("div", { className: "h2-one" }, [square(one, false), el("span", { className: "h2-one-t" }, [el("span", { className: "h2-one-n", text: e.title || one.name })].concat(one.price ? [el("span", { className: "h2-one-p", text: one.price })] : []))]));
+    } else if (e.tiles && e.tiles.length) {
+      var row = el("div", { className: "h2-tiles" });
+      e.tiles.forEach(function (t) { row.appendChild(square(t, true)); });
       card.appendChild(row);
       // One line under the pictures: what it is, and how many more came with it.
       card.appendChild(el("div", { className: "h2-name", text: e.title || e.tiles[0].name }));
