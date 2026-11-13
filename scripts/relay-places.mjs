@@ -91,9 +91,9 @@ export async function goTab(page, name) {
   await page.evaluate(() => { const a = document.activeElement; if (a && a.blur) a.blur(); });
   await tab(page, name).click();
 }
-// For tests that aren't about interests: this phone has already said "Not now" to "What do you shop for?" for whoever
-// is signed in, so neither the one-time sheet on Home nor the sign-up step gets in the way. (scripts/test-signup-ui.mjs
-// and scripts/test-layout-ui.mjs test those.)
+// For tests that aren't about the first-run prompts: this phone has already said "Not now" to "What do you shop for?"
+// and seen the four first-run tips, for whoever is signed in, so neither the one-time sheet on Home, the sign-up step nor
+// the tips get in the way. (scripts/test-signup-ui.mjs, scripts/test-layout-ui.mjs and scripts/test-tips-ui.mjs test those.)
 export async function skipInterests(ctx) {
   await ctx.addInitScript(() => {
     try {
@@ -101,6 +101,8 @@ export async function skipInterests(ctx) {
       if (!s || !s.email) return;
       const l = JSON.parse(localStorage.getItem(k) || "[]");
       if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
+      const t = JSON.parse(localStorage.getItem("relay.tips.v1") || "{}");
+      if (!t[s.email]) { t[s.email] = ["home", "ask", "browse", "receipts"]; localStorage.setItem("relay.tips.v1", JSON.stringify(t)); }
     } catch (e) { /* storage blocked: nothing to do */ }
   });
 }
