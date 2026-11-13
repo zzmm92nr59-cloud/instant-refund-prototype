@@ -3,14 +3,19 @@
 // goes by). Signed out, not on the team, or no answer: back to the current app.
 (function(){var API="https://relay-square-api2.9pts72cy5j.workers.dev",KEY="relay.session.v1",root=document.documentElement,passed=null;
 function token(){try{var s=JSON.parse(localStorage.getItem(KEY)||"null");return s&&typeof s.token==="string"&&s.token?s.token:null}catch(e){return null}}
-function leave(){window.__relayLeaving=true;root.classList.add("rl-gate");try{location.replace("./")}catch(e){location.href="./"}}
-function check(){var t=token();if(!t){leave();return}if(t===passed)return;passed=null;root.classList.add("rl-gate");
+// Shut: nothing shows, and nothing can be tapped, reached by keyboard or read out (the body starts out inert).
+function shut(){root.classList.add("rl-gate");if(document.body)document.body.setAttribute("inert","")}
+function show(){root.classList.remove("rl-gate");if(document.body)document.body.removeAttribute("inert")}
+function leave(){window.__relayLeaving=true;shut();try{location.replace("./")}catch(e){location.href="./"}}
+function check(){var t=token();if(!t){leave();return}if(t===passed)return;passed=null;shut();
  var stop=typeof AbortController==="function"?new AbortController():null,timer=setTimeout(function(){if(stop)stop.abort()},12000);
  fetch(API+"/relay/my/admin/me",{headers:{Authorization:"Bearer "+t},cache:"no-store",signal:stop?stop.signal:undefined})
   .then(function(r){return r.ok?r.json():null})
-  .then(function(b){clearTimeout(timer);if(token()!==t){check();return}if(b&&b.admin===true){passed=t;root.classList.remove("rl-gate")}else leave()})
+  .then(function(b){clearTimeout(timer);if(token()!==t){check();return}if(b&&b.admin===true){passed=t;show()}else leave()})
   .catch(function(){clearTimeout(timer);leave()})}
 check();
+// The answer can arrive before the page's body exists.
+document.addEventListener("DOMContentLoaded",function(){if(passed&&passed===token())show()});
 // Signing out here, or the account changing in another tab, is checked again straight away.
 window.addEventListener("relay:session",check);
 window.addEventListener("storage",function(e){if(!e.key||e.key===KEY)check()});
@@ -273,7 +278,7 @@ html.on-me .topline .avatar{display:none}#view:has(#mePage>.rl-abar)>.rl-navback
 .dc-page .actions{margin-top:18px;display:flex;flex-direction:column;gap:10px}
 .dc-page .actions>*{width:100%;box-sizing:border-box;justify-content:center;min-height:50px;font-size:17px}
 .dc-page #watchNote{font-size:14px;line-height:1.45;margin:12px 0 0}
-</style></head><body><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html">Testing tools ↗</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><p class="sub" style="margin-top:28px">Loading…</p></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script src="./relay-recommendation-engine.js?v=20261014-discover"></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet"></script><script>(function(){try{
+</style></head><body inert><div class="app"><aside class="sidebar"><div class="logo">relay<span>✦</span></div><nav class="side-nav" id="side" aria-label="Relay"></nav><div class="sidebar-note"><strong>Everything you buy, in one place.</strong><p>Receipts, returns and price drops, sorted for you.</p></div><p class="small muted" id="testingLink" style="margin:25px 12px;display:none"><a href="./testing.html">Testing tools ↗</a></p></aside><main class="main"><div class="topline"><div><div class="eyebrow">YOUR RELAY SPACE</div><div class="small muted" id="greeting">Everything you buy. One place.</div></div><div class="split"><button id="modeToggle" class="toggle hidden" onclick="toggleDemo()" aria-hidden="true"></button><div class="avatar">R</div></div></div><div id="view"><p class="sub" style="margin-top:28px">Loading…</p></div></main></div><nav class="footnav" id="foot" aria-label="Relay"></nav><div class="nextup" id="nextUp" hidden></div><script src="./relay-exchange-engine.js?v=20261014-simulate"></script><script src="./relay-recommendation-engine.js?v=20261014-discover"></script><script src="./relay-wallet-ledger.js?v=20261018-exchange-wallet"></script><script>(function(){try{
 if(window.__relayLeaving)return;
 const testing=new URLSearchParams(location.search).get("testing")==="1";
 // The shops' websites preview used to come only with the testing tools; it now has its own switch (Relay's team, Profile
