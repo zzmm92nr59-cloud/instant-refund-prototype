@@ -3,7 +3,7 @@
  * It NEVER caches anything from the Relay API, Square, Shopify or Plaid - only
  * Relay's own static pages and icons from this same site. Bump VERSION to force
  * every installed copy to drop its old cache. */
-const VERSION = "relay-shell-v135";
+const VERSION = "relay-shell-v136";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "account.js", "relay-gestures.js", "terms.html", "privacy.html", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -23,9 +23,8 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // API / third-party calls go straight to the network
-  // The team's try-out of the new layout (next.html and its script) is never kept: always straight from the network,
-  // so a copy from before an update can't show. With no connection the page goes back to the current app.
-  if (/\/(next\.html|account-next\.js)$/.test(url.pathname)) {
+  // next.html (where the new layout was tried out) is now only a way back to the app: never kept, always from the network.
+  if (/\/next\.html$/.test(url.pathname)) {
     event.respondWith(fetch(req.url, { cache: "no-store" }).catch(() => (req.mode === "navigate" ? Response.redirect("./") : Response.error())));
     return;
   }
