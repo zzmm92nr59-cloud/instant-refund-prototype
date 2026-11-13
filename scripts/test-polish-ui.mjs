@@ -5,7 +5,7 @@
 // from the account; the keyboard space is tracked; no raw error text.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeShows } from "./relay-places.mjs";
+import { skipInterests, homeShows, homeCard, profileButton, openProfile, openAccountRow, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -52,7 +52,7 @@ await homeShows(page, "J");
 const measure = () => page.evaluate(() => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
   const out = { small: [], tiny: [], symbols: [], purple: [] };
-  for (const el of document.querySelectorAll("#view button, #view a, #view summary, #view select, #view input, #foot button, .rl-sheet button, .rl-sheet a, .rl-sheet summary, .avatar")) {
+  for (const el of document.querySelectorAll("#view button, #view a, #view summary, #view select, #view input, #foot button, .rl-sheet button, .rl-sheet a, .rl-sheet summary, .avatar:not(button .avatar)")) {
     if (!vis(el)) continue; const r = el.getBoundingClientRect();
     if (r.height < 43.5) out.small.push((el.innerText || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 30) + " " + Math.round(r.height));
     if (/[◎✦↻▶⌂◈▤⇄]/u.test(el.innerText || "")) out.symbols.push((el.innerText || "").trim().slice(0, 30));
@@ -66,7 +66,7 @@ const measure = () => page.evaluate(() => {
   for (const el of document.querySelectorAll("*")) { const s = getComputedStyle(el); if (/rgb\((48, 37, 93|91, 33, 182|124, 77, 189|30, 27, 75|109, 40, 217|76, 29, 149)\)/.test(s.backgroundImage + s.backgroundColor)) out.purple.push(el.className || el.tagName); }
   return out;
 });
-for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
+for (const pg of ["profile", "receipts", "discover", "radar", "wrapped", "me"]) {
   await page.evaluate(p => window.go(p), pg); await page.waitForTimeout(1200);
   const m = await measure();
   assert.deepEqual(m.small, [], pg + ": everything tappable is at least 44px tall");
@@ -74,16 +74,17 @@ for (const pg of ["profile", "receipts", "discover", "radar", "me"]) {
   assert.deepEqual(m.symbols, [], pg + ": no symbol characters used as icons in buttons");
   assert.deepEqual(m.purple, [], pg + ": no purple");
 }
-await page.locator(".avatar").click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
-for (const sub of [null, "Email connection", "Email permission", "Download my data", "Delete my account", "Help", "Two-step sign-in"]) {
-  if (sub) { await page.locator(".rl-arow, .rl-ptile", { hasText: sub }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.waitForTimeout(300); }
+await page.evaluate(() => window.go("receipts")); await profileButton(page).click(); await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(600);
+// Every page of Profile, its two sections included (the rows under them open from there).
+for (const sub of [null, "Email connection", "Security and privacy", "Email permission", "Download my data", "Delete my account", "Help and legal", "Help", "Two-step sign-in"]) {
+  if (sub) { await openProfile(page); await openAccountRow(page, sub); await page.locator("#view [data-back]:visible").first().waitFor(); await page.waitForTimeout(300); }
   const m = await measure(), where = "Profile" + (sub ? " > " + sub : "");
   assert.deepEqual(m.small, [], where + ": everything tappable is at least 44px tall");
   assert.deepEqual(m.tiny, [], where + ": no everyday text under 13px (capitals 12px)");
   assert.deepEqual(m.symbols, [], where + ": no symbol characters used as icons");
   assert.deepEqual(m.purple, [], where + ": no purple");
-  if (sub) await page.getByRole("button", { name: "Back to Profile" }).click();
 }
+await openProfile(page); await openAccountRow(page, "Security and privacy");
 // Download my data: one file with the shopper's data, made once however fast the button is tapped twice.
 await page.locator(".rl-arow", { hasText: "Download my data" }).first().click();
 const dlBtn = page.locator(".rl-sheet, #mePage").getByRole("button", { name: "Download my data" }).last();
@@ -93,9 +94,10 @@ const saved = JSON.parse(await (await import("node:fs/promises")).readFile(await
 assert.equal(saved.account.email, EMAIL); assert.equal(saved.receipts.length, 2);
 await page.getByText("Your file is downloading.").waitFor();
 assert.equal(state.exports, 1, "a second tap while it's preparing doesn't make a second file");
-await page.getByRole("button", { name: "Back to Profile" }).click();
+await page.getByRole("button", { name: "Back to Security" }).click();
 console.log("ok - Download my data gives one file with the shopper's data, once per tap");
-// The legal pages are real pages, reachable from the Account page.
+// The legal pages are real pages, reachable from Profile's Help and legal.
+await openProfile(page); await openAccountRow(page, "Help and legal"); await page.locator(".rl-arow", { hasText: "Terms of use" }).waitFor();
 for (const [label, heading] of [["Terms of use", "Terms of use"], ["Privacy policy", "Privacy policy"]]) {
   const href = await page.locator(".rl-arow", { hasText: label }).getAttribute("href");
   const lp = await ctx.newPage(); await lp.goto(new URL(href, origin + "/index.html").href);
@@ -106,7 +108,7 @@ for (const [label, heading] of [["Terms of use", "Terms of use"], ["Privacy poli
 console.log("ok - no purple, 44px tap targets, no tiny text and no symbol icons on Profile, Receipts, Discover, Price alerts, Wrapped and every Account page");
 
 // Wrapped: the story has no purple slides either.
-await page.evaluate(() => window.go("me"));
+await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("button", { name: /Play your 2026 story/ }).click();
 const slideBgs = [];
 for (let k = 0; k < 14; k++) { await page.waitForTimeout(250); slideBgs.push(await page.locator(".rl-story-frame").evaluate(f => getComputedStyle(f).backgroundColor)); if (await page.getByRole("button", { name: "Watch again" }).count()) break; await page.keyboard.press("ArrowRight"); }
@@ -147,8 +149,8 @@ assert.match(await page.evaluate(() => document.querySelector('meta[name="viewpo
 assert.ok(await page.evaluate(() => [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => /--rl-kb/.test(r.cssText)); } catch { return false; } })), "sheets make room for the keyboard");
 console.log("ok - follows the phone's light or dark setting, press effect on buttons, sheets make room for the keyboard");
 
-// A double tap on Watch price watches it once (it doesn't watch then unwatch).
-await page.evaluate(() => window.go("discover"));
+// A double tap on Watch price watches it once (it doesn't watch then unwatch). Products are under Browse, Shops on Relay.
+await openShops(page);
 const watchBtn = page.locator('[data-watch="shopify:kick:variant:1"]');
 // Discover redraws its list once live prices arrive, which can swap the button out mid-scroll: retry until it settles.
 await watchBtn.waitFor(); await page.waitForTimeout(800);
@@ -165,11 +167,11 @@ await page.waitForTimeout(300);
 assert.equal(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem("relay-radar-v2") || "{}")).length), 0, "a separate tap later still works");
 console.log("ok - a quick double tap only counts once; a later tap still works");
 
-// Caching: next visit shows the wallet straight away from this device, even while Relay is slow to answer.
+// Caching: next visit shows Home's cards straight away from this device, even while Relay is slow to answer.
 state.receiptsDelay = 4000;
 await page.reload();
-await page.locator("#walletPage").getByText("Long Jacket").waitFor({ timeout: 1500 });
-console.log("ok - the wallet shows at once on the next visit, from what was loaded last time");
+await homeCard(page, "Long Jacket").first().waitFor({ timeout: 1500 });
+console.log("ok - Home shows at once on the next visit, from what was loaded last time");
 state.receiptsDelay = 0;
 
 // Watches kept with the account come back to a phone that lost them.
@@ -177,12 +179,12 @@ state.serverWatches = [{ sku: "shopify:kick:variant:1", product: "Court Classic 
 await page.evaluate(() => localStorage.removeItem("relay-radar-v2"));
 await page.reload();
 await homeShows(page, "J");
-await page.locator(".htile", { hasText: "Price alerts" }).getByText("1 watched").waitFor();
+await page.getByRole("button", { name: "Price alerts, 1 watched" }).waitFor();
 console.log("ok - watches come back from the account when this device lost them");
 
 // Signing out removes the copy kept on this device.
 assert.ok(await page.evaluate(() => !!localStorage.getItem("relay.cache.v1")));
-await page.locator(".avatar").click();
+await profileButton(page).click();
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.locator(".rl-welcome").getByRole("button", { name: "Get started" }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.cache.v1")), null, "nothing of the account left on the device");

@@ -38,17 +38,22 @@ const UNDER = {
 const RENAMED = { "Email connection": "Inboxes" };
 export async function openProfile(page) {
   await page.evaluate(() => window.go("me"));
-  await page.locator("#mePage .rl-arow").first().waitFor();
+  await page.locator("#mePage .rl-arow:visible", { hasText: "Security and privacy" }).first().waitFor();
 }
+// The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
+export const profileButton = (page) => page.locator(".h2-me:visible, .topline .avatar:visible").first();
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
   name = RENAMED[name] || name;
   const hub = Object.keys(UNDER).find((h) => UNDER[h].includes(name));
-  if (!(await page.locator("#mePage").count())) await openProfile(page);
-  if (hub && !(await page.locator("#mePage .rl-arow", { hasText: name }).count())) {
-    await page.locator("#mePage .rl-arow", { hasText: hub }).first().click();
+  if (!(await page.locator("#mePage .rl-arow:visible").count())) await openProfile(page);
+  if (hub && !(await page.locator("#mePage .rl-arow:visible", { hasText: name }).count())) {
+    // The app's double-tap guard ignores a second tap on the same spot within 400ms, so a test that has just tapped the
+    // section (then gone back) waits as long as a person would.
+    await page.waitForTimeout(450);
+    await page.locator("#mePage .rl-arow:visible", { hasText: hub }).first().click();
   }
-  const row = page.locator("#mePage .rl-arow", { hasText: name }).first();
+  const row = page.locator("#mePage .rl-arow:visible", { hasText: name }).first();
   await row.waitFor();
   await row.click();
 }

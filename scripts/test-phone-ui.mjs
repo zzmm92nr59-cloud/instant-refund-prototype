@@ -1,13 +1,13 @@
 // Browser test: phone numbers and sign-in codes by text. Stubbed Relay server, made-up person and number (Ofcom's range
 // for TV and film), and a FAKE text-message reader standing in for Android's: nothing here proves a real text arrives.
-// Checks: Phone number appears in Account only when Relay can send texts; adding a number takes a texted code; every code
+// Checks: Phone number appears in Profile only when Relay can send texts; adding a number takes a texted code; every code
 // box lets the phone offer the code from the notification (one-time-code, numbers keypad), keeps just the code when the
 // whole message is pasted, and sends six digits by itself; "Text me a new code" waits its turn; codes by text switch on
 // with a fresh code and show recovery codes once; signing in stops at "Check your phone", texts the code at once, and
 // takes the texted code, the app's or a recovery code; every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeShows } from "./relay-places.mjs";
+import { skipInterests, homeShows, profileButton } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -104,10 +104,13 @@ const codeBoxIs = async sel => assert.equal(await page.locator(sel).evaluate(el 
 const signedInAt = async () => {
   await page.goto(origin + "/index.html");
   await page.evaluate(([e, t]) => localStorage.setItem("relay.session.v1", JSON.stringify({ token: t, email: e, expiresAt: 9e12 })), [EMAIL, TOKEN]);
-  await page.reload(); await page.locator(".avatar").click();
-  await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor(); await page.waitForTimeout(500);
+  await page.reload(); await profileButton(page).click();
+  await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor();
+  // Phone number, Two-step sign-in and Devices live in Profile's Security and privacy.
+  await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click();
+  await page.locator("#mePage .rl-arow", { hasText: "Delete my account" }).waitFor(); await page.waitForTimeout(500);
 };
-const openRow = async label => { await page.locator(".rl-arow", { hasText: label }).first().click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); };
+const openRow = async label => { await page.locator(".rl-arow", { hasText: label }).first().click(); await page.getByRole("button", { name: "Back to Security" }).waitFor(); };
 
 // 1. Phone number shows in Account only when Relay can send texts.
 reset({ available: false });
@@ -117,7 +120,7 @@ reset();
 await signedInAt();
 await page.locator(".rl-arow", { hasText: "Phone number" }).waitFor();
 assert.match(await page.locator(".rl-arow", { hasText: "Phone number" }).innerText(), /Add one for sign-in codes/);
-console.log("ok - Phone number appears in Account only when Relay can send texts");
+console.log("ok - Phone number appears in Profile only when Relay can send texts");
 
 // 2. Adding a number: type it, a code is texted, paste the whole text (or let the phone fill it) and it's confirmed.
 await openRow("Phone number");
@@ -171,12 +174,12 @@ assert.equal(await page.getByRole("button", { name: "Set up authenticator app" }
 await page.getByText("One way at a time. To switch, turn this one off first.").waitFor();
 await polished("two-step: on");
 // The number can't be changed while codes go to it.
-await page.getByRole("button", { name: "Back to Profile" }).click();
+await page.getByRole("button", { name: "Back to Security" }).click();
 await page.locator(".rl-arow", { hasText: "Two-step sign-in" }).getByText("On: text message").waitFor();
 await openRow("Phone number");
 await page.getByText("To change or remove this number, turn off codes by text under Two-step sign-in first.").waitFor();
 assert.equal(await page.getByRole("button", { name: "Remove number" }).count(), 0);
-await page.getByRole("button", { name: "Back to Profile" }).click();
+await page.getByRole("button", { name: "Back to Security" }).click();
 console.log("ok - codes by text: switched on with a code texted now, recovery codes shown once, the number locked while it's on");
 
 // 4. Signing in with codes by text: "Check your phone", the code texted at once, finished by the texted code.
@@ -242,7 +245,7 @@ await page.locator("#rl-2s-manage").fill(RECOVERY[1]);
 await page.getByRole("button", { name: "Turn off", exact: true }).click();
 await page.getByText("Codes by text are off.").waitFor();
 assert.equal(st.twoStep, false);
-await page.getByRole("button", { name: "Back to Profile" }).click();
+await page.getByRole("button", { name: "Back to Security" }).click();
 await openRow("Phone number");
 await page.getByRole("button", { name: "Remove number" }).click();
 await page.getByRole("button", { name: "Remove number" }).last().click();
