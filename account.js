@@ -954,6 +954,15 @@
     ".rl-au-pay{display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;box-sizing:border-box}" +
     ".rl-dt-fact.rl-au-desc{flex-direction:column;align-items:flex-start;gap:4px}.rl-au-desc b{white-space:pre-line;font-weight:400;text-align:left}" +
     ".rl-au-small{font-size:13px;line-height:1.45;color:var(--rl-text2);margin:14px 0 0}" +
+    // Your shops (Browse): a sideways row of round logos with the name under each.
+    ".rl-ys{margin:18px 0 4px}.rl-ys-h{display:flex;align-items:center;justify-content:space-between}.rl-ys-all{all:unset;cursor:pointer;min-height:44px;padding:0 4px;font-size:17px;color:var(--rl-accent)}" +
+    ".rl-ys-row{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;scroll-padding-inline:18px;margin:0 -18px;padding:4px 18px 8px;scrollbar-width:none}.rl-ys-row::-webkit-scrollbar{display:none}" +
+    ".rl-ys-shop{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:78px;min-height:44px;display:flex;flex-direction:column;align-items:center;gap:6px;scroll-snap-align:start;border-radius:16px;transition:transform .12s}" +
+    ".rl-ys-shop:active{transform:scale(.94)}.rl-ys-shop:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-ys-logo{flex:none;border-radius:50%;display:grid;place-items:center;font-weight:700;overflow:hidden;box-sizing:border-box}.rl-ys-logo.rl-has-logo{background:#fff!important;border:1px solid var(--rl-line)}" +
+    ".rl-ys-name{font-size:13px;line-height:16px;text-align:center;color:var(--rl-text);max-width:78px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}" +
+    ".rl-ys-head{display:flex;align-items:center;gap:14px;margin:4px 0 10px}.rl-ys-head h2{margin:0}.rl-ys-count{margin:0;font-size:17px;color:var(--rl-text)}.rl-ys-last{margin:2px 0 14px;font-size:15px;color:var(--rl-text2)}" +
+    ".rl-ys-acts{display:grid;gap:10px;margin:0 0 16px}.rl-ys-acts .rl-btn{margin:0;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;min-height:44px}" +
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
     ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
   document.head.appendChild(css);
@@ -5451,6 +5460,137 @@
         accIc("chev", 18, "rl-arow-c")]));
     }).catch(function () {});
   }
+  // ---- Your shops (Browse): every shop the shopper has a receipt from, made only from their own receipts ----
+  // One entry per shop however its name is spelt: receipts join a shop when they share the shop's web address, or the same
+  // name once spaces, capitals, "&"/"and" and the like are set aside. Most bought from first. Relay's test shops are left
+  // out unless the testing tools are on. Nothing here is recommended, priced or made up.
+  var MAIL_HOSTS = /^(gmail|googlemail|outlook|hotmail|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|pm|btinternet|sky|virginmedia|talktalk)\.[a-z.]+$/;
+  function ysName(n) { return String(n || "").toLowerCase().replace(/&/g, " and ").replace(/\b(the|ltd|limited|plc|uk|inc|co)\b/g, " ").replace(/[^a-z0-9]+/g, ""); }
+  function ysDomain(d) { d = String(d || "").toLowerCase().trim().replace(/^www\./, ""); return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) && !MAIL_HOSTS.test(d) && !CARRIER_DOMAIN.test(d) ? d : ""; }
+  // Shops on Relay, from Browse's own list of products (index.html): their names and addresses, test shops marked.
+  // null until Browse's list of products is in: until then Relay can't tell a test shop, so Your shops waits for it.
+  function ysRelayShops() { try { return window.relayShopsOnRelay ? window.relayShopsOnRelay() : []; } catch (e) { return []; } }
+  function yourShops(receipts, purchases) {
+    var testing = testingOn(), onRelay = ysRelayShops() || [];
+    var testShop = function (g) { return onRelay.some(function (sh) { return sh.test && ((sh.domain && g.domains[sh.domain]) || (sh.name && g.names[ysName(sh.name)])); }); };
+    var groups = [], byKey = {};
+    var join = function (keys, add) {
+      var found = keys.map(function (k) { return byKey[k]; }).filter(Boolean)[0];
+      var g = found || { names: {}, domains: {}, labels: {}, cats: {}, buys: [], logo: "" };
+      if (!found) groups.push(g);
+      keys.forEach(function (k) { var other = byKey[k]; if (other && other !== g) { // two groups turn out to be one shop
+        Object.keys(other).forEach(function (f) { if (f === "buys") g.buys = g.buys.concat(other.buys); else if (typeof other[f] === "object") Object.keys(other[f]).forEach(function (n) { g[f][n] = (g[f][n] || 0) + other[f][n]; }); });
+        Object.keys(byKey).forEach(function (kk) { if (byKey[kk] === other) byKey[kk] = g; }); groups.splice(groups.indexOf(other), 1); }
+        byKey[k] = g; });
+      add(g);
+    };
+    var tally = function (o, k) { if (k) o[k] = (o[k] || 0) + 1; };
+    // Shop orders the shop confirmed to Relay (only with testing tools do Relay's own test shops send theirs).
+    var shopOrders = {};
+    (purchases || []).forEach(function (o) {
+      if (o.test && !testing) return;
+      var name = o.store || "", m = /^shopify:([a-z0-9-]+\.myshopify\.com)$/.exec(String(o.retailer || "")), dom = m ? m[1] : "";
+      var keys = [ysName(name) && "n:" + ysName(name), dom && "d:" + dom].filter(Boolean); if (!keys.length) return;
+      shopOrders[ysName(name) + "|" + o.amountMinor] = true;
+      join(keys, function (g) { tally(g.names, ysName(name)); tally(g.labels, name); if (dom) tally(g.domains, dom); tally(g.cats, "other");
+        g.buys.push({ kind: "order", label: name, o: o, at: String(o.orderedAt || "").slice(0, 10), title: (o.items || []).map(function (i) { return i.title; }).filter(Boolean).join(", ") || name, total: Number.isInteger(o.amountMinor) ? money(o.amountMinor, o.currency) : "" }); });
+    });
+    orderRows(receipts || []).forEach(function (x) {
+      if (isCarrier(x) || x.kind === "not_receipt" || x.status === "not_receipt" || x.status === "dismissed") return;
+      if (x.testShop && !testing) return; // Relay's own test shops (the server marks them)
+      var r = x.retailer || {}, name = r.name || "", dom = ysDomain(r.domain);
+      // The same purchase as a shop order already counted.
+      if (shopOrders[ysName(name) + "|" + x.totalPence]) return;
+      var keys = [ysName(name) && "n:" + ysName(name), dom && "d:" + dom].filter(Boolean); if (!keys.length) return;
+      var named = (x.items || []).filter(function (i) { return i && i.name; });
+      join(keys, function (g) { tally(g.names, ysName(name)); tally(g.labels, name); if (dom) tally(g.domains, dom); tally(g.cats, x.category || "other");
+        if (!g.logo && logoDom(x)) g.logo = logoDom(x);
+        g.buys.push({ kind: "receipt", label: name, x: x, at: String(x.orderDate || "").slice(0, 10), title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : name,
+          total: x.totalPence == null ? "" : money(x.totalPence, x.currency) }); });
+    });
+    var top = function (o) { return Object.keys(o).sort(function (a, b) { return o[b] - o[a] || (a < b ? -1 : 1); })[0] || ""; };
+    return groups.filter(function (g) { return testing || !testShop(g); }).map(function (g) {
+      g.buys.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+      // The name the shop goes by most; on a tie, the one not in capitals, then the one on the newest receipt.
+      var shout = function (t) { return t === t.toUpperCase() && /[A-Z]{2}/.test(t); }, newest = g.buys.map(function (b) { return b.label; });
+      var name = Object.keys(g.labels).sort(function (a, b) { return g.labels[b] - g.labels[a] || shout(a) - shout(b) || newest.indexOf(a) - newest.indexOf(b); })[0] || "", domain = top(g.domains);
+      var relay = onRelay.filter(function (sh) { return (testing || !sh.test) && ((sh.domain && g.domains[sh.domain]) || (sh.name && g.names[ysName(sh.name)])); })[0];
+      return { name: name, domain: domain, logo: g.logo || domain, cat: top(g.cats) || "other", count: g.buys.length, last: g.buys[0] && g.buys[0].at, buys: g.buys, relay: relay ? relay.name : null };
+    }).sort(function (a, b) { return b.count - a.count || (a.last < b.last ? 1 : a.last > b.last ? -1 : 0) || (a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1); });
+  }
+  // A shop's round picture: its logo whole on white, otherwise its initial on its kind of shopping's soft tile.
+  function ysLogo(shop, px) {
+    var c = CAT_ICONS[shop.cat] || CAT_ICONS.other;
+    var box = el("span", { className: "rl-ys-logo", text: String(shop.name).trim().charAt(0).toUpperCase(), style: "width:" + px + "px;height:" + px + "px;background:" + c[0] + ";color:" + c[1] + ";font-size:" + Math.round(px * 0.4) + "px" });
+    box.setAttribute("aria-hidden", "true");
+    if (shop.logo) shopLogo(box, shop.logo, Math.round(px * 0.62), function () {});
+    return box;
+  }
+  function ysWhen(d) { return d ? new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : ""; }
+  function ysSheet(shop) {
+    open(function (sheet) {
+      sheet.classList.add("rl-ys-sheet"); sheet.setAttribute("aria-label", shop.name);
+      sheet.appendChild(el("div", { className: "rl-ys-head" }, [ysLogo(shop, 64), el("h2", { text: shop.name })]));
+      sheet.appendChild(el("p", { className: "rl-ys-count", text: "You've bought from here " + (shop.count === 1 ? "once" : shop.count === 2 ? "twice" : shop.count + " times") }));
+      if (shop.last) sheet.appendChild(el("p", { className: "rl-ys-last", text: "Last on " + ysWhen(shop.last) }));
+      var acts = el("div", { className: "rl-ys-acts" });
+      // Only a web address Relay already has from the shop's own emails or orders: never a guessed one.
+      if (shop.domain) acts.appendChild(el("a", { className: "rl-btn ghost", href: "https://" + shop.domain + "/", target: "_blank", rel: "noopener noreferrer", text: "Visit their website" }));
+      if (shop.relay && window.relayOpenShop) acts.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "See them on Shops on Relay", onclick: function () { close(); window.relayOpenShop(shop.relay); } }));
+      if (acts.childNodes.length) sheet.appendChild(acts);
+      sheet.appendChild(accGroup(shop.count === 1 ? "Your receipt" : "Your receipts", shop.buys.map(function (b) {
+        return accRow("doc", b.title, [ysWhen(b.at), b.total].filter(Boolean).join(", "), function () {
+          if (b.kind === "receipt") { var card = emailCard(b.x, { markable: true }); card.onclick(); }
+          else open(function (sh) { sh.appendChild(el("h2", { text: shop.name })); (b.o.items || []).forEach(function (it) { sh.appendChild(confirmedCard(b.o, it, function () { close(); }, it.returnBy && it.returnBy.date)); });
+            sh.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close })); });
+        });
+      })));
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+    });
+  }
+  function ysAll(list) {
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", "Your shops");
+      sheet.appendChild(el("h2", { text: "Your shops" }));
+      var q = el("input", { type: "search", className: "rl-field", placeholder: "Search your shops", ariaLabel: "Search your shops", autocomplete: "off" });
+      var none = el("p", { className: "rl-anote", text: "None of your shops is called that.", hidden: true });
+      var rows = list.map(function (sh) { var r = accRow("bag", sh.name, sh.count === 1 ? "1 receipt" : sh.count + " receipts", function () { ysSheet(sh); }); r.replaceChild(ysLogo(sh, 30), r.firstChild); r._find = sh.name.toLowerCase(); return r; });
+      q.addEventListener("input", function () { var t = q.value.trim().toLowerCase(), n = 0; rows.forEach(function (r) { var on = !t || r._find.indexOf(t) >= 0; r.style.display = on ? "" : "none"; if (on) n++; }); none.hidden = n > 0; });
+      sheet.appendChild(q); sheet.appendChild(accGroup("", rows)); sheet.appendChild(none);
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+    });
+  }
+  var YS_ROW = 12;
+  function mountYourShops(host, fresh) {
+    var draw = function (receipts, purchases) {
+      if (!host.isConnected) return;
+      var list = yourShops(receipts, purchases);
+      host.textContent = "";
+      if (!list.length) return; // a new shopper: Browse already says what to do first
+      var head = el("div", { className: "rl-calm-h rl-ys-h" }, [el("h2", { text: "Your shops" })]);
+      if (list.length > YS_ROW) head.appendChild(el("button", { type: "button", className: "rl-ys-all", text: "See all", ariaLabel: "See all " + list.length + " of your shops", onclick: function () { ysAll(list); } }));
+      host.appendChild(head);
+      var row = el("div", { className: "rl-ys-row", role: "list" });
+      list.slice(0, YS_ROW).forEach(function (sh) {
+        var b = el("button", { type: "button", className: "rl-ys-shop", role: "listitem", ariaLabel: sh.name + ", " + (sh.count === 1 ? "1 receipt" : sh.count + " receipts"), onclick: function () { ysSheet(sh); } },
+          [ysLogo(sh, 64), el("span", { className: "rl-ys-name", text: sh.name })]);
+        row.appendChild(b);
+      });
+      host.appendChild(row);
+    };
+    // The last copy at once (what Receipts loaded), then the fresh list quietly. Relay's connected shops are known from
+    // Browse's list of products, asked for on opening: draw once that's in.
+    var pur = (memo.purchases || api(purchasesPath())).then(function (r) { return r && r.ok ? (r.body && r.body.purchases) || [] : []; }, function () { return []; });
+    var when = function (receipts) {
+      pur.then(function (p) {
+        if (ysRelayShops() !== null) return draw(receipts, p);
+        var once = function () { removeEventListener("relay-catalogue", once); draw(receipts, p); };
+        addEventListener("relay-catalogue", once);
+      });
+    };
+    if (memo.receipts) when(memo.receipts.rows);
+    (fresh || api("/relay/my/receipts?all=1")).then(function (r) { if (r && r.ok && r.body) when(r.body.receipts || []); }, function () {});
+  }
   // Draft 2: Browse's own screen. One Wrapped card, then the kinds of shopping as colour tiles (each opens that kind's
   // receipts), then three doors. Everything on it is the shopper's own: nothing is recommended or made up.
   function mountBrowse(host, opts) {
@@ -5461,6 +5601,8 @@
     if (!s || !s.token) return;
     var hero = el("div", { id: "rl-wrapped" }); host.appendChild(hero);
     if (!isReview()) wrappedDoor(hero, function (y) { memo.wrappedYear = y; if (window.go) window.go("wrapped"); });
+    var fresh = api("/relay/my/receipts?all=1");
+    var shops = el("div", { className: "rl-ys" }); host.appendChild(shops); mountYourShops(shops, fresh);
     var cats = el("div"); host.appendChild(cats);
     var NAMES = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other" };
     var openCat = function (k) { return function () { memo.openCat = k; memo.catFilter = null; if (window.go) window.go("receipts"); }; };
@@ -5486,7 +5628,7 @@
       cats.appendChild(grid);
     };
     if (memo.receipts) drawCats(memo.receipts.rows); else for (var i = 0; i < 2; i++) cats.appendChild(el("div", { className: "rl-skel", style: "height:112px;border-radius:20px;margin:14px 0 0" }));
-    api("/relay/my/receipts?all=1").then(function (r) { if (r.ok && r.body) drawCats(r.body.receipts || []); else if (!memo.receipts) cats.textContent = ""; }, function () { if (!memo.receipts) cats.textContent = ""; });
+    fresh.then(function (r) { if (r.ok && r.body) drawCats(r.body.receipts || []); else if (!memo.receipts) cats.textContent = ""; }, function () { if (!memo.receipts) cats.textContent = ""; });
     var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
     var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
     host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));

@@ -680,6 +680,9 @@ function withoutSize(text){return RelayExchangeEngine.styleOf(text)}
 function sameDesign(p){return sameFamily(p)&&withoutSize(p.variation)===withoutSize(selected.detail)}
 function sameSize(p){const a=sizeOf(p.variation),b=sizeOf(selected.detail);return !!a&&!!b&&a===b}
 function selectStore(value){storeFilter=value;renderCatalog()}
+// Your shops (account.js): which shops are on Relay (their names and addresses; test shops marked), and opening one in Shops on Relay.
+function relayShopsOnRelay(){if(!catalogReady)return null;const seen=new Map();for(const p of catalog){if(p.fixture||p.provider==='relay_demo')continue;const n=storeOf(p),k=storeKey(n);if(!seen.has(k))seen.set(k,{name:n,domain:String(p.shopDomain||'').toLowerCase().replace(/^www\./,''),test:!!p.testShop})}return [...seen.values()]}
+function relayOpenShop(name){dcShow("shops");storeFilter=String(name);renderCatalog();window.scrollTo(0,0)}
 // ---- Discover for shoppers: products from shops on Relay, one card per product, and picks from what you spend ----
 let discoverKind="all",discoverSpend=null,discoverSpendAsked=false;
 const DC_KINDS={fashion:"Fashion",home:"Home",pets:"Pets",beauty:"Beauty",electronics:"Tech",food:"Food & drink",other:"Other"};
@@ -1168,7 +1171,7 @@ async function loadCatalog(manual=false){
  if(webAsk)try{const response=await webAsk;if(response.ok){const data=await response.json();const web=(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))&&p.webShop);
   next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
  catalog=next.filter(p=>!p.fixture).concat(demoProducts());
- }finally{catalogReady=true}
+ }finally{catalogReady=true;try{window.dispatchEvent(new Event("relay-catalogue"))}catch{}}
  if(page==="wallet")render();
  if(manual){
   for(const [sku,w] of Object.entries(watch)){
@@ -1194,7 +1197,7 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){const orderTime=o.createdAt||o.authorizedAt||o.orderCreatedAt;if(!orderTime||!Number.isFinite(Date.parse(orderTime))||Date.parse(orderTime)<Date.parse(walletCutover))continue;if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false,verified:true,createdAt:orderTime})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
+Object.assign(window,{relayShopsOnRelay,relayOpenShop,meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
 // For relay-gestures.js: is this a tab's own screen (pull to refresh works there), and refreshing it. Discover's catalogue
 // comes straight from the shops' feeds, so it's read again too; on Receipts the inbox is checked as well.
 window.RelayShell={isTabRoot:onTabRoot,refresh:shellRefresh,open:openLink};

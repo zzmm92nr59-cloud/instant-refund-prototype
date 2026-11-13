@@ -2061,6 +2061,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     // The Receipts page asks for everything (?all=1); Home and the wallet only need the newest, so they stay quick.
     const all = url.searchParams.get("all") === "1";
     const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? { rows: 3000, cards: 3000 } : {});
+    await markTestShopReceipts(env, list);
     timing.totalMs = Date.now() - t0;
     return json({ receipts: list, timing }, 200, cors);
   }
@@ -2360,3 +2361,24 @@ export async function sendReturnReminders(env, now = Date.now(), fetchImpl = fet
   return { sent };
 }
 function escapeHtml(t) { return String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Receipts from Relay's own test shops (Shopify development stores Relay knows are test shops): marked testShop, so the
+// app shows them as a shop of yours only with its testing tools on. Matched on the shop's address or its name, as the
+// shop is stored; nothing is guessed. Without the shop tables nothing is marked.
+const tidyName = (n) => String(n || "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "");
+export async function markTestShopReceipts(env, list) {
+  if (!list || !list.length || !env.RELAY_DB) return list;
+  let tests = [];
+  try {
+    tests = (await env.RELAY_DB.prepare("SELECT p.domain AS domain, s.label AS label FROM shopify_shop_plan p LEFT JOIN shopify_shops s ON s.domain = p.domain WHERE p.test_shop = 1").all()).results || [];
+  } catch { return list; }
+  if (!tests.length) return list;
+  const domains = new Set(tests.map((t) => String(t.domain || "").toLowerCase()).filter(Boolean));
+  const names = new Set(tests.map((t) => tidyName(t.label)).filter(Boolean));
+  for (const r of list) {
+    const ret = (r && r.retailer) || {};
+    const d = String(ret.domain || "").toLowerCase().replace(/^www\./, "");
+    if ((d && domains.has(d)) || (ret.name && names.has(tidyName(ret.name)))) r.testShop = true;
+  }
+  return list;
+}
