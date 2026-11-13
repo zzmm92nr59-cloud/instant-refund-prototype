@@ -67,11 +67,12 @@ export async function openAccountRow(page, name) {
   if (hub && !(await page.locator("#mePage .rl-arow:visible", { hasText: name }).count())) {
     // The app's double-tap guard ignores a second tap on the same spot within 400ms, so a test that has just tapped the
     // section (then gone back) waits as long as a person would.
-    await page.waitForTimeout(450);
+    await waitOutDoubleTap(page);
     await page.locator("#mePage .rl-arow:visible", { hasText: hub }).first().click();
   }
   const row = page.locator("#mePage .rl-arow:visible", { hasText: name }).first();
   await row.waitFor();
+  await waitOutDoubleTap(page);
   await row.click();
 }
 export const accountRow = (page, name) => page.locator("#mePage .rl-arow", { hasText: RENAMED[name] || name }).first();
@@ -82,6 +83,12 @@ export async function openShops(page) {
   await page.evaluate(() => { window.go("discover"); if (window.dcShow) window.dcShow("shops"); });
   await page.locator("#catalogResults").waitFor({ state: "attached" });
 }
+// The app ignores a second tap on the same button, in the same spot, within 400ms (the shell's double-tap guard: a
+// double tap must never do the thing twice). A person never taps the same control twice that fast on purpose, but a
+// test on a fast machine does: Filter, then a kind, then Filter again in under 400ms, and the second Filter is (rightly)
+// ignored. So the helpers below wait that long before tapping a control a test may just have tapped.
+export const GUARD_MS = 450;
+export const waitOutDoubleTap = (page) => page.waitForTimeout(GUARD_MS);
 // Receipts: a list by month. A kind (Fashion, Gifts, Shop orders…), a year or "Returns and swaps" is chosen from its
 // filter sheet (the button at the top of the list); the receipts of that kind then show in the list.
 export async function openReceiptKind(page, name) {
@@ -90,6 +97,7 @@ export async function openReceiptKind(page, name) {
   }
   // A group already open: back to the whole list first.
   if (await page.locator("#view .rl-cat-back:visible").count()) await page.locator("#view .rl-cat-back").first().click();
+  await waitOutDoubleTap(page);
   await page.locator("#view .rl-calm-filter").first().click();
   const sheet = page.locator(".rl-sheet[aria-label='Filter receipts']").last();
   await sheet.locator(".rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first().click();
@@ -99,6 +107,7 @@ export async function openReceiptKind(page, name) {
 // would on a phone.
 export async function goTab(page, name) {
   await page.evaluate(() => { const a = document.activeElement; if (a && a.blur) a.blur(); });
+  await waitOutDoubleTap(page);
   await tab(page, name).click();
 }
 // For tests that aren't about the first-run prompts: this phone has already said "Not now" to "What do you shop for?"

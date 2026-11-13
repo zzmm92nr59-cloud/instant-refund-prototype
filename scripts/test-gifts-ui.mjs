@@ -9,6 +9,7 @@ import { createRequire } from "node:module"; import { createServer } from "node:
 import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 // Receipts' filter sheet: the Gifts row, with how many.
 const giftsRow = async (page, count) => {
+  await page.waitForTimeout(450); // (the app ignores a second tap on the same button within 400ms)
   await page.locator("#view .rl-calm-filter").first().click();
   const row = page.locator(".rl-sheet[aria-label='Filter receipts'] .rl-arow").filter({ has: page.getByText("Gifts", { exact: true }) }).first();
   await row.getByText(count, { exact: true }).waitFor();
