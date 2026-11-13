@@ -1003,14 +1003,17 @@
     // the start (and just above the keyboard while typing, when the tab bar steps aside).
     // (The page's hidden live region sits a pixel below everything; on Ask it is moved to the top so the page can't scroll.)
     "html.on-ask .topline .avatar{display:none}html.on-ask body>.rl-sr{top:0}" +
-    ".rl-asktab{display:flex;flex-direction:column;margin:0 -2px;min-height:calc(100vh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}}" +
-    "@media(max-width:760px){.rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}html.on-ask .main{padding-bottom:calc(var(--rl-tab-top,84px) + 16px)}html.on-ask body.typing .main{padding-bottom:calc(8px + var(--rl-kb,0px))}" +
+    ".rl-asktab{display:flex;flex-direction:column;margin:0 -2px;min-height:calc(100vh - 230px)}" +
+    "@media(max-width:760px){.rl-asktab{min-height:calc(100vh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}}" +
+    ".rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}html.on-ask .main{padding-bottom:calc(var(--rl-tab-top,84px) + 16px)}html.on-ask body.typing .main{padding-bottom:calc(8px + var(--rl-kb,0px))}" +
     ".rl-asktab .rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 16px)}body.typing .rl-asktab .rl-chat-bar{bottom:calc(8px + var(--rl-kb,0px))}body.typing .rl-asktab{min-height:calc(100vh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}" +
     "@supports(height:100dvh){body.typing .rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}}}" +
     ".rl-asktab .rl-chat{margin-top:12px}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-msg:empty{display:none}" +
     // The box: one pill 56px tall with a 40px round send button inside it (the button itself is 44px, rule 4).
     ".rl-asktab .rl-chat-bar{margin:auto 4px 0;padding:0 6px 0 8px;gap:4px;min-height:56px;border-radius:28px;align-items:flex-end}" +
-    ".rl-asktab .rl-chat-in{min-height:56px;padding:17px 12px 18px;border-radius:24px;background:transparent;line-height:21px}.rl-asktab .rl-chat-in:focus-visible{outline:0}" +
+    ".rl-asktab .rl-chat-in{min-height:56px;padding:17px 4px 18px 12px;border-radius:24px;background:transparent;line-height:21px}.rl-asktab .rl-chat-in:focus-visible{outline:0}" +
+    // The hint stays on one line (it must never make the empty box taller); a narrow phone gives it the box's full width.
+    ".rl-asktab .rl-chat-in::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:389px){.rl-asktab .rl-chat-bar{margin-left:0;margin-right:0;gap:2px}.rl-asktab .rl-chat-in{padding-left:8px;padding-right:0}}" +
     ".rl-asktab .rl-chat-bar:focus-within{box-shadow:0 0 0 2px var(--rl-accent),0 6px 20px rgba(0,0,0,.08)}" +
     ".rl-asktab .rl-chat-send{width:44px;height:44px;margin:0 0 6px;background:none}.rl-asktab .rl-chat-send .rl-jic{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--rl-accent);color:var(--rl-bg)}" +
     // Before anything is asked. Sizes and spacing follow a phone-shopping app's chat page (measured in points on a 402 by

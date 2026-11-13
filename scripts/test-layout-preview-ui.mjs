@@ -6,6 +6,13 @@
 //  * anyone else is sent to ./ without the new layout ever showing: signed out (and nothing of the app starts, nothing
 //    is asked of the server), a shopper who isn't on the team, a team account that has to sign in again, no answer
 //    from the server, the account changing in another tab, and signing out inside it;
+//  * the new layout's Ask page before anything is asked: no big title and no avatar; the six newest purchases as tiles
+//    (newest first, never an "on its way" email), four questions to try, the AI line, what is kept and Talk to a
+//    person; the measured sizes; nothing tappable under 44px and no text under 13px, in light and dark;
+//  * a tile asks first and names the receipt, then attaches exactly that receipt, and asks Relay's server nothing
+//    until a question is sent; the question then goes with that receipt and no other;
+//  * a typed question gets "Search your receipts for this instead" under it, which opens Receipts with those words in
+//    its search; a question the page offered doesn't; and a chat puts nothing new on the phone;
 //  * the service worker never keeps next.html or account-next.js (a changed copy shows on the very next open), and
 //    with no connection next.html goes back to the current app. It asks for the two files past the browser's own
 //    short-lived copies too; the test browser keeps none while a test answers for the server, so that is read from sw.js.
@@ -29,8 +36,15 @@ await mkdir("/tmp/shots", { recursive: true });
 // Three made-up accounts, told apart by their sign-in: on the team, a shopper, and on the team but needing to sign in again.
 const TEAM = "T".repeat(43), SHOPPER = "S".repeat(43), AGAIN = "A".repeat(43);
 const EMAILS = { [TEAM]: "ops@example.com", [SHOPPER]: "member@example.com", [AGAIN]: "ops2@example.com" };
-const st = { hold: 0, down: false };
+const st = { hold: 0, down: false, receipts: false };
 const asked = []; // every request to Relay's server: which page asked, and for what
+const chats = []; // what was sent to the assistant
+// Made-up receipts for the Ask page: eight purchases out of date order, and an "on its way" email, which isn't one.
+const dayAgo = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+const SHOPS = [["Fernhill Outfitters", "fernhill.example", "fashion", "Cord Trousers"], ["Brindle Coffee", "brindle.example", "food", "House Espresso 1kg"], ["Quillon Tech", "quillon.example", "electronics", "USB-C Hub"], ["Ashby Home", "ashbyhome.example", "home", "Desk Lamp"]];
+const bought = n => { const sh = SHOPS[n % 4]; return { id: "aaaa000" + n + "-1111-4111-8111-00000000000" + n, status: "confirmed", kind: "receipt", retailer: { name: sh[0], domain: sh[1] }, orderRef: "R-" + (500 + n), orderDate: dayAgo(n), totalPence: 1000 + n * 100, currency: "GBP",
+  items: [{ name: sh[3], pricePence: 1000 + n * 100, qty: 1 }], category: sh[2], categoryLabel: sh[2], returnable: true, returns: null, source: "shopper_email", parserVersion: 28 }; };
+const RECEIPTS = [5, 2, 8, 1, 7, 3, 6, 4].map(bought).concat([{ ...bought(0), id: "bbbb0001-1111-4111-8111-000000000001", kind: "delivery_update", totalPence: null, items: [] }]);
 const stub = async ctx => {
   await ctx.route("https://**/*", async route => {
     const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
@@ -52,13 +66,14 @@ const stub = async ctx => {
     if (p === "/relay/my/profile") return j({ email: EMAILS[token] || "", name: token === TEAM ? "Ops" : "Member", photo: null });
     if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
     if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAILS[token] || "", others: [] });
-    if (p === "/relay/my/receipts") return j({ receipts: [] });
+    if (p === "/relay/my/receipts") return j({ receipts: st.receipts && token === TEAM ? RECEIPTS : [] });
     if (p === "/relay/my/purchases") return j({ purchases: [] });
     if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
     if (p === "/relay/my/2fa") return j({ required: true, enrolled: true, verified: true, methods: ["passkey"], app: true, text: false });
     if (p === "/relay/my/phone") return j({ available: false });
     if (p === "/relay/my/card") return j({ enabled: false });
     if (p === "/relay/my/help/chat" && m === "GET") return j({ available: true, handoff: true });
+    if (p === "/relay/my/help/chat" && m === "POST") { chats.push(JSON.parse(req.postData() || "{}")); return j({ reply: "A stand-in answer from the test." }); }
     if (p === "/relay/my/auctions") return j({ canBid: true, auctions: [] });
     if (p === "/relay/auctions") return j({ auctions: [] });
     if (p === "/relay/shopify/catalogue") return j({ published: true, products: [] });
@@ -217,6 +232,134 @@ await Promise.all([page.waitForURL(u => new URL(u).pathname === "/"), page.locat
 await currentApp("signed out inside");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.session.v1")), null, "signed out");
 console.log("ok - signing out inside the new layout lands on the current app");
+
+// ---- The new layout's Ask page ----
+// Everything tappable under 44px either way, and every bit of text under 13px (capitals may be 12px), on the page as it stands.
+const sizes = () => page.evaluate(() => {
+  const vis = e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== "hidden" && c.display !== "none" && Number(c.opacity) > 0; };
+  const small = [], tiny = new Set();
+  for (const e of document.querySelectorAll("#view button, #view a, #view [role=button], #view input, #view textarea, #foot button")) {
+    if (!vis(e)) continue; const r = e.getBoundingClientRect();
+    if (r.height < 43.5 || r.width < 43.5) small.push((e.getAttribute("aria-label") || e.innerText || e.placeholder || e.className).trim().replace(/\s+/g, " ").slice(0, 40) + " " + Math.round(r.width) + "x" + Math.round(r.height));
+  }
+  const walk = document.createTreeWalker(document.querySelector("#view"), NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) { const e = n.parentElement; if (!n.textContent.trim() || !e || !vis(e) || e.closest(".rl-sr")) continue;
+    const c = getComputedStyle(e), px = parseFloat(c.fontSize); if (px < 13 && !(c.textTransform === "uppercase" && px >= 12)) tiny.add(n.textContent.trim().slice(0, 30) + " " + px); }
+  return { small, tiny: [...tiny] };
+});
+const bothSchemes = async what => { for (const scheme of ["light", "dark"]) { await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(120); assert.deepEqual(await sizes(), { small: [], tiny: [] }, what + ": nothing tappable under 44px, no text under 13px (" + scheme + ")"); } await page.emulateMedia({ colorScheme: "light" }); };
+const dayWords = d => page.evaluate(d => { const t = new Date(d), o = { day: "numeric", month: "short" }; if (t.getFullYear() !== new Date().getFullYear()) o.year = "numeric"; return t.toLocaleDateString("en-GB", o); }, d);
+const openAsk = async () => {
+  await page.goto(origin + "/next.html");
+  await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate") && document.querySelectorAll("#foot button").length === 4);
+  await page.evaluate(() => window.tabTap("ask"));
+  await page.locator("#askPage .rl-ask-q").first().waitFor();
+};
+const box = sel => page.locator(sel).first().evaluate(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return { x: r.left, y: r.top, w: r.width, h: r.height, bottom: r.bottom, radius: c.borderRadius, font: c.fontSize, weight: c.fontWeight }; });
+const newest = [1, 2, 3, 4, 5, 6].map(bought);
+
+// 10. Before anything is asked.
+st.receipts = true;
+await signIn(TEAM);
+await openAsk();
+await page.locator(".rl-ask-tile").first().waitFor();
+assert.deepEqual(await page.locator("#view h1").evaluate(e => [e.innerText.trim(), e.getBoundingClientRect().width <= 1]), ["Ask", true], "the page's name is there for screen readers only: no big title");
+assert.equal(await page.locator(".topline .avatar").isVisible(), false, "no avatar on Ask");
+assert.equal((await page.locator(".rl-ask-hb").innerText()).trim(), "Ask about a receipt");
+assert.deepEqual(await page.locator(".rl-ask-tile").evaluateAll(ts => ts.map(t => t.getAttribute("data-receipt"))), newest.map(r => r.id), "the six newest purchases, newest first, and never the 'on its way' email");
+assert.equal(await page.locator(".rl-ask-tile").first().getAttribute("aria-label"), "Ask about your receipt from " + newest[0].retailer.name + ", " + await dayWords(newest[0].orderDate));
+assert.equal((await page.locator(".rl-ask-tile .rl-ask-tile-d").first().innerText()).trim(), await dayWords(newest[0].orderDate), "each tile carries the day it was bought");
+assert.equal((await page.locator(".rl-ask-h2").innerText()).trim(), "Try asking");
+assert.deepEqual(await page.locator(".rl-ask-q").evaluateAll(qs => qs.map(q => q.innerText.trim())), ["How do I return something?", "How does a swap work?", "Why is a receipt missing?", "How does Relay find my receipts?"], "the same four questions, with no second line");
+assert.equal((await page.locator(".rl-ask-ai").innerText()).trim(), "Relay's assistant is an AI, so it can get things wrong.");
+assert.ok(await page.locator(".rl-ask-ai").isVisible(), "the AI line shows before anything is asked");
+assert.match(await page.locator("#askPage .rl-anote").innerText(), /^Relay keeps no copy of this chat\. Your messages go to Anthropic/, "what is kept is still said");
+assert.ok(await page.locator("#askPage .rl-chat-person", { hasText: "Talk to a person" }).isVisible(), "Talk to a person is still there");
+assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Search receipts or ask about Relay");
+assert.equal(await page.locator("#askPage .rl-chat-about, #askPage .rl-chat-b").count(), 0, "no earlier chat is listed or shown");
+// The measured arrangement.
+{ const t0 = await box(".rl-ask-tile"), t1 = await page.locator(".rl-ask-tile").nth(1).evaluate(e => e.getBoundingClientRect().left);
+  assert.deepEqual([t0.w, t0.h, t0.radius, t1 - (t0.x + t0.w)], [115, 115, "24px", 8], "tiles are 115px squares with a 24px corner, 8px apart");
+  const h = await box(".rl-ask-h2"), chev = await box(".rl-ask-chev"), row = await box(".rl-ask-q"), pic = await box(".rl-ask-qi"), words = await box(".rl-ask-q b");
+  assert.deepEqual([h.font, h.weight, chev.w, chev.h], ["20px", "700", 20, 20], "headings are 20px bold; the round chevron is 20px");
+  assert.deepEqual([row.h, pic.w, pic.h, pic.radius, words.font], [64, 48, 48, "12px", "16px"], "a question is a 64px row with a 48px tile and 16px words");
+  const bar = await box("#askPage .rl-chat-bar"), field = await box("#askPage .rl-chat-in"), send = await box("#askPage .rl-chat-send"), ring = await box("#askPage .rl-chat-send .rl-jic"), foot = await box("#foot");
+  assert.deepEqual([bar.h, bar.radius, field.font, ring.w, ring.h], [56, "28px", "16px", 40, 40], "the box is one 56px pill with 16px words and a 40px round send button");
+  assert.ok(send.w >= 44 && send.h >= 44 && field.h >= 44, "the send button and the field are still 44px to tap");
+  assert.equal(Math.round(foot.y - bar.bottom), 16, "the box rests 16px above the tab bar");
+  assert.equal(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), 0, "with room to spare the page doesn't scroll"); }
+await bothSchemes("Ask before anything is asked");
+await page.screenshot({ path: "/tmp/shots/layout-preview-ask-open.png" });
+console.log("ok - Ask before anything is asked: newest receipts as tiles, four questions, the AI line, the measured sizes");
+
+// 11. A tile: asks first and names the receipt, attaches exactly that one, and nothing goes anywhere until a question is sent.
+{ const pick = newest[2], label = pick.retailer.name + ", " + await dayWords(pick.orderDate), n0 = asked.length, c0 = chats.length;
+  await page.locator('.rl-ask-tile[data-receipt="' + pick.id + '"]').click();
+  const sheet = page.locator(".rl-sheet").last();
+  await sheet.getByRole("button", { name: "Show it" }).waitFor();
+  assert.match(await sheet.innerText(), new RegExp("^Show Relay's assistant your receipt from " + label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\? It sees what Relay read from it \\(the shop, date, total, items and return date\\), not the email itself\\."), "the sheet names the receipt and says what the assistant will see");
+  assert.equal(await page.locator(".rl-chat-about").count(), 0, "nothing is attached until Show it");
+  await sheet.getByRole("button", { name: "Show it" }).click();
+  await page.locator(".rl-chat-about").waitFor();
+  assert.equal((await page.locator(".rl-chat-about span").first().innerText()).trim(), "About your receipt from " + label, "Ask opens with that receipt attached");
+  assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Ask about this receipt");
+  await page.waitForTimeout(600);
+  assert.deepEqual(asked.slice(n0), [], "tapping a tile and showing the receipt asks Relay's server nothing");
+  assert.equal(chats.length, c0, "nothing is sent to the assistant until a question is");
+  await bothSchemes("Ask with a receipt attached");
+  await page.locator(".rl-chat-chips button", { hasText: "The total is wrong" }).click();
+  await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
+  assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "The total is wrong" }], receiptId: pick.id }], "the question goes with that receipt, and only that one");
+  assert.equal(await page.locator(".rl-ask-find").count(), 0, "a question about a receipt isn't offered as a search");
+  await page.getByRole("button", { name: "Stop showing it" }).click();
+  assert.equal(await page.locator("#askPage .rl-chat-in").getAttribute("placeholder"), "Search receipts or ask about Relay"); }
+console.log("ok - a tile asks first, attaches exactly that receipt, and sends nothing until a question is sent");
+
+// 12. A typed question: sent to the assistant as today, and the same words can be looked for in Receipts instead.
+{ await openAsk();
+  const keys0 = await page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage)).sort()), c0 = chats.length;
+  await page.locator("#askPage .rl-chat-in").fill("brown cord trousers");
+  await page.locator("#askPage .rl-chat-send").click();
+  await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
+  assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "brown cord trousers" }] }], "the question goes to the assistant with no receipt");
+  const find = page.locator(".rl-chat-b.me .rl-ask-find");
+  assert.equal(await find.count(), 1, "one control, under the shopper's own message");
+  const look = await find.evaluate(e => { const c = getComputedStyle(e), probe = document.createElement("span"); probe.style.color = "var(--rl-accent)"; document.body.appendChild(probe); const accent = getComputedStyle(probe).color; probe.remove();
+    return { text: e.innerText.trim(), tall: e.getBoundingClientRect().height >= 44, accent: c.color === accent, underline: c.textDecorationLine, font: c.fontSize }; });
+  assert.deepEqual(look, { text: "Search your receipts for this instead", tall: true, accent: true, underline: "none", font: "15px" }, "quiet: accent colour, no underline, 44px to tap");
+  assert.ok(await page.locator("#askPage .rl-chat-person", { hasText: "Talk to a person" }).isVisible() && /^Relay keeps no copy of this chat/.test(await page.locator("#askPage .rl-anote").innerText()), "Talk to a person and what is kept are still there once a chat is under way");
+  await bothSchemes("Ask after a question");
+  await page.screenshot({ path: "/tmp/shots/layout-preview-ask-sent.png" });
+  // A second typed question: the control moves to the newest one.
+  await page.locator("#askPage .rl-chat-in").fill("tall desk lamp"); await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelectorAll("#askPage .rl-chat-b.bot").length === 3);
+  assert.deepEqual(await page.locator(".rl-chat-b.me").evaluateAll(bs => bs.map(b => [b.querySelector("p").innerText, Boolean(b.querySelector(".rl-ask-find"))])), [["brown cord trousers", false], ["tall desk lamp", true]], "only the newest typed question carries it");
+  // Nothing about the chat is put on the phone.
+  const keys1 = await page.evaluate(() => Object.keys(localStorage).concat(Object.keys(sessionStorage)).sort());
+  assert.deepEqual(keys1.filter(k => !keys0.includes(k)), [], "a chat adds nothing to what the phone keeps");
+  assert.equal(await page.evaluate(() => Object.values(localStorage).concat(Object.values(sessionStorage)).some(v => /brown cord trousers|tall desk lamp|stand-in answer/i.test(String(v)))), false, "no copy of the chat is kept on the phone");
+  await Promise.all([page.locator("#receiptsPage").waitFor(), find.click()]);
+  assert.equal(await page.getByRole("searchbox", { name: "Search your receipts" }).inputValue(), "tall desk lamp", "Receipts opens with those words in its search");
+  assert.equal(await page.locator('#foot button[aria-current="page"]').getAttribute("data-tab"), "receipts", "on the Receipts tab"); }
+console.log("ok - a typed question can be looked for in Receipts instead, and a chat puts nothing on the phone");
+
+// 13. A question the page offered is sent as it is, with no search under it; the heading's chevron opens Receipts.
+{ await openAsk(); const c0 = chats.length;
+  await page.locator(".rl-ask-q", { hasText: "How does a swap work?" }).click();
+  await page.locator(".rl-chat-b.bot", { hasText: "A stand-in answer from the test." }).waitFor();
+  assert.deepEqual(chats.slice(c0), [{ messages: [{ role: "user", text: "How does a swap work?" }] }]);
+  assert.equal(await page.locator(".rl-ask-find").count(), 0, "an offered question isn't offered as a search");
+  await openAsk();
+  await Promise.all([page.locator("#receiptsPage").waitFor(), page.locator(".rl-ask-hb").click()]);
+  // With no receipts the block is left out and the questions come first.
+  st.receipts = false;
+  await openAsk();
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator(".rl-ask-tile").count(), 0, "no receipts, no tiles");
+  assert.equal(await page.locator(".rl-ask-hb").isVisible(), false, "and no heading for them");
+  assert.ok(await page.locator(".rl-ask-h2", { hasText: "Try asking" }).isVisible());
+  await bothSchemes("Ask with no receipts"); }
+console.log("ok - an offered question has no search under it; the heading opens Receipts; with no receipts the block is left out");
 assert.deepEqual(errors, [], "no script errors");
 await ctx.close();
 
@@ -255,4 +398,4 @@ assert.deepEqual(errors2, [], "no script errors with the service worker running"
 console.log("ok - the service worker never keeps the try-out's files; a new copy shows at once; no connection goes back to the current app");
 
 await browser.close(); server.close();
-console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, and the service worker (stubbed server)");
+console.log("PASS the new layout as a team-only try-out: the way in and out, the gate, its Ask page, and the service worker (stubbed server)");
