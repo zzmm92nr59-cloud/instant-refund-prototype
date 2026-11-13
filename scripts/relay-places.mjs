@@ -50,6 +50,15 @@ export async function openProfile(page) {
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
 // (Home's own picture comes after the page's top line in the page, so the last one showing is Home's when on Home.)
 export const profileButton = (page) => page.locator(".topline .avatar, .h2-me").filter({ visible: true }).last();
+// Taps the picture to open Profile, as a person would: once the picture is drawn, and again if the tap landed just as the
+// screen was being drawn (a busy machine can do that).
+export async function tapPicture(page) {
+  await page.waitForFunction(() => [...document.querySelectorAll(".h2-me, .topline .avatar")].some(e => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.visibility !== "hidden" && c.display !== "none"; }), null, { timeout: 20000 });
+  for (let i = 0; ; i++) {
+    try { await profileButton(page).click({ timeout: 8000 }); await page.locator("#mePage .rl-arow").first().waitFor({ timeout: 8000 }); return; }
+    catch (e) { if (i === 2) throw e; await page.waitForTimeout(450); }
+  }
+}
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
   name = RENAMED[name] || name;

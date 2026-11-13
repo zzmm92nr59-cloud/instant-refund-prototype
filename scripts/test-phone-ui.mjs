@@ -7,7 +7,7 @@
 // takes the texted code, the app's or a recovery code; every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeShows, profileButton } from "./relay-places.mjs";
+import { skipInterests, homeShows, profileButton, tapPicture } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -104,7 +104,7 @@ const codeBoxIs = async sel => assert.equal(await page.locator(sel).evaluate(el 
 const signedInAt = async () => {
   await page.goto(origin + "/index.html");
   await page.evaluate(([e, t]) => localStorage.setItem("relay.session.v1", JSON.stringify({ token: t, email: e, expiresAt: 9e12 })), [EMAIL, TOKEN]);
-  await page.reload(); await profileButton(page).click();
+  await page.reload(); await tapPicture(page);
   await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor();
   // Phone number, Two-step sign-in and Devices live in Profile's Security and privacy.
   await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click();
