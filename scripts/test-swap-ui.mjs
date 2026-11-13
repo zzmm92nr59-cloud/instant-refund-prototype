@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
+import { skipInterests } from './relay-places.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = resolve('.');
@@ -23,7 +24,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
 async function run({ card, mode = "card", returnInfo = null, exchange = null, blocked = null, returnable = false }) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context);
   const posts = [];
   let saved = card;
   await context.route('https://js.stripe.com/v3/', r => r.fulfill({ contentType: 'text/javascript', body: STRIPE_STUB }));
@@ -178,7 +179,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
 // 6. Home after a swap: the card is redrawn from the shop's order however the sheet is closed, the swapped item is still
 // there to return, a "return by" date shows only when it is the shop's own, and a swap with money still to pay is on Home.
 {
-  const context = await browser.newContext({ viewport: { width: 390, height: 820 } });
+  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context);
   const by = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
   const byText = new Date(by + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   let swapped = false;

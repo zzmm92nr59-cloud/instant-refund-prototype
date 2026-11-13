@@ -4,6 +4,7 @@
 // shop's return email has arrived, the card's main button shows the return QR code instead. Stubbed server, made-up orders.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".svg" ? "image/svg+xml" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -26,7 +27,7 @@ const receipts = [
     returnPlan: { id: "33333333-3333-4333-8333-333333333333", kind: "return_instructions", qrMentioned: true, carrier: "Evri", returnId: "RT-5551234", deadline: day(10), gmailId: "abc123def456" } },
 ];
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
 const originalAsks = [];
 await ctx.route("https://**/*", async route => {

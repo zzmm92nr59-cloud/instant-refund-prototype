@@ -66,3 +66,16 @@ export async function goTab(page, name) {
   await page.evaluate(() => { const a = document.activeElement; if (a && a.blur) a.blur(); });
   await tab(page, name).click();
 }
+// For tests that aren't about interests: this phone has already said "Not now" to "What do you shop for?" for whoever
+// is signed in, so neither the one-time sheet on Home nor the sign-up step gets in the way. (scripts/test-signup-ui.mjs
+// and scripts/test-layout-ui.mjs test those.)
+export async function skipInterests(ctx) {
+  await ctx.addInitScript(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("relay.session.v1") || "null"), k = "relay.interests-later.v1";
+      if (!s || !s.email) return;
+      const l = JSON.parse(localStorage.getItem(k) || "[]");
+      if (!l.includes(s.email)) { l.push(s.email); localStorage.setItem(k, JSON.stringify(l)); }
+    } catch (e) { /* storage blocked: nothing to do */ }
+  });
+}

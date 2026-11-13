@@ -17,6 +17,7 @@
 //     on every visit to Profile.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, homeShows } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -36,7 +37,7 @@ reset();
 const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" };
 const browser = await chromium.launch();
 async function shopper({ testingTools = false, hash = "" } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
   await ctx.route("https://**/*", async route => {
     const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
     if (m === "OPTIONS") return route.fulfill({ status: 204, headers: H });
@@ -99,7 +100,7 @@ const TEN_MINUTES = 600000;
 // 1. An ordinary shopper.
 {
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   await pass(page, 6000);   // Discover's catalogue is fetched a few seconds after the start, so that tab opens at once
   await until(page, () => count(/shopify\/catalogue/) === 1, "the catalogue");
   assert.deepEqual([...log].sort(), ["GET /relay/my/alerts/status", "GET /relay/my/gmail", "GET /relay/my/instore/shops", "GET /relay/my/profile", "GET /relay/my/purchases", "GET /relay/my/receipts", "GET /relay/shopify/catalogue"],
@@ -142,7 +143,7 @@ const TEN_MINUTES = 600000;
 {
   reset();
   const { ctx, page } = await shopper({ testingTools: true });
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   await pass(page, 6000);
   await until(page, () => count(/live-test\/products/) === 1 && count(/verified-purchases/) >= 1 && count(/instore\/suggestions/) >= 1, "the test shop's products, the old test purchases and in-store suggestions");
   const mark = log.length;
@@ -156,7 +157,7 @@ const TEN_MINUTES = 600000;
 {
   reset({ instoreLive: true });
   const { ctx, page } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   await until(page, () => count(/instore\/suggestions/) === 1, "in-store suggestions");
   await pass(page, 6000);
   assert.equal(count(/live-test\/products|verified-purchases/), 0);
@@ -168,7 +169,7 @@ const TEN_MINUTES = 600000;
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   const now = await page.evaluate(() => Date.now());
   st.auction = { id: A1, shop: "Hollow Pine", title: "Wool Beanie", variant: "Navy", size: null, description: null, condition: "new_tags", conditionText: "New with tags", fromCatalogue: true, pictures: [],
     startMinor: 1000, priceMinor: 3100, nextMinor: 3200, bids: 4, deliveryMinor: 395, currency: "GBP", endsAt: now + 3 * 3600e3, status: "live" };
@@ -213,7 +214,7 @@ const TEN_MINUTES = 600000;
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   const asks = () => count(/GET \/relay\/my\/resale\/requests\/.*\/messages/);
   await page.locator(".avatar").click();
   await page.getByRole("button", { name: "Swap & resell", exact: true }).click();
@@ -269,7 +270,7 @@ const TEN_MINUTES = 600000;
 {
   reset({ scan: { state: "running", full: false, found: 5, scannedBack: "2026-03-01", startedAt: Date.now() - 60000, updatedAt: Date.now(), finishedAt: null, error: null }, scanAnswer: "busy" });
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   await page.evaluate(() => window.tabTap("receipts"));
   await until(page, () => st.scanPosts >= 1, "the page asking how the read is getting on");
   await pass(page, 9000);
@@ -292,7 +293,7 @@ const TEN_MINUTES = 600000;
 {
   reset();
   const { ctx, page, errors } = await shopper();
-  await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+  await homeShows(page, "J");
   const OWN = /GET \/relay\/my\/(profile|delivery|phone|card|2fa|consent|admin\/me)$/;
   await page.evaluate(() => window.tabTap("me")); await pass(page, 3000); await settle(page, 500);
   const first = log.filter(x => OWN.test(x)).sort();

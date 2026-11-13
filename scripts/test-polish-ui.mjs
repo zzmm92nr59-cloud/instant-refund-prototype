@@ -5,6 +5,7 @@
 // from the account; the keyboard space is tracked; no raw error text.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, homeShows } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -15,7 +16,7 @@ const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 const W = { year: 2026, years: [{ year: 2026, receipts: 2 }], industries: [{ category: "fashion", label: "Fashion", receipts: 1, spentPence: 9500 }, { category: "food", label: "Food & drink", receipts: 1, spentPence: 4200 }], receipts: 2, shops: 2, items: 2, spentPence: 13700, currency: "GBP", coverage: { withTotal: 2, noTotal: 0, otherCurrency: 0 }, topShops: [{ name: "RAINS", receipts: 1, spentPence: 9500 }, { name: "Nespresso", receipts: 1, spentPence: 4200 }], categories: [{ category: "fashion", label: "Fashion", receipts: 1 }, { category: "food", label: "Food & drink", receipts: 1 }], byMonth: months.map(m => ({ month: m, receipts: m === "Oct" ? 2 : 0, spentPence: 0 })), busiestMonth: "Oct", topItems: [], photos: [], personality: { label: "The Mixer", why: "Your shopping was spread across 2 kinds of shop." } };
 const state = { connected: true, receiptsDelay: 0, serverWatches: [] };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark", serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method();
   const j = b => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -45,7 +46,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e })), EMAIL);
 await page.reload();
-await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+await homeShows(page, "J");
 
 // The page measured as a shopper sees it.
 const measure = () => page.evaluate(() => {
@@ -175,7 +176,7 @@ state.receiptsDelay = 0;
 state.serverWatches = [{ sku: "shopify:kick:variant:1", product: "Court Classic Trainers", variant: "White / UK 8", store: "Kick Lane", via: "item", lastSeenMinor: 8500 }];
 await page.evaluate(() => localStorage.removeItem("relay-radar-v2"));
 await page.reload();
-await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+await homeShows(page, "J");
 await page.locator(".htile", { hasText: "Price alerts" }).getByText("1 watched").waitFor();
 console.log("ok - watches come back from the account when this device lost them");
 

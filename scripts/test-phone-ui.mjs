@@ -7,6 +7,7 @@
 // takes the texted code, the app's or a recovery code; every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, homeShows } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -18,7 +19,7 @@ let st;
 const reset = o => { st = { available: true, ending: null, pendingEnding: null, twoStep: false, app: false, left: 0, starts: [], confirms: [], sends: 0, textCalls: [], signinTexts: 0, verifies: [], methods: ["text"], ...o }; };
 reset();
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 // The stand-in for Android's text reader: hands over a code only when the test says one has "arrived".
 await ctx.addInitScript(() => {
   if (!("OTPCredential" in window)) window.OTPCredential = function () {};
@@ -198,7 +199,7 @@ await polished("sign-in: check your phone"); await shot("signin");
 await page.locator("#rl-2s-code").fill("111111");
 await page.getByText("That code isn't right. Check it and try again.").waitFor();
 await page.locator("#rl-2s-code").fill("654321");
-await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+await homeShows(page, "J");
 assert.ok((await page.evaluate(() => localStorage.getItem("relay.session.v1"))).includes(TOKEN), "signed in after the texted code");
 assert.deepEqual(st.verifies, ["111111", "654321"]);
 console.log("ok - signing in: 'Check your phone', the code texted once, straight away; the texted code finishes it");
@@ -223,7 +224,7 @@ await page.getByRole("button", { name: "Confirm" }).click();
 await page.getByText("That recovery code isn't right, or it's already been used.").waitFor();
 await page.locator("#rl-2s-code").fill(RECOVERY[0]);
 await page.getByRole("button", { name: "Confirm" }).click();
-await page.locator("#homeHello", { hasText: "Jess" }).waitFor();
+await homeShows(page, "J");
 assert.equal(st.signinTexts, 0, "no text when codes come from the app");
 console.log("ok - with the app: its code, or a recovery code without the phone");
 
