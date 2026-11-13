@@ -143,8 +143,10 @@ const signIn = async token => {
 const tabs = () => page.evaluate(() => [...document.querySelectorAll("#foot button")].map(b => (b.getAttribute("aria-label") || b.innerText || "").trim().replace(/\s+/g, " ")));
 const CURRENT_TABS = ["Home", "Receipts", "Discover", "Profile"];
 const currentApp = async what => {
-  await page.waitForURL(u => new URL(u).pathname === "/", { timeout: 15000 });
-  await page.waitForFunction(() => document.querySelectorAll("#foot button").length > 0 || document.querySelector("#view .darkbtn"), null, { timeout: 15000 });
+  // Where the page ends up (a move cut short on the way, which a busy machine can report, doesn't count).
+  for (let t = Date.now(); new URL(page.url()).pathname !== "/"; ) { if (Date.now() - t > 15000) throw new Error(what + ": never reached the current app"); await page.waitForTimeout(100); }
+  for (let t = Date.now(); ; ) { try { if (await page.evaluate(() => document.querySelectorAll("#foot button").length > 0 || Boolean(document.querySelector("#view .darkbtn")))) break; } catch (e) { /* the page was still changing */ }
+    if (Date.now() - t > 15000) throw new Error(what + ": the current app never drew"); await page.waitForTimeout(150); }
   assert.equal(await page.locator("html.rl-gate").count(), 0, what + ": the current app has no gate");
   assert.equal(await page.locator(".h2-band, #homePage.h2-home").count(), 0, what + ": the current layout is showing, not the new one");
 };
@@ -267,7 +269,9 @@ await page.goto(origin + "/next.html");
 await page.waitForFunction(() => !document.documentElement.classList.contains("rl-gate"));
 await page.locator(".h2-me").click();
 await page.locator("#mePage .rl-arow").first().waitFor();
-await Promise.all([page.waitForURL(u => new URL(u).pathname === "/"), page.locator("#mePage .rl-aout", { hasText: "Sign out" }).click()]);
+// Signing out moves the page twice in quick succession (the app's own sign-out, then the gate), and a busy machine can
+// report the first move as cut short: what counts is where the page ends up.
+await page.locator("#mePage .rl-aout", { hasText: "Sign out" }).click();
 await currentApp("signed out inside");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.session.v1")), null, "signed out");
 console.log("ok - signing out inside the new layout lands on the current app");

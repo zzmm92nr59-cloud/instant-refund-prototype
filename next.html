@@ -6,7 +6,9 @@ function token(){try{var s=JSON.parse(localStorage.getItem(KEY)||"null");return 
 // Shut: nothing shows, and nothing can be tapped, reached by keyboard or read out (the body starts out inert).
 function shut(){root.classList.add("rl-gate");if(document.body)document.body.setAttribute("inert","")}
 function show(){root.classList.remove("rl-gate");if(document.body)document.body.removeAttribute("inert")}
-function leave(){window.__relayLeaving=true;shut();try{location.replace("./")}catch(e){location.href="./"}}
+function leave(){window.__relayLeaving=true;shut();const go=()=>{try{location.replace("./")}catch(e){location.href="./"}};go();
+// A move started while the page is still changing (signing out does both at once) can be cut short: try again until it lands.
+let n=0;const again=setInterval(()=>{if(++n>10||!/next\.html$/.test(location.pathname)){clearInterval(again);return}go()},1200)}
 function check(){var t=token();if(!t){leave();return}if(t===passed)return;passed=null;shut();
  var stop=typeof AbortController==="function"?new AbortController():null,timer=setTimeout(function(){if(stop)stop.abort()},12000);
  // Asked the way the app asks everything: the sign-in, and the newest bookmark Relay has handed this device, so the
