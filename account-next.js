@@ -997,6 +997,26 @@
     ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}" +
     ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{position:absolute;left:0;top:0;width:100%!important;height:100%!important;object-fit:cover;object-position:center}" +
     ".h2-art.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-art>img.rl-logo-img{left:16px;top:16px;width:calc(100% - 32px)!important;height:calc(100% - 32px)!important;object-fit:contain}" +
+    // Receipts and other lists in the new layout: a logo sits whole on white (or its own colour), no pale ring, as on Home.
+    ".rl-rr-pic.rl-has-logo,.rl-po-img.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none!important}.rl-rr-pic.rl-has-logo>img{width:34px!important;height:34px!important;object-fit:contain}" +
+    // Three colour looks for Home's cards and the Ask page, from Relay's own palette, each behind a class on <html>
+    // (look-q, look-n, look-s). None is on by default: Home keeps its category colours until one is chosen.
+    // Q, quiet: cards in the card colour; colour only inside the pictures and the strip.
+    "html.look-q .h2-feed.tint .h2-card.has-c{background:var(--rl-card);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(60,60,67,.86)}@media(prefers-color-scheme:dark){html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:var(--rl-text2)}}" +
+    "html.look-q .h2-feed.tint .h2-card.has-c .h2-go{background:var(--rl-fill);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-logo:not(.rl-has-logo){background:var(--rl-fill);color:var(--rl-text)}" +
+    "html.look-q .h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:none;color:#fff}" +
+    // N, navy and lime: every card Relay's navy (a step lighter than the black page in dark), lime for the arrow and the open tab.
+    "html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#101828;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-head-t span,html.look-n .h2-feed.tint .h2-card .h2-line-t span{color:rgba(255,255,255,.72)}" +
+    "html.look-n .h2-feed.tint .h2-card .h2-go{background:#c7f567;color:#101828}html.look-n .h2-feed.tint .h2-card .h2-logo:not(.rl-has-logo){background:#fff;color:#101828}" +
+    "html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#1d2a44;box-shadow:none;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:#c7f567!important}html.look-n .h2-feed.tint .h2-card .h2-pic:has(.rl-ill){background:transparent}" +
+    "html.look-n .footnav button.active{background:#c7f567!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#c7f567}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#c7f567;color:#101828}" +
+    "@media(prefers-color-scheme:dark){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
+    // S, softer: the same category colours at lower strength; dark text on the pale cards, white on the deep ones.
+    "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 16%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c .h2-go{background:var(--h2-c);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 30%,#fff);box-shadow:none;color:#000}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}html.look-s .rl-ask-qi{background:color-mix(in srgb,var(--qi) 18%,var(--rl-bg));color:var(--qi)}" +
+    "@media(prefers-color-scheme:dark){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 22%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(255,255,255,.1)!important;color:#fff!important}}" +
     ".h2-one{display:flex;align-items:center;gap:12px;min-width:0}.h2-one-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}" +
     ".h2-one-n{font-size:16px;line-height:21px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.h2-one-p{font-size:16px;line-height:21px;font-weight:600}" +
     ".h2-price{position:absolute;left:12px;top:12px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600}" +
@@ -1052,7 +1072,7 @@
     // Relay has its logo, and always in the tile's spoken name.
     ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
     ".rl-ask-q b{flex:1;min-width:0;font-size:16px;line-height:21px;font-weight:500;color:var(--rl-text)}" +
-    ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
+    ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--qi)}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
     // Said quietly at the end: it's an AI, what is kept, and the way to a person.
     ".rl-ask-ai{margin:10px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
     ".rl-asktab.rl-ask-opening .rl-anote{margin:4px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
@@ -4199,7 +4219,7 @@
           recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
           list.appendChild(el("h2", { className: "rl-ask-h2", text: "Try asking" }));
           list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
-            var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[q[1]] ? accIc(q[1], 24, "rl-ask-qi-i") : jIc(q[1], 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.background = q[2];
+            var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[q[1]] ? accIc(q[1], 24, "rl-ask-qi-i") : jIc(q[1], 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.setProperty("--qi", q[2]);
             return el("button", { type: "button", className: "rl-ask-q", onclick: function () { box.value = q[0]; sendQuestion(true); } }, [pic, el("b", { text: q[0] })]);
           })));
           list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
