@@ -1017,6 +1017,11 @@
     "html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}html.look-s .rl-ask-qi{background:color-mix(in srgb,var(--qi) 18%,var(--rl-bg));color:var(--qi)}" +
     "@media(prefers-color-scheme:dark){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
     "html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 22%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(255,255,255,.1)!important;color:#fff!important}}" +
+    // Interests: chips of 44px or more with one of Relay's drawings; the chosen ones in the accent colour.
+    ".rl-int-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px}.rl-int{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;line-height:20px;font-weight:600;transition:transform .12s,background .15s}" +
+    ".rl-int:active{transform:scale(.95)}.rl-int:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}.rl-int-i{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--rl-bg);color:var(--rl-text)}" +
+    ".rl-int[aria-pressed=true]{background:var(--rl-accent);color:var(--rl-bg)}.rl-int[aria-pressed=true] .rl-int-i{background:var(--rl-bg);color:var(--rl-accent)}" +
+    ".rl-int-h{margin:4px 0 6px;font-size:24px;line-height:29px;font-weight:700;color:var(--rl-text)}.rl-int-p{margin:0 0 14px;font-size:16px;line-height:22px;color:var(--rl-text2)}.rl-int-save:disabled{opacity:.5}.rl-int-later{margin-top:10px}" +
     ".h2-one{display:flex;align-items:center;gap:12px;min-width:0}.h2-one-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}" +
     ".h2-one-n{font-size:16px;line-height:21px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.h2-one-p{font-size:16px;line-height:21px;font-weight:600}" +
     ".h2-price{position:absolute;left:12px;top:12px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600}" +
@@ -4139,6 +4144,104 @@
       if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: label });
     });
   }
+  // ---- Interests: what the shopper says they shop for (worker/interests.js keeps them with the account) ----
+  // The same twelve as the server's list, each with one of Relay's drawings. Browse puts shops of the matching kinds
+  // (receipt categories) first; once there are receipts, what was bought stays the stronger signal there.
+  var INTEREST_CHOICES = [["fashion", "Fashion", "dress", ["fashion"]], ["activewear", "Activewear", "jacket", ["fashion"]], ["trainers", "Trainers", "shoe", ["fashion"]],
+    ["beauty", "Beauty", "lipstick", ["beauty"]], ["home", "Home", "sofa", ["home"]], ["garden", "Garden", "flower", ["home"]], ["tech", "Tech", "laptop", ["electronics"]],
+    ["gaming", "Games and apps", "gamepad", ["digital", "electronics"]], ["food", "Food and drink", "basket", ["food"]], ["coffee", "Coffee and tea", "cup", ["food"]],
+    ["travel", "Travel", "plane", ["travel"]], ["daysout", "Days out", "ticket", ["experiences"]]];
+  var INTEREST_BY = {}; INTEREST_CHOICES.forEach(function (c) { INTEREST_BY[c[0]] = c; });
+  // The last copy read, for this account only (removed on sign-out), so opening the app doesn't have to ask again; and
+  // the accounts that said "Not now" on this phone (kept on this phone, so the question isn't asked twice here).
+  var INTERESTS_KEY = "relay.interests.v1", INTERESTS_LATER_KEY = "relay.interests-later.v1";
+  function interestsCached() {
+    var s = load();
+    try { var c = JSON.parse(localStorage.getItem(INTERESTS_KEY) || "null"); return c && s && c.email === s.email && Array.isArray(c.list) ? c.list.filter(function (x) { return INTEREST_BY[x]; }) : null; } catch (e) { return null; }
+  }
+  function interestsPublish(list) {
+    var cats = {}; (list || []).forEach(function (id) { (INTEREST_BY[id] ? INTEREST_BY[id][3] : []).forEach(function (c) { cats[c] = 1; }); });
+    window.__relayInterestCats = Object.keys(cats);
+    if (typeof window.relayInterestsChanged === "function") window.relayInterestsChanged();
+  }
+  function interestsRemember(list) {
+    var s = load(); if (!s || !s.email) return;
+    try { localStorage.setItem(INTERESTS_KEY, JSON.stringify({ email: s.email, list: list })); } catch (e) {}
+    interestsPublish(list);
+  }
+  function interestsLoad(fresh) {
+    var c = interestsCached();
+    if (c && !fresh) { interestsPublish(c); return Promise.resolve(c); }
+    return api("/relay/my/interests", fresh ? { fresh: true } : undefined).then(function (r) {
+      if (!r.ok || !r.body) return c || null;
+      var list = (r.body.interests || []).filter(function (x) { return INTEREST_BY[x]; }); interestsRemember(list); return list;
+    }, function () { return c || null; });
+  }
+  function interestsLater(say) {
+    var s = load(), who = s && s.email; if (!who) return false;
+    var all = []; try { all = JSON.parse(localStorage.getItem(INTERESTS_LATER_KEY) || "[]"); } catch (e) { all = []; }
+    if (!Array.isArray(all)) all = [];
+    if (say && all.indexOf(who) < 0) { all.push(who); try { localStorage.setItem(INTERESTS_LATER_KEY, JSON.stringify(all.slice(-8))); } catch (e) {} }
+    return all.indexOf(who) >= 0;
+  }
+  try { window.addEventListener("relay:session", function () { if (!load()) { try { localStorage.removeItem(INTERESTS_KEY); } catch (e) {} window.__relayInterestCats = []; } }); } catch (e) {}
+  // "Fashion, Tech and 2 more", or what to do when there are none yet.
+  function interestsWords(list) {
+    var names = (list || []).map(function (id) { return INTEREST_BY[id] ? INTEREST_BY[id][1] : null; }).filter(Boolean);
+    if (!names.length) return "Choose what you shop for";
+    if (names.length <= 2) return names.join(" and ");
+    return names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more";
+  }
+  // The chips: tap to choose, tap again to undo. onChange gets the chosen ids in the list's order.
+  function interestsPicker(chosen, onChange) {
+    var on = {}; (chosen || []).forEach(function (id) { on[id] = true; });
+    var box = el("div", { className: "rl-int-chips", role: "group", ariaLabel: "What you shop for" });
+    INTEREST_CHOICES.forEach(function (c) {
+      var pic = el("span", { className: "rl-int-i" }); pic.setAttribute("aria-hidden", "true");
+      pic.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + ILL[c[2]] + "</svg>";
+      var b = el("button", { type: "button", className: "rl-int" }, [pic, el("span", { text: c[1] })]);
+      b.setAttribute("data-interest", c[0]); b.setAttribute("aria-pressed", on[c[0]] ? "true" : "false");
+      b.onclick = function () { on[c[0]] = !on[c[0]]; b.setAttribute("aria-pressed", on[c[0]] ? "true" : "false"); onChange(INTEREST_CHOICES.filter(function (x) { return on[x[0]]; }).map(function (x) { return x[0]; })); };
+      box.appendChild(b);
+    });
+    return box;
+  }
+  // Saving: one request at a time (a double tap saves once); the button waits while it's going.
+  function interestsSaveButton(label, getList, msg, done) {
+    var busy = false, btn = el("button", { type: "button", className: "rl-btn rl-int-save", text: label });
+    btn.onclick = function () {
+      var list = getList(); if (busy || !list.length) return;
+      busy = true; btn.disabled = true; say(msg, "");
+      api("/relay/my/interests", { method: "PUT", body: { interests: list } }).then(function (r) {
+        busy = false;
+        if (!r.ok) { btn.disabled = false; return say(msg, "Couldn't save that. Check your connection and try again.", true); }
+        interestsRemember((r.body && r.body.interests) || list); done(list);
+      }, function () { busy = false; btn.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    };
+    return btn;
+  }
+  // Once: the first time the new layout opens for an account with none saved, unless "Not now" was said on this phone.
+  var interestsAsked = false;
+  function interestsMaybeAsk() {
+    var s = load(); if (interestsAsked || !s || !s.token || isReview() || interestsLater()) return;
+    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return; }
+    interestsAsked = true;
+    interestsLoad(true).then(function (list) { if (list && !list.length && !interestsLater() && !document.querySelector(".rl-back")) interestsSheet(); });
+  }
+  function interestsSheet() {
+    var chosen = [];
+    open(function (sheet) {
+      sheet.classList.add("rl-int-sheet");
+      sheet.appendChild(el("h2", { className: "rl-int-h", text: "What do you shop for?" }));
+      sheet.appendChild(el("p", { className: "rl-int-p", text: "Pick a few and Relay shows shops you'll like first." }));
+      var msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
+      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { close(); });
+      save.disabled = true;
+      sheet.appendChild(interestsPicker([], function (list) { chosen = list; save.disabled = !list.length; }));
+      sheet.appendChild(msg); sheet.appendChild(save);
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-int-later", text: "Not now", onclick: function () { interestsLater(true); close(); } }));
+    });
+  }
   // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
   var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
   // The help chat's screen (worker/support-chat.js answers it; its rules are there). It is Profile's "Contact us" page while
@@ -4410,6 +4513,18 @@
         deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
       rows.push(deliveryRow);
     }
+    // What the shopper shops for (interests): change it any time.
+    var interestsRow = accRow("bag", "Your interests", interestsWords(interestsCached() || []), function () { page("Your interests", function (b) {
+      var chosen = (interestsCached() || []).slice(), msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
+      b.appendChild(el("p", { className: "rl-int-p", text: "Pick what you shop for and Relay shows shops you'll like first in Browse. What you buy counts for more once Relay has your receipts." }));
+      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { home(); });
+      save.disabled = !chosen.length;
+      b.appendChild(interestsPicker(chosen, function (list) { chosen = list; save.disabled = !list.length; }));
+      b.appendChild(msg); b.appendChild(save);
+    }); });
+    interestsRow.setAttribute("data-row", "interests");
+    rows.push(interestsRow);
+    interestsLoad().then(function (list) { if (list && interestsRow.isConnected) interestsRow.setDetail(interestsWords(list)); });
     // The reviewer account has no inbox, so its orders from shops stay one tap away here. Everyone else finds them on Receipts.
     var ordersRow = accRow("bag", "Shop orders", "None yet", function () { page("Shop orders", ordersPage); });
     if (review) rows.push(ordersRow);
@@ -7448,6 +7563,8 @@
     var s = load();
     if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
     host.textContent = ""; host.classList.add("h2-home"); paintAvatars();
+    // Asked only while Home is still the screen (never over another tab the shopper has moved to).
+    setTimeout(function () { if (host.isConnected) interestsMaybeAsk(); }, 700);
     var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
     var top = el("div"); host.appendChild(top);
     mountInstore(top, refresh, "suggest");
@@ -7856,6 +7973,7 @@
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
+    interests: function () { return interestsLoad(); },
     purchases: function () { return (memo.purchases || api(purchasesPath())).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;

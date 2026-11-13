@@ -1,3 +1,4 @@
+import { shopCategory } from "./interests.js";
 import { receiveSquareWebhook } from "./square-webhooks.js";
 import { importHistoricalSquareOrders } from "./square-history.js";
 import { syncSquareRefunds } from "./square-orders.js";
@@ -107,7 +108,7 @@ const relayWorker = {
   async relayFetch(request, env, ctx) {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-D1-Bookmark",
     };
 
@@ -353,9 +354,12 @@ const relayWorker = {
               AND v.currency='GBP'
             GROUP BY i.id,v.id ORDER BY i.title,v.title LIMIT 250`)
             .bind("shopify:" + store.domain).all();
+          // The kind of shop it is, as Relay already sorts shops (interests.js shopCategory): Browse puts shops matching a
+          // shopper's interests first. null when Relay can't tell; never guessed.
+          const shopCat = shopCategory(store, (rows.results || []).map(r => r.product));
           for (const row of rows.results || []) {
             products.push({...row, sku:row.catalogueId, provider:"shopify",
-              storeName:store.label,shopDomain:store.domain,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {}),
+              storeName:store.label,shopDomain:store.domain,shopCategory:shopCat,inventoryScope:"shop_aggregate",...(store.test ? {testShop:true} : {}),
               ...(store.test && store.canOrder ? {testOrders:true} : {})});
           }
         }

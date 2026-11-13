@@ -30,6 +30,7 @@ import { handleExportRoute } from "./export.js";
 import { handleCardRoute, forgetCard } from "./payments.js";
 import { handleResaleRoute, resaleDeleteStatements } from "./resale.js";
 import { handleProfileRoute, profileDeleteStatements, ensureProfileTable, cleanName } from "./profile.js";
+import { handleInterestsRoute, interestsDeleteStatements, ensureInterestsTable } from "./interests.js";
 import { handleDeliveryRoute, deliveryDeleteStatements, ensureDeliveryTables } from "./delivery.js";
 import { handleAuctionShopperRoute, forgetAuctionBidder } from "./auctions.js";
 import { TOTP_TABLE_SQL, totpDeleteStatements, secondStepFor, twoStepOn, handleTotpAuthRoute, handleTotpShopperRoute } from "./totp.js";
@@ -571,6 +572,7 @@ async function listPurchases(env, shopper, orderId) {
 async function deleteShopper(env, shopper, o) {
   await ensurePushTables(env.RELAY_DB);
   await ensureProfileTable(env.RELAY_DB);
+  await ensureInterestsTable(env.RELAY_DB);
   await ensureDeliveryTables(env.RELAY_DB);
   for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
   await forgetCard(env, shopper.id, o).catch(() => {});
@@ -581,6 +583,7 @@ async function deleteShopper(env, shopper, o) {
   await env.RELAY_DB.batch([
     ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
     ...profileDeleteStatements(env.RELAY_DB, shopper.id),
+    ...interestsDeleteStatements(env.RELAY_DB, shopper.id),
     ...deliveryDeleteStatements(env.RELAY_DB, shopper.id),
     ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
     ...supportDeleteStatements(env.RELAY_DB, shopper.id),
@@ -704,6 +707,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (exportResponse) return exportResponse;
     const profileResponse = await handleProfileRoute(request, env, url, cors, shopper, o);
     if (profileResponse) return profileResponse;
+    // What the shopper says they shop for (interests.js): kept with the account, used by Browse to put those shops first.
+    const interestsResponse = await handleInterestsRoute(request, env, url, cors, shopper, o);
+    if (interestsResponse) return interestsResponse;
     // Delivery details, and starting a checkout at a shop's own website with them filled in (delivery.js).
     const deliveryResponse = await handleDeliveryRoute(request, env, url, cors, shopper, o);
     if (deliveryResponse) return deliveryResponse;

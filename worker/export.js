@@ -23,6 +23,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
 
   const account = await one("SELECT email, created_at AS createdAt FROM shoppers WHERE id = ?", id);
   const profile = await one("SELECT name, photo_type AS photoType, photo_data AS photoData, updated_at AS updatedAt FROM shopper_profiles WHERE shopper_id = ?", id);
+  const interests = await one("SELECT interests, updated_at AS updatedAt FROM shopper_interests WHERE shopper_id = ?", id);
   const mail = await one("SELECT provider, google_email AS address, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id = ?", id);
   // Other inboxes the shopper connected (kept as "<id>~<n>").
   const moreMail = (await rows("SELECT shopper_id AS box, provider, google_email AS address, connected_at AS connectedAt, last_scan_at AS lastScanAt FROM gmail_connections WHERE shopper_id LIKE ? ORDER BY shopper_id", id + "~%"))
@@ -39,6 +40,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     about: "Everything Relay keeps about you, as of " + iso(now) + ". Receipts are the details Relay read from your emails; the emails themselves stay in your inbox.",
     account: account && { email: account.email, createdAt: iso(account.createdAt) },
     profile: profile && { name: profile.name || null, photo: profile.photoData ? "data:" + (profile.photoType || "image/jpeg") + ";base64," + profile.photoData : null, updatedAt: iso(profile.updatedAt) },
+    // What they said they shop for (Profile, Your interests).
+    interests: interests && { interests: parse(interests.interests) || [], updatedAt: iso(interests.updatedAt) },
     // The delivery address kept for filling in shops' checkouts, and each shop it was sent to.
     delivery: await deliveryForExport(env, id),
     // Auctions bid on (with the most they'd pay) and anything won or offered to them.
