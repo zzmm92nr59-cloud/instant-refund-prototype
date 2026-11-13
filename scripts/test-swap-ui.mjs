@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
-import { skipInterests } from './relay-places.mjs';
+import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind } from './relay-places.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = resolve('.');
@@ -60,10 +60,16 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  // Returns and swaps already started live on the Returns & swaps page; the wallet shows what can still be returned or swapped.
+  // Returns and swaps already started live on the Returns & swaps page; an order's card on Home opens its page, with Swap.
   if (returnInfo || exchange) await page.evaluate(() => window.go('returns'));
-  if (!returnInfo && !exchange) await page.getByRole('button', { name: 'Swap', exact: true }).click();
+  if (!returnInfo && !exchange) await openSwap(page);
   return { context, page, posts, errors };
+}
+
+// The order's card on Home opens its page, which has Swap.
+async function openSwap(page) {
+  await page.locator('#homePage .h2-feed > .h2-item').first().click();
+  await page.locator('.rl-sheet').getByRole('button', { name: 'Swap', exact: true }).click();
 }
 
 // 1. With a saved Apple Pay card: prices are shown, the dearer swap says exactly what will be taken and when.
@@ -81,7 +87,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   await page.getByText(/£5\.00 was taken from your card \(test mode, no real money\)/).waitFor();
   assert.deepEqual(posts.find(x => x.p === '/relay/my/exchange').body, { orderId: 'o1', lineId: 'L1', variantKey: 'k14', agreedDiffMinor: 500 });
   // The cheaper one says the shop refunds, and nothing is taken.
-  await page.reload(); await page.getByRole('button', { name: 'Swap', exact: true }).click();
+  await page.reload(); await openSwap(page);
   await page.getByRole('button', { name: /Kids\. £5\.00 less/ }).click();
   assert.match(await page.locator('.rl-sheet').last().innerText(), /costs £5\.00 less\. Kick Lane will refund the £5\.00 to how you paid\./);
   assert.deepEqual(errors, []);
@@ -226,16 +232,25 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
   await page.goto(origin + '/index.html');
-  const card = (shop) => page.locator('.rl-po').filter({ hasText: shop });
+  // Home: one card for each order; tapping it opens the order's page, with its items and what you can do.
+  const card = (shop) => homeCard(page, shop);
+  const orderPage = async (shop) => { await page.waitForTimeout(450); return openHomeCard(page, shop); };
   await card('Kick Lane').getByText('Return by ' + byText).waitFor();
   assert.equal(await page.getByText(/Swap or return by/).count(), 0);
   assert.equal(await card('Fern Street').getByText(/Return by|days left/).count(), 0, "no date for a shop that hasn't given its returns period");
-  await card('Fern Street').getByRole('button', { name: 'Return', exact: true }).waitFor();
-  await card('Oak & Thread').getByText('£5.00 still to pay Oak & Thread for the swap.').waitFor();
-  assert.equal(await card('Oak & Thread').getByRole('link', { name: 'Pay £5.00 to Oak & Thread' }).getAttribute('href'), 'https://oak-thread.myshopify.com/1/invoices/xyz');
-  assert.equal(await card('Mill & Loom').count(), 0, 'a swapped item that is now being returned has nothing left to do on Home');
+  let sh = await orderPage('Fern Street');
+  await sh.getByRole('button', { name: 'Return', exact: true }).waitFor();
+  assert.equal(await sh.getByText(/Return by|days left/).count(), 0, 'nor on its page');
+  await closeSheet(page);
+  await card('Oak & Thread').getByText('Pay £5.00 to finish your swap').waitFor();
+  sh = await orderPage('Oak & Thread');
+  await sh.getByText('£5.00 still to pay Oak & Thread for the swap.').waitFor();
+  assert.equal(await sh.getByRole('link', { name: 'Pay £5.00 to Oak & Thread' }).getAttribute('href'), 'https://oak-thread.myshopify.com/1/invoices/xyz');
+  await closeSheet(page);
+  assert.ok(!/Pay|Swap|Return by/.test(await card('Mill & Loom').innerText()), 'a swapped item that is now being returned has nothing left to do: ' + await card('Mill & Loom').innerText());
   // Swap Black for Navy, then close the finished sheet by tapping outside it.
-  await card('Kick Lane').getByRole('button', { name: 'Swap', exact: true }).click();
+  sh = await orderPage('Kick Lane');
+  await sh.getByRole('button', { name: 'Swap', exact: true }).click();
   const option = page.getByRole('button', { name: 'Navy. Only 3 left' });
   await option.waitFor();
   await page.getByRole('heading', { name: 'Swap Logo Cap' }).waitFor(); // the same word as the button that opened it
@@ -248,14 +263,16 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   assert.deepEqual(await sheet.getByRole('button').allInnerTexts(), ['Done'], 'one way out, said once');
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/swap-finished.png' });
   await page.mouse.click(195, 30);
-  await card('Kick Lane').getByText('✓ Swapped from Black to Navy').waitFor();
-  await card('Kick Lane').getByRole('button', { name: 'Return', exact: true }).waitFor();
-  assert.equal(await card('Kick Lane').getByRole('button', { name: 'Swap', exact: true }).count(), 0, 'one swap per item');
+  await page.locator('.rl-back').waitFor({ state: 'detached' });
   await card('Kick Lane').getByText('Return by ' + byText).waitFor();
+  sh = await orderPage('Kick Lane');
+  await sh.getByText('✓ Swapped from Black to Navy').waitFor();
+  await sh.getByRole('button', { name: 'Return', exact: true }).waitFor();
+  assert.equal(await sh.getByRole('button', { name: 'Swap', exact: true }).count(), 0, 'one swap per item');
+  await closeSheet(page);
   if (process.env.SHOTS) await page.screenshot({ path: process.env.SHOTS + '/home-after-swap.png', fullPage: true });
-  // Profile, Shop orders: what each order comes to now, and what it was placed at when that has changed.
-  await page.evaluate(() => window.go('me'));
-  await page.locator('.rl-ptile', { hasText: 'Shop orders' }).click();
+  // Receipts, Shop orders: what each order comes to now, and what it was placed at when that has changed.
+  await openReceiptKind(page, 'Shop orders');
   const rows = page.locator('.rl-order');
   await rows.filter({ hasText: 'Field Jacket' }).getByText('£90.00 at Oak & Thread on 5 Jan 2026. It was £85.00 when you ordered.').waitFor();
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
