@@ -72,6 +72,7 @@ export async function openAccountRow(page, name) {
   }
   const row = page.locator("#mePage .rl-arow:visible", { hasText: name }).first();
   await row.waitFor();
+  await waitOutDoubleTap(page);
   await row.click();
 }
 export const accountRow = (page, name) => page.locator("#mePage .rl-arow", { hasText: RENAMED[name] || name }).first();
