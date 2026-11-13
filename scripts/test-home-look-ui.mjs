@@ -2,14 +2,14 @@
 // Checks: the sign-in page is Relay's navy in light and dark mode (as the welcome story is), with Relay's name, a small
 // wallet picture (hidden from screen readers), a white headline, three equal white buttons and Face ID in lime with its
 // icon, all readable; it rises in, except where the phone asks for less motion; the next step (email) is back in the app's
-// own colours, and Back from it returns to "Welcome back" when that's where it started. Home: each wallet card counts down
-// to its return date with a bar (green, amber in the last week, red in the last three days) and opens its own page, with
-// Start return (when the shop has a returns page) and "I'm sending this back"; under the wallet, four colourful tiles (Receipts, Returns &
-// swaps, Price alerts with how many things are watched, and Wrapped) each open their page. Every screen passes the polish
-// rules in light and dark.
+// own colours, and Back from it returns to "Welcome back" when that's where it started. Home: each card shows its return
+// date, and in the last week the days left (amber, red in the last three days) with those cards first; a card opens its
+// own page, with the countdown, Start return (when the shop has a returns page) and "I'm sending this back". From Home,
+// All receipts, the bell (Price alerts, with how many things are watched) and, through Receipts and Browse, Returns &
+// swaps and Wrapped each open their page. Every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind, goTab } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const types = { ".js": "text/javascript", ".png": "image/png", ".svg": "image/svg+xml" };
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", types[extname(p)] || "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -47,14 +47,14 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Jess Tester", photo: null });
   if (p === "/relay/my/alerts/status") return j({ devices: 0, stores: [], watches: [{ sku: "shopify:fernway.example:101", product: "Linen Notebook", variant: "A5", lastSeenMinor: 1800 }, { sku: "shopify:fernway.example:102", product: "Desk Lamp", variant: "", lastSeenMinor: 4500 }] });
-  if (p === "/relay/my/wrapped") return j({ year: new Date().getFullYear(), receipts: 0, years: [], coverage: {} });
+  if (p === "/relay/my/wrapped") return j({ year: new Date().getFullYear(), receipts: 4, spentPence: 29800, years: [{ year: new Date().getFullYear(), receipts: 4 }], industries: [], coverage: {} });
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 // The polish rules, and readable colours, on whatever is showing in the given part of the page.
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none" && parseFloat(s.opacity) > 0.5; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -131,80 +131,76 @@ await page.waitForTimeout(300);
 await polished("sign-in page, new", ".rl-sheet");
 console.log("ok - the sign-in page: Relay's navy in light and dark, a wallet picture, white buttons, Face ID in lime, readable; the next step is the app's own colours");
 
-// 2. Home: the wallet's cards count down to each return date.
+// 2. Home: each card shows its return date; in the last week, the days left, with those cards first.
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: 9e12 })), EMAIL);
 await page.goto(origin + "/index.html");
-const wallet = page.locator("#walletPage");
-await wallet.getByText("Court Classic Trainers").waitFor();
+await homeCard(page, "Court Classic Trainers").waitFor();
 await page.waitForTimeout(500);
-const card = name => wallet.locator(".rl-po", { hasText: name });
-const due = name => card(name).locator(".rl-due");
-assert.match(await due("Court Classic Trainers").innerText(), new RegExp("^Return by " + shortDay(day(12)) + "\\s+12 days left$"));
-assert.equal(await due("Court Classic Trainers").getAttribute("class"), "rl-due ok");
-const width = name => due(name).locator(".rl-due-bar i").evaluate(n => n.style.width);
-assert.equal(await width("Court Classic Trainers"), "14%", "2 days of 14 gone");
-assert.match(await due("Vitamin C Serum").innerText(), new RegExp("^Return by " + shortDay(day(2)) + "\\s+2 days left$"));
-assert.equal(await due("Vitamin C Serum").getAttribute("class"), "rl-due urgent", "red in the last three days");
-assert.equal(await width("Vitamin C Serum"), "93%");
-assert.equal(await due("Wool Coat").getAttribute("class"), "rl-due soon", "amber in the last week");
+const card = name => homeCard(page, name);
+const strip = name => card(name).locator(".h2-strip");
+assert.equal(await card("Court Classic Trainers").locator(".h2-line-t b").innerText(), "Return by " + shortDay(day(12)));
+assert.equal(await strip("Court Classic Trainers").count(), 0, "no countdown while there's more than a week");
+assert.equal(await strip("Vitamin C Serum").innerText(), "2 days left");
+assert.equal(await strip("Vitamin C Serum").getAttribute("class"), "h2-strip urgent", "red in the last three days");
+assert.equal(await strip("Wool Coat").innerText(), "6 days left");
+assert.equal(await strip("Wool Coat").getAttribute("class"), "h2-strip soon", "amber in the last week");
+const order = await page.locator("#homePage .h2-feed > .h2-item .h2-one-n").allInnerTexts();
+assert.deepEqual(order.slice(0, 2), ["Vitamin C Serum", "Wool Coat"], "the ones about to run out come first");
 // No buttons on a card: the whole card opens its page, which has what you can do (Start return first when the shop has a
 // returns page, then I'm sending this back).
 assert.equal(await card("Court Classic Trainers").locator("button").count(), 0, "no buttons on the card itself");
 assert.equal(await card("Court Classic Trainers").getAttribute("role"), "button", "the card is the button");
-assert.match(await card("Court Classic Trainers").getAttribute("aria-label"), new RegExp("^Court Classic Trainers, Kick Lane, £85\\.00, return by "));
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").evaluate(n => getComputedStyle(n).textTransform), "none");
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-brand").innerText(), "Court Classic Trainers", "the card leads with what was bought");
-assert.equal(await card("Court Classic Trainers").locator(".rl-po-meta").innerText(), "Kick Lane", "with the shop under it");
-const dsheet = page.locator(".rl-sheet");
-await card("Court Classic Trainers").click();
+assert.match(await card("Court Classic Trainers").getAttribute("aria-label"), /^Kick Lane\. Court Classic Trainers\. Return by /);
+assert.equal(await card("Court Classic Trainers").locator(".h2-one-n").innerText(), "Court Classic Trainers", "the card names what was bought");
+assert.equal(await card("Court Classic Trainers").locator(".h2-head-t b").innerText(), "Kick Lane", "and the shop");
+assert.equal(await card("Court Classic Trainers").locator(".h2-head-t b").evaluate(n => getComputedStyle(n).textTransform), "none");
+let dsheet = await openHomeCard(page, "Court Classic Trainers");
 assert.deepEqual(await dsheet.locator(".rl-dt-acts button").allInnerTexts(), ["I'm sending this back"]);
-await dsheet.getByRole("button", { name: "Close" }).click();
-await card("Wool Coat").click();
+await dsheet.getByText("12 days left", { exact: true }).waitFor();
+await dsheet.getByRole("button", { name: "Close" }).click(); await dsheet.waitFor({ state: "detached" });
+await page.waitForTimeout(450);
+dsheet = await openHomeCard(page, "Wool Coat");
 assert.deepEqual(await dsheet.locator(".rl-dt-acts button").allInnerTexts(), ["Start return", "I'm sending this back"]);
 assert.equal(await dsheet.getByRole("link", { name: /Start a return with/ }).count(), 0, "one way to start the return, not two");
-await dsheet.getByRole("button", { name: "Close" }).click();
+await dsheet.getByRole("button", { name: "Close" }).click(); await dsheet.waitFor({ state: "detached" });
 // A card with the item's photo: what it is, the shop, the price, and the parcel's news in a plain line.
 const nf = card("Northfold");
-await nf.locator(".rl-po-img.rl-has-photo img").waitFor();
-assert.equal(await nf.locator(".rl-po-brand").innerText(), "Flow Flared Pant");
-assert.equal(await nf.locator(".rl-po-meta").innerText(), "Northfold");
-assert.equal(await nf.locator(".rl-po-ship").innerText(), "On its way with Royal Mail");
-assert.equal(await nf.locator(".rl-po-ship svg").count(), 1, "with a drawn parcel, not a symbol");
-assert.equal(await nf.locator(".rl-due").count(), 0, "a date Relay worked out (UK law's minimum) is never shown as a countdown");
-await nf.click();
-assert.equal(await dsheet.locator(".rl-dt-head h2").innerText(), "Flow Flared Pant", "its page names what was bought");
+await nf.locator(".h2-art.rl-has-photo img").waitFor();
+assert.equal(await nf.locator(".h2-one-n").innerText(), "Flow Flared Pant");
+assert.equal(await nf.locator(".h2-head-t b").innerText(), "Northfold");
+assert.equal(await nf.locator(".h2-one-p").innerText(), "£69.00");
+assert.equal(await nf.locator(".h2-line-t b").innerText(), "On its way");
+assert.ok(!/Return by|days? left/.test(await nf.innerText()), "a date Relay worked out (UK law's minimum) is never shown as a return date or countdown");
+await page.waitForTimeout(450);
+dsheet = await openHomeCard(page, "Northfold");
+assert.equal(await dsheet.getByRole("heading").first().innerText(), "Flow Flared Pant", "its page names what was bought");
 assert.equal(await dsheet.locator(".rl-dt-sub").innerText(), "Northfold");
 assert.match(await dsheet.locator(".rl-dt-facts").innerText(), /Price\s+£69\.00\s+Size or colour\s+UK 8\s+Ordered\s+\d+ \w+ \d{4}\s+Order number\s+R-4444/);
 await dsheet.getByText("No return date in Northfold's email", { exact: true }).waitFor();
 // (Still on its way, so no date even though the server counted one from a delivery: the screen never contradicts itself.)
 await dsheet.getByText("By UK law you have at least 14 days from delivery to change your mind about most online orders. Relay adds the date once it arrives. Northfold may give longer.").waitFor();
 assert.ok(!/days? left/.test(await dsheet.innerText()), "no countdown on its page either");
-await dsheet.getByRole("button", { name: "Close" }).click();
-console.log("ok - wallet cards count down with a bar (green, amber, red), lead with what was bought, and open a page with Start return and I'm sending this back");
-
-// 3. Under the wallet: four colourful tiles, each opening its page; Price alerts says how many things are watched.
-const tiles = page.locator(".home-tiles .htile");
-await page.locator(".htile", { hasText: "2 watched" }).waitFor();
-assert.deepEqual(await tiles.evaluateAll(ns => ns.map(n => n.getAttribute("aria-label") || n.innerText.replace(/\s+/g, " ").trim())),
-  ["Receipts", "Returns & swaps", "Price alerts 2 watched", "Your " + new Date().getFullYear() + " Wrapped"]);
-assert.deepEqual(await tiles.evaluateAll(ns => ns.map(n => getComputedStyle(n).backgroundColor)),
-  [NAVY, "rgb(224, 68, 110)", "rgb(79, 114, 224)", "rgb(199, 245, 103)"], "the welcome story's navy, pink and blue, and Wrapped's lime");
-assert.equal(await page.getByRole("button", { name: "All receipts" }).count(), 0, "the tiles replace the old buttons");
-assert.equal(await page.locator("#view .profile-row").count(), 0, "and the old Price alerts row");
+await dsheet.getByRole("button", { name: "Close" }).click(); await dsheet.waitFor({ state: "detached" });
 await polished("home", "#view");
-await page.locator(".htile", { hasText: "Receipts" }).click();
+console.log("ok - Home's cards show the return date, the last week's days left (amber, red) first, lead with what was bought, and open a page with the countdown, Start return and I'm sending this back");
+
+// 3. From Home: All receipts, the bell (how many things are watched) and, through Receipts and Browse, Returns & swaps and
+//    Wrapped, each open their page. (The four tiles under the old wallet are gone; these are where each now lives.)
+await page.getByRole("button", { name: "Price alerts, 2 watched" }).waitFor();
+assert.equal(await page.locator("#view .profile-row").count(), 0, "no old Price alerts row");
+await homeCard(page, "All receipts").click();
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.evaluate(() => window.go("profile")); await page.locator(".htile").first().waitFor();
-await page.locator(".htile", { hasText: "Returns & swaps" }).click();
-await page.getByRole("heading", { name: "Returns & swaps", exact: true }).waitFor();
-await page.evaluate(() => window.go("profile")); await page.locator(".htile").first().waitFor();
-await page.locator(".htile", { hasText: "Price alerts" }).click();
+await goTab(page, "Home"); await homeCard(page, "Court Classic Trainers").waitFor();
+await page.getByRole("button", { name: "Price alerts, 2 watched" }).click();
 await page.getByRole("heading", { name: "Price alerts", exact: true }).waitFor();
-await page.evaluate(() => window.go("profile")); await page.locator(".htile").first().waitFor();
-await page.getByRole("button", { name: "Your " + new Date().getFullYear() + " Wrapped" }).click();
-await page.getByRole("heading", { name: "Profile", exact: true }).waitFor();
-assert.equal(await page.evaluate(() => window.page), "me", "Wrapped lives in Profile");
-console.log("ok - Home's tiles: Receipts, Returns & swaps, Price alerts (2 watched) and Wrapped, each opening its page");
+await goTab(page, "Receipts"); await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
+await openReceiptKind(page, "Returns and swaps");
+await page.getByRole("heading", { name: "Returns & swaps", exact: true }).waitFor();
+await goTab(page, "Browse");
+await page.getByRole("button", { name: /^Relay Wrapped \d{4}/ }).click();
+await page.locator(".rl-wr-play").waitFor();
+assert.equal(await page.evaluate(() => window.page), "wrapped", "Wrapped opens its own page from Browse");
+console.log("ok - All receipts, Price alerts (2 watched) on Home's bell, Returns & swaps from Receipts and Wrapped from Browse each open their page");
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS the sign-in page and Home: Relay's navy, a wallet picture, return countdowns and colourful tiles (stubbed server)");
+console.log("PASS the sign-in page and Home: Relay's navy, a wallet picture, return dates and countdowns, and the way to every page (stubbed server)");
 await browser.close(); server.close();
