@@ -1,10 +1,10 @@
-// Browser test: AI help with receipts (Profile, Email connection). Stubbed Relay server, made-up shops and people.
+// Browser test: AI help with receipts (Profile, Inboxes). Stubbed Relay server, made-up shops and people.
 // Checks: hidden until Relay can offer it (the AI key is set); off to start; the switch says what it means, turns on and off
 // once for a double tap, and says plainly what happened (off deletes what the AI read); a receipt the AI filled in says
 // which parts were read by AI, for the shopper to check. Passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -79,7 +79,7 @@ await page.reload();
 const view = page.locator("#mePage");
 const openMail = async () => {
   await page.evaluate(() => window.go("me"));
-  await view.locator(".rl-ptile", { hasText: "Email connection" }).click();
+  await view.locator(".rl-arow", { hasText: "Inboxes" }).click();
   await view.getByText("Relay is reading your", { exact: false }).waitFor();
   await page.waitForTimeout(400);
 };
@@ -114,7 +114,7 @@ console.log("ok - off to start; says what it means; on and off once each, in pla
 // 3. A receipt the AI filled in says so, for the shopper to check.
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 const scarf = page.locator(".rl-rr").filter({ hasText: "Merino Wool Scarf" });
 await scarf.locator(".rl-rr-main").click();
 await scarf.getByText("The total and items were read by AI. Check they're right, and use Fix details if not.").waitFor();
