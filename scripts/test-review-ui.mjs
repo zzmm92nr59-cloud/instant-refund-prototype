@@ -98,10 +98,10 @@ const view = page.locator("#mePage");
 reset({ member: true });
 await signedInAs(MEMBER);
 await profile();
-await view.locator(".rl-arow", { hasText: "Two-step sign-in" }).waitFor();
+await view.locator(".rl-arow", { hasText: "Security and privacy" }).waitFor();
 await page.waitForTimeout(300);
 assert.equal(await view.getByText("Sign-in for app reviewers").count(), 0);
-assert.equal(await view.locator(".rl-ptile", { hasText: "Email connection" }).count(), 1, "members keep the inbox rows");
+assert.equal(await view.locator(".rl-arow", { hasText: "Inboxes" }).count(), 1, "members keep the inbox rows");
 console.log("ok - members don't see the reviewer sign-in, and keep every row of their own");
 
 // 2. An admin turns it on, copies the address and code, and turns it off (asked first).
@@ -184,15 +184,21 @@ await polished("receipts", ".rl-empty");
 await page.getByRole("button", { name: "Go to Home" }).click();
 await card.waitFor();
 await profile();
-await view.locator(".rl-arow", { hasText: "Devices" }).waitFor();
-await view.locator(".rl-ptile", { hasText: "Shop orders" }).getByText("None yet").waitFor();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).getByText("None yet").waitFor();
 await page.waitForTimeout(400);
-for (const gone of ["Email connection", "Add a missing receipt", "Face ID & passkeys", "Two-step sign-in", "Phone number", "Card for swaps", "Email permission"])
+for (const gone of ["Inboxes", "Add a missing receipt", "Delivery details"])
+  assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");
+// One level down, under Security and privacy: Devices, and none of the ways of signing in that can't be added.
+await view.locator(".rl-arow", { hasText: "Security and privacy" }).click();
+await view.locator(".rl-arow", { hasText: "Devices" }).waitFor(); await page.waitForTimeout(400);
+for (const gone of ["Face ID & passkeys", "Two-step sign-in", "Phone number", "Card for swaps", "Email permission"])
   assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");
 await view.getByText("This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it.").waitFor();
+await view.getByRole("button", { name: /^Back/ }).first().click();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).waitFor();
 assert.equal(await view.locator("#rl-wrapped").count(), 0, "no Wrapped: it's made from inbox receipts");
 await polished("profile", "#mePage");
-await view.locator(".rl-ptile", { hasText: "Shop orders" }).click();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).click();
 await view.getByText("None yet. An order shows up here when a shop that uses Relay confirms one placed with " + REVIEW + ".").waitFor();
 st.catalogue = [];
 await page.evaluate(() => window.go("discover"));

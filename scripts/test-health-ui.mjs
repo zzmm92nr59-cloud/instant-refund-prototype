@@ -120,7 +120,7 @@ const profile = async () => { await page.evaluate(() => window.go("me")); await 
 st.admin = false;
 await signedInAs(MEMBER);
 await profile();
-await view.locator(".rl-arow", { hasText: "Two-step sign-in" }).waitFor();
+await view.locator(".rl-arow", { hasText: "Security and privacy" }).waitFor();
 await page.waitForTimeout(400);
 assert.equal(await view.getByText("Relay health").count(), 0, "members don't see Relay health");
 console.log("ok - only admins see Relay health");
