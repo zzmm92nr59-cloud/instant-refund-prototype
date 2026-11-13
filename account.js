@@ -1908,7 +1908,7 @@
       api("/relay/my/second-step", { fresh: true }).then(function (ss) {
         // A second step comes first when the account needs one (it can't use anything else until then).
         if (ss.ok && ss.body.required && !ss.body.done) return protectAccount(function () { startJourney(info); });
-        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail")]).then(function (r) {
+        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail"), interestsLoad(true)]).then(function (r) {
         if (!document.body.contains(sheet)) return;
         if (r[1].status === 401) { save(null); return open(signedOutView); }
         var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {};
@@ -1918,6 +1918,8 @@
         var steps = [];
         if (!p.name && !fl.nameSkipped) steps.push("name");
         if (!st.connected && !fl.mailLater && !isReview()) steps.push("mail");
+        // What they shop for, after the inbox: so Browse can show shops they'll like first (interests.js).
+        if (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()) steps.push("interests");
         if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
         steps.push("done");
         runJourney(sheet, st, steps, 0);
@@ -2053,12 +2055,24 @@
       if (st.mailNote) say(note2, st.mailNote.text, st.mailNote.bad);
       return;
     }
+    if (kind === "interests") {
+      var chosen = [];
+      var body4 = jFrame(sheet, { back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
+        title: "What do you shop for?", sub: "Pick a few and Relay shows shops you'll like first." });
+      if (st.connected) body4.appendChild(scanCard(sheet, st));
+      var note4 = el("div", { className: "rl-msg" }); note4.setAttribute("role", "status");
+      var save4 = interestsSaveButton("Continue", function () { return chosen; }, note4, function () { next(); });
+      save4.disabled = true;
+      body4.appendChild(interestsPicker([], function (list) { chosen = list; save4.disabled = !list.length; }));
+      body4.appendChild(save4); body4.appendChild(note4);
+      return;
+    }
     // Done: a short welcome, the scan still counting, and where to go first.
     var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
     var body3 = jFrame(sheet, { of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
       kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
       sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app."
-        : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time from Account, under Receipts." });
+        : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time: tap your picture at the top of the screen, then Inboxes." });
     if (st.connected) body3.appendChild(scanCard(sheet, st));
     var tips = el("div", { className: "rl-jcard" });
     (isReview() ? [["check", "Swap a size or colour before the shop sends your order"], ["eye", "Price drops on things you watch, sent to your phone"]]
