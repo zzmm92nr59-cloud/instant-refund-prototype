@@ -15,6 +15,7 @@ on:
       - account-next.js
       - sw.js
       - scripts/test-layout-ui.mjs
+      - scripts/test-tips-ui.mjs
       - scripts/sample-pictures.mjs
       - scripts/test-swap-ui.mjs
       - .github/workflows/ui-smoke-test.yml
@@ -112,6 +113,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-auctions-ui.mjs
       - name: Test the layout everyone has (the Ask tab, pictures in their tiles, the three looks, interests, and the old next.html address)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-layout-ui.mjs
+      - name: Test the first-run tips (after interests or straight away, one per tab, the tab lit and pointed at, keyboard, once per account)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-tips-ui.mjs
       - name: Test auctions in the shop's dashboard (what happened to each in words, started once, photos made smaller first, plain refusals)
         run: node scripts/test-retailer-auctions-ui.mjs
       - name: Check everything the app sent passes the server's input rules (worker/validate.js)

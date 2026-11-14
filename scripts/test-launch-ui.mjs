@@ -4,7 +4,7 @@
 // no demo/sandbox/test wording anywhere a shopper looks, and testing tools only when switched on with ?testtools=1.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { TABS, tabNames, litTab, tab, goTab, homeShows, homeCard, openProfile, openAccountRow, openShops } from "./relay-places.mjs";
+import { TABS, tabNames, litTab, tab, goTab, homeShows, homeCard, openProfile, openAccountRow, openShops, skipTips } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -26,7 +26,7 @@ const shopProducts = [
 const sandboxProducts = [{ product: "Sandbox Hoodie", variation: "M", sku: "DEMO-SBX-1", priceMinor: 4000, currency: "GBP", storeName: "Relay Ltd test shop", provider: "square_sandbox", quantity: 3 }];
 let cardSaved = false;
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await skipTips(ctx); // (the first-run tips are scripts/test-tips-ui.mjs)
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method();
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -201,7 +201,7 @@ assert.deepEqual((await page.locator("#side button").allInnerTexts()).map(x => x
 await page.screenshot({ path: "/tmp/shots/launch-desktop.png" });
 // 8. If the account part of the app can't load, the Home page says so instead of waiting forever.
 //    (A fresh browser with no service worker, so account.js can't come from the app's offline copy.)
-const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipTips(ctx2);
 await ctx2.route("https://**/*", r => r.abort());
 await ctx2.route("**/account.js*", r => r.abort());
 const broken = await ctx2.newPage();

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { skipInterests } from "./relay-places.mjs";
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
@@ -12,7 +13,7 @@ const origin=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,...(process.env.RELAY_CHROMIUM?{executablePath:process.env.RELAY_CHROMIUM,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']}: {})});
 let passed=0;
 async function fresh(file='index.html',width=1280,setup){
- const context=await browser.newContext({viewport:{width,height:900}});
+ const context=await browser.newContext({viewport:{width,height:900}});await skipInterests(context);
  await context.route('https://**/*',route=>route.fulfill({status:403,contentType:'application/json',body:'{"error":"Unauthorised test response"}'}));
  if(setup)await context.addInitScript(setup);
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
