@@ -4908,7 +4908,7 @@
       box.appendChild(el("p", { text: text }));
       draw();
       sw.onclick = function () {
-        try { localStorage.setItem(key, on() ? "0" : "1"); } catch (e) {}
+        try { localStorage.setItem(key, on() ? "0" : "1"); if (key === "relay-web-preview") localStorage.setItem("relay-web-preview-chosen", "1"); } catch (e) {}
         draw();
         if (typeof window.testToolsChanged === "function") window.testToolsChanged();
       };
@@ -5815,6 +5815,7 @@
   // Draft 2: Browse's own screen. One Wrapped card, then the kinds of shopping as colour tiles (each opens that kind's
   // receipts), then three doors. Everything on it is the shopper's own: nothing is recommended or made up.
   function mountBrowse(host, opts) {
+    teamWebDefault();
     opts = opts || {};
     if (!host) return;
     host.textContent = "";
@@ -7989,6 +7990,19 @@
     item.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tap(); } };
     return item;
   }
+  // Relay's team sees shops' own websites in Browse straight away (asked when Browse opens, so opening the app
+  // costs nothing): on by default for a team account on this device, until they switch it off themselves under Profile, Team. Shoppers are never affected (admin only).
+  var teamWebChecked = false;
+  function teamWebDefault() {
+    if (teamWebChecked) return; teamWebChecked = true;
+    try { if (localStorage.getItem("relay-web-preview-chosen") === "1" || localStorage.getItem("relay-web-preview") === "1") return; } catch (e) { return; }
+    api("/relay/my/admin/me").then(function (r) {
+      if (!r.ok || !r.body || !r.body.admin || r.body.signInAgain) return;
+      try { localStorage.setItem("relay-web-preview", "1"); } catch (e) { return; }
+      if (typeof window.testToolsChanged === "function") window.testToolsChanged();
+    }).catch(function () {});
+  }
+
   function mountHome(host) {
     if (!host) return;
     var s = load();
