@@ -34,7 +34,7 @@ for (const scheme of ["dark", "light"]) {
   await page.locator("#browsePage .rl-tile").first().waitFor();
   await page.locator("#browsePage .rl-wr-door").waitFor();
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  assert.equal(bg, scheme === "dark" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)", scheme + ": the page follows the phone's setting");
+  assert.equal(bg, "rgb(255, 255, 255)", scheme + ": Relay is always white, whatever the phone is set to");
   // The tiles: this year's Wrapped first, "Other" last, and each name readable on its tile.
   assert.ok(await page.evaluate(() => { const d = document.querySelector("#browsePage .rl-wr-door"), t = document.querySelector("#browsePage .rl-tile"); return Boolean(d.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING); }), "this year's Wrapped leads");
   const tiles = await page.locator("#browsePage .rl-tile").evaluateAll(ts => ts.map(t => ({ name: t.querySelector("b").textContent, bg: getComputedStyle(t).backgroundColor, fg: getComputedStyle(t.querySelector("b")).color, year: t.classList.contains("rl-year") })));

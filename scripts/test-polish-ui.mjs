@@ -137,11 +137,11 @@ assert.equal(await page.evaluate(() => window.__audio[1].state), "closed", "clos
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.storySound.v1")), "on");
 console.log("ok - the Wrapped story uses flat colours from Relay's palette, with its own music (off is remembered, closing stops it)");
 
-// A real dark theme that follows the phone (this browser asks for dark), a press effect on buttons, and the keyboard
+// Relay is always white even though this browser asks for dark (rule 11), a press effect on buttons, and the keyboard
 // space is tracked for sheets.
-assert.equal(await page.evaluate(() => document.querySelector('meta[name="color-scheme"]').content), "light dark");
-assert.deepEqual(await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.body).color]), ["rgb(0, 0, 0)", "rgb(255, 255, 255)"],
-  "in dark mode the page is black with white text");
+assert.equal(await page.evaluate(() => document.querySelector('meta[name="color-scheme"]').content), "light"); // always white (rule 11)
+assert.deepEqual(await page.evaluate(() => [getComputedStyle(document.body).backgroundColor, getComputedStyle(document.body).color]), ["rgb(255, 255, 255)", "rgb(0, 0, 0)"],
+  "even with the phone in dark mode the page is white with black text");
 assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("#foot")).backdropFilter !== "none"), true, "the tab bar is frosted glass");
 assert.ok(await page.evaluate(() => [...document.styleSheets].some(ss => { try { return [...ss.cssRules].some(r => /button:active/.test(r.selectorText || "") && /scale/.test(r.cssText)); } catch { return false; } })), "buttons shrink a little when pressed");
 assert.match(await page.locator("#foot button").first().evaluate(b => getComputedStyle(b).transitionProperty), /transform/);

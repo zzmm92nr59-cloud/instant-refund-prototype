@@ -385,7 +385,7 @@
   var css = document.createElement("style");
   css.textContent = ".rl-back{position:fixed;inset:0;background:rgba(15,27,51,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999}" +
     // Whatever is behind a sheet dims so the eye goes to the sheet; on a dark screen it has to dim further to show.
-    "@media (prefers-color-scheme: dark){.rl-back{background:rgba(0,0,0,.62)}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-back{background:rgba(0,0,0,.62)}}" +
     // Frosted (a preview, off until a class is put on the page: frost-soft or frost-strong). The page behind a sheet blurs
     // and dims instead of the flat layer, and the sheet lets a little of it through. Full-page steps (sign-in) stay solid.
     // Where blur isn't supported, @supports leaves the flat dim above.
@@ -394,12 +394,12 @@
       "html.frost-soft .rl-back:not(:has(>.rl-jr))::before,html.frost-strong .rl-back:not(:has(>.rl-jr))::before{content:\"\";position:fixed;inset:0;z-index:-1;pointer-events:none}" +
       "html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.2);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3)}" +
       "html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.34);-webkit-backdrop-filter:blur(24px) saturate(1.3);backdrop-filter:blur(24px) saturate(1.3)}" +
-      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.36)}html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.52)}}" +
+      "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.36)}html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.52)}}" +
       "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 94%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
       "html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 88%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
       // Over a see-through sheet the grey words need more ink to stay at 4.5 to 1 (light mode; dark already passes).
       "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(60,60,67,.84)}" +
-      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(235,235,245,.7)}}" +
+      "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(235,235,245,.7)}}" +
     "}" +
     "@media(min-width:640px){.rl-back{align-items:center}}" +
     ".rl-sheet{background:var(--rl-sheet);width:100%;max-width:420px;border-radius:28px 28px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.18);max-height:88vh;overflow:auto;font-family:inherit;color:var(--rl-text)}" +
@@ -427,7 +427,7 @@
     ".rl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}" +
     "@media(max-width:360px){.rl-po-img{width:80px;height:80px}}" +
     // In dark mode cards are Relay's navy (the --rl-card token), so a wallet card's buttons and picture box are lighter on it.
-    "@media(prefers-color-scheme:dark){.rl-po .rl-po-secondary{background:rgba(255,255,255,.12)}.rl-po .rl-po-img,.rl-po .rl-po-img.rl-has-logo{background:rgba(255,255,255,.1)!important}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-po .rl-po-secondary{background:rgba(255,255,255,.12)}.rl-po .rl-po-img,.rl-po .rl-po-img.rl-has-logo{background:rgba(255,255,255,.1)!important}}" +
     ".rl-po-status{font-size:13px;line-height:1.4;padding:8px 11px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-po-status.wait{background:var(--rl-fill);color:var(--rl-text2)}" +
     ".rl-po-actions{display:flex;gap:8px;flex-wrap:wrap}" +
     // Inside a card: tinted buttons rather than outlined ones, Details only as wide as its word beside another button.
@@ -889,7 +889,7 @@
     // A shop's logo sits on white in light and dark, like an app icon, so dark logos stay readable.
     ".rl-po .rl-po-img.rl-has-logo,.rl-dt-head .rl-po-img.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}" +
     ".rl-dt-facts{margin:16px 0 0;border-radius:16px;background:var(--rl-card);padding:0 16px}" +
-    "@media (prefers-color-scheme: dark){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
     ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}" +
     ".rl-dt-fact span{color:var(--rl-text2);flex:none}.rl-dt-fact b{font-weight:500;text-align:right;overflow-wrap:anywhere;color:var(--rl-text)}" +
     // Grouped lists like the phone's Settings: no outline, and the line between rows starts after the icon.
@@ -927,13 +927,13 @@
     ".rl-dl-pc .rl-btn.rl-dl-find{flex:none;width:auto;margin:0;padding:0 16px;white-space:nowrap;border-radius:16px}" +
     ".rl-dl-pick{margin:12px 2px 6px;font-size:15px;font-weight:600;color:var(--rl-text)}" +
     ".rl-dl-list{display:flex;flex-direction:column;border-radius:14px;background:var(--rl-card);max-height:300px;overflow-y:auto;margin:0 0 8px;-webkit-overflow-scrolling:touch}" +
-    "@media (prefers-color-scheme: dark){.rl-dl-list{background:rgba(255,255,255,.07)}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-dl-list{background:rgba(255,255,255,.07)}}" +
     ".rl-dl-addr{all:unset;box-sizing:border-box;cursor:pointer;min-height:48px;display:flex;align-items:center;padding:11px 14px;font-size:16px;line-height:1.35;color:var(--rl-text);border-top:.5px solid var(--rl-line);-webkit-tap-highlight-color:transparent;transition:background .12s}" +
     ".rl-dl-addr:first-child{border-top:0}.rl-dl-addr:active{background:var(--rl-fill)}.rl-dl-addr:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px}" +
     ".rl-dl-sugg{display:inline-flex;width:auto;margin:6px 8px 0 0;padding:0 16px}.rl-dl-found .rl-msg{margin:8px 2px 0}" +
     // Auctions: a card per auction (one tap opens it), and its page.
     // On a sheet the cards sit on a lighter grey (light) or a lighter navy (dark), so each one reads as a card.
-    ".rl-sheet .rl-au-card{background:var(--rl-card)}@media (prefers-color-scheme: dark){.rl-sheet .rl-au-card{background:rgba(255,255,255,.07)}}" +
+    ".rl-sheet .rl-au-card{background:var(--rl-card)}@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-sheet .rl-au-card{background:rgba(255,255,255,.07)}}" +
     ".rl-au-card{margin:10px 0}.rl-au-card .rl-po-top{display:flex;align-items:flex-start}.rl-au-pic{flex:none;overflow:hidden;background:var(--rl-fill)}" +
     ".rl-au-pic img,.rl-au-big img,.rl-au-thumb img{width:100%;height:100%;object-fit:cover;display:block}" +
     ".rl-au-what{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-title{font-size:17px;font-weight:600;line-height:1.3;color:var(--rl-text)}" +
@@ -947,7 +947,7 @@
     ".rl-au-shopname{font-size:15px;color:var(--rl-text2);margin:4px 0 2px}.rl-au-h{margin:0 0 4px;font-size:24px;line-height:1.2;color:var(--rl-text)}" +
     ".rl-au-sub{font-size:15px;line-height:1.4;color:var(--rl-text2);margin:0 0 12px}" +
     ".rl-au-pricebox{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;padding:14px 16px;border-radius:18px;background:var(--rl-card);margin:4px 0 12px}" +
-    "@media (prefers-color-scheme: dark){.rl-au-pricebox{background:rgba(255,255,255,.07)}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-au-pricebox{background:rgba(255,255,255,.07)}}" +
     ".rl-au-pricebox>div{display:flex;flex-direction:column;gap:2px;min-width:0}.rl-au-lbl{font-size:13px;font-weight:600;color:var(--rl-text2)}" +
     ".rl-au-now{font-size:28px;font-weight:700;line-height:1.1;color:var(--rl-text)}.rl-au-meta{font-size:15px;color:var(--rl-text2)}" +
     ".rl-au-left.big{font-weight:600;color:var(--rl-text);text-align:right;flex:none}.rl-au-you.big{margin:0 0 12px}" +
@@ -971,7 +971,7 @@
     ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}" +
     // Slide to bid: a round handle dragged to the end of a 56px pill. Relay's navy and lime, whichever the phone's setting.
     ".rl-slide{position:relative;height:56px;border-radius:28px;background:#101828;color:#fff;margin:14px 0 4px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}" +
-    "@media(prefers-color-scheme:dark){.rl-slide{background:#26324a}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-slide{background:#26324a}}" +
     ".rl-slide-fill{position:absolute;left:0;top:0;bottom:0;width:56px;border-radius:28px;background:#3d5a1f}" +
     ".rl-slide-t{position:absolute;top:0;bottom:0;left:56px;right:0;display:flex;align-items:center;justify-content:center;padding:0 12px;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;pointer-events:none}" +
     ".rl-slide-tl{left:0;right:auto;justify-content:center;padding:0 0 0 12px;color:#fff}.rl-slide-t[hidden]{display:none}" +
@@ -1043,7 +1043,7 @@
     // Three colour looks for Home's cards and the Ask page, from Relay's own palette, each behind a class on <html>
     // (look-q, look-n, look-s). None is on by default: Home keeps its category colours until one is chosen.
     // Q, quiet: cards in the card colour; colour only inside the pictures and the strip.
-    "html.look-q .h2-feed.tint .h2-card.has-c{background:var(--rl-card);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(60,60,67,.86)}@media(prefers-color-scheme:dark){html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:var(--rl-text2)}}" +
+    "html.look-q .h2-feed.tint .h2-card.has-c{background:var(--rl-card);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(60,60,67,.86)}@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:var(--rl-text2)}}" +
     "html.look-q .h2-feed.tint .h2-card.has-c .h2-go{background:var(--rl-fill);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-logo:not(.rl-has-logo){background:var(--rl-fill);color:var(--rl-text)}" +
     "html.look-q .h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:none;color:#fff}" +
     // N, navy and lime: every card Relay's navy (a step lighter than the black page in dark), lime for the arrow and the open tab.
@@ -1051,18 +1051,18 @@
     "html.look-n .h2-feed.tint .h2-card .h2-go{background:#c7f567;color:#101828}html.look-n .h2-feed.tint .h2-card .h2-logo:not(.rl-has-logo){background:#fff;color:#101828}" +
     "html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#1d2a44;box-shadow:none;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:#c7f567!important}html.look-n .h2-feed.tint .h2-card .h2-pic:has(.rl-ill){background:transparent}" +
     "html.look-n .footnav button.active{background:#c7f567!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#c7f567}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#c7f567;color:#101828}" +
-    "@media(prefers-color-scheme:dark){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
     // S, softer: the same category colours at lower strength; dark text on the pale cards, white on the deep ones.
     "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 16%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
     "html.look-s .h2-feed.tint .h2-card.has-c .h2-go{background:var(--h2-c);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 30%,#fff);box-shadow:none;color:#000}" +
     "html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}html.look-s .rl-ask-qi{background:color-mix(in srgb,var(--qi) 18%,var(--rl-bg));color:var(--qi)}" +
-    "@media(prefers-color-scheme:dark){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
     "html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 22%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(255,255,255,.1)!important;color:#fff!important}}" +
     // Interests: chips of 44px or more with one of Relay's drawings; the chosen ones in the accent colour.
     // First-run tips: the page dimmed except the tab the tip is about (lit, with a lime ring), and a card pointing at it.
     ".rl-tip-layer{position:fixed;inset:0;z-index:9990}" +
     ".rl-tip-ring{position:fixed;border-radius:999px;box-shadow:0 0 0 200vmax rgba(0,0,0,.55);border:3px solid #c7f567;box-sizing:border-box;pointer-events:none;transition:left .25s,top .25s,width .25s,height .25s}" +
-    "@media(prefers-color-scheme:dark){.rl-tip-ring{box-shadow:0 0 0 200vmax rgba(0,0,0,.7)}}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-tip-ring{box-shadow:0 0 0 200vmax rgba(0,0,0,.7)}}" +
     ".rl-tip{position:fixed;left:16px;right:16px;max-width:420px;margin:0 auto;background:var(--rl-sheet);color:var(--rl-text);border-radius:22px;padding:18px 18px 16px;box-shadow:0 12px 40px rgba(0,0,0,.25)}" +
     ".rl-tip-layer.side .rl-tip{right:auto;width:340px;margin:0}" +
     ".rl-tip h2{margin:0 0 4px;font-size:20px;line-height:26px;font-weight:700}.rl-tip p{margin:0 0 14px;font-size:16px;line-height:22px;color:var(--rl-text)}" +
@@ -1092,7 +1092,7 @@
     "@media(prefers-reduced-motion:reduce){.h2-item,.h2-chip{transition:none}.h2-item:active{transform:none}}" +
     // Dark screens (rule 11): a drawing sits on a dark tile, as Home's pictures do today, never on a pale panel. A real
     // photo still fills the area, and a shop's logo keeps the white it was made for.
-    "@media(prefers-color-scheme:dark){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
+    "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
     ".h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(8,12,22,.5)!important;color:#fff!important}.h2-feed.tint .h2-card.has-c .h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.24)}}" +
     // Ask. No big title and no avatar; the page is exactly a screen tall, so the box rests 16px above the tab bar from
     // the start (and just above the keyboard while typing, when the tab bar steps aside).
