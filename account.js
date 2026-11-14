@@ -968,7 +968,22 @@
     ".rl-ys-webn{font-size:14px;line-height:18px;color:var(--rl-text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.rl-ys-webp b{font-size:15px;color:var(--rl-text)}.rl-ys-webd{font-size:13px;color:var(--rl-text2);margin:8px 0 16px}" +
     ".rl-ys-acts{display:grid;gap:10px;margin:0 0 16px}.rl-ys-acts .rl-btn{margin:0;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;min-height:44px}" +
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
-    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
+    ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}" +
+    // Slide to bid: a round handle dragged to the end of a 56px pill. Relay's navy and lime, whichever the phone's setting.
+    ".rl-slide{position:relative;height:56px;border-radius:28px;background:#101828;color:#fff;margin:14px 0 4px;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}" +
+    "@media(prefers-color-scheme:dark){.rl-slide{background:#26324a}}" +
+    ".rl-slide-fill{position:absolute;left:0;top:0;bottom:0;width:56px;border-radius:28px;background:#3d5a1f}" +
+    ".rl-slide-t{position:absolute;top:0;bottom:0;left:56px;right:0;display:flex;align-items:center;justify-content:center;padding:0 12px;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;pointer-events:none}" +
+    ".rl-slide-tl{left:0;right:auto;justify-content:center;padding:0 0 0 12px;color:#fff}.rl-slide-t[hidden]{display:none}" +
+    ".rl-slide-m{position:absolute;visibility:hidden;white-space:nowrap;font-size:17px;font-weight:600;left:0;top:0;pointer-events:none}" +
+    ".rl-slide-k{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:#c7f567;color:#101828;display:grid;place-items:center;cursor:grab;touch-action:none}" +
+    ".rl-slide-k:active{cursor:grabbing}.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:transform .28s cubic-bezier(.2,.9,.3,1.2),width .28s cubic-bezier(.2,.9,.3,1.2)}" +
+    ".rl-slide.busy .rl-slide-k,.rl-slide.off .rl-slide-k{cursor:default}.rl-slide.off{opacity:.55}.rl-slide.done{background:#c7f567;color:#101828}.rl-slide.done .rl-slide-fill{opacity:0}" +
+    ".rl-slide-k .rl-jic{color:#101828!important;margin:0}" +
+    "@media(prefers-reduced-motion:reduce){.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:none}}" +
+    // For screen readers and keyboards: the same bid as an ordinary button, shown when it has the keyboard's focus.
+    ".rl-kbonly{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:0;padding:0;border:0}" +
+    ".rl-kbonly:focus,.rl-kbonly:focus-visible{position:static!important;width:100%;height:auto;clip:auto;clip-path:none;white-space:normal;padding:14px 18px;margin-top:10px}";
   document.head.appendChild(css);
   // The calm layout (draft): quiet rows in place of tiles. One job per tab; everything else is one tap deeper.
   var calmCss = document.createElement("style");
@@ -1044,6 +1059,16 @@
     "@media(prefers-color-scheme:dark){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
     "html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 22%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(255,255,255,.1)!important;color:#fff!important}}" +
     // Interests: chips of 44px or more with one of Relay's drawings; the chosen ones in the accent colour.
+    // First-run tips: the page dimmed except the tab the tip is about (lit, with a lime ring), and a card pointing at it.
+    ".rl-tip-layer{position:fixed;inset:0;z-index:9990}" +
+    ".rl-tip-ring{position:fixed;border-radius:999px;box-shadow:0 0 0 200vmax rgba(0,0,0,.55);border:3px solid #c7f567;box-sizing:border-box;pointer-events:none;transition:left .25s,top .25s,width .25s,height .25s}" +
+    "@media(prefers-color-scheme:dark){.rl-tip-ring{box-shadow:0 0 0 200vmax rgba(0,0,0,.7)}}" +
+    ".rl-tip{position:fixed;left:16px;right:16px;max-width:420px;margin:0 auto;background:var(--rl-sheet);color:var(--rl-text);border-radius:22px;padding:18px 18px 16px;box-shadow:0 12px 40px rgba(0,0,0,.25)}" +
+    ".rl-tip-layer.side .rl-tip{right:auto;width:340px;margin:0}" +
+    ".rl-tip h2{margin:0 0 4px;font-size:20px;line-height:26px;font-weight:700}.rl-tip p{margin:0 0 14px;font-size:16px;line-height:22px;color:var(--rl-text)}" +
+    ".rl-tip-btns{display:flex;gap:10px}.rl-tip-btns .rl-btn{flex:1;margin:0;min-height:44px}" +
+    ".rl-tip-arrow{position:absolute;width:14px;height:14px;background:var(--rl-sheet);transform:rotate(45deg);border-radius:2px}" +
+    "@media(prefers-reduced-motion:reduce){.rl-tip-ring{transition:none}}" +
     ".rl-int-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px}.rl-int{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;line-height:20px;font-weight:600;transition:transform .12s,background .15s}" +
     ".rl-int:active{transform:scale(.95)}.rl-int:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}.rl-int-i{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--rl-bg);color:var(--rl-text)}" +
     ".rl-int[aria-pressed=true]{background:var(--rl-accent);color:var(--rl-bg)}.rl-int[aria-pressed=true] .rl-int-i{background:var(--rl-bg);color:var(--rl-accent)}" +
@@ -1589,6 +1614,7 @@
   // link signs you in, and then you connect your inbox once. Either way the first scan starts at once and you see it
   // counting while you add your name, so the first screen after is full, not empty.
   var JI = {
+    next: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     check: '<path d="m5 12.5 4.2 4.2L19 7"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
@@ -1612,6 +1638,75 @@
     var s = el("span", { className: "rl-jic" }); s.setAttribute("aria-hidden", "true");
     s.innerHTML = '<svg viewBox="0 0 24 24" width="' + (px || 20) + '" height="' + (px || 20) + '" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">' + JI[n] + "</svg>";
     return s;
+  }
+  // Slide to confirm: a round handle dragged to the end of a pill. send() runs only when it reaches the end; let go early
+  // and it springs back. o.label() is what the pill says (and must name exactly what will be sent); o.ok() says whether
+  // it can be slid now; o.send(done) does the thing, then calls done(true) to show it done or done(false) to start again.
+  // It doesn't start the browser's own gestures (a swipe back, pull to refresh, a sheet's swipe down: .rl-noswipe/.rl-noptr).
+  function slider(o) {
+    // Two places for the words, so the amount can always be read: ahead of the handle ("Slide to bid £50.00", then just
+    // "£50.00" as the room runs out), and behind it on the fill near the end ("Release to bid £50.00").
+    var t = el("span", { className: "rl-slide-t" }), tl = el("span", { className: "rl-slide-t rl-slide-tl" }), fill = el("span", { className: "rl-slide-fill" });
+    var knob = el("span", { className: "rl-slide-k" }, [jIc("next", 24)]);
+    var box = el("div", { className: "rl-slide rl-noswipe rl-noptr" }, [fill, tl, t, knob]);
+    box.setAttribute("aria-hidden", "true"); // the button beside it is the way in for screen readers and keyboards
+    var x = 0, max = 0, drag = null, state = "idle";
+    // How wide some words are on the pill, measured off screen (a centred line that's too long spills both ways, so the
+    // line itself can't be asked).
+    var meas = el("span", { className: "rl-slide-m" }); box.appendChild(meas);
+    var fits = function (n, text, room) { meas.textContent = text; var ok = room > 0 && meas.offsetWidth <= room; if (ok) n.textContent = text; return ok; };
+    var words = function () {
+      var w = box.getBoundingClientRect().width || 0;
+      t.style.left = ""; t.style.right = ""; tl.style.width = ""; tl.hidden = true; t.hidden = false;
+      if (state !== "idle") { t.style.left = "0px"; t.style.right = "0px"; t.textContent = state === "busy" ? "Bidding…" : (o.doneText || "Done"); return; }
+      var full = o.label(), amount = o.amount ? o.amount() : "", behind = o.release ? o.release() : "";
+      // Behind the handle, once there's room for all of it.
+      tl.style.width = Math.max(0, x) + "px";
+      if (x > 0 && behind && fits(tl, behind, x - 20)) { tl.hidden = false; t.hidden = true; return; }
+      // Ahead of it: all of it, or the amount alone.
+      t.style.left = (x + 56) + "px"; t.style.right = "0px";
+      var room = w - (x + 56) - 24;
+      if (!w || x === 0 || fits(t, full, room)) { t.textContent = full; if (x === 0) { t.style.left = "56px"; } return; }
+      if (amount && fits(t, amount, room)) return;
+      // No room ahead and not yet enough behind for all the words: the amount alone, behind the handle.
+      t.hidden = true; tl.hidden = false; tl.textContent = amount;
+    };
+    var put = function (v) { x = v; knob.style.transform = "translateX(" + v + "px)"; fill.style.width = (v + 56) + "px"; words(); };
+    var show = function () { words(); box.classList.toggle("off", state === "idle" && !o.ok()); };
+    var back = function () { box.classList.add("back"); put(0); setTimeout(function () { box.classList.remove("back"); }, 300); };
+    var api = {
+      el: box,
+      reset: function () { state = "idle"; box.classList.remove("busy", "done"); drag = null; back(); show(); },
+      refresh: function () { if (state === "idle") { if (x) back(); show(); } },
+      busy: function () { return state !== "idle"; }
+    };
+    knob.addEventListener("pointerdown", function (e) {
+      if (state !== "idle" || !o.ok()) { if (state === "idle" && o.refuse) o.refuse(); return; }
+      max = box.getBoundingClientRect().width - 56;
+      drag = { start: e.clientX - x, id: e.pointerId, label: o.label() };
+      try { knob.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault(); e.stopPropagation();
+    });
+    knob.addEventListener("pointermove", function (e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      put(Math.max(0, Math.min(max, e.clientX - drag.start)));
+      e.preventDefault();
+    });
+    var end = function (e) {
+      if (!drag || (e && e.pointerId !== drag.id)) return;
+      var d = drag; drag = null;
+      // Sent only from the very end, and only for exactly the amount the pill showed when the slide began.
+      if (x < max - 2 || d.label !== o.label() || !o.ok()) { back(); show(); return; }
+      state = "busy"; put(max); box.classList.add("busy"); show();
+      o.send(function (ok) {
+        if (!box.isConnected) return;
+        if (ok) { state = "done"; box.classList.remove("busy"); box.classList.add("done"); knob.textContent = ""; knob.appendChild(jIc("check", 24)); show(); }
+        else api.reset();
+      });
+    };
+    knob.addEventListener("pointerup", end); knob.addEventListener("pointercancel", function (e) { if (drag && e.pointerId === drag.id) { drag = null; back(); show(); } });
+    show();
+    return api;
   }
   // The frame of every step: progress dots (when there is more than one step), Back or Close, then the step itself.
   function jFrame(sheet, o) {
@@ -4269,9 +4364,11 @@
   var interestsAsked = false;
   // Asked once, on Home, and only into a still screen: if the shopper has tapped, typed or scrolled since Home opened,
   // or has moved on, the sheet waits for the next time Home opens rather than appearing under their finger.
+  // The first-run tips come after the interests sheet, or straight away when it isn't shown (on the same terms).
   function interestsMaybeAsk(host) {
-    var s = load(); if (interestsAsked || !s || !s.token || isReview() || interestsLater()) return;
-    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return; }
+    var s = load(); if (!s || !s.token || isReview()) return;
+    if (interestsAsked || interestsLater()) return tipsMaybe(host);
+    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return tipsMaybe(host); }
     interestsAsked = true;
     var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
     evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
@@ -4279,7 +4376,7 @@
       evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
       var still = host && host.isConnected && !acted && !document.querySelector(".rl-back, .rl-sheet");
       if (!still) { interestsAsked = false; return; }
-      if (list && !list.length && !interestsLater()) interestsSheet();
+      if (list && !list.length && !interestsLater()) interestsSheet(); else tipsMaybe(host);
     });
   }
   function interestsSheet() {
@@ -4294,7 +4391,114 @@
       sheet.appendChild(interestsPicker([], function (list) { chosen = list; save.disabled = !list.length; }));
       sheet.appendChild(msg); sheet.appendChild(save);
       sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-int-later", text: "Not now", onclick: function () { interestsLater(true); close(); } }));
+      // However it closes (Save, Not now, a tap outside, a swipe down), the tips come next.
+      var gone = setInterval(function () { if (!sheet.isConnected) { clearInterval(gone); setTimeout(tipsMaybe, 350); } }, 250);
     });
+  }
+
+  // ---- First-run tips: one for each tab, shown once per account ----
+  // After the interests sheet (or straight away when it isn't shown), on Home: up to four tips, each lighting its tab with
+  // the page behind dimmed, an arrow to the tab, one line on what it's for, Next (Done on the last) and Skip. Which ones
+  // have been seen is kept with the account (worker/tips.js), and on the phone when Relay can't be reached. Profile's
+  // Help and legal has "Show the tips again".
+  var TIPS = [["home", "profile", "Home", "What needs you comes first: returns to send, parcels on the way and swaps."],
+    ["ask", "ask", "Ask", "Ask Relay's assistant about a receipt, or how anything in Relay works."],
+    ["browse", "discover", "Browse", "Your kinds of shopping, your year in Wrapped, auctions and shops on Relay."],
+    ["receipts", "receipts", "Receipts", "Every receipt Relay found, by month. Tap + to add one that's missing."]];
+  var TIPS_KEY = "relay.tips.v1", tipsChecked = false, tipsOpen = false, tipsServer = null;
+  function tipsLocal() { var s = load(); try { var all = JSON.parse(localStorage.getItem(TIPS_KEY) || "{}"); return (s && s.email && all[s.email]) || []; } catch (e) { return []; } }
+  function tipsLocalSet(list) { var s = load(); if (!s || !s.email) return; try { var all = JSON.parse(localStorage.getItem(TIPS_KEY) || "{}"); all[s.email] = list; localStorage.setItem(TIPS_KEY, JSON.stringify(all)); } catch (e) { /* storage blocked */ } }
+  function tipsSeen() {
+    // Once this phone has been through the tips it knows, and asks Relay nothing (opening the app stays quiet: rule 20).
+    // Otherwise what the account says (seen on another phone), joined with what this phone remembers, kept here too.
+    var mine = tipsLocal();
+    if (mine.length) { tipsServer = mine; return Promise.resolve(mine); }
+    return api("/relay/my/tips").then(function (r) { tipsServer = r.ok && r.body ? r.body.seen || [] : null; return tipsServer; }, function () { tipsServer = null; return null; })
+      .then(function (srv) { var all = (srv || []).concat(tipsLocal()).filter(function (x, i, a) { return a.indexOf(x) === i; }); if (all.length) tipsLocalSet(all); return all; });
+  }
+  function tipsMark(ids) {
+    var all = tipsLocal().concat(ids).filter(function (x, i, a) { return a.indexOf(x) === i; });
+    tipsLocalSet(all);
+    if (tipsServer) { tipsServer = all; tipsPut(); }
+  }
+  // One change at a time, each with everything seen so far, so a later one never arrives before an earlier one.
+  var tipsQueue = Promise.resolve();
+  function tipsPut() {
+    tipsQueue = tipsQueue.then(function () { return api("/relay/my/tips", { method: "PUT", body: { seen: tipsLocal() } }); }).catch(function () {});
+  }
+  function tipTab(key) {
+    var navs = ["foot", "side"].map(function (id) { return document.getElementById(id); });
+    for (var i = 0; i < navs.length; i++) { var b = navs[i] && navs[i].querySelector('[data-tab="' + key + '"]'); if (b) { var r = b.getBoundingClientRect(); if (r.width > 0 && r.height > 0) return b; } }
+    return null;
+  }
+  function tipsMaybe(host) {
+    var s = load();
+    if (tipsChecked || tipsOpen || !s || !s.token || isReview() || window.page !== "profile") return;
+    tipsChecked = true;
+    // Like the interests sheet, only into a still screen: a tap, key or scroll in the moment before means next time.
+    var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
+    evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
+    tipsSeen().then(function (seen) { return new Promise(function (ok) { setTimeout(function () { ok(seen); }, 300); }); }).then(function (seen) {
+      evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
+      var list = TIPS.filter(function (t) { return seen.indexOf(t[0]) < 0 && tipTab(t[1]); });
+      if (!list.length) return;
+      var still = !acted && window.page === "profile" && (!host || host.isConnected) && !document.querySelector(".rl-back, .rl-sheet");
+      if (!still) { tipsChecked = false; return; }
+      tipsShow(list);
+    });
+  }
+  function tipsShow(list) {
+    tipsOpen = true;
+    var at = 0, stepAt = 0, back = document.activeElement;
+    var ring = el("div", { className: "rl-tip-ring" }), arrow = el("span", { className: "rl-tip-arrow" });
+    var title = el("h2", { id: "rl-tip-h" }), line = el("p", { id: "rl-tip-p" });
+    var skip = el("button", { type: "button", className: "rl-btn ghost", text: "Skip" }), next = el("button", { type: "button", className: "rl-btn" });
+    var card = el("div", { className: "rl-tip", role: "dialog" }, [arrow, title, line, el("div", { className: "rl-tip-btns" }, [skip, next])]);
+    card.setAttribute("aria-modal", "true"); card.setAttribute("aria-labelledby", "rl-tip-h"); card.setAttribute("aria-describedby", "rl-tip-p");
+    var layer = el("div", { className: "rl-tip-layer" }, [ring, card]);
+    var place = function () {
+      var b = tipTab(list[at][1]); if (!b) return;
+      var r = b.getBoundingClientRect(), pad = 6, side = r.left < 200 && r.width > r.height * 2;
+      ring.style.cssText = "left:" + (r.left - pad) + "px;top:" + (r.top - pad) + "px;width:" + (r.width + pad * 2) + "px;height:" + (r.height + pad * 2) + "px";
+      layer.classList.toggle("side", side);
+      if (side) { card.style.cssText = "left:" + (r.right + 18) + "px;top:" + Math.max(12, r.top - 12) + "px"; arrow.style.cssText = "left:-7px;top:" + (Math.min(r.height, 60) / 2 + 12 - 7) + "px"; }
+      else {
+        card.style.cssText = "bottom:" + (innerHeight - r.top + 18) + "px";
+        var c = card.getBoundingClientRect();
+        arrow.style.cssText = "bottom:-7px;left:" + Math.max(18, Math.min(c.width - 32, r.left + r.width / 2 - c.left - 7)) + "px";
+      }
+    };
+    var show = function () {
+      var t = list[at];
+      title.textContent = t[2]; line.textContent = t[3];
+      next.textContent = at === list.length - 1 ? "Done" : "Next";
+      next.setAttribute("aria-label", (at === list.length - 1 ? "Done" : "Next") + ", tip " + (at + 1) + " of " + list.length);
+      tipsMark([t[0]]); // shown is seen: it won't come back, even if Relay is closed now
+      place(); next.focus();
+    };
+    var finish = function (all) {
+      if (all) tipsMark(list.map(function (t) { return t[0]; }));
+      tipsOpen = false; layer.remove();
+      removeEventListener("resize", place); document.removeEventListener("keydown", key, true);
+      try { if (back && back.focus) back.focus(); } catch (e) {}
+    };
+    // One step per tap: a quick second tap on Next never skips a tip.
+    next.onclick = function () { var now = Date.now(); if (now - stepAt < 450) return; stepAt = now; if (at >= list.length - 1) return finish(false); at++; show(); };
+    skip.onclick = function () { finish(true); };
+    function key(e) {
+      if (e.key === "Escape") { e.preventDefault(); finish(true); }
+      else if (e.key === "Tab") { e.preventDefault(); (document.activeElement === next ? skip : next).focus(); } // focus stays in the tip
+    }
+    document.addEventListener("keydown", key, true);
+    addEventListener("resize", place);
+    document.body.appendChild(layer);
+    stepAt = Date.now(); show();
+  }
+  // Profile, Help and legal: "Show the tips again".
+  function tipsAgain() {
+    tipsLocalSet([]);
+    var go = function () { tipsChecked = false; if (window.go) window.go("profile"); setTimeout(tipsMaybe, 700); };
+    tipsServer = []; tipsPut(); tipsQueue.then(go, go);
   }
   // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
   var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
@@ -4656,6 +4860,7 @@
     function helpHub(b) {
       b.appendChild(accGroup("", [
         accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat(chatRow._ai ? [] : [chatRow], [
+        accRow("help", "Show the tips again", "A tip for each tab, from Home", function () { tipsAgain(); }),
         accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
         accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })])));
     }
@@ -7431,34 +7636,51 @@
       // What's wrong with a bid shows right under it.
       var msg = el("div", { className: "rl-msg", role: "status" });
       body.appendChild(msg);
-      var go = el("button", { type: "button", className: "rl-btn" });
+      // Slide to bid (the pill), or the same bid as an ordinary button for screen readers and keyboards.
+      var go = el("button", { type: "button", className: "rl-btn rl-kbonly" });
       var pence = function () { var n = Number(String(input.value).replace(/[£,\s]/g, "")); return isFinite(n) && n > 0 ? Math.round(n * 100) : NaN; };
-      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Bid" : "Bid up to " + money(p, "GBP"); };
-      input.addEventListener("input", label); label();
+      var slide = slider({ label: function () { var p = pence(); return isNaN(p) ? "Type the most you'd pay" : "Slide to bid " + money(p, "GBP"); },
+        amount: function () { var p = pence(); return isNaN(p) ? "" : money(p, "GBP"); },
+        release: function () { var p = pence(); return isNaN(p) ? "" : "Release to bid " + money(p, "GBP"); },
+        ok: function () { var p = pence(); return !isNaN(p) && p >= least; }, doneText: "Bid placed",
+        refuse: function () { say(msg, "Bid " + money(least, "GBP") + " or more.", true); },
+        send: function (done) { send(pence(), done); } });
+      var label = function () { var p = pence(); go.textContent = isNaN(p) ? "Place bid" : "Place bid " + money(p, "GBP"); slide.refresh(); };
+      input.addEventListener("input", function () { say(msg, ""); label(); }); // a new amount: the old message no longer applies
       body.appendChild(el("p", { className: "rl-au-small", text: "Plus " + (a.deliveryMinor ? money(a.deliveryMinor, "GBP") + " delivery" : "free delivery") + " if you win. You pay " + a.shop + " within 24 hours at its own checkout." }));
       var ERR = { bid_too_low: function (b) { return "Bid " + money(b.nextMinor || least, "GBP") + " or more."; }, bid_not_higher: function (b) { return "The most you'd pay is already " + money(b.maxMinor, "GBP") + ". Type more than that."; },
         bid_too_high: function () { return "That's more than Relay takes for one bid."; }, auction_ended: function () { return "This auction has ended."; },
         bidding_paused: function () { return "Two auctions you won weren't paid for, so bidding is paused for now."; }, delivery_details_needed: function () { return "Add your delivery details first."; } };
-      go.onclick = function () {
-        if (go.disabled) return;
-        var p = pence();
-        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
-        go.disabled = true; go.textContent = "Bidding…"; say(msg, "");
+      // One bid at a time: the button and the slider are both locked while it's being sent.
+      var sending = false;
+      function send(p, done) {
+        if (sending) return;
+        sending = true; go.disabled = true; input.disabled = true; say(msg, "");
+        var finish = function (ok) { sending = false; go.disabled = false; input.disabled = false; label(); if (done) done(ok); };
         api("/relay/my/auctions/bid", { method: "POST", body: { auctionId: a.id, maxMinor: p } }).then(function (r) {
-          go.disabled = false; label();
           if (r.ok && r.body && r.body.auction) {
             try { localStorage.setItem(AU_BID_KEY, "1"); } catch (e) {}
             auLive.at = 0;
-            bidDone(r.body.auction, r.body.you.leading, p);
+            finish(true);
+            // "Bid placed" on the pill for a moment, then whether they're winning.
+            setTimeout(function () { if (body.isConnected) bidDone(r.body.auction, r.body.you.leading, p); }, done ? 900 : 0);
             return;
           }
+          finish(false);
           var e = r.body && r.body.error;
           if (e === "delivery_details_needed") { x.canBid = false; x.why = e; return bidView(x); }
           say(msg, ERR[e] ? ERR[e](r.body) : "Couldn't place your bid. Try again.", true);
-        }, function () { go.disabled = false; label(); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+        }, function () { finish(false); say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      go.onclick = function () {
+        if (go.disabled || sending || slide.busy()) return;
+        var p = pence();
+        if (isNaN(p) || p < least) { say(msg, "Bid " + money(least, "GBP") + " or more.", true); input.focus(); return; }
+        go.textContent = "Bidding…";
+        send(p);
       };
       input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.onclick(); });
-      body.appendChild(go); body.appendChild(backToIt);
+      body.appendChild(slide.el); body.appendChild(go); body.appendChild(backToIt); label();
       setTimeout(function () { try { input.focus(); input.select(); } catch (e) {} }, 60);
     }
     // After a bid: whether they're winning, in words, then back to the auction (or straight into bidding again).

@@ -38,3 +38,5 @@ jobs:
         run: node scripts/test-auctions.mjs
       - name: Interests (kept with the account, only ids on the list, each account its own, shops' categories never guessed)
         run: node scripts/test-interests.mjs
+      - name: First-run tips seen (kept with the account, only ids on the list, each account its own, exported and deleted with it)
+        run: node scripts/test-tips.mjs

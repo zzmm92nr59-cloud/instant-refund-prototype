@@ -94,6 +94,8 @@ jobs:
           node scripts/test-delivery.mjs
           node --check worker/interests.js
           node scripts/test-interests.mjs
+          node --check worker/tips.js
+          node scripts/test-tips.mjs
           node --check worker/auctions.js
           node scripts/test-auctions.mjs
           node --check worker/photo-search.js
