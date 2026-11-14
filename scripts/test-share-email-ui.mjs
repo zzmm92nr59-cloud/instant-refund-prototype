@@ -6,6 +6,7 @@
 // deletes one. Everything passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -26,7 +27,7 @@ const SHARED = { id: "99999999-9999-4999-8999-999999999999", sentAt, deletedBy: 
   note: "The total was missed", read: { kind: "receipt", shop: "Brindle & Co", domain: "brindle.example", orderRef: "BR-1", orderDate: day(-5), totalPence: null, currency: "GBP", confidence: "low", reader: 26,
     items: [{ name: "Merino Wool Scarf", qty: 1, pricePence: 4500 }] }, fixed: { totalPence: 4500 } };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -71,7 +72,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 // characters as icons, nothing wider than the screen.
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -105,7 +106,7 @@ await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify
 await page.reload();
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 const fixSheet = page.getByRole("dialog", { name: "Fix this receipt" }), shareSheet = page.getByRole("dialog", { name: "Send this email to Relay" });
 
 // 1. Only a receipt that came from an inbox can be sent: a pasted one can't.

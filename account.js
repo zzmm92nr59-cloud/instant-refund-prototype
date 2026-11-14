@@ -28,6 +28,7 @@
   // The help chat about one receipt the shopper chose to show it (Ask the assistant on the receipt). Profile opens it.
   var openChatAbout = null, wantChatAbout = null;
   window.relayAskAboutReceipt = function (about) {
+    if (askOn() && window.go) { memo.chatAbout = about; window.go("ask"); return; }
     wantChatAbout = about;
     if (window.go) window.go("me");
     setTimeout(function () { if (wantChatAbout && openChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
@@ -72,6 +73,10 @@
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
   // them all, so nothing out of date shows after an edit. fresh: true asks Relay regardless.
   var READ_REUSE_MS = 60 * 1000, reads = {};
+  // What only the shopper changes (their name, address, phone, card, how they sign in, what they've agreed to, whether
+  // they're on Relay's team) is reused for ten minutes instead of one. Their own change forgets everything, so the only
+  // way these go out of date is a change made on another device, which pulling down picks up at once.
+  var OWN_REUSE_MS = 10 * 60 * 1000, OWN_READS = { "/relay/my/profile": 1, "/relay/my/delivery": 1, "/relay/my/phone": 1, "/relay/my/card": 1, "/relay/my/2fa": 1, "/relay/my/consent": 1, "/relay/my/admin/me": 1 };
   // Relay answers from the nearest copy of its database and hands back a bookmark with each answer. Sending the newest one
   // back means no answer is ever older than one already seen, so a change just made always shows. It's only sent once
   // Relay has given one (a server that doesn't give them wouldn't expect it).
@@ -86,7 +91,7 @@
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
-    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < READ_REUSE_MS)) return hit.answer.then(copyAnswer);
+    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return hit.answer.then(copyAnswer);
     inflight++;
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
@@ -114,6 +119,21 @@
       setTimeout(finish, max || 8000);
       setTimeout(function () { if (!inflight) finish(); else idleWaiters.push(finish); }, 150);
     });
+  }
+  // The few screens that have to keep themselves up to date while they're open (an auction's price, a conversation) ask
+  // again every `ms`, but only while that screen is still there and Relay is the app in front: nothing is asked for in
+  // the background. Coming back to Relay asks once straight away if a turn was missed. It stops for good once the screen
+  // has gone, or once more() says there is nothing left to wait for. Everything else in Relay asks when it's opened or
+  // pulled down, never on a timer.
+  function keepFresh(node, ms, ask, more) {
+    var last = Date.now(), timer = setInterval(tick, ms);
+    function over() { return !document.body.contains(node) || Boolean(more && !more()); }
+    function stop() { clearInterval(timer); document.removeEventListener("visibilitychange", back); }
+    function tick() { if (over()) return stop(); if (document.hidden) return; last = Date.now(); ask(); }
+    // Back in front after missing a turn: ask now, and count the next turn from now (not two close together).
+    function back() { if (over()) return stop(); if (!document.hidden && Date.now() - last >= ms) { clearInterval(timer); timer = setInterval(tick, ms); tick(); } }
+    document.addEventListener("visibilitychange", back);
+    return stop;
   }
   // Pull to refresh: everything is asked for again. What's on screen (and the copy kept on this device) stays until the
   // new answer arrives, so nothing goes blank.
@@ -155,12 +175,26 @@
   // The shop's own logo in a picture box, when there's no photo of the item: one Relay keeps for well-known shops, or
   // the one Relay fetched once from the shop's website. The box keeps its initials until a logo has loaded.
   // onMiss runs when the shop has no logo Relay can show (no address, none found, or the picture won't load).
+  // A logo sits on white, like an app icon. When the logo's own picture has a solid background of another colour (a
+  // pale grey square, say), its box takes that colour instead, so the picture's square edge never shows inside the box.
+  // The new layout's tiles and circles use it (--logo-bg); nothing else does.
+  function logoBack(box, pic) {
+    var back = "#fff";
+    try {
+      var c = document.createElement("canvas"); c.width = c.height = 8;
+      var g = c.getContext("2d"); g.drawImage(pic, 0, 0, 8, 8);
+      var d = g.getImageData(0, 0, 8, 8).data, at = function (x, y) { var i = (y * 8 + x) * 4; return [d[i], d[i + 1], d[i + 2], d[i + 3]]; };
+      var k = [at(0, 0), at(7, 0), at(0, 7), at(7, 7)];
+      if (k.every(function (q) { return q[3] > 250 && Math.abs(q[0] - k[0][0]) + Math.abs(q[1] - k[0][1]) + Math.abs(q[2] - k[0][2]) < 12; })) back = "rgb(" + k[0][0] + "," + k[0][1] + "," + k[0][2] + ")";
+    } catch (e) { back = "#fff"; }
+    box.style.setProperty("--logo-bg", back);
+  }
   function shopLogo(box, dom, px, onMiss) {
     var miss = function () { if (onMiss) onMiss(); };
     if (!box || !dom || !/^[A-Za-z0-9.-]{3,80}$/.test(dom)) return miss();
     var put = function (src) {
       var pic = el("img", { alt: "", className: "rl-logo-img", style: "width:" + px + "px;height:" + px + "px;object-fit:contain" });
-      pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); box.appendChild(pic); };
+      pic.onload = function () { box.textContent = ""; box.classList.add("rl-has-logo"); logoBack(box, pic); box.appendChild(pic); };
       pic.onerror = miss;
       pic.src = src;
     };
@@ -352,6 +386,21 @@
   css.textContent = ".rl-back{position:fixed;inset:0;background:rgba(15,27,51,.45);display:flex;align-items:flex-end;justify-content:center;z-index:9999}" +
     // Whatever is behind a sheet dims so the eye goes to the sheet; on a dark screen it has to dim further to show.
     "@media (prefers-color-scheme: dark){.rl-back{background:rgba(0,0,0,.62)}}" +
+    // Frosted (a preview, off until a class is put on the page: frost-soft or frost-strong). The page behind a sheet blurs
+    // and dims instead of the flat layer, and the sheet lets a little of it through. Full-page steps (sign-in) stay solid.
+    // Where blur isn't supported, @supports leaves the flat dim above.
+    "@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr)),html.frost-strong .rl-back:not(:has(>.rl-jr)){background:transparent}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))::before,html.frost-strong .rl-back:not(:has(>.rl-jr))::before{content:\"\";position:fixed;inset:0;z-index:-1;pointer-events:none}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.2);-webkit-backdrop-filter:blur(12px) saturate(1.3);backdrop-filter:blur(12px) saturate(1.3)}" +
+      "html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(15,27,51,.34);-webkit-backdrop-filter:blur(24px) saturate(1.3);backdrop-filter:blur(24px) saturate(1.3)}" +
+      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.36)}html.frost-strong .rl-back:not(:has(>.rl-jr))::before{background:rgba(0,0,0,.52)}}" +
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 94%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
+      "html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{background:color-mix(in srgb,var(--rl-sheet) 88%,transparent);-webkit-backdrop-filter:blur(30px) saturate(1.6);backdrop-filter:blur(30px) saturate(1.6)}" +
+      // Over a see-through sheet the grey words need more ink to stay at 4.5 to 1 (light mode; dark already passes).
+      "html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(60,60,67,.84)}" +
+      "@media (prefers-color-scheme: dark){html.frost-soft .rl-back:not(:has(>.rl-jr))>.rl-sheet,html.frost-strong .rl-back:not(:has(>.rl-jr))>.rl-sheet{--rl-text2:rgba(235,235,245,.7)}}" +
+    "}" +
     "@media(min-width:640px){.rl-back{align-items:center}}" +
     ".rl-sheet{background:var(--rl-sheet);width:100%;max-width:420px;border-radius:28px 28px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.18);max-height:88vh;overflow:auto;font-family:inherit;color:var(--rl-text)}" +
     "@media(min-width:640px){.rl-sheet{border-radius:28px}}" +
@@ -908,6 +957,153 @@
     ".rl-au-done{display:flex;align-items:center;gap:10px;margin:14px 0 8px;color:var(--rl-text)}.rl-au-done .rl-jic{flex:none}.rl-au-done.good .rl-jic{color:var(--rl-accent)}.rl-au-done .rl-au-h{margin:0}" +
     ".rl-au-done+.rl-dl-intro+.rl-btn,.rl-au-done+.rl-dl-intro+.rl-btn+.rl-btn{margin-top:10px}";
   document.head.appendChild(css);
+  // The calm layout (draft): quiet rows in place of tiles. One job per tab; everything else is one tap deeper.
+  var calmCss = document.createElement("style");
+  calmCss.textContent = ".rl-calm-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:24px 2px 10px}.rl-calm-h h2{margin:0;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}" +
+    ".rl-calm-h.first{margin-top:10px}" +
+    ".rl-crow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:64px;display:flex;align-items:center;gap:12px;padding:9px 14px;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-crow+.rl-crow{border-top:1px solid var(--rl-line)}.rl-crow:active{background:var(--rl-fill)}.rl-crow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
+    ".rl-crow .rl-po-img{flex:none;width:46px;height:46px;border-radius:12px;overflow:hidden}.rl-crow .rl-po-img img{width:100%;height:100%;object-fit:cover}" +
+    ".rl-crow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:2px}.rl-crow-t b{font-size:16px;line-height:21px;font-weight:650;color:var(--rl-text);overflow-wrap:anywhere}" +
+    ".rl-crow-t span{font-size:14px;line-height:19px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".rl-crow-e{flex:none;max-width:42%;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text);text-align:right}.rl-crow-e.urgent{color:var(--rl-danger)}.rl-crow-e.soon{color:var(--rl-warn)}" +
+    ".rl-crow .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    ".rl-calm-none{margin:0;padding:20px 16px;font-size:16px;line-height:22px;color:var(--rl-text2)}" +
+    ".rl-calm-door{margin-top:16px}" +
+    ".rl-wr-door{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;margin-top:14px;padding:16px 16px 16px 18px;border-radius:20px;background:#101828;border:1px solid rgba(255,255,255,.1);color:#fff;transition:transform .15s,opacity .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-wr-door:active{transform:scale(.985);opacity:.9}.rl-wr-door:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#c7f567;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
+    ".rl-wr-door-t b{font-size:19px;line-height:24px;font-weight:700;color:#fff}.rl-wr-door-t span{font-size:14px;line-height:19px;color:#d4d4e5}.rl-wr-door .rl-arow-c{flex:none;color:#c7f567}" +
+    "@media(prefers-reduced-motion:reduce){.rl-wr-door{transition:none}.rl-wr-door:active{transform:none}}" +
+    ".rl-calm-bar{display:flex;gap:8px;align-items:center;margin:0 0 2px}" +
+    ".rl-calm-filter{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:10px;padding:0 12px 0 14px;border-radius:12px;background:var(--rl-card);color:var(--rl-text);font-size:16px;font-weight:600;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-calm-filter>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}.rl-calm-filter .rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2);transform:rotate(90deg)}" +
+    ".rl-calm-fi{flex:none;display:inline-flex;color:var(--rl-text)}" +
+    ".rl-calm-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:44px;height:44px;display:grid;place-items:center;border-radius:12px;background:var(--rl-card);color:var(--rl-text);transition:background .15s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-calm-filter:active,.rl-calm-add:active{background:var(--rl-fill)}.rl-calm-filter:focus-visible,.rl-calm-add:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-calm-bar{margin-top:-6px}.rl-recstat.rl-recstat-top{margin:-4px 2px 16px}" +
+    // Draft 2: Home's feed. One flick moves one card: the page snaps to each card's top edge (Home only, html.h2-snap).
+    "html.h2-snap{scroll-snap-type:y mandatory;scroll-padding-top:var(--h2-band,calc(env(safe-area-inset-top) + 118px));scroll-padding-bottom:calc(var(--rl-tab-top,84px) + 12px)}" +
+    // Sizes and spacing follow a phone-shopping feed's proportions (measured in points on a 402 by 874 screen); the
+    // colours, drawings, glass and words are Relay's. Home's edges are 16px (the page's are 18).
+    ".h2-home{margin:0 -2px}" +
+    // The pinned band (phones): it starts at the top of the screen, under the status bar, and carries the page's own
+    // background. It is solid on purpose: a see-through, blurred band was tried and made the search hint and the
+    // unchosen chip words harder to read whenever a card passed behind them.
+    "@media(max-width:760px){.h2-band{position:sticky;top:0;z-index:7;margin:calc(-1*(env(safe-area-inset-top) + 10px)) -18px 0;padding:calc(env(safe-area-inset-top) + 12px) 16px 6px;background:var(--rl-bg)}" +
+    ".h2-band .h2-top{margin:0 0 5px}.h2-band .h2-chips{margin:0 -16px;padding:0 16px}}" +
+    // Chips: a 38px pill for the chosen one inside a 44px button (rule 4), the others plain words.
+    ".h2-chips{display:flex;gap:4px;overflow-x:auto;margin:0 -16px 6px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
+    ".h2-chip{all:unset;box-sizing:border-box;flex:none;height:44px;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
+    ".h2-chip>span{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2);white-space:nowrap;transition:background .15s,color .15s}" +
+    ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}" +
+    ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:28px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
+    ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:28px;background:var(--rl-card);color:var(--rl-text)}" +
+    ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
+    ".h2-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-logo.rl-has-logo>img{width:30px!important;height:30px!important;object-fit:contain}.h2-logo-i{display:inline-flex}.h2-head-t{min-width:0;display:flex;flex-direction:column;gap:1px}.h2-head-t b{font-size:15px;line-height:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.h2-head-t span{font-size:14px;line-height:18px;color:var(--rl-text2)}" +
+    // Pictures: always 140px squares. A photo is pinned to the square's four edges and fills it (it is never laid out
+    // inside it: a photo whose height depended on a row that took its height from the photo ended up far below the
+    // square). A logo sits whole on white with 16px around it. Several things are squares in a sideways row with the
+    // price on each; one thing has its square on the left and its name and price beside it.
+    ".h2-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.h2-tiles::-webkit-scrollbar{display:none}" +
+    ".h2-pic{position:relative;flex:none;display:block;width:140px;height:140px;border-radius:22px;overflow:hidden;background:var(--rl-fill);scroll-snap-align:start}" +
+    ".h2-art{position:absolute;inset:0;display:grid;place-items:center}.h2-art>img{position:absolute;left:0;top:0;width:100%!important;height:100%!important;object-fit:cover;object-position:center}" +
+    ".h2-art.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none}.h2-art>img.rl-logo-img{left:16px;top:16px;width:calc(100% - 32px)!important;height:calc(100% - 32px)!important;object-fit:contain}" +
+    // Receipts and other lists in the new layout: a logo sits whole on white (or its own colour), no pale ring, as on Home.
+    ".rl-rr-pic.rl-has-logo,.rl-po-img.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:none!important}.rl-rr-pic.rl-has-logo>img{width:34px!important;height:34px!important;object-fit:contain}" +
+    // Three colour looks for Home's cards and the Ask page, from Relay's own palette, each behind a class on <html>
+    // (look-q, look-n, look-s). None is on by default: Home keeps its category colours until one is chosen.
+    // Q, quiet: cards in the card colour; colour only inside the pictures and the strip.
+    "html.look-q .h2-feed.tint .h2-card.has-c{background:var(--rl-card);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(60,60,67,.86)}@media(prefers-color-scheme:dark){html.look-q .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-q .h2-feed.tint .h2-card.has-c .h2-line-t span{color:var(--rl-text2)}}" +
+    "html.look-q .h2-feed.tint .h2-card.has-c .h2-go{background:var(--rl-fill);color:var(--rl-text)}html.look-q .h2-feed.tint .h2-card.has-c .h2-logo:not(.rl-has-logo){background:var(--rl-fill);color:var(--rl-text)}" +
+    "html.look-q .h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:none;color:#fff}" +
+    // N, navy and lime: every card Relay's navy (a step lighter than the black page in dark), lime for the arrow and the open tab.
+    "html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#101828;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-head-t span,html.look-n .h2-feed.tint .h2-card .h2-line-t span{color:rgba(255,255,255,.72)}" +
+    "html.look-n .h2-feed.tint .h2-card .h2-go{background:#c7f567;color:#101828}html.look-n .h2-feed.tint .h2-card .h2-logo:not(.rl-has-logo){background:#fff;color:#101828}" +
+    "html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#1d2a44;box-shadow:none;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:#c7f567!important}html.look-n .h2-feed.tint .h2-card .h2-pic:has(.rl-ill){background:transparent}" +
+    "html.look-n .footnav button.active{background:#c7f567!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#c7f567}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#c7f567;color:#101828}" +
+    "@media(prefers-color-scheme:dark){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
+    // S, softer: the same category colours at lower strength; dark text on the pale cards, white on the deep ones.
+    "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 16%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c .h2-go{background:var(--h2-c);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 30%,#fff);box-shadow:none;color:#000}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}html.look-s .rl-ask-qi{background:color-mix(in srgb,var(--qi) 18%,var(--rl-bg));color:var(--qi)}" +
+    "@media(prefers-color-scheme:dark){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 22%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(255,255,255,.1)!important;color:#fff!important}}" +
+    // Interests: chips of 44px or more with one of Relay's drawings; the chosen ones in the accent colour.
+    ".rl-int-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 16px}.rl-int{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:inline-flex;align-items:center;gap:8px;padding:6px 14px 6px 8px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:15px;line-height:20px;font-weight:600;transition:transform .12s,background .15s}" +
+    ".rl-int:active{transform:scale(.95)}.rl-int:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px}.rl-int-i{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--rl-bg);color:var(--rl-text)}" +
+    ".rl-int[aria-pressed=true]{background:var(--rl-accent);color:var(--rl-bg)}.rl-int[aria-pressed=true] .rl-int-i{background:var(--rl-bg);color:var(--rl-accent)}" +
+    ".rl-int-h{margin:4px 0 6px;font-size:24px;line-height:29px;font-weight:700;color:var(--rl-text)}.rl-int-p{margin:0 0 14px;font-size:16px;line-height:22px;color:var(--rl-text2)}.rl-int-save:disabled{opacity:.5}.rl-int-later{margin-top:10px}" +
+    ".h2-one{display:flex;align-items:center;gap:12px;min-width:0}.h2-one-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}" +
+    ".h2-one-n{font-size:16px;line-height:21px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.h2-one-p{font-size:16px;line-height:21px;font-weight:600}" +
+    ".h2-price{position:absolute;left:12px;top:12px;z-index:1;height:24px;padding:0 9px;border-radius:999px;background:rgba(16,24,40,.8);color:#fff;font-size:13px;line-height:24px;font-weight:600}" +
+    ".h2-name{font-size:14px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+    ".h2-line{display:flex;align-items:center;justify-content:space-between;gap:12px}.h2-line-t{min-width:0;display:flex;flex-direction:column;gap:2px}" +
+    ".h2-line-t b{font-size:24px;line-height:28px;font-weight:700;letter-spacing:-.01em;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
+    ".h2-line-t span{font-size:14px;line-height:18px;color:var(--rl-text2);overflow-wrap:anywhere}" +
+    ".h2-go{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.h2-go-i{display:inline-flex}" +
+    ".h2-strip{margin-top:-28px;height:64px;padding:28px 16px 0;box-sizing:border-box;border-radius:0 0 28px 28px;background:var(--rl-fill);font-size:14px;line-height:36px;font-weight:600;text-align:center;color:var(--rl-text)}.h2-strip.urgent{color:var(--rl-danger)}.h2-strip.soon{color:var(--rl-warn)}" +
+    ".h2-item.small .h2-card{padding:12px 16px;border-radius:22px}.h2-item.small{border-radius:22px}.h2-item.small .h2-line-t b{font-size:16px;line-height:21px;font-weight:600}" +
+    ".h2-item.small .h2-line{justify-content:flex-start}.h2-item.small .h2-line-t{flex:1}.h2-item.small .h2-go{order:-1;background:var(--rl-fill)}" +
+    ".h2-shopbox{margin-top:16px}.h2-shopbox:empty{display:none}.h2-none{background:var(--rl-card);border-radius:22px}.h2-start{scroll-snap-stop:always}" +
+    // Look A: each card in its kind of shopping's colour (deepened where white text needs it, cardColour), text white.
+    ".h2-feed.tint .h2-card.has-c{background:var(--h2-c);color:#fff}.h2-feed.tint .h2-card.has-c .h2-head-t span,.h2-feed.tint .h2-card.has-c .h2-line-t span{color:#fff}" +
+    ".h2-feed.tint .h2-card.has-c .h2-go{background:rgba(255,255,255,.24);color:#fff}.h2-feed.tint .h2-card.has-c .h2-logo{background:#fff;color:#101828}" +
+    ".h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:inset 0 0 0 400px rgba(0,0,0,.28);color:#fff}" +
+    "@media(prefers-reduced-motion:reduce){.h2-item,.h2-chip{transition:none}.h2-item:active{transform:none}}" +
+    // Dark screens (rule 11): a drawing sits on a dark tile, as Home's pictures do today, never on a pale panel. A real
+    // photo still fills the area, and a shop's logo keeps the white it was made for.
+    "@media(prefers-color-scheme:dark){.h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:var(--h2-ink,#C9D0DF)!important}.h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.18)}" +
+    ".h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:rgba(8,12,22,.5)!important;color:#fff!important}.h2-feed.tint .h2-card.has-c .h2-pic:has(.rl-ill) .h2-price{background:rgba(255,255,255,.24)}}" +
+    // Ask. No big title and no avatar; the page is exactly a screen tall, so the box rests 16px above the tab bar from
+    // the start (and just above the keyboard while typing, when the tab bar steps aside).
+    // (The page's hidden live region sits a pixel below everything; on Ask it is moved to the top so the page can't scroll.)
+    "html.on-ask .topline .avatar{display:none}html.on-ask body>.rl-sr{top:0}" +
+    ".rl-asktab{display:flex;flex-direction:column;margin:0 -2px;min-height:calc(100vh - 230px)}" +
+    "@media(max-width:760px){.rl-asktab{min-height:calc(100vh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}@supports(height:100dvh){.rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 26px - var(--rl-tab-top,84px))}}" +
+    ".rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 12px)}html.on-ask .main{padding-bottom:calc(var(--rl-tab-top,84px) + 16px)}html.on-ask body.typing .main{padding-bottom:calc(8px + var(--rl-kb,0px))}" +
+    ".rl-asktab .rl-chat-bar{bottom:calc(var(--rl-tab-top,84px) + 16px)}body.typing .rl-asktab .rl-chat-bar{bottom:calc(8px + var(--rl-kb,0px))}body.typing .rl-asktab{min-height:calc(100vh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}" +
+    "@supports(height:100dvh){body.typing .rl-asktab{min-height:calc(100dvh - env(safe-area-inset-top) - 18px - var(--rl-kb,0px))}}}" +
+    ".rl-asktab .rl-chat{margin-top:12px}.rl-asktab .rl-chat-person{margin:0 0 10px}.rl-asktab .rl-msg:empty{display:none}" +
+    // The box: one pill 56px tall with a 40px round send button inside it (the button itself is 44px, rule 4).
+    ".rl-asktab .rl-chat-bar{margin:auto 4px 0;padding:0 6px 0 8px;gap:4px;min-height:56px;border-radius:28px;align-items:flex-end}" +
+    ".rl-asktab .rl-chat-in{min-height:56px;padding:17px 4px 18px 12px;border-radius:24px;background:transparent;line-height:21px}.rl-asktab .rl-chat-in:focus-visible{outline:0}" +
+    // The hint stays on one line (it must never make the empty box taller); a narrow phone gives it the box's full width.
+    ".rl-asktab .rl-chat-in::placeholder{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}@media(max-width:389px){.rl-asktab .rl-chat-bar{margin-left:0;margin-right:0;gap:2px}.rl-asktab .rl-chat-in{padding-left:8px;padding-right:0}}" +
+    ".rl-asktab .rl-chat-bar:focus-within{box-shadow:0 0 0 2px var(--rl-accent),0 6px 20px rgba(0,0,0,.08)}" +
+    ".rl-asktab .rl-chat-send{width:44px;height:44px;margin:0 0 6px;background:none}.rl-asktab .rl-chat-send .rl-jic{width:40px;height:40px;border-radius:999px;display:grid;place-items:center;background:var(--rl-accent);color:var(--rl-bg)}" +
+    // Before anything is asked. Sizes and spacing follow a phone-shopping app's chat page (measured in points on a 402 by
+    // 874 screen): 115px square tiles 8px apart, 20px headings, 64px rows with a 48px tile. The tiles, drawings,
+    // colours and words are Relay's.
+    ".rl-chat.rl-ask-open{display:block;margin:0}.rl-ask-rec{margin:0 0 14px}" +
+    ".rl-ask-h,.rl-ask-h2{font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text);font-family:var(--rl-sys)}.rl-ask-h{margin:2px 0 6px}.rl-ask-h2{margin:0 0 14px}.rl-ask-open.no-rec .rl-ask-h2{margin-top:12px}" +
+    ".rl-ask-hb{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;gap:8px;min-height:44px;transition:opacity .12s}.rl-ask-hb:active{opacity:.55}.rl-ask-hb:focus-visible{outline:2px solid var(--rl-accent);outline-offset:2px;border-radius:10px}" +
+    ".rl-ask-chev{flex:none;width:20px;height:20px;border-radius:999px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}" +
+    ".rl-ask-tiles{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding-left:16px}.rl-ask-tiles::-webkit-scrollbar{display:none}" +
+    ".rl-ask-tile{all:unset;box-sizing:border-box;cursor:pointer;flex:none;display:flex;flex-direction:column;gap:4px;width:115px;scroll-snap-align:start;transition:transform .12s}" +
+    ".rl-ask-sq{position:relative;display:block;width:115px;height:115px;border-radius:24px;overflow:hidden;background:var(--rl-fill)}" +
+    ".rl-ask-tile:active{transform:scale(.96)}.rl-ask-tile:focus-visible .rl-ask-sq{outline:2px solid var(--rl-accent);outline-offset:2px}" +
+    ".rl-ask-sq .h2-art>img.rl-logo-img{left:14px;top:14px;width:calc(100% - 28px)!important;height:calc(100% - 28px)!important}" +
+    ".rl-ask-day{padding:0 2px;font-size:13px;line-height:16px;color:var(--rl-text2)}" +
+    // The day it was bought is a line under the tile, so it never covers a photo or a logo. The shop is in the picture when
+    // Relay has its logo, and always in the tile's spoken name.
+    ".rl-ask-q{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:8px 0;transition:opacity .12s}.rl-ask-q:active{opacity:.55}.rl-ask-q:focus-visible{outline:2px solid var(--rl-accent);outline-offset:-2px;border-radius:14px}" +
+    ".rl-ask-q b{flex:1;min-width:0;font-size:16px;line-height:21px;font-weight:500;color:var(--rl-text)}" +
+    ".rl-ask-qi{flex:none;width:48px;height:48px;border-radius:12px;display:grid;place-items:center;color:#fff;background:var(--qi)}.rl-ask-qi>span{display:grid;margin:0;color:inherit}" +
+    // Said quietly at the end: it's an AI, what is kept, and the way to a person.
+    ".rl-ask-ai{margin:10px 0 0;font-size:13.5px;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-asktab.rl-ask-opening .rl-anote{margin:4px 0 0!important;line-height:18px;color:var(--rl-text2)}" +
+    ".rl-asktab.rl-ask-opening .rl-chat-person{display:inline-flex;align-items:center;align-self:flex-start;width:auto;min-height:44px;margin:0;padding:0;border-radius:0;font-size:15px;font-weight:600}" +
+    // On a short phone the AI line moves above the questions, so it is still on the first screen.
+    "@media(max-height:760px){.rl-chat.rl-ask-open{display:flex;flex-direction:column;gap:0}.rl-ask-open .rl-ask-rec{order:0}.rl-ask-open .rl-ask-h2{order:1;margin-bottom:6px}.rl-ask-open .rl-ask-ai{order:2;margin:0 0 6px}.rl-ask-open .rl-ask-qs{order:3}}" +
+    // After a question typed into the box: the same words can be looked for in Receipts instead.
+    ".rl-ask-find{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-end;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--rl-accent);font-size:15px;font-weight:600;text-align:right;transition:opacity .12s}.rl-ask-find:active{opacity:.55}.rl-ask-find:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px;border-radius:10px}" +
+    // Outlines while the page is being worked out.
+    ".rl-ask-sk .rl-skel{display:block;min-height:0;margin:0;border:0}.rl-ask-sk-t{display:flex;gap:8px;margin:0 0 20px}.rl-ask-sk-r{display:flex;align-items:center;gap:12px;height:64px}" +
+    ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}" +
+    ".rl-arow-t b{font-weight:600}.rl-arow-d{font-size:14px}.rl-rr-mid b{font-size:16px;font-weight:600}.rl-rr-mid span{font-size:14px}.rl-rr-end b{font-size:16px;font-weight:600}";
+  document.head.appendChild(calmCss);
   function el(tag, props, kids) {
     var n = document.createElement(tag);
     Object.keys(props || {}).forEach(function (k) { if (k === "text") n.textContent = props[k]; else if (k.indexOf("data-") === 0) n.setAttribute(k, props[k]); else n[k] = props[k]; });
@@ -1104,7 +1300,10 @@
     if (input) card.appendChild(input);
     card.appendChild(el("button", { className: "rl-btn", text: yesLabel || "Yes, continue", onclick: function () { var v = input ? input.value : true; done(); onYes(v); } }));
     card.appendChild(el("button", { className: "rl-btn ghost", text: "Cancel", onclick: done }));
-    layer.addEventListener("click", function (e) { if (e.target === layer) done(); });
+    // A tap outside closes it, but not the second half of the double tap that opened it. (The phone's back, which Relay
+    // passes on as a click of its own, always closes it.)
+    var born = Date.now();
+    layer.addEventListener("click", function (e) { if (e.target === layer && (!e.isTrusted || Date.now() - born > 400)) done(); });
     document.addEventListener("keydown", onKey);
     document.body.appendChild(layer);
     (input || card.querySelector("button")).focus();
@@ -1245,7 +1444,7 @@
       var e = r.body && r.body.error;
       return e === "no_email" ? "This receipt was pasted in, so there's no email to send."
         : e === "gmail_not_connected" ? "The inbox this receipt came from isn't connected any more."
-        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Open Profile, then Email connection, and tap Connect again."
+        : e === "gmail_reconnect_needed" ? "Your inbox needs connecting again. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
         : e === "email_not_found" ? "That email is no longer in your inbox, so it can't be sent."
         : e === "consent_required" ? "Relay needs your permission to read your email first."
         : r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh."
@@ -1611,7 +1810,9 @@
   // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
   function providerStep(sheet, kind) {
     var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: 3, at: 1,
+    // A new account goes on to its name, what it shops for, then "You're all set": four steps. Someone coming back usually
+    // has those already (before signing in Relay can't tell), so three.
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: signInOpts.returning ? 3 : 4, at: 1,
       title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
     var points = el("div", { className: "rl-jcard" });
     [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
@@ -1725,7 +1926,7 @@
       api("/relay/my/second-step", { fresh: true }).then(function (ss) {
         // A second step comes first when the account needs one (it can't use anything else until then).
         if (ss.ok && ss.body.required && !ss.body.done) return protectAccount(function () { startJourney(info); });
-        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail")]).then(function (r) {
+        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail"), interestsLoad(true)]).then(function (r) {
         if (!document.body.contains(sheet)) return;
         if (r[1].status === 401) { save(null); return open(signedOutView); }
         var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {};
@@ -1735,6 +1936,9 @@
         var steps = [];
         if (!p.name && !fl.nameSkipped) steps.push("name");
         if (!st.connected && !fl.mailLater && !isReview()) steps.push("mail");
+        // What they shop for, after the inbox: so Browse can show shops they'll like first (interests.js). Only as part of
+        // getting started: someone already set up who signs in again goes straight in (Home asks them once instead).
+        if ((steps.length || st.justConnected) && r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()) steps.push("interests");
         if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
         steps.push("done");
         runJourney(sheet, st, steps, 0);
@@ -1751,19 +1955,28 @@
   // progress). The count shows on every step until the shopper leaves the journey.
   function journeyScan(sheet, st) {
     if (st.scanner) return st.scanner;
-    var listeners = [], last = st.scan || null, stopped = false, done = false;
+    var listeners = [], last = st.scan || null, stopped = false, done = false, fails = 0;
     function tell() { listeners.forEach(function (f) { try { f(last, done); } catch (e) {} }); }
+    // A round that didn't work is tried again after 5 seconds, then 10, 20, 40 and at most every minute: Relay reads on
+    // by itself meanwhile, so there is no hurry.
+    function again() { fails++; setTimeout(step, Math.min(60000, 5000 * Math.pow(2, fails - 1))); }
     function step() {
       if (stopped || !document.body.contains(sheet)) return;
+      // With Relay in the background there's no one to show the count to: wait until it's on screen again.
+      if (document.hidden) {
+        var back = function () { if (document.hidden) return; document.removeEventListener("visibilitychange", back); step(); };
+        return document.addEventListener("visibilitychange", back);
+      }
       api("/relay/my/gmail/scan", { method: "POST", body: {} }).then(function (x) {
         if (stopped || !document.body.contains(sheet)) return;
-        if (!x.ok) return setTimeout(step, 5000);
+        if (!x.ok) return again();
+        fails = 0;
         last = x.body.job || last;
         if (last && last.state === "failed") { done = true; tell(); return; }
         if (x.body.busy) { tell(); return setTimeout(step, x.body.retryAfterMs || 4000); }
         if (x.body.more) { tell(); return step(); }
         done = true; memo.receipts = null; memo.gmail = null; tell();
-      }, function () { setTimeout(step, 5000); });
+      }, function () { again(); });
     }
     st.scanner = { on: function (f) { listeners.push(f); f(last, done); }, stop: function () { stopped = true; } };
     step();
@@ -1861,12 +2074,24 @@
       if (st.mailNote) say(note2, st.mailNote.text, st.mailNote.bad);
       return;
     }
+    if (kind === "interests") {
+      var chosen = [];
+      var body4 = jFrame(sheet, { back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
+        title: "What do you shop for?", sub: "Pick a few and Relay shows shops you'll like first." });
+      if (st.connected) body4.appendChild(scanCard(sheet, st));
+      var note4 = el("div", { className: "rl-msg" }); note4.setAttribute("role", "status");
+      var save4 = interestsSaveButton("Continue", function () { return chosen; }, note4, function () { next(); });
+      save4.disabled = true;
+      body4.appendChild(interestsPicker([], function (list) { chosen = list; save4.disabled = !list.length; }));
+      body4.appendChild(save4); body4.appendChild(note4);
+      return;
+    }
     // Done: a short welcome, the scan still counting, and where to go first.
     var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
     var body3 = jFrame(sheet, { of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
       kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
       sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app."
-        : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time from Account, under Receipts." });
+        : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time: tap your picture at the top of the screen, then Inboxes." });
     if (st.connected) body3.appendChild(scanCard(sheet, st));
     var tips = el("div", { className: "rl-jcard" });
     (isReview() ? [["check", "Swap a size or colour before the shop sends your order"], ["eye", "Price drops on things you watch, sent to your phone"]]
@@ -2651,13 +2876,16 @@
     return card;
   }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
-  function shipLine(dv) {
+  function shipWords(dv, short) {
     var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
-    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier ? " with " + dv.carrier : "";
-    var said = done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
+    var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier && !short ? " with " + dv.carrier : "";
+    return done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
       : dv.status === "out_for_delivery" ? "Out for delivery" + by
       : dv.status === "due" ? (dv.at && dv.at !== today ? "Arriving " + day(dv.at) : "Arriving today") + by : "On its way" + by;
-    return el("div", { className: "rl-po-ship" + (done ? " done" : "") }, [jIc(done ? "check" : "parcel", 17), el("span", { text: said })]);
+  }
+  function shipLine(dv) {
+    var done = dv.status === "delivered";
+    return el("div", { className: "rl-po-ship" + (done ? " done" : "") }, [jIc(done ? "check" : "parcel", 17), el("span", { text: shipWords(dv) })]);
   }
   function disconnectGmail(done, msg) {
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
@@ -2833,7 +3061,7 @@
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
         var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
         var subOf = function () { return [named.length ? who : ref, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
-          row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(" · ") || "Receipt"; };
+          row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
         var wrap = el("div", { className: "rl-rr" });
         var btn = el("button", { type: "button", className: "rl-rr-main" });
@@ -2883,12 +3111,7 @@
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
           // Questions about it: Relay's assistant, shown this receipt only when the shopper says so (support-chat.js).
           var askRow = el("div", { className: "rl-rc-fix", style: "display:none" }, [el("span", { text: "Questions about it?" }),
-            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () {
-              var shopName = (row.retailer && row.retailer.name) || "this shop";
-              ask("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
-                if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: shopName + (row.orderDate ? ", " + shortDate(row.orderDate) : "") });
-              });
-            } })]);
+            el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () { askAssistantAbout(row); } })]);
           detail.appendChild(askRow);
           (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; }))
             .then(function (hc) { if (hc && hc.available) askRow.style.display = ""; });
@@ -2985,7 +3208,7 @@
         var canReturn = function (r) { var dl = deadlineOf(r); return Boolean(dl && dl >= today); };
         var years = []; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y) && years.indexOf(y) === -1) years.push(y); });
         var c = CAT_ICONS[k] || CAT_ICONS.other;
-        list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All groups" })]));
+        list.appendChild(el("button", { type: "button", className: "rl-cat-back rl-navback", "data-back": "", onclick: function () { memo.openCat = null; memo.catFilter = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }, [jIc("back", 24), el("span", { text: "All receipts" })]));
         // One search box: in a group, the group's own (the page's search steps aside until you're back).
         if (list.parentNode) list.parentNode.classList.add("rl-in-cat");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
@@ -3059,7 +3282,9 @@
         // An email from a shop on Relay is the same purchase as its shop order, which is already under "Shop orders".
         if (onPage && shopRows.length) { var dup = {}; shopRows.forEach(function (x) { dup[label(x[0].store) + "|" + x[0].amountMinor] = true; });
           rows = rows.filter(function (r) { return !dup[label(r.retailer && r.retailer.name) + "|" + r.totalPence]; }); }
-        if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." })); return; }
+        if (!rows.length && !shopRows.length) { list.appendChild(el("p", { text: "No receipts found yet." }));
+          if (onPage) list.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
+          return; }
         // Soonest deadline first, then no deadline, then expired.
         var rank = function (r) { var d = daysLeft(deadlineOf(r)); return d === null ? [1, 0] : d < 0 ? [2, -d] : [0, d]; };
         var sorted = rows.slice().sort(function (a, b) { var A = rank(a), B = rank(b); return A[0] - B[0] || A[1] - B[1]; });
@@ -3067,7 +3292,7 @@
         var by = {}; sorted.forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
         var keys = Object.keys(by).sort(function (a, b) { var na = by[a][0].returnable === false ? 1 : 0, nb = by[b][0].returnable === false ? 1 : 0; return (a === "other") - (b === "other") || na - nb || by[b].length - by[a].length; });
         if (memo.openCat === "shop" && shopRows.length) {
-          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All groups", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
+          list.appendChild(el("button", { className: "rl-po-secondary", text: "‹ All receipts", "data-back": "", style: "flex:none;padding:7px 14px;font-size:14px", onclick: function () { memo.openCat = null; drawList(); window.scrollTo && window.scrollTo(0, memo.catY || 0); } }));
           list.appendChild(el("h3", { style: "font-size:20px;margin:14px 0 8px;color:var(--rl-text);display:flex;align-items:center;gap:10px" }, [catIcon("shop", 32), el("span", { text: "Shop orders (" + shopRows.length + ")" })]));
           list.lastChild.firstChild.style.background = "#101828";
           var sq = el("input", { type: "search", placeholder: "Search shop orders", style: "margin:0 0 12px;width:100%;box-sizing:border-box;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:15px;background:var(--rl-card);font-family:inherit" });
@@ -3085,28 +3310,53 @@
           return;
         }
         memo.openCat = null;
-        var grid = el("div", { className: "rl-tiles" });
-        // Opening a group starts at its top; coming back lands where the groups were.
-        var open = function (k) { return function () { memo.catY = window.scrollY || 0; memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); }; };
-        // This year's Wrapped comes first, as soon as there's a receipt from this year.
-        var year = new Date().getFullYear();
-        if (rows.some(function (r) { return String(r.orderDate || "").slice(0, 4) === String(year); }))
-          grid.appendChild(el("button", { type: "button", className: "rl-tile rl-year", ariaLabel: "Your " + year + " Wrapped", onclick: function () { if (window.go) window.go("wrapped"); } },
-            [el("span", { className: "rl-year-n", text: String(year) }), el("b", { text: "Wrapped" })]));
-        if (giftRows.length) {
-          var giftPic = giftRows.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
-            .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
-          grid.appendChild(tile("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), giftPic, 0, open("gifts")));
-        }
-        if (shopRows.length) grid.appendChild(tile("shop", "Shop orders", shopRows.length + " item" + (shopRows.length === 1 ? "" : "s"), null, 0, open("shop")));
-        keys.forEach(function (k) {
-          var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length;
-          // The tile's picture: the newest photo of something bought in this group (only a receipt's own item photo).
-          var photo = by[k].slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); })
-            .filter(function (r) { return r.hasImage && r.id && (r.items || []).filter(function (i) { return i && i.name; }).length <= 1; })[0];
-          grid.appendChild(tile(k, groupNames[k] || "Other", by[k].length + (by[k].length === 1 ? " receipt" : " receipts"), photo, soon, open(k)));
-        });
-        list.appendChild(grid);
+        // Calm layout: no tiles. One Filter control and one small Add control, then the receipts themselves, newest first,
+        // under month headings. Kinds of shopping, gifts and shop orders are in the Filter sheet, on the pages they had.
+        var openK = function (k) { memo.catY = window.scrollY || 0; memo.openCat = k; drawList(); window.scrollTo && window.scrollTo(0, 0); };
+        var yearN = {}; rows.forEach(function (r) { var y = String(r.orderDate || "").slice(0, 4); if (/^\d{4}$/.test(y)) yearN[y] = (yearN[y] || 0) + 1; });
+        var yearList = Object.keys(yearN).sort().reverse();
+        if (memo.calmYear && !yearN[memo.calmYear]) memo.calmYear = null;
+        var counted = function (n) { return n + (n === 1 ? " receipt" : " receipts"); };
+        var kindRow = function (k, label, detail, onclick) { var row = accRow("doc", label, detail, onclick), chip = catIcon(k, 30); if (k === "shop") chip.style.background = TILE_COLOURS.shop; row.replaceChild(chip, row.firstChild); return row; };
+        var filterSheet = function (sheet) {
+          sheet.setAttribute("aria-label", "Filter receipts");
+          sheet.appendChild(el("h2", { text: "Filter" }));
+          var pick = function (fn) { return function () { close(); fn(); }; };
+          var kinds = [accRow("doc", "All receipts", counted(rows.length), pick(function () { memo.calmYear = null; drawList(); }))];
+          keys.forEach(function (k) { kinds.push(kindRow(k, groupNames[k] || "Other", counted(by[k].length), pick(function () { openK(k); }))); });
+          if (giftRows.length) kinds.push(kindRow("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), pick(function () { openK("gifts"); })));
+          if (shopRows.length) kinds.push(kindRow("shop", "Shop orders", shopRows.length + (shopRows.length === 1 ? " item" : " items"), pick(function () { openK("shop"); })));
+          sheet.appendChild(accGroup("", kinds));
+          if (window.go) sheet.appendChild(accGroup("", [accRow("swap", "Returns and swaps", "What you've sent back, and where each one has got to", pick(function () { window.go("returns"); }))]));
+          if (yearList.length > 1) sheet.appendChild(accGroup("Year", yearList.map(function (y) { return accRow("doc", y, counted(yearN[y]), pick(function () { memo.calmYear = y; drawList(); })); })));
+          sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+        };
+        list.appendChild(el("div", { className: "rl-calm-bar" }, [
+          el("button", { type: "button", className: "rl-calm-filter", ariaLabel: "Filter receipts, showing " + (memo.calmYear || "all receipts"), onclick: function () { open(filterSheet); } },
+            [accIc("filter", 20, "rl-calm-fi"), el("span", { text: memo.calmYear || "All receipts" }), accIc("chev", 16, "rl-arow-c")]),
+          el("button", { type: "button", className: "rl-calm-add", ariaLabel: "Add a missing receipt", onclick: function () { open(function (sheet) { addReceiptView(sheet, close); }); } }, [accIc("plus", 22, "rl-calm-fi")])]));
+        var newest = rows.slice().sort(function (x, y) { return String(y.orderDate || "").localeCompare(String(x.orderDate || "")); });
+        if (memo.calmYear) newest = newest.filter(function (r) { return String(r.orderDate || "").slice(0, 4) === memo.calmYear; });
+        var months = el("div"); list.appendChild(months);
+        var shownN = 30;
+        var drawMonths = function () {
+          months.textContent = "";
+          if (!newest.length) { months.appendChild(el("p", { className: "rl-calm-none", text: "No receipts from your email yet. Orders from shops on Relay are under Filter." })); return; }
+          var month = null, card = null;
+          newest.slice(0, shownN).forEach(function (r) {
+            var m = r.orderDate ? r.orderDate.slice(0, 7) : "none";
+            if (m !== month) {
+              month = m;
+              var inMonth = newest.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
+              months.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
+                el("span", { text: tot ? money(tot, "GBP") : counted(inMonth.length) })]));
+              card = el("div", { className: "rl-cat-list" }); months.appendChild(card);
+            }
+            card.appendChild(receiptRow(r));
+          });
+          if (newest.length > shownN) months.appendChild(loadAhead(el("button", { type: "button", className: "rl-po-secondary rl-cat-more", text: "Show " + Math.min(40, newest.length - shownN) + " more of " + (newest.length - shownN), onclick: function () { shownN += 40; drawMonths(); } })));
+        };
+        drawMonths();
       }
       // One kind of shopping as a tile: its colour, a tinted photo of something bought there (or its drawing), its name, and
       // how many return deadlines are coming up.
@@ -3177,6 +3427,9 @@
         function step(small) {
           // The shopper went to another page: Relay carries on by itself.
           if (!document.body.contains(status)) { scanning = false; return; }
+          // The same when Relay itself is in the background: nothing is asked for until it's on screen again, when the
+          // page picks the reading up where Relay has got to (__relayScanResume below).
+          if (document.hidden) { scanning = false; scanBtn.disabled = false; return; }
           return api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({}, full ? { full: true } : {}, small ? { small: true } : {}) }).then(function (x) {
             if (x.status === 401) return finish(owner + " has ended Relay's access to your " + MB + ". Tap Connect again at the top of this page. Your receipts stay as they are.", true, true);
             if (!x.ok) return retry();
@@ -3239,12 +3492,16 @@
         search.style.cssText = "";
         var mag = el("span"); mag.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>';
         box.appendChild(el("label", { className: "rl-search" }, [mag, search]));
+        if (window.__relayFindReceipts != null) {
+          var found = String(window.__relayFindReceipts || ""); window.__relayFindReceipts = null;
+          if (found) { search.value = found; query = found.toLowerCase(); } else setTimeout(function () { try { search.focus(); } catch (e) {} }, 0);
+        }
+        box.appendChild(el("div", { className: "rl-recstat rl-recstat-top" }, [status]));
         box.appendChild(list);
-        box.appendChild(el("div", { className: "rl-recstat" }, [status]));
         // Pulling the page down checks the inbox now (relay-gestures.js through checkInbox), so there's no button for it.
         window.__relayCheckNow = function () { if (document.body.contains(status) && !scanBtn.disabled) scanBtn.onclick(); };
-        // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks).
-        box.appendChild(el("div", { className: "rl-acard rl-rec-more" }, [accRow("doc", "Add a missing receipt", null, function () { open(function (sheet) { addReceiptView(sheet, close); }); })]));
+        // A shop missing from the list can be looked for directly (Relay reads only the email the shopper picks): the small
+        // Add control beside Filter (drawList).
       } else { box.appendChild(scanBtn); box.appendChild(status); box.appendChild(search); box.appendChild(list); }
       loadList();
       // On the Receipts page these housekeeping options stay out of the way; they live under the account button (top right).
@@ -3270,7 +3527,7 @@
     var note = sheet.children[1];
     api("/relay/my/receipts/" + encodeURIComponent(receiptId) + "/original").then(function (r) {
       if (!r.ok) {
-        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
+        note.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
           : r.status === 404 ? "That email is no longer in your " + MB + ", so it can't be shown."
           : r.status === 409 ? "Connect your email again to open the original."
           : "Couldn't load the original email. Try again in a moment.";
@@ -3363,8 +3620,8 @@
         if (mine !== seq) return;
         list.textContent = "";
         if (!r.ok) {
-          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."
-            : r.status === 409 ? "Connect your email first: open Profile, then Email connection." : "Couldn't search " + MB + " just now. Try again in a moment.";
+          status.textContent = r.body && r.body.error === "gmail_reconnect_needed" ? MB + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."
+            : r.status === 409 ? "Connect your email first: tap your picture at the top of the screen, then Inboxes." : "Couldn't search " + MB + " just now. Try again in a moment.";
           return;
         }
         var rows = (r.body && r.body.results) || [];
@@ -3540,13 +3797,14 @@
       el("p", { text: "Posting: Relay doesn't handle payments, so never pay a stranger in advance by bank transfer. Collecting in person is the safer way.", style: "margin:4px 0" }),
       el("p", { text: "Keep chatting here. Relay hides phone numbers and emails to protect you both.", style: "margin:4px 0 0" })]);
     [head, sub, tips, log, input, send, msg, tools, el("button", { className: "rl-btn ghost", text: "Back", "data-back": "", onclick: function () { stop(); onBack(); } })].forEach(function (n) { sheet.appendChild(n); });
-    var timer = null, isOpen = false;
-    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    var stopFresh = null, isOpen = false, loaded = false;
+    function stop() { if (stopFresh) { stopFresh(); stopFresh = null; } }
     function load() {
       if (!document.body.contains(sheet)) return stop();
-      api("/relay/my/resale/requests/" + requestId + "/messages").then(function (r) {
+      // Asked of Relay itself each time (not a copy from the last minute), or a reply could sit unseen.
+      api("/relay/my/resale/requests/" + requestId + "/messages", { fresh: true }).then(function (r) {
         if (!r.ok) return say(msg, "Couldn't load this conversation.", true);
-        var b = r.body; isOpen = b.open;
+        var b = r.body; isOpen = b.open; loaded = true;
         head.textContent = b.title; sub.textContent = "Chatting with the " + b.with.toLowerCase() + ". Names and contact details stay private. Relay doesn't handle payment or postage, so agree them here.";
         log.textContent = "";
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
@@ -3578,7 +3836,9 @@
     };
     keepDraft(input, "msg:" + requestId);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter") send.onclick(); });
-    load(); timer = setInterval(load, 8000);
+    load();
+    // New messages are looked for every 30 seconds while the conversation is open and on screen, and never once it has ended.
+    stopFresh = keepFresh(sheet, 30000, load, function () { return !loaded || isOpen; });
   }
   function resaleView(sheet, onBack, focusReceipt, startTab) {
     var body = el("div"), msg = el("div", { className: "rl-msg" });
@@ -3814,6 +4074,9 @@
   // ---- The Account page. Laid out like a phone's Settings: a few short groups, each row opening a page of its own,
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    filter: '<path d="M4 7h8.5M19.5 7h.5M4 17h.5M11.5 17H20"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
     mail: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="m3.8 7 8.2 6 8.2-6"/>',
     paste: '<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9.5 4V3h5v1M9.5 10h5M9.5 14h5"/>',
@@ -3879,9 +4142,9 @@
     return el("section", { className: "rl-agroup" }, (title ? [el("h3", { text: title })] : []).concat([card]));
   }
   // The bar across the top: Back on the left (on inner pages), the page name, and Done on the right.
-  function accBar(sheet, title, onBack) {
+  function accBar(sheet, title, onBack, backWord) {
     // On the Profile page the same sections sit in the page itself: no Done button, and the page already has its title.
-    var inPage = sheet.classList.contains("rl-inpage"), home = inPage ? "Profile" : "Account";
+    var inPage = sheet.classList.contains("rl-inpage"), home = backWord || (inPage ? "Profile" : "Account");
     if (inPage && !onBack) return;
     var bar = el("div", { className: "rl-abar" }, [
       onBack ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back to " + home, "data-back": "", onclick: onBack }, [accIc("back", 20, "rl-ab-i"), el("span", { text: home })]) : el("span"),
@@ -3892,17 +4155,340 @@
   }
   var HELP = [
     ["How does Relay find my receipts?", "With your permission, Relay reads your Gmail or Outlook in read-only mode and picks out order confirmations, receipts and return emails. It keeps the details it needs (store, items, total, return deadline) and a link back to the original email, not the email itself."],
-    ["I shop with more than one email address. Can Relay read them all?", "Yes. Open Profile, then Email connection, and add a Gmail or Outlook inbox. Relay reads up to five and puts all their receipts together. Disconnecting one deletes only the receipts it brought in."],
-    ["A receipt is missing. What can I do?", "Open Profile and choose Add a missing receipt. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
+    ["I shop with more than one email address. Can Relay read them all?", "Yes. Tap your picture at the top of the screen, then Inboxes, and add a Gmail or Outlook inbox. Relay reads up to five and puts all their receipts together. Disconnecting one deletes only the receipts it brought in."],
+    ["A receipt is missing. What can I do?", "Open Receipts and tap the plus beside All receipts. Start typing the shop's name to search your inbox, or paste the order email in. If it's in another inbox, forward it to the one Relay reads."],
     ["Can Relay refund me automatically?", "No. Relay finds your purchases and return deadlines from your email, so it can remind you and show you how to return something, but the refund itself always comes from the shop."],
     ["Will Relay ever email from my account?", "Never. Relay can't send, delete or change anything in your inbox. The only emails it sends are sign-in emails and, if you ask for one, a single return reminder to your sign-in address."],
-    ["How do I stop Relay reading my email?", "Open Profile, then Email connection, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Privacy & data."],
-    ["How do I get a copy of my data?", "Open Profile, then Download my data under Privacy & data. You get one file with everything Relay keeps about you."],
-    ["How do I make signing in safer?", "Open Profile, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
-    ["How do I delete my account?", "Open Profile, then Delete my account under Privacy & data. Your sign-in and everything linked to it are deleted, and it can't be undone."],
+    ["How do I stop Relay reading my email?", "Tap your picture at the top of the screen, then Inboxes, and choose Disconnect. Relay deletes every receipt it captured from that inbox. You can also withdraw your permission under Security and privacy, Email permission."],
+    ["How do I get a copy of my data?", "Tap your picture at the top of the screen, then Security and privacy, then Download my data. You get one file with everything Relay keeps about you."],
+    ["How do I make signing in safer?", "Tap your picture at the top of the screen, then Security and privacy, then Two-step sign-in. Relay can text a code to your phone, or you can use an authenticator app, so signing in with an email link, Google or Microsoft also needs that code. Keep the recovery codes it shows you in case you lose your phone."],
+    ["How do I delete my account?", "Tap your picture at the top of the screen, then Security and privacy, then Delete my account. Your sign-in and everything linked to it are deleted, and it can't be undone."],
     ["Can the help chat look at one of my receipts?", "Only if you choose. Open the receipt, tap Ask the assistant, then Show it. The assistant sees what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, and only for that chat. Relay keeps no copy of the chat."]
   ];
   var CONSENT_FALLBACK = ["Relay reads your email in read-only mode and looks only for order confirmations, receipts and return emails.", "It never sends email from your account, never deletes or changes anything in your inbox, and never sells or shares what it finds."];
+  // Asking the assistant about one receipt: it is shown that receipt only once the shopper says so (support-chat.js), and
+  // nothing goes anywhere until they send a question. The same from the receipt itself and from its tile on the Ask tab,
+  // where the question names the receipt because it isn't the thing on screen.
+  function askAssistantAbout(row, named) {
+    var shop = (row.retailer && row.retailer.name) || "", label = (shop || "this shop") + (row.orderDate ? ", " + shortDate(row.orderDate) : "");
+    ask((named && shop ? "Show Relay's assistant your receipt from " + label + "?" : "Show this receipt to Relay's assistant?") + " It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.", "Show it", function () {
+      if (window.relayAskAboutReceipt) window.relayAskAboutReceipt({ id: row.id, label: label });
+    });
+  }
+  // ---- Interests: what the shopper says they shop for (worker/interests.js keeps them with the account) ----
+  // The same twelve as the server's list, each with one of Relay's drawings. Browse puts shops of the matching kinds
+  // (receipt categories) first; once there are receipts, what was bought stays the stronger signal there.
+  var INTEREST_CHOICES = [["fashion", "Fashion", "dress", ["fashion"]], ["activewear", "Activewear", "jacket", ["fashion"]], ["trainers", "Trainers", "shoe", ["fashion"]],
+    ["beauty", "Beauty", "lipstick", ["beauty"]], ["home", "Home", "sofa", ["home"]], ["garden", "Garden", "flower", ["home"]], ["tech", "Tech", "laptop", ["electronics"]],
+    ["gaming", "Games and apps", "gamepad", ["digital", "electronics"]], ["food", "Food and drink", "basket", ["food"]], ["coffee", "Coffee and tea", "cup", ["food"]],
+    ["travel", "Travel", "plane", ["travel"]], ["daysout", "Days out", "ticket", ["experiences"]]];
+  var INTEREST_BY = {}; INTEREST_CHOICES.forEach(function (c) { INTEREST_BY[c[0]] = c; });
+  // The last copy read, for this account only (removed on sign-out), so opening the app doesn't have to ask again; and
+  // the accounts that said "Not now" on this phone (kept on this phone, so the question isn't asked twice here).
+  var INTERESTS_KEY = "relay.interests.v1", INTERESTS_LATER_KEY = "relay.interests-later.v1";
+  function interestsCached() {
+    var s = load();
+    try { var c = JSON.parse(localStorage.getItem(INTERESTS_KEY) || "null"); return c && s && c.email === s.email && Array.isArray(c.list) ? c.list.filter(function (x) { return INTEREST_BY[x]; }) : null; } catch (e) { return null; }
+  }
+  function interestsPublish(list) {
+    var cats = {}; (list || []).forEach(function (id) { (INTEREST_BY[id] ? INTEREST_BY[id][3] : []).forEach(function (c) { cats[c] = 1; }); });
+    window.__relayInterestCats = Object.keys(cats);
+    if (typeof window.relayInterestsChanged === "function") window.relayInterestsChanged();
+  }
+  function interestsRemember(list) {
+    var s = load(); if (!s || !s.email) return;
+    try { localStorage.setItem(INTERESTS_KEY, JSON.stringify({ email: s.email, list: list })); } catch (e) {}
+    interestsPublish(list);
+  }
+  function interestsLoad(fresh) {
+    var c = interestsCached();
+    if (c && !fresh) { interestsPublish(c); return Promise.resolve(c); }
+    return api("/relay/my/interests", fresh ? { fresh: true } : undefined).then(function (r) {
+      // An answer without a list says nothing about what they chose, so it never counts as "nothing chosen".
+      if (!r.ok || !r.body || !Array.isArray(r.body.interests)) return c || null;
+      var list = r.body.interests.filter(function (x) { return INTEREST_BY[x]; }); interestsRemember(list); return list;
+    }, function () { return c || null; });
+  }
+  function interestsLater(say) {
+    var s = load(), who = s && s.email; if (!who) return false;
+    var all = []; try { all = JSON.parse(localStorage.getItem(INTERESTS_LATER_KEY) || "[]"); } catch (e) { all = []; }
+    if (!Array.isArray(all)) all = [];
+    if (say && all.indexOf(who) < 0) { all.push(who); try { localStorage.setItem(INTERESTS_LATER_KEY, JSON.stringify(all.slice(-8))); } catch (e) {} }
+    return all.indexOf(who) >= 0;
+  }
+  try { window.addEventListener("relay:session", function () { if (!load()) { try { localStorage.removeItem(INTERESTS_KEY); } catch (e) {} window.__relayInterestCats = []; } }); } catch (e) {}
+  // "Fashion, Tech and 2 more", or what to do when there are none yet.
+  function interestsWords(list) {
+    var names = (list || []).map(function (id) { return INTEREST_BY[id] ? INTEREST_BY[id][1] : null; }).filter(Boolean);
+    if (!names.length) return "Choose what you shop for";
+    if (names.length <= 2) return names.join(" and ");
+    return names.slice(0, 2).join(", ") + " and " + (names.length - 2) + " more";
+  }
+  // The chips: tap to choose, tap again to undo. onChange gets the chosen ids in the list's order.
+  function interestsPicker(chosen, onChange) {
+    var on = {}; (chosen || []).forEach(function (id) { on[id] = true; });
+    var box = el("div", { className: "rl-int-chips", role: "group", ariaLabel: "What you shop for" });
+    INTEREST_CHOICES.forEach(function (c) {
+      var pic = el("span", { className: "rl-int-i" }); pic.setAttribute("aria-hidden", "true");
+      pic.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + ILL[c[2]] + "</svg>";
+      var b = el("button", { type: "button", className: "rl-int" }, [pic, el("span", { text: c[1] })]);
+      b.setAttribute("data-interest", c[0]); b.setAttribute("aria-pressed", on[c[0]] ? "true" : "false");
+      b.onclick = function () { on[c[0]] = !on[c[0]]; b.setAttribute("aria-pressed", on[c[0]] ? "true" : "false"); onChange(INTEREST_CHOICES.filter(function (x) { return on[x[0]]; }).map(function (x) { return x[0]; })); };
+      box.appendChild(b);
+    });
+    return box;
+  }
+  // Saving: one request at a time (a double tap saves once); the button waits while it's going.
+  function interestsSaveButton(label, getList, msg, done) {
+    var busy = false, btn = el("button", { type: "button", className: "rl-btn rl-int-save", text: label });
+    btn.onclick = function () {
+      var list = getList(); if (busy || !list.length) return;
+      busy = true; btn.disabled = true; say(msg, "");
+      api("/relay/my/interests", { method: "PUT", body: { interests: list } }).then(function (r) {
+        busy = false;
+        if (!r.ok) { btn.disabled = false; return say(msg, "Couldn't save that. Check your connection and try again.", true); }
+        interestsRemember((r.body && r.body.interests) || list); done(list);
+      }, function () { busy = false; btn.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
+    };
+    return btn;
+  }
+  // Once: the first time the new layout opens for an account with none saved, unless "Not now" was said on this phone.
+  var interestsAsked = false;
+  // Asked once, on Home, and only into a still screen: if the shopper has tapped, typed or scrolled since Home opened,
+  // or has moved on, the sheet waits for the next time Home opens rather than appearing under their finger.
+  function interestsMaybeAsk(host) {
+    var s = load(); if (interestsAsked || !s || !s.token || isReview() || interestsLater()) return;
+    var c = interestsCached(); if (c && c.length) { interestsPublish(c); return; }
+    interestsAsked = true;
+    var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
+    evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
+    interestsLoad(true).then(function (list) {
+      evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
+      var still = host && host.isConnected && !acted && !document.querySelector(".rl-back, .rl-sheet");
+      if (!still) { interestsAsked = false; return; }
+      if (list && !list.length && !interestsLater()) interestsSheet();
+    });
+  }
+  function interestsSheet() {
+    var chosen = [];
+    open(function (sheet) {
+      sheet.classList.add("rl-int-sheet");
+      sheet.appendChild(el("h2", { className: "rl-int-h", text: "What do you shop for?" }));
+      sheet.appendChild(el("p", { className: "rl-int-p", text: "Pick a few and Relay shows shops you'll like first." }));
+      var msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
+      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { close(); });
+      save.disabled = true;
+      sheet.appendChild(interestsPicker([], function (list) { chosen = list; save.disabled = !list.length; }));
+      sheet.appendChild(msg); sheet.appendChild(save);
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-int-later", text: "Not now", onclick: function () { interestsLater(true); close(); } }));
+    });
+  }
+  // The four questions the Ask tab offers before anything is asked, each with a drawn icon on one of Relay's tile colours.
+  var ASK_STARTERS = [["How do I return something?", "ret", "#14918A"], ["How does a swap work?", "swap", "#E0446E"], ["Why is a receipt missing?", "help", "#D47B1F"], ["How does Relay find my receipts?", "mail", "#4F72E0"]];
+  // The help chat's screen (worker/support-chat.js answers it; its rules are there). It is Profile's "Contact us" page while
+  // the assistant is off, and the Ask tab while it is on (opts.tab): same screen, same routes, same wording about who answers.
+  function chatPage(b, opts) {
+      opts = opts || {};
+      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
+      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
+      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
+      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
+      var log = memo.chatLog || (memo.chatLog = []);
+      var aboutBar = null, foot = null;
+      function noteText() {
+        return !ai ? "Relay's team will see your message and your email address, so they can reply."
+          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
+          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
+      }
+      // What the box says it is for. In the Ask tab it takes a question, and what was typed can then be looked for in
+      // Receipts instead (the control under the message).
+      var HINT = opts.tab ? "Search receipts or ask about Relay" : "Ask about Relay";
+      function stopAbout() {
+        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = HINT;
+        if (foot) foot.textContent = noteText();
+        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
+      }
+      var list = el("div", { className: "rl-chat", role: "log" });
+      list.setAttribute("aria-live", "polite");
+      var note = el("p", { className: "rl-msg" });
+      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? HINT : "Write your question", value: draftGet("help-chat") });
+      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
+      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", opts.tab ? 20 : 22)]);
+      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
+      var busy = false;
+      function bubble(t, findable) {
+        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
+        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
+        // Said once, over its first message: who's answering, and that it's an AI.
+        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
+        // Under the newest thing the shopper typed: look for the same words in Receipts instead.
+        if (findable) n.appendChild(el("button", { type: "button", className: "rl-ask-find", text: "Search your receipts for this instead", onclick: function () {
+          window.__relayFindReceipts = String(t.text).replace(/\s+/g, " ").trim().slice(0, 80); if (window.go) window.go("receipts");
+        } }));
+        return n;
+      }
+      // The Ask tab's newest receipts, to ask about one: what the app already has, brought up to date once if that is old.
+      var recHost = null, recRows = (memo.receipts && memo.receipts.rows) || [];
+      function drawTiles() {
+        if (!recHost) return;
+        recHost.textContent = "";
+        var rows = orderRows(recRows).filter(function (x) { return x && x.id; }).sort(function (x, y) { var X = x.orderDate || "", Y = y.orderDate || ""; return X < Y ? 1 : X > Y ? -1 : 0; }).slice(0, 6);
+        recHost.style.display = rows.length ? "" : "none";
+        list.classList.toggle("no-rec", !rows.length);
+        if (!rows.length) return;
+        var head = el("button", { type: "button", className: "rl-ask-hb", onclick: function () { if (window.go) window.go("receipts"); } }, [el("span", { text: "Ask about a receipt" }), accIc("chev", 12, "rl-ask-chev")]);
+        head.setAttribute("aria-label", "Ask about a receipt. See all your receipts");
+        recHost.appendChild(el("h2", { className: "rl-ask-h" }, [head]));
+        var strip = el("div", { className: "rl-ask-tiles" });
+        rows.forEach(function (x) {
+          var shop = (x.retailer && x.retailer.name) || "", when = x.orderDate ? shortDate(x.orderDate) : "";
+          var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); receiptPic(art, x, 60, 64);
+          var day = el("span", { className: "rl-ask-day", text: when || "\u00a0" }); day.setAttribute("aria-hidden", "true");
+          var tile = el("button", { type: "button", className: "rl-ask-tile", onclick: function () { askAssistantAbout(x, true); } }, [el("span", { className: "rl-ask-sq" }, [art]), day]);
+          tile.setAttribute("aria-label", "Ask about your receipt" + (shop ? " from " + shop : "") + (when ? ", " + when : ""));
+          tile.setAttribute("data-receipt", x.id);
+          if (x.category && x.category !== "shop" && x.category !== "other" && TILE_COLOURS[x.category]) tile.style.setProperty("--h2-ink", TILE_COLOURS[x.category]);
+          strip.appendChild(tile);
+        });
+        recHost.appendChild(strip);
+      }
+      function opening() { return Boolean(opts.tab && ai && !about && !log.length); }
+      function draw() {
+        list.textContent = "";
+        var first = opening();
+        list.classList.toggle("rl-ask-open", first);
+        if (opts.tab) b.classList.toggle("rl-ask-opening", first);
+        recHost = null;
+        if (first) {
+          recHost = el("div", { className: "rl-ask-rec" }); list.appendChild(recHost); drawTiles();
+          list.appendChild(el("h2", { className: "rl-ask-h2", text: "Try asking" }));
+          list.appendChild(el("div", { className: "rl-ask-qs" }, ASK_STARTERS.map(function (q) {
+            var pic = el("span", { className: "rl-ask-qi" }, [ACC_IC[q[1]] ? accIc(q[1], 24, "rl-ask-qi-i") : jIc(q[1], 24)]); pic.setAttribute("aria-hidden", "true"); pic.style.setProperty("--qi", q[2]);
+            return el("button", { type: "button", className: "rl-ask-q", onclick: function () { box.value = q[0]; sendQuestion(true); } }, [pic, el("b", { text: q[0] })]);
+          })));
+          list.appendChild(el("p", { className: "rl-ask-ai", text: "Relay's assistant is an AI, so it can get things wrong." }));
+          return;
+        }
+        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
+          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
+          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
+        if (ai && !log.length) {
+          var chips = el("div", { className: "rl-chat-chips" });
+          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
+            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(true); } }));
+          });
+          list.appendChild(chips);
+        }
+        var newest = -1; if (opts.tab && !about) log.forEach(function (t, i) { if (t.role === "user") newest = i; });
+        log.forEach(function (t, i) { list.appendChild(bubble(t, i === newest && t.typed === true)); });
+      }
+      function turns(extra) {
+        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
+        if (extra) out.push({ role: "user", text: extra });
+        return out.slice(-24);
+      }
+      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
+      // offered: one of the page's own questions was tapped, not typed (the button and the Enter key pass something else).
+      function sendQuestion(offered) {
+        var q = box.value.replace(/\s+$/, "").trim();
+        if (busy || !q) return;
+        if (!ai) return handoff();
+        say(note, "");
+        log.push({ role: "user", text: q, typed: offered !== true }); box.value = ""; draftSet("help-chat", ""); fit();
+        draw();
+        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
+        typing.setAttribute("aria-label", "Relay's assistant is writing");
+        list.appendChild(typing); scrollEnd();
+        lock(true);
+        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
+          lock(false); typing.remove();
+          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
+          log.pop(); box.value = q; fit(); draw();
+          var e = r.body && r.body.error;
+          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
+          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
+            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
+            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
+        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      function handoff() {
+        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
+        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
+        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
+          lock(true); say(note, "");
+          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
+            lock(false);
+            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
+            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
+            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
+            draw(); scrollEnd();
+          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        });
+      }
+      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(opts.tab ? 56 : 48, box.scrollHeight)) + "px"; }
+      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
+      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
+      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
+      send.onclick = sendQuestion;
+      // Pressing send leaves the cursor in the box: the keyboard stays up for the next question, and the box doesn't
+      // slide away from under a mouse as the page settles back.
+      send.addEventListener("mousedown", function (e) { e.preventDefault(); });
+      person.onclick = handoff;
+      // Which receipt the assistant can see, and a way to stop showing it.
+      if (about) {
+        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
+          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
+        b.appendChild(aboutBar);
+      }
+      // A problem is said just above the box, so it's never hidden behind the tab bar.
+      b.appendChild(list);
+      foot = el("p", { className: "rl-anote", text: noteText() });
+      if (opts.tab) { b.appendChild(foot); if (ai) b.appendChild(person); b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); }
+      else { b.appendChild(note); b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send])); if (ai) b.appendChild(person); b.appendChild(foot); }
+      draw(); setTimeout(fit, 0);
+      // The tiles show what the app already has; if that is more than a few minutes old, ask once and redraw them.
+      if (opening() && !memoFresh(memo.receipts)) api("/relay/my/receipts").then(function (r) {
+        if (!r.ok || !r.body || !list.isConnected) return;
+        var rows = r.body.receipts || []; if (JSON.stringify(rows) === JSON.stringify(recRows)) return;
+        recRows = rows; drawTiles();
+      }, function () {});
+    }
+  // Whether the assistant is on: asked once each time Relay is opened, and the last answer is remembered on this phone so
+  // the tab doesn't turn up late. Signing out forgets it.
+  var ASK_KEY = "relay.ask.v1", askAsked = false;
+  function helpChatState() {
+    return memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; });
+  }
+  function askOn() {
+    var s = load();
+    if (!s || !s.token) return false;
+    var was = false; try { was = localStorage.getItem(ASK_KEY) === "1"; } catch (e) {}
+    if (!askAsked) { askAsked = true; helpChatState().then(function (hc) {
+      if (!hc) return;
+      var on = Boolean(hc.available);
+      try { localStorage.setItem(ASK_KEY, on ? "1" : "0"); } catch (e) {}
+      if (on !== was && window.relayNavChanged) window.relayNavChanged();
+    }); }
+    return memo.helpChat ? Boolean(memo.helpChat.available) : was;
+  }
+  try { window.addEventListener("relay:session", function () { askAsked = false; if (!load()) { try { localStorage.removeItem(ASK_KEY); } catch (e) {} } }); } catch (e) {}
+  function mountAsk(host) {
+    if (!host) return;
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) { host.appendChild(el("div", { className: "rl-po" }, [el("h3", { text: "Sign in to ask Relay", style: "margin:0" }), el("button", { className: "rl-po-primary", text: "Sign in", style: "max-width:220px", onclick: show })])); return; }
+    host.classList.add("rl-asktab");
+    var bone = function (w, h, r, m) { return el("div", { className: "rl-skel", style: "width:" + w + "px;height:" + h + "px;border-radius:" + r + "px" + (m ? ";margin:" + m : "") }); };
+    var bones = el("div", { className: "rl-ask-sk" }, [bone(180, 22, 8, "13px 0 17px"), el("div", { className: "rl-ask-sk-t" }, [bone(115, 115, 24), bone(115, 115, 24), bone(115, 115, 24)]), bone(110, 22, 8, "0 0 17px")]);
+    for (var i = 0; i < 4; i++) bones.appendChild(el("div", { className: "rl-ask-sk-r" }, [bone(48, 48, 12), bone(170 + (i % 2) * 40, 16, 8)]));
+    bones.setAttribute("aria-hidden", "true"); host.appendChild(bones);
+    helpChatState().then(function (hc) {
+      if (!host.isConnected) return;
+      host.textContent = "";
+      if (!hc || !hc.available) { host.appendChild(el("p", { className: "rl-calm-none", text: "Relay's assistant is off at the moment. To write to Relay's team, tap your picture at the top, then Help and legal." })); return; }
+      chatPage(host, { tab: true });
+    });
+  }
   function signedInView(sheet, email, notice, c) {
     sheet.textContent = "";
     var inPage = sheet.classList.contains("rl-inpage");
@@ -3913,13 +4499,20 @@
     // On the Profile page, an inner page starts at its top and Back lands where Profile was.
     function home() { signedInView(sheet, email, null, c); if (inPage) scrollBackTo(profileY); }
     // An inner page with the top bar. Each section keeps its own heading out of the way: the bar already names it.
+    // Calm layout: two of Profile's rows open a page of rows (hub). While one of that page's own rows is open, backTo is
+    // the page, so Back returns one level and names it, not all the way to Profile.
+    var backTo = null;
     function page(title, build) {
-      if (inPage) profileY = window.scrollY || 0;
+      if (inPage && !backTo) profileY = window.scrollY || 0;
       sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {}
       if (inPage) window.scrollTo(0, 0);
-      accBar(sheet, title, home);
+      accBar(sheet, title, backTo || home, backTo ? backTo.word : null);
       var body = el("div", { className: "rl-asub" }); sheet.appendChild(body);
       build(body);
+    }
+    function hub(title, word, build) {
+      var again = function () { backTo = null; page(title, build); backTo = again; };
+      again.word = word; again();
     }
     // Screens that bring their own heading and Back button.
     function screen(view) { sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {} view(sheet); }
@@ -3946,28 +4539,39 @@
     var review = isReview();
     if (notice) say(msg, notice.text, notice.bad);
 
-    // The everyday things, as colourful tiles like the Receipts page (settings stay as lists below). The reviewer account
-    // (isReview) can't have an inbox, delivery details or bids, so those tiles, and Wrapped (made from inbox receipts), are
-    // left out for it.
-    var tiles = [];
-    var mailRow = accTile("mail", "Email connection", "", function () { page("Email connection", mailPage); });
-    if (!review) tiles.push(mailRow);
-    var deliveryRow = null, auctionRow = null, alertRow = null;
+    // Draft 2: Profile opens from the avatar and is who you are, then a short list. Each thing has one home: Wrapped,
+    // Swap & resell and Auctions are on Browse; price alerts are Home's bell; adding a missing receipt and shop orders are
+    // on Receipts; the assistant is the Ask tab.
+    // The reviewer account (isReview) can't have an inbox or delivery details, so those rows, and Wrapped (made from inbox
+    // receipts), are left out for it.
+    var rows = [];
+    var mailRow = accRow("mail", "Inboxes", "", function () { page("Inboxes", mailPage); });
+    if (!review) rows.push(mailRow);
+    var deliveryRow = null;
     if (!review) {
       // The delivery details Relay fills in at shops' checkouts.
-      deliveryRow = accTile("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
+      deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
         deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
-      tiles.push(deliveryRow);
+      rows.push(deliveryRow);
     }
-    // Price alerts (only where the app's pages are here to open).
-    if (window.go) { alertRow = accTile("bell", "Price alerts", "", function () { close(); window.go("radar"); }); tiles.push(alertRow); }
-    if (marketOn()) tiles.push(accTile("swap", "Swap & resell", "", function () { openResale(); }));
-    // Auctions: bids and wins (a win to pay for comes first, in words).
-    if (!review) { auctionRow = accTile("gavel", "Auctions", "", function () { openAuctions("mine"); }); tiles.push(auctionRow); }
-    if (!review) tiles.push(accTile("paste", "Add a missing receipt", "", function () { openFind(); }));
-    var ordersRow = accTile("bag", "Shop orders", review ? "None yet" : "", function () { page("Shop orders", ordersPage); }); if (!review) ordersRow.style.display = "none";
-    tiles.push(ordersRow);
-    sheet.appendChild(el("div", { className: "rl-tiles rl-ptiles" }, tiles));
+    // What the shopper shops for (interests): change it any time.
+    var interestsRow = accRow("bag", "Your interests", interestsWords(interestsCached() || []), function () { page("Your interests", function (b) {
+      var chosen = (interestsCached() || []).slice(), msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
+      b.appendChild(el("p", { className: "rl-int-p", text: "Pick what you shop for and Relay shows shops you'll like first in Browse. What you buy counts for more once Relay has your receipts." }));
+      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { home(); });
+      save.disabled = !chosen.length;
+      b.appendChild(interestsPicker(chosen, function (list) { chosen = list; save.disabled = !list.length; }));
+      b.appendChild(msg); b.appendChild(save);
+    }); });
+    interestsRow.setAttribute("data-row", "interests");
+    rows.push(interestsRow);
+    interestsLoad().then(function (list) { if (list && interestsRow.isConnected) interestsRow.setDetail(interestsWords(list)); });
+    // The reviewer account has no inbox, so its orders from shops stay one tap away here. Everyone else finds them on Receipts.
+    var ordersRow = accRow("bag", "Shop orders", "None yet", function () { page("Shop orders", ordersPage); });
+    if (review) rows.push(ordersRow);
+    rows.push(accRow("lock", "Security and privacy", "", function () { hub("Security and privacy", "Security", secHub); }));
+    rows.push(accRow("help", "Help and legal", "", function () { hub("Help and legal", "Back", helpHub); }));
+    sheet.appendChild(accGroup("", rows));
     var mailState = null;
     api("/relay/my/gmail").then(function (g) {
       if (g.ok) rememberMailbox(g.body);
@@ -3980,75 +4584,68 @@
     api(purchasesPath()).then(function (r) {
       if (r.status === 401) { save(null); close(); return; }
       orders = (r.ok && r.body && r.body.purchases) || [];
-      if (orders.length) { ordersRow.style.display = ""; ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders")); }
+      if (orders.length) ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders"));
     }).catch(function () {});
-    if (alertRow) alertStatus().then(function (st) {
-      var n = st && st.watches ? st.watches.length : 0;
-      alertRow.setDetail(n ? n + " watched" : "");
-    });
     if (deliveryRow) api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? r.body.delivery.postcode : "Add your address"); }).catch(function () {});
-    if (auctionRow) auctionsMine().then(function (b) {
-      var rows = (b && b.auctions) || [], todo = rows.filter(function (r) { return AU_TODO[r.you.state]; }).length;
-      var live = rows.filter(function (r) { return r.auction.status === "live" || r.auction.status === "ending"; }).length;
-      auctionRow.setDetail(todo ? todo + " to pay for" : live ? "Bidding on " + live : "");
-    });
-    // This year's Wrapped, under the tiles.
-    if (inPage && !review) { var wr = el("div", { className: "rl-agroup", id: "rl-wrapped" }, [el("h3", { text: "Wrapped" })]), wb = el("div"); wr.appendChild(wb); sheet.appendChild(wr); mountWrapped(wb); }
 
-    // Sign-in & security
-    var secRows = [];
-    if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
-    var openTwoStep = function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); };
-    // Shown once Relay can send texts (or when a number is already on the account).
-    var phoneRow = accRow("phone", "Phone number", "", function () { page("Phone number", function (b) { phoneSection(b, openTwoStep); }); });
-    phoneRow.style.display = "none"; secRows.push(phoneRow);
-    var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
-    secRows.push(twoRow);
-    var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
-    secRows.push(devicesRow);
-    var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
-    cardRow.style.display = "none"; secRows.push(cardRow);
-    sheet.appendChild(accGroup("Sign-in & security", review ? [devicesRow] : secRows));
-    if (review) sheet.appendChild(el("p", { className: "rl-anote", text: "This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it." }));
-    api("/relay/my/2fa").then(function (r) {
-      if (!r.ok || !r.body) return;
-      var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
-    }).catch(function () {});
-    api("/relay/my/phone").then(function (r) {
-      if (!r.ok || !r.body || !(r.body.available || r.body.ending)) return;
-      phoneRow.style.display = ""; phoneRow.setDetail(r.body.ending ? "Ending " + r.body.ending : "Add one for sign-in codes");
-    }).catch(function () {});
-    api("/relay/my/card").then(function (r) {
-      if (!r.ok || !r.body || !r.body.enabled) return;
-      if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
-      cardRow.style.display = ""; cardRow.setDetail(r.body.card ? cardText(r.body.card) : "None saved");
-    }).catch(function () {});
+    // Security and privacy: signing in, and what Relay keeps. Asked for when the page is opened, so it is current each time.
+    function secHub(b) {
+      var secRows = [];
+      if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
+      var openTwoStep = function () { page("Two-step sign-in", function (b) { twoStepSection(b); }); };
+      // Shown once Relay can send texts (or when a number is already on the account).
+      var phoneRow = accRow("phone", "Phone number", "", function () { page("Phone number", function (b) { phoneSection(b, openTwoStep); }); });
+      phoneRow.style.display = "none"; secRows.push(phoneRow);
+      var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
+      secRows.push(twoRow);
+      var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
+      secRows.push(devicesRow);
+      var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
+      cardRow.style.display = "none"; secRows.push(cardRow);
+      b.appendChild(accGroup("Sign-in & security", review ? [devicesRow] : secRows));
+      if (review) b.appendChild(el("p", { className: "rl-anote", text: "This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it." }));
+      api("/relay/my/2fa").then(function (r) {
+        if (!r.ok || !r.body) return;
+        var t = r.body; twoRow.setDetail(t.text && t.app ? "On: text and app" : t.text ? "On: text message" : t.app ? "On: authenticator app" : "Off");
+      }).catch(function () {});
+      api("/relay/my/phone").then(function (r) {
+        if (!r.ok || !r.body || !(r.body.available || r.body.ending)) return;
+        phoneRow.style.display = ""; phoneRow.setDetail(r.body.ending ? "Ending " + r.body.ending : "Add one for sign-in codes");
+      }).catch(function () {});
+      api("/relay/my/card").then(function (r) {
+        if (!r.ok || !r.body || !r.body.enabled) return;
+        if (r.body.testMode !== false && !testingOn() && !r.body.card) return;
+        cardRow.style.display = ""; cardRow.setDetail(r.body.card ? cardText(r.body.card) : "None saved");
+      }).catch(function () {});
+      b.appendChild(accGroup("Privacy & data", (review ? [] : [
+        accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
+        accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
+        accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
+    }
 
-    // Privacy & data
-    sheet.appendChild(accGroup("Privacy & data", (review ? [] : [
-      accRow("shield", "Email permission", "What Relay reads and keeps", function () { page("Email permission", permissionPage); })]).concat([
-      accRow("download", "Download my data", "A copy of everything Relay keeps", function () { page("Download my data", exportPage); }),
-      accRow("trash", "Delete my account", "", function () { page("Delete my account", deletePage); }, { danger: true })])));
-
-    // Help & legal
+    // Help and legal
     // The help chat: shown once Relay says it's on (an AI assistant), or that a person can be reached by email.
     var chatRow = accRow("chat", "Chat with us", "Ask Relay's assistant, or a person", function () { page(chatRow._ai ? "Help chat" : "Contact us", chatPage); });
     chatRow.style.display = "none";
     (memo.helpChat ? Promise.resolve(memo.helpChat) : api("/relay/my/help/chat").then(function (r) { return r.ok && r.body ? (memo.helpChat = r.body) : null; }, function () { return null; })).then(function (hc) {
       if (!hc || !(hc.available || hc.handoff)) return;
       chatRow._ai = Boolean(hc.available);
-      if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); }
-      chatRow.style.display = "";
+      if (!hc.available) { chatRow.querySelector(".rl-arow-t b").textContent = "Contact us"; chatRow.setDetail("Write to Relay's team. They'll reply by email"); chatRow.style.display = ""; }
+      else if (askOn()) chatRow.remove();
+      else chatRow.style.display = "";
+      // Asking the assistant about a receipt lands on Profile's first screen and opens the chat from there.
       openChatAbout = function () {
-        if (!chatRow.isConnected || !hc.available || !wantChatAbout) return false;
+        if (!head.isConnected || !hc.available || !wantChatAbout) return false;
         memo.chatAbout = wantChatAbout; page("Help chat", chatPage); return true;
       };
       if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
-    sheet.appendChild(accGroup("Help & legal", [
-      accRow("help", "Help", "Common questions", function () { page("Help", helpPage); }), chatRow,
-      accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
-      accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })]));
+    function helpHub(b) {
+      b.appendChild(accGroup("", [
+        accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat(chatRow._ai ? [] : [chatRow], [
+        accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
+        accRow("doc", "Privacy policy", "", null, { href: "./privacy.html" })])));
+    }
 
     // Reviewing member reports: only for the people who do that.
     var abox = el("div"); sheet.appendChild(abox);
@@ -4067,10 +4664,7 @@
       if (wantHealth) setTimeout(function () { if (wantHealth && openHealthPage()) wantHealth = false; }, 0);
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
-        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow,
-        // The new layout, for Relay's team to try on their own phones (next.html lets nobody else in). Nothing is
-        // remembered: opening Relay always shows this layout.
-        accRow("devices", "Try the new layout", "Only Relay's team can open it", function () { location.href = "next.html"; })]));
+        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
       abox.appendChild(teamTesting());
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
@@ -4084,7 +4678,7 @@
 
     // Two switches for Relay's team, each changing only what this device shows (so they also work in the app on the home
     // screen, which a link can't reach). Shoppers never see them.
-    //  * Shops' websites: the preview from shops' own websites in Discover and search by photo. Real products only.
+    //  * Shops' websites: the preview from shops' own websites in Browse and search by photo. Real products only.
     //  * Testing tools: Relay's test shops, test orders and sample items (the same as opening Relay with ?testtools=1).
     function teamSwitch(title, label, text, key) {
       var box = el("div", { className: "rl-aih" });
@@ -4104,8 +4698,8 @@
     }
     function teamTesting() {
       var box = el("div");
-      box.appendChild(teamSwitch("Shops' websites in Discover", "Shops' websites in Discover on this device",
-        "Real products and prices from shops' own websites, read once a day, in Discover and search by photo. Only Relay's team sees them.", "relay-web-preview"));
+      box.appendChild(teamSwitch("Shops' websites in Browse", "Shops' websites in Browse on this device",
+        "Real products and prices from shops' own websites, read once a day, in Browse and search by photo. Only Relay's team sees them.", "relay-web-preview"));
       box.appendChild(teamSwitch("Testing tools", "Testing tools on this device",
         "Relay's test shops, test orders and sample items, for trying things out. Off shows Relay as shoppers see it.", "relay-testing-tools"));
       return box;
@@ -4186,7 +4780,7 @@
       b.appendChild(el("button", { className: "rl-btn ghost", text: "Re-scan all my email", onclick: function () { window.__relayAutoFull = true; close(); window.go("receipts"); } }));
       b.appendChild(el("p", { className: "rl-anote", text: "A full re-scan looks through every email again. It can take a few minutes." }));
       b.appendChild(el("p", { className: "rl-anote", text: "Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay." }));
-      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Email connection", mailPage); }); }
+      function again() { memo.gmail = null; cachedGet("gmail", "/relay/my/gmail").then(function (g) { mailState = g.ok && g.body ? g.body : mailState; page("Inboxes", mailPage); }); }
       function disconnectInbox(x, next) {
         if (!x.mailbox && !next) return disconnectGmail(again, note);
         var who = x.email || inboxName(x.provider);
@@ -4672,115 +5266,6 @@
     // ---- The help chat (worker/support-chat.js): Relay's AI assistant, and "Talk to a person", which emails the chat to
     // Relay's team. The conversation lives only on this screen (and this session): Relay keeps no copy. With the
     // assistant off, it's a message to Relay's team. ----
-    function chatPage(b) {
-      var hc = memo.helpChat || {}, ai = Boolean(hc.available);
-      // A chat about a receipt starts afresh, and so does an ordinary one after it (the assistant no longer sees it).
-      var about = ai ? memo.chatAbout || null : null; memo.chatAbout = null;
-      if ((about ? about.id : null) !== (memo.chatLogAbout || null)) { memo.chatLog = []; memo.chatLogAbout = about ? about.id : null; }
-      var log = memo.chatLog || (memo.chatLog = []);
-      var aboutBar = null, foot = null;
-      function noteText() {
-        return !ai ? "Relay's team will see your message and your email address, so they can reply."
-          : about ? "Relay keeps no copy of this chat. Your messages, and what Relay read from this receipt, go to Anthropic, the AI company that answers them, without your email address. Talk to a person emails the chat to Relay's team."
-          : "Relay keeps no copy of this chat. Your messages go to Anthropic, the AI company that answers them, without your receipts or email address. Talk to a person emails the chat to Relay's team.";
-      }
-      function stopAbout() {
-        about = null; if (aboutBar) aboutBar.remove(); aboutBar = null; box.placeholder = "Ask about Relay";
-        if (foot) foot.textContent = noteText();
-        log.push({ role: "note", text: "The assistant can't see the receipt any more." }); draw();
-      }
-      var list = el("div", { className: "rl-chat", role: "log" });
-      list.setAttribute("aria-live", "polite");
-      var note = el("p", { className: "rl-msg" });
-      var box = el("textarea", { className: "rl-chat-in", rows: 1, maxLength: 1000, placeholder: about ? "Ask about this receipt" : ai ? "Ask about Relay" : "Write your question", value: draftGet("help-chat") });
-      box.setAttribute("aria-label", ai ? "Your question for Relay's assistant" : "Your message to Relay's team");
-      var send = el("button", { type: "button", className: "rl-chat-send", ariaLabel: ai ? "Send" : "Send to Relay's team" }, [jIc("send", 22)]);
-      var person = el("button", { type: "button", className: "rl-btn ghost rl-chat-person", text: "Talk to a person" });
-      var busy = false;
-      function bubble(t) {
-        var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
-        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
-        // Said once, over its first message: who's answering, and that it's an AI.
-        if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
-        return n;
-      }
-      function draw() {
-        list.textContent = "";
-        list.appendChild(bubble({ role: "bot", first: true, text: about ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. I can see what Relay read from this receipt. What would you like to know?"
-          : ai ? "Hi, I'm Relay's assistant. I'm an AI, so I can get things wrong. Ask me anything about using Relay, or tap Talk to a person."
-          : "Write your question and tap send. Relay's team will reply by email to " + (load() || {}).email + "." }));
-        if (ai && !log.length) {
-          var chips = el("div", { className: "rl-chat-chips" });
-          (about ? ["The total is wrong", "Some items are missing", "This isn't something I bought"] : ["How does Relay find my receipts?", "A receipt is missing", "How do I mark a gift?"]).forEach(function (q) {
-            chips.appendChild(el("button", { type: "button", text: q, onclick: function () { box.value = q; sendQuestion(); } }));
-          });
-          list.appendChild(chips);
-        }
-        log.forEach(function (t) { list.appendChild(bubble(t)); });
-      }
-      function turns(extra) {
-        var out = log.filter(function (t) { return t.role === "user" || t.role === "assistant"; }).map(function (t) { return { role: t.role, text: t.text }; });
-        if (extra) out.push({ role: "user", text: extra });
-        return out.slice(-24);
-      }
-      function lock(yes) { busy = yes; send.disabled = yes; person.disabled = yes; }
-      function sendQuestion() {
-        var q = box.value.replace(/\s+$/, "").trim();
-        if (busy || !q) return;
-        if (!ai) return handoff();
-        say(note, "");
-        log.push({ role: "user", text: q }); box.value = ""; draftSet("help-chat", ""); fit();
-        draw();
-        var typing = el("div", { className: "rl-chat-b bot rl-chat-typing" }, [el("span", { className: "rl-skel" }), el("span", { className: "rl-skel" })]);
-        typing.setAttribute("aria-label", "Relay's assistant is writing");
-        list.appendChild(typing); scrollEnd();
-        lock(true);
-        api("/relay/my/help/chat", { method: "POST", body: Object.assign({ messages: turns() }, about ? { receiptId: about.id } : {}) }).then(function (r) {
-          lock(false); typing.remove();
-          if (r.ok && r.body && r.body.reply) { log.push({ role: "assistant", text: r.body.reply }); draw(); scrollEnd(); return; }
-          log.pop(); box.value = q; fit(); draw();
-          var e = r.body && r.body.error;
-          if (e === "receipt_not_found" && about) { stopAbout(); return say(note, "That receipt isn't in your Receipts any more, so the assistant can't see it. Send your question again to ask without it.", true); }
-          say(note, e === "chat_off" ? "The assistant is off right now. Tap Talk to a person and Relay's team will email you."
-            : r.status === 429 ? "That's a lot of messages for one day. Tap Talk to a person, or try again tomorrow."
-            : "The assistant couldn't answer just now. Try again in a moment, or tap Talk to a person.", true);
-        }, function () { lock(false); typing.remove(); log.pop(); box.value = q; fit(); draw(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-      }
-      function handoff() {
-        var extra = box.value.trim(), msgs = turns(extra || null), email = (load() || {}).email;
-        if (!msgs.some(function (t) { return t.role === "user"; })) { say(note, "Write your question first, then send it.", true); box.focus(); return; }
-        ask("Send this to Relay's team? They'll reply by email to " + email + ".", "Send", function () {
-          lock(true); say(note, "");
-          api("/relay/my/help/handoff", { method: "POST", body: { messages: msgs } }).then(function (r) {
-            lock(false);
-            if (!r.ok) return say(note, r.status === 429 ? "You've already sent a few today. Relay's team will reply by email." : "Couldn't send that. Try again in a moment.", true);
-            if (extra) { log.push({ role: "user", text: extra }); box.value = ""; draftSet("help-chat", ""); fit(); }
-            log.push({ role: "note", text: "Sent to Relay's team. They'll reply by email to " + email + "." });
-            draw(); scrollEnd();
-          }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
-        });
-      }
-      function fit() { box.style.height = "auto"; box.style.height = Math.min(140, Math.max(48, box.scrollHeight)) + "px"; }
-      function scrollEnd() { try { send.scrollIntoView({ block: "end", behavior: "smooth" }); } catch (e) {} }
-      box.addEventListener("input", function () { draftSet("help-chat", box.value); fit(); });
-      box.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendQuestion(); } });
-      send.onclick = sendQuestion;
-      person.onclick = handoff;
-      // Which receipt the assistant can see, and a way to stop showing it.
-      if (about) {
-        aboutBar = el("div", { className: "rl-rc-fix rl-chat-about" }, [el("span", { text: "About your receipt from " + about.label }),
-          el("button", { type: "button", className: "rl-pill", text: "Stop showing it", onclick: stopAbout })]);
-        b.appendChild(aboutBar);
-      }
-      // A problem is said just above the box, so it's never hidden behind the tab bar.
-      b.appendChild(list);
-      b.appendChild(note);
-      b.appendChild(el("div", { className: "rl-chat-bar" }, [box, send]));
-      if (ai) b.appendChild(person);
-      foot = el("p", { className: "rl-anote", text: noteText() });
-      b.appendChild(foot);
-      draw(); setTimeout(fit, 0);
-    }
     function helpPage(b) {
       HELP.forEach(function (q) {
         b.appendChild(el("details", { className: "rl-faq" }, [el("summary", { text: q[0] }), el("p", { text: q[1] })]));
@@ -4850,8 +5335,8 @@
     if (adding && result === "failed") return { text: "Couldn't add that inbox. Please try again.", bad: true };
     // Connecting an inbox again that didn't go ahead: Relay still can't read it, and says so plainly.
     var again = false; try { again = sessionStorage.getItem("relay.reconnecting") === "1"; sessionStorage.removeItem("relay.reconnecting"); } catch (e) {}
-    if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from Profile, then Email connection.", bad: true };
-    if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from Profile, then Email connection.", bad: true };
+    if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from your picture at the top of the screen, then Inboxes.", bad: true };
+    if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from your picture at the top of the screen, then Inboxes.", bad: true };
     return { text: notes[result][0], bad: notes[result][1] };
   }
   function completeGmail() {
@@ -4949,7 +5434,65 @@
   function memoDrop(prefix) { Object.keys(memo).forEach(function (k) { if (k.indexOf(prefix) === 0) delete memo[k]; }); }
   // Wrapped is one story a year: the year's total, how it split, then a chapter for each kind of shopping. It lives on the
   // Profile page as a card: this year's (and earlier years' that have receipts), with Play.
+  // Calm layout: on Profile, Wrapped is one card and one tap, shown only when a year has receipts. Its page holds the story,
+  // the other years and adding an earlier year (mountWrapped).
+  function wrappedDoor(host, onTap) {
+    var s = load();
+    if (!s || !s.token) return;
+    var year = new Date().getFullYear();
+    cachedGet("wrapped" + year, "/relay/my/wrapped?year=" + year).then(function (r) {
+      if (!host.isConnected || !r.ok || !r.body) return;
+      var w = r.body, had = (w.years || []).filter(function (y) { return y.receipts > 0; }).sort(function (x, y) { return y.year - x.year; });
+      if (!w.receipts && !had.length) return;
+      var show = w.receipts ? year : had[0].year, n = w.receipts || had[0].receipts;
+      host.textContent = "";
+      host.appendChild(el("button", { type: "button", className: "rl-wr-door", ariaLabel: "Relay Wrapped " + show + ", " + n + (n === 1 ? " receipt" : " receipts"), onclick: function () { onTap(show); } }, [
+        el("span", { className: "rl-wr-door-t" }, [el("i", { text: "RELAY WRAPPED " + show }), el("b", { text: "Your " + show + " in purchases" }), el("span", { text: n + (n === 1 ? " receipt" : " receipts") })]),
+        accIc("chev", 18, "rl-arow-c")]));
+    }).catch(function () {});
+  }
+  // Draft 2: Browse's own screen. One Wrapped card, then the kinds of shopping as colour tiles (each opens that kind's
+  // receipts), then three doors. Everything on it is the shopper's own: nothing is recommended or made up.
+  function mountBrowse(host, opts) {
+    opts = opts || {};
+    if (!host) return;
+    host.textContent = "";
+    var s = load();
+    if (!s || !s.token) return;
+    var hero = el("div", { id: "rl-wrapped" }); host.appendChild(hero);
+    if (!isReview()) wrappedDoor(hero, function (y) { memo.wrappedYear = y; if (window.go) window.go("wrapped"); });
+    var cats = el("div"); host.appendChild(cats);
+    var NAMES = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other" };
+    var openCat = function (k) { return function () { memo.openCat = k; memo.catFilter = null; if (window.go) window.go("receipts"); }; };
+    var drawCats = function (rows) {
+      if (!document.body.contains(cats)) return;
+      cats.textContent = "";
+      var by = {}; orderRows(rows).forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
+      var keys = Object.keys(by).sort(function (a, b) { return (a === "other") - (b === "other") || by[b].length - by[a].length; });
+      if (!keys.length) return;
+      cats.appendChild(el("div", { className: "rl-calm-h" }, [el("h2", { text: "Your categories" })]));
+      var grid = el("div", { className: "rl-tiles" });
+      keys.forEach(function (k) {
+        // "Due soon" only when the shop's own return date is within a week (statedDeadline): never a date Relay worked out.
+        var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length, n = by[k].length;
+        var t = el("button", { type: "button", className: "rl-tile", ariaLabel: (NAMES[k] || "Other") + ", " + n + (n === 1 ? " receipt" : " receipts") + (soon ? ", " + soon + " due soon" : ""), onclick: openCat(k), style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) });
+        var art = el("span", { className: "rl-tile-art" });
+        art.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (CAT_ICONS[k] || CAT_ICONS.other)[2] + "</svg>";
+        t.appendChild(art);
+        if (soon) t.appendChild(el("span", { className: "rl-tile-badge", text: soon + " due soon" }));
+        t.appendChild(el("b", { text: NAMES[k] || "Other" }));
+        grid.appendChild(t);
+      });
+      cats.appendChild(grid);
+    };
+    if (memo.receipts) drawCats(memo.receipts.rows); else for (var i = 0; i < 2; i++) cats.appendChild(el("div", { className: "rl-skel", style: "height:112px;border-radius:20px;margin:14px 0 0" }));
+    api("/relay/my/receipts?all=1").then(function (r) { if (r.ok && r.body) drawCats(r.body.receipts || []); else if (!memo.receipts) cats.textContent = ""; }, function () { if (!memo.receipts) cats.textContent = ""; });
+    var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
+    var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
+    host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));
+  }
   function mountWrapped(host, year) {
+    year = year || memo.wrappedYear || undefined; memo.wrappedYear = null;
     host.textContent = "";
     var s = load();
     if (!s || !s.token) return;
@@ -5026,8 +5569,8 @@
       var found = 0, errors = 0, missed = [];
       function oneYear(k) {
         if (k >= years.length) {
-          status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: open Profile, then Email connection." :
-            missed.length ? " Some of your inboxes need connecting again before Relay can read them: open Profile, then Email connection." : "");
+          status.textContent = "Done. Relay found " + found + " receipts in " + years.join(", ") + "." + (missed.length === 1 ? " Your " + missed[0] + " inbox needs connecting again before Relay can read it: tap your picture at the top of the screen, then Inboxes." :
+            missed.length ? " Some of your inboxes need connecting again before Relay can read them: tap your picture at the top of the screen, then Inboxes." : "");
           setTimeout(function () { done(years[0]); }, missed.length ? 4000 : 900); return;
         }
         var y = years[k], where = "";
@@ -5037,7 +5580,7 @@
           status.textContent = "Reading " + y + where + (day ? ", back to " + day : "") + "… " + found + " receipts found so far. Keep this page open.";
           api("/relay/my/gmail/scan", { method: "POST", body: Object.assign({ year: y }, cursor ? { cursor: cursor } : {}) }).then(function (x) {
             if (!x.ok) {
-              if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Open Profile, then Email connection, and tap Connect again."; return; }
+              if (x.status === 401) { status.textContent = mailName() + " needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again."; return; }
               if (++errors > 8) { status.textContent = mailName() + " is busy. Relay saved its place: press the button again in a few minutes to carry on."; go.disabled = false; return; }
               return setTimeout(function () { round(cursor); }, 4000 * Math.min(errors, 4));
             }
@@ -6093,6 +6636,10 @@
     if (deadline) card.appendChild(dueBar(deadline, "Return by ", String(o.orderedAt || "").slice(0, 10)));
     if (it.exchange && it.exchange.status === "awaiting_payment") status("Swapping" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle + " once you've paid the difference", false);
     else if (it.exchange) status("✓ Swapped" + (it.exchange.fromTitle ? " from " + it.exchange.fromTitle : "") + " to " + it.exchange.toTitle, true);
+    // After a swap, or the shop changing or refunding it, the order doesn't come to what it was placed at
+    // (amountNowMinor, order-ref.js on the server), so both are said.
+    if (Number.isInteger(o.amountNowMinor) && Number.isInteger(o.amountMinor) && o.amountNowMinor !== o.amountMinor)
+      status("The order now comes to " + money(o.amountNowMinor, o.currency) + ". It was " + money(o.amountMinor, o.currency) + " when you ordered.", true);
     var actions = el("div", { className: "rl-po-actions" });
     if (it.exchange && it.exchange.balance) {
       var bal = it.exchange.balance;
@@ -6559,6 +7106,33 @@
   // The Auctions page: what's live, and the shopper's own bids and wins.
   function openAuctions(tab) { if (!load()) return show(); open(function (sheet) { auctionsView(sheet, tab || "live"); }); }
   function openAuction(id) { if (!load()) return show(); open(function (sheet) { auctionView(sheet, id, function () { auctionsView(sheet, "live"); }); }); }
+  // Calm layout: live auctions inside Discover. A card opens that auction's page (a sheet); bids already made are one row.
+  // again: drawn once more after an auction's sheet closes (a bid may have been made), keeping what's there until it's in.
+  function mountAuctions(host, again) {
+    var body = again && host.firstChild;
+    if (!body) {
+      host.textContent = "";
+      if (!load()) return;
+      body = el("div"); host.appendChild(body);
+      for (var i = 0; i < 3; i++) body.appendChild(el("div", { className: "rl-skel rl-au-skel" }));
+    }
+    // Opened on purpose, so it asks for the latest: prices and wins change while the app is closed.
+    Promise.all([auctionsLive(true), auctionsMine(true)]).then(function (rs) {
+      if (!host.isConnected) return;
+      body.textContent = "";
+      var rows = rs[0] || [], mine = (rs[1] && rs[1].auctions) || [], youOf = {};
+      mine.forEach(function (r) { youOf[r.auction.id] = r.you; });
+      if (!rows.length) body.appendChild(el("div", { className: "rl-empty", style: "margin-top:14px" }, [el("h3", { text: "No auctions right now" }),
+        el("p", { text: "When shops on Relay put clothes up for auction, they show here. You bid the most you'd pay, and Relay bids for you only as much as it takes to stay ahead." })]));
+      var shut = function () { close(); mountAuctions(host, true); };
+      rows.forEach(function (a) { body.appendChild(auCard(a, youOf[a.id], function () { open(function (sheet) { auctionView(sheet, a.id, shut); }); })); });
+      if (mine.length) {
+        var todo = mine.filter(function (r) { return AU_TODO[r.you.state]; }).length;
+        body.appendChild(accGroup("", [accRow("gavel", "Your bids", todo ? todo + " to pay for" : "", function () { openAuctions("mine"); })]));
+      }
+      auTick(body);
+    });
+  }
   function auctionsView(sheet, tab) {
     sheet.textContent = ""; sheet.setAttribute("aria-label", "Auctions");
     try { sheet.scrollTop = 0; } catch (e) {}
@@ -6743,12 +7317,16 @@
       body.appendChild(el("button", { type: "button", className: leading ? "rl-btn" : "rl-btn ghost", text: leading ? "Done" : "Back to the auction", onclick: refresh }));
     }
     get().then(draw);
-    // While it's open, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
-    var poll = setInterval(function () {
-      if (!document.body.contains(body)) return clearInterval(poll);
+    // While it's open and on screen, the price and bids stay fresh (every 20 seconds), unless the shopper is typing a bid.
+    // Once the auction is over there's nothing to keep up with: it carries on for ten minutes past the end, so a winner
+    // sees the shop's link to pay arrive, then stops (opening the page again, or coming back to Relay, asks afresh).
+    keepFresh(body, 20000, function () {
       if (body.querySelector("#rl-au-max") || body.querySelector("#rl-dl-firstName")) return;
       get(true).then(function (y) { if (y && document.body.contains(body) && !body.querySelector("#rl-au-max") && !body.querySelector("#rl-dl-firstName")) draw(y); });
-    }, 20000);
+    }, function () {
+      var a = shown && shown.a;
+      return !a || a.status === "live" || a.status === "ending" || (a.status !== "cancelled" && Date.now() < (Number(a.endsAt) || 0) + 600000);
+    });
   }
   // Copies text, saying whether it worked (older browsers get a hidden text box to copy from).
   function copyText(text) {
@@ -6897,6 +7475,253 @@
     if (memo.walletPurchases && memo.receipts) drawBoth([memo.walletPurchases, memo.receipts.rows]);
     loadBoth().then(function (both) { if (document.body.contains(grid)) drawBoth(both); });
   }
+  // One quiet row: a picture or icon, what it is, one line under it, something short on the right, and a chevron.
+  function calmRow(pic, title, sub, end, endClass, onTap) {
+    var kids = [];
+    if (pic) kids.push(pic);
+    kids.push(el("span", { className: "rl-crow-t" }, [el("b", { text: title })].concat(sub ? [el("span", { text: sub })] : [])));
+    if (end) kids.push(el("span", { className: "rl-crow-e" + (endClass ? " " + endClass : ""), text: end }));
+    kids.push(accIc("chev", 18, "rl-arow-c"));
+    return el("button", { type: "button", className: "rl-crow", onclick: onTap }, kids);
+  }
+  function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.background = ACC_TINT[name]; } return i; }
+  function leftWords(d) { return d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left"; }
+  function dayWords(day) { return new Date(String(day).slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); }
+  // ---- Draft 2: Home is a feed, one card for each order ----
+  // What needs the shopper comes first (money owed for a swap, a return date inside a week), then orders still in play (on
+  // the way, a return under way, still returnable), then the newest. A card is one tap and opens that order's page.
+  // Every line on a card is something Relay knows: the shop's own return date (statedDeadline), the parcel's latest news
+  // (shipWords), how far a return has got. A strip under a card is only ever days left on a return. Nothing is made up.
+  var HOME_TINT = true;    // look A (chosen): each card takes its kind of shopping's colour. One class on the feed.
+  // Look A's card colour for a kind of shopping: its tile colour, deepened towards the ink that kind's drawing already
+  // uses by just enough for white 14px text to reach 4.5 to 1 on it. The tiles themselves (Browse) keep TILE_COLOURS.
+  var CARD_INK = { shop: "#101828", other: "#1F2937" }, cardColours = {};
+  function hexRgb(h) { var n = parseInt(String(h).replace("#", ""), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function whiteOn(rgb) { var l = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 1.05 / (0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] + 0.05); }
+  function cardColour(cat) {
+    if (cardColours[cat]) return cardColours[cat];
+    var base = hexRgb(TILE_COLOURS[cat]), ink = hexRgb((cat !== "shop" && cat !== "other" && CAT_ICONS[cat] && CAT_ICONS[cat][1]) || CARD_INK[cat] || "#101828"), out = base;
+    for (var t = 0; t <= 1.0001 && whiteOn(out) < 4.5; t += 0.02) out = base.map(function (v, i) { return Math.round(v + (ink[i] - v) * t); });
+    return (cardColours[cat] = "#" + out.map(function (v) { return (v < 16 ? "0" : "") + v.toString(16); }).join(""));
+  }
+  var homeSizes = null;    // watches the feed's size, so the first screen is worked out again when text or pictures change it
+  function feedEntries(purchases, receipts, refresh) {
+    var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
+    var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
+    purchases.forEach(function (o) {
+      var items = (o.items || []).filter(Boolean); if (!items.length) return;
+      var shop = o.store || "Shop", at = String(o.orderedAt || "").slice(0, 10);
+      var owe = items.filter(function (it) { return it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo; })[0];
+      var back = items.filter(function (it) { return it.returnInfo; })[0], swapped = items.filter(function (it) { return it.exchange; })[0];
+      var dates = items.map(function (it) { return (it.returnable || it.exchangeable) && !it.returnInfo && it.returnBy && it.returnBy.date ? it.returnBy.date : null; }).filter(function (d) { return d && d >= today; }).sort();
+      var dl = dates[0] || null;
+      var e = { key: "o" + o.id, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2, title: items[0].title + (items.length > 1 ? " + " + (items.length - 1) + " more" : "") };
+      e.tiles = items.slice(0, 6).map(function (it) { return { name: it.title, price: Number.isInteger(it.priceMinor) ? money(it.priceMinor, it.currency) : "", draw: function (box) {
+        var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 96); };
+        // The shop's own photo of the item gets the tall picture area; a drawing gets the short one.
+        if (it.imageUrl && /^https:\/\//.test(it.imageUrl)) { var ph = el("img", { src: it.imageUrl, alt: "" }); ph.onerror = function () { ph.remove(); box.classList.remove("rl-has-photo"); drawIt(); }; box.classList.add("rl-has-photo"); box.appendChild(ph); } else drawIt(); } }; });
+      if (owe) { e.line = "Pay " + money(owe.exchange.balance.owedMinor, owe.currency) + " to finish your swap"; e.rank = 0; e.swaps = true; e.owes = true; }
+      else if (back) { var done = back.returnInfo.status === "refunded";
+        e.line = done ? "Refunded" + (back.returnInfo.refundMinor ? " " + money(back.returnInfo.refundMinor, back.currency) : "") : "Return started, waiting for the refund"; e.rank = done ? 2 : 1; e.swaps = !done; }
+      else if (dl) { e.line = "Return by " + dayWords(dl); soon(e, dl); }
+      else if (swapped) e.line = "Swapped to " + swapped.exchange.toTitle;
+      else e.line = at ? "Bought " + dayWords(at) : "From " + shop;
+      // Its page: every item of the order, the one that needs something first.
+      var lead = owe || back || items.filter(function (it) { return dl && it.returnBy && it.returnBy.date === dl; })[0] || items[0];
+      e.open = function () { open(function (sheet) {
+        sheet.appendChild(el("h2", { text: shop }));
+        [lead].concat(items.filter(function (it) { return it !== lead; })).forEach(function (it) { sheet.appendChild(confirmedCard(o, it, function () { close(); refresh(); }, it.returnBy && it.returnBy.date)); });
+        sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
+      }); };
+      out.push(e);
+    });
+    orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
+      if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
+      var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
+      var named = (x.items || []).filter(function (i) { return i && i.name; });
+      // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
+      var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
+      if (keep.length) named = keep.concat(named.filter(function (i) { return keep.indexOf(i) < 0; }));
+      var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
+      var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
+      var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
+        title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who };
+      e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
+          price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
+          draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
+        : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
+      if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+          : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
+        e.swaps = !p.refundedAt; e.rank = p.refundedAt ? 2 : 1; }
+      else if (canGoBack && stated && daysLeft(stated) <= 7) { e.line = "Return by " + dayWords(stated); soon(e, stated); }
+      else if (freshDelivery(x)) { e.line = shipWords(dv, true); e.onWay = true; e.rank = 1; }
+      else if (canGoBack && stated) { e.line = "Return by " + dayWords(stated); e.rank = 1; }
+      // No date from the shop: Relay never shows one of its own as a deadline, only that it can still surely go back.
+      else if (canGoBack) { e.line = keep.length === 1 ? keep[0].name + " can still be returned" : keep.length ? "Some of it can still be returned" : "Can still be returned"; e.rank = 1; }
+      else if (dv && dv.status === "delivered" && dv.at) e.line = shipWords(dv, true);
+      else e.line = "Bought " + dayWords(x.orderDate);
+      // Nothing open on it: the newest things that could ever have gone back come before a coffee from this morning.
+      if (e.rank === 2) e.quiet = !(x.returnable !== false && x.orderDate >= fresh);
+      var card = null;
+      e.open = function () { card = card || emailCard(x, { markable: true, changed: refresh }); card.onclick(); };
+      out.push(e);
+    });
+    return out.sort(function (a, b) {
+      return a.rank - b.rank || (a.rank === 0 ? Number(Boolean(b.owes)) - Number(Boolean(a.owes)) || (a.when < b.when ? -1 : a.when > b.when ? 1 : 0) : 0) || (a.rank === 1 ? Number(Boolean(b.onWay)) - Number(Boolean(a.onWay)) || Number(Boolean(b.swaps)) - Number(Boolean(a.swaps)) : 0)
+        || (a.rank === 1 && a.when !== b.when ? (!a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1) : 0) || (a.rank === 2 ? Number(Boolean(a.quiet)) - Number(Boolean(b.quiet)) : 0) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+    });
+  }
+  // One card: the shop and the day, what was bought as large tiles with the price on each, one big line, and (only for a
+  // return date inside a week) the days left as a strip under it. The whole card is one tap.
+  function feedCard(e) {
+    var item = el("div", { className: "h2-item" + (e.small ? " small" : ""), tabIndex: 0 });
+    item.setAttribute("role", "button");
+    var card = el("div", { className: "h2-card" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : "") });
+    if (e.cat && TILE_COLOURS[e.cat]) item.style.setProperty("--h2-c", cardColour(e.cat));
+    item.style.setProperty("--h2-ink", e.cat && e.cat !== "shop" && e.cat !== "other" && TILE_COLOURS[e.cat] ? TILE_COLOURS[e.cat] : "#C9D0DF");
+    if (e.shop) {
+      var logo = el("span", { className: "h2-logo", text: String(e.shop).trim().charAt(0).toUpperCase() }); logo.setAttribute("aria-hidden", "true");
+      if (e.icon) { logo.textContent = ""; logo.appendChild(accIc(e.icon, 20, "h2-logo-i")); } else if (e.dom) shopLogo(logo, e.dom, 28);
+      card.appendChild(el("div", { className: "h2-head" }, [logo, el("span", { className: "h2-head-t" }, [el("b", { text: e.shop })].concat(e.at ? [el("span", { text: dayWords(e.at) })] : []))]));
+    }
+    var square = function (t, pill) {
+      var art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); t.draw(art);
+      return el("span", { className: "h2-pic" }, [art].concat(pill && t.price ? [el("span", { className: "h2-price", text: t.price })] : []));
+    };
+    if (e.tiles && e.tiles.length === 1) {
+      // One thing: its square, and beside it what it is (up to three lines) and what it cost. No price on the picture.
+      var one = e.tiles[0];
+      card.appendChild(el("div", { className: "h2-one" }, [square(one, false), el("span", { className: "h2-one-t" }, [el("span", { className: "h2-one-n", text: e.title || one.name })].concat(one.price ? [el("span", { className: "h2-one-p", text: one.price })] : []))]));
+    } else if (e.tiles && e.tiles.length) {
+      var row = el("div", { className: "h2-tiles" });
+      e.tiles.forEach(function (t) { row.appendChild(square(t, true)); });
+      card.appendChild(row);
+      // One line under the pictures: what it is, and how many more came with it.
+      card.appendChild(el("div", { className: "h2-name", text: e.title || e.tiles[0].name }));
+    }
+    var go = el("span", { className: "h2-go" }, [accIc("arrow", 18, "h2-go-i")]); go.setAttribute("aria-hidden", "true");
+    card.appendChild(el("div", { className: "h2-line" }, [el("span", { className: "h2-line-t" }, [el("b", { text: e.line })].concat(e.sub ? [el("span", { text: e.sub })] : [])), go]));
+    item.appendChild(card);
+    if (e.strip) item.appendChild(el("div", { className: "h2-strip " + (e.stripKind || ""), text: e.strip }));
+    item.setAttribute("aria-label", [e.shop, e.tiles && e.tiles.length ? e.tiles.map(function (t) { return t.name; }).join(", ") : null, e.line, e.strip].filter(Boolean).join(". "));
+    var busy = false, tap = function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); e.open(); };
+    item.onclick = tap;
+    item.onkeydown = function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); tap(); } };
+    return item;
+  }
+  function mountHome(host) {
+    if (!host) return;
+    var s = load();
+    if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
+    host.textContent = ""; host.classList.add("h2-home"); paintAvatars();
+    // Asked only while Home is still the screen (never over another tab the shopper has moved to).
+    setTimeout(function () { if (host.isConnected) interestsMaybeAsk(host); }, 700);
+    var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
+    var top = el("div"); host.appendChild(top);
+    mountInstore(top, refresh, "suggest");
+    var chips = el("div", { className: "h2-chips", role: "group", ariaLabel: "What to show" });
+    var feed = el("div", { className: "h2-feed" + (HOME_TINT ? " tint" : "") });
+    // The pinned band: Home's top row (drawn by the page) and the chips, kept at the top of the screen like the tab bar
+    // is kept at the bottom. It is made once around the top row and reused when Home is drawn again.
+    var topRow = document.querySelector("#view .h2-top"), band = topRow && topRow.parentNode && topRow.parentNode.classList.contains("h2-band") ? topRow.parentNode : null;
+    if (topRow && !band) { band = el("div", { className: "h2-band" }); topRow.parentNode.insertBefore(band, topRow); band.appendChild(topRow); }
+    if (band) { Array.prototype.forEach.call(band.querySelectorAll(".h2-chips"), function (old) { old.remove(); }); band.appendChild(chips); } else host.appendChild(chips);
+    host.appendChild(feed);
+    // Bought in a shop: adding a purchase from its receipt (only once shops on Relay take card payments in person, or with
+    // testing tools). It sat under the wallet before; it goes after the cards.
+    var shopBox = el("div", { className: "h2-shopbox" }); host.appendChild(shopBox); mountInstore(shopBox, refresh, "box");
+    for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
+    var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
+    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product; }); } catch (e) { return []; } };
+    // A brand-new account: one card that says what to do first.
+    var startCard = function () {
+      return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+        el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and shows them here.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
+        el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } }),
+        el("button", { className: "rl-po-secondary", text: "Add a missing receipt", style: "max-width:280px", onclick: function () { open(function (sheet) { addReceiptView(sheet, function () { close(); refresh(); }); }); } })]);
+    };
+    var draw = function () {
+      if (!state.both || !document.body.contains(feed)) return;
+      var all = feedEntries(state.both[0], state.both[1], refresh), watched = watches();
+      var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
+      // "To return" runs soonest date first; the others keep the feed's order.
+      sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
+      if (!sets[state.pick] || (state.pick !== "you" && !sets[state.pick].length)) state.pick = "you";
+      chips.textContent = "";
+      [["you", "For you"], ["back", "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"], ["watch", "Watching"]].forEach(function (c) {
+        if (c[0] !== "you" && !sets[c[0]].length) return;
+        var b = el("button", { type: "button", className: "h2-chip", onclick: function () { if (state.pick === c[0]) return; state.pick = memo.homeChip = c[0]; draw(); try { window.scrollTo(0, 0); } catch (e) {} } });
+        b.appendChild(el("span", { text: c[1] }));
+        b.setAttribute("aria-pressed", state.pick === c[0] ? "true" : "false");
+        chips.appendChild(b);
+      });
+      chips.style.display = chips.children.length > 1 ? "" : "none";
+      feed.textContent = "";
+      if (state.pick === "you") {
+        if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+          el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
+          el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
+        else if (state.connected === false) feed.appendChild(startCard());
+        // Inboxes to connect again and auctions waiting on the shopper come before any order: one small card each.
+        if (state.mail.length) { var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
+          feed.appendChild(feedCard({ small: true, icon: "mail", line: oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again", sub: oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment",
+            open: function () { if (window.go) window.go("receipts"); } })); }
+        if (state.wins.length) { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
+          feed.appendChild(feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
+            sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }
+      }
+      if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
+        var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
+        feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
+            draw: function (box) { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); } }],
+          line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
+          open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
+      });
+      else {
+        // For you: everything that needs something or is still in play, then the newest, about eight in all.
+        var list = sets[state.pick], open2 = list.filter(function (e) { return e.rank < 2; });
+        var shown = state.pick === "you" ? open2.slice(0, 8).concat(list.filter(function (e) { return e.rank === 2; }).slice(0, Math.max(0, 8 - open2.length))) : list.slice(0, 12);
+        shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
+        if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
+      }
+      if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
+      if (testingOn()) { var t = el("div", { className: "h2-tools" }); feed.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
+      firstScreen();
+    };
+    // Which cards are stopping places. The band stays pinned, so a card at rest sits just under it (the page's scroll
+    // padding is the band's height). The first thing in the feed is the stop at the very top of the page, which pull to
+    // refresh needs; any small notices after it, and the first order's card, are not stops of their own while they show
+    // whole on that first screen; every card after that is a stop. A card too tall to show whole (bigger text) is always
+    // a stop, so none of it is out of reach. Measured without the nudge pull to refresh gives the page while it works.
+    var firstScreen = function () {
+      if (!document.body.contains(feed)) return;
+      var bandH = band && document.body.contains(band) ? Math.ceil(band.getBoundingClientRect().height) : 0;
+      if (bandH) document.documentElement.style.setProperty("--h2-band", bandH + "px");
+      var bar = document.getElementById("foot"), br = bar && bar.getBoundingClientRect ? bar.getBoundingClientRect() : null;
+      var limit = (br && br.height ? br.top : window.innerHeight) - 8, y = window.scrollY || 0, nudge = 0;
+      try { var mm = /matrix\(([^)]+)\)/.exec(getComputedStyle(document.querySelector("main.main")).transform || ""); if (mm) nudge = parseFloat(mm[1].split(",")[5]) || 0; } catch (e) {}
+      var feedTop = feed.getBoundingClientRect().top - nudge + y, leading = true;
+      Array.prototype.forEach.call(feed.children, function (c, i) {
+        var fits = c.getBoundingClientRect().bottom - nudge + y <= limit;
+        c.classList.toggle("h2-nosnap", i > 0 && leading && fits);
+        c.style.scrollMarginTop = i === 0 ? Math.max(0, Math.ceil(feedTop - bandH)) + 4 + "px" : "";
+        if (!c.classList.contains("small") && !c.classList.contains("h2-start")) leading = false;
+      });
+    };
+    // Bigger text, a photo arriving or the phone turning changes what fits: a card that no longer fits the first screen
+    // becomes a stopping place again, so no part of it is ever out of reach.
+    try { if (homeSizes) homeSizes.disconnect(); homeSizes = window.ResizeObserver ? new ResizeObserver(firstScreen) : null; if (homeSizes) { homeSizes.observe(feed); if (band) homeSizes.observe(band); } } catch (e) { homeSizes = null; }
+    if (!isReview()) cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+      if (!g.ok || !g.body) return;
+      state.connected = Boolean(g.body.connected); state.mail = inboxesToFix(g.body); draw();
+    }, function () {});
+    if (memo.walletPurchases && memo.receipts) { state.both = [memo.walletPurchases, memo.receipts.rows]; draw(); }
+    loadBoth().then(function (both) { state.both = both; draw(); });
+    // A win to pay for: asked only of someone who has bid before, as the tab's red number is.
+    var bid = false; try { bid = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {}
+    if (bid) auctionsMine().then(function (b) { state.wins = ((b && b.auctions) || []).filter(function (r) { return r.you && AU_TODO[r.you.state]; }); draw(); });
+  }
   function whichItems(x, parts, done) {
     var who = (x.retailer && x.retailer.name) || "this shop";
     var card = el("div", { className: "rl-po" }, [el("div", { className: "rl-po-shop", text: who }), el("h3", { text: "Which items did you send back?", style: "margin:4px 0 6px" }),
@@ -6977,7 +7802,16 @@
   }
 
   // ---- Bought in a shop: card-only purchases Relay thinks are yours ("Is this yours?"), and adding one from its receipt. ----
+  // Square shops are still on Square's test system, so for now "Is this yours?" can only be about a test purchase. It is
+  // asked for only when there are real Square shops, or with testing tools on; which of those it is is remembered for
+  // five minutes, so an ordinary shopper's Home doesn't ask about in-store purchases every time it's opened.
   function mountInstore(host, done, part) {
+    cachedGet("instoreShops", "/relay/my/instore/shops").then(function (sh) {
+      if (!(sh.ok && sh.body && (sh.body.live || testingOn()))) return;
+      instoreNow(host, done, part);
+    }, function () {});
+  }
+  function instoreNow(host, done, part) {
     api("/relay/my/instore/suggestions").then(function (r) {
       if (!r.ok) return;
       var list = part === "box" ? [] : (r.body && r.body.suggestions) || [];
@@ -7180,7 +8014,7 @@
     // (Its own copy: the Receipts page keeps memo.receipts in a different shape.)
     cachedGet("nextUp", "/relay/my/receipts").then(function (r) { if (r.ok && r.body) draw(r.body.receipts || []); }, function () {});
   }
-  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
+  window.RelayAccount = { mountNextUp: mountNextUp, open: show, testingOn: testingOn, isReview: isReview, mountWallet: mountWallet, mountHome: mountHome, mountReturns: mountReturns, email: function () { var x = load(); return (x && x.email) || ""; }, mountConfirmed: mountConfirmed, mountAlerts: mountAlerts, enablePush: enablePush, syncWatch: syncWatch, syncStore: syncStore, alertStatus: alertStatus, tasteRows: function () { return cachedGet("taste", "/relay/my/style").then(function (r) { return r.ok ? (r.body.receipts || []) : []; }); }, mountWrapped: mountWrapped, mountMe: mountMe, drawing: { key: illKey, keys: function () { return Object.keys(ILL); }, draw: illustrate, html: drawingHtml,
     of: function (name) { var k = illKey({ items: [{ name: name }], retailer: {}, category: "other" }); return { key: k, kind: ILL_KIND[k] || "other" }; } }, spendProfile: spendProfile, mountMarket: mountMarket, mountDemoMarket: mountDemoMarket, mountReceipts: mountReceipts, mountProfile: mountProfile, editProfile: editProfile, profile: function () { return profileNow(); }, onProfile: function (f) { profileWatchers.push(f); loadProfile(); }, open: function () { show(); }, signedIn: function () { var s = load(); return Boolean(s && s.token); }, receipts: function () { return api("/relay/my/receipts"); },
     // Wrapped's soundtrack, for listening to it outside the story (the preview and tests).
     storySong: storySong,
@@ -7189,10 +8023,11 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
-    openAuctions: openAuctions, openAuction: openAuction, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
+    openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
     photoAvailable: photoAvailable, photoSearch: photoSearch,
+    interests: function () { return interestsLoad(); },
     purchases: function () { return (memo.purchases || api(purchasesPath())).then(function (r) { return (r.ok && r.body && r.body.purchases) || []; }, function () { return []; }); } };
   function keyboardWatch() {
     var vv = window.visualViewport; if (!vv || window.__rlKb) return; window.__rlKb = true;

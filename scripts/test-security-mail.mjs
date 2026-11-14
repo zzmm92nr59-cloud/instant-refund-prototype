@@ -63,7 +63,7 @@ assert.equal(m.subject, "Relay: A passkey was added");
 assert.match(m.text, /A passkey called “Jess's <iPhone>” was added to your Relay account\./);
 assert.ok(m.html.includes("Jess&#39;s &lt;iPhone&gt;") && !m.html.includes("<iPhone>"), "names are escaped in the HTML");
 assert.match(m.text, /When: 3 November 2026 at 16:30/);
-assert.match(m.text, /If this wasn't you, sign in to Relay with your email, open Profile, choose Devices and sign out your other devices\./);
+assert.match(m.text, /If this wasn't you, sign in to Relay with your email, tap your picture at the top of the screen, then Security and privacy, choose Devices and sign out your other devices\. Then check Two-step sign-in there\./);
 assert.equal(securityNoticeMessage("nonsense"), null);
 assert.match(securityNoticeMessage("recovery_used", { left: 1 }).text, /1 is left\./);
 console.log("ok - the notices say what changed and when, and what to do if it wasn't you");

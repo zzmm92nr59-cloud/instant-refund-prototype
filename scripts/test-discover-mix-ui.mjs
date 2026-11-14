@@ -11,6 +11,7 @@
 // Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -43,7 +44,7 @@ web.push({ sku: "web:cocoa-cottage.test:301", product: "Black Toast Glass Cake S
 const st = { webAsked: 0, admin: { admin: false }, purchaseAsks: [], wrapped: { receipts: 0 } };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -67,7 +68,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -104,7 +105,7 @@ const signIn = async (url) => {
 // The grid's cards, in order: [shop, product].
 const grid = () => page.$$eval("#catalogResults .dc-card", cards => cards.map(c => [c.querySelector(".dc-shop").textContent.replace(/ · TEST$/, ""), c.querySelector("h3").textContent]));
 const discover = async (waitFor) => {
-  await page.evaluate(() => window.go("discover"));
+  await openShops(page); // products are under Browse, Shops on Relay
   await page.locator("#catalogResults .dc-card").first().waitFor();
   if (waitFor) await page.locator("#catalogResults .dc-card", { hasText: waitFor }).first().waitFor();
 };
@@ -123,7 +124,8 @@ assert.ok(!SHOPPER_NEVER_SEES.test(await page.locator(".main").innerText()), "no
 await polished("shoppers", ".main");
 console.log("ok - shoppers: every shop near the top, each in its own order");
 
-// 2. Lowest and Highest price still sort across every shop.
+// 2. Lowest and Highest price still sort across every shop (Sort is behind "Sort and filter").
+if (await page.locator("#dcFilt").getAttribute("aria-expanded") !== "true") await page.locator("#dcFilt").click();
 await page.selectOption("#filter", "low");
 cards = await grid();
 assert.deepEqual(cards.slice(0, 2), [["Pebble & Co", "Pebble Mug"], ["Big Barn", "Barn Jumper 1"]], "cheapest first, whichever shop");
@@ -220,6 +222,7 @@ await page.locator(".dc-preview").waitFor();
 const shopNames = await page.$$eval("#dcShops [data-shop]", bs => bs.map(b => b.dataset.shop).filter(s => s !== "all").sort());
 assert.deepEqual(shopNames, ["Big Barn", "Cocoa Cottage", "Fern Row", "Hollow Pine", "Pebble & Co", "Velvet Row"], "real shops and shops' websites only: no test shops");
 assert.equal(await page.locator("#catalogResults .dc-shop", { hasText: "TEST" }).count(), 0);
+if (await page.locator("#dcFilt").getAttribute("aria-expanded") !== "true") await page.locator("#dcFilt").click(); // kinds are behind "Sort and filter"
 await page.locator("#dcKinds [data-kind='food']").click();
 assert.deepEqual((await grid()).map(c => c[1]), ["Dark Chocolate Truffles - Gift Box"], "only food is food");
 await page.locator("#dcKinds [data-kind='fashion']").click();
@@ -238,10 +241,10 @@ console.log("ok - the shops' websites switch: real shops only; clothes are fashi
 // 9. The team's two switches, and a device that had testing tools on moves to the shops' websites once.
 st.admin = { admin: false, signInAgain: true };
 await openProfile();
-const webSw = me.getByRole("switch", { name: "Shops' websites in Discover on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
+const webSw = me.getByRole("switch", { name: "Shops' websites in Browse on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
 assert.equal(await webSw.getAttribute("aria-checked"), "true");
 assert.equal(await testSw.getAttribute("aria-checked"), "false");
-assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Discover" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Discover and search by photo\. Only Relay's team sees them\./);
+assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Browse" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Browse and search by photo\. Only Relay's team sees them\./);
 await polished("team switches", "#mePage");
 await testSw.click();
 st.purchaseAsks = [];

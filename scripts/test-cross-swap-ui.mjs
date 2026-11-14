@@ -6,6 +6,7 @@
 // appears only with testing on. Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, homeReady } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -34,7 +35,7 @@ const cap = () => {
 const purchases = () => [{ id: ORDER, store: "Oak & Thread", retailer: "shopify:oak-thread.myshopify.com", orderedAt: day(-2), items: [cap()] }];
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -72,7 +73,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -110,12 +111,17 @@ const sheet = page.locator(".rl-xs");
 
 // 1. Offered only where another shop has something in stock.
 st.otherShops = false;
+// (An order's card on Home opens its page, with what can be done: Return, Swap, Swap with another shop.)
+const orderPage = async () => { await homeReady(page); await page.locator("#homePage .h2-feed > .h2-item").first().click(); return page.locator(".rl-back .rl-sheet").last(); };
 await signIn(origin + "/index.html");
-await page.getByRole("button", { name: "Return", exact: true }).first().waitFor();
+let op = await orderPage();
+await op.getByRole("button", { name: "Return", exact: true }).first().waitFor();
+await page.waitForTimeout(800);
 assert.equal(await page.getByRole("button", { name: "Swap with another shop" }).count(), 0, "not offered when no other shop has anything");
 st.otherShops = true;
 await page.reload();
-const offer = page.getByRole("button", { name: "Swap with another shop" }).first();
+op = await orderPage();
+const offer = op.getByRole("button", { name: "Swap with another shop" }).first();
 await offer.waitFor();
 console.log("ok - offered only where another shop has something in stock");
 

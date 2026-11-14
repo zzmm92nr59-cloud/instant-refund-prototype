@@ -1,11 +1,12 @@
 // Browser test: Swap & resell without a tab of its own. Stubbed Relay server, made-up members, shops and items (ids shaped like
 // the server's, so scripts/test-validation.mjs can check every request the app makes here against the server's rules).
-// Checks: Discover, Profile and a receipt past its return date lead to it, and there's no Market tab; greyed outlines while
+// Checks: Browse and a receipt past its return date lead to it, and there's no Market tab; greyed outlines while
 // it loads, never "Loading…"; drawn icons, never emoji; statuses and dates in plain words; asking, accepting and taking
 // down happen once for a double tap (taking down asks first); listing an item uses labelled fields; passes the polish rules
 // in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, tabNames, TABS, goTab, openProfile } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -25,7 +26,7 @@ const ITEMS = { items: [
   { receiptId: R1, itemIndex: 0, title: "Ceramic Vase", store: "Larkspur Home", pricePence: 4000, currency: "GBP", orderDate: "2026-09-01", returnWindowOpen: false, returnDeadline: "2026-10-01", alreadyListed: false },
   { receiptId: "22222222-2222-4222-8222-222222222222", itemIndex: 0, title: "Brass Lamp", store: "Larkspur Home", pricePence: 6000, currency: "GBP", orderDate: "2026-10-30", returnWindowOpen: true, returnDeadline: "2026-11-20", alreadyListed: false }] };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -59,7 +60,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 // The polish rules within one part of the page. A checkbox is tapped through its label, so the label is what's measured.
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -93,12 +94,15 @@ const polished = async (where, scope) => {
 await page.goto(origin + "/index.html");
 await page.evaluate(e => { localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })); localStorage.setItem("relay-market-area", "SW11"); }, EMAIL);
 await page.reload();
-assert.deepEqual((await page.locator("#foot button").allInnerTexts()).map(x => x.trim()), ["Home", "Receipts", "Discover", "Profile"], "no Market tab");
+await page.locator("#foot button").first().waitFor();
+assert.deepEqual(await tabNames(page), TABS, "no Market tab");
 
-// 1. From Discover: outlines first, then what members are selling, nearest first, in plain words with drawn icons.
-await page.locator("#foot").getByRole("button", { name: "Discover" }).click();
-await page.locator(".dc-sc", { hasText: "Swap & resell" }).click();
-const sheet = page.locator(".rl-sheet").filter({ has: page.getByRole("heading", { name: "Swap & resell" }) });
+// 1. From Browse: outlines first, then what members are selling, nearest first, in plain words with drawn icons.
+await goTab(page, "Browse");
+await page.locator("#browsePage .rl-b2-doors .rl-arow", { hasText: "Swap & resell" }).click();
+// It opens as a page of Browse, under its own bar.
+await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
+const sheet = page.locator("#dcAlt");
 await sheet.locator(".rl-mk-skel").first().waitFor();
 assert.equal(await sheet.getByText(/Loading/).count(), 0, "no bare 'Loading…'");
 await sheet.getByText("Merino Wool Scarf").waitFor();
@@ -108,11 +112,11 @@ assert.match(await scarf.innerText(), /Merino Wool Scarf\s+£25\.00\s+Brindle & 
 await scarf.getByText("Near you").waitFor();
 assert.equal(await scarf.locator(".rl-mk-near svg").count(), 1, "a drawn pin, not an emoji");
 assert.match(await sheet.locator(".rl-order", { hasText: "Linen Shirt" }).innerText(), /Open to offers[\s\S]*You asked about this: waiting for the seller\./);
-await polished("browse", ".rl-sheet");
+await polished("browse", "#dcAlt");
 await scarf.getByRole("button", { name: "I'd like this" }).dblclick();
 await sheet.getByText("Sent. The seller sees your request from “Member”, not your name.").waitFor();
 assert.deepEqual(st.asks, [["aaaaaaaa-aaaa-4aaa-8aaa-000000000001", { kind: "buy" }]], "asked once for a double tap");
-console.log("ok - Discover leads to Swap & resell: outlines, then listings nearest first, in plain words with drawn icons; asking happens once");
+console.log("ok - Browse leads to Swap & resell: outlines, then listings nearest first, in plain words with drawn icons; asking happens once");
 
 // Reporting a listing: says what happens, needs what's wrong, sends once, and the listing goes from Browse.
 const shirt = sheet.locator(".rl-order", { hasText: "Linen Shirt" });
@@ -131,7 +135,7 @@ await page.waitForTimeout(900);
 assert.deepEqual(st.reports, [["aaaaaaaa-aaaa-4aaa-8aaa-000000000002", { reason: "It's a counterfeit" }]], "reported once");
 assert.equal(await sheet.locator(".rl-order", { hasText: "Linen Shirt" }).count(), 0, "gone from Browse");
 await sheet.locator(".rl-order", { hasText: "Merino Wool Scarf" }).waitFor();
-await polished("browse after a report", ".rl-sheet");
+await polished("browse after a report", "#dcAlt");
 console.log("ok - a listing can be reported from Browse: what's wrong needed, sent once, then gone from Browse");
 
 // 2. Yours: a request to accept (once), what you asked about, and taking a listing down (asks first).
@@ -140,7 +144,7 @@ const tote = sheet.locator(".rl-order", { hasText: "Canvas Tote" });
 await tote.getByText("Member would like to buy").waitFor();
 await tote.getByText("“Is it still available?”").waitFor();
 await sheet.getByText("You'd like to buy it. Waiting for the seller.").waitFor();
-await polished("yours", ".rl-sheet");
+await polished("yours", "#dcAlt");
 await tote.getByRole("button", { name: "Accept" }).dblclick();
 await page.waitForTimeout(900);
 assert.deepEqual(st.accepts, ["bbbbbbbb-bbbb-4bbb-8bbb-000000000001"], "accepted once for a double tap");
@@ -165,29 +169,27 @@ await vase.getByLabel("Handover", { exact: true }).selectOption("post");
 assert.equal(await vase.getByLabel("Postcode area for collection", { exact: true }).isVisible(), false, "no collection area when it's posted");
 await vase.getByLabel("I'm open to swaps").check();
 await vase.getByLabel(/I agree Relay shows this item's name/).check();
-await polished("sell", ".rl-sheet");
+await polished("sell", "#dcAlt");
 await vase.getByRole("button", { name: "Put it on Relay" }).dblclick();
 await sheet.getByText("Listed. Other members can now see it.").waitFor();
 assert.deepEqual(st.listings, [{ receiptId: R1, itemIndex: 0, condition: "good", size: "One size", askPence: 1500, swapOk: true, note: "", agree: true, handover: "post", area: null }], "listed once, with what was chosen");
 await page.keyboard.press("Escape").catch(() => {});
-await sheet.getByRole("button", { name: "Back", exact: true }).click();
+await page.locator("#view [data-back]:visible").first().click();
+await page.locator("#browsePage .rl-b2-doors").waitFor();
 console.log("ok - Sell: plain dates, a heads-up while it can still go back, labelled fields, listed once");
 
-// 4. Profile leads there too, and so does a receipt past its return date.
-await page.locator(".avatar").click();
-await page.locator("#mePage .rl-ptile", { hasText: "Swap & resell" }).click();
-await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
-await page.locator("#mePage").getByRole("button", { name: "Back", exact: true }).click();
-await page.locator("#foot").getByRole("button", { name: "Receipts" }).click();
+// 4. A receipt past its return date leads there too. (Profile no longer has a Swap & resell row: it's Browse's door.)
+await openProfile(page);
+assert.equal(await page.locator("#mePage .rl-arow", { hasText: "Swap & resell" }).count(), 0, "Swap & resell is on Browse, not in Profile");
+await goTab(page, "Receipts");
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Home & garden", { exact: true }).click();
 const row = page.locator(".rl-rr").filter({ hasText: "Ceramic Vase" });
 await row.locator(".rl-rr-main").click();
 await row.getByRole("button", { name: "Sell or swap it instead" }).click();
 await page.getByRole("heading", { name: "Swap & resell" }).waitFor();
 assert.equal(await page.locator(".rl-mk-tabs").getByRole("button", { name: "Sell", exact: true }).getAttribute("aria-pressed"), "true", "opens on Sell, for that item");
 await page.locator(".rl-order", { hasText: "Ceramic Vase" }).first().waitFor();
-console.log("ok - Profile and a receipt past its return date lead there too");
+console.log("ok - a receipt past its return date leads there too");
 assert.deepEqual(errors, [], "no page errors");
-console.log("PASS swap & resell without a tab (and reporting a listing): Discover, Profile and old receipts lead to it; outlines, words, drawn icons, once per tap, labelled form, polished");
+console.log("PASS swap & resell without a tab (and reporting a listing): Browse and old receipts lead to it; outlines, words, drawn icons, once per tap, labelled form, polished");
 await browser.close(); server.close();

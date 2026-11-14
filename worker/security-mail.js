@@ -15,7 +15,7 @@ const NOTES = {
   recovery_used: ["A recovery code was used", d => "Someone signed in to your Relay account with one of your recovery codes. " + (d.left === 1 ? "1 is" : d.left + " are") + " left."],
   others_out: ["Your other devices were signed out", d => "Relay was signed out on " + (d.count === 1 ? "1 other device" : d.count + " other devices") + ". The device you did this on stays signed in."],
 };
-const IF_NOT_YOU = "If this wasn't you, sign in to Relay with your email, open Profile, choose Devices and sign out your other devices. Then check Two-step sign-in.";
+const IF_NOT_YOU = "If this wasn't you, sign in to Relay with your email, tap your picture at the top of the screen, then Security and privacy, choose Devices and sign out your other devices. Then check Two-step sign-in there.";
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 function whenText(now) {
   try { return new Date(now).toLocaleString("en-GB", { timeZone: "Europe/London", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }); }

@@ -1,6 +1,6 @@
 // Browser test: adding a missing receipt. Stubbed Relay server, made-up person and invented shops; the inbox search,
 // adding and pasting are FAKED here (the real reading is checked in test-gmail).
-// Checks: Profile's "Add a missing receipt" opens one page; typing searches the inbox by itself once typing pauses (not on
+// Checks: Receipts' "Add a missing receipt" (+) opens one page; typing searches the inbox by itself once typing pauses (not on
 // every letter), and an older, slower search never replaces a newer one; the shopper's own shops are one tap away; Add adds
 // once even on a double tap; an email that isn't an order says so; Paste reads what was copied in one tap and shows what
 // was added, and when the phone won't share the clipboard a box to paste into appears; forwarding from another inbox names
@@ -8,6 +8,7 @@
 // was pasted. Every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, goTo } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -32,7 +33,7 @@ const results = {
     { id: "m3", subject: "Your Kestrel Outdoor order has shipped", from: "Kestrel Outdoor", date: day(-30), added: true }],
 };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
@@ -69,7 +70,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 // The polish rules, and readable colours, on whatever is showing.
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c; } return rgb(getComputedStyle(document.body).backgroundColor); };
   const out = { small: [], tiny: [], symbols: [], faint: [], wide: [] };
@@ -88,7 +89,7 @@ const measure = scope => page.evaluate(scope => {
   if (document.documentElement.scrollWidth > innerWidth + 1) out.wide.push(document.documentElement.scrollWidth);
   return out;
 }, scope);
-const polished = async (where, scope = "#mePage") => {
+const polished = async (where, scope = ".rl-back .rl-sheet") => {
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme }); await page.waitForTimeout(80);
     assert.deepEqual(await measure(scope), { small: [], tiny: [], symbols: [], faint: [], wide: [] }, where + " (" + scheme + ")");
@@ -97,21 +98,21 @@ const polished = async (where, scope = "#mePage") => {
   await page.emulateMedia({ colorScheme: "light" });
 };
 const signedIn = async () => {
-  await page.goto(origin + "/index.html");
+  await goTo(page, origin + "/index.html");
   await page.evaluate(([e, t]) => { localStorage.clear(); localStorage.setItem("relay.session.v1", JSON.stringify({ token: t, email: e, expiresAt: 9e12 })); }, [EMAIL, TOKEN]);
   await page.reload();
 };
-const view = page.locator("#mePage");
+const view = page.locator(".rl-back .rl-sheet").last();
 
-// 1. Profile -> Add a missing receipt: one page, with the shopper's own shops one tap away.
+// 1. Receipts -> Add a missing receipt (the + at the top): one page, with the shopper's own shops one tap away.
 await signedIn();
-await page.evaluate(() => window.go("receipts")); await page.locator(".rl-tile").first().waitFor();
-await page.evaluate(() => window.go("me"));
-await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor();
-const row = page.locator(".rl-ptile", { hasText: "Add a missing receipt" });
-assert.equal(await row.getAttribute("aria-label"), "Add a missing receipt", "a tile on Profile, like the Receipts page");
+await page.evaluate(() => window.go("receipts"));
+const row = page.getByRole("button", { name: "Add a missing receipt" });
+await row.waitFor();
+assert.ok((await row.boundingBox()).height >= 44, "a 44px button");
+assert.equal(await row.locator("svg").count(), 1, "a drawn plus, not a symbol");
 await row.click();
-await page.getByRole("button", { name: "Back to Profile" }).waitFor();
+await view.getByRole("heading", { name: "Add a receipt" }).waitFor();
 await view.getByText("Relay brings your receipts in by itself. Missing one? Find it here.").waitFor();
 const q = page.locator("#rl-ar-q");
 await q.waitFor();
@@ -120,7 +121,7 @@ assert.deepEqual(await page.locator(".rl-ar-chip").allInnerTexts(), ["Kestrel Ou
 await view.getByText("Add that inbox to Relay as well, or forward the email to " + EMAIL + ".").waitFor();
 await view.getByRole("button", { name: "Add a Gmail inbox" }).waitFor();
 await polished("page");
-console.log("ok - Profile's Add a missing receipt opens one page: search, the shopper's own shops, paste, forward");
+console.log("ok - Receipts' Add a missing receipt opens one page: search, the shopper's own shops, paste, forward");
 
 // 2. Typing searches by itself once typing pauses; a slower, older answer never replaces a newer one.
 await q.pressSequentially("kes", { delay: 70 });
@@ -158,7 +159,7 @@ await page.locator(".rl-ar-chip", { hasText: "Harlow & Co" }).click();
 await view.getByText("Nothing in Gmail for “Harlow & Co”. Try the shop's name or the order number.").waitFor();
 assert.equal(st.finds.at(-1), "Harlow & Co"); assert.equal(await q.inputValue(), "Harlow & Co");
 await q.fill("broken"); await page.waitForTimeout(600);
-await view.getByText("Gmail needs connecting again first. Open Profile, then Email connection, and tap Connect again.").waitFor();
+await view.getByText("Gmail needs connecting again first. Tap your picture at the top of the screen, then Inboxes, and tap Connect again.").waitFor();
 await q.fill(""); await page.waitForTimeout(600);
 assert.equal(await page.locator(".rl-ar-row").count(), 0, "clearing the search clears the list");
 console.log("ok - a shop is one tap away; nothing found and a broken connection are explained");

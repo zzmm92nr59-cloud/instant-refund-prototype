@@ -5,6 +5,7 @@
 // right?", No, "Some details are wrong" opens the same sheet. The sheet passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -29,7 +30,7 @@ const shown = () => Object.values(read).map(x => {
   return c;
 });
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 const asks = [], REPLY = "Relay read the total as £60.00. If that's wrong, tap Fix details on the receipt and change it.";
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
@@ -58,7 +59,7 @@ await ctx.route("https://**/*", async route => {
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -92,7 +93,7 @@ await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify
 await page.reload();
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-await page.locator("#view").getByText("Fashion", { exact: true }).click();
+await openReceiptKind(page, "Fashion");
 
 // 1. The scarf was read wrong: open its details and fix it.
 const scarf = page.locator(".rl-rr").filter({ hasText: "Merino Wool Scarf" });
@@ -150,7 +151,7 @@ await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 await page.waitForTimeout(400);
 // (The Fashion group may still be open from before.)
-if (!(await page.locator(".rl-rr").filter({ hasText: "Linen Shirt" }).count())) await page.locator("#view").getByText("Fashion", { exact: true }).click();
+if (!(await page.locator(".rl-rr").filter({ hasText: "Linen Shirt" }).count())) await openReceiptKind(page, "Fashion");
 const askShirt = page.locator(".rl-rr").filter({ hasText: "Linen Shirt" });
 // (Its details may still be open from before: a tap would close them.)
 if (!(await askShirt.locator(".rl-rc-fix").count())) await askShirt.locator(".rl-rr-main").click();
@@ -160,14 +161,14 @@ await askShirt.getByRole("button", { name: "Ask the assistant" }).click();
 await page.getByText("Show this receipt to Relay's assistant? It sees what Relay read from it (the shop, date, total, items and return date), not the email itself.").waitFor();
 assert.equal(asks.length, 0, "nothing is sent before they say so");
 await page.getByRole("button", { name: "Show it" }).click();
-const chat = page.locator("#mePage .rl-asub");
+const chat = page.locator("#askPage"); // the assistant is the Ask tab
 await chat.getByText("About your receipt from Larkspur Home", { exact: false }).waitFor();
 await chat.getByText("I can see what Relay read from this receipt. What would you like to know?", { exact: false }).waitFor();
 await chat.getByText("Your messages, and what Relay read from this receipt, go to Anthropic", { exact: false }).waitFor();
 await chat.getByRole("button", { name: "The total is wrong" }).click();
 await chat.getByText(REPLY).waitFor();
 assert.deepEqual(asks[0], { messages: [{ role: "user", text: "The total is wrong" }], receiptId: ID2 });
-await polished("chat about a receipt", "#mePage .rl-asub");
+await polished("chat about a receipt", "#askPage");
 await chat.getByRole("button", { name: "Stop showing it" }).click();
 await chat.getByText("The assistant can't see the receipt any more.").waitFor();
 assert.equal(await chat.getByText("About your receipt from", { exact: false }).count(), 0);

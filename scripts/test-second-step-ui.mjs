@@ -5,6 +5,7 @@
 // can't be turned off (said in plain words); Relay's team are asked to sign in again for team tools. Polished, light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -17,7 +18,7 @@ let st;
 const reset = (o = {}) => { st = { email: "jess.tester@example.com", name: "Jess", done: false, app: false, passkeys: 0, enables: [], disables: [], admin: { admin: false }, verify: null, gated: 0, ...o }; };
 reset();
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -52,7 +53,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -119,6 +120,7 @@ console.log("ok - the authenticator app set up (once per tap), recovery codes sh
 
 // 3. The last second step can't be turned off: said in plain words.
 await page.evaluate(() => window.go("me"));
+await page.locator(".rl-arow", { hasText: "Security and privacy" }).click();
 await page.locator(".rl-arow", { hasText: "Two-step sign-in" }).click();
 await page.getByRole("button", { name: "Turn off the app" }).click();
 await page.getByLabel("App code or recovery code").fill("654321"); // six digits send it by themselves

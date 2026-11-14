@@ -1,6 +1,6 @@
 // Browser test: more than one inbox in the app. Stubbed Relay server, made-up person and addresses; Google's and
 // Microsoft's pages are FAKED (nothing here proves real Google or Microsoft accept the request).
-// Checks: Profile says how many inboxes are connected; the Email connection page lists each inbox with how its reading is
+// Checks: Profile's Inboxes row says how many inboxes are connected; the Inboxes page lists each inbox with how its reading is
 // going, each with its own Disconnect, and buttons to add a Gmail or an Outlook inbox; adding one asks Relay for "another
 // inbox" and goes to Microsoft's (or Google's) page, once even on a double tap; coming back says what happened (added,
 // already connected, or not added); disconnecting one inbox, or the main one (the next becomes the main inbox), asks first
@@ -8,6 +8,7 @@
 // each email is in, and adds from that one. Every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const types = { ".js": "text/javascript", ".png": "image/png", ".svg": "image/svg+xml" };
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", types[extname(p)] || "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -20,7 +21,7 @@ let st;
 const reset = o => { st = { others: [{ mailbox: 2, provider: "microsoft", email: HOME, lastScanAt: null, autoAt: null, scan: { state: "running", found: 4 } }], connects: [], disconnects: [], finds: [], adds: [], connectError: null, ...o }; };
 reset();
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -60,7 +61,7 @@ await ctx.route("https://accounts.google.com/**", r => r.fulfill({ status: 200, 
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -94,13 +95,13 @@ const signedIn = async (hash = "") => {
   await page.goto(origin + "/index.html" + hash);
 };
 const profile = async () => { await page.evaluate(() => window.go("me")); await page.locator("#mePage .rl-arow").first().waitFor(); };
-const mailPage = async () => { await page.locator(".rl-ptile", { hasText: "Email connection" }).click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.locator(".rl-ibx-row").first().waitFor(); };
+const mailPage = async () => { await page.locator("#mePage .rl-arow", { hasText: "Inboxes" }).click(); await page.getByRole("button", { name: "Back to Profile" }).waitFor(); await page.locator(".rl-ibx-row").first().waitFor(); };
 const view = page.locator("#mePage");
 
 // 1. Profile and the Email connection page: each inbox, how its reading is going, its own Disconnect, and ways to add more.
 await signedIn();
 await profile();
-await page.locator(".rl-ptile", { hasText: "Email connection" }).getByText("2 inboxes connected").waitFor();
+await page.locator("#mePage .rl-arow", { hasText: "Inboxes" }).getByText("2 inboxes connected").waitFor();
 await mailPage();
 const rows = page.locator(".rl-ibx-row");
 assert.equal(await rows.count(), 2);
@@ -113,7 +114,7 @@ await view.getByText("Shop with more than one email address? Add the others and 
 await view.getByRole("button", { name: "Add a Gmail inbox" }).waitFor();
 await view.getByRole("button", { name: "Add an Outlook inbox" }).waitFor();
 await polished("email connection", "#mePage");
-console.log("ok - the Email connection page lists each inbox with how its reading is going, its own Disconnect, and ways to add more");
+console.log("ok - the Inboxes page lists each inbox with how its reading is going, its own Disconnect, and ways to add more");
 
 // 2. Adding another inbox: Relay is asked for "another inbox", then Microsoft's page (once, even on a double tap).
 await view.getByRole("button", { name: "Add an Outlook inbox" }).dblclick();
@@ -166,8 +167,9 @@ console.log("ok - disconnecting one inbox, or the main one (the next takes its p
 
 // 4. Add a receipt searches every inbox, says which inbox each email is in, and adds from that one.
 reset();
-await signedIn(); await profile();
-await page.locator(".rl-ptile", { hasText: "Add a missing receipt" }).click();
+await signedIn(); await page.evaluate(() => window.go("receipts"));
+await page.getByRole("button", { name: "Add a missing receipt" }).click();
+const arSheet = page.locator(".rl-back .rl-sheet").last();
 const q = page.locator("#rl-ar-q");
 await q.waitFor();
 assert.equal(await q.getAttribute("placeholder"), "Search your inboxes");
@@ -178,21 +180,21 @@ await page.locator(".rl-ar-row", { hasText: "Kestrel Outdoor" }).getByText("In "
 await studio.getByRole("button", { name: "Add Your Studio North order" }).dblclick();
 await studio.getByText("In your Receipts now.").waitFor();
 assert.deepEqual(st.adds, [{ messageId: "AAMkOutlookMsg0001", mailbox: 2 }], "added once, from the inbox it's in");
-await view.getByRole("button", { name: "Add an Outlook inbox" }).waitFor();
-await polished("add a receipt, two inboxes", "#mePage");
+await arSheet.getByRole("button", { name: "Add an Outlook inbox" }).waitFor();
+await polished("add a receipt, two inboxes", ".rl-back .rl-sheet");
 console.log("ok - Add a receipt searches every inbox, shows which inbox each email is in, and adds from that one");
 
-// 5. An inbox whose access ended: Profile and its tab say so, the Email connection page offers Connect again (that same
+// 5. An inbox whose access ended: the Receipts tab and Profile's Inboxes row say so, the Email connection page offers Connect again (that same
 //    inbox, asked for once even on a double tap, then Microsoft's page), and coming back says it's connected again.
 reset({ others: [{ mailbox: 2, provider: "microsoft", email: HOME, lastScanAt: Date.now() - 36e5, checkedAt: Date.now() - 36e5, needsReconnect: true }] });
 await signedIn();
-const tabNumber = page.locator('#foot [data-tab="me"] .tab-badge');
+const tabNumber = page.locator('#foot [data-tab="receipts"] .tab-badge');
 await tabNumber.waitFor();
-assert.equal(await tabNumber.innerText(), "1", "a red number on the Profile tab");
-assert.match(await page.locator('#foot [data-tab="me"]').getAttribute("aria-label"), /^Profile, an inbox needs connecting again$/);
-assert.equal(await page.locator('#foot [data-tab="profile"] .tab-badge').count(), 0, "on Profile, where Email connection is, not Home");
+assert.equal(await tabNumber.innerText(), "1", "a red number on the Receipts tab (Profile isn't a tab)");
+assert.match(await page.locator('#foot [data-tab="receipts"]').getAttribute("aria-label"), /^Receipts, an inbox needs connecting again$/);
+assert.equal(await page.locator('#foot [data-tab="profile"] .tab-badge').count(), 0, "on Receipts, where the receipts stop coming in, not Home");
 await profile();
-await page.locator(".rl-ptile", { hasText: "Email connection" }).getByText("Needs connecting again").waitFor();
+await page.locator("#mePage .rl-arow", { hasText: "Inboxes" }).getByText("Needs connecting again").waitFor();
 await mailPage();
 assert.match(await rows.nth(1).innerText(), /jess\.home@outlook\.com[\s\S]*Outlook needs connecting again/);
 await view.getByText("Relay can't read one of your inboxes at the moment. Connect it again and Relay catches up on what it missed. Your receipts stay as they are.").waitFor();
@@ -208,7 +210,7 @@ await page.getByText("Outlook is connected again. Relay is catching up on what i
 assert.equal(await page.evaluate(() => sessionStorage.getItem("relay.reconnecting")), null, "the note is used once");
 await page.evaluate(() => window.go("home")); await page.waitForTimeout(400);
 assert.equal(await tabNumber.count(), 0, "the red number goes once it's connected again");
-console.log("ok - an inbox whose access ended: the Profile tab, its tile and its row say so; Connect again asks once for that inbox and says when it's back");
+console.log("ok - an inbox whose access ended: the Receipts tab, Profile's Inboxes row and its own row say so; Connect again asks once for that inbox and says when it's back");
 
 // 6. The first inbox's access ended: Receipts says so at the top, with the button; cancelling at Google says it still can't read it.
 reset({ mainProblem: true, others: [] });
@@ -223,7 +225,7 @@ await page.waitForURL(/accounts\.google\.com/);
 assert.deepEqual(st.connects, [{ again: 1 }]);
 await page.goto(origin + "/index.html");
 await page.goto(origin + "/index.html#gmail=denied");
-await page.getByText("Gmail wasn't connected again, so Relay still can't read it. You can try again from Profile, then Email connection.").waitFor();
+await page.getByText("Gmail wasn't connected again, so Relay still can't read it. You can try again from your picture at the top of the screen, then Inboxes.").waitFor();
 console.log("ok - the first inbox's access ended: Receipts says so first with Connect Gmail again; cancelling says it still can't read it");
 
 assert.deepEqual(errors, [], "no page errors");

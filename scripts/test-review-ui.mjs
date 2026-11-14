@@ -6,6 +6,7 @@
 // Every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, goTo } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const types = { ".js": "text/javascript", ".png": "image/png", ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json" };
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", types[extname(p)] || "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -16,7 +17,7 @@ let st;
 const reset = o => { st = { on: false, admin: false, posts: [], catalogue: [], verify: [], name: null, ...o }; };
 reset();
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin });
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
@@ -56,7 +57,7 @@ await ctx.route("https://**/*", async route => {
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -86,9 +87,9 @@ const polished = async (where, scope) => {
   await page.emulateMedia({ colorScheme: "light" });
 };
 const signedInAs = async email => {
-  await page.goto(origin + "/index.html");
+  await goTo(page, origin + "/index.html");
   await page.evaluate(e => { localStorage.clear(); localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: 9e12 })); }, email);
-  await page.goto(origin + "/index.html");
+  await goTo(page, origin + "/index.html");
 };
 const profile = async () => { await page.evaluate(() => window.go("me")); await page.locator("#mePage .rl-arow").first().waitFor(); };
 const view = page.locator("#mePage");
@@ -97,10 +98,10 @@ const view = page.locator("#mePage");
 reset({ member: true });
 await signedInAs(MEMBER);
 await profile();
-await view.locator(".rl-arow", { hasText: "Two-step sign-in" }).waitFor();
+await view.locator(".rl-arow", { hasText: "Security and privacy" }).waitFor();
 await page.waitForTimeout(300);
 assert.equal(await view.getByText("Sign-in for app reviewers").count(), 0);
-assert.equal(await view.locator(".rl-ptile", { hasText: "Email connection" }).count(), 1, "members keep the inbox rows");
+assert.equal(await view.locator(".rl-arow", { hasText: "Inboxes" }).count(), 1, "members keep the inbox rows");
 console.log("ok - members don't see the reviewer sign-in, and keep every row of their own");
 
 // 2. An admin turns it on, copies the address and code, and turns it off (asked first).
@@ -183,20 +184,26 @@ await polished("receipts", ".rl-empty");
 await page.getByRole("button", { name: "Go to Home" }).click();
 await card.waitFor();
 await profile();
-await view.locator(".rl-arow", { hasText: "Devices" }).waitFor();
-await view.locator(".rl-ptile", { hasText: "Shop orders" }).getByText("None yet").waitFor();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).getByText("None yet").waitFor();
 await page.waitForTimeout(400);
-for (const gone of ["Email connection", "Add a missing receipt", "Face ID & passkeys", "Two-step sign-in", "Phone number", "Card for swaps", "Email permission"])
+for (const gone of ["Inboxes", "Add a missing receipt", "Delivery details"])
+  assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");
+// One level down, under Security and privacy: Devices, and none of the ways of signing in that can't be added.
+await view.locator(".rl-arow", { hasText: "Security and privacy" }).click();
+await view.locator(".rl-arow", { hasText: "Devices" }).waitFor(); await page.waitForTimeout(400);
+for (const gone of ["Face ID & passkeys", "Two-step sign-in", "Phone number", "Card for swaps", "Email permission"])
   assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");
 await view.getByText("This account is shared by Relay's reviewers, so a passkey, two-step sign-in, a phone number or a card can't be added to it.").waitFor();
+await view.getByRole("button", { name: /^Back/ }).first().click();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).waitFor();
 assert.equal(await view.locator("#rl-wrapped").count(), 0, "no Wrapped: it's made from inbox receipts");
 await polished("profile", "#mePage");
-await view.locator(".rl-ptile", { hasText: "Shop orders" }).click();
+await view.locator(".rl-arow", { hasText: "Shop orders" }).click();
 await view.getByText("None yet. An order shows up here when a shop that uses Relay confirms one placed with " + REVIEW + ".").waitFor();
 st.catalogue = [];
 await page.evaluate(() => window.go("discover"));
 await page.waitForFunction(() => true);
-for (let i = 0; i < 40 && !st.catalogue.length; i++) await page.waitForTimeout(100);
+for (let i = 0; i < 150 && !st.catalogue.length; i++) await page.waitForTimeout(100); // up to 15s: a busy test machine can be slow to open Browse
 assert.ok(st.catalogue.length, "Discover asked for the catalogue");
 assert.ok(st.catalogue.every(q => q === "?test=1"), "the reviewer's Discover includes test shops: " + st.catalogue.join(","));
 console.log("ok - Receipts points to Home, Profile leaves out the inbox and sign-in settings, Discover includes test shops");

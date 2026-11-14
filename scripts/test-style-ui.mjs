@@ -2,6 +2,9 @@
 // Stubbed Relay server, made-up data.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openShops } from "./relay-places.mjs";
+// Sort, kinds and the "Picks for you" switch are behind Shops on Relay's "Sort and filter".
+const openFilters = async (page) => { if (await page.locator("#dcFilt").getAttribute("aria-expanded") !== "true") await page.locator("#dcFilt").click(); };
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -41,7 +44,7 @@ const shopProducts = [
   ...[["Linen Cushion", "Oat"], ["Metal Watering Can", ""], ["Knitted Throw Blanket", ""], ["Solar String Lights", ""]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hg:" + i, sku: "shopify:hg:" + i, priceMinor: 2500 + i * 100, currency: "GBP", quantity: 8, storeName: "Home and Garden", provider: "shopify" })),
   ...[["Claw Hammer", ""], ["Cordless Drill 18V", ""], ["Aluminium Step Ladder", "3 step"], ["Aluminium Step Ladder", "5 step"]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hh:" + i, sku: "shopify:hh:" + i, priceMinor: 1500 + i * 2000, currency: "GBP", quantity: 5, storeName: "Hammer & Home", provider: "shopify" }))];
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await skipInterests(ctx);
 const imageAsks = [], wrappedAsks = [];
 await ctx.route("https://**/*", route => { const u = new URL(route.request().url()); const j = b => route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
   if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
@@ -58,13 +61,15 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   return j({}); });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 await page.addInitScript(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "S".repeat(43), email: "c@example.com" })));
+await skipInterests(page); // (after the session, so it knows who's signed in)
 await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 
 // Discover: picks are off until the shopper turns them on. Then they come from the year's spending (from Wrapped: 89% fashion
 // here), the shops they buy from and their sizes from receipts, and each pick says why it's there.
-await page.evaluate(() => window.go("discover"));
-await page.locator(".dc-invite", { hasText: "Picks for you" }).waitFor();
-await page.locator(".dc-invite").getByRole("button", { name: "Turn on" }).click();
+await openShops(page);
+const invite = page.locator(".dc-pickrow", { hasText: "Turn on picks for you" });
+await invite.getByText("Chosen from your receipts. Only you see them.").waitFor();
+await invite.click();
 const panel = page.locator(".dc-for");
 await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
 await panel.locator(".dc-basis", { hasText: "sporty" }).waitFor();
@@ -79,6 +84,7 @@ assert.ok(!(await panel.innerText()).includes("Cosy Dog Bed"), "nothing they've 
 const grid = await page.locator("#catalogResults [data-card-select] h3").allInnerTexts();
 assert.equal(grid[0], "Court Classic Trainers"); assert.ok(grid.includes("Cosy Dog Bed"));
 // Two shops and two kinds of product: chips to narrow it down (and picks step aside while filtering).
+await openFilters(page);
 await page.locator("#dcKinds").getByRole("button", { name: "Pets" }).click();
 assert.deepEqual(await page.locator("#catalogResults [data-card-select] h3").allInnerTexts(), ["Cosy Dog Bed"]);
 assert.equal(await page.locator(".dc-for").count(), 0);
@@ -87,12 +93,16 @@ await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
 assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White · UK 8, UK 9", "the colour is said once, then the sizes");
 await page.waitForTimeout(1300);   // the drawings finish drawing themselves in
 await page.screenshot({ path: "/tmp/shots/discover-for-you.png", fullPage: true });
-// Forgetting the style keeps the spending picks; turning picks off goes back to the invitation.
+// Forgetting the style keeps the spending picks; turning picks off leaves a "Picks for you" switch in the filters (the
+// invitation was answered, so it doesn't come back).
 await panel.getByRole("button", { name: "Forget my style" }).click();
 await page.waitForTimeout(200);
 assert.doesNotMatch(await panel.locator(".dc-basis").innerText(), /sporty/);
 await panel.getByRole("button", { name: "Turn off" }).click();
-await page.locator(".dc-invite", { hasText: "Picks for you" }).waitFor();
+await page.locator(".dc-for").waitFor({ state: "detached" });
+assert.equal(await invite.count(), 0, "the invitation was answered");
+await openFilters(page);
+await page.locator(".dc-chips").getByRole("button", { name: "Picks for you" }).waitFor();
 // Sizes read in their natural order, and the ladder's two sizes are one product.
 assert.equal(await page.locator("#catalogResults [data-card-select]", { hasText: "Aluminium Step Ladder" }).count(), 1);
 assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Aluminium Step Ladder" }).locator(".dc-opts").innerText(), "3 step, 5 step");
@@ -104,8 +114,9 @@ industries = [{ category: "home", label: "Home & garden", receipts: 9, spentPenc
   { category: "fashion", label: "Fashion", receipts: 3, spentPence: 10000 }, { category: "other", label: "Other", receipts: 4, spentPence: 12000 }];
 await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
 await page.reload(); await page.waitForTimeout(600);
-await page.evaluate(() => window.go("discover"));
-await page.locator(".dc-invite").getByRole("button", { name: "Turn on" }).click();
+await openShops(page);
+await openFilters(page);
+await page.locator(".dc-chips").getByRole("button", { name: "Picks for you" }).click();
 await panel.locator(".dc-basis", { hasText: "45% home & garden" }).waitFor();
 const homePicks = await panel.locator(".dc-strip [data-card-select]").evaluateAll(cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, c.querySelector(".dc-why").textContent]));
 assert.equal(homePicks.length, 6);
@@ -123,14 +134,14 @@ await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } c
 await page.reload(); await page.waitForTimeout(600);
 console.log("PASS Discover: opt-in picks shared out by where the money goes (shops, sizes and price within each kind), each with a reason; filters, forget and turn off work");
 
-// Wrapped: one story a year on the Profile page. Total, where it went, a chapter (with its own scene) per kind of
+// Wrapped: one story a year, on its own page (Browse's Wrapped card opens it). Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.
 await page.evaluate(() => window.go("wrapped"));
-assert.equal(await page.evaluate(() => window.page), "me", "the old Wrapped address opens Profile");
+assert.equal(await page.evaluate(() => window.page), "wrapped", "Wrapped has its own page");
 await page.getByRole("button", { name: "Play your 2026 story" }).waitFor();
-assert.match(await page.locator("#rl-wrapped").innerText(), /Your 2026 in purchases\.\s+£336\.00 · 4 receipts · 2 chapters/);
+assert.match(await page.locator(".rl-wr-cover").innerText(), /Your 2026 in purchases\.\s+£336\.00 · 4 receipts · 2 chapters/);
 assert.equal(await page.locator(".rl-wr-kinds").count(), 0, "no separate Wrapped per kind any more: one story");
-assert.equal(await page.locator("#rl-wrapped .rl-wr-dots i").count(), 2, "the card's colour strip shows how the year split");
+assert.equal(await page.locator(".rl-wr-cover .rl-wr-dots i").count(), 2, "the card's colour strip shows how the year split");
 await page.getByRole("button", { name: "Play your 2026 story" }).click();
 assert.equal(await page.locator(".rl-story-x svg").count(), 1, "close is a drawn icon"); assert.equal((await page.locator(".rl-story-x").innerText()).trim(), "");
 const texts = [], scenes = [];
@@ -158,7 +169,7 @@ await page.keyboard.press("Escape");
 photos = [];
 await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/wrapped/.test(k)) localStorage.removeItem(k); });
 await page.reload(); await page.waitForTimeout(800);
-await page.evaluate(() => window.go("me"));
+await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("button", { name: "Play your 2026 story" }).click();
 const plain = [];
 for (let k = 0; k < 20; k++) {
@@ -170,5 +181,5 @@ for (let k = 0; k < 20; k++) {
 }
 assert.ok(!plain.join("\n").includes("brought home"));
 assert.deepEqual(errors, []);
-console.log("PASS Wrapped: one yearly story on Profile (total, split, a chapter with its own scene per kind, highlights), real photos only");
+console.log("PASS Wrapped: one yearly story on its own page (total, split, a chapter with its own scene per kind, highlights), real photos only");
 await browser.close(); server.close();

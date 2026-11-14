@@ -7,6 +7,7 @@
 // basket. The shared reviewer account has no Delivery details. Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, homeReady, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -19,7 +20,7 @@ const web = [{ sku: "web:hollow-pine.test:72", product: "Wool Beanie", variation
   storeName: "Hollow Pine", shopDomain: "hollow-pine.test", productUrl: "https://hollow-pine.test/products/wool-beanie?variant=72", kind: "Hats", checkedAt: CHECKED, webShop: true }];
 const st = { delivery: null, saves: [], checkouts: [], removes: 0, checkout: null, review: false, lookup: false, lookups: [] };
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -60,7 +61,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -92,13 +93,13 @@ const polished = async (where, scope) => {
 await page.goto(origin + "/index.html");
 await page.evaluate(e => { localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })); localStorage.setItem("relay-web-preview", "1"); }, EMAIL);
 await page.reload();
-await page.locator("#walletPage").waitFor();
+await homeReady(page);
 
-// 1. Profile: Delivery details under Shopping, and the form.
+// 1. Profile: a Delivery details row, and the form.
 await page.evaluate(() => window.go("me"));
-const row = page.locator("#mePage .rl-ptile", { hasText: "Delivery details" });
+const row = page.locator("#mePage .rl-arow", { hasText: "Delivery details" });
 await row.getByText("Add your address").waitFor();
-assert.equal(await row.getAttribute("aria-label"), "Delivery details, Add your address", "a tile on Profile");
+assert.equal(await row.evaluate(n => n.tagName), "BUTTON", "a row on Profile you tap");
 await row.click();
 await page.getByRole("button", { name: "Back to Profile" }).waitFor();
 const field = name => page.getByLabel(name, { exact: true });
@@ -120,10 +121,10 @@ await field("Postcode").fill("sw11 1aa");
 await page.getByRole("button", { name: "Save", exact: true }).click();
 await row.getByText("SW11 1AA", { exact: true }).waitFor();
 assert.deepEqual(st.saves[1], { firstName: "Jess", lastName: "Tester", line1: "12 High Street", line2: "", town: "London", county: "", postcode: "sw11 1aa", phone: "07700 900456" });
-console.log("ok - Profile: a Delivery details tile; the form says what to fix, saves once, and the tile shows the postcode");
+console.log("ok - Profile: a Delivery details row; the form says what to fix, saves once, and the row shows the postcode");
 
 // 2. Buy on a product from a shop's website: what goes to the shop, then the checkout with it filled in.
-await page.evaluate(() => window.go("discover"));
+await openShops(page);
 await page.getByRole("button", { name: /^Wool Beanie, / }).click();
 const buy = page.locator("#buyOnSite");
 await buy.waitFor();
@@ -172,7 +173,7 @@ await page.getByRole("button", { name: "Remove my delivery details" }).click();
 await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
 await row.getByText("Add your address").waitFor();
 assert.equal(st.removes, 1);
-await page.evaluate(() => window.go("discover"));
+await openShops(page);
 await page.getByRole("button", { name: /^Wool Beanie, / }).click();
 st.checkout = null;
 await page.locator("#buyOnSite").click();
@@ -191,7 +192,7 @@ console.log("ok - without delivery details, Buy offers to add them first (then c
 // 5. Find address: type the postcode, pick from the addresses there, and the rest is filled in.
 assert.equal(await page.getByRole("button", { name: "Find address" }).count(), 0, "no Find address while Relay's postcode lookup is off");
 st.lookup = true;
-await page.evaluate(() => window.go("discover")); await page.evaluate(() => window.go("me"));
+await openShops(page); await page.evaluate(() => window.go("me"));
 await row.click();
 const find = page.getByRole("button", { name: "Find address" });
 await find.waitFor();

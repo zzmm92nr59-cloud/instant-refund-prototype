@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
+import { skipInterests } from './relay-places.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = resolve('.');
@@ -46,8 +47,11 @@ async function shopperPage(returnBody, plan = null, before = /If Kick Lane has s
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
+  await skipInterests(page);
   await page.goto(origin + '/index.html');
-  const ret = page.getByRole('button', { name: 'Return', exact: true });
+  // The order's card on Home opens its page, with Return.
+  await page.locator('#homePage .h2-feed > .h2-item').first().click();
+  const ret = page.locator('.rl-back .rl-sheet').getByRole('button', { name: 'Return', exact: true });
   await ret.waitFor(); await ret.evaluate(e => e.scrollIntoView({ block: 'center' }));
   await ret.click();
   await page.getByRole('button', { name: 'Wrong size or fit' }).click();

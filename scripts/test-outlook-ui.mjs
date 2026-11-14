@@ -3,6 +3,7 @@
 // Stubbed Relay server and a stubbed Microsoft page; made-up data. Real Microsoft is not contacted.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipTips, openReceiptKind, openProfile, closeSheet } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -13,7 +14,7 @@ const state = { microsoft: true, accepted: true, earlier: false, connected: fals
 const WORDING = ["With your permission, Relay reads your email (Gmail or Outlook) in read-only mode.", "You can disconnect your email at any time."];
 const posts = [];
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await skipTips(ctx); // (its sign-up goes through the interests step)
 await ctx.route("https://login.microsoftonline.com/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "<title>Microsoft</title><h1>Microsoft sign-in (stub)</h1>" }));
 await ctx.route("https://accounts.google.com/**", route => route.fulfill({ status: 200, contentType: "text/html", body: "<title>Google</title><h1>Google (stub)</h1>" }));
 await ctx.route("https://**/*", route => {
@@ -36,6 +37,9 @@ await ctx.route("https://**/*", route => {
     orderRef: "OL-1", orderDate: "2026-10-14", totalPence: 5900, currency: "GBP", items: [{ name: "Wool jumper", qty: 1, pricePence: 5900 }], outlookId: "AQMkADAwATM0MDAAMS1-receipt1", category: "fashion", categoryLabel: "Fashion" }] : [] });
   if (u.pathname === "/relay/my/receipts/" + RID + "/original") return j({ html: "<p>Order OL-1</p>", extraImages: [], links: [] });
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
+  // What they shop for: nothing chosen yet, as the real server answers a new account (and saving keeps the list).
+  if (u.pathname === "/relay/my/interests" && m === "GET") return j({ interests: [], updatedAt: null });
+  if (u.pathname === "/relay/my/interests" && m === "PUT") { let b = {}; try { b = JSON.parse(route.request().postData() || "{}"); } catch {} return j({ interests: b.interests || [], updatedAt: Date.now() }); }
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
@@ -90,17 +94,22 @@ await page.waitForTimeout(800);
 assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself, straight away");
 await page.locator(".rl-jscan").waitFor();
 await page.getByRole("button", { name: "Skip" }).click();
+// Then what they shop for (they can choose later), then "See my receipts".
+await page.getByRole("heading", { name: "What do you shop for?" }).waitFor();
+await page.getByRole("button", { name: "Later" }).click();
 await page.getByRole("button", { name: "See my receipts" }).click();
 await page.getByText(/Found or updated 1 receipt/).waitFor();
 assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.mailbox")), "outlook", "every screen now names Outlook");
 await page.screenshot({ path: "/tmp/shots/one-step-receipts.png" });
-// Group tiles use drawn pictures (or a photo of something bought), not emoji.
-const tile = page.locator(".rl-tile:not(.rl-year)").first();
+// Group tiles (on Browse) use drawn pictures (or a photo of something bought), not emoji.
+await page.evaluate(() => window.go("discover"));
+const tile = page.locator("#browsePage .rl-tile").first();
 await tile.waitFor();
-assert.equal(await page.locator(".rl-tile .rl-tile-art svg, .rl-tile .rl-tile-pic").count() >= 1, true);
-const cardText = await page.locator(".rl-tiles").innerText();
+assert.equal(await page.locator("#browsePage .rl-tile .rl-tile-art svg, #browsePage .rl-tile .rl-tile-pic").count() >= 1, true);
+const cardText = await page.locator("#browsePage .rl-tiles").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
+await page.evaluate(() => window.go("receipts"));
 // A missing receipt can be added straight from the Receipts page, searching Outlook as you type.
 await page.getByRole("button", { name: "Add a missing receipt" }).click();
 await page.getByRole("heading", { name: "Add a receipt" }).waitFor();
@@ -142,18 +151,21 @@ const pageText = await page.locator("body").innerText();
 assert.ok(!/Gmail/.test(pageText), "no Gmail wording for an Outlook shopper: " + (pageText.match(/.{0,40}Gmail.{0,40}/) || [""])[0]);
 await page.screenshot({ path: "/tmp/shots/receipts-outlook-connected.png" });
 // The original email opens from Outlook.
-await page.getByText("Fashion", { exact: true }).first().click();
+await openReceiptKind(page, "Fashion");
 await page.locator(".rl-rr-main", { hasText: "Example Outfitters" }).first().click();
 await page.locator(".rl-rr-detail .rl-pill", { hasText: /^(View receipt|Receipt and (QR code|label))$/ }).first().click();
 await page.getByText("Shown straight from your Outlook. Relay doesn't keep a copy.").waitFor();
 await page.keyboard.press("Escape");
-await page.evaluate(() => window.RelayAccount.open());
-await page.locator(".rl-ptile", { hasText: "Outlook connected" }).click();
-await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).waitFor();
+while (await page.locator(".rl-back").count()) await closeSheet(page);
+await openProfile(page);
+await page.locator("#mePage .rl-arow", { hasText: "Inboxes" }).getByText("Outlook connected").waitFor();
+await page.locator("#mePage .rl-arow", { hasText: "Inboxes" }).click();
+const inboxes = page.locator("#mePage");
+await inboxes.getByRole("button", { name: "Add a missing receipt" }).waitFor();
 assert.ok(await page.getByRole("button", { name: "Disconnect jess.tester@outlook.com" }).count());
 assert.match(await page.locator(".rl-ibx-row").innerText(), /jess\.tester@outlook\.com[\s\S]*Outlook, checked/);
 assert.ok(await page.getByText("Disconnecting an inbox deletes every receipt Relay captured from it. Receipts you added by hand stay.").count());
-await page.locator(".rl-sheet").getByRole("button", { name: "Add a missing receipt" }).click();
+await inboxes.getByRole("button", { name: "Add a missing receipt" }).click();
 await page.getByRole("searchbox", { name: "Search Outlook for a receipt" }).waitFor();
 assert.equal(await page.locator("#rl-ar-q").getAttribute("placeholder"), "Search your Outlook");
 console.log("ok - with Outlook connected, the scan starts, the original opens from Outlook and every screen names Outlook");

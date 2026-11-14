@@ -1,11 +1,20 @@
 // Browser test: tagging receipts as gifts. Stubbed Relay server, made-up account and shops; the Wrapped it serves is built
 // by the real worker/wrapped.js from the same receipts, so the story shows what the server would really send.
 // Checks: a receipt's details have a "Bought as a gift" switch (a double tap saves once), then an optional "who's it for";
-// the row says who it's for and gets a small present on its picture; a Gifts tile in Relay's lime gathers them, with
+// the row says who it's for and gets a small present on its picture; Gifts in Receipts' filter (a drawn present) gathers them on a lime page, with
 // a filter for each person and a search that finds them by name; untagging works; Wrapped's cover counts gifts and the
 // story has a gifts slide (and the biggest treat isn't a gift). Every new part passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openReceiptKind } from "./relay-places.mjs";
+// Receipts' filter sheet: the Gifts row, with how many.
+const giftsRow = async (page, count) => {
+  await page.waitForTimeout(450); // (the app ignores a second tap on the same button within 400ms)
+  await page.locator("#view .rl-calm-filter").first().click();
+  const row = page.locator(".rl-sheet[aria-label='Filter receipts'] .rl-arow").filter({ has: page.getByText("Gifts", { exact: true }) }).first();
+  await row.getByText(count, { exact: true }).waitFor();
+  return row;
+};
 import { buildWrapped } from "../worker/wrapped.js";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -26,7 +35,7 @@ const receipts = [
 const gifts = { [ID.scarf]: { for: "Mum" }, [ID.lamp]: { for: "Dad" } }, posts = [];
 const withGifts = () => receipts.map(x => gifts[x.id] ? { ...x, gift: gifts[x.id] } : x);
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -80,18 +89,18 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
 
-// 1. Receipts: a Gifts tile for the two already tagged, in lime with navy text.
+// 1. Receipts: Gifts in the filter, for the two already tagged, with a drawn present in navy.
 await page.evaluate(() => window.go("receipts"));
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
-const giftsTile = page.getByRole("button", { name: "Gifts, 2 gifts" });
-await giftsTile.waitFor();
-const tileLook = await giftsTile.evaluate(n => [getComputedStyle(n).backgroundColor, getComputedStyle(n.querySelector("b")).color]);
-assert.deepEqual(tileLook, ["rgb(199, 245, 103)", "rgb(16, 24, 40)"], "lime with navy text");
-await polished(".rl-tiles", "tiles");
-console.log("ok - a Gifts tile gathers the receipts already tagged, in Relay's own colours");
+const giftsTile = await giftsRow(page, "2 gifts");
+assert.equal(await giftsTile.locator(".rl-cat-ico svg").count(), 1, "a drawn present, not a symbol");
+assert.equal(await giftsTile.locator(".rl-cat-ico").evaluate(n => getComputedStyle(n).color), "rgb(16, 24, 40)", "in Relay's navy");
+await polished(".rl-sheet[aria-label='Filter receipts']", "filter");
+await page.mouse.click(200, 40); await page.locator(".rl-back").waitFor({ state: "detached" });
+console.log("ok - Gifts in Receipts' filter gathers the receipts already tagged, in Relay's own colours");
 
 // 2. Tag the vase as a gift: one save for a double tap, then who it's for.
-await page.locator("#view").getByText("Home & garden", { exact: true }).click();
+await openReceiptKind(page, "Home & garden");
 const vase = page.locator(".rl-rr").filter({ hasText: "Hand-thrown Ceramic Vase" });
 await vase.locator(".rl-rr-main").click();
 const sw = vase.getByRole("switch", { name: "Bought as a gift" });
@@ -112,14 +121,14 @@ await who.press("Enter");
 await vase.getByText("Saved. It's a gift for Sam.").waitFor();
 assert.deepEqual(posts[1], [ID.vase, { gift: true, for: "Sam" }]);
 assert.equal(await save.isDisabled(), true, "saved, so nothing new to save");
-assert.match(await vase.locator(".rl-rr-mid").innerText(), /Larkspur Home · Gift for Sam/, "the row says who it's for");
+assert.match(await vase.locator(".rl-rr-mid").innerText(), /Larkspur Home, Gift for Sam/, "the row says who it's for");
 assert.equal(await vase.locator(".rl-rr-gift").count(), 1, "and has a small present on its picture");
 assert.equal(await page.locator(".rl-rr").filter({ hasText: "Brass Table Lamp" }).locator(".rl-rr-gift").count(), 1, "the lamp (for Dad) has one too");
 console.log("ok - 'Bought as a gift' saves once for a double tap, then who it's for; the row shows it straight away");
 
 // 3. The Gifts page: all three, a filter for each person, a search that finds a gift by who it's for.
-await page.getByRole("button", { name: "All groups" }).click();
-await page.getByRole("button", { name: "Gifts, 3 gifts" }).click();
+await page.locator("#view .rl-cat-back").click();
+await (await giftsRow(page, "3 gifts")).click();
 await page.getByRole("heading", { name: "Gifts", exact: true }).waitFor();
 const hero = page.locator(".rl-cat-hero");
 assert.match(await hero.innerText(), /£425\.00 across 3 gifts since /);

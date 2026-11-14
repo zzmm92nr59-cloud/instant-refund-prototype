@@ -5,6 +5,15 @@
 // search works; everything passes the polish rules (44px taps, no tiny text, no symbol icons).
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests } from "./relay-places.mjs";
+// A group is chosen from Receipts' filter sheet; its row says how many receipts are in it.
+const openGroup = async (page, name, count) => {
+  await page.waitForTimeout(450); // (the app ignores a second tap on the same button within 400ms)
+  await page.locator("#view .rl-calm-filter").first().click();
+  const row = page.locator(".rl-sheet[aria-label='Filter receipts'] .rl-arow").filter({ has: page.getByText(name, { exact: true }) }).first();
+  assert.match((await row.innerText()).replace(/\s+/g, " "), new RegExp(name.replace(/[&]/g, "\\$&") + " " + count + "$"));
+  await row.click();
+};
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".ico" ? "image/x-icon" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
@@ -22,7 +31,7 @@ const euro = [{ id: "77777777-7777-4777-8777-777777777777", status: "confirmed",
   items: [{ name: "Pro plan (yearly)", qty: 1 }], category: "digital", categoryLabel: "Digital & subscriptions", returnable: false }];
 const asked = [], posted = [];
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -50,12 +59,13 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
 await page.evaluate(() => window.go("receipts"));
-await page.getByRole("button", { name: "Food & drink, 130 receipts" }).waitFor();
+await page.locator("#view .rl-calm-filter").waitFor();
+await page.waitForFunction(() => document.querySelectorAll("#view .rl-rr, #view .rl-crow").length > 0);
 assert.ok(asked.includes("?all=1"), "the Receipts page asks for every receipt: " + asked.join(","));
 console.log("ok - the Receipts page gets all 130, not just the newest 100");
 
 // Food & drink: 130 receipts over two years.
-await page.getByRole("button", { name: "Food & drink, 130 receipts" }).click();
+await openGroup(page, "Food & drink", "130 receipts");
 const hero = page.locator(".rl-cat-hero");
 await hero.waitFor();
 const spent = food.reduce((n, r) => n + r.totalPence, 0);
@@ -97,8 +107,8 @@ await page.getByText("Nothing matches that search").waitFor();
 console.log("ok - a group's page: header with count, spend and since when; years; months with totals; 40 at a time; rows open; search");
 
 // Fashion: "Can still return" shows only what can still go back, with its days left.
-await page.getByRole("button", { name: "All groups" }).click();
-await page.getByRole("button", { name: /^Fashion, 2 receipts$/ }).click();
+await page.locator("#view .rl-cat-back").click();
+await openGroup(page, "Fashion", "2 receipts");
 await page.locator(".rl-cat-chips button", { hasText: "Can still return" }).click();
 assert.equal(await page.locator(".rl-rr").count(), 1);
 assert.match(await page.locator(".rl-rr").innerText(), /Long Jacket[\s\S]*£95\.00[\s\S]*20 days left/);
@@ -123,8 +133,8 @@ assert.deepEqual(posted, [["88888888-8888-4888-8888-888888888888/dismiss", { rea
 console.log("ok - an opened receipt: View receipt once, its group as a setting, and Is this right? (No asks why and removes it)");
 // A receipt that isn't in pounds: its own amount with its own sign, nothing in pounds made up for its group or month, and
 // a plain line saying it isn't added to the totals.
-await page.getByRole("button", { name: "All groups" }).click();
-await page.getByRole("button", { name: /^Digital & subscriptions, 1 receipt$/ }).click();
+await page.locator("#view .rl-cat-back").click();
+await openGroup(page, "Digital & subscriptions", "1 receipt");
 const euroHero = await page.locator(".rl-cat-hero").innerText();
 assert.match(euroHero, /1 receipt since /); assert.ok(!euroHero.includes("£"), "no pounds made up for a group with none: " + euroHero);
 assert.match(await page.locator(".rl-cat-month").first().innerText(), /\s1 receipt$/, "the month gives a count, not £0.00");
@@ -141,15 +151,15 @@ assert.equal(await fix.getByLabel("Total in EUR").inputValue(), "80.00");
 await page.keyboard.press("Escape");
 await page.screenshot({ path: "/tmp/shots/cat-euro.png" });
 console.log("ok - a receipt in euros: its own amount, no pounds made up, and a plain line that it isn't added in");
-// Home only shows what can still go back: never supermarket or takeaway food, even when the email mentions a deadline.
+// Home is a feed of what you bought, but it only says something can go back when it can: never supermarket or takeaway
+// food, even when the email mentions a deadline, and nothing past its return date.
 food[0].returns = { deadline: day(10) };
 await page.evaluate(() => window.go("profile"));
-const wallet = page.locator("#walletPage");
-await wallet.getByText("Long Jacket").first().waitFor();
-const homeText = await wallet.innerText();
-assert.ok(!/Greggs|Deliveroo|Sausage roll|Meal \d/.test(homeText), "no food on Home: " + homeText.slice(0, 200));
-assert.ok(!/Bucket Hat/.test(homeText), "nothing past its return date");
-console.log("ok - Home shows only what can still be returned");
+await page.locator("#homePage .h2-feed > .h2-item", { hasText: "Long Jacket" }).first().waitFor();
+const homeCards = await page.locator("#homePage .h2-feed > .h2-item").allInnerTexts();
+for (const t of homeCards.filter(t => /Greggs|Deliveroo|Sausage roll|Meal \d|Bucket Hat/.test(t))) assert.ok(!/Return by|days? left|can still be returned/i.test(t), "not shown as returnable: " + t.replace(/\s+/g, " "));
+assert.match(homeCards.find(t => /Long Jacket/.test(t)), /Return by/, "what can go back says so");
+console.log("ok - Home says only what can still be returned can go back");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS receipt groups: every receipt, a clear header, filters, months with totals, tidy rows");
 await browser.close(); server.close();

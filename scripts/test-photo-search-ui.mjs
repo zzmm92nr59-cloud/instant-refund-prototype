@@ -7,6 +7,7 @@
 // buy on the shop's own website and when Relay checked. Passes the polish rules in light and dark, at phone size.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
+import { skipInterests, openShops } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const server = createServer(async (req, res) => { try { const p = resolve(root, "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/")) throw Error();
@@ -39,7 +40,7 @@ const ANSWERS = {
 };
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
 await ctx.route("https://**/*", async route => {
   const req = route.request(), u = new URL(req.url()), m = req.method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -68,7 +69,7 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 page.on("dialog", () => { throw new Error("a browser pop-up appeared; Relay must ask inside the page"); });
 const measure = scope => page.evaluate(scope => {
   const vis = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
-  const rgb = c => (c.match(/[\d.]+/g) || []).map(Number);
+  const rgb = c => { const v = (c.match(/[\d.]+/g) || []).map(Number); return /^color\(srgb/.test(c) ? v.map((x, i) => i < 3 ? x * 255 : x) : v; }; // color-mix() comes back as color(srgb 0–1)
   const flat = (fg, bg) => { const [r, g, b, a = 1] = fg; return [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)]; };
   const lum = ([r, g, b]) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const bgOf = el => { for (let n = el; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.length >= 3 && (c.length < 4 || c[3] > 0.6)) return c.slice(0, 3); } return rgb(getComputedStyle(document.body).backgroundColor).slice(0, 3); };
@@ -103,7 +104,7 @@ const signIn = async (url) => {
   await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
   await page.reload();
 };
-const discover = async () => { await page.evaluate(() => window.go("discover")); await page.locator(".dc-card").first().waitFor(); };
+const discover = async () => { await openShops(page); await page.locator(".dc-card").first().waitFor(); }; // Browse, Shops on Relay
 // A big screenshot-sized picture (1600 × 1000), as a phone would give.
 const picture = Buffer.from(await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 1600; c.height = 1000; const g = c.getContext("2d");
   g.fillStyle = "#e9e4d8"; g.fillRect(0, 0, 1600, 1000); g.fillStyle = "#fafafa"; g.beginPath(); g.ellipse(800, 560, 520, 210, 0, 0, Math.PI * 2); g.fill();
