@@ -58,7 +58,7 @@ const RECEIPTS = [rec("Hollow Pine", "hollow-pine.example", 4), rec("Hollow Pine
 const st = { webAsked: 0 };
 
 const browser = await chromium.launch();
-const newPage = async (colorScheme, team) => {
+const newPage = async (colorScheme, team, admin = false) => {
   const ctx = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: process.env.YS_SHOTS ? 3 : 1, colorScheme, serviceWorkers: "block" }); await skipInterests(ctx);
   if (team) await ctx.addInitScript(() => { try { localStorage.setItem("relay-web-preview", "1"); } catch (e) {} });
   await ctx.route("https://**/*", async route => {
@@ -78,7 +78,7 @@ const newPage = async (colorScheme, team) => {
     if (p === "/relay/my/wrapped") return j({ receipts: 0, years: [] });
     if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
     if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
-    if (p === "/relay/my/admin/me") return j({ admin: false });
+    if (p === "/relay/my/admin/me") return j({ admin });
     const lg = /^\/relay\/my\/logo\/(.+)$/.exec(p), shop = lg && SHOPS.find(s => s.domain === decodeURIComponent(lg[1]));
     if (shop) return route.fulfill({ status: 200, contentType: "image/svg+xml", headers: { "access-control-allow-origin": "*" }, body: logo(shop) });
     if (lg) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
@@ -236,6 +236,30 @@ for (const scheme of ["light", "dark"]) {
   assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Wool Beanie" }).count(), 0, "switch off: gone");
   await page.context().close();
   console.log("ok - ?testing=1 shows them; off again, they're gone");
+}
+
+// Team accounts get the shops' websites straight away, without finding the switch; a choice they made stays.
+{
+  const page = await newPage("dark", false, true);
+  await signIn(page);
+  await page.evaluate(() => window.go("discover"));
+  await page.waitForFunction(() => localStorage.getItem("relay-web-preview") === "1", null, { timeout: 15000 });
+  await shopsOnRelay(page);
+  await page.locator("#catalogResults .dc-card", { hasText: "Wool Beanie" }).waitFor();
+  await page.context().close();
+  const off = await newPage("dark", false, true);
+  await off.goto(origin + "/index.html");
+  await off.evaluate(() => { localStorage.setItem("relay-web-preview", "0"); localStorage.setItem("relay-web-preview-chosen", "1"); });
+  await signIn(off);
+  await off.evaluate(() => window.go("discover")); await off.waitForTimeout(1500);
+  assert.equal(await off.evaluate(() => localStorage.getItem("relay-web-preview")), "0", "a team member who switched it off keeps it off");
+  await off.context().close();
+  const shopper = await newPage("dark", false, false);
+  await signIn(shopper);
+  await shopper.evaluate(() => window.go("discover")); await shopper.waitForTimeout(1500);
+  assert.notEqual(await shopper.evaluate(() => localStorage.getItem("relay-web-preview")), "1", "a shopper never gets it");
+  await shopper.context().close();
+  console.log("ok - on by default for Relay's team (once they open Browse); a choice to switch it off stays; shoppers never");
 }
 
 await browser.close(); server.close();
