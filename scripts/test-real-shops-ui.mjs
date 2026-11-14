@@ -262,5 +262,51 @@ for (const scheme of ["light", "dark"]) {
   console.log("ok - on by default for Relay's team (once they open Browse); a choice to switch it off stays; shoppers never");
 }
 
+// Browse, the way Connor asked (14 Nov): a section per kind of product, its name and a chevron, then two big photos a row,
+// each with the shop's round logo and name, the product's name and price. Nothing Relay doesn't have (no ratings or discounts).
+{
+  const page = await newPage("dark", true);
+  await signIn(page);
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#browseGrid .bg-sec .bg-card").first().waitFor({ timeout: 15000 });
+  const secs = await page.$$eval("#browseGrid .bg-sec", ss => ss.map(s => ({ h: s.querySelector(".bg-h h2").textContent, cards: [...s.querySelectorAll(".bg-card")].map(c => [c.querySelector(".bg-sn").textContent, c.querySelector(".bg-name").textContent, c.querySelector(".bg-price").textContent]) })));
+  assert.ok(secs.length >= 2, "a section for each kind with products: " + JSON.stringify(secs.map(s => s.h)));
+  for (const sc of secs) { assert.ok(sc.cards.length >= 2 && sc.cards.length <= 4, sc.h + ": two to four products"); for (const c of sc.cards) assert.match(c[2], /^(From )?£\d/, "a price on every product"); }
+  assert.ok(secs.some(sc => sc.cards.some(c => c[1] === "Wool Beanie" && c[0] === "Hollow Pine")), "real products with their shop");
+  const text = await page.locator("#browseGrid").innerText();
+  assert.doesNotMatch(text, NEVER); assert.doesNotMatch(text, /\bsave\b|%|\breviews?\b|\brating/i, "no made-up discounts or ratings");
+  // Two to a row, big square photos, each shop's logo beside its name.
+  const g = await page.evaluate(() => { const cs = [...document.querySelectorAll("#browseGrid .bg-sec")[0].querySelectorAll(".bg-card")].map(c => c.querySelector(".bg-pic").getBoundingClientRect());
+    return { w: cs[0].width, h: cs[0].height, sameRow: Math.abs(cs[0].top - cs[1].top) < 1, logos: document.querySelectorAll("#browseGrid .bg-logo .rl-ys-logo").length, cards: document.querySelectorAll("#browseGrid .bg-card").length, bg: getComputedStyle(document.body).backgroundColor }; });
+  assert.ok(g.w > 160 && Math.abs(g.w - g.h) < 1 && g.sameRow, "two big square photos a row: " + JSON.stringify(g));
+  assert.equal(g.logos, g.cards, "every product shows its shop's logo");
+  assert.equal(g.bg, "rgb(255, 255, 255)", "white, even with the phone in dark mode");
+  await page.waitForFunction(() => [...document.querySelectorAll("#browseGrid .bg-pic img")].slice(0, 4).every(i => i.complete && i.naturalWidth > 0));
+  assert.deepEqual(await measure(page, "#browseGrid"), clean);
+  await shot(page, "browse-grid");
+  // The heading opens Shops on Relay at that kind; a product opens its page.
+  const first = secs[0].h;
+  await waitOutDoubleTap(page); await page.locator("#browseGrid .bg-h").first().click();
+  await page.locator("#catalogResults .dc-card").first().waitFor();
+  assert.equal(await page.locator("#dcKinds .dc-chip.on").innerText(), first, "the heading's kind is picked");
+  await page.evaluate(() => window.dcShow("home")); await page.locator("#browseGrid .bg-card").first().waitFor();
+  await waitOutDoubleTap(page); await page.locator("#browseGrid .bg-card", { hasText: "Wool Beanie" }).click();
+  await page.getByText("View on their website").first().waitFor();
+  assert.deepEqual(page.errors, []);
+  await page.context().close();
+  console.log("ok - Browse: sections by kind, two big photos a row with logo, shop, name and price; heading and product open");
+}
+{
+  const page = await newPage("light", false);
+  await signIn(page);
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#browsePage .rl-ys-shop").first().waitFor();
+  await page.waitForTimeout(600);
+  assert.equal(await page.locator("#browseGrid .bg-card").count(), 0, "a shopper sees no shops' websites in Browse");
+  assert.equal(await page.locator("#browseGrid .skel").count(), 0, "and no outlines left behind");
+  await page.context().close();
+  console.log("ok - Browse: shoppers see only shops on Relay with photos");
+}
+
 await browser.close(); server.close();
 console.log("PASS real shops for the team (screen)");
