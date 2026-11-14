@@ -241,6 +241,16 @@ html.on-me .topline .avatar{display:none}#view:has(#mePage>.rl-abar)>.rl-navback
 .dc-watch.on{color:#fff;background:radial-gradient(circle,#101828 17px,transparent 17.5px)}
 @media (prefers-color-scheme:dark){.dc-watch{color:#fff;background:radial-gradient(circle,rgba(0,0,0,.55) 17px,transparent 17.5px)}.dc-watch.on{color:#101828;background:radial-gradient(circle,#c7f567 17px,transparent 17.5px)}}
 .dc-empty{border:0}
+.dc-chips.dc-logos{gap:12px;padding-bottom:6px}.dc-shopb{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:78px;min-height:44px;display:flex;flex-direction:column;align-items:center;gap:6px;border-radius:16px;transition:transform .12s}
+.dc-shopb:active{transform:scale(.94)}.dc-shopb:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}
+.dc-shopb .dc-shopb-l{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text);box-sizing:border-box;border:2px solid transparent;overflow:hidden}
+.dc-shopb .dc-shopb-l .rl-ys-logo{width:100%!important;height:100%!important}.dc-shopb[aria-pressed=true] .dc-shopb-l{border-color:var(--rl-text)}
+.dc-shopb-n{font-size:13px;line-height:16px;text-align:center;color:var(--rl-text);max-width:78px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.dc-shopb[aria-pressed=true] .dc-shopb-n{font-weight:700}
+.dc-card.dc-web .dc-row{padding-top:2px}.dc-card.dc-web .dc-shop{padding-top:1px}
+.dc-shopb .dc-shopb-l .ico-i{width:24px;height:24px}
+.dc-checked{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 12px;margin:14px 0 4px;padding:13px 16px;border-radius:14px;background:var(--rl-card);font-size:15px}.dc-checked span{color:var(--rl-text2);white-space:nowrap}.dc-checked b{font-weight:600;white-space:nowrap}
+.dc-pricefrom{font-size:13px;color:var(--rl-text2);margin:10px 0 0}
 /* A product's page: a screen of its own, with a big picture, the name and price, the sizes and one main button. */
 #dcRoot.dc-detail>.title,#dcRoot.dc-detail>.dc-shortcuts,#dcRoot.dc-detail>#dcForYou,#dcRoot.dc-detail>.dc-bar,#dcRoot.dc-detail>.dc-chips,#dcRoot.dc-detail>#storeAlert,#dcRoot.dc-detail>#dcPreview{display:none}
 #dcRoot.dc-detail>.dc-grid{display:block;margin-top:0}
@@ -680,6 +690,15 @@ function withoutSize(text){return RelayExchangeEngine.styleOf(text)}
 function sameDesign(p){return sameFamily(p)&&withoutSize(p.variation)===withoutSize(selected.detail)}
 function sameSize(p){const a=sizeOf(p.variation),b=sizeOf(selected.detail);return !!a&&!!b&&a===b}
 function selectStore(value){storeFilter=value;renderCatalog()}
+// Your shops (account.js): which shops are on Relay (their names and addresses; test shops marked), and opening one in Shops on Relay.
+function relayShopsOnRelay(){if(!catalogReady)return null;const seen=new Map();for(const p of catalog){if(p.fixture||p.provider==='relay_demo'||p.provider==='web')continue;const n=storeOf(p),k=storeKey(n);if(!seen.has(k))seen.set(k,{name:n,domain:String(p.shopDomain||'').toLowerCase().replace(/^www\./,''),test:!!p.testShop})}return [...seen.values()]}
+// Relay's team (testing tools, or the team's Shops' websites switch): Browse shows real shops from their own websites.
+function teamShops(){return testTools()||webPreview()}
+// A shop's products from its own website, for its sheet in Your shops (team only): matched on its web address or name.
+function relayWebProductsFor(domain,name){if(!teamShops()||!catalogReady)return[];const d=String(domain||"").toLowerCase().replace(/^www\./,"");
+ const rows=catalog.filter(p=>p.provider==="web"&&((d&&String(p.shopDomain||"").toLowerCase().replace(/^www\./,"")===d)||(name&&sameStore(storeOf(p),name))));
+ return dcGroups(rows).map(g=>({sku:g.lead.sku,product:g.product,store:g.store,imageUrl:g.imageUrl,price:dcPrice(g),checkedAt:g.lead.checkedAt}))}
+function relayOpenShop(name){dcShow("shops");storeFilter=String(name);renderCatalog();window.scrollTo(0,0)}
 // ---- Discover for shoppers: products from shops on Relay, one card per product, and picks from what you spend ----
 let discoverKind="all",discoverSpend=null,discoverSpendAsked=false;
 const DC_KINDS={fashion:"Fashion",home:"Home",pets:"Pets",beauty:"Beauty",electronics:"Tech",food:"Food & drink",other:"Other"};
@@ -747,7 +766,10 @@ function dcStock(g){return g.left===0?'<span class="dc-stock out">Out of stock</
 function dcPicture(g,px){if(/^https:\/\//.test(g.imageUrl))return '<img class="dc-photo" alt="" loading="lazy" referrerpolicy="no-referrer" src="'+safe(g.imageUrl)+'" onerror="this.remove()">'+(dcDrawing()?dcDrawing().html(g.draw,g.kind==="pets"?"home":g.kind,px||56):"");
  return dcDrawing()?dcDrawing().html(g.draw,g.kind==="pets"?"home":g.kind,px||56):""}
 function dcWatchBtn(sku){const on=!!watch[sku];return '<button class="dc-watch'+(on?' on':'')+'" data-watch="'+safe(sku)+'" aria-pressed="'+(on?'true':'false')+'" aria-label="'+(on?'Watching the price':'Watch price')+'">'+ic(on?"check":"bell")+'</button>'}
-function dcCard(g,why){return '<div class="dc-cardwrap"><div class="dc-card" role="button" tabindex="0" data-card-select="'+safe(g.lead.sku)+'" aria-label="'+safe(g.product+", "+g.store+", "+dcPrice(g))+'"><div class="dc-pic">'+dcPicture(g)+'</div><div class="dc-body"><div class="dc-shop">'+safe(g.store)+(testTools()&&!liveProduct(g.lead)?' · TEST':'')+'</div><h3>'+safe(g.product)+'</h3>'+(dcOptions(g)?'<div class="dc-opts">'+safe(dcOptions(g))+'</div>':'')+'<div class="dc-row"><b>'+dcPrice(g)+'</b>'+dcStock(g)+'</div>'+(why?'<div class="dc-why">'+safe(why)+'</div>':'')+'</div></div>'+(g.lead.provider==="web"?'':dcWatchBtn(g.lead.sku))+'</div>'}
+function dcCard(g,why){if(g.lead.provider==="web")return dcWebCard(g,why);return '<div class="dc-cardwrap"><div class="dc-card" role="button" tabindex="0" data-card-select="'+safe(g.lead.sku)+'" aria-label="'+safe(g.product+", "+g.store+", "+dcPrice(g))+'"><div class="dc-pic">'+dcPicture(g)+'</div><div class="dc-body"><div class="dc-shop">'+safe(g.store)+(testTools()&&!liveProduct(g.lead)?' · TEST':'')+'</div><h3>'+safe(g.product)+'</h3>'+(dcOptions(g)?'<div class="dc-opts">'+safe(dcOptions(g))+'</div>':'')+'<div class="dc-row"><b>'+dcPrice(g)+'</b>'+dcStock(g)+'</div>'+(why?'<div class="dc-why">'+safe(why)+'</div>':'')+'</div></div>'+(g.lead.provider==="web"?'':dcWatchBtn(g.lead.sku))+'</div>'}
+// A product from a shop's own website: its photo, name (two lines), price and shop. No sizes, and no stock words: those
+// are only what the website said when Relay read it, which the product's page says with its date.
+function dcWebCard(g,why){return '<div class="dc-cardwrap"><div class="dc-card dc-web" role="button" tabindex="0" data-card-select="'+safe(g.lead.sku)+'" aria-label="'+safe(g.product+", "+dcPrice(g)+", "+g.store)+'"><div class="dc-pic">'+dcPicture(g)+'</div><div class="dc-body"><h3>'+safe(g.product)+'</h3><div class="dc-row"><b>'+dcPrice(g)+'</b></div><div class="dc-shop">'+safe(g.store)+'</div>'+(why?'<div class="dc-why">'+safe(why)+'</div>':'')+'</div></div></div>'}
 // Picks from what the shopper spends: the kinds of shopping they spend most on, shops they buy from, their sizes, their usual price.
 // Picks follow where the money goes: the six places are shared out between the kinds of thing the shopper spends on, in
 // proportion to their spending (45% home and 10% fashion is about five home picks to one fashion), at most three from one
@@ -789,8 +811,10 @@ function shopperDiscoverView(){const signed=dcSigned();if(!signed)dcMode="shops"
  const head='<div id="dcRoot">'+back+'<h1 class="title">'+(signed?'Shops on Relay':'Browse')+'</h1>';
  return head+'<div class="dc-bar"><div class="dc-search" onclick="if(event.target===this)$(\'query\').focus()"><span class="dc-sic" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg></span><input id="query" type="search" placeholder="Search" aria-label="Search products" oninput="renderCatalog()"><button type="button" class="dc-cam" id="dcCam" aria-label="Search by photo" onclick="photoSearch()"'+(photoShown()?'':' hidden')+'>'+ic("camera")+'</button></div><button type="button" class="dc-filt" id="dcFilt" aria-label="Sort and filter" aria-expanded="'+(dcFiltersOpen?'true':'false')+'" onclick="dcToggleFilters()">'+ic("filter")+'</button></div>'
  +'<div id="dcFilters"'+(dcFiltersOpen?'':' hidden')+'><label class="dc-sortrow"><span>Sort</span><select id="filter" aria-label="Sort" onchange="renderCatalog()"><option value="all">'+(personalise?'For you':'Newest')+'</option><option value="low">Lowest price</option><option value="high">Highest price</option></select></label>'
- +'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div><div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div>'
+ +(teamShops()?'':'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div>')+'<div class="dc-chips" id="dcKinds" role="group" aria-label="Kinds of product"></div>'
  +(dcSigned()&&personaliseAsked?'<div class="dc-chips">'+dcChip("Picks for you",personalise,'onclick="togglePersonalise()"')+'</div>':'')+'</div>'
+ // Relay's team sees the shops as a row of logos above the products, not behind Sort and filter.
+ +(teamShops()?'<div class="dc-chips" id="dcShops" role="group" aria-label="Shops"></div>':'')
  +'<div id="dcForYou"></div><div id="storeAlert"></div><div id="dcPreview"></div><div id="catalogResults" class="dc-grid"></div></div>'}
 // Search by photo (account.js): the camera shows once it's on, and always in Relay's testing tools (which say if it's off).
 function photoShown(){const A=window.RelayAccount;return !!(A&&A.photoAvailable&&A.signedIn&&A.signedIn()&&(A.photoAvailable()||testTools()))}
@@ -800,6 +824,9 @@ function relayOpenProduct(sku,name){dcShow("shops");if(catalog.some(x=>x.sku===s
 function relaySearchFor(text){dcShow("shops");const q=$("query");if(!q)return;q.value=String(text||"").slice(0,80);storeFilter="all";discoverKind="all";renderCatalog();q.scrollIntoView({block:"center"})}
 // When Relay last read a shop's website: "today at 14:05", "yesterday at 09:10" or "on 3 November".
 function checkedWhen(iso){const d=new Date(iso);if(!Number.isFinite(d.getTime()))return"recently";const day=x=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime(),n=(day(new Date())-day(d))/864e5,t=d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});return n<1?"today at "+t:n<2?"yesterday at "+t:"on "+d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})}
+// The same, as a date and time ("13 November, 14:05"), and as a date ("13 November").
+function checkedLong(iso){const d=new Date(iso);return Number.isFinite(d.getTime())?d.toLocaleDateString("en-GB",{day:"numeric",month:"long"})+", "+d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"}):"Recently"}
+function checkedOn(iso){const d=new Date(iso);return Number.isFinite(d.getTime())?d.toLocaleDateString("en-GB",{day:"numeric",month:"long"}):"the day Relay last checked"}
 function dcChip(label,on,attr){return '<button type="button" class="dc-chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" '+attr+'>'+label+'</button>'}
 // Interests (Profile, Your interests): shops of the kinds the shopper picked come first in Shops on Relay. A shop's kind is
 // the one Relay's server gives it (shopCategory); a shop it can't tell about is never moved. Receipts come first once there
@@ -821,11 +848,20 @@ function renderShopperCatalog(root){
  if(storeFilter!=="all"&&![...shopCount.keys()].some(n=>sameStore(n,storeFilter)))storeFilter="all";
  const inShop=all.filter(g=>storeFilter==="all"||sameStore(g.store,storeFilter));
  const kindCount=new Map();for(const g of inShop)kindCount.set(g.kind,(kindCount.get(g.kind)||0)+1);
- if(discoverKind!=="all"&&!kindCount.has(discoverKind))discoverKind="all";
+ if(discoverKind!=="all"&&discoverKind!=="mine"&&!kindCount.has(discoverKind))discoverKind="all";
  const shopsEl=$("dcShops"),kindsEl=$("dcKinds");
- if(shopsEl)shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+[...shopCount.entries()].sort((a,b)=>shopHit(b[0])-shopHit(a[0])||b[1]-a[1]).map(([n])=>dcChip(safe(n),sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):"";
- if(kindsEl)kindsEl.innerHTML=kindCount.size>1?dcChip("Everything",discoverKind==="all",'data-kind="all"')+[...kindCount.keys()].sort((a,b)=>(a==="other")-(b==="other")||kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
- let groups=inShop.filter(g=>(discoverKind==="all"||g.kind===discoverKind)&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
+ const shopList=[...shopCount.entries()].sort((a,b)=>shopHit(b[0])-shopHit(a[0])||b[1]-a[1]).map(([n])=>n);
+ // Relay's team, with shops' websites in: each shop as its logo (whole on white) and name. Otherwise chips.
+ const logos=teamShops()&&all.some(g=>g.lead.provider==="web")&&!!(window.RelayAccount&&RelayAccount.shopBadge);
+ if(shopsEl){shopsEl.classList.toggle("dc-logos",logos&&shopCount.size>1);
+  if(logos&&shopCount.size>1){const dom=n=>{const g=all.find(x=>x.store===n);return g?String(g.lead.shopDomain||""):""},kindOf=n=>{const g=all.find(x=>x.store===n);return g&&g.lead.shopCategory||"other"};
+   const b=(n,label,on)=>'<button type="button" class="dc-shopb" aria-pressed="'+(on?'true':'false')+'" data-shop="'+safe(n)+'"><span class="dc-shopb-l"'+(n==="all"?'><svg class="ico-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg>':' data-badge="'+safe(dom(n))+'" data-name="'+safe(n)+'" data-cat="'+safe(kindOf(n))+'">')+'</span><span class="dc-shopb-n">'+safe(label)+'</span></button>';
+   shopsEl.innerHTML=b("all","All shops",storeFilter==="all")+shopList.map(n=>b(n,n,sameStore(n,storeFilter))).join("");
+   shopsEl.querySelectorAll("[data-badge]").forEach(x=>{try{x.appendChild(RelayAccount.shopBadge(x.dataset.name,x.dataset.badge,x.dataset.cat,56))}catch(e){}})}
+  else shopsEl.innerHTML=shopCount.size>1?dcChip("All shops",storeFilter==="all",'data-shop="all"')+shopList.map(n=>dcChip(safe(n),sameStore(n,storeFilter),'data-shop="'+safe(n)+'"')).join(""):""}
+ const mine=teamShops()&&inShop.some(interestHit);if(discoverKind==="mine"&&!mine)discoverKind="all";
+ if(kindsEl)kindsEl.innerHTML=kindCount.size>1||mine?dcChip("Everything",discoverKind==="all",'data-kind="all"')+(mine?dcChip("Your interests",discoverKind==="mine",'data-kind="mine"'):"")+[...kindCount.keys()].sort((a,b)=>(a==="other")-(b==="other")||kindCount.get(b)-kindCount.get(a)).map(k=>dcChip(DC_KINDS[k]||"Other",discoverKind===k,'data-kind="'+k+'"')).join(""):"";
+ let groups=inShop.filter(g=>(discoverKind==="all"||(discoverKind==="mine"?interestHit(g):g.kind===discoverKind))&&(!query||(g.product+" "+g.store+" "+g.options.join(" ")).toLowerCase().includes(query)));
  const forYou=$("dcForYou");if(forYou)forYou.innerHTML=query||storeFilter!=="all"||discoverKind!=="all"?"":dcForYou(all);
  if(sort==="low")groups.sort((a,b)=>a.min-b.min);else if(sort==="high")groups.sort((a,b)=>b.max-a.max);
  else{if(storeFilter==="all")groups=dcMix(groups);
@@ -836,7 +872,7 @@ function renderShopperCatalog(root){
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  {const fb=$("dcFilt");if(fb&&fb.classList)fb.classList.toggle("on",storeFilter!=="all"||discoverKind!=="all"||sort!=="all")}
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
- if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview"><b>Preview: products from '+webShops.size+' shops\' own websites.</b> Relay reads their public product lists once a day. These shops haven\'t joined Relay, so shoppers don\'t see them. Tap a product to buy it on the shop\'s website.</div>':"";
+ if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview">Products from '+webShops.size+' shops\' own websites, as Relay last read them. Only Relay\'s team sees these.</div>':"";
  root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p></div>';
  const wire=box=>{if(!box)return;
   box.querySelectorAll("[data-watch]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleWatch(b.dataset.watch)});
@@ -853,16 +889,19 @@ function webCheckoutUrl(p){try{const v=/:(\d{1,20})$/.exec(String(p.sku||""));if
 let dcListY=0;
 function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)return;const fresh=!$("backToResults");if(fresh)dcListY=window.scrollY;const g=dcGroups(shownProducts().filter(x=>sameStore(storeOf(x),storeOf(p))&&String(x.product).trim().toLowerCase()===String(p.product).trim().toLowerCase()))[0];
  const on=!!watch[sku],stock=liveStock(p);
- const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
+ const opts=g&&g.variants.length>1?'<div class="dc-sizes" role="group" aria-label="Sizes and colours">'+g.variants.map(v=>{const q=p.provider==="web"||v.quantity==null||v.quantity===""?null:Number(v.quantity);return '<button type="button" class="dc-size'+(v.sku===sku?' on':'')+(q===0?' out':'')+'" data-size="'+safe(v.sku)+'" aria-pressed="'+(v.sku===sku?'true':'false')+'">'+safe(v.variation||"One size")+(q===0?' <span>Sold out</span>':'')+'</button>'}).join("")+'</div>':'';
  const web=p.provider==="web"&&/^https:\/\//.test(String(p.productUrl||"")),shop=safe(storeOf(p));
  const checkout=web?webCheckoutUrl(p):null;
  // Signed in: Buy starts the shop's checkout with the shopper's delivery details filled in (account.js buyAtShop).
  const fills=!!(checkout&&window.RelayAccount&&RelayAccount.buyAtShop&&RelayAccount.signedIn&&RelayAccount.signedIn());
- const act=web?(fills?'<button class="darkbtn dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="darkbtn dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>')
+ // A shop's website: View on their website first (the product's own page), then Buy at the shop, quieter. With no checkout
+ // to start (sold out, or nothing to go by), the one button is the product's own page.
+ const view=web&&checkout?'<a class="darkbtn dc-buy" id="viewOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">View on their website'+ic("ext")+'</a>':'';
+ const act=web?view+(fills?'<button class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shop+'\'s website')+ic("ext")+'</a>')
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
  const note=web?(fills?'Relay fills in your delivery details at '+shop+'\'s checkout. ':checkout?'Opens '+shop+'\'s own checkout with this one in the basket. ':'')+(p.inStock===false?'Sold out on '+shop+'\'s website when Relay checked ':p.inStock?'Price and stock as '+shop+'\'s website showed them ':'Price as '+shop+'\'s website showed it ')+checkedWhen(p.checkedAt)+'. You pay there, not through Relay.':on?'Relay tells you when the price drops.':'';
  {const r=$("dcRoot");if(r&&r.classList&&r.classList.add)r.classList.add("dc-detail")}
- box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p></div>';
+ box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+(web?'<div class="dc-checked"><span>When Relay last checked</span><b>'+safe(checkedLong(p.checkedAt))+'</b></div>':'')+opts+'<div class="actions">'+act+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p>'+(web?'<p class="dc-pricefrom">Prices from '+shop+'\'s website on '+safe(checkedOn(p.checkedAt))+'.</p>':'')+'</div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
  if(fills&&$("buyOnSite"))$("buyOnSite").onclick=()=>RelayAccount.buyAtShop({sku:p.sku,title:p.product,variation:p.variation||"",price:priceIn(p.priceMinor,p.currency),shop:storeOf(p),fallbackUrl:checkout});
@@ -1168,7 +1207,7 @@ async function loadCatalog(manual=false){
  if(webAsk)try{const response=await webAsk;if(response.ok){const data=await response.json();const web=(Array.isArray(data.products)?data.products:[]).filter(p=>p.sku&&Number.isFinite(Number(p.priceMinor))&&p.webShop);
   next.push(...web.map(p=>({...p,provider:"web",store:p.storeName,fixture:false})))}}catch{}
  catalog=next.filter(p=>!p.fixture).concat(demoProducts());
- }finally{catalogReady=true}
+ }finally{catalogReady=true;try{window.dispatchEvent(new Event("relay-catalogue"))}catch{}}
  if(page==="wallet")render();
  if(manual){
   for(const [sku,w] of Object.entries(watch)){
@@ -1194,7 +1233,7 @@ async function loadShopifyStatus(){
 async function loadVerified(){try{const saved=localStorage.getItem("relayVerifiedOrder"),card=JSON.parse(localStorage.getItem("relayCard")||"null"),q=new URLSearchParams();if(saved)q.set("orderId",saved);if(card?.brand)q.set("brand",card.brand);if(card?.last4)q.set("last4",card.last4);const r=await fetch(VERIFIED+(q.size?"?"+q:""),{cache:"no-store"});if(!r.ok)throw Error("Verified purchase API returned "+r.status);const d=await r.json();real=[];for(const o of d.purchases||d.verifiedPurchases||[]){const orderTime=o.createdAt||o.authorizedAt||o.orderCreatedAt;if(!orderTime||!Number.isFinite(Date.parse(orderTime))||Date.parse(orderTime)<Date.parse(walletCutover))continue;if(o.verified===false||(o.matchStatus&&String(o.matchStatus).toUpperCase()!=="MATCHED"))continue;for(const [i,x] of (o.items||[]).entries())real.push({id:"sq-"+o.orderId+"-"+i,item:x.name||"Purchase",detail:x.variation||"Standard",merchant:o.merchant||"Retailer",price:Number(x.price??o.total??0),date:new Date(o.createdAt||Date.now()).toLocaleDateString("en-GB"),deadline:o.deadline||"Retailer policy",icon:"🛍️",demo:false,verified:true,createdAt:orderTime})}error=""}catch(e){real=[];error=e.message}if(page==="wallet")render()}
 // Compatibility for previously cached v4 handlers that called showCatalog.
 function showCatalog(){return renderCatalog()}
-Object.assign(window,{meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
+Object.assign(window,{relayShopsOnRelay,relayOpenShop,relayWebProductsFor,teamShops,meBack,dcPick,dcShow,dcToggleFilters,homeSearch,browseSearch,photoSearch,relayOpenProduct,relaySearchFor,testTools,webPreview,testToolsChanged,openMarket,openAuctions,tabTap,toggleTestTools,toggleStoreAlert,forgetTaste,go,toggleDemo,openPurchase,render,setPlanPreview,startSample,switchShopper,checkSandboxBank,togglePersonalise,selectStore,renderCatalog,showCatalog,showRadar,chooseSku,placeDemoOrder,watchSku,unwatch,loadCatalog,simulateDemoRefund,simulateDemoReturn,resetDemoTransactions,resetWalletHistory,advanceDemoExchangeReturn});
 // For relay-gestures.js: is this a tab's own screen (pull to refresh works there), and refreshing it. Discover's catalogue
 // comes straight from the shops' feeds, so it's read again too; on Receipts the inbox is checked as well.
 window.RelayShell={isTabRoot:onTabRoot,refresh:shellRefresh,open:openLink};
