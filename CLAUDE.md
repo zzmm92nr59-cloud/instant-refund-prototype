@@ -13,7 +13,7 @@ Check new work against these before shipping (scripts/test-polish-ui.mjs checks 
 8. No emoji or symbol characters as icons in buttons; use the drawn line icons (ic() in index.html).
 9. A double tap must never do the thing twice (guard in index.html; disable buttons while a request is running).
 10. A new user never lands on an empty screen: always say what to do first.
-11. Must survive bigger phone text, and look right in light and dark mode: the app follows the phone's setting, so colour things with the --rl-* tokens, never a fixed white or near-black (text on a coloured tile or button keeps that tile's own colours).
+11. Must survive bigger phone text. Relay is always light (white), whatever the phone is set to (Connor, 14 Nov 2026): the dark styles stay in the code behind "and (min-resolution: 9999dppx)", which never matches; remove that to bring dark mode back. Still colour things with the --rl-* tokens, never a fixed white or near-black (text on a coloured tile or button keeps that tile's own colours).
 12. Never show raw error text, codes or server messages: plain English with what to do next.
 13. Every button visibly reacts when pressed.
 14. Preferences survive updates: keep them with the account where possible; never rename storage keys without moving the old value.
