@@ -90,6 +90,12 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         readings: (await rows("SELECT receipt_id AS receiptId, fields, failed, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? ORDER BY created_at", id))
           .map((r) => ({ receiptId: r.receiptId, read: parse(r.fields), couldNotRead: r.failed || null, at: iso(r.at) })) };
     })(),
+    // AI for picks: whether it's on, and what the AI made of each thing you bought (only item names were sent).
+    aiForPicks: await (async () => {
+      const on = await one("SELECT on_since AS since FROM picks_ai WHERE shopper_id = ?", id);
+      return { on: Boolean(on), since: on ? iso(on.since) : null,
+        items: (await rows("SELECT name_key AS item, data, created_at AS at FROM item_kinds WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ item: r.item, read: parse(r.data), at: iso(r.at) })) };
+    })(),
     // The help chat keeps no conversations: only how many messages you sent each day, and whether you asked for a person.
     helpChat: (await rows("SELECT day, messages, handoffs FROM support_chat_usage WHERE shopper_id = ? ORDER BY day", id)),
     alerts: {

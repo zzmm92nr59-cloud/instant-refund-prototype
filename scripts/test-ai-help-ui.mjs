@@ -11,7 +11,7 @@ await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http:/
 await mkdir("/tmp/shots", { recursive: true });
 const EMAIL = "jess.tester@example.com", day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const ID1 = "11111111-1111-4111-8111-111111111111";
-const st = { available: false, on: false, posts: [] };
+const st = { picks: false, pickPosts: [], available: false, on: false, posts: [] };
 const receipts = [{ id: ID1, status: "pending", needsShopperConfirmation: true, kind: "receipt", gmailId: "m1abcdef", retailer: { name: "Brindle & Co", domain: "brindle.example" },
   orderRef: "BR-1", orderDate: day(-5), totalPence: 4500, currency: "GBP", category: "fashion", categoryLabel: "Fashion", returnable: true, returns: null,
   items: [{ name: "Merino Wool Scarf", qty: 1, pricePence: 3500, category: "fashion" }], aiFilled: ["total", "items"] }];
@@ -23,6 +23,8 @@ await ctx.route("https://**/*", async route => {
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
+  if (p === "/relay/my/item-kinds" && m === "GET") return j({ available: st.available, on: st.picks, kinds: {} });
+  if (p === "/relay/my/item-kinds" && m === "POST") { const b = JSON.parse(route.request().postData() || "{}"); st.pickPosts.push(b); st.picks = b.on; return j({ available: true, on: st.picks }); }
   if (p === "/relay/my/ai-reading" && m === "GET") return j({ available: st.available, on: st.available && st.on, since: st.on ? new Date().toISOString() : null });
   if (p === "/relay/my/ai-reading" && m === "POST") {
     const b = JSON.parse(route.request().postData() || "{}"); st.posts.push(b);
@@ -110,6 +112,19 @@ await view.getByText("Off. What the AI read has been deleted.").waitFor();
 assert.deepEqual(st.posts, [{ on: true }, { on: false }]);
 assert.equal(await sw.getAttribute("aria-checked"), "false");
 console.log("ok - off to start; says what it means; on and off once each, in plain words");
+// AI for picks has its own switch under AI help: off to start, item names only, on and off once each.
+const psw = view.getByRole("switch", { name: "AI for picks" });
+await psw.waitFor();
+assert.equal(await psw.getAttribute("aria-checked"), "false");
+assert.match(await view.locator(".rl-aih-picks").innerText(), /Nothing else is sent: not your emails, address, order numbers or prices\./);
+await psw.dblclick();
+await view.getByText("On. Your picks will follow what the AI works out.").waitFor();
+assert.deepEqual(st.pickPosts, [{ on: true }], "on once for a double tap");
+await page.waitForTimeout(500);
+await psw.click();
+await view.getByText("Off. What the AI worked out has been deleted.").waitFor();
+assert.deepEqual(st.pickPosts, [{ on: true }, { on: false }]);
+console.log("ok - AI for picks: its own switch, off to start, item names only, on and off once each");
 
 // 3. A receipt the AI filled in says so, for the shopper to check.
 await page.evaluate(() => window.go("receipts"));

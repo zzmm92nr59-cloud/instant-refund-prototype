@@ -14,6 +14,7 @@ import { handleHealthRoute } from "./health.js";
 import { handleHealthEmailRoute } from "./health-digest.js";
 import { handleSharedEmailAdminRoute } from "./shared-emails.js";
 import { handleAiReadingRoute } from "./ai-runner.js";
+import { handleItemKindsRoute } from "./item-kinds.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -707,6 +708,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // "AI help": Claude reads emails Relay's own reader isn't sure about, only for shoppers who switch it on.
     const aiResponse = await handleAiReadingRoute(path, request.method, request, env, cors, shopper, o);
     if (aiResponse) return aiResponse;
+    // "AI for picks": Claude reads the names of the things bought, for Browse's picks, only for shoppers who switch it on.
+    const kindsResponse = await handleItemKindsRoute(path, request.method, request, env, cors, shopper, o);
+    if (kindsResponse) return kindsResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;

@@ -20,7 +20,7 @@ import { buildWrapped } from "./wrapped.js";
 import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
-import { AI_READS_SQL, AI_SETTING_SQL, attachAiReads } from "./ai-reader.js";
+import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads } from "./ai-reader.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
@@ -229,7 +229,7 @@ async function ensureGmailTablesRun(db) {
     // "Send this email to Relay": the one email a shopper chose to send, details hidden, encrypted, kept 30 days at most.
     SHARED_EMAILS_SQL,
     // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
-    AI_SETTING_SQL, AI_READS_SQL,
+    AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -265,6 +265,8 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -600,6 +602,8 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -1605,6 +1609,27 @@ function isRelayEmail(c, env) {
   const own = (String(env.RELAY_EMAIL_FROM || "").match(/@([a-z0-9.-]+)/i) || [])[1];
   return domain === "resend.dev" || Boolean(own && domain === own.toLowerCase()) || /^relay$/i.test(String(r.name || "").trim()) && !c.orderRef;
 }
+// Everything the shopper bought that picks can learn from (/relay/my/style, and AI for picks in item-kinds.js): physical things
+// only (no travel or apps, and no food unless it's something that has a companion, like coffee, tea or wine), across all their
+// receipts rather than just the newest.
+const COMPANION_FOOD = /coffee|espresso|nespresso|capsule|\bpods?\b|lungo|ristretto|\btea\b|teabag|\bwine\b|prosecco|champagne/i;
+export async function styleThings(env, shopperId) {
+  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const things = [];
+    // Each item by what it is: a jacket from a supermarket counts, the bread in the same order doesn't.
+    const NOT_THINGS = ["travel", "digital"];
+    for (const c of cards) {
+      if (c.kind === "return_instructions") continue;
+      if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
+      const items = (c.items || []).filter(i => i && typeof i.name === "string" && i.name.trim() && (() => { const cat = typeof i.category === "string" ? i.category : c.category; return !NOT_THINGS.includes(cat) && (cat !== "food" || COMPANION_FOOD.test(i.name + " " + ((c.retailer && c.retailer.name) || ""))); })()).slice(0, 20)
+        .map(i => ({ name: i.name.slice(0, 120), variant: typeof i.variant === "string" ? i.variant.slice(0, 80) : null, pricePence: Number.isInteger(i.pricePence) ? i.pricePence : null, qty: i.qty || 1 }));
+      if (!items.length) continue;
+      things.push({ id: c.id, retailer: { name: (c.retailer && (c.retailer.name || c.retailer.domain)) || null }, orderDate: c.orderDate || null, category: c.category, hasImage: Boolean(c.hasImage), items });
+      if (things.length >= 400) break;
+    }
+  return things;
+}
+
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
@@ -2045,22 +2070,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   // Everything the shopper bought that their style can be learned from: physical things only (no food, travel or apps),
   // across all their receipts rather than just the newest. The app works the style out on the device from this list.
-  if (path === "/relay/my/style" && m === "GET") {
-    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
-    const things = [];
-    // Each item by what it is: a jacket from a supermarket counts, the bread in the same order doesn't.
-    const NOT_THINGS = ["food", "travel", "digital"];
-    for (const c of cards) {
-      if (c.kind === "return_instructions") continue;
-      if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
-      const items = (c.items || []).filter(i => i && typeof i.name === "string" && i.name.trim() && !NOT_THINGS.includes(typeof i.category === "string" ? i.category : c.category)).slice(0, 20)
-        .map(i => ({ name: i.name.slice(0, 120), variant: typeof i.variant === "string" ? i.variant.slice(0, 80) : null, pricePence: Number.isInteger(i.pricePence) ? i.pricePence : null, qty: i.qty || 1 }));
-      if (!items.length) continue;
-      things.push({ id: c.id, retailer: { name: (c.retailer && (c.retailer.name || c.retailer.domain)) || null }, orderDate: c.orderDate || null, category: c.category, hasImage: Boolean(c.hasImage), items });
-      if (things.length >= 400) break;
-    }
-    return json({ receipts: things }, 200, cors);
-  }
+  if (path === "/relay/my/style" && m === "GET") return json({ receipts: await styleThings(env, shopper.id) }, 200, cors);
   if (path === "/relay/my/receipts" && m === "GET") {
     // The Receipts page asks for everything (?all=1); Home and the wallet only need the newest, so they stay quick.
     const all = url.searchParams.get("all") === "1";
