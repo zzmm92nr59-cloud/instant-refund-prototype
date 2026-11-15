@@ -93,6 +93,24 @@ assert.doesNotMatch(panelText, /% |spending|spend most/i, "no shares of spending
 // The list below starts with the picks, and everything else is still there, just later.
 const grid = await page.locator("#catalogResults [data-card-select] h3").allInnerTexts();
 assert.deepEqual(grid.slice(0, 3), said.map(x => x[0])); assert.ok(grid.includes("Cosy Dog Bed"));
+// "Not for me" on a pick's page: hidden, fewer of that kind, and it can be undone. Relay says it learnt it, and Forget my style
+// clears what it learnt on this phone.
+await page.locator("#dcForYou .dc-strip [data-card-select]", { hasText: "Everyday Leggings" }).click();
+await page.locator(".dc-page h2", { hasText: "Everyday Leggings" }).waitFor();
+await page.getByRole("button", { name: "Not for me" }).click();
+await panel.locator(".dc-fewer", { hasText: "Fewer leggings from now on." }).waitFor();
+assert.ok(!(await panel.locator(".dc-strip").innerText()).includes("Everyday Leggings"), "hidden from picks");
+await panel.getByRole("button", { name: "Undo" }).click();
+await panel.locator(".dc-strip [data-card-select]", { hasText: "Everyday Leggings" }).waitFor();
+assert.equal(await panel.locator(".dc-fewer").count(), 0);
+await panel.getByRole("button", { name: "Forget my style" }).waitFor();
+// A product that isn't a pick has no "Not for me".
+await page.locator("#catalogResults [data-card-select]", { hasText: "Cosy Dog Bed" }).click();
+await page.locator(".dc-page h2", { hasText: "Cosy Dog Bed" }).waitFor();
+assert.equal(await page.getByRole("button", { name: "Not for me" }).count(), 0);
+await page.getByRole("button", { name: "Back" }).first().click();
+await panel.getByRole("button", { name: "Forget my style" }).click();
+await panel.getByRole("button", { name: "Forget my style" }).waitFor({ state: "detached" });
 // Kinds of product: chips to narrow it down (and picks step aside while filtering).
 await openFilters(page);
 await page.locator("#dcKinds").getByRole("button", { name: "Pets" }).click();
@@ -140,7 +158,7 @@ await panel.getByRole("button", { name: "Turn off" }).click();
 style.receipts = wardrobe;
 await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
 await page.reload(); await page.waitForTimeout(600);
-console.log("PASS Discover: opt-in picks from the things you bought (more of a kind you buy again, one companion, nothing for one-offs or food), each with a reason; filters and turn off work");
+console.log("PASS Discover: opt-in picks from the things you bought (more of a kind you buy again, one companion, nothing for one-offs or food), each with a reason; Not for me, undo and forget; filters and turn off work");
 
 // Wrapped: one story a year, on its own page (Browse's Wrapped card opens it). Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.

@@ -66,9 +66,25 @@ assert.ok(html.includes('togglePersonalise'),"Discover needs a user-facing on/of
  assert.deepEqual(engine.picks([buys[0],buys[3]],groups),[],"a TV and bananas pick nothing");
  assert.deepEqual(engine.picks([{item:"Seamless Leggings",merchant:"Gym Row",price:40,verified:true}],groups).map(x=>x.g.product),["Run Leggings","Flow Tights"],"never the very thing they bought");
  assert.deepEqual(engine.picks([buys[4]],groups),[],"unverified purchases are ignored");
+ // Learning on the phone: looks, watches, "Not for me" and picks left unopened.
+ const hood=[g("Zip Hoodie","Gym Row",5000),g("Pullover Hoodie","Track Lane",5000)],all=groups.concat(hood),legs=[buys[1]];
+ assert.ok(!engine.picks(legs,all).some(x=>/Hoodie/.test(x.g.product)),"no hoodies before they've looked at any");
+ const taps=[engine.tapOf({product:"Zip Hoodie",store:"Gym Row"}),engine.tapOf({product:"Pullover Hoodie",store:"Track Lane"})];
+ assert.equal(taps[0].kind,"hoodie");
+ const looked=engine.picks(legs,all,{taps});
+ assert.ok(looked.some(x=>x.g.product==="Zip Hoodie"&&x.why[0]==="Like the hoodie you've been looking at"),"two looks at hoodies bring hoodie picks");
+ assert.ok(engine.picks(legs,all,{watched:[{product:"Zip Hoodie"}]}).some(x=>/Hoodie/.test(x.g.product)),"one watch counts as two looks");
+ assert.ok(!engine.picks(legs,all,{taps:[taps[0]]}).some(x=>/Hoodie/.test(x.g.product)),"one look isn't enough");
+ const no1=[{key:"Gym Row|Seamless Leggings",kind:"leggings",store:"Gym Row"}];
+ const after=engine.picks(legs,all,{taps,notFor:no1});
+ assert.ok(!after.some(x=>x.g.product==="Seamless Leggings"),"Not for me hides that product");
+ assert.equal(after[0].why[0],"Like the hoodie you've been looking at","and its kind drops below what they've been looking at");
+ const no3=no1.concat([{key:"Track Lane|Run Leggings",kind:"leggings"},{key:"x",kind:"leggings"}]);
+ assert.ok(!engine.picks(legs,all,{notFor:no3}).some(x=>/Leggings|Tights/.test(x.g.product)),"three times and the kind is gone");
+ assert.equal(engine.picks(legs,all,{seen:{"Gym Row|Seamless Leggings":4}})[0].g.product!=="Seamless Leggings",true,"a pick shown on four days without being opened drops back");
 }
 assert.ok(html.includes('personalisationHistory(),'),"App should use the purchase history for ranking");
 const script=html.match(/<script>([\s\S]*?)<\/script>/i);
 assert.ok(script);
 new vm.Script(script[1],{filename:"Relay embedded app"});
-console.log("PASS: opt-in Discover recommendation ranking, cross-shop examples, consent default, unverified exclusions, unchanged source inventory, picks from the things bought (one-offs and food pick nothing), UI integration");
+console.log("PASS: opt-in Discover recommendation ranking, cross-shop examples, consent default, unverified exclusions, unchanged source inventory, picks from the things bought (one-offs and food pick nothing), learning from looks, watches, Not for me and unopened picks, UI integration");
