@@ -376,10 +376,14 @@
   function isCarrier(x) { return CARRIER_DOMAIN.test(String((x && x.retailer && x.retailer.domain) || "")); }
   // "On its way" only while that's still likely: three weeks after the order (or the last delivery date). After that an
   // old "shipped" email says nothing about now, so it isn't shown and doesn't keep an order in the wallet.
+  // Whether Relay can still honestly say a parcel is on its way. Shops rarely email when it arrives, so a claim goes stale:
+  // "due" holds until a day after the date given, "out for delivery" for a day, anything else for 10 days from the latest
+  // update (Connor, 15 Nov: a lululemon order still said On its way after more than two weeks). After that, nothing is said.
   function freshDelivery(x) {
     var dv = x && x.delivery; if (!dv || !dv.status || dv.status === "delivered") return false;
     var ref = dv.at || x.orderDate; if (!ref || !/^\d{4}-\d{2}-\d{2}/.test(ref)) return false;
-    return (Date.now() - Date.parse(ref.slice(0, 10) + "T00:00:00Z")) / 864e5 <= 21;
+    var ago = (Date.now() - Date.parse(ref.slice(0, 10) + "T00:00:00Z")) / 864e5;
+    return dv.status === "due" ? ago <= 1 : dv.status === "out_for_delivery" ? ago <= 1 : ago <= 10;
   }
   function daysLeft(dl) {
     if (!dl || !/^\d{4}-\d{2}-\d{2}$/.test(dl)) return null;
