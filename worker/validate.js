@@ -99,8 +99,9 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/alerts/mode": { fields: { mode: one("watchlist", "all") } },
   "/relay/my/alerts/check": NOTHING,
   // Resale between members.
-  "/relay/my/resale/listings": { limit: 16 * KB, fields: { receiptId: str(64), itemIndex: int(0, 999), condition: str(40), size: text(60), askPence: int(0, 10000000),
-    swapOk: bool, note: text(600), handover: str(20), area: text(20), agree: bool } },
+  // Up to 4 of the seller's own photos, made smaller on the phone first (each at most 450 KB, as for auctions).
+  "/relay/my/resale/listings": { limit: 2600 * KB, tooLarge: "photos_too_big", fields: { receiptId: str(64), itemIndex: int(0, 999), condition: str(40), size: text(60), askPence: int(0, 10000000),
+    swapOk: bool, note: text(600), handover: str(20), area: text(20), agree: bool, photos: list(4, str(620000)) } },
   // Swaps, returns and payments.
   "/relay/my/exchange": { fields: { orderId: id(), lineId: id(), variantKey: str(300), agreedDiffMinor: int(-100000000, 100000000) } },
   "/relay/my/return": { fields: { orderId: id(), lineId: id(), reason: str(60) } },

@@ -13,6 +13,7 @@ const DAY = 24 * 60 * 60 * 1000;
 import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
 import { ensureOnce, runAll } from "./once.js";
 import { categorise, storeKey } from "./receipt-category.js";
+import { decodePhoto } from "./auctions.js";
 
 // What can be resold: physical goods only. Food & drink, travel and digital purchases can't be handed to
 // someone else, and receipt lines like "You've saved" or "Delivery" aren't products at all.
@@ -36,7 +37,7 @@ export function postcodeArea(v) {
   const m = String(v || "").toUpperCase().replace(/\s+/g, " ").trim().match(/^([A-Z]{1,2}[0-9][A-Z0-9]?)(?: ?[0-9][A-Z]{2})?$/);
   return m ? m[1] : null;
 }
-const MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000, MAX_LISTING_REPORTS_PER_DAY = 10;
+const MAX_PHOTOS = 4, MAX_ACTIVE_LISTINGS = 20, MAX_REQUESTS_PER_DAY = 30, MAX_ASK_PENCE = 500000, MAX_LISTING_REPORTS_PER_DAY = 10;
 
 export function ensureResaleTables(db) { return ensureOnce(db, "resale", () => ensureResaleTablesRun(db)); }
 async function ensureResaleTablesRun(db) {
@@ -62,11 +63,13 @@ async function ensureResaleTablesRun(db) {
     // A listing reported straight from Browse, without a conversation (one report per member per listing).
     `CREATE TABLE IF NOT EXISTS resale_listing_reports (
        id TEXT PRIMARY KEY, listing_id TEXT NOT NULL, reporter_id TEXT NOT NULL, reason TEXT, created_at INTEGER NOT NULL, UNIQUE (listing_id, reporter_id))`,
+    // The seller's own photos of what they're selling (up to 4, made smaller on their phone first).
+    `CREATE TABLE IF NOT EXISTS resale_photos (listing_id TEXT NOT NULL, n INTEGER NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (listing_id, n))`,
     ...ADMIN_TABLE_SQL
   ];
   await runAll(db, statements);
   // Added later: how the item changes hands, and the area for collection (only the first half of a postcode, never an address).
-  for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT"]) {
+  for (const sql of ["ALTER TABLE resale_listings ADD COLUMN handover TEXT", "ALTER TABLE resale_listings ADD COLUMN area TEXT", "ALTER TABLE resale_listings ADD COLUMN photos INTEGER NOT NULL DEFAULT 0"]) {
     try { await db.prepare(sql).run(); } catch { /* already there */ }
   }
 }
@@ -79,6 +82,7 @@ export function resaleDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM resale_reports WHERE reporter_id = ? OR request_id IN " + MY_REQUESTS).bind(shopperId, shopperId, shopperId),
     db.prepare("DELETE FROM resale_listing_reports WHERE reporter_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId),
     db.prepare("DELETE FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?) OR offered_listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId, shopperId, shopperId),
+    db.prepare("DELETE FROM resale_photos WHERE listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?)").bind(shopperId),
     db.prepare("DELETE FROM resale_listings WHERE seller_id = ?").bind(shopperId)
   ];
 }
@@ -99,7 +103,7 @@ function returnWindow(details, now) {
 // The shopper's own receipt items that could be listed, with whether each is already listed.
 async function listable(env, shopperId, now) {
   const rows = await env.RELAY_DB.prepare(
-    "SELECT id, details FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT 100")
+    "SELECT id, details FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT 2000")
     .bind(shopperId).all();
   const plans = new Map();
   const out = [];
@@ -119,7 +123,8 @@ async function listable(env, shopperId, now) {
         orderDate: r.orderDate || null, returnWindowOpen: rw.open, returnDeadline: rw.deadline, alreadyListed: taken.has(r.id + ":" + i) });
     });
   }
-  return out;
+  // Newest purchase first (Connor, 15 Nov: only the 100 receipts added most recently were looked at, so older things were missing).
+  return out.sort((a, b) => String(b.orderDate || "").localeCompare(String(a.orderDate || ""))).slice(0, 300);
 }
 
 async function createListing(env, shopper, body, now) {
@@ -146,6 +151,13 @@ async function createListing(env, shopper, body, now) {
   const item = Array.isArray(d.items) ? d.items[index] : null;
   if (!item || typeof item.name !== "string") return { status: 404, body: { error: "not_found" } };
   if (!resellable(d, item, (await learnedCategories(env, shopper.id)).get(storeKey(d)))) return { status: 400, body: { error: "not_resellable" } };
+  const photos = [];
+  for (const raw of Array.isArray(body.photos) ? body.photos.slice(0, MAX_PHOTOS + 1) : []) {
+    const ph = decodePhoto(raw);
+    if (!ph || ph.error) return { status: 400, body: { error: ph && ph.error ? ph.error : "bad_photo" } };
+    photos.push(ph);
+  }
+  if (photos.length > MAX_PHOTOS) return { status: 400, body: { error: "too_many_photos" } };
   const count = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM resale_listings WHERE seller_id = ? AND status = 'active'").bind(shopper.id).first();
   if (count && count.n >= MAX_ACTIVE_LISTINGS) return { status: 429, body: { error: "too_many_listings" } };
   const id = uuid();
@@ -155,7 +167,10 @@ async function createListing(env, shopper, body, now) {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?)`)
       .bind(id, shopper.id, receiptId, index, clean(item.name, 120), clean((d.retailer && (d.retailer.name || d.retailer.domain)) || "", 60) || null,
         d.currency === "GBP" || !d.currency ? "GBP" : clean(d.currency, 3), clean(body.size, 20) || null, body.condition, ask,
-        body.swapOk === true ? 1 : 0, clean(body.note, 200) || null, d.hasImage && d.items.length === 1 ? 1 : 0, now, handover, area).run(); // a receipt photo is only trusted as the item's photo when the order has one item
+        body.swapOk === true ? 1 : 0, clean(body.note, 200) || null, photos.length || (d.hasImage && d.items.length === 1) ? 1 : 0, now, handover, area).run(); // a receipt photo is only trusted as the item's photo when the order has one item
+    if (photos.length) await env.RELAY_DB.batch([
+      env.RELAY_DB.prepare("UPDATE resale_listings SET photos = ? WHERE id = ?").bind(photos.length, id),
+      ...photos.map((ph, k) => env.RELAY_DB.prepare("INSERT INTO resale_photos (listing_id, n, type, data) VALUES (?,?,?,?)").bind(id, k + 1, ph.type, ph.data))]);
   } catch (e) {
     return { status: 409, body: { error: "already_listed" } };
   }
@@ -164,7 +179,7 @@ async function createListing(env, shopper, body, now) {
 
 const publicListing = (r, mine) => ({
   id: r.id, title: r.title, store: r.store, size: r.size, condition: r.condition, askPence: r.ask_pence, currency: r.currency || "GBP",
-  swapOk: Boolean(r.swap_ok), note: r.note, hasImage: Boolean(r.has_image), createdAt: r.created_at, status: r.status, mine: Boolean(mine),
+  swapOk: Boolean(r.swap_ok), note: r.note, hasImage: Boolean(r.has_image), photos: r.photos || 0, createdAt: r.created_at, status: r.status, mine: Boolean(mine),
   handover: r.handover || "post", area: r.area || null
 });
 
@@ -362,12 +377,22 @@ export async function handleResaleRoute(request, env, url, cors, shopper, opts) 
   }
   const decision = /^\/relay\/my\/resale\/requests\/([0-9a-f-]{36})\/(accept|decline)$/.exec(path);
   if (decision && m === "POST") return send(await decide(env, shopper, decision[1], decision[2] === "accept"));
+  // The seller's own photos (n = 1 to 4): seen like the listing's picture, by members while it's active and by the seller.
+  const own = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/photos\/([1-4])$/.exec(path);
+  if (own && m === "GET") {
+    const row = await env.RELAY_DB.prepare(`SELECT p.type, p.data FROM resale_photos p JOIN resale_listings l ON l.id = p.listing_id
+      WHERE p.listing_id = ? AND p.n = ? AND (l.status = 'active' OR l.seller_id = ?)`).bind(own[1], Number(own[2]), shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
+      status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'" } });
+  }
   const image = /^\/relay\/my\/resale\/listings\/([0-9a-f-]{36})\/image$/.exec(path);
   if (image && m === "GET") {
     // Any signed-in member may see the photo of an active listing, and sellers see their own.
-    const row = await env.RELAY_DB.prepare(
+    const row = (await env.RELAY_DB.prepare(`SELECT p.type, p.data FROM resale_photos p JOIN resale_listings l ON l.id = p.listing_id
+        WHERE p.listing_id = ? AND p.n = 1 AND (l.status = 'active' OR l.seller_id = ?)`).bind(image[1], shopper.id).first()) || (await env.RELAY_DB.prepare(
       `SELECT i.type, i.data FROM resale_listings l JOIN receipt_images i ON i.receipt_id = l.receipt_id
-         WHERE l.id = ? AND l.has_image = 1 AND (l.status = 'active' OR l.seller_id = ?)`).bind(image[1], shopper.id).first();
+         WHERE l.id = ? AND l.has_image = 1 AND (l.status = 'active' OR l.seller_id = ?)`).bind(image[1], shopper.id).first());
     if (!row) return json({ error: "not_found" }, 404, cors);
     return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
       status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=3600", "X-Content-Type-Options": "nosniff" } });

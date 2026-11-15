@@ -114,6 +114,26 @@ r = await get(`/relay/my/resale/listings/${L1}/image`, bob);
 assert.equal(r.status, 200); assert.equal(r.headers.get("content-type"), "image/png");
 assert.equal((await get(`/relay/my/resale/listings/${L1}/image`)).status, 401);
 assert.equal((await get(`/relay/my/resale/listings/${L2}/image`, bob)).status, 404, "a multi-item order's photo is not assumed to be this item's");
+// The seller's own photos (up to 4): the first is the listing's picture; members see them, as with the receipt's photo.
+{
+  const JPG = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(400, 9)]).toString("base64");
+  assert.equal((await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: ["data:image/png;base64,AAAA"] })).status, 400, "not really a picture");
+  assert.equal((await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: [JPG, JPG, JPG, JPG, JPG] })).status, 400, "at most 4");
+  const ok = await post("/relay/my/resale/listings", alice, { receiptId: A3, itemIndex: 1, condition: "good", agree: true, photos: [JPG, JPG] });
+  assert.equal(ok.status, 200);
+  const LP = (await ok.json()).id;
+  const lp = (await (await get("/relay/my/resale/feed", bob)).json()).listings.find(l => l.id === LP);
+  assert.equal(lp.photos, 2); assert.equal(lp.hasImage, true, "a multi-item order gets a picture from the seller's own photo");
+  const first = await get(`/relay/my/resale/listings/${LP}/image`, bob);
+  assert.equal(first.status, 200); assert.equal(first.headers.get("content-type"), "image/jpeg", "the seller's photo comes first");
+  assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`, bob)).status, 200);
+  assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/3`, bob)).status, 404);
+  assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`)).status, 401);
+  assert.equal((await post(`/relay/my/resale/listings/${LP}/withdraw`, alice)).status, 200);
+  assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`, bob)).status, 404, "a withdrawn listing's photos are the seller's alone");
+  assert.equal((await get(`/relay/my/resale/listings/${LP}/photos/2`, alice)).status, 200);
+  console.log("ok - the seller's own photos: up to 4, checked to be pictures, the first leads, members see them while it's active");
+}
 
 // Asking.
 const ask = (token, id, body) => post(`/relay/my/resale/listings/${id}/ask`, token, body);

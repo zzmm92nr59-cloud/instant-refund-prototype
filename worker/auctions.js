@@ -409,7 +409,7 @@ async function expire(env, a, offer, now, o, f) {
 }
 
 // ---- Shops' routes (retailer.js hands these over with the shop already known) ----
-function decodePhoto(raw) {
+export function decodePhoto(raw) {
   const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(raw || ""));
   if (!m) return null;
   let bin;
