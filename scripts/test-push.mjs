@@ -122,6 +122,22 @@ assert.equal(pushes.length, 0, "a price rise is not an alert");
 setPrice("DEMO-JACKET", 4400); clock += 60000; await post("/relay/my/alerts/check", alice, {});
 assert.equal(pushes.length, 1, "a later fall from the new price is");
 assert.equal((await post("/relay/my/alerts/watch", alice, { sku: "DEMO-JACKET", on: false })).status, 200);
+// A product from a shop's own website (web-shops.js) can be watched too: its price as Relay last read it, about once a day.
+{
+  sqlite.exec("CREATE TABLE IF NOT EXISTS web_shop_items (id TEXT PRIMARY KEY, domain TEXT NOT NULL, product_key TEXT NOT NULL, position INTEGER NOT NULL, product TEXT NOT NULL, variation TEXT, price_minor INTEGER NOT NULL, available INTEGER, image_url TEXT NOT NULL, product_url TEXT NOT NULL, kind TEXT, checked_at INTEGER NOT NULL)");
+  const W = "web:hollow-pine.example:4401";
+  sqlite.prepare("INSERT INTO web_shop_items (id, domain, product_key, position, product, variation, price_minor, available, image_url, product_url, kind, checked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+    .run(W, "hollow-pine.example", "web:hollow-pine.example:44", 0, "Wool Beanie", null, 2800, 1, "https://img.example/p/1.png", "https://hollow-pine.example/products/wool-beanie", null, clock);
+  assert.equal((await post("/relay/my/alerts/watch", alice, { sku: W, product: "Wool Beanie", store: "Hollow Pine", priceMinor: 2800 })).status, 200);
+  pushes = []; clock += 60000; await post("/relay/my/alerts/check", alice, {});
+  assert.equal(pushes.length, 0, "no drop yet");
+  sqlite.prepare("UPDATE web_shop_items SET price_minor = 2200 WHERE id = ?").run(W); clock += 60000;
+  const cw = await (await post("/relay/my/alerts/check", alice, {})).json();
+  assert.equal(cw.drops, 1, "a shop website's lower price is a drop"); assert.equal(pushes.length, 1);
+  assert.equal((await read(pa, pushes[0].body)).body, "Wool Beanie is now £22.00 (was £28.00)");
+  assert.equal((await post("/relay/my/alerts/watch", alice, { sku: W, on: false })).status, 200);
+  console.log("ok - a product from a shop's own website can be watched: its daily-read price falling is an alert");
+}
 
 // A stale second copy of the same SKU (an old seed row, listed first) must never hide the shop's current price.
 sqlite.prepare("INSERT INTO retailer_catalog_items (id, provider, external_item_id, title) VALUES (?,?,?,?)").run("iold", "relay_demo", "xold", "Old copy");

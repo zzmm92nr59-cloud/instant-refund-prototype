@@ -21,7 +21,7 @@ await mkdir("/tmp/shots", { recursive: true });
 const EMAIL = "jess.tester@gmail.com", day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const food = Array.from({ length: 130 }, (_, i) => ({ id: "00000000-0000-4000-8000-" + String(i).padStart(12, "0"), status: "confirmed", kind: "receipt",
   retailer: { name: i % 2 ? "Deliveroo" : "Greggs", domain: i % 2 ? "deliveroo.co.uk" : "greggs.co.uk" }, orderRef: "F" + (1000 + i), orderDate: day(-i * 5), totalPence: 1000 + i, currency: "GBP",
-  items: [{ name: i === 7 ? "Sausage roll" : "Meal " + i, qty: 1 }], category: "food", categoryLabel: "Food & drink", returnable: false, notReturnableReason: "Food and drink usually can't be returned." }));
+  items: i === 7 ? [{ name: "Sausage roll", qty: 1 }].concat(Array.from({ length: 11 }, (_, k) => ({ name: "Grocery " + (k + 1), qty: k === 0 ? 2 : 1, pricePence: 100 + k }))) : [{ name: "Meal " + i, qty: 1 }], category: "food", categoryLabel: "Food & drink", returnable: false, notReturnableReason: "Food and drink usually can't be returned." }));
 const fashion = [{ id: "99999999-9999-4999-8999-999999999999", status: "confirmed", kind: "receipt", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-1", orderDate: day(-5), totalPence: 9500, currency: "GBP",
   items: [{ name: "Long Jacket", qty: 1, pricePence: 9500 }], category: "fashion", categoryLabel: "Fashion", returnable: true, returns: { deadline: day(20) } },
   { id: "88888888-8888-4888-8888-888888888888", status: "pending", kind: "receipt", gmailId: "hat0email01", retailer: { name: "RAINS", domain: "rains.com" }, orderRef: "RA-0", orderDate: day(-400), totalPence: 4500, currency: "GBP",
@@ -88,10 +88,16 @@ await page.evaluate(() => window.scrollTo(0, 0));
 const m = await measure(); assert.deepEqual(m, { small: [], tiny: [] }, "polish rules on the group page");
 await page.screenshot({ path: "/tmp/shots/cat-food.png" });
 // A whole row opens its details.
-const row = page.locator(".rl-rr").filter({ hasText: "Sausage roll" });
+const row = page.locator(".rl-rr").filter({ hasText: "+ 11 more" });
 await row.locator(".rl-rr-main").click();
 assert.equal(await row.locator(".rl-rr-main").getAttribute("aria-expanded"), "true");
 await row.locator("select").waitFor();
+// A long shop (12 things) is a list, one thing a line with its price, the first eight then the rest on a tap (Connor, 15 Nov).
+assert.equal(await row.locator(".rl-rr-list li").count(), 8);
+assert.equal(await row.locator(".rl-rr-list li").nth(1).innerText(), "2 × Grocery 1\n£2.00");
+await page.waitForTimeout(450); await row.getByRole("button", { name: "Show all 12 items" }).click();
+assert.equal(await row.locator(".rl-rr-list li").count(), 12);
+assert.equal(await row.locator(".rl-rr-main").getAttribute("aria-expanded"), "true", "showing the rest keeps the receipt open");
 await page.waitForTimeout(500); // a second tap straight after the first is ignored on purpose (no double taps)
 await row.locator(".rl-rr-main").click();
 assert.equal(await row.locator(".rl-rr-detail").count(), 0);

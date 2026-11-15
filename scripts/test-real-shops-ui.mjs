@@ -193,6 +193,8 @@ for (const scheme of ["light", "dark"]) {
   assert.equal(await view.getAttribute("target"), "_blank"); assert.match(await view.getAttribute("rel"), /noopener/);
   const acts = await pg.locator(".actions > *").evaluateAll(xs => xs.map(x => (x.innerText || "").trim()));
   assert.equal(acts[0], "View on their website", "View on their website comes first");
+  // Its price can be watched (Relay reads the shop's prices about once a day).
+  assert.equal(acts[acts.length - 1], "Watch price", "Watch price comes last");
   assert.equal(await pg.locator(".dc-pricefrom").innerText(), "Prices from Lark & Lantern's website on " + dateLong + ".");
   assert.doesNotMatch(text, /Add to bag|Out of stock|Only \d+ left/);
   assert.doesNotMatch(text, NEVER);
@@ -201,6 +203,11 @@ for (const scheme of ["light", "dark"]) {
   assert.deepEqual(await measure(page, ".dc-page"), clean, "product page (" + scheme + ")");
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
   await shot(page, "product-page-" + scheme);
+  await waitOutDoubleTap(page); await pg.getByRole("button", { name: "Watch price" }).click();
+  await page.locator(".dc-page").getByRole("button", { name: "Watching the price" }).waitFor();
+  assert.ok(await page.evaluate(sku => { try { return Boolean(JSON.parse(localStorage.getItem("relay-watchlist") || localStorage.getItem("relay.watch.v1") || "{}")[sku]) || Boolean(window.relayLocalWatches && window.relayLocalWatches().some(w => w.sku === sku)); } catch (e) { return false; } }, WEB.find(w => w.product === "Brass Table Lamp").sku), "on the watchlist");
+  await waitOutDoubleTap(page); await page.locator(".dc-page").getByRole("button", { name: "Watching the price" }).click();
+  await page.locator(".dc-page").getByRole("button", { name: "Watch price" }).waitFor();
   await page.getByRole("button", { name: "Back" }).click();
 
   // Your shops: a shop's sheet shows its products from its website.
