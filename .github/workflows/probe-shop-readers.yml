@@ -9,4 +9,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node scripts/probe/check-live.mjs
+      - run: node scripts/probe/dump-names.mjs
+      - uses: actions/upload-artifact@v4
+        with: { name: names, path: names.json, retention-days: 1 }
