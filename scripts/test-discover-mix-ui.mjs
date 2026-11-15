@@ -244,7 +244,7 @@ await openProfile();
 const webSw = me.getByRole("switch", { name: "Shops' websites in Browse on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
 assert.equal(await webSw.getAttribute("aria-checked"), "true");
 assert.equal(await testSw.getAttribute("aria-checked"), "false");
-assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Browse" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Browse and search by photo\. Only Relay's team sees them\./);
+assert.match(await me.locator(".rl-aih", { hasText: "Shops' websites in Browse" }).innerText(), /Real products and prices from shops' own websites, read once a day, in Browse and search by photo\. Only Relay's team and its testers see them\./);
 await polished("team switches", "#mePage");
 await testSw.click();
 st.purchaseAsks = [];

@@ -55,7 +55,7 @@ let n = 0;
 const rec = (name, domain, daysAgo, cat = "fashion") => ({ id: "00000000-0000-4000-8000-" + String(++n).padStart(12, "0"), status: "confirmed", kind: "receipt", retailer: { name, domain },
   orderRef: "R" + n, orderDate: day(-daysAgo), totalPence: 2000 + n * 100, currency: "GBP", items: [{ name: "Item " + n, qty: 1 }], category: cat, categoryLabel: "Fashion" });
 const RECEIPTS = [rec("Hollow Pine", "hollow-pine.example", 4), rec("Hollow Pine", "hollow-pine.example", 30), rec("Fern Row", "fern-row.example", 12, "home")];
-const st = { webAsked: 0 };
+const st = { webAsked: 0, tester: false, testers: [] };
 
 const browser = await chromium.launch();
 const newPage = async (colorScheme, team, admin = false) => {
@@ -78,7 +78,8 @@ const newPage = async (colorScheme, team, admin = false) => {
     if (p === "/relay/my/wrapped") return j({ receipts: 0, years: [] });
     if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
     if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
-    if (p === "/relay/my/admin/me") return j({ admin });
+    if (p === "/relay/my/admin/me") return j({ admin, ...(st.tester ? { tester: true } : {}) });
+    if (p === "/relay/my/admin/testers") { if (m === "POST") { const b = JSON.parse(req.postData() || "{}"); st.testers = b.remove ? st.testers.filter(t => t.email !== b.email) : st.testers.concat([{ email: b.email, addedAt: Date.now() }]); } return j({ testers: st.testers, max: 100 }); }
     const lg = /^\/relay\/my\/logo\/(.+)$/.exec(p), shop = lg && SHOPS.find(s => s.domain === decodeURIComponent(lg[1]));
     if (shop) return route.fulfill({ status: 200, contentType: "image/svg+xml", headers: { "access-control-allow-origin": "*" }, body: logo(shop) });
     if (lg) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
@@ -306,6 +307,50 @@ for (const scheme of ["light", "dark"]) {
   assert.equal(await page.locator("#browseGrid .skel").count(), 0, "and no outlines left behind");
   await page.context().close();
   console.log("ok - Browse: shoppers see only shops on Relay with photos");
+}
+
+// A tester's phone (family and friends, before shops agree): opened once with ?shops=1, Browse shows the shops' websites
+// from then on, and the address loses ?shops=1 straight away.
+{
+  const page = await newPage("light", false);
+  await page.goto(origin + "/index.html?shops=1");
+  assert.equal(await page.evaluate(() => location.search), "", "the address loses ?shops=1");
+  await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
+  await page.goto(origin + "/index.html");
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#browseGrid .bg-card", { hasText: "Wool Beanie" }).waitFor({ timeout: 15000 });
+  assert.ok(st.webAsked > 0);
+  assert.deepEqual(page.errors, []);
+  await page.context().close();
+  console.log("ok - a tester's phone opened once with ?shops=1 shows the shops' websites in Browse");
+}
+
+// Testers an admin added (Profile, Team, Testers): their Browse shows the shops' websites, with no switch to find.
+{
+  st.tester = true;
+  const page = await newPage("light", false, false);
+  await signIn(page);
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#browseGrid .bg-card", { hasText: "Wool Beanie" }).waitFor({ timeout: 15000 });
+  await page.context().close(); st.tester = false;
+  // The admin's Testers page: add one by email, then remove them.
+  const adm = await newPage("light", false, true);
+  await signIn(adm);
+  await adm.evaluate(() => window.go("me"));
+  await adm.locator(".rl-arow", { hasText: "Testers" }).click();
+  await adm.getByText("No testers yet.").waitFor();
+  await adm.getByLabel("Tester's email address").fill("mum@example.com");
+  await waitOutDoubleTap(adm); await adm.getByRole("button", { name: "Add tester" }).click();
+  await adm.locator(".rl-arow", { hasText: "mum@example.com" }).waitFor();
+  assert.deepEqual(st.testers.map(t => t.email), ["mum@example.com"]);
+  assert.deepEqual(await measure(adm, "#mePage"), clean);
+  await adm.screenshot({ path: SHOTS + "/team-testers.png" });
+  await waitOutDoubleTap(adm); await adm.locator(".rl-arow", { hasText: "mum@example.com" }).click();
+  await adm.getByRole("button", { name: "Remove" }).last().click();
+  await adm.getByText("No testers yet.").waitFor();
+  assert.deepEqual(adm.errors, []);
+  await adm.context().close();
+  console.log("ok - testers: an added tester's Browse shows the shops' websites; admins add and remove them under Profile, Team");
 }
 
 await browser.close(); server.close();

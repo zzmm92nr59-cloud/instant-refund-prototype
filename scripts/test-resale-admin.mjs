@@ -172,4 +172,22 @@ for (let i = 0; i < 9; i++) {
   assert.equal((await reportL(dave, id, "Spam " + i)).status, i < 8 ? 200 : 429, "report " + (i + 3));
 }
 console.log("ok - listings reported from Browse: what's wrong needed, not your own, once each, hidden for the reporter, reviewed without names, 10 a day");
+// Testers (family and friends, before shops agree): an admin lists them by email; a tester learns only that they are one.
+{
+  const T = "/relay/my/admin/testers";
+  assert.equal((await get(T, alice)).status, 404, "a shopper can't see the list");
+  assert.equal((await post(T, alice, { email: "bob@example.com" })).status, 404, "or add to it");
+  assert.equal((await post(T, admin, { email: "not an email" })).status, 400);
+  const added = await (await post(T, admin, { email: " Bob@Example.com " })).json();
+  assert.deepEqual(added.testers.map(x => x.email), ["bob@example.com"], "kept in lower case, spaces trimmed");
+  assert.equal((await post(T, admin, { email: "bob@example.com" })).status, 200, "adding twice is fine");
+  assert.equal((await (await get(T, admin)).json()).testers.length, 1);
+  assert.deepEqual(await (await get("/relay/my/admin/me", bob)).json(), { admin: false, tester: true }, "a tester learns that, and nothing else");
+  assert.deepEqual(await (await get("/relay/my/admin/me", alice)).json(), { admin: false }, "nobody else is told anything");
+  assert.equal((await get("/relay/my/admin/reports", bob)).status, 404, "a tester gets no team tools");
+  assert.deepEqual((await (await post(T, admin, { email: "bob@example.com", remove: true })).json()).testers, []);
+  assert.deepEqual(await (await get("/relay/my/admin/me", bob)).json(), { admin: false });
+  assert.equal((await post(T, admin, { email: "x@example.com", extra: 1 })).status, 400, "only the listed fields");
+  console.log("ok - testers: admins add and remove them by email; a tester learns only that, and gets no team tools");
+}
 console.log("PASS resale report review: admin-only, pseudonymous, dismiss / remove listing / block, blocks survive re-signup, no self-review, listings reported from Browse");
