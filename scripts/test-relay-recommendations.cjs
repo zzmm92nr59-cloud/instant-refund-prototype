@@ -55,6 +55,10 @@ assert.ok(html.includes('togglePersonalise'),"Discover needs a user-facing on/of
   g("Run Leggings","Track Lane",3000,["Grey"]),g("Flow Tights","Studio North",9000,["Plum"]),g("Sold Out Leggings","Gym Row",4000,["Black"],0),
   g("Stoneware Espresso Cup","Clay Works",1200),g("Breakfast Mug","Clay Works",1400),g("Evening Gown","Another Shop",14999),g("Dark Chocolate Truffles","Cocoa Cottage",900)];
  assert.deepEqual(engine.kindOf("55 inch QLED TV"),{mode:"none"});
+ for(const bag of ["Sainsbury's Bag for Life","Carrier Bag 10p","Large Reusable Shopping Bag","Bin Bags x20"])assert.deepEqual(engine.kindOf(bag),{mode:"none"},bag+" is no bag to pick from");
+ assert.equal(engine.kindOf("Yorkshire Tea Bags x80").noun,"tea","tea bags are tea, not a bag");
+ assert.deepEqual(engine.picks([{item:"Bag",merchant:"Corner Grocer",price:0.1,verified:true}],[g("Canvas Tote Bag","Bag Shop",2000)]),[],"a 10p line picks nothing");
+ assert.equal(engine.picks([{item:"Canvas Tote Bag",merchant:"Bag Shop",price:20,verified:true}],[g("Leather Tote Bag","Bag Shop",6000)]).length,1,"a real bag still does");
  assert.equal(engine.kindOf("Bananas"),null,"what Relay can't place picks nothing");
  assert.equal(engine.kindOf("Align High-Rise Pant 25").key,"leggings");
  assert.equal(engine.kindOf("Espresso capsules, 50 pack").mode,"companion");

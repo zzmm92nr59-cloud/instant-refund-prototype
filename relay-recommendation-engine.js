@@ -172,9 +172,13 @@
   ["wine","wine",/\bwine\b|prosecco|champagne/,/wine glass|\bglasses\b|decanter|corkscrew/,/wine/],
   ["bed","bedding",/duvet|mattress|\bbed\b|\bdivan\b/,/pillowcase|duvet cover|fitted sheet|\bsheets?\b|bedding|\bthrow\b|blanket/,null]];
  // What a bought item is: {mode:"none"} for a one-off, "similar" or "companion" with its kind, or null when Relay can't say.
+ // Lines on a receipt that aren't things anyone would want more of: a supermarket's carrier bag, bin bags, packaging.
+ const NOT_A_THING=/carrier bag|bags? for life|plastic bag|paper bag|reusable (shopping )?bag|shopping bag|bin bag|bin liner|freezer bag|sandwich bag|food bag|gift bag|gift wrap|packaging|\bbag charge\b/;
  function kindOf(name){
   const s=normal(name);if(!s)return null;
+  if(NOT_A_THING.test(s))return {mode:"none"};
   if(ONE_OFF.test(s))return {mode:"none"};
+  if(/\btea ?bags?\b/.test(s)){const c=COMPANIONS.find(x=>x[0]==="tea");return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:null};}
   const k=KINDS.find(x=>x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[3]||k[2]};
   const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
   return null;
@@ -212,6 +216,8 @@
   const src=new Map(),owned=new Set();
   for(const p of bought){
    owned.add(normal(p.merchant)+"|"+normal(p.item));
+   // A line under £2 (a carrier bag, a pack of hair ties) says nothing about what someone would buy again.
+   if(Number(p.price)>0&&Number(p.price)<2&&!aiKindOf(p.item,options.aiKinds))continue;
    const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||shopCompanion(p.merchant);if(!k||k.mode==="none")continue;
    if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
    const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
