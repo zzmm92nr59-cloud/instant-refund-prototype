@@ -19,6 +19,8 @@ const receipts = [
   { id: "22222222-2222-4222-8222-222222222222", status: "pending", kind: "receipt", retailer: { name: "Royal Mail", domain: "royalmail.com" }, orderDate: day(-3), items: [], returnable: true, returns: {}, delivery: ship() },
   // Ordered 4 days ago and on its way: shown, with its delivery line.
   { id: "33333333-3333-4333-8333-333333333333", status: "pending", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderDate: day(-4), totalPence: 8500, currency: "GBP", items: [{ name: "Court Classic Trainers", qty: 1, pricePence: 8500 }], returnable: true, returns: {}, delivery: ship() },
+  // Shipped 16 days ago and nothing since (shops rarely say when it arrives): no longer claimed to be on its way.
+  { id: "55555555-5555-4555-8555-555555555555", status: "pending", kind: "receipt", retailer: { name: "Flare Studio", domain: null }, orderDate: day(-16), totalPence: 6900, currency: "GBP", items: [{ name: "Flared Pant", qty: 1, pricePence: 6900 }], returnable: true, returns: {}, delivery: { status: "shipped", at: day(-16), carrier: null } },
   // A deadline ahead (and an old delivery line, which isn't shown).
   { id: "44444444-4444-4444-8444-444444444444", status: "pending", kind: "receipt", retailer: { name: "Amazon.co.uk", domain: "amazon.co.uk" }, orderDate: day(-40), totalPence: 2599, currency: "GBP", items: [{ name: "Desk Lamp", qty: 1, pricePence: 2599 }], returnable: true, returns: { deadline: day(10) }, delivery: ship(null, { status: "due", at: day(-36) }) },
   // An older supermarket order that was mostly a jacket: its card is named after the jacket, not the loaf listed first.
@@ -57,6 +59,8 @@ assert.equal(await homeCard(page, "Royal Mail").count(), 0, "no card for the del
 assert.ok(/Desk Lamp/.test(text), "an order with a return deadline ahead is shown");
 const kick = homeCard(page, "Court Classic Trainers"), lamp = homeCard(page, "Desk Lamp");
 assert.match(await kick.innerText(), /On its way/, "a recent parcel still shows it's on its way");
+const flare = homeCard(page, "Flared Pant");
+assert.ok(!(await flare.count()) || !/On its way|Arriving|Out for delivery/.test(await flare.innerText()), "shipped over 10 days ago with no news: not claimed to be on its way");
 assert.match(await lamp.innerText(), /Return by/);
 assert.ok(!/Arriving |On its way|Out for delivery/.test(await lamp.innerText()), "an old delivery line isn't shown: " + await lamp.innerText());
 // Pictures: no product photo, so the shop's logo (a known one from Relay's own set, or fetched once) instead of initials.
