@@ -437,6 +437,7 @@ gmailBox.m5 = `From: Example Outfitters <orders@exampleoutfitters.test>\nSubject
 gmailBox.m6 = gmailBox.m5.replace("EO-5", "EO-6").replace("EO-5", "EO-6").replace("wool-jumper.png", "fake.png");
 await scanAll();
 assert.ok(!imageCalls.some(u => u.includes("logo") || u.startsWith("http://")), "logos and non-https images are never fetched");
+let ownPhotoReceipt = null;
 const withPhoto = sqlite.prepare("SELECT id, details FROM captured_receipts WHERE details LIKE '%EO-5%'").get();
 assert.equal(JSON.parse(withPhoto.details).hasImage, true);
 assert.ok(!withPhoto.details.includes("wool-jumper.png") && !withPhoto.details.includes("cdn.exampleoutfitters"), "image address is not kept");
@@ -448,9 +449,37 @@ assert.equal(r.headers.get("content-type"), "image/png");
 assert.deepEqual(Buffer.from(await r.arrayBuffer()), PNG);
 assert.equal((await call(`/relay/my/receipts/${withPhoto.id}/image`, { token: bob })).status, 404, "another shopper cannot see the photo");
 assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alice })).status, 404);
+// The shopper's own photo (an in-store receipt has none; a shop's can be the wrong colour): checked to be a picture, kept
+// as the receipt's photo, never replaced by a scan, theirs alone, and theirs to take away.
+{
+  const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(300, 7)]), url = "data:image/jpeg;base64," + JPG.toString("base64");
+  assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, bob, { image: url })).status, 404, "not someone else's receipt");
+  assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, alice, { image: "data:image/jpeg;base64,AAAA" })).status, 400, "not really a picture");
+  assert.equal((await post(`/relay/my/receipts/${noPhoto.id}/photo`, alice, { image: url })).status, 200);
+  let d = JSON.parse(sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(noPhoto.id).details);
+  assert.deepEqual([d.ownPhoto, d.hasImage, d.photoIsItem], [true, true, true]);
+  r = await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: alice });
+  assert.equal(r.status, 200); assert.equal(r.headers.get("content-type"), "image/jpeg"); assert.deepEqual(Buffer.from(await r.arrayBuffer()), JPG);
+  assert.equal((await call(`/relay/my/receipts/${noPhoto.id}/image`, { token: bob })).status, 404);
+  const listed = (await (await call("/relay/my/receipts", { token: alice })).json()).receipts.find(x => x.id === noPhoto.id);
+  assert.equal(listed.hasImage, true, "shown as the receipt's photo"); assert.equal(listed.ownPhoto, true);
+  ownPhotoReceipt = noPhoto.id;
+  console.log("ok - a shopper's own photo of what they bought: checked, kept, theirs alone");
+}
 const photoCalls = imageCalls.length;
 await scanAll();
 assert.equal(imageCalls.length, photoCalls, "photos are fetched only once per receipt");
+{
+  // Scanning again never replaces the shopper's own photo; taking it away puts the receipt back as it was.
+  const d = JSON.parse(sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(ownPhotoReceipt).details);
+  assert.deepEqual([d.ownPhoto, d.hasImage], [true, true], "kept through a scan");
+  assert.equal(sqlite.prepare("SELECT type FROM receipt_images WHERE receipt_id = ?").get(ownPhotoReceipt).type, "image/jpeg");
+  assert.equal((await post(`/relay/my/receipts/${ownPhotoReceipt}/photo`, alice, { remove: true })).status, 200);
+  const e = JSON.parse(sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(ownPhotoReceipt).details);
+  assert.deepEqual([e.ownPhoto, e.hasImage], [false, false]);
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM receipt_images WHERE receipt_id = ?").get(ownPhotoReceipt).n, 0);
+  console.log("ok - a scan never replaces the shopper's own photo; they can take it away");
+}
 // A photo is only shown as the item when it's named after the item; an advert in the same kind of email is stored but never shown.
 assert.equal(JSON.parse(withPhoto.details).photoIsItem, true, "the photo's alt text names the item");
 gmailBox.m9 = gmailBox.m5.replace(/EO-5/g, "EO-9").replace('alt="Wool jumper"', 'alt="New arrivals"').replace("products/wool-jumper.png", "promo/new-season/wool-jumper.png").replace("Wool jumper - Qty", "Cardigan - Qty");

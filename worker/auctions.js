@@ -409,18 +409,8 @@ async function expire(env, a, offer, now, o, f) {
 }
 
 // ---- Shops' routes (retailer.js hands these over with the shop already known) ----
-export function decodePhoto(raw) {
-  const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(raw || ""));
-  if (!m) return null;
-  let bin;
-  try { bin = atob(m[2]); } catch { return null; }
-  if (bin.length < 100 || bin.length > MAX_PHOTO_BYTES) return { error: "photo_too_big" };
-  const b = (i) => bin.charCodeAt(i);
-  // What the bytes really are, whatever the label says.
-  const type = b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff ? "image/jpeg" : b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47 ? "image/png"
-    : bin.slice(0, 4) === "RIFF" && bin.slice(8, 12) === "WEBP" ? "image/webp" : null;
-  return type ? { type, data: m[2] } : null;
-}
+import { decodePhoto } from "./photos.js";
+export { decodePhoto };
 async function shopCatalogue(db, shop) {
   const conn = "shopify:" + shop.shop_ref;
   const rows = ((await db.prepare(`SELECT v.id AS variantKey, i.title AS product, v.title AS variant, v.price_minor AS priceMinor, i.image_url AS imageUrl, s.quantity AS stock

@@ -161,6 +161,8 @@ const PATTERNS = [
   [new RegExp("^/relay/my/receipts/" + uuidish + "/remind$"), { fields: { on: bool } }],
   // Who a gift was for is a name the shopper types, so it's cleaned like other text people write.
   [new RegExp("^/relay/my/receipts/" + uuidish + "/gift$"), { fields: { gift: bool, for: text(40) } }],
+  // The shopper's own photo of what they bought (made smaller on the phone first: at most 450 KB, as for auctions).
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/photo$"), { limit: 700 * KB, tooLarge: "photo_too_big", fields: { image: str(620000), remove: bool } }],
   // "Fix this receipt": what the shopper typed in place of what Relay read (worker/gmail.js cleanFix checks it further).
   [new RegExp("^/relay/my/receipts/" + uuidish + "/fix$"), { limit: 16 * KB, fields: { shop: text(80), totalPence: int(0, 100000000), orderDate: str(10),
     items: list(50, obj({ name: text(120), qty: int(1, 999), pricePence: int(0, 100000000) })), undo: bool } }],

@@ -2976,6 +2976,8 @@
     if (x.id && mailRef(x) && openOriginal) pill(rt.qrMentioned ? "Receipt and QR code" : rt.labelMentioned ? "Receipt and label" : "View receipt", function () { openOriginal(x.id); });
     if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl) && freshDelivery(x))
       acts.appendChild(el("a", { className: "rl-pill", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel" }));
+    // Your own photo of it (Connor, 15 Nov: an in-store receipt has no picture, and a shop's picture can be the wrong colour).
+    if (x.id && x.kind === "receipt") pill(x.ownPhoto ? "Change photo" : x.hasImage ? "Not the right photo?" : "Add a photo", function () { ownPhotoSheet(x, function () { refresh("photo"); }); });
     if (left !== null && left >= 0 && x.id && x.reminder && !(x.returnBy && deadlineOf(x) === x.returnBy.date)) {
       var rem = pill(x.reminder === "on" ? "Reminder on · turn off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before", function () {
         rem.disabled = true; api("/relay/my/receipts/" + x.id + "/remind", { method: "POST", body: { on: x.reminder === "off" } }).then(function () { refresh("remind"); }); });
@@ -4253,6 +4255,8 @@
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    camera: '<path d="M4 8h3.2L9 5.5h6L16.8 8H20v11H4z"/><circle cx="12" cy="13.2" r="3.4"/>',
+    image: '<rect x="4" y="5" width="16" height="14" rx="2.2"/><circle cx="9.2" cy="10" r="1.6"/><path d="M20 15.5l-4.5-4.5L7 19"/>',
     filter: '<path d="M4 7h8.5M19.5 7h.5M4 17h.5M11.5 17H20"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
@@ -8093,6 +8097,42 @@
     });
     return box;
   }
+  // Take a photo, or choose one (a screenshot of the shop's own page works too); made smaller here, then kept as the
+  // receipt's photo. Only you see it.
+  function ownPhotoSheet(x, done) {
+    var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "Add a photo" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    var note = el("div", { className: "rl-msg" });
+    var cam = el("input", { type: "file", accept: "image/*", style: "display:none" }), lib = el("input", { type: "file", accept: "image/*", style: "display:none" });
+    cam.setAttribute("capture", "environment");
+    var busy = false, buttons = [];
+    var send = function (body) {
+      if (busy) return; busy = true; buttons.forEach(function (b) { b.disabled = true; }); say(note, "Saving your photo.");
+      api("/relay/my/receipts/" + x.id + "/photo", { method: "POST", body: body }).then(function (r) {
+        busy = false; buttons.forEach(function (b) { b.disabled = false; });
+        if (!r.ok) return say(note, r.status === 413 || (r.body && r.body.error === "photo_too_big") ? "That picture is too big. Try another." : r.body && r.body.error === "bad_photo" ? "That doesn't look like a picture. Try another." : "That didn't save. Try again.", true);
+        delete memo.blobs["/relay/my/receipts/" + x.id + "/image"]; shut(); if (done) done();
+      }).catch(function () { busy = false; buttons.forEach(function (b) { b.disabled = false; }); say(note, "Couldn't reach Relay. Check your connection.", true); });
+    };
+    var pick = function (input) { var f = input.files && input.files[0]; input.value = ""; if (!f) return;
+      shrinkPhoto(f).then(function (u) { if (!u) return say(note, "Couldn't read that picture. Try another.", true); send({ image: u }); }); };
+    cam.onchange = function () { pick(cam); }; lib.onchange = function () { pick(lib); };
+    var b1 = el("button", { type: "button", className: "rl-btn", onclick: function () { cam.click(); } }, [accIc("camera", 20, "rl-calm-fi"), el("span", { text: "Take a photo" })]);
+    var b2 = el("button", { type: "button", className: "rl-btn ghost", style: "margin-top:10px", onclick: function () { lib.click(); } }, [accIc("image", 20, "rl-calm-fi"), el("span", { text: "Choose a photo" })]);
+    buttons = [b1, b2];
+    card.appendChild(el("h2", { text: x.hasImage && !x.ownPhoto ? "Use your own photo" : x.ownPhoto ? "Change your photo" : "Add a photo" }));
+    card.appendChild(el("p", { text: "Take a photo of it, or choose one. A screenshot of it on the shop's website or app works too. Only you see it." }));
+    card.appendChild(b1); card.appendChild(b2);
+    if (x.ownPhoto) { var b3 = el("button", { type: "button", className: "rl-btn ghost", style: "margin-top:10px", text: "Remove my photo", onclick: function () { send({ remove: true }); } }); buttons.push(b3); card.appendChild(b3); }
+    card.appendChild(note); card.appendChild(cam); card.appendChild(lib);
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+  }
+
   function feedCard(e) {
     var item = el("div", { className: "h2-item" + (e.small ? " small" : ""), tabIndex: 0 });
     item.setAttribute("role", "button");

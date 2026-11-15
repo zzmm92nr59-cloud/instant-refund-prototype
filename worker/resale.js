@@ -13,7 +13,7 @@ const DAY = 24 * 60 * 60 * 1000;
 import { ADMIN_TABLE_SQL, handleResaleAdminRoute, isBlocked } from "./resale-admin.js";
 import { ensureOnce, runAll } from "./once.js";
 import { categorise, storeKey } from "./receipt-category.js";
-import { decodePhoto } from "./auctions.js";
+import { decodePhoto } from "./photos.js";
 
 // What can be resold: physical goods only. Food & drink, travel and digital purchases can't be handed to
 // someone else, and receipt lines like "You've saved" or "Delivery" aren't products at all.

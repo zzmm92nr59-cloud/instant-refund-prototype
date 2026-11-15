@@ -13,6 +13,7 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts. (Microsoft has no
 //    revoke call for personal accounts: the token is deleted, and the shopper can remove Relay at account.live.com.)
+import { decodePhoto } from "./photos.js";
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
@@ -981,6 +982,8 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (details.kind === "receipt") {
         // A photo that failed once is tried again whenever the reader version changes (a transient failure should not be permanent).
         details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && (prev.hasImage || !stale);
+        // A photo the shopper added themselves stays: it's never replaced by one read from the email.
+        if (prev.ownPhoto) { details.ownPhoto = true; details.hasImage = true; details.imageTried = true; }
         if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN && calls + 2 < budget) {
           imagesTried++;
           const urls = extractProductImageUrls(rawText, details);
@@ -992,7 +995,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
           }
         }
         // Only an email that has a photo needs checking that the photo is of the item (reading it again costs time).
-        if (details.hasImage) details.photoIsItem = photoShowsItem(rawText, details);
+        if (details.hasImage) details.photoIsItem = details.ownPhoto ? true : photoShowsItem(rawText, details);
       }
       if (seen) {
         // The shopper's confirm/dismiss choice lives in the status column and is kept.
@@ -1329,13 +1332,14 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
   let image = null;
   if (details.kind === "receipt") {
     details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && Boolean(prev.hasImage);
+    if (prev.ownPhoto) { details.ownPhoto = true; details.hasImage = true; details.imageTried = true; }
     if (!details.imageTried) {
       const urls = extractProductImageUrls(rawText, details);
       image = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
       details.imageTried = true;
       if (image) details.hasImage = true;
     }
-    if (details.hasImage) details.photoIsItem = photoShowsItem(rawText, details);
+    if (details.hasImage) details.photoIsItem = details.ownPhoto ? true : photoShowsItem(rawText, details);
   }
   if (seen) {
     await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = 'pending' WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(details), seen.id, shopperId).run();
@@ -2233,6 +2237,31 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   }
   // "Fix this receipt": the shopper corrects what Relay read wrong (the shop, total, date or items), or undoes that. Their
   // words replace what was read for them straight away, and which parts were wrong is counted for the Relay health page.
+  // The shopper's own photo of what they bought (an in-store receipt has none; a shop's photo may be the wrong colour):
+  // made smaller on their phone, checked here to really be a picture, kept as the receipt's photo. remove: true takes it away.
+  const own = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/photo$/.exec(path);
+  if (own && m === "POST") {
+    const b = await request.json().catch(() => ({}));
+    const row = await env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE id = ? AND shopper_id = ? AND status NOT IN ('dismissed','not_receipt')").bind(own[1], shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    let d = {}; try { d = JSON.parse(row.details) || {}; } catch { d = {}; }
+    const now = opts.now || Date.now();
+    if (b && b.remove === true) {
+      if (!d.ownPhoto) return json({ ok: true }, 200, cors);
+      d.ownPhoto = false; d.hasImage = false; d.imageTried = false; delete d.photoIsItem;
+      await env.RELAY_DB.batch([
+        env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE receipt_id = ? AND shopper_id = ?").bind(own[1], shopper.id),
+        env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(d), own[1], shopper.id)]);
+      return json({ ok: true }, 200, cors);
+    }
+    const ph = decodePhoto(b && b.image);
+    if (!ph || ph.error) return json({ error: (ph && ph.error) || "bad_photo" }, 400, cors);
+    d.ownPhoto = true; d.hasImage = true; d.imageTried = true; d.photoIsItem = true;
+    await env.RELAY_DB.batch([
+      imageStatement(env, shopper.id, { receiptId: own[1], type: ph.type, data: ph.data }, now),
+      env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(d), own[1], shopper.id)]);
+    return json({ ok: true }, 200, cors);
+  }
   const fx = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/fix$/.exec(path);
   if (fx && m === "POST") {
     const b = await request.json().catch(() => ({}));
