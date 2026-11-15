@@ -57,6 +57,7 @@ export const WEB_SHOPS = [
   { domain: "www.nike.com", label: "Nike", reader: "pages", sitemap: "https://www.nike.com/sitemap-v2-pdp-en-gb.xml", match: /\/gb\/t\//, pagePrice: "currentPrice" },
 ];
 export const PAGES_PER_SHOP = 24;
+const PAGE_SHOPS = new Set(WEB_SHOPS.filter(s => s.reader === "pages").map(s => s.domain));
 
 export const USER_AGENT = "RelayBot/1.0 (+https://zzmm92nr59-cloud.github.io/instant-refund-prototype/relaybot.html)";
 export const ROBOT_TOKEN = "relaybot";
@@ -355,7 +356,9 @@ export async function webShopProducts(env, now = Date.now()) {
   const kinds = new Map([...titles].map(([d, t]) => [d, shopCategory({ label: t.label, domain: d }, t.names)]));
   return rows.map(r => ({ sku: r.id, ...(kinds.get(r.domain) ? { shopCategory: kinds.get(r.domain) } : {}), product: r.product, variation: r.variation, priceMinor: r.price_minor, currency: "GBP", imageUrl: r.image_url,
     quantity: r.available === 0 ? 0 : null, inStock: r.available === 1 ? true : r.available === 0 ? false : null,
-    storeName: r.label, shopDomain: r.domain, productUrl: r.product_url, kind: r.kind, checkedAt: new Date(r.checked_at).toISOString(), webShop: true }));
+    storeName: r.label, shopDomain: r.domain, productUrl: r.product_url, kind: r.kind, checkedAt: new Date(r.checked_at).toISOString(), webShop: true,
+    // A shop read from its product pages (M&S, JD Sports…) has no basket Relay can start: Buy opens the product's own page.
+    ...(PAGE_SHOPS.has(r.domain) ? { checkout: false } : {}) }));
 }
 
 // GET /relay/web-shops: the preview catalogue, and how each shop's website answered when Relay last read it.

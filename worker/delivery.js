@@ -228,6 +228,7 @@ export async function startWebCheckout(env, shopper, sku, o = {}) {
   // Only the shops in Relay's list (web-shops.js): never an address someone sends.
   const shop = ref && WEB_SHOPS.find(s => s.domain === ref.domain);
   if (!shop) return { status: 400, body: { error: "not_a_web_shop" } };
+  if (shop.reader === "pages") return { status: 400, body: { error: "no_checkout" } }; // read from its pages: no basket to start
   const db = env.RELAY_DB, now = o.now || Date.now(), f = o.fetchImpl || ((...a) => fetch(...a));
   await ensureWebShopTables(db);
   await ensureDeliveryTables(db);
