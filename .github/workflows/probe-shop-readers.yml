@@ -9,4 +9,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node scripts/probe/shop-reader-probe2.mjs
+      - run: node scripts/probe/run-readers.mjs
