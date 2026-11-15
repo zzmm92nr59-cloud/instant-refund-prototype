@@ -678,7 +678,9 @@ function reasonLabel(){return ({size:"Wrong size",colour:"Different colour",desi
 function sameFamily(p){return String(p.product||"").trim().toLowerCase()===String(selected.item||"").trim().toLowerCase()}
 function showDemo(){return demo||testTools()}
 function liveProduct(p){return !!p&&!p.fixture&&p.provider!=="square_sandbox"&&p.provider!=="relay_demo"}
-function shownProducts(){return showDemo()?catalog:catalog.filter(liveProduct)}
+// Browse shows real shops only, even with testing tools on (Connor, 15 Nov): Relay's test shops' products never show there.
+// Testing tools still bring test shops' orders, swaps and auctions. The investor demo (?demo=1) keeps its sample products.
+function shownProducts(){return demo?catalog:catalog.filter(p=>liveProduct(p)&&!p.testShop)}
 function storeOf(p){return p.store||p.storeName||(p.provider==="shopify"?"Shopify retailer":p.provider==="relay_demo"?"Relay Studio":"North & Co.")}
 function stockText(p){const q=p.quantity==null||p.quantity===""?null:Number(p.quantity);return q===null||!Number.isFinite(q)?"Stock not shared":q<=0?"Out of stock":q<=5?"Only "+q+" left":"In stock"}
 function storeKey(n){return String(n||"").toLowerCase().replace(/[^a-z0-9&]+/g,"")}

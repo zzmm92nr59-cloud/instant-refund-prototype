@@ -183,7 +183,9 @@ assert.deepEqual(await tabs(), [...TABS, "Market"]);
 await page.getByRole("heading", { name: "Testing tools" }).waitFor();
 await page.getByText("Bought in a shop? Add it from the receipt").waitFor();
 await openShops(page);
-await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).getByText(/· TEST/).waitFor();
+// Even with testing tools on, Browse shows real shops only (Connor, 15 Nov): test shops' products never show there.
+await page.locator('[data-card-select="shopify-v-1"]').waitFor();
+assert.equal(await page.locator("[data-card-select]", { hasText: "Sandbox Hoodie" }).count(), 0, "no test shop's products in Browse");
 assert.ok(catalogueAsks.slice(asksBefore).some(q => /test=1/.test(q)), "with testing tools on, Shops on Relay asks for test shops too");
 await openAccountRow(page, "Card for swaps");
 await page.getByText("TEST MODE · no real money").waitFor();
