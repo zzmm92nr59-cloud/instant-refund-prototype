@@ -102,7 +102,7 @@
   return prepared;
  }
  // What a shopper looked at (opened or watched). A tap is a weaker signal than a purchase, so it only nudges the order.
- function tapOf(product){return {category:category(product.product||product.item),colour:colourOf(product.variation||product.detail),merchant:normal(product.store||product.merchant||product.storeName),priceMinor:Math.round(Number(product.priceMinor||0))};}
+ function tapOf(product){const name=product.product||product.item,k=kindOf(name);return {category:category(name),kind:k&&k.key?k.key:null,colour:colourOf(product.variation||product.detail),merchant:normal(product.store||product.merchant||product.storeName),priceMinor:Math.round(Number(product.priceMinor||0))};}
  function top(list,key,n){const m=new Map();list.forEach(x=>{const k=x[key];if(k&&k!=="other")m.set(k,(m.get(k)||0)+1)});return [...m.entries()].sort((a,b)=>b[1]-a[1]||(a[0]<b[0]?-1:1)).slice(0,n).map(([name,count])=>({name,count}));}
  // A plain summary of what Relay has noticed, shown to the shopper so nothing is hidden. Counts only: no guesses.
  function profile(purchases,taps){
@@ -183,8 +183,20 @@
  // groups: what Browse shows, each {key, product, store, min (pence), options[], left}. Returns up to `limit` picks, best first,
  // each {g, score, why[]}. At most two of a kind (three when there's only one kind to go on), one companion per thing bought,
  // three from one shop, and never the very thing they already bought.
+ //
+ // It learns from what the shopper does, on their own phone (options): products they opened (taps) or watch (watched) make
+ // that kind count for more, and a kind they keep looking at without buying becomes a pick of its own; "Not for me" (notFor)
+ // hides that product and halves its kind each time (three times and the kind is gone); a pick shown on four days without
+ // being opened (seen) drops back.
  function picks(purchases,groups,options={}){
   const limit=options.limit||6,sizes=(options.sizes||[]).map(normal).filter(Boolean);
+  const looks=new Map(),lookColours=new Set(),lookShops=new Set();
+  const look=(k,n)=>{if(k)looks.set(k,(looks.get(k)||0)+n)};
+  for(const t of Array.isArray(options.taps)?options.taps:[]){if(!t)continue;look(t.kind,1);if(t.colour)lookColours.add(t.colour);if(t.merchant)lookShops.add(t.merchant)}
+  for(const w of Array.isArray(options.watched)?options.watched:[]){const k=w&&kindOf(w.product);if(k&&k.mode!=="none")look(k.key,2)}
+  const notFor=Array.isArray(options.notFor)?options.notFor.filter(Boolean):[],seen=options.seen||{};
+  const hiddenKeys=new Set(notFor.map(x=>normal(x.key)).filter(Boolean)),dislike=new Map(),shopDislike=new Map();
+  notFor.forEach(x=>{if(x.kind)dislike.set(x.kind,(dislike.get(x.kind)||0)+1);if(x.store)shopDislike.set(normal(x.store),(shopDislike.get(normal(x.store))||0)+1)});
   const bought=(Array.isArray(purchases)?purchases:[]).filter(p=>p&&p.item&&p.merchant&&(p.demo===true||p.verified===true));
   const src=new Map(),owned=new Set();
   for(const p of bought){
@@ -196,14 +208,18 @@
    x.shops.set(normal(p.merchant),String(p.merchant).trim());
    const pm=Math.round(Number(p.price||0)*100);if(pm>0)x.prices.push(pm);
   }
-  const kinds=[...src.values()].map(x=>({...x,weight:x.mode==="similar"?1+Math.min(x.n,4)*.5:.8,
-   paid:x.prices.length?x.prices.slice().sort((a,b)=>a-b)[Math.floor(x.prices.length/2)]:0}));
+  // A kind they keep looking at (two looks, or one watch) without having bought it: picks of its own, weaker than a purchase.
+  for(const [key,n] of looks){if(src.has(key)||n<2)continue;const k=KINDS.find(x=>x[0]===key);if(!k)continue;
+   src.set(key,{mode:"similar",key,noun:k[1],want:k[3]||k[2],n:0,looked:true,colours:new Set(),shops:new Map(),prices:[]})}
+  const kinds=[...src.values()].map(x=>{const lk=Math.min(looks.get(x.key)||0,4),d=dislike.get(x.key)||0;
+   const base=x.looked?.6+lk*.15:x.mode==="similar"?1+Math.min(x.n,4)*.5+lk*.25:.8+lk*.1;
+   return {...x,weight:d>=3?0:base*Math.pow(.5,d),paid:x.prices.length?x.prices.slice().sort((a,b)=>a-b)[Math.floor(x.prices.length/2)]:0}}).filter(x=>x.weight>0);
   if(!kinds.length)return[];
-  const stock=(Array.isArray(groups)?groups:[]).filter(g=>g&&g.product&&g.left!==0&&!owned.has(normal(g.store)+"|"+normal(g.product)));
+  const stock=(Array.isArray(groups)?groups:[]).filter(g=>g&&g.product&&g.left!==0&&!owned.has(normal(g.store)+"|"+normal(g.product))&&!hiddenKeys.has(normal(g.key)));
   const perKind=kinds.filter(k=>k.mode==="similar").length===1?3:2;
   const pool=kinds.map(k=>{
    const shop=[...k.shops.values()][0],many=k.shops.size>1;
-   const lead=k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
+   const lead=k.looked?"Like the "+k.noun+" you've been looking at":k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
    const list=stock.filter(g=>k.want.test(normal(g.product))).map((g,i)=>{
     let s=3;const why=[lead],text=normal(g.product+" "+(g.options||[]).join(" "));
     const col=[...k.colours].find(c=>new RegExp("\\b"+c+"\\b").test(text));
@@ -213,6 +229,10 @@
     if(fit){s+=.5;if(why.length<2)why.push("In your size, "+fit)}
     if(k.shops.has(normal(g.store))){s+=1;if(why.length<2)why.push("From "+possessiveShop(k.shops.get(normal(g.store)))+" range")}
     if(k.paid&&g.min>=k.paid*.5&&g.min<=k.paid*1.6)s+=.5;
+    if(!col&&[...lookColours].some(c=>new RegExp("\\b"+c+"\\b").test(text)))s+=.5;
+    if(lookShops.has(normal(g.store)))s+=.5;
+    s-=shopDislike.get(normal(g.store))||0;
+    if((Number(seen[normal(g.key)])||Number(seen[g.key])||0)>=4)s-=1.5;
     return {g,i,k,score:s*k.weight,why};
    }).sort((a,b)=>b.score-a.score||a.i-b.i);
    return {k,list,taken:0,cap:k.mode==="companion"?1:perKind};
