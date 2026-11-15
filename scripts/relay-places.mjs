@@ -21,6 +21,9 @@ export async function homeShows(page, initial, opts) {
   await homeReady(page, opts);
   await page.locator(".h2-me .avatar", { hasText: initial }).waitFor(opts);
 }
+// Home is Wallet (photo squares) by default. Tests of the big cards, one per flick, ask for that layout on the device first;
+// Wallet and Today have their own checks in test-home-look-ui.mjs.
+export async function bigCards(ctx) { await ctx.addInitScript(() => { try { localStorage.setItem("relay-home-look", "cards"); } catch (e) {} }); }
 // A card on Home, by any text on it. Tapping it opens what the old wallet card showed (its page, a sheet).
 export const homeCard = (page, text) => page.locator("#homePage .h2-feed > .h2-item", { hasText: text });
 export async function openHomeCard(page, text) {

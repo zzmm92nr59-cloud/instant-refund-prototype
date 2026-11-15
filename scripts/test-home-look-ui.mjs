@@ -9,7 +9,7 @@
 // swaps and Wrapped each open their page. Every screen passes the polish rules in light and dark.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind, goTab } from "./relay-places.mjs";
+import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind, goTab, bigCards } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const types = { ".js": "text/javascript", ".png": "image/png", ".svg": "image/svg+xml" };
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", types[extname(p)] || "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
@@ -29,10 +29,12 @@ const receipts = [
   // With the item's photo, on its way: the card is headed with the shop's name; the item's name is in Details.
   receipt("44444444-4444-4444-8444-444444444444", "Northfold", "Flow Flared Pant", 6900, 5, { hasImage: true, items: [{ name: "Flow Flared Pant", variant: "UK 8", qty: 1, pricePence: 6900, category: "fashion" }],
     delivery: { status: "shipped", carrier: "Royal Mail", at: day(-3) }, returnBy: { date: day(10), basis: "uk_law", from: "delivery" } }),
+  // An app bought from Apple yesterday: can't be returned, so Wallet and Today leave it out (it stays in Receipts).
+  receipt("55555555-5555-4555-8555-555555555555", "Apple", "Match Masters", 159, 1, { category: "digital", returnable: false, items: [{ name: "Match Masters", qty: 1, pricePence: 159, category: "digital" }] }),
 ];
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx); await bigCards(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -184,6 +186,11 @@ await dsheet.getByRole("button", { name: "Close" }).click(); await dsheet.waitFo
 await polished("home", "#view");
 console.log("ok - Home's cards show the return date, the last week's days left (amber, red) first, lead with what was bought, and open a page with the countdown, Start return and I'm sending this back");
 // The other two ways Home can look (Profile, Home layout): Today (what needs you, then a list) and Wallet (photo squares).
+// With nothing chosen, Home is Wallet (Connor's pick, 15 Nov).
+await page.evaluate(() => { localStorage.removeItem("relay-home-look"); window.go("receipts"); });
+await page.evaluate(() => window.go("profile"));
+await page.locator("#homePage .hl-sq").first().waitFor();
+assert.equal(await page.locator("#homePage .h2-feed > .h2-item:not(.small)").count(), 0, "no big cards by default");
 for (const look of ["today", "wallet"]) {
   await page.evaluate(l => { localStorage.setItem("relay-home-look", l); window.go("receipts"); }, look);
   await page.evaluate(() => window.go("profile"));
@@ -199,12 +206,13 @@ for (const look of ["today", "wallet"]) {
     assert.ok(g.w > 150 && Math.abs(g.w - g.h) < 1 && g.row, "two big squares a row: " + JSON.stringify(g));
     assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
   }
+  assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Match Masters" }).count(), 0, look + ": an app that can't be returned isn't on Home");
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
   await polished("home " + look, "#view");
   await page.locator(look === "today" ? ".hl-row" : ".hl-sq").first().click();
   await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(450); await page.locator(".rl-back").last().click({ position: { x: 20, y: 20 } }); await page.locator(".rl-back").waitFor({ state: "detached" });
 }
-await page.evaluate(() => localStorage.removeItem("relay-home-look"));
+await page.evaluate(() => localStorage.setItem("relay-home-look", "cards"));
 console.log("ok - Home's other layouts: Today (summary, then small rows) and Wallet (two big squares a row, labels), polished, each opens its page");
 
 // 3. From Home: All receipts, the bell (how many things are watched) and, through Receipts and Browse, Returns & swaps and

@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
-import { skipInterests } from './relay-places.mjs';
+import { skipInterests, bigCards } from './relay-places.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = resolve('.');
@@ -47,7 +47,7 @@ async function shopperPage(returnBody, plan = null, before = /If Kick Lane has s
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
   await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]);
-  await skipInterests(page);
+  await skipInterests(page); await bigCards(page);
   await page.goto(origin + '/index.html');
   // The order's card on Home opens its page, with Return.
   await page.locator('#homePage .h2-feed > .h2-item').first().click();

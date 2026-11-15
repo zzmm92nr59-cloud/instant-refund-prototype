@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
-import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind } from './relay-places.mjs';
+import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind, bigCards } from './relay-places.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const root = resolve('.');
@@ -24,7 +24,7 @@ const STRIPE_STUB = `window.Stripe = function (pk) { window.__stripePk = pk; ret
   confirmCardSetup: function (secret) { window.__confirmedSecret = secret; return Promise.resolve({ setupIntent: { id: 'seti_test000001', status: 'succeeded' } }); } }; };`;
 
 async function run({ card, mode = "card", returnInfo = null, exchange = null, blocked = null, returnable = false }) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context);
+  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context); await bigCards(context);
   const posts = [];
   let saved = card;
   await context.route('https://js.stripe.com/v3/', r => r.fulfill({ contentType: 'text/javascript', body: STRIPE_STUB }));
@@ -58,7 +58,7 @@ async function run({ card, mode = "card", returnInfo = null, exchange = null, bl
   const page = await context.newPage();
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', () => { throw new Error('a browser pop-up appeared; Relay must ask inside the page'); });
-  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); // (after the session, so it knows who's signed in)
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); await bigCards(context); // (after the session, so it knows who's signed in)
   await page.goto(origin + '/index.html');
   // Returns and swaps already started live on the Returns & swaps page; an order's card on Home opens its page, with Swap.
   if (returnInfo || exchange) await page.evaluate(() => window.go('returns'));
@@ -185,7 +185,7 @@ async function openSwap(page) {
 // 6. Home after a swap: the card is redrawn from the shop's order however the sheet is closed, the swapped item is still
 // there to return, a "return by" date shows only when it is the shop's own, and a swap with money still to pay is on Home.
 {
-  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context);
+  const context = await browser.newContext({ viewport: { width: 390, height: 820 } }); await skipInterests(context); await bigCards(context);
   const by = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
   const byText = new Date(by + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   let swapped = false;
@@ -230,7 +230,7 @@ async function openSwap(page) {
   });
   const page = await context.newPage();
   const errors = []; page.on('pageerror', e => errors.push(String(e)));
-  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); // (after the session, so it knows who's signed in)
+  await page.addInitScript(([k, v]) => localStorage.setItem(k, v), ['relay.session.v1', JSON.stringify({ token: SESSION, email: 'alice@example.com' })]); await skipInterests(context); await bigCards(context); // (after the session, so it knows who's signed in)
   await page.goto(origin + '/index.html');
   // Home: one card for each order; tapping it opens the order's page, with its items and what you can do.
   const card = (shop) => homeCard(page, shop);

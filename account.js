@@ -7938,6 +7938,7 @@
       var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
+        noReturn: (x.returnable === false && !(x.returnableItems || []).length) || x.category === "digital",
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
@@ -7966,9 +7967,10 @@
   }
   // One card: the shop and the day, what was bought as large tiles with the price on each, one big line, and (only for a
   // return date inside a week) the days left as a strip under it. The whole card is one tap.
-  // Which Home: "cards" (big cards, one per flick), "today" or "wallet". Kept on this device; the app's own default otherwise.
+  // Which Home: "wallet" (the default since Connor chose it, 15 Nov), "today", or "cards" (the big cards, one per flick).
+  // Kept on this device with ?home=… or relay-home-look; the app's own default otherwise.
   var HOME_LOOKS = ["cards", "today", "wallet"], HOME_LOOK_KEY = "relay-home-look";
-  function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1]; var v = localStorage.getItem(HOME_LOOK_KEY); return HOME_LOOKS.indexOf(v) >= 0 ? v : "cards"; } catch (e) { return "cards"; } }
+  function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1]; var v = localStorage.getItem(HOME_LOOK_KEY); return HOME_LOOKS.indexOf(v) >= 0 ? v : "wallet"; } catch (e) { return "wallet"; } }
   function setHomeLook(v) { try { localStorage.setItem(HOME_LOOK_KEY, v); } catch (e) {} }
   var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
   var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
@@ -8087,6 +8089,9 @@
     var draw = function () {
       if (!state.both || !document.body.contains(feed)) return;
       var all = feedEntries(state.both[0], state.both[1], refresh), watched = watches();
+      // Wallet and Today show the things you might send back or are waiting for: never app purchases, subscriptions or
+      // anything that can't be returned (Connor, 15 Nov), unless it's on its way or a return is still going. They stay in Receipts.
+      if (homeLook() !== "cards") all = all.filter(function (e) { return !e.noReturn || e.onWay || e.swaps; });
       var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
       // "To return" runs soonest date first; the others keep the feed's order.
       sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });

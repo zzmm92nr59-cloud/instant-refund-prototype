@@ -5,7 +5,7 @@
 // search works; everything passes the polish rules (44px taps, no tiny text, no symbol icons).
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
-import { skipInterests } from "./relay-places.mjs";
+import { skipInterests, bigCards } from "./relay-places.mjs";
 // A group is chosen from Receipts' filter sheet; its row says how many receipts are in it.
 const openGroup = async (page, name, count) => {
   await page.waitForTimeout(450); // (the app ignores a second tap on the same button within 400ms)
@@ -31,7 +31,7 @@ const euro = [{ id: "77777777-7777-4777-8777-777777777777", status: "confirmed",
   items: [{ name: "Pro plan (yearly)", qty: 1 }], category: "digital", categoryLabel: "Digital & subscriptions", returnable: false }];
 const asked = [], posted = [];
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx);
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx); await bigCards(ctx);
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
