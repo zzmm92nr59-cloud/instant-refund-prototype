@@ -925,6 +925,7 @@
     ".rl-mk-acts{display:flex;gap:8px;margin-top:10px}.rl-mk-acts .rl-btn{flex:1;margin:0;min-height:48px;padding:12px 10px;font-size:16px}" +
     ".rl-mk-card .rl-mk-select:not([hidden]){display:block;margin-top:8px}.rl-mk-card .rl-mk-report{margin-top:4px;font-size:15px;color:var(--rl-text2)}" +
     // Delivery details and buying at a shop's website with them filled in.
+    ".rl-cp-rows{margin:0 0 14px}.rl-cp-rows+.rl-dl-open{margin-bottom:8px}" +
     ".rl-dl-intro{font-size:15px;line-height:1.45;color:var(--rl-text2);margin:0 0 14px}.rl-dl-item{display:flex;flex-direction:column;gap:2px;margin:0 0 16px}" +
     ".rl-dl-item b{font-size:17px;font-weight:600;color:var(--rl-text)}.rl-dl-item span{font-size:15px;color:var(--rl-text2)}" +
     ".rl-dl-to{margin:0 0 6px}.rl-dl-to .rl-dt-fact b{white-space:pre-line;line-height:1.4}.rl-dl-link,.rl-dl-open{display:flex;align-items:center;justify-content:center;box-sizing:border-box;text-decoration:none;min-height:50px}" +
@@ -7408,6 +7409,64 @@
     if (!load()) return show();
     open(function (sheet) { buyView(sheet, p); });
   }
+  // A shop Relay can't fill in (it's read from its own pages: JD Sports, M&S…): your delivery details, one tap to copy each,
+  // then the product's own page, where you paste them into the shop's checkout. Relay never types into another site.
+  function copyAtShop(p) {
+    if (!load()) return show();
+    open(function (sheet) { copyView(sheet, p); });
+  }
+  function copyView(sheet, p) {
+    sheet.textContent = "";
+    sheet.setAttribute("aria-label", "Buy at " + p.shop);
+    sheet.appendChild(el("h2", { text: "Buy at " + p.shop }));
+    sheet.appendChild(el("div", { className: "rl-dl-item" }, [el("b", { text: p.title }), el("span", { text: [p.variation, p.price].filter(Boolean).join(", ") })]));
+    var body = el("div"), note = el("div", { className: "rl-msg", role: "status" });
+    sheet.appendChild(body); sheet.appendChild(note);
+    body.appendChild(el("div", { className: "rl-skel", style: "min-height:220px;border-radius:16px" }));
+    var openShop = function (text) {
+      return el("a", { className: "rl-btn rl-dl-open", href: p.url, target: "_blank", rel: "noopener noreferrer", text: text || "Open " + possessive(p.shop) + " website", onclick: function () { setTimeout(close, 400); } });
+    };
+    var edit = function () { body.textContent = ""; say(note, ""); deliveryForm(body, { saveLabel: "Save", onSaved: function () { copyView(sheet, p); }, onCancel: function () { copyView(sheet, p); } }); };
+    api("/relay/my/delivery").then(function (r) {
+      if (!document.body.contains(body)) return;
+      body.textContent = "";
+      var d = r.ok && r.body ? r.body.delivery : null;
+      if (!d) {
+        body.appendChild(el("p", { className: "rl-dl-intro", text: "Add your delivery details once, and Relay keeps them ready to copy into any shop's checkout." }));
+        body.appendChild(el("button", { type: "button", className: "rl-btn", text: "Add delivery details", onclick: edit }));
+        body.appendChild(el("a", { className: "rl-btn ghost rl-dl-link", href: p.url, target: "_blank", rel: "noopener noreferrer", text: "Go to " + p.shop + " without them" }));
+        return;
+      }
+      body.appendChild(el("p", { className: "rl-dl-intro", text: "Relay can't type into " + possessive(p.shop) + " checkout, so tap a line to copy it, then paste it there." }));
+      var rows = el("div", { className: "rl-cp-rows" });
+      var copyRow = function (label, value) {
+        if (!value) return;
+        var c = el("span", { className: "rl-rg-c", text: "Copy" });
+        var b = el("button", { type: "button", className: "rl-rg-row" }, [el("span", { className: "rl-rg-l", text: label }), el("b", { text: value }), c]);
+        b.setAttribute("aria-label", "Copy your " + label.toLowerCase() + ", " + value);
+        b.onclick = function () {
+          copyText(value).then(function (ok) {
+            rows.querySelectorAll(".rl-rg-c").forEach(function (x) { x.textContent = "Copy"; });
+            c.textContent = ok ? "Copied" : "Select it to copy";
+          });
+        };
+        rows.appendChild(b);
+      };
+      copyRow("Name", [d.firstName, d.lastName].filter(Boolean).join(" "));
+      copyRow("Address", d.line1);
+      copyRow("Address line 2", d.line2);
+      copyRow("Town", d.town);
+      copyRow("County", d.county);
+      copyRow("Postcode", d.postcode);
+      copyRow("Email", (load() || {}).email || "");
+      if (d.phone) copyRow("Phone", ukPhone(d.phone));
+      body.appendChild(rows);
+      body.appendChild(openShop());
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Change delivery details", onclick: edit }));
+      body.appendChild(el("p", { className: "rl-dl-intro", text: "You choose delivery and pay at " + p.shop + ", not through Relay. Your receipt shows up in Relay once it's emailed to you." }));
+      body.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", onclick: close }));
+    }, function () { body.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); body.appendChild(openShop("Go to " + p.shop)); });
+  }
   function buyView(sheet, p) {
     sheet.textContent = "";
     sheet.setAttribute("aria-label", "Buy at " + p.shop);
@@ -8614,6 +8673,7 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
+    copyAtShop: copyAtShop,
     openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
