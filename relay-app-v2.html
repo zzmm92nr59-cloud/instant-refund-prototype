@@ -914,13 +914,11 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  const checkout=web?webCheckoutUrl(p):null;
  // Signed in: Buy starts the shop's checkout with the shopper's delivery details filled in (account.js buyAtShop).
  const fills=!!(checkout&&window.RelayAccount&&RelayAccount.buyAtShop&&RelayAccount.signedIn&&RelayAccount.signedIn());
- // A shop Relay can't fill in (read from its own pages): Buy opens your details, one tap to copy each, then the shop's page.
- const copies=!!(web&&!checkout&&p.checkout===false&&p.inStock!==false&&window.RelayAccount&&RelayAccount.copyAtShop&&RelayAccount.signedIn&&RelayAccount.signedIn());
  // A shop's website: View on their website first (the product's own page), then Buy at the shop, quieter. With no checkout
  // to start (sold out, or nothing to go by), the one button is the product's own page.
  const shops=/['’]s$|s'$/i.test(shop)?shop:/s$/i.test(shop)?shop+"'":shop+"'s"; // JD Sports' website, not JD Sports's
  const view=web&&checkout?'<a class="darkbtn dc-buy" id="viewOnSite" href="'+safe(p.productUrl)+'" target="_blank" rel="noopener noreferrer">View on their website'+ic("ext")+'</a>':'';
- const act=web?view+(copies?'<button class="darkbtn dc-buy" id="buyOnSite">Buy at '+shop+'</button>':fills?'<button class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shops+' website')+ic("ext")+'</a>')
+ const act=web?view+(fills?'<button class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite">Buy at '+shop+'</button>':'<a class="'+(view?'outline':'darkbtn')+' dc-buy" id="buyOnSite" href="'+safe(checkout||p.productUrl)+'" target="_blank" rel="noopener noreferrer">'+(checkout?'Buy at '+shop:'See it on '+shops+' website')+ic("ext")+'</a>')
   :'<button class="'+(on?'outline':'darkbtn')+'" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>';
  // A shop's website can be watched too (Connor, 15 Nov): Relay reads its prices once a day and says when one falls.
  const webWatch=web?'<button class="outline dc-buy" id="watchSelected" aria-pressed="'+(on?'true':'false')+'">'+(on?ic("check")+' Watching the price':ic("bell")+' Watch price')+'</button>':'';
@@ -929,7 +927,6 @@ function shopperProductPage(box,sku){const p=catalog.find(x=>x.sku===sku);if(!p)
  box.innerHTML='<div class="dc-page" style="grid-column:1/-1"><button class="rl-navback" data-back id="backToResults">'+ic("back")+'<span>Back</span></button><div class="dc-pagepic">'+(g?dcPicture(g,96):"")+'</div><div class="dc-shop">'+shop+'</div><h2>'+safe(p.product)+'</h2>'+(p.variation&&!opts?'<p class="muted">'+safe(p.variation)+'</p>':'')+'<div class="price">'+priceIn(p.priceMinor,p.currency)+'</div>'+(stock&&!web?'<p class="small muted">'+safe(stock)+'</p>':'')+(web?'<div class="dc-checked"><span>When Relay last checked</span><b>'+safe(checkedLong(p.checkedAt))+'</b></div>':'')+opts+'<div class="actions">'+act+webWatch+'</div><p class="small muted" id="watchNote" aria-live="polite">'+note+'</p>'+(web?'<p class="dc-pricefrom">Prices from '+shop+'\'s website on '+safe(checkedOn(p.checkedAt))+'.</p>':'')+'</div>';
  $("backToResults").onclick=()=>{renderCatalog();scrollBack(dcListY)};
  if($("watchSelected"))$("watchSelected").onclick=()=>{toggleWatch(sku,true);chooseSku(sku)};
- if(copies&&$("buyOnSite"))$("buyOnSite").onclick=()=>RelayAccount.copyAtShop({title:p.product,variation:p.variation||"",price:priceIn(p.priceMinor,p.currency),shop:storeOf(p),url:p.productUrl});
  if(fills&&$("buyOnSite"))$("buyOnSite").onclick=()=>RelayAccount.buyAtShop({sku:p.sku,title:p.product,variation:p.variation||"",price:priceIn(p.priceMinor,p.currency),shop:storeOf(p),fallbackUrl:checkout});
  box.querySelectorAll("[data-size]").forEach(b=>b.onclick=()=>chooseSku(b.dataset.size));
  if(fresh)window.scrollTo(0,0);

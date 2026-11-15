@@ -71,7 +71,6 @@ const newPage = async (colorScheme, team, admin = false) => {
     if (!p.startsWith("/relay/")) return route.abort();
     if (p === "/relay/shopify/catalogue") return j({ products: CONNECTED, published: true, publishedStoreCount: 1 });
     if (p === "/relay/web-shops") { st.webAsked++; return j({ products: WEB, shops: SHOPS.map(s => ({ name: s.name, domain: s.domain, status: "ok", products: s.items.length, checkedAt: CHECKED })), preview: true }); }
-    if (p === "/relay/my/delivery") return j({ delivery: { firstName: "Sam", lastName: "Tester", line1: "1 Made-up Street", line2: "", town: "Exampleton", county: "", postcode: "ZZ1 1ZZ", phone: "" } });
     if (p === "/relay/my/photo-search") return j({ available: false, perDay: 30 });
     if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
     if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3, maxInboxes: 5 });
@@ -212,22 +211,13 @@ for (const scheme of ["light", "dark"]) {
   await waitOutDoubleTap(page); await page.locator(".dc-page").getByRole("button", { name: "Watching the price" }).click();
   await page.locator(".dc-page").getByRole("button", { name: "Watch price" }).waitFor();
   await page.getByRole("button", { name: "Back" }).click();
-  // A shop read from its product pages: no checkout Relay can start or fill in. Buy opens your delivery details, one tap
-  // to copy each, and the product's own page on its website.
+  // A shop read from its product pages: one button, the product's own page on its website; no checkout Relay can't start.
   await page.locator("#catalogResults .dc-card", { hasText: "Seaweed Face Oil" }).click();
   await pg.locator("h2", { hasText: "Seaweed Face Oil" }).waitFor();
-  assert.equal(await pg.getByText(/View on their website|checkout/).count(), 0, "no checkout offered for a shop read from its pages");
-  await waitOutDoubleTap(page); await pg.getByRole("button", { name: "Buy at Saltmarsh" }).click();
-  const cs = page.locator(".rl-cp-rows"); await cs.waitFor();
-  assert.deepEqual(await cs.locator(".rl-rg-l").allInnerTexts(), ["Name", "Address", "Town", "Postcode", "Email"], "each line of your details, empty ones left out");
-  await cs.getByRole("button", { name: /Copy your postcode/ }).click();
-  await cs.getByText("Copied").waitFor();
-  const own = page.getByRole("link", { name: "Open Saltmarsh's website" });
+  const own = pg.getByRole("link", { name: "See it on Saltmarsh's website" });
   assert.equal(await own.getAttribute("href"), WEB.find(w => w.product === "Seaweed Face Oil").productUrl, "opens the product's own page");
-  assert.deepEqual(await measure(page, ".rl-sheet"), clean, "copy your details sheet (" + scheme + ")");
-  await shot(page, "copy-details-" + scheme);
-  await page.locator(".rl-sheet").getByRole("button", { name: "Close" }).click(); await cs.waitFor({ state: "detached" });
-  console.log("ok - a shop read from its pages: Buy shows your details to copy, then opens the product's own page (" + scheme + ")");
+  assert.equal(await pg.getByText(/Buy at|View on their website|checkout/).count(), 0, "no checkout offered for a shop read from its pages");
+  console.log("ok - a shop read from its pages opens the product's own page (" + scheme + ")");
   await page.getByRole("button", { name: "Back" }).click();
 
   // Your shops: a shop's sheet shows its products from its website.
