@@ -112,7 +112,8 @@ await ask.getByText(/picks out order emails/).waitFor();
 assert.equal(await ask.locator(".rl-chat-typing").count(), 0);
 assert.deepEqual(st.chats[0], { messages: [{ role: "user", text: "How does Relay find my receipts?" }] });
 assert.equal(await ask.getByRole("button", { name: "A receipt is missing" }).count(), 0, "suggestions go once the chat has started");
-assert.match(await ask.locator(".rl-chat-b.bot p").last().innerText(), /\n1\. Open Receipts\n2\. Tap a group$/, "the answer's lines are kept, as plain text");
+// The answer's numbered steps show as a numbered list, never as the raw "1." text (Connor, 15 Nov: stars and dashes showed).
+assert.deepEqual(await ask.locator(".rl-chat-b.bot .rl-rich").last().locator("ol li").allInnerTexts(), ["Open Receipts", "Tap a group"], "the steps are a numbered list");
 // A typed question, sent with a double tap: once.
 const box = ask.getByRole("textbox", { name: "Your question for Relay's assistant" });
 await box.fill("My total is wrong");

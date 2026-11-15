@@ -148,7 +148,9 @@ export async function runPriceAlerts(env, o = {}) {
   const byShopper = new Map();
   let checked = 0, drops = 0, sent = 0;
   for (const w of rows) {
-    const cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL AND currency = 'GBP' ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
+    let cur = await db.prepare("SELECT price_minor AS p, currency AS c FROM retailer_catalog_variants WHERE (sku = ? OR id = ?) AND price_minor IS NOT NULL AND currency = 'GBP' ORDER BY updated_at DESC, id LIMIT 1").bind(w.sku, w.sku).first();
+    // A product from a shop's own website (web-shops.js, read about once a day): its price as Relay last read it.
+    if (!cur && /^web:/.test(w.sku)) cur = await db.prepare("SELECT price_minor AS p, 'GBP' AS c FROM web_shop_items WHERE id = ?").bind(w.sku).first().catch(() => null);
     if (!cur || !Number.isFinite(cur.p)) continue;
     checked++;
     if (w.last_seen_minor != null && cur.p < w.last_seen_minor) {

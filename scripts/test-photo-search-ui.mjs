@@ -195,7 +195,7 @@ await page.locator(".dc-preview").waitFor();
 assert.match(await page.locator(".dc-preview").innerText(), /^Products from 2 shops' own websites, as Relay last read them\. Only Relay's team and its testers see these\.$/);
 assert.ok(st.webAsked >= 1);
 const beanie = page.locator(".dc-cardwrap").filter({ hasText: "Wool Beanie" });
-assert.equal(await beanie.locator("[data-watch]").count(), 0, "no price alerts for shops' websites");
+assert.equal(await beanie.locator("[data-watch]").count(), 0, "no watch button on a shop website's tile (it's on its page)");
 assert.doesNotMatch(await beanie.innerText(), /Out of stock|left/, "one colour sold out, another can be bought: not out of stock, and no count Relay doesn't know");
 // A website's stock is only what it said when Relay read it, so a tile never says it undated: the product's page says it,
 // with when Relay checked (below).
@@ -208,7 +208,7 @@ await page.locator(".dc-page h2", { hasText: "Wool Beanie" }).waitFor();
 await page.getByRole("button", { name: "Buy at Hollow Pine" }).waitFor();
 const when = new Date(CHECKED).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Relay fills in your delivery details at Hollow Pine's checkout\\. Price and stock as Hollow Pine's website showed them (today|yesterday) at " + when + "\\. You pay there, not through Relay\\.$"));
-assert.equal(await page.getByRole("button", { name: /Watch price/ }).count(), 0, "no price alerts for shops' websites");
+assert.equal(await page.getByRole("button", { name: /Watch price/ }).count(), 1, "a shop website's product page can watch its price (Connor, 15 Nov; checked once a day)");
 await page.getByRole("button", { name: /^Navy/ }).click();
 assert.equal(await page.getByRole("link", { name: "See it on Hollow Pine's website" }).getAttribute("href"), web[0].productUrl, "a sold-out colour opens its own page, not a checkout");
 assert.match(await page.locator("#watchNote").innerText(), new RegExp("^Sold out on Hollow Pine's website when Relay checked (today|yesterday) at " + when + "\\."));

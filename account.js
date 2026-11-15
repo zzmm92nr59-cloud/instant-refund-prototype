@@ -87,7 +87,10 @@
     opts = opts || {};
     var method = opts.method || "GET", s = load(), headers = {};
     // Reads carry no body, so they don't say it's JSON (one less reason for the browser to ask first).
-    if (method !== "GET") { headers["Content-Type"] = "application/json"; reads = {}; }
+    if (method !== "GET") { headers["Content-Type"] = "application/json"; reads = {};
+      // Any change to a receipt (a gift, a fix, a category, one added or removed) changes Wrapped too: it's built again next
+      // time it's opened (Connor, 15 Nov: a gift he'd just marked wasn't in his story).
+      if (/^\/relay\/my\/(receipts|gmail)\b/.test(path)) Object.keys(memo).forEach(function (k) { if (k.indexOf("wrapped") === 0) delete memo[k]; }); }
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
@@ -595,7 +598,7 @@
     // the floating tab bar on a phone, and above the keyboard while typing, when the tab bar steps aside).
     ".rl-chat{display:flex;flex-direction:column;gap:12px;margin:6px 0 12px}.rl-chat-b{max-width:86%;display:flex;flex-direction:column;gap:4px}" +
     ".rl-chat-b p{margin:0;padding:11px 14px;border-radius:18px;font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}" +
-    ".rl-chat-b.bot{align-self:flex-start}.rl-chat-b.bot p{background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);border-bottom-left-radius:6px}" +
+    ".rl-chat-b.bot{align-self:flex-start}.rl-chat-b.bot p{background:var(--rl-card);border:1px solid var(--rl-line);color:var(--rl-text);border-bottom-left-radius:6px}.rl-chat-b.bot .rl-rich{background:var(--rl-card);color:var(--rl-text);padding:11px 14px;border-radius:18px;border-bottom-left-radius:6px;font-size:16px;line-height:1.45;overflow-wrap:anywhere}.rl-chat-b.bot .rl-rich p{background:none;border:0;padding:0;border-radius:0;white-space:normal}.rl-chat-b.bot .rl-rich p+p,.rl-chat-b.bot .rl-rich p+ul,.rl-chat-b.bot .rl-rich ul+p,.rl-chat-b.bot .rl-rich p+ol,.rl-chat-b.bot .rl-rich ol+p{margin-top:8px}.rl-rich ul,.rl-rich ol{margin:0;padding:0 0 0 22px}.rl-rich li{margin:2px 0}" +
     ".rl-chat-b.me{align-self:flex-end}.rl-chat-b.me p{background:var(--rl-accent);color:var(--rl-bg);border-bottom-right-radius:6px}" +
     ".rl-chat-b.note{align-self:stretch;max-width:none}.rl-chat-b.note p{background:var(--rl-accent-bg);color:var(--rl-text);font-size:15px;text-align:center}" +
     ".rl-chat-who{font-size:13px;font-weight:600;color:var(--rl-text2);margin:0 4px}" +
@@ -868,7 +871,7 @@
     ".rl-se-body .rl-hp-row:first-child{border-top:0}" +
     ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#c7f567;color:#101828;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
-    ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
+    ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-list{list-style:none;margin:0 0 8px;padding:0}.rl-rr-list li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-top:1px solid var(--rl-line);font-size:15px;line-height:20px;color:var(--rl-text)}.rl-rr-list li:first-child{border-top:0}.rl-rr-list li b{flex:none;font-weight:600}.rl-rr-more{all:unset;cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;font-weight:600;color:var(--rl-accent)}.rl-rr-more:active{opacity:.6}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
     ".rl-cat-more{display:block;margin:14px auto 0;width:auto;min-height:44px;padding:0 20px}" +
     "@media(max-width:420px){.rl-cat-hero h3{font-size:24px}.rl-rr-main{padding:10px 12px;gap:10px}.rl-rr-pic{width:44px;height:44px}}" +
     // The phone keyboard never covers what you're typing in a sheet: the sheet sits above it.
@@ -2892,7 +2895,7 @@
     } else if (rt.windowDays) {
       head = rt.windowDays + " days to return";
       why = rt.windowFrom === "delivery" ? "From the day it arrives, " + who + "'s email says." + (by ? " Even counting from your order, that's until at least " + day(by.date) + "." : "")
-        : who + "'s email doesn't say from when." + (by ? " Counting from your order, that's until at least " + day(by.date) + "." : "");
+        : possessive(who) + " email doesn't say from when." + (by ? " Counting from your order, that's until at least " + day(by.date) + "." : "");
     } else if (pol) {
       // No date or window in the emails, but Relay has read the shop's own returns policy: what it gives for most items,
       // and the least that means for this order (never a countdown: sale items and the like can have less).
@@ -3217,7 +3220,18 @@
         btn.onclick = function () {
           if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
           detail = el("div", { className: "rl-rr-detail" });
-          if (names && named.length > 1) detail.appendChild(el("p", { className: "rl-rr-items", text: names }));
+          // Every item on its own line, with its price when the receipt gave one (Connor, 15 Nov: a long shop was one block of
+          // text). A long order shows its first eight, then the rest on a tap.
+          if (named.length > 1) {
+            var ul = el("ul", { className: "rl-rr-list" }), cut = named.length > 10 ? 8 : named.length;
+            var li = function (i) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; return el("li", {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }),
+              Number.isInteger(i.pricePence) ? el("b", { text: money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), row.currency || "GBP") }) : null].filter(Boolean)); };
+            named.slice(0, cut).forEach(function (i) { ul.appendChild(li(i)); });
+            detail.appendChild(ul);
+            if (cut < named.length) { var more = el("button", { type: "button", className: "rl-rr-more", text: "Show all " + named.length + " items" });
+              more.onclick = function (e) { e.stopPropagation(); named.slice(cut).forEach(function (i) { ul.appendChild(li(i)); }); more.remove(); };
+              detail.appendChild(more); }
+          }
           // Not in pounds: shown as it was charged, and left out of anything Relay adds up. Said once, here.
           if (notPounds(row)) detail.appendChild(el("p", { className: "rl-rr-items", text: "Paid in " + moneyName(row.currency) + ", so it isn't added to your totals in pounds." }));
           detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
@@ -4570,7 +4584,7 @@
       var busy = false;
       function bubble(t, findable) {
         var who = t.role === "user" ? "me" : t.role === "note" ? "note" : "bot";
-        var n = el("div", { className: "rl-chat-b " + who }, [el("p", { text: t.text })]);
+        var n = el("div", { className: "rl-chat-b " + who }, [who === "bot" ? richText(t.text) : el("p", { text: t.text })]);
         // Said once, over its first message: who's answering, and that it's an AI.
         if (who === "bot" && t.first) n.insertBefore(el("span", { className: "rl-chat-who", text: "Relay's assistant (AI)" }), n.firstChild);
         // Under the newest thing the shopper typed: look for the same words in Receipts instead.
@@ -8042,6 +8056,20 @@
     var box = el("div", { className: "hl-sum" }, [el("h2", { className: "hl-sum-h", text: "Today" })]);
     if (!rows.length) box.appendChild(el("p", { className: "hl-sum-ok", text: "Nothing needs you right now." }));
     rows.forEach(function (r) { box.appendChild(el("button", { type: "button", className: "hl-sum-r", onclick: function () { pickChip(r[2]); } }, [r[0], el("span", { className: "t", text: r[1] }), accIc("chev", 16, "rl-arow-c")])); });
+    return box;
+  }
+  // "Sainsbury's" + "'s" reads "Sainsbury's's": a name that already ends in 's or s' takes nothing more.
+  function possessive(name) { var n = String(name || "").trim(); return /['’]s$|s'$/i.test(n) ? n : /s$/i.test(n) ? n + "'" : n + "'s"; }
+  // The assistant writes a little Markdown (lists, **bold**): shown as a list and bold text, never as stars and dashes.
+  function richText(text) {
+    var box = el("div", { className: "rl-rich" }), list = null;
+    var inline = function (line) { var p = []; String(line).split(/\*\*([^*]+)\*\*/).forEach(function (part, k) { if (part) p.push(k % 2 ? el("b", { text: part }) : document.createTextNode(part.replace(/\*\*/g, ""))); }); return p; };
+    String(text || "").split(/\n/).forEach(function (raw) {
+      var line = raw.trim(), dot = /^[-*•]\s+(.*)$/.exec(line), num = /^\d+[.)]\s+(.*)$/.exec(line), bullet = dot || num, kind = num ? "ol" : "ul";
+      if (!line) { list = null; return; }
+      if (bullet) { if (!list || list.tagName.toLowerCase() !== kind) { list = el(kind); box.appendChild(list); } list.appendChild(el("li", {}, inline(bullet[1]))); return; }
+      list = null; box.appendChild(el("p", {}, inline(line.replace(/^#{1,4}\s+/, ""))));
+    });
     return box;
   }
   function feedCard(e) {
