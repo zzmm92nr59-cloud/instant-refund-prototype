@@ -134,5 +134,98 @@
   if(p.typicalPriceMinor)bits.push("A typical buy is about £"+Math.round(p.typicalPriceMinor/100)+".");
   return bits.length?bits.join(" "):null;
  }
- return Object.freeze({rank,category,colourOf,getHistory,tapOf,profile,sizeOf,stylesOf,headline});
+ // Picks from the things themselves, not from where the money went (Connor, 15 Nov 2026): a £200 TV is one purchase, not a
+ // love of electronics. Each bought item is read for what it is:
+ //  - a one-off or something no shop here should follow up (a TV, a laptop, a sofa, a subscription): nothing is picked;
+ //  - something people buy again in other colours and cuts (leggings, a hoodie, trainers): more of the same kind;
+ //  - something with a companion (coffee: a cup): one companion at most, because they probably own one already.
+ // An item Relay can't place (most food, anything unusual) picks nothing. Nothing is guessed.
+ const ONE_OFF=/\btv\b|television|\boled\b|\bqled\b|monitor|laptop|macbook|\bimac\b|console|playstation|xbox|nintendo|fridge|freezer|washing machine|tumble dryer|dishwasher|\boven\b|\bhob\b|microwave|vacuum|sofa|wardrobe|gift ?card|subscription|membership|\bplan\b|delivery|postage|warranty|insurance/;
+ const KINDS=[
+  // [key, what to call theirs, what they bought, what to pick (same when null)]
+  ["leggings","leggings",/legging|\btights\b|\balign\b/,/legging|\btights\b/],
+  ["joggers","joggers",/jogger|sweatpant|track ?pant|tracksuit bottom/,null],
+  ["shorts","shorts",/\bshorts\b/,null],
+  ["jeans","jeans",/\bjeans?\b/,null],
+  ["sportsbra","sports bra",/sports? bra|\bbra\b|bralette/,null],
+  ["hoodie","hoodie",/hoodie|sweatshirt|\bscuba\b/,/hoodie|sweatshirt/],
+  ["jumper","jumper",/jumper|sweater|cardigan|\bknit\b/,null],
+  ["tshirt","T-shirt",/t-?shirt|\btee\b|\btank\b/,null],
+  ["shirt","shirt",/\bshirt\b|overshirt|blouse/,null],
+  ["jacket","jacket",/jacket|\bcoat\b|parka|puffer|gilet/,null],
+  ["dress","dress",/\bdress\b/,null],
+  ["skirt","skirt",/\bskirt\b/,null],
+  ["trousers","trousers",/trouser|chino|\bpants?\b/,/trouser|chino|\bpants\b/],
+  ["trainers","trainers",/trainer|sneaker|running shoe/,null],
+  ["boots","boots",/\bboots?\b/,null],
+  ["shoes","shoes",/\bshoes?\b|loafer|sandal/,null],
+  ["socks","socks",/\bsocks?\b/,null],
+  ["underwear","underwear",/boxer|\bbriefs?\b|knicker|underwear|\bthong\b/,null],
+  ["bag","bag",/\bbag\b|\btote\b|backpack|rucksack|holdall/,null],
+  ["hat","hat",/beanie|\bcap\b|\bhat\b/,null],
+  ["candle","candle",/candle|diffuser/,null],
+  ["skincare","skincare",/serum|moisturi[sz]|cleanser|\bspf\b|face (cream|oil|mask|wash)|hand cream|body (wash|lotion|oil)/,null]];
+ const COMPANIONS=[
+  // [key, what to call theirs, what they bought, what goes with it, what's an even better fit]
+  ["coffee","coffee",/nespresso|espresso|coffee|\bcapsules?\b|\bpods?\b|lungo|ristretto/,/espresso cup|coffee cup|\bmugs?\b|\bcups?\b/,/espresso/],
+  ["tea","tea",/\btea\b|teabags?/,/\bmugs?\b|teapot|\bcups?\b/,/tea/],
+  ["wine","wine",/\bwine\b|prosecco|champagne/,/wine glass|\bglasses\b|decanter|corkscrew/,/wine/],
+  ["bed","bedding",/duvet|mattress|\bbed\b|\bdivan\b/,/pillowcase|duvet cover|fitted sheet|\bsheets?\b|bedding|\bthrow\b|blanket/,null]];
+ // What a bought item is: {mode:"none"} for a one-off, "similar" or "companion" with its kind, or null when Relay can't say.
+ function kindOf(name){
+  const s=normal(name);if(!s)return null;
+  if(ONE_OFF.test(s))return {mode:"none"};
+  const k=KINDS.find(x=>x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[3]||k[2]};
+  const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
+  return null;
+ }
+ const possessiveShop=n=>/s$/i.test(n)?n+"'":n+"'s";
+ // groups: what Browse shows, each {key, product, store, min (pence), options[], left}. Returns up to `limit` picks, best first,
+ // each {g, score, why[]}. At most two of a kind (three when there's only one kind to go on), one companion per thing bought,
+ // three from one shop, and never the very thing they already bought.
+ function picks(purchases,groups,options={}){
+  const limit=options.limit||6,sizes=(options.sizes||[]).map(normal).filter(Boolean);
+  const bought=(Array.isArray(purchases)?purchases:[]).filter(p=>p&&p.item&&p.merchant&&(p.demo===true||p.verified===true));
+  const src=new Map(),owned=new Set();
+  for(const p of bought){
+   owned.add(normal(p.merchant)+"|"+normal(p.item));
+   const k=kindOf(p.item);if(!k||k.mode==="none")continue;
+   if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
+   const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
+   const c=colourOf(p.detail)||colourOf(p.item);if(c)x.colours.add(c);
+   x.shops.set(normal(p.merchant),String(p.merchant).trim());
+   const pm=Math.round(Number(p.price||0)*100);if(pm>0)x.prices.push(pm);
+  }
+  const kinds=[...src.values()].map(x=>({...x,weight:x.mode==="similar"?1+Math.min(x.n,4)*.5:.8,
+   paid:x.prices.length?x.prices.slice().sort((a,b)=>a-b)[Math.floor(x.prices.length/2)]:0}));
+  if(!kinds.length)return[];
+  const stock=(Array.isArray(groups)?groups:[]).filter(g=>g&&g.product&&g.left!==0&&!owned.has(normal(g.store)+"|"+normal(g.product)));
+  const perKind=kinds.filter(k=>k.mode==="similar").length===1?3:2;
+  const pool=kinds.map(k=>{
+   const shop=[...k.shops.values()][0],many=k.shops.size>1;
+   const lead=k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
+   const list=stock.filter(g=>k.want.test(normal(g.product))).map((g,i)=>{
+    let s=3;const why=[lead],text=normal(g.product+" "+(g.options||[]).join(" "));
+    const col=[...k.colours].find(c=>new RegExp("\\b"+c+"\\b").test(text));
+    const fit=(g.options||[]).flatMap(o=>String(o).split(/\s*[\/,|]\s*/)).find(o=>sizes.includes(normal(o)));
+    if(k.better&&k.better.test(normal(g.product)))s+=1;
+    if(col){s+=1;why.push("In "+col+", like yours")}
+    if(fit){s+=.5;if(why.length<2)why.push("In your size, "+fit)}
+    if(k.shops.has(normal(g.store))){s+=1;if(why.length<2)why.push("From "+possessiveShop(k.shops.get(normal(g.store)))+" range")}
+    if(k.paid&&g.min>=k.paid*.5&&g.min<=k.paid*1.6)s+=.5;
+    return {g,i,k,score:s*k.weight,why};
+   }).sort((a,b)=>b.score-a.score||a.i-b.i);
+   return {k,list,taken:0,cap:k.mode==="companion"?1:perKind};
+  }).filter(x=>x.list.length).sort((a,b)=>b.k.weight-a.k.weight||b.list[0].score-a.list[0].score);
+  const out=[],perShop=new Map(),used=new Set();
+  // In turns, strongest kind first, so one kind can't fill the row.
+  for(let round=0;round<3&&out.length<limit;round++)for(const p of pool){
+   if(out.length>=limit)break;if(p.taken>=p.cap)continue;
+   const x=p.list.find(y=>!used.has(y.g.key||y.g.product+"|"+y.g.store)&&(perShop.get(normal(y.g.store))||0)<3);if(!x)continue;
+   used.add(x.g.key||x.g.product+"|"+x.g.store);perShop.set(normal(x.g.store),(perShop.get(normal(x.g.store))||0)+1);p.taken++;
+   out.push({g:x.g,score:x.score,why:x.why.slice(0,2)});
+  }
+  return out;
+ }
+ return Object.freeze({rank,category,colourOf,getHistory,tapOf,profile,sizeOf,stylesOf,headline,kindOf,picks});
 });

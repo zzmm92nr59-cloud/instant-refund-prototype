@@ -41,8 +41,34 @@ assert.ok(html.includes('relay-recommendation-engine.js'),"App must load recomme
 assert.ok(html.includes('relay-discover-personalise-v1'),"Consent must be opt-in, persisted per browser");
 assert.ok(html.includes('let personalise=false'),"Personalisation must default off");
 assert.ok(html.includes('togglePersonalise'),"Discover needs a user-facing on/off setting");
+// Picks come from the things bought, not from where the money went: a TV is a one-off (no more electronics, no phone cases),
+// food picks nothing, leggings bring more leggings (the colour and shop they chose first), coffee brings one cup.
+{
+ const buys=[
+  {item:"55 inch QLED TV",merchant:"Screen Barn",price:200,verified:true},
+  {item:"Align High-Rise Pant 25",detail:"Black / 8",merchant:"Studio North",price:88,verified:true},
+  {item:"Espresso capsules, 50 pack",merchant:"Bean Post",price:25,verified:true},
+  {item:"Bananas",merchant:"Corner Grocer",price:1,verified:true},
+  {item:"Evening Gown",detail:"Purple",merchant:"Another Shop",price:150,verified:false}];
+ const g=(product,store,min,options,left)=>({key:store+"|"+product,product,store,min,options:options||[],left});
+ const groups=[g("Striped Phone Case","Case Corner",3500),g("65 inch OLED TV","Screen Barn",99900),g("Seamless Leggings","Gym Row",4000,["Black / 8","Navy / 10"]),
+  g("Run Leggings","Track Lane",3000,["Grey"]),g("Flow Tights","Studio North",9000,["Plum"]),g("Sold Out Leggings","Gym Row",4000,["Black"],0),
+  g("Stoneware Espresso Cup","Clay Works",1200),g("Breakfast Mug","Clay Works",1400),g("Evening Gown","Another Shop",14999),g("Dark Chocolate Truffles","Cocoa Cottage",900)];
+ assert.deepEqual(engine.kindOf("55 inch QLED TV"),{mode:"none"});
+ assert.equal(engine.kindOf("Bananas"),null,"what Relay can't place picks nothing");
+ assert.equal(engine.kindOf("Align High-Rise Pant 25").key,"leggings");
+ assert.equal(engine.kindOf("Espresso capsules, 50 pack").mode,"companion");
+ const got=engine.picks(buys,groups,{sizes:["8"]});
+ assert.deepEqual(got.map(x=>x.g.product),["Seamless Leggings","Stoneware Espresso Cup","Flow Tights","Run Leggings"],"leggings first, one cup, three of the one kind");
+ assert.deepEqual(got[0].why,["Like the leggings you bought at Studio North","In black, like yours"]);
+ assert.deepEqual(got[1].why,["Goes with your coffee from Bean Post"]);
+ assert.ok(got.find(x=>x.g.product==="Flow Tights").why.includes("From Studio North's range"));
+ assert.deepEqual(engine.picks([buys[0],buys[3]],groups),[],"a TV and bananas pick nothing");
+ assert.deepEqual(engine.picks([{item:"Seamless Leggings",merchant:"Gym Row",price:40,verified:true}],groups).map(x=>x.g.product),["Run Leggings","Flow Tights"],"never the very thing they bought");
+ assert.deepEqual(engine.picks([buys[4]],groups),[],"unverified purchases are ignored");
+}
 assert.ok(html.includes('personalisationHistory(),'),"App should use the purchase history for ranking");
 const script=html.match(/<script>([\s\S]*?)<\/script>/i);
 assert.ok(script);
 new vm.Script(script[1],{filename:"Relay embedded app"});
-console.log("PASS: opt-in Discover recommendation ranking, cross-shop examples, consent default, unverified exclusions, unchanged source inventory, UI integration");
+console.log("PASS: opt-in Discover recommendation ranking, cross-shop examples, consent default, unverified exclusions, unchanged source inventory, picks from the things bought (one-offs and food pick nothing), UI integration");
