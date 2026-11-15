@@ -45,7 +45,18 @@ export const WEB_SHOPS = [
   { domain: "www.kentbrushes.com", label: "Kent Brushes" },
   // Pets
   { domain: "www.lordsandlabradors.co.uk", label: "Lords & Labradors" },
+  // Bigger shops that aren't on Shopify, read from their product pages (readPages below): their product sitemap, then a
+  // couple of dozen product pages a day, each page's schema.org Product data (the same data search engines read).
+  // Checked from GitHub's servers on 15 Nov 2026: each allows robots on its product pages and its pages carry that data.
+  // Not here, and why: John Lewis (pages didn't answer a robot), adidas (refused robots.txt), lululemon, Zara, Sainsbury's,
+  // Amazon, ASOS (blocked or no answer). Relay never tries to get round a shop that says no.
+  { domain: "www.marksandspencer.com", label: "M&S", reader: "pages", sitemap: "https://www.marksandspencer.com/sitemap/sitemap_index.xml", childMatch: /\/uk_sitemap[^/]*product/i, match: /\/p\/[a-z]{2,4}\d{5,}/ },
+  { domain: "www.jdsports.co.uk", label: "JD Sports", reader: "pages", sitemap: "https://www.jdsports.co.uk/sitemaps/index-sitemap.xml", childMatch: /product/i, match: /\/product\/[^/]+\/\d+\/?$/ },
+  { domain: "uk.puma.com", label: "PUMA", reader: "pages", sitemap: "https://uk.puma.com/sitemaps/urls/uk/sitemap_index.xml", match: /\/uk\/en\/pd\// },
+  { domain: "uk.gymshark.com", label: "Gymshark", reader: "pages", sitemap: "https://uk.gymshark.com/sitemap_products_1.xml", match: /\/products\/(?!gift-card)[a-z0-9-]+$/ },
+  { domain: "www.nike.com", label: "Nike", reader: "pages", sitemap: "https://www.nike.com/sitemap-v2-pdp-en-gb.xml", match: /\/gb\/t\//, pagePrice: "currentPrice" },
 ];
+export const PAGES_PER_SHOP = 24;
 
 export const USER_AGENT = "RelayBot/1.0 (+https://zzmm92nr59-cloud.github.io/instant-refund-prototype/relaybot.html)";
 export const ROBOT_TOKEN = "relaybot";
@@ -180,12 +191,95 @@ export function shopRows(shop, origin, products, now) {
   return rows;
 }
 
+// ---- Shops read from their product pages (reader: "pages") ----
+// A page or sitemap as text. Past `max` characters: a page is too big; a sitemap (partial) keeps its first part, which
+// lists enough products (Nike's UK list is larger than a Worker should hold).
+async function getText(f, url, accept, max = 16_000_000, partial = false) {
+  let r;
+  try { r = await f(url, { headers: { "User-Agent": USER_AGENT, Accept: accept, "Accept-Language": "en-GB" }, redirect: "follow", signal: AbortSignal.timeout(20000) }); }
+  catch { return { status: "unreachable" }; }
+  const done = () => r.text().catch(() => "");
+  if (r.status === 401 || r.status === 403 || r.status === 429) { await done(); return { status: "blocked" }; }
+  if (!r.ok) { await done(); return { status: r.status >= 500 ? "unreachable" : "missing" }; }
+  if (!partial || !r.body || !r.body.getReader) { const text = await r.text(); return text.length > max ? { status: "too_big" } : { status: "ok", text, url: r.url || url }; }
+  const reader = r.body.getReader(), dec = new TextDecoder(); let text = "";
+  try { for (;;) { const { done: end, value } = await reader.read(); if (end) break; text += dec.decode(value, { stream: true }); if (text.length >= max) { await reader.cancel().catch(() => {}); break; } } }
+  catch { if (!text) return { status: "unreachable" }; }
+  return { status: "ok", text: text.slice(0, max), url: r.url || url };
+}
+// HTML entities in a page's data ("Arrival 7&quot; Shorts").
+const unentity = (t) => String(t || "").replace(/&(quot|amp|apos|#39|#x27|lt|gt|nbsp);/gi, (m, e) => ({ quot: '"', amp: "&", apos: "'", "#39": "'", "#x27": "'", lt: "<", gt: ">", nbsp: " " })[e.toLowerCase()]);
+const locsOf = (xml) => [...String(xml).matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map(m => m[1].replace(/&amp;/g, "&"));
+// The schema.org Product data on a page (JSON-LD), with its variants.
+export function pageProduct(html) {
+  for (const m of String(html).matchAll(/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
+    let j; try { j = JSON.parse(m[1].trim()); } catch { continue; }
+    for (const x of [].concat(j).flatMap(y => (y && y["@graph"]) || [y])) if (x && /Product(Group)?$/.test([].concat(x["@type"]).join(" "))) return x;
+  }
+  return null;
+}
+// The price in pounds the page states (an offer's price, its lowest price, or its price specification), or 0: never guessed.
+function offerPence(offers) {
+  for (const o of [].concat(offers || [])) {
+    if (!o || typeof o !== "object") continue;
+    const spec = o.priceSpecification || {}, cur = String(o.priceCurrency || spec.priceCurrency || "").toUpperCase();
+    if (cur && cur !== "GBP") continue;
+    const p = penceOf(o.price != null ? o.price : o.lowPrice != null ? o.lowPrice : spec.price);
+    if (p && cur === "GBP") return p;
+  }
+  return 0;
+}
+const firstImage = (img) => { for (const x of [].concat(img || [])) { const u = typeof x === "string" ? x : x && (x.url || x.contentUrl); if (u && /^https:\/\/[^\s"'<>]{8,600}$/.test(u)) return u; } return null; };
+const inStockOf = (offers) => { const a = [].concat(offers || []).map(o => String((o && o.availability) || "")).join(" "); return /InStock|OnlineOnly|LimitedAvailability/i.test(a) ? 1 : /OutOfStock|SoldOut|Discontinued/i.test(a) ? 0 : null; };
+// One product page as Relay's rows: the product, its colour, its price and picture, as the page states them.
+export function pageRows(shop, url, html, position, now) {
+  const p = pageProduct(html);
+  if (!p || !p.name) return [];
+  const variants = [].concat(p.hasVariant || []).filter(v => v && typeof v === "object");
+  let price = offerPence(p.offers) || variants.map(v => offerPence(v.offers)).find(Boolean) || 0;
+  // A shop whose Product data has no price but whose UK page states it in its own data (Nike: "currentPrice"), read there.
+  if (!price && shop.pagePrice) { const m = new RegExp('"' + shop.pagePrice + '"\\s*:\\s*"?(\\d{1,5}(?:\\.\\d{1,2})?)').exec(html); if (m) price = penceOf(m[1]); }
+  const image = firstImage(p.image) || variants.map(v => firstImage(v.image)).find(Boolean) || null;
+  if (!price || !image) return [];
+  const colour = oneLine(p.color || (variants.find(v => v.color) || {}).color || "", 60) || null;
+  const code = (/(\d{5,})\/?$/.exec(url) || /([a-z]{2,4}\d{5,})/i.exec(url) || [null, url.replace(/[^a-z0-9]+/gi, "-").slice(-60)])[1];
+  const key = "web:" + shop.domain + ":" + code;
+  return [{ id: key + ":1", domain: shop.domain, productKey: key, position, product: oneLine(unentity(p.name), 140), variation: colour && unentity(colour), priceMinor: price,
+    available: inStockOf(p.offers) ?? inStockOf(variants.flatMap(v => [].concat(v.offers || []))), imageUrl: image, productUrl: url, kind: null, checkedAt: now }];
+}
+// A shop's product sitemap (or the product sitemaps an index lists), then up to 24 product pages robots.txt allows: spread
+// across the whole list, a different spread each day, so Browse shows a mix that changes.
+export async function readPages(f, shop, robots, now) {
+  if (!robotsAllow(robots.groups, new URL(shop.sitemap).pathname)) return { status: "robots", rows: [] };
+  let sm = await getText(f, shop.sitemap, "application/xml,text/xml", 6_000_000, true);
+  if (sm.status !== "ok") return { status: sm.status === "missing" ? "not_readable" : sm.status, rows: [] };
+  let urls = locsOf(sm.text);
+  if (/<sitemapindex/i.test(sm.text)) {
+    const kids = urls.filter(u => !shop.childMatch || shop.childMatch.test(u)).slice(0, 2);
+    urls = [];
+    for (const k of kids) { const x = await getText(f, k, "application/xml,text/xml", 6_000_000, true); if (x.status === "ok") urls.push(...locsOf(x.text)); }
+  }
+  urls = [...new Set(urls.filter(u => { try { const x = new URL(u); return sameSite(x.origin, shop.domain) && shop.match.test(x.pathname) && robotsAllow(robots.groups, x.pathname + x.search); } catch { return false; } }))];
+  if (!urls.length) return { status: "empty", rows: [] };
+  const n = Math.min(PAGES_PER_SHOP, urls.length), step = urls.length / n, day = Math.floor(now / DAY);
+  const picks = Array.from({ length: n }, (_, i) => urls[Math.floor((i * step + (day * 7919) % step)) % urls.length]);
+  const rows = []; let blocked = 0;
+  for (const [i, u] of picks.entries()) {
+    const pg = await getText(f, u, "text/html", 4_000_000);
+    if (pg.status === "blocked") { if (++blocked >= 3) break; continue; }
+    if (pg.status === "ok") rows.push(...pageRows(shop, u, pg.text, i, now));
+  }
+  if (!rows.length) return { status: blocked ? "blocked" : "empty", rows: [] };
+  return { status: "ok", rows, products: new Set(rows.map(r => r.productKey)).size, origin: new URL(shop.sitemap).origin };
+}
+
 // One shop: its robots.txt, then its currency and where it delivers (/meta.json), then its products (/products.json).
 export async function readShop(f, shop, now) {
   let origin = "https://" + shop.domain;
   const robots = await readRobots(f, origin);
   if (!robots.reachable) return { status: "unreachable", rows: [] };
   if (robots.origin && sameSite(robots.origin, shop.domain)) origin = robots.origin;
+  if (shop.reader === "pages") return readPages(f, shop, robots, now);
   const listPath = "/products.json?limit=" + PAGE_LIMIT;
   if (!robotsAllow(robots.groups, listPath) || !robotsAllow(robots.groups, "/meta.json")) return { status: "robots", rows: [], origin };
   const meta = await getJson(f, origin + "/meta.json");
@@ -217,7 +311,9 @@ export async function refreshWebShops(env, o = {}) {
   const listed = new Set(shops.map(s => s.domain)), gone = known.filter(k => !listed.has(k.domain));
   if (gone.length) await db.batch(gone.flatMap(k => [db.prepare("DELETE FROM web_shop_items WHERE domain = ?").bind(k.domain), db.prepare("DELETE FROM web_shops WHERE domain = ?").bind(k.domain)]));
   const nextAt = new Map(known.map(k => [k.domain, Number(k.next_at) || 0]));
-  const due = shops.filter(s => (nextAt.get(s.domain) || 0) <= now).sort((a, b) => (nextAt.get(a.domain) || 0) - (nextAt.get(b.domain) || 0)).slice(0, o.max || SHOPS_PER_RUN);
+  let due = shops.filter(s => (nextAt.get(s.domain) || 0) <= now).sort((a, b) => (nextAt.get(a.domain) || 0) - (nextAt.get(b.domain) || 0)).slice(0, o.max || SHOPS_PER_RUN);
+  // A shop read from its pages makes about 27 requests, so it has a run to itself.
+  if (due.some(s => s.reader === "pages")) due = [due.find(s => s.reader === "pages")];
   const results = [];
   for (const shop of due) {
     // Taken first, so two runs never read the same shop at once.
