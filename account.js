@@ -3679,13 +3679,18 @@
         if (!/^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/.test(u)) return;
         body.appendChild(el("img", { src: u, alt: "Picture attached to the email", style: "display:block;max-width:100%;margin:8px auto;background:var(--rl-card);border-radius:8px" }));
       });
-      var frame = el("iframe", { title: "Original receipt email", style: "width:100%;height:60vh;border:1px solid var(--rl-line);border-radius:12px;background:var(--rl-card);margin-top:8px" });
+      var frame = el("iframe", { title: "Original receipt email", style: "width:100%;height:70vh;display:block;border:1px solid var(--rl-line);border-radius:12px;background:var(--rl-card);margin-top:8px" });
       // No scripts, no same-origin: the email can show itself but cannot run code or touch Relay.
       frame.setAttribute("sandbox", "allow-popups allow-popups-to-escape-sandbox");
       frame.setAttribute("referrerpolicy", "no-referrer");
-      frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src https: data:; style-src \'unsafe-inline\'; font-src https:">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>body{margin:8px;font-family:-apple-system,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style>' + String(b.html || "");
       body.appendChild(frame);
+      // Emails are designed for a wider screen (usually 600px). Relay reads that width from the email's own HTML and shrinks
+      // the whole email to fit the phone's width, so it never has to be scrolled sideways.
+      var html0 = String(b.html || ""), design = 0;
+      html0.replace(/\bwidth\s*=\s*["']?(\d{3,4})(?!\s*%)|\b(?:min-)?width\s*:\s*(\d{3,4})px/gi, function (m, a1, a2) { var v = Number(a1 || a2); if (v >= 360 && v <= 1200 && v > design) design = v; return m; });
+      var room = Math.max(200, (frame.clientWidth || 340) - 18), zoom = design > room ? Math.max(0.3, Math.floor(room / design * 1000) / 1000) : 1;
+      frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src https: data:; style-src \'unsafe-inline\'; font-src https:">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1"><base target="_blank"><style>' + (zoom < 1 ? 'html{zoom:' + zoom + '}' : '') + 'body{margin:8px;font-family:-apple-system,sans-serif;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}</style>' + html0;
     }).catch(function () { note.textContent = "Couldn't reach Relay."; });
   }
 
@@ -7872,6 +7877,14 @@
   // the way, a return under way, still returnable), then the newest. A card is one tap and opens that order's page.
   // Every line on a card is something Relay knows: the shop's own return date (statedDeadline), the parcel's latest news
   // (shipWords), how far a return has got. A strip under a card is only ever days left on a return. Nothing is made up.
+  // A tall photo (a person wearing the thing, as most clothes shops send) cropped to a square shows its top, so their head
+  // stays in the picture (Connor, 15 Nov: a lululemon photo lost her head). Square and wide photos keep their middle.
+  var TALL_AT = "50% 8%";
+  if (typeof document !== "undefined" && document.addEventListener) document.addEventListener("load", function (e) {
+    var i = e.target;
+    if (!i || i.tagName !== "IMG" || i.classList.contains("rl-logo-img") || !i.naturalWidth || i.naturalHeight < i.naturalWidth * 1.15) return;
+    if (i.closest && i.closest(".h2-art,.hl-pic,.hl-sqpic,.rl-rr-pic,.rl-ask-sq,.bg-pic,.dc-pic,.rl-tile,.rl-ys-webpic,.rl-po-img")) i.style.objectPosition = TALL_AT;
+  }, true);
   var HOME_TINT = true;    // look A (chosen): each card takes its kind of shopping's colour. One class on the feed.
   // Look A's card colour for a kind of shopping: its tile colour, deepened towards the ink that kind's drawing already
   // uses by just enough for white 14px text to reach 4.5 to 1 on it. The tiles themselves (Browse) keep TILE_COLOURS.

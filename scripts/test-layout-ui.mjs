@@ -263,7 +263,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
     const ix = Math.max(0, Math.min(s.right, r.right) - Math.max(s.left, r.left)), iy = Math.max(0, Math.min(s.bottom, r.bottom) - Math.max(s.top, r.top)), back = getComputedStyle(art);
     return { kind: !img ? "drawing" : img.classList.contains("rl-logo-img") ? "logo" : "photo", w: r.width, h: r.height, radius: getComputedStyle(t).borderRadius, covers: Math.round(100 * ix * iy / (r.width * r.height)),
       inside: s.left >= r.left - .5 && s.top >= r.top - .5 && s.right <= r.right + .5 && s.bottom <= r.bottom + .5, margin: Math.round(Math.min(s.left - r.left, s.top - r.top, r.right - s.right, r.bottom - s.bottom)),
-      fit: look && look.objectFit, at: look && look.objectPosition, back: back.backgroundColor, ring: back.boxShadow, loaded: !img || (img.complete && img.naturalWidth > 0), price: Boolean(t.querySelector(".h2-price")) }; }), sel);
+      fit: look && look.objectFit, at: look && look.objectPosition, tall: Boolean(img && img.naturalHeight > img.naturalWidth * 1.15), back: back.backgroundColor, ring: back.boxShadow, loaded: !img || (img.complete && img.naturalWidth > 0), price: Boolean(t.querySelector(".h2-price")) }; }), sel);
   // The colour on the screen at the middle of an element (it is scrolled to the middle of the screen first).
   const middle = async loc => { await loc.evaluate(e => e.scrollIntoView({ block: "center", inline: "center" })); await page.waitForTimeout(120);
     const r = await loc.evaluate(e => { const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
@@ -274,7 +274,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
   const sitRight = (list, side, radius, where) => {
     for (const t of list) {
       assert.deepEqual([t.w, t.h, t.radius], [side, side, radius], where + ": every tile is a " + side + "px square");
-      if (t.kind === "photo") assert.ok(t.inside && t.covers >= 80 && t.fit === "cover" && t.at === "50% 50%", where + ": a photo's box lies inside its tile, covers it and is centred " + JSON.stringify(t));
+      if (t.kind === "photo") assert.ok(t.inside && t.covers >= 80 && t.fit === "cover" && t.at === (t.tall ? "50% 8%" : "50% 50%"), where + ": a photo's box lies inside its tile and covers it, centred (a tall photo shows its top, so a person keeps their head) " + JSON.stringify(t));
       if (t.kind === "logo") { assert.ok(t.inside && t.margin >= 12 && t.fit === "contain", where + ": a logo lies wholly inside its tile with room around it " + JSON.stringify(t));
         assert.ok((t.back === WHITE || t.back === GREY) && t.ring === "none", where + ": a logo sits on white, or on its own background colour, with no ring " + JSON.stringify(t)); }
     }
@@ -299,7 +299,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
     assert.deepEqual(home.filter(t => t.kind === "logo").map(t => t.back).sort(), [GREY, WHITE, WHITE, WHITE].sort(), "Home (" + scheme + "): the logo with its own pale grey sits on that grey; the others, the see-through one too, on white");
     // On the screen: the photo's own middle is at the tile's middle (it was far below the tile).
     const photos = page.locator(".h2-feed .h2-pic:has(img:not(.rl-logo-img))");
-    for (let i = 0; i < await photos.count(); i++) assert.ok(marked(await middle(photos.nth(i))), "Home (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile");
+    for (let i = 0; i < await photos.count(); i++) { if (await photos.nth(i).locator("img").evaluate(m => m.naturalHeight > m.naturalWidth * 1.15)) continue; assert.ok(marked(await middle(photos.nth(i))), "Home (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile"); }
     // The header's logo: a circle in the logo's own white or grey, no ring, the logo whole inside it.
     const heads = await page.locator(".h2-feed .h2-logo.rl-has-logo").evaluateAll(cs => cs.map(c => { const r = c.getBoundingClientRect(), i = c.querySelector("img").getBoundingClientRect(), look = getComputedStyle(c), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       return { back: look.backgroundColor, ring: look.boxShadow, round: look.borderRadius, whole: [[i.left, i.top], [i.right, i.top], [i.left, i.bottom], [i.right, i.bottom]].every(p => Math.hypot(p[0] - cx, p[1] - cy) <= r.width / 2 + .5) }; }));
@@ -349,7 +349,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
     assert.deepEqual(ask.map(t => t.kind), ["photo", "photo", "photo", "logo", "logo", "logo"], "Ask (" + scheme + "): the three newest have photos, the next three logos");
     sitRight(ask, 115, "24px", "Ask (" + scheme + ")");
     const photos = page.locator(".rl-ask-sq:has(img:not(.rl-logo-img))");
-    for (let i = 0; i < 3; i++) assert.ok(marked(await middle(photos.nth(i))), "Ask (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile");
+    for (let i = 0; i < 3; i++) { if (await photos.nth(i).locator("img").evaluate(m => m.naturalHeight > m.naturalWidth * 1.15)) continue; assert.ok(marked(await middle(photos.nth(i))), "Ask (" + scheme + "): photo " + (i + 1) + " shows its own middle at the middle of its tile"); }
     const days = await page.locator(".rl-ask-tile").evaluateAll(ts => ts.map(t => { const sq = t.querySelector(".rl-ask-sq").getBoundingClientRect(), d = t.querySelector(".rl-ask-day"), r = d.getBoundingClientRect(); return { under: r.top >= sq.bottom, font: getComputedStyle(d).fontSize, text: d.innerText.trim().length > 0, onPicture: Boolean(t.querySelector(".rl-ask-sq .rl-ask-day")) }; }));
     assert.ok(days.every(d => d.under && d.font === "13px" && d.text && !d.onPicture), "Ask (" + scheme + "): the day is a 13px line under the tile and never over the picture");
     assert.deepEqual(await sizes(), { small: [], tiny: [] }, "Ask with pictures: nothing tappable under 44px, no text under 13px (" + scheme + ")");
@@ -413,7 +413,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
   assert.equal(st.interestPuts.length, 2, "Not now saves nothing");
   st.shops = false; }
 console.log("ok - interests: asked once, saved once, not asked again; Profile shows and changes them; Shops on Relay puts matching shops first, normal order when nothing matches");
-console.log("ok - pictures: photos fill their squares with their middle in the middle, logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
+console.log("ok - pictures: photos fill their squares with their middle in the middle (a tall one its top), logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
 assert.deepEqual(errors, [], "no script errors");
 
 // 16. next.html, the old try-out address: anyone is sent to the app, keeping what came after it, and the service worker
