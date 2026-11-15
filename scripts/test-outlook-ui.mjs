@@ -102,12 +102,12 @@ await page.getByText(/Found or updated 1 receipt/).waitFor();
 assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.mailbox")), "outlook", "every screen now names Outlook");
 await page.screenshot({ path: "/tmp/shots/one-step-receipts.png" });
-// Group tiles (on Browse) use drawn pictures (or a photo of something bought), not emoji.
-await page.evaluate(() => window.go("discover"));
-const tile = page.locator("#browsePage .rl-tile").first();
+// Group tiles (on Receipts) use drawn pictures (or a photo of something bought), not emoji.
+await page.evaluate(() => window.go("receipts"));
+const tile = page.locator("#receiptsPage .rl-tile").first();
 await tile.waitFor();
-assert.equal(await page.locator("#browsePage .rl-tile .rl-tile-art svg, #browsePage .rl-tile .rl-tile-pic").count() >= 1, true);
-const cardText = await page.locator("#browsePage .rl-tiles").innerText();
+assert.equal(await page.locator("#receiptsPage .rl-tile .rl-tile-art svg, #receiptsPage .rl-tile .rl-tile-pic").count() >= 1, true);
+const cardText = await page.locator("#receiptsPage .rl-tiles").innerText();
 assert.ok(!/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(cardText), "no emoji on the group tiles: " + cardText);
 await page.evaluate(() => window.go("receipts"));
 // A missing receipt can be added straight from the Receipts page, searching Outlook as you type.

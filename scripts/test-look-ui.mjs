@@ -30,14 +30,14 @@ for (const scheme of ["dark", "light"]) {
   await page.goto(origin + "/index.html");
   await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: "jess@example.com", expiresAt: Date.now() + 864e5 })));
   await page.reload();
-  await page.evaluate(() => window.go("discover"));
-  await page.locator("#browsePage .rl-tile").first().waitFor();
-  await page.locator("#browsePage .rl-wr-door").waitFor();
+  await page.evaluate(() => window.go("receipts"));
+  await page.locator("#receiptsPage .rl-tile").first().waitFor();
+  await page.locator("#receiptsPage .rl-wr-door").waitFor();
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   assert.equal(bg, "rgb(255, 255, 255)", scheme + ": Relay is always white, whatever the phone is set to");
   // The tiles: this year's Wrapped first, "Other" last, and each name readable on its tile.
-  assert.ok(await page.evaluate(() => { const d = document.querySelector("#browsePage .rl-wr-door"), t = document.querySelector("#browsePage .rl-tile"); return Boolean(d.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING); }), "this year's Wrapped leads");
-  const tiles = await page.locator("#browsePage .rl-tile").evaluateAll(ts => ts.map(t => ({ name: t.querySelector("b").textContent, bg: getComputedStyle(t).backgroundColor, fg: getComputedStyle(t.querySelector("b")).color, year: t.classList.contains("rl-year") })));
+  assert.ok(await page.evaluate(() => { const d = document.querySelector("#receiptsPage .rl-wr-door"), t = document.querySelector("#receiptsPage .rl-tile"); return Boolean(d.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING); }), "this year's Wrapped leads");
+  const tiles = await page.locator("#receiptsPage .rl-tile").evaluateAll(ts => ts.map(t => ({ name: t.querySelector("b").textContent, bg: getComputedStyle(t).backgroundColor, fg: getComputedStyle(t.querySelector("b")).color, year: t.classList.contains("rl-year") })));
   assert.equal(tiles[tiles.length - 1].name, "Other", "Other comes last");
   const lum = c => { const v = c.match(/\d+/g).slice(0, 3).map(x => { x /= 255; return x <= .03928 ? x / 12.92 : Math.pow((x + .055) / 1.055, 2.4); }); return .2126 * v[0] + .7152 * v[1] + .0722 * v[2]; };
   for (const t of tiles) { const a = lum(t.bg), b = lum(t.fg); assert.ok((Math.max(a, b) + .05) / (Math.min(a, b) + .05) >= 3, scheme + ": " + t.name + " is readable on its tile"); }
@@ -52,7 +52,7 @@ for (const scheme of ["dark", "light"]) {
   assert.notEqual(await page.locator("#foot").evaluate(f => getComputedStyle(f).backdropFilter), "none", "the tab bar is frosted glass");
   await page.screenshot({ path: `/tmp/shots/look-receipts-${scheme}.png` });
   // A tile opens its group in the tile's own colour.
-  await page.locator("#browsePage .rl-tile", { hasText: "Fashion" }).click();
+  await page.locator("#receiptsPage .rl-tile", { hasText: "Fashion" }).click();
   assert.equal(await page.locator(".rl-cat-hero").evaluate(h => getComputedStyle(h).backgroundColor), tileColours.Fashion);
   // While typing, the floating bars step aside for the keyboard.
   await page.locator(".rl-cat-search").focus();
@@ -60,14 +60,14 @@ for (const scheme of ["dark", "light"]) {
   await page.locator(".rl-cat-search").blur();
   assert.equal(await page.locator("#foot").isVisible(), true);
   // The Wrapped card opens Wrapped, with Browse still lit.
-  await page.evaluate(() => window.go("discover"));
-  await page.locator("#browsePage .rl-wr-door").click();
+  await page.waitForTimeout(450); await page.locator(".rl-cat-back").click();
+  await page.locator("#receiptsPage .rl-wr-door").click();
   await page.locator(".rl-wr-play, .rl-wr-door").first().waitFor({ timeout: 10000 });
   assert.equal(await page.evaluate(() => window.page), "wrapped");
-  assert.equal(await litTab(page), "Browse", "Wrapped lives in Browse");
+  assert.equal(await litTab(page), "Receipts", "Wrapped lives in Receipts");
   assert.deepEqual(errors, [], "no page errors");
   await ctx.close();
 }
-console.log("ok - Browse's colourful tiles led by Wrapped, readable in light and dark; returns due soon on the Home tab; the tab bar steps aside for the keyboard");
+console.log("ok - Receipts' colourful tiles led by Wrapped, readable in light and dark; returns due soon on the Home tab; the tab bar steps aside for the keyboard");
 console.log("PASS look: follows the phone's light or dark setting, colourful tiles, floating glass tab bar with returns due soon on Home");
 await browser.close(); server.close();
