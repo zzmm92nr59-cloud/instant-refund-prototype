@@ -314,6 +314,47 @@ for (const scheme of ["light", "dark"]) {
   await page.context().close();
   console.log("ok - Browse: sections by kind, two big photos a row with logo, shop, name and price; heading and product open");
 }
+// Typing in Browse's search: matching shops and products show as you type, in place of the sections.
+{
+  const page = await newPage("light", true);
+  await signIn(page);
+  await page.evaluate(() => window.go("discover"));
+  await page.locator("#browseGrid .bg-card").first().waitFor({ timeout: 15000 });
+  const q = page.locator("#browseQuery");
+  await q.click(); await q.pressSequentially("holl");
+  const sug = page.locator("#browseSuggest"); await sug.locator(".bs-row").first().waitFor();
+  assert.ok(await page.locator("#browseGrid").isHidden(), "the sections make way while typing");
+  assert.deepEqual(await sug.locator("[data-bs-shop] .bs-t b").allInnerTexts(), ["Hollow Pine"], "the shop that matches");
+  const prods = await sug.locator("[data-bs-sku] .bs-t b").allInnerTexts();
+  assert.ok(prods.length >= 2 && prods.includes("Wool Beanie"), "the shop's products: " + prods);
+  assert.equal(await sug.locator("[data-bs-shop] .rl-ys-logo").count(), 1, "the shop's logo");
+  assert.deepEqual(await measure(page, "#browseSuggest"), clean, "suggestions");
+  await shot(page, "browse-suggest");
+  // A product's name matches too, from any shop.
+  await q.fill(""); await q.pressSequentially("lamp");
+  await sug.locator("[data-bs-sku]", { hasText: "Brass Table Lamp" }).waitFor();
+  assert.equal(await sug.locator("[data-bs-shop]").count(), 0, "no shop called lamp");
+  await waitOutDoubleTap(page); await sug.locator("[data-bs-sku]", { hasText: "Brass Table Lamp" }).click();
+  await page.waitForTimeout(800);
+  await page.locator(".dc-page h2", { hasText: "Brass Table Lamp" }).waitFor({ timeout: 3000 }); // and it stays open
+  // Nothing matches: says so, and what to try.
+  await page.evaluate(() => window.dcShow("home")); await page.locator("#browseQuery").waitFor();
+  await page.locator("#browseQuery").fill("zzzz"); await page.locator("#browseQuery").dispatchEvent("input");
+  await page.locator("#browseSuggest .bs-none").waitFor();
+  // Cleared: the sections come back.
+  await page.locator("#browseQuery").fill(""); await page.locator("#browseQuery").dispatchEvent("input");
+  await page.locator("#browseGrid .bg-card").first().waitFor();
+  assert.ok(await page.locator("#browseSuggest").isHidden());
+  // Tapping a shop opens its products.
+  await page.locator("#browseQuery").pressSequentially("fern");
+  await waitOutDoubleTap(page); await page.locator("#browseSuggest [data-bs-shop]", { hasText: "Fern Row" }).click();
+  await page.locator("#catalogResults .dc-card").first().waitFor();
+  const stores = await page.$$eval("#catalogResults .dc-card", cs => cs.map(c => c.innerText));
+  assert.ok(stores.length && stores.every(t => /Fern Row/.test(t)), "only Fern Row's products");
+  assert.deepEqual(page.errors, []);
+  await page.context().close();
+  console.log("ok - Browse search: shops and products that match show as you type; a shop opens its products, a product its page");
+}
 {
   const page = await newPage("light", false);
   await signIn(page);
