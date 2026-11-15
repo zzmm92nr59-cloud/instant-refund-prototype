@@ -6,7 +6,8 @@
  else root.RelayRecommendationEngine=api;
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
  "use strict";
- const normal=s=>String(s??"").toLowerCase().trim();
+ // Lower case, with the shops' fancy hyphens (T‑shirt) and quotes made plain.
+ const normal=s=>String(s??"").toLowerCase().replace(/[\u2010-\u2015\u2212]/g,"-").replace(/[\u2018\u2019]/g,"'").trim();
  const colours=["white","black","grey","gray","cream","sand","slate","forest","green","blue","navy","olive","pink","ecru","brown","stone","chalk","oat","washed","rust","charcoal","moss","clay","red","beige","camel","khaki","taupe","ivory","burgundy","lilac","lavender","purple","yellow","orange","mauve","teal","mint","sage"];
  const NEUTRAL=new Set(["white","black","grey","gray","cream","sand","slate","navy","ecru","brown","stone","chalk","oat","charcoal","beige","camel","khaki","taupe","ivory"]);
  // Style words found in item names. Each one is a plain description of what was bought, not a judgement of the person.
@@ -142,38 +143,52 @@
  // An item Relay can't place (most food, anything unusual) picks nothing. Nothing is guessed.
  const ONE_OFF=/\btv\b|television|\boled\b|\bqled\b|monitor|laptop|macbook|\bimac\b|console|playstation|xbox|nintendo|fridge|freezer|washing machine|tumble dryer|dishwasher|\boven\b|\bhob\b|microwave|vacuum|sofa|wardrobe|gift ?card|subscription|membership|\bplan\b|delivery|postage|warranty|insurance/;
  const KINDS=[
-  // [key, what to call theirs, what they bought, what to pick (same when null)]
-  ["leggings","leggings",/legging|\btights\b|\balign\b/,/legging|\btights\b/],
-  ["joggers","joggers",/jogger|sweatpant|track ?pant|tracksuit bottom/,null],
+  // [key, what to call theirs, what they bought, what to pick (same when null)]. Order matters: the first that fits wins
+  // (Boxer Shorts are underwear, a Knit Jacket is a jacket, a Tight Fit Tee is a T-shirt).
+  ["pet","things for your pet",/\b(dogs?|cats?|pupp(y|ies)|kittens?|pets?)\b|\blitter\b/,null],
+  ["underwear","underwear",/boxer|\bbriefs?\b|knicker|underwear|\bthong\b|\btrunks\b|g-string/,null],
+  ["swimwear","swimwear",/bikini|swimsuit|swim ?shorts|swimming costume|swimwear/,null],
+  ["footballshirt","football shirt",/\b(home|away|third) (shirt|jersey)\b|football (shirt|jersey)|\bkit\b(?=.*\b(fc|united|city)\b)/,/\b(home|away|third) (shirt|jersey)\b|football (shirt|jersey)/],
+  ["tshirt","T-shirt",/\bt[- ]?shirts?\b|\btees?\b|\btanks?\b/,/\bt[- ]?shirts?\b|\btees?\b/],
+  ["leggings","leggings",/legging|\btights?\b(?! fit)|\balign\b/,/legging|\btights?\b(?! fit)/],
+  ["joggers","joggers",/jogger|sweatpant|track ?pant|tracksuit bottom|training pant/,null],
   ["shorts","shorts",/\bshorts\b/,null],
   ["jeans","jeans",/\bjeans?\b/,null],
   ["sportsbra","sports bra",/sports? bra|\bbra\b|bralette/,null],
   ["hoodie","hoodie",/hoodie|sweatshirt|\bscuba\b/,/hoodie|sweatshirt/],
-  ["jumper","jumper",/jumper|sweater|cardigan|\bknit\b/,null],
-  ["tshirt","T-shirt",/t-?shirt|\btee\b|\btank\b/,null],
-  ["shirt","shirt",/\bshirt\b|overshirt|blouse/,null],
-  ["jacket","jacket",/jacket|\bcoat\b|parka|puffer|gilet/,null],
+  ["jacket","jacket",/jacket|\bcoat\b|raincoat|parka|puffer|gilet|anorak/,null],
+  ["jumper","jumper",/jumper|sweater|cardigan|\bknit\b|roll neck/,null],
+  ["shirt","shirt",/\bshirt\b|overshirt|blouse|\bpolo\b/,/(?<!\bt[- ]?)\bshirt\b|overshirt|blouse|\bpolo\b/],
+  ["top","top",/\btops?\b|bodysuit|\bcami(sole)?\b/,/\btops?\b|bodysuit|\bcami(sole)?\b/],
+  ["jumpsuit","jumpsuit",/jumpsuit|playsuit|dungaree|boiler ?suit/,null],
   ["dress","dress",/\bdress\b/,null],
   ["skirt","skirt",/\bskirt\b/,null],
-  ["trousers","trousers",/trouser|chino|\bpants?\b/,/trouser|chino|\bpants\b/],
-  ["trainers","trainers",/trainer|sneaker|running shoe/,null],
+  ["trousers","trousers",/trouser|chino|\bpants?\b|\bflares\b/,/trouser|chino|\bpants\b|\bflares\b/],
+  ["pyjamas","pyjamas",/pyjama|pajama|\bpjs?\b|nightie|nightdress|loungewear set/,null],
   ["boots","boots",/\bboots?\b/,null],
-  ["shoes","shoes",/\bshoes?\b|loafer|sandal/,null],
-  ["socks","socks",/\bsocks?\b/,null],
-  ["underwear","underwear",/boxer|\bbriefs?\b|knicker|underwear|\bthong\b/,null],
-  ["bag","bag",/\bbag\b|\btote\b|backpack|rucksack|holdall/,null],
+  ["shoes","shoes",/loafer|sandal|court shoe|\bheels?\b|ballet flat|\bmules?\b|slipper|espadrille/,null],
+  ["trainers","trainers",/trainer|sneaker|running shoe|air max|air force|jordan|\bdunks?\b|samba|gazelle|ultraboost|\bshoes?\b/,null],
+  ["socks","socks",/socks?\b/,null],
+  ["bag","bag",/\bbag\b|\btote\b|backpack|rucksack|holdall|\bpouch\b/,/\bbag\b|\btote\b|backpack|rucksack|holdall/],
   ["hat","hat",/beanie|\bcap\b|\bhat\b/,null],
+  ["scarf","scarf",/scarf|snood/,null],
+  ["gloves","gloves",/gloves?\b|mittens?|wrist warmers?/,null],
+  ["tie","tie",/\btie\b(?! front)/,/\btie\b(?! front| dye)/],
+  ["mug","mugs",/\bmugs?\b|\bteacup|cup and saucer/,/\bmugs?\b|\bteacup|cup and saucer/],
+  ["blanket","blanket",/blanket|\bthrow\b/,null],
+  ["hairbrush","hairbrush",/hairbrush|hair brush|\bcomb\b/,null],
+  ["cushion","cushion",/cushion/,null],
   ["candle","candle",/candle|diffuser/,null],
   ["skincare","skincare",/serum|moisturi[sz]|cleanser|\bspf\b|face (cream|oil|mask|wash)|hand cream|body (wash|lotion|oil)/,null]];
  const COMPANIONS=[
   // [key, what to call theirs, what they bought, what goes with it, what's an even better fit]
   ["coffee","coffee",/nespresso|espresso|coffee|\bcapsules?\b|\bpods?\b|lungo|ristretto/,/espresso cup|coffee cup|\bmugs?\b|\bcups?\b/,/espresso/],
-  ["tea","tea",/\btea\b|teabags?/,/\bmugs?\b|teapot|\bcups?\b/,/tea/],
+  ["tea","tea",/tea ?bags?|teabags?|loose leaf|earl grey|english breakfast|green tea|herbal tea|\bchai\b|yorkshire tea|pg tips|twinings/,/\bmugs?\b|teapot|\bcups?\b/,/tea/],
   ["wine","wine",/\bwine\b|prosecco|champagne/,/wine glass|\bglasses\b|decanter|corkscrew/,/wine/],
   ["bed","bedding",/duvet|mattress|\bbed\b|\bdivan\b/,/pillowcase|duvet cover|fitted sheet|\bsheets?\b|bedding|\bthrow\b|blanket/,null]];
  // What a bought item is: {mode:"none"} for a one-off, "similar" or "companion" with its kind, or null when Relay can't say.
  // Lines on a receipt that aren't things anyone would want more of: a supermarket's carrier bag, bin bags, packaging.
- const NOT_A_THING=/carrier bag|bags? for life|plastic bag|paper bag|reusable (shopping )?bag|shopping bag|bin bag|bin liner|freezer bag|sandwich bag|food bag|gift bag|gift wrap|packaging|\bbag charge\b/;
+ const NOT_A_THING=/washing bag|laundry bag|carrier bag|bags? for life|plastic bag|paper bag|reusable (shopping )?bag|shopping bag|bin bag|bin liner|freezer bag|sandwich bag|food bag|gift bag|gift wrap|packaging|\bbag charge\b/;
  function kindOf(name){
   const s=normal(name);if(!s)return null;
   if(NOT_A_THING.test(s))return {mode:"none"};
@@ -191,7 +206,7 @@
   const look=(Array.isArray(d.look)?d.look:[]).filter(w=>typeof w==="string"&&w);if(!d.kind||!look.length)return null;
   const want=new RegExp("\\b("+look.map(esc).join("|")+")");
   const known=KINDS.find(x=>x[1]===d.kind||x[0]===d.kind||x[1]+"s"===d.kind);
-  return d.mode==="with"?{mode:"companion",key:"with:"+d.kind,noun:d.kind,want,better:null}:{mode:"similar",key:known?known[0]:d.kind,noun:d.kind,want};}
+  return d.mode==="with"?{mode:"companion",key:"with:"+d.kind,noun:d.kind,want,better:null}:{mode:"similar",key:known?known[0]:d.kind,noun:d.kind,want,ai:true};}
  // A shop that sells one thing with a companion (Nespresso: coffee), when the item's own name doesn't say (Ispirazione Roma).
  function shopCompanion(shop){const s=normal(shop);const c=COMPANIONS.find(x=>x[2].test(s));return c?{mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null}:null;}
  const possessiveShop=n=>/s$/i.test(n)?n+"'":n+"'s";
@@ -221,6 +236,8 @@
    const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||shopCompanion(p.merchant);if(!k||k.mode==="none")continue;
    if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
    const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
+   // The AI's words for what to look for widen what the word lists know (yoga pants are leggings too).
+   if(k.ai&&!x.ai){x.want=new RegExp(x.want.source+"|"+k.want.source);x.ai=true}
    const c=colourOf(p.detail)||colourOf(p.item);if(c)x.colours.add(c);
    x.shops.set(normal(p.merchant),String(p.merchant).trim());
    const pm=Math.round(Number(p.price||0)*100);if(pm>0)x.prices.push(pm);
@@ -237,7 +254,10 @@
   const pool=kinds.map(k=>{
    const shop=[...k.shops.values()][0],many=k.shops.size>1;
    const lead=k.looked?"Like the "+k.noun+" you've been looking at":k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
-   const list=stock.filter(g=>k.want.test(normal(g.product))).map((g,i)=>{
+   // A product picked as more of a kind must be that kind itself, as far as the word lists can tell: Boxer Shorts aren't
+   // shorts, a Knit Jacket isn't a jumper, a Cap Sleeve T-Shirt isn't a cap.
+   const sameKind=g=>{if(k.mode!=="similar"||k.ai||!KINDS.some(x=>x[0]===k.key))return true;const o=kindOf(g.product);return !o||(o.mode==="similar"&&o.key===k.key)};
+   const list=stock.filter(g=>k.want.test(normal(g.product))&&sameKind(g)).map((g,i)=>{
     let s=3;const why=[lead],text=normal(g.product+" "+(g.options||[]).join(" "));
     const col=[...k.colours].find(c=>new RegExp("\\b"+c+"\\b").test(text));
     const fit=(g.options||[]).flatMap(o=>String(o).split(/\s*[\/,|]\s*/)).find(o=>sizes.includes(normal(o)));

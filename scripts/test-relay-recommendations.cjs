@@ -70,6 +70,14 @@ assert.ok(html.includes('togglePersonalise'),"Discover needs a user-facing on/of
  assert.deepEqual(engine.picks([buys[0],buys[3]],groups),[],"a TV and bananas pick nothing");
  assert.deepEqual(engine.picks([{item:"Seamless Leggings",merchant:"Gym Row",price:40,verified:true}],groups).map(x=>x.g.product),["Run Leggings","Flow Tights"],"never the very thing they bought");
  assert.deepEqual(engine.picks([buys[4]],groups),[],"unverified purchases are ignored");
+ // Every receipt line and product name in picks-lines.json reads as what it is (the traps found in shops' real names).
+ const lines=require("./picks-lines.json").lines,wrong=[];
+ for(const [n,want] of lines){const k=engine.kindOf(n);const got=!k?null:k.mode==="none"?"none":k.mode==="companion"?"with:"+k.key:k.key;if(got!==want)wrong.push(n+": "+got+", not "+want)}
+ assert.deepEqual(wrong,[],"names read as what they are");
+ // A product picked as more of a kind is that kind itself: Boxer Shorts and Bikini Bottom Shorts aren't shorts.
+ const sh=[g("Boxer Shorts in Kelly Green","Yak Row",3000),g("Bikini Bottom Shorts","Yak Row",3000),g("Track Shorts","Gym Row",3000),g("Cap Sleeve T Shirt","Gym Row",2000),g("Fisherman Beanie","Sea Co",2500)];
+ assert.deepEqual(engine.picks([{item:"Running Shorts 5\"",merchant:"Gym Row",price:30,verified:true}],sh).map(x=>x.g.product),["Track Shorts"]);
+ assert.deepEqual(engine.picks([{item:"Ribbed Beanie",merchant:"Sea Co",price:25,verified:true}],sh).map(x=>x.g.product),["Fisherman Beanie"],"a cap-sleeve T-shirt is no cap");
  // Learning on the phone: looks, watches, "Not for me" and picks left unopened.
  const hood=[g("Zip Hoodie","Gym Row",5000),g("Pullover Hoodie","Track Lane",5000)],all=groups.concat(hood),legs=[buys[1]];
  assert.ok(!engine.picks(legs,all).some(x=>/Hoodie/.test(x.g.product)),"no hoodies before they've looked at any");
