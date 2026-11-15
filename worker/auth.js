@@ -582,6 +582,8 @@ async function deleteShopper(env, shopper, o) {
   await forgetAuctionBidder(env, shopper.id, o.now).catch(() => {});
   // Cancel Relay's Gmail access at Google too, not just the copy of the key Relay holds.
   await ensureGmailTables(env.RELAY_DB).then(() => revokeAllMailboxes(env, shopper.id, o.fetchImpl)).catch(() => {});
+  // Off Relay's tester list too (resale-admin.js; the table exists only once an admin has opened it).
+  await env.RELAY_DB.prepare("DELETE FROM relay_testers WHERE email = ?").bind(String(shopper.email || "").trim().toLowerCase()).run().catch(() => {});
   await env.RELAY_DB.batch([
     ...resaleDeleteStatements(env.RELAY_DB, shopper.id),
     ...profileDeleteStatements(env.RELAY_DB, shopper.id),
