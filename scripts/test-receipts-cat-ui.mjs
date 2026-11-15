@@ -39,6 +39,7 @@ await ctx.route("https://**/*", async route => {
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
+  if (m === "POST" && /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/photo$/.test(p)) { posted.push([p.split("/").slice(-2).join("/"), route.request().postDataJSON()]); return j({ ok: true }); }
   if (m === "POST" && /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/(dismiss|confirm)$/.test(p)) { posted.push([p.split("/").slice(-2).join("/"), route.request().postDataJSON()]); return j({ ok: true }); }
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() });
   if (p === "/relay/my/receipts") { asked.push(u.search); return j({ receipts: u.searchParams.get("all") === "1" ? [...fashion, ...euro, ...food] : [...fashion, ...euro, ...food].slice(0, 100) }); }
@@ -98,6 +99,17 @@ assert.equal(await row.locator(".rl-rr-list li").nth(1).innerText(), "2 × Groce
 await page.waitForTimeout(450); await row.getByRole("button", { name: "Show all 12 items" }).click();
 assert.equal(await row.locator(".rl-rr-list li").count(), 12);
 assert.equal(await row.locator(".rl-rr-main").getAttribute("aria-expanded"), "true", "showing the rest keeps the receipt open");
+// No picture of it (an in-store receipt): add your own, taken or chosen (a screenshot of the shop's page works too).
+await page.waitForTimeout(450); await row.getByRole("button", { name: "Add a photo" }).click();
+const sh = page.getByRole("dialog", { name: "Add a photo" });
+await sh.getByRole("button", { name: "Take a photo" }).waitFor();
+assert.equal(await sh.locator('input[capture="environment"]').count(), 1, "Take a photo opens the camera");
+const PIC = await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 500; c.height = 700; const g = c.getContext("2d"); g.fillStyle = "#e9c"; g.fillRect(0, 0, 500, 700); return c.toDataURL("image/png").split(",")[1]; });
+await sh.locator('input[type="file"]:not([capture])').setInputFiles({ name: "slides.png", mimeType: "image/png", buffer: Buffer.from(PIC, "base64") });
+await sh.waitFor({ state: "detached" });
+const sentPhoto = posted.find(x => x[0].endsWith("/photo"));
+assert.ok(sentPhoto && /^data:image\/jpeg;base64,/.test(sentPhoto[1].image), "sent as a smaller JPEG");
+posted.length = 0;
 await page.waitForTimeout(500); // a second tap straight after the first is ignored on purpose (no double taps)
 await row.locator(".rl-rr-main").click();
 assert.equal(await row.locator(".rl-rr-detail").count(), 0);
