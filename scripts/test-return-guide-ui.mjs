@@ -39,7 +39,7 @@ await ctx.route("https://**/*", async route => {
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "{}" });
   const orig = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/original$/.exec(p);
   // Relay's server sends the email with its pictures already in place (see worker/original.js).
-  if (orig) { originalAsks.push(orig[1]); return j({ html: '<p>Show this QR code at an Evri ParcelShop.</p><img alt="QR code" src="data:image/png;base64,' + QR + '">', links: [], extraImages: [] }); }
+  if (orig) { originalAsks.push(orig[1]); return j({ html: '<table width="640" style="width:640px"><tr><td><p>Show this QR code at an Evri ParcelShop.</p><img alt="QR code" src="data:image/png;base64,' + QR + '"></td></tr></table>', links: [], extraImages: [] }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() });
   if (p === "/relay/my/receipts") return j({ receipts });
@@ -105,6 +105,8 @@ const qr = page.frameLocator('iframe[title="Original receipt email"]').locator("
 await qr.waitFor();
 assert.deepEqual(originalAsks, ["33333333-3333-4333-8333-333333333333"], "the QR code comes from the shop's own return email, fetched when asked for");
 assert.match(await qr.getAttribute("src"), /^data:image\/png;base64,/);
+// Shops design emails 600px or more wide: shown shrunk to the phone's width, never scrolled sideways (Connor, 15 Nov).
+assert.ok(await page.frameLocator('iframe[title="Original receipt email"]').locator("html").evaluate(h => h.scrollWidth <= h.clientWidth + 1), "the shop's email fits the screen's width");
 await page.screenshot({ path: "/tmp/shots/return-qr.png" });
 console.log("ok - once the return email is in, the card's main button shows its QR code");
 
