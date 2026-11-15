@@ -162,6 +162,11 @@ assert.deepEqual(page.body.shops.map(s => [s.name, s.status, s.products]), [["Al
 assert.equal(sqlite.prepare("SELECT next_at FROM web_shops WHERE domain = 'a.test'").get().next_at, NOW + 864e5 + 1 + 864e5 / 4, "tried again in 6 hours");
 assert.equal(sqlite.prepare("SELECT next_at FROM web_shops WHERE domain = 'b.test'").get().next_at, NOW + 864e5 + 1 + 7 * 864e5, "robots.txt said no: asked again in a week");
 assert.deepEqual((await webShopProducts(env, NOW + SHOW_FOR + 1)).map(p => p.product), [], "3 days old: hidden");
+// A shop read from its product pages (JD Sports): no basket Relay can start, so the app opens the product's own page.
+sqlite.prepare("INSERT INTO web_shops (domain, label, origin, status, products, items, checked_at, next_at) VALUES ('www.jdsports.co.uk', 'JD Sports', 'https://www.jdsports.co.uk', 'ok', 1, 1, ?, ?)").run(NOW, NOW + 864e5);
+sqlite.prepare("INSERT INTO web_shop_items (id, domain, product_key, position, product, price_minor, image_url, product_url, checked_at) VALUES ('web:www.jdsports.co.uk:123:1', 'www.jdsports.co.uk', '123', 0, 'Made-up Trainer', 6000, 'https://i.test/t.jpg', 'https://www.jdsports.co.uk/product/x/123/', ?)").run(NOW);
+{ const jd = (await webShopProducts(env, NOW + 1)).find(p => p.shopDomain === "www.jdsports.co.uk");
+  assert.ok(jd, "the page-read shop's product is listed"); assert.equal(jd.checkout, false, "no checkout for a shop read from its pages"); }
 
 // Taken off the list: forgotten, products too. Two runs at once never read the same shop.
 await refreshWebShops(env, { now: NOW + 2 * 864e5, fetchImpl, shops: SHOPS.slice(1) });

@@ -47,7 +47,9 @@ SHOPS.forEach((sh, si) => sh.items.forEach(([name, price, bg, shape], i) => {
   const id = si * 100 + i + 1, slug = name.toLowerCase().replace(/[^a-z]+/g, "-");
   PHOTOS.set("/p/" + id + ".svg", photo(bg, shape, sh.colour));
   WEB.push({ sku: "web:" + sh.domain + ":" + id, product: name, variation: null, priceMinor: price, currency: "GBP", imageUrl: "https://img.example/p/" + id + ".svg", quantity: null, inStock: true,
-    storeName: sh.name, shopDomain: sh.domain, shopCategory: sh.cat, productUrl: "https://" + sh.domain + "/products/" + slug + "?variant=" + id, kind: null, checkedAt: CHECKED, webShop: true });
+    storeName: sh.name, shopDomain: sh.domain, shopCategory: sh.cat, productUrl: "https://" + sh.domain + "/products/" + slug + "?variant=" + id, kind: null, checkedAt: CHECKED, webShop: true,
+    // Saltmarsh is read from its product pages (like M&S or JD Sports): no basket Relay can start there.
+    ...(sh.name === "Saltmarsh" ? { checkout: false } : {}) });
 }));
 // A shop connected to Relay, which shoppers do see.
 const CONNECTED = [{ sku: "shopify:juniper-row.myshopify.com:variant:gid://shopify/ProductVariant/1", catalogueId: "shopify:juniper-row.myshopify.com:variant:gid://shopify/ProductVariant/1", product: "Oak Stool", variation: null, priceMinor: 6000, currency: "GBP", quantity: 3, storeName: "Juniper Row", shopDomain: "juniper-row.myshopify.com", imageUrl: null }];
@@ -208,6 +210,14 @@ for (const scheme of ["light", "dark"]) {
   assert.ok(await page.evaluate(sku => { try { return Boolean(JSON.parse(localStorage.getItem("relay-watchlist") || localStorage.getItem("relay.watch.v1") || "{}")[sku]) || Boolean(window.relayLocalWatches && window.relayLocalWatches().some(w => w.sku === sku)); } catch (e) { return false; } }, WEB.find(w => w.product === "Brass Table Lamp").sku), "on the watchlist");
   await waitOutDoubleTap(page); await page.locator(".dc-page").getByRole("button", { name: "Watching the price" }).click();
   await page.locator(".dc-page").getByRole("button", { name: "Watch price" }).waitFor();
+  await page.getByRole("button", { name: "Back" }).click();
+  // A shop read from its product pages: one button, the product's own page on its website; no checkout Relay can't start.
+  await page.locator("#catalogResults .dc-card", { hasText: "Seaweed Face Oil" }).click();
+  await pg.locator("h2", { hasText: "Seaweed Face Oil" }).waitFor();
+  const own = pg.getByRole("link", { name: "See it on Saltmarsh's website" });
+  assert.equal(await own.getAttribute("href"), WEB.find(w => w.product === "Seaweed Face Oil").productUrl, "opens the product's own page");
+  assert.equal(await pg.getByText(/Buy at|View on their website|checkout/).count(), 0, "no checkout offered for a shop read from its pages");
+  console.log("ok - a shop read from its pages opens the product's own page (" + scheme + ")");
   await page.getByRole("button", { name: "Back" }).click();
 
   // Your shops: a shop's sheet shows its products from its website.
