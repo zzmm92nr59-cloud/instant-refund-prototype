@@ -13,8 +13,21 @@ export const ADMIN_TABLE_SQL = [
   `CREATE TABLE IF NOT EXISTS resale_report_reviews (
      report_id TEXT PRIMARY KEY, outcome TEXT NOT NULL, reviewed_at INTEGER NOT NULL)`,
   `CREATE TABLE IF NOT EXISTS resale_blocks (
-     email_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, report_id TEXT)`
+     email_hash TEXT PRIMARY KEY, created_at INTEGER NOT NULL, report_id TEXT)`,
+  // Testers (Connor's family and friends, before shops agree): their account shows shops' own websites in Browse, as the
+  // team's does. Nothing else: a tester has no team tools. Listed by email, at most 100, added and removed by an admin.
+  `CREATE TABLE IF NOT EXISTS relay_testers (email TEXT PRIMARY KEY, added_at INTEGER NOT NULL)`
 ];
+export const MAX_TESTERS = 100;
+export async function isTester(env, shopper) {
+  if (!shopper || !shopper.email || !env.RELAY_DB) return false;
+  try { return Boolean(await env.RELAY_DB.prepare("SELECT 1 AS x FROM relay_testers WHERE email = ?").bind(String(shopper.email).trim().toLowerCase()).first()); }
+  catch { return false; }
+}
+async function testerList(env) {
+  return ((await env.RELAY_DB.prepare("SELECT email, added_at FROM relay_testers ORDER BY added_at DESC LIMIT ?").bind(MAX_TESTERS).all()).results || [])
+    .map(r => ({ email: r.email, addedAt: r.added_at }));
+}
 
 // While two-step sign-in is required (second-step.js), an admin's session must also have passed a second step; otherwise
 // every admin route answers as if it did not exist, and /relay/my/admin/me says to sign in again.
@@ -150,12 +163,27 @@ async function review(env, admin, reportId, outcome, now) {
 export async function handleResaleAdminRoute(path, method, request, env, cors, shopper, now) {
   if (!path.startsWith("/relay/my/admin/")) return null;
   if (path === "/relay/my/admin/me" && method === "GET") {
-    if (!isAdmin(env, shopper)) return json({ admin: false, ...(listedAdmin(env, shopper) ? { signInAgain: true } : {}) }, 200, cors);
+    if (!isAdmin(env, shopper)) return json({ admin: false, ...(listedAdmin(env, shopper) ? { signInAgain: true } : {}), ...(await isTester(env, shopper) ? { tester: true } : {}) }, 200, cors);
     return json({ admin: true, openReports: await openReportCount(env) }, 200, cors);
   }
   // Anyone else gets the same answer as for a path that does not exist.
   if (!isAdmin(env, shopper)) return json({ error: "not_found" }, 404, cors);
   if (path === "/relay/my/admin/reports" && method === "GET") return json({ reports: await openReports(env) }, 200, cors);
+  if (path === "/relay/my/admin/testers" && method === "GET") return json({ testers: await testerList(env), max: MAX_TESTERS }, 200, cors);
+  if (path === "/relay/my/admin/testers" && method === "POST") {
+    const text = await request.text();
+    let body = null; try { body = text.length < 1000 ? JSON.parse(text) : null; } catch { body = null; }
+    const email = String((body && body.email) || "").trim().toLowerCase();
+    if (!/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/.test(email)) return json({ error: "invalid_email" }, 400, cors);
+    if (body.remove === true) await env.RELAY_DB.prepare("DELETE FROM relay_testers WHERE email = ?").bind(email).run();
+    else {
+      const n = await env.RELAY_DB.prepare("SELECT COUNT(*) AS n FROM relay_testers").first();
+      const had = await env.RELAY_DB.prepare("SELECT 1 AS x FROM relay_testers WHERE email = ?").bind(email).first();
+      if (!had && n && n.n >= MAX_TESTERS) return json({ error: "too_many_testers", max: MAX_TESTERS }, 409, cors);
+      await env.RELAY_DB.prepare("INSERT OR IGNORE INTO relay_testers (email, added_at) VALUES (?, ?)").bind(email, now || Date.now()).run();
+    }
+    return json({ testers: await testerList(env), max: MAX_TESTERS }, 200, cors);
+  }
   const m = /^\/relay\/my\/admin\/reports\/([0-9a-f-]{36})\/review$/.exec(path);
   if (m && method === "POST") {
     const text = await request.text();

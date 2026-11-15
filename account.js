@@ -4917,7 +4917,8 @@
       if (wantHealth) setTimeout(function () { if (wantHealth && openHealthPage()) wantHealth = false; }, 0);
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
-        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow]));
+        accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow,
+        accRow("face", "Testers", "Who sees shops' websites in Browse", function () { page("Testers", testersPage); })]));
       abox.appendChild(teamTesting());
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
@@ -4952,7 +4953,7 @@
     function teamTesting() {
       var box = el("div");
       box.appendChild(teamSwitch("Shops' websites in Browse", "Shops' websites in Browse on this device",
-        "Real products and prices from shops' own websites, read once a day, in Browse and search by photo. Only Relay's team sees them.", "relay-web-preview"));
+        "Real products and prices from shops' own websites, read once a day, in Browse and search by photo. Only Relay's team and its testers see them.", "relay-web-preview"));
       box.appendChild(teamSwitch("Testing tools", "Testing tools on this device",
         "Relay's test shops, test orders and sample items, for trying things out. Off shows Relay as shoppers see it.", "relay-testing-tools"));
       return box;
@@ -5076,6 +5077,41 @@
           el("span", { text: money(changed ? o.amountNowMinor : o.amountMinor, o.currency) + (o.store ? " at " + o.store : "") + " on " +
             new Date(o.orderedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + (changed ? ". It was " + money(o.amountMinor, o.currency) + " when you ordered." : "") })]));
       });
+    }
+    // Testers (worker/resale-admin.js): family and friends whose account shows shops' own websites in Browse, as the team's
+    // does, before shops have agreed. Added by the email they sign in with; it turns on when they next open Browse.
+    function testersPage(b) {
+      var note = el("div", { className: "rl-msg" }), list = el("div");
+      var input = el("input", { type: "email", placeholder: "Their email address", autocomplete: "off", inputMode: "email", ariaLabel: "Tester's email address", style: "width:100%;box-sizing:border-box;min-height:48px;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:17px;background:var(--rl-card);color:var(--rl-text);font-family:inherit;margin:0 0 10px" });
+      var add = el("button", { type: "button", className: "rl-btn", text: "Add tester" });
+      b.appendChild(el("p", { text: "Testers see real products from shops' websites in Browse, as you do. Add the email they sign in to Relay with. It turns on the next time they open Browse." }));
+      b.appendChild(input); b.appendChild(add); b.appendChild(note); b.appendChild(list);
+      list.appendChild(el("div", { className: "rl-skel", style: "min-height:96px;border-radius:18px;margin-top:14px" }));
+      function draw(body) {
+        list.textContent = "";
+        var rows = (body && body.testers) || [];
+        if (!rows.length) { list.appendChild(el("p", { className: "rl-anote", text: "No testers yet." })); return; }
+        list.appendChild(accGroup("Testers", rows.map(function (t) {
+          var row = accRow("face", t.email, "", function () { ask("Remove " + t.email + " as a tester? Their Browse stops showing shops' websites.", "Remove", function () { send({ email: t.email, remove: true }, null); }); });
+          return row;
+        })));
+      }
+      function send(body, btn) {
+        if (btn) { if (btn.disabled) return; btn.disabled = true; }
+        api("/relay/my/admin/testers", { method: "POST", body: body }).then(function (r) {
+          if (btn) btn.disabled = false;
+          if (r.status === 400) return say(note, "That doesn't look like an email address.", true);
+          if (r.status === 409) return say(note, "That's the most testers Relay allows. Remove one first.", true);
+          if (!r.ok || !r.body) return say(note, "That didn't work. Try again.", true);
+          if (!body.remove) { input.value = ""; say(note, "Added. They'll see the shops next time they open Browse."); } else say(note, "Removed.");
+          draw(r.body);
+        }).catch(function () { if (btn) btn.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      }
+      add.onclick = function () { var v = String(input.value || "").trim(); if (!v) return say(note, "Type their email address first.", true); send({ email: v }, add); };
+      api("/relay/my/admin/testers", { fresh: true }).then(function (r) {
+        if (!r.ok || !r.body) { list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
+        draw(r.body);
+      }).catch(function () { list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection.", true); });
     }
     // The sign-in for Shopify's reviewers (worker/review-account.js): turn it on, copy the address and code into the App
     // Store submission's testing instructions, and turn it off when the review is over.
@@ -8051,7 +8087,8 @@
     if (teamWebChecked) return; teamWebChecked = true;
     try { if (localStorage.getItem("relay-web-preview-chosen") === "1" || localStorage.getItem("relay-web-preview") === "1") return; } catch (e) { return; }
     api("/relay/my/admin/me").then(function (r) {
-      if (!r.ok || !r.body || !r.body.admin || r.body.signInAgain) return;
+      // Relay's team, and testers an admin added under Profile, Team, Testers (they see nothing else of the team's).
+      if (!r.ok || !r.body || !((r.body.admin && !r.body.signInAgain) || r.body.tester)) return;
       try { localStorage.setItem("relay-web-preview", "1"); } catch (e) { return; }
       if (typeof window.testToolsChanged === "function") window.testToolsChanged();
     }).catch(function () {});

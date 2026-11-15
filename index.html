@@ -272,6 +272,8 @@ const testing=new URLSearchParams(location.search).get("testing")==="1";
 // The shops' websites preview used to come only with the testing tools; it now has its own switch (Relay's team, Profile
 // → Team). Once per device, a device that had testing tools on gets the preview instead, with testing tools off: real
 // shops only, no test shops or test orders. Runs before ?testtools=1 is read, so the link still turns testing tools on.
+// A tester (Connor's family and friends, before shops agree): opening Relay once with ?shops=1 turns on shops' own websites in Browse on that phone, like the team's switch. The address loses ?shops=1 straight away.
+try{if(/[?&]shops=1(&|$)/.test(location.search)){localStorage.setItem("relay-web-preview","1");localStorage.setItem("relay-web-preview-chosen","1");const u=new URL(location.href);u.searchParams.delete("shops");window.history.replaceState(window.history.state,"",u.pathname+u.search+u.hash)}}catch(e){}
 try{if(localStorage.getItem("relay-web-preview")===null){const on=localStorage.getItem("relay-testing-tools")==="1";localStorage.setItem("relay-web-preview",on?"1":"0");if(on)localStorage.setItem("relay-testing-tools","0")}}catch(e){}
 try{const tt=new URLSearchParams(location.search).get("testtools");if(tt==="1"||tt==="0")localStorage.setItem("relay-testing-tools",tt)}catch(e){}
 const API="https://relay-square-api2.9pts72cy5j.workers.dev",VERIFIED=API+"/relay/verified-purchases";const sample=null;
@@ -888,7 +890,7 @@ function renderShopperCatalog(root){
  const filtered=!!(query||storeFilter!=="all"||discoverKind!=="all");
  {const fb=$("dcFilt");if(fb&&fb.classList)fb.classList.toggle("on",storeFilter!=="all"||discoverKind!=="all"||sort!=="all")}
  const prev=$("dcPreview"),webShops=new Set(all.filter(g=>g.lead.provider==="web").map(g=>g.store));
- if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview">Products from '+webShops.size+' shops\' own websites, as Relay last read them. Only Relay\'s team sees these.</div>':"";
+ if(prev)prev.innerHTML=(testTools()||webPreview())&&webShops.size?'<div class="dc-preview">Products from '+webShops.size+' shops\' own websites, as Relay last read them. Only Relay\'s team and its testers see these.</div>':"";
  root.innerHTML=groups.length?groups.slice(0,60).map(g=>dcCard(g)).join(""):'<div class="dc-empty"><h3>'+(filtered?'Nothing matches that':'New products are on their way')+'</h3><p>'+(filtered?'Try another word, shop or kind.':'When shops join Relay, their newest products show up here.')+'</p></div>';
  const wire=box=>{if(!box)return;
   box.querySelectorAll("[data-watch]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleWatch(b.dataset.watch)});

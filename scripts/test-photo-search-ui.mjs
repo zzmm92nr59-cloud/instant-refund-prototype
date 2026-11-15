@@ -192,7 +192,7 @@ st.photoOn = false; st.answer = "web";
 await page.goto(origin + "/index.html?testing=1");
 await discover();
 await page.locator(".dc-preview").waitFor();
-assert.match(await page.locator(".dc-preview").innerText(), /^Products from 2 shops' own websites, as Relay last read them\. Only Relay's team sees these\.$/);
+assert.match(await page.locator(".dc-preview").innerText(), /^Products from 2 shops' own websites, as Relay last read them\. Only Relay's team and its testers see these\.$/);
 assert.ok(st.webAsked >= 1);
 const beanie = page.locator(".dc-cardwrap").filter({ hasText: "Wool Beanie" });
 assert.equal(await beanie.locator("[data-watch]").count(), 0, "no price alerts for shops' websites");
