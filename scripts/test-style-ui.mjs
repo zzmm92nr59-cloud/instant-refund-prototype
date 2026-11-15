@@ -39,6 +39,13 @@ const shopProducts = [
   { product: "Court Classic Trainers", variation: "White / UK 8", catalogueId: "shopify:kick:1", sku: "shopify:kick:1", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Court Classic Trainers", variation: "White / UK 9", catalogueId: "shopify:kick:2", sku: "shopify:kick:2", priceMinor: 8500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Canvas Tote", variation: "Natural", catalogueId: "shopify:kick:3", sku: "shopify:kick:3", priceMinor: 2400, currency: "GBP", quantity: 30, storeName: "Kick Lane", provider: "shopify" },
+  // More of what they buy (leggings, a hoodie, trainers), a cup for someone who buys coffee, and a phone case nobody asked for.
+  { product: "Everyday Leggings", variation: "Black / M", catalogueId: "shopify:kick:4", sku: "shopify:kick:4", priceMinor: 4500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Zip Hoodie", variation: "Grey / M", catalogueId: "shopify:kick:5", sku: "shopify:kick:5", priceMinor: 5000, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Trail Trainers", variation: "Grey / UK 8", catalogueId: "shopify:kick:6", sku: "shopify:kick:6", priceMinor: 8000, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Stoneware Espresso Cup", variation: "", catalogueId: "shopify:hg:8", sku: "shopify:hg:8", priceMinor: 1200, currency: "GBP", quantity: 9, storeName: "Home and Garden", provider: "shopify" },
+  { product: "Breakfast Mug", variation: "", catalogueId: "shopify:hg:9", sku: "shopify:hg:9", priceMinor: 1400, currency: "GBP", quantity: 9, storeName: "Home and Garden", provider: "shopify" },
+  { product: "Striped Phone Case", variation: "", catalogueId: "shopify:kick:7", sku: "shopify:kick:7", priceMinor: 3500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Cosy Dog Bed", variation: "Large", catalogueId: "shopify:pets:1", sku: "shopify:pets:1", priceMinor: 3900, currency: "GBP", quantity: 12, storeName: "Pet Pantry", provider: "shopify" },
   // Two home shops (their products' names say what they are, or the shop's does).
   ...[["Linen Cushion", "Oat"], ["Metal Watering Can", ""], ["Knitted Throw Blanket", ""], ["Solar String Lights", ""]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hg:" + i, sku: "shopify:hg:" + i, priceMinor: 2500 + i * 100, currency: "GBP", quantity: 8, storeName: "Home and Garden", provider: "shopify" })),
@@ -64,26 +71,29 @@ await page.addInitScript(() => localStorage.setItem("relay.session.v1", JSON.str
 await skipInterests(page); // (after the session, so it knows who's signed in)
 await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 
-// Discover: picks are off until the shopper turns them on. Then they come from the year's spending (from Wrapped: 89% fashion
-// here), the shops they buy from and their sizes from receipts, and each pick says why it's there.
+// Discover: picks are off until the shopper turns them on. Then they come from the things on their receipts: more of a kind
+// people buy again (leggings, a hoodie, trainers), in their colour and size where the shop has it, and each pick says why.
 await openShops(page);
 const invite = page.locator(".dc-pickrow", { hasText: "Turn on picks for you" });
 await invite.getByText("Chosen from your receipts. Only you see them.").waitFor();
 await invite.click();
 const panel = page.locator(".dc-for");
 await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
-await panel.locator(".dc-basis", { hasText: "sporty" }).waitFor();
-const basis = await panel.locator(".dc-basis").innerText();
-assert.match(basis, /^From your 2026 spending: 89% fashion, 11% digital & subscriptions\./);
-assert.match(basis, /You're sporty and relaxed, mostly in neutrals\. Usually a size M, UK 8 in shoes\./);
 const picks = panel.locator(".dc-strip [data-card-select]");
-assert.equal(await picks.first().locator("h3").innerText(), "Court Classic Trainers", "the best match comes first");
-assert.equal(await picks.first().locator(".dc-why").innerText(), "You spend most on fashion\nYou buy from Kick Lane");
-assert.ok(!(await panel.innerText()).includes("Cosy Dog Bed"), "nothing they've never spent on is pushed at them");
-// The list below follows the same order, and the pet shop's product is still there, just later.
+await picks.first().waitFor();
+const said = await picks.evaluateAll(cs => cs.map(c => [c.querySelector("h3").textContent, c.querySelector(".dc-why").innerText]));
+assert.deepEqual(said, [
+  ["Trail Trainers", "Like the trainers you bought at Kick Lane\nIn your size, UK 8"],
+  ["Everyday Leggings", "Like the leggings you bought at Lululemon\nIn black, like yours"],
+  ["Zip Hoodie", "Like the hoodie you bought at Studio North\nIn your size, M"]], "one of each kind they buy, best match first");
+const panelText = await panel.innerText();
+assert.ok(!panelText.includes("Court Classic Trainers"), "never the very thing they already bought");
+for (const no of ["Cosy Dog Bed", "Striped Phone Case", "Espresso Cup", "Canvas Tote", "Cordless Drill"]) assert.ok(!panelText.includes(no), "nothing unrelated to what they buy: " + no);
+assert.doesNotMatch(panelText, /% |spending|spend most/i, "no shares of spending");
+// The list below starts with the picks, and everything else is still there, just later.
 const grid = await page.locator("#catalogResults [data-card-select] h3").allInnerTexts();
-assert.equal(grid[0], "Court Classic Trainers"); assert.ok(grid.includes("Cosy Dog Bed"));
-// Two shops and two kinds of product: chips to narrow it down (and picks step aside while filtering).
+assert.deepEqual(grid.slice(0, 3), said.map(x => x[0])); assert.ok(grid.includes("Cosy Dog Bed"));
+// Kinds of product: chips to narrow it down (and picks step aside while filtering).
 await openFilters(page);
 await page.locator("#dcKinds").getByRole("button", { name: "Pets" }).click();
 assert.deepEqual(await page.locator("#catalogResults [data-card-select] h3").allInnerTexts(), ["Cosy Dog Bed"]);
@@ -93,11 +103,7 @@ await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
 assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White · UK 8, UK 9", "the colour is said once, then the sizes");
 await page.waitForTimeout(1300);   // the drawings finish drawing themselves in
 await page.screenshot({ path: "/tmp/shots/discover-for-you.png", fullPage: true });
-// Forgetting the style keeps the spending picks; turning picks off leaves a "Picks for you" switch in the filters (the
-// invitation was answered, so it doesn't come back).
-await panel.getByRole("button", { name: "Forget my style" }).click();
-await page.waitForTimeout(200);
-assert.doesNotMatch(await panel.locator(".dc-basis").innerText(), /sporty/);
+// Turning picks off leaves a "Picks for you" switch in the filters (the invitation was answered, so it doesn't come back).
 await panel.getByRole("button", { name: "Turn off" }).click();
 await page.locator(".dc-for").waitFor({ state: "detached" });
 assert.equal(await invite.count(), 0, "the invitation was answered");
@@ -106,33 +112,35 @@ await page.locator(".dc-chips").getByRole("button", { name: "Picks for you" }).w
 // Sizes read in their natural order, and the ladder's two sizes are one product.
 assert.equal(await page.locator("#catalogResults [data-card-select]", { hasText: "Aluminium Step Ladder" }).count(), 1);
 assert.equal(await page.locator("#catalogResults .dc-card", { hasText: "Aluminium Step Ladder" }).locator(".dc-opts").innerText(), "3 step, 5 step");
-// Someone whose money mostly goes on their home: most picks are for the home, even though they buy from a shoe shop in their
-// size. The places are shared out by spending (45% home to 10% fashion), never more than three from one shop, and nothing is
-// picked for food because no shop on Relay sells it yet.
-const fashionYear = industries;
-industries = [{ category: "home", label: "Home & garden", receipts: 9, spentPence: 45000 }, { category: "food", label: "Food & drink", receipts: 20, spentPence: 33000 },
-  { category: "fashion", label: "Fashion", receipts: 3, spentPence: 10000 }, { category: "other", label: "Other", receipts: 4, spentPence: 12000 }];
+// Someone whose biggest purchase was a TV, who also buys coffee and groceries: a TV is a one-off, so no more electronics (and
+// no phone cases); food picks nothing; the coffee gets one cup, the espresso one, because they probably have cups already.
+const wardrobe = style.receipts;
+style.receipts = [
+  { id: "b1", retailer: { name: "Screen Barn" }, category: "electronics", items: [{ name: "55 inch QLED TV", variant: "", pricePence: 20000 }] },
+  { id: "b2", retailer: { name: "Bean Post" }, category: "food", items: [{ name: "Espresso capsules, 50 pack", variant: "", pricePence: 2500 }] },
+  { id: "b3", retailer: { name: "Corner Grocer" }, category: "food", items: [{ name: "Bananas", variant: "", pricePence: 120 }, { name: "Semi-skimmed milk", variant: "", pricePence: 150 }] }];
 await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
 await page.reload(); await page.waitForTimeout(600);
 await openShops(page);
 await openFilters(page);
 await page.locator(".dc-chips").getByRole("button", { name: "Picks for you" }).click();
-await panel.locator(".dc-basis", { hasText: "45% home & garden" }).waitFor();
-const homePicks = await panel.locator(".dc-strip [data-card-select]").evaluateAll(cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, c.querySelector(".dc-why").textContent]));
-assert.equal(homePicks.length, 6);
-assert.equal(homePicks.filter(p => p[0] === "Home and Garden" || p[0] === "Hammer & Home").length, 5, "five of six picks are for the home");
-assert.deepEqual(homePicks.filter(p => p[0] === "Kick Lane").map(p => p[1]), ["Court Classic Trainers"], "one pick for the 10% spent on fashion");
-assert.ok(homePicks.every(p => ["Home and Garden", "Hammer & Home", "Kick Lane"].includes(p[0]) && homePicks.filter(q => q[0] === p[0]).length <= 3), "at most three from one shop");
-assert.match(homePicks[0][2], /^You spend most on home & garden/);
-assert.equal(homePicks.find(p => p[1] === "Court Classic Trainers")[2], "10% of your spending is fashion\nYou buy from Kick Lane");
-assert.deepEqual((await page.locator("#catalogResults [data-card-select] h3").allInnerTexts()).slice(0, 5).sort(), homePicks.slice(0, 5).map(p => p[1]).sort(), "the list below starts the same way");
+await picks.first().waitFor();
+assert.deepEqual(await picks.evaluateAll(cs => cs.map(c => [c.querySelector("h3").textContent, c.querySelector(".dc-why").innerText])),
+  [["Stoneware Espresso Cup", "Goes with your coffee from Bean Post"]], "one cup for the coffee, and nothing for the TV or the groceries");
 await page.waitForTimeout(1300);
 await page.screenshot({ path: "/tmp/shots/discover-home-picks.png", fullPage: false });
-await panel.getByRole("button", { name: "Turn off" }).click();
-industries = fashionYear;
+// Nothing on the receipts that a shop here follows: says so plainly.
+style.receipts = [{ id: "c1", retailer: { name: "Screen Barn" }, category: "electronics", items: [{ name: "55 inch QLED TV", variant: "", pricePence: 20000 }] }];
 await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
 await page.reload(); await page.waitForTimeout(600);
-console.log("PASS Discover: opt-in picks shared out by where the money goes (shops, sizes and price within each kind), each with a reason; filters, forget and turn off work");
+await openShops(page);
+await panel.getByText("Nothing in Browse goes with what you've bought yet. As more shops join, picks show up here.").waitFor();
+assert.equal(await picks.count(), 0);
+await panel.getByRole("button", { name: "Turn off" }).click();
+style.receipts = wardrobe;
+await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
+await page.reload(); await page.waitForTimeout(600);
+console.log("PASS Discover: opt-in picks from the things you bought (more of a kind you buy again, one companion, nothing for one-offs or food), each with a reason; filters and turn off work");
 
 // Wrapped: one story a year, on its own page (Browse's Wrapped card opens it). Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.

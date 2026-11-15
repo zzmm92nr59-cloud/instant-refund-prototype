@@ -58,6 +58,7 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/receipts") return j({ receipts: [] });
   if (p === "/relay/my/purchases") { st.purchaseAsks.push(u.search); return j({ purchases: [] }); }
   if (p === "/relay/my/wrapped") return j(st.wrapped);
+  if (p === "/relay/my/style") return j(st.style || {});
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Sam Tester", photo: null });
   if (p === "/relay/my/second-step") return j({ required: true, done: true, checked: true, app: true, text: false, passkeys: 0 });
   if (p === "/relay/my/admin/me") return j(st.admin);
@@ -209,10 +210,13 @@ await polished("team tools", "#mePage");
 console.log("ok - the switch is with the team tools too");
 
 // 8. The shops' websites switch on its own: real shops only (no test shops, no test orders asked for), and each product's
-// kind from what it is: colours named after food don't make clothes food, and For you gives a food reason only for food.
+// kind from what it is: colours named after food don't make clothes food, and For you follows the things bought, never food.
 await page.evaluate(() => { localStorage.setItem("relay-web-preview", "1"); localStorage.setItem("relay-testing-tools", "0"); localStorage.setItem("relay-discover-personalise-v1", "true"); });
 st.wrapped = { year: new Date().getFullYear(), receipts: 30, topShops: [], industries: [
   { category: "food", label: "Food & drink", spentPence: 37000 }, { category: "home", label: "Home & garden", spentPence: 33000 }, { category: "fashion", label: "Fashion", spentPence: 30000 }] };
+// What they bought: a hoodie, a jumper and a box of chocolates. Picks follow the clothes; food picks nothing.
+st.style = { receipts: [{ id: "s1", retailer: { name: "Thread Yard" }, category: "fashion", items: [{ name: "Zip Hoodie", variant: "Grey / M", pricePence: 5000 }, { name: "Lambswool Jumper", variant: "Navy / M", pricePence: 7000 }] },
+  { id: "s2", retailer: { name: "Sweet Corner" }, category: "food", items: [{ name: "Salted caramel chocolates", variant: "", pricePence: 1200 }] }] };
 st.purchaseAsks = [];
 await page.reload();
 await page.waitForTimeout(800);
@@ -232,11 +236,12 @@ await page.locator("#dcKinds [data-kind='home']").click();
 assert.ok((await grid()).some(c => c[1] === "Black Toast Glass Cake Stand"), "a cake stand is for the home, not food");
 await page.locator("#dcKinds [data-kind='all']").click();
 const picks = await page.$$eval("#dcForYou .dc-strip .dc-card", cs => cs.map(c => [c.querySelector(".dc-shop").textContent, c.querySelector("h3").textContent, (c.querySelector(".dc-why") || {}).textContent || ""]));
-assert.ok(picks.length >= 3, "picks from what you spend: " + JSON.stringify(picks));
-for (const [, product, why] of picks) if (/food/i.test(why)) assert.equal(product, "Dark Chocolate Truffles - Gift Box", "a food reason only for food: " + product + " — " + why);
-assert.ok(picks.some(([shop, , why]) => shop !== "Cocoa Cottage" && /^30% of your spending is fashion/.test(why)), "clothes get the fashion reason: " + JSON.stringify(picks));
+assert.ok(picks.length >= 2 && picks.every(x => /hoodie|jumper/i.test(x[1])) && picks.some(x => x[1] === "Strike Light Grey Pullover Hoodie"), "picks from the things they bought: " + JSON.stringify(picks));
+assert.ok(picks.filter(x => /jumper/i.test(x[1])).length <= 2, "at most two of a kind");
+assert.ok(picks.every(([, , why]) => /^Like the (hoodie|jumper) you bought at Thread Yard/.test(why)), "each says which purchase it follows: " + JSON.stringify(picks));
+assert.ok(!picks.some(x => /Truffles|Cake Stand/.test(x[1])), "chocolates don't bring more food, or anything else");
 await polished("shops websites only", ".main");
-console.log("ok - the shops' websites switch: real shops only; clothes are fashion whatever their colour; food reasons only for food");
+console.log("ok - the shops' websites switch: real shops only; clothes are fashion whatever their colour; picks follow the things bought, never food");
 
 // 9. The team's two switches, and a device that had testing tools on moves to the shops' websites once.
 st.admin = { admin: false, signInAgain: true };
