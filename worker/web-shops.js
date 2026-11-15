@@ -192,16 +192,23 @@ export function shopRows(shop, origin, products, now) {
 }
 
 // ---- Shops read from their product pages (reader: "pages") ----
-async function getText(f, url, accept, max = 16_000_000) {
+// A page or sitemap as text. Past `max` characters: a page is too big; a sitemap (partial) keeps its first part, which
+// lists enough products (Nike's UK list is larger than a Worker should hold).
+async function getText(f, url, accept, max = 16_000_000, partial = false) {
   let r;
   try { r = await f(url, { headers: { "User-Agent": USER_AGENT, Accept: accept, "Accept-Language": "en-GB" }, redirect: "follow", signal: AbortSignal.timeout(20000) }); }
   catch { return { status: "unreachable" }; }
   const done = () => r.text().catch(() => "");
   if (r.status === 401 || r.status === 403 || r.status === 429) { await done(); return { status: "blocked" }; }
   if (!r.ok) { await done(); return { status: r.status >= 500 ? "unreachable" : "missing" }; }
-  const text = await r.text();
-  return text.length > max ? { status: "too_big" } : { status: "ok", text, url: r.url || url };
+  if (!partial || !r.body || !r.body.getReader) { const text = await r.text(); return text.length > max ? { status: "too_big" } : { status: "ok", text, url: r.url || url }; }
+  const reader = r.body.getReader(), dec = new TextDecoder(); let text = "";
+  try { for (;;) { const { done: end, value } = await reader.read(); if (end) break; text += dec.decode(value, { stream: true }); if (text.length >= max) { await reader.cancel().catch(() => {}); break; } } }
+  catch { if (!text) return { status: "unreachable" }; }
+  return { status: "ok", text: text.slice(0, max), url: r.url || url };
 }
+// HTML entities in a page's data ("Arrival 7&quot; Shorts").
+const unentity = (t) => String(t || "").replace(/&(quot|amp|apos|#39|#x27|lt|gt|nbsp);/gi, (m, e) => ({ quot: '"', amp: "&", apos: "'", "#39": "'", "#x27": "'", lt: "<", gt: ">", nbsp: " " })[e.toLowerCase()]);
 const locsOf = (xml) => [...String(xml).matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map(m => m[1].replace(/&amp;/g, "&"));
 // The schema.org Product data on a page (JSON-LD), with its variants.
 export function pageProduct(html) {
@@ -237,20 +244,20 @@ export function pageRows(shop, url, html, position, now) {
   const colour = oneLine(p.color || (variants.find(v => v.color) || {}).color || "", 60) || null;
   const code = (/(\d{5,})\/?$/.exec(url) || /([a-z]{2,4}\d{5,})/i.exec(url) || [null, url.replace(/[^a-z0-9]+/gi, "-").slice(-60)])[1];
   const key = "web:" + shop.domain + ":" + code;
-  return [{ id: key + ":1", domain: shop.domain, productKey: key, position, product: oneLine(p.name, 140), variation: colour, priceMinor: price,
+  return [{ id: key + ":1", domain: shop.domain, productKey: key, position, product: oneLine(unentity(p.name), 140), variation: colour && unentity(colour), priceMinor: price,
     available: inStockOf(p.offers) ?? inStockOf(variants.flatMap(v => [].concat(v.offers || []))), imageUrl: image, productUrl: url, kind: null, checkedAt: now }];
 }
 // A shop's product sitemap (or the product sitemaps an index lists), then up to 24 product pages robots.txt allows: spread
 // across the whole list, a different spread each day, so Browse shows a mix that changes.
 export async function readPages(f, shop, robots, now) {
   if (!robotsAllow(robots.groups, new URL(shop.sitemap).pathname)) return { status: "robots", rows: [] };
-  let sm = await getText(f, shop.sitemap, "application/xml,text/xml");
+  let sm = await getText(f, shop.sitemap, "application/xml,text/xml", 6_000_000, true);
   if (sm.status !== "ok") return { status: sm.status === "missing" ? "not_readable" : sm.status, rows: [] };
   let urls = locsOf(sm.text);
   if (/<sitemapindex/i.test(sm.text)) {
     const kids = urls.filter(u => !shop.childMatch || shop.childMatch.test(u)).slice(0, 2);
     urls = [];
-    for (const k of kids) { const x = await getText(f, k, "application/xml,text/xml"); if (x.status === "ok") urls.push(...locsOf(x.text)); }
+    for (const k of kids) { const x = await getText(f, k, "application/xml,text/xml", 6_000_000, true); if (x.status === "ok") urls.push(...locsOf(x.text)); }
   }
   urls = [...new Set(urls.filter(u => { try { const x = new URL(u); return sameSite(x.origin, shop.domain) && shop.match.test(x.pathname) && robotsAllow(robots.groups, x.pathname + x.search); } catch { return false; } }))];
   if (!urls.length) return { status: "empty", rows: [] };
