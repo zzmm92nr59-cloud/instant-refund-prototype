@@ -31,6 +31,10 @@ const receipts = [
     delivery: { status: "shipped", carrier: "Royal Mail", at: day(-3) }, returnBy: { date: day(10), basis: "uk_law", from: "delivery" } }),
   // An app bought from Apple yesterday: can't be returned, so Wallet and Today leave it out (it stays in Receipts).
   receipt("55555555-5555-4555-8555-555555555555", "Apple", "Match Masters", 159, 1, { category: "digital", returnable: false, items: [{ name: "Match Masters", qty: 1, pricePence: 159, category: "digital" }] }),
+  // Coffee pods bought today (usually can't go back): still on Home for a week, so a new purchase is there to see.
+  receipt("66666666-6666-4666-8666-666666666666", "Nespresso", "Vertuo Pods", 4200, 0, { category: "food", returnable: false, items: [{ name: "Vertuo Pods", qty: 1, pricePence: 4200, category: "food" }] }),
+  // The same a fortnight ago: gone from Home (it stays in Receipts).
+  receipt("77777777-7777-4777-8777-777777777777", "Nespresso", "Original Pods", 3900, 14, { category: "food", returnable: false, items: [{ name: "Original Pods", qty: 1, pricePence: 3900, category: "food" }] }),
 ];
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64");
 const browser = await chromium.launch();
@@ -207,6 +211,8 @@ for (const look of ["today", "wallet"]) {
     assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
   }
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Match Masters" }).count(), 0, look + ": an app that can't be returned isn't on Home");
+  assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Vertuo Pods" }).count(), 1, look + ": something bought this week is on Home, even if it can't go back");
+  assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Original Pods" }).count(), 0, look + ": not when it's older than a week");
   await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
   await polished("home " + look, "#view");
   await page.locator(look === "today" ? ".hl-row" : ".hl-sq").first().click();

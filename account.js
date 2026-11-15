@@ -8016,7 +8016,7 @@
       var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
-        noReturn: (x.returnable === false && !(x.returnableItems || []).length) || x.category === "digital",
+        noReturn: x.returnable === false && !(x.returnableItems || []).length, digital: x.category === "digital",
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
@@ -8218,9 +8218,13 @@
     var draw = function () {
       if (!state.both || !document.body.contains(feed)) return;
       var all = feedEntries(state.both[0], state.both[1], refresh), watched = watches();
-      // Wallet and Today show the things you might send back or are waiting for: never app purchases, subscriptions or
-      // anything that can't be returned (Connor, 15 Nov), unless it's on its way or a return is still going. They stay in Receipts.
-      if (homeLook() !== "cards") all = all.filter(function (e) { return !e.noReturn || e.onWay || e.swaps; });
+      // Wallet and Today show the things you might send back or are waiting for: never app purchases or subscriptions, and
+      // nothing older than a week that can't be returned (Connor, 15 Nov), unless it's on its way or a return is going.
+      // They stay in Receipts.
+      // Something that usually can't go back (Nespresso pods, a food shop) still shows for a week after it's bought, so a new
+      // purchase is always there to see (Connor, 15 Nov); apps and subscriptions never do.
+      var weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+      if (homeLook() !== "cards") all = all.filter(function (e) { return e.onWay || e.swaps || (!e.digital && (!e.noReturn || String(e.at || "").slice(0, 10) >= weekAgo)); });
       var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
       // "To return" runs soonest date first; the others keep the feed's order.
       sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
