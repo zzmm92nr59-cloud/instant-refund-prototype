@@ -3439,6 +3439,17 @@
           if (yearList.length > 1) sheet.appendChild(accGroup("Year", yearList.map(function (y) { return accRow("doc", y, counted(yearN[y]), pick(function () { memo.calmYear = y; drawList(); })); })));
           sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
         };
+        // Receipts (Connor, 15 Nov): Wrapped at the top, then a coloured square for each kind of shopping (with how many
+        // shop-stated return dates are within a week), then the filter and the receipts by month.
+        if (onPage && !memo.calmYear) {
+          var wr = el("div", { className: "rl-rec-wr" }); list.appendChild(wr);
+          if (!isReview()) wrappedDoor(wr, function (y) { memo.wrappedYear = y; if (window.go) window.go("wrapped"); });
+          var soonOf = function (rs) { return rs.filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length; };
+          var squares = keys.map(function (k) { return tile(k, groupNames[k] || "Other", counted(by[k].length), null, soonOf(by[k]), function () { openK(k); }); });
+          if (giftRows.length) squares.push(tile("gifts", "Gifts", giftRows.length + (giftRows.length === 1 ? " gift" : " gifts"), null, 0, function () { openK("gifts"); }));
+          if (shopRows.length) squares.push(tile("shop", "Shop orders", shopRows.length + (shopRows.length === 1 ? " item" : " items"), null, 0, function () { openK("shop"); }));
+          if (squares.length) { list.appendChild(el("div", { className: "rl-calm-h" }, [el("h2", { text: "Your categories" })])); list.appendChild(el("div", { className: "rl-tiles rl-rec-tiles", style: "margin-bottom:18px" }, squares)); }
+        }
         list.appendChild(el("div", { className: "rl-calm-bar" }, [
           el("button", { type: "button", className: "rl-calm-filter", ariaLabel: "Filter receipts, showing " + (memo.calmYear || "all receipts"), onclick: function () { open(filterSheet); } },
             [accIc("filter", 20, "rl-calm-fi"), el("span", { text: memo.calmYear || "All receipts" }), accIc("chev", 16, "rl-arow-c")]),
@@ -5821,36 +5832,8 @@
     host.textContent = "";
     var s = load();
     if (!s || !s.token) return;
-    var hero = el("div", { id: "rl-wrapped" }); host.appendChild(hero);
-    if (!isReview()) wrappedDoor(hero, function (y) { memo.wrappedYear = y; if (window.go) window.go("wrapped"); });
     var fresh = api("/relay/my/receipts?all=1");
     var shops = el("div", { className: "rl-ys" }); host.appendChild(shops); mountYourShops(shops, fresh);
-    var cats = el("div"); host.appendChild(cats);
-    var NAMES = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other" };
-    var openCat = function (k) { return function () { memo.openCat = k; memo.catFilter = null; if (window.go) window.go("receipts"); }; };
-    var drawCats = function (rows) {
-      if (!document.body.contains(cats)) return;
-      cats.textContent = "";
-      var by = {}; orderRows(rows).forEach(function (r) { var k = r.category || "other"; (by[k] = by[k] || []).push(r); });
-      var keys = Object.keys(by).sort(function (a, b) { return (a === "other") - (b === "other") || by[b].length - by[a].length; });
-      if (!keys.length) return;
-      cats.appendChild(el("div", { className: "rl-calm-h" }, [el("h2", { text: "Your categories" })]));
-      var grid = el("div", { className: "rl-tiles" });
-      keys.forEach(function (k) {
-        // "Due soon" only when the shop's own return date is within a week (statedDeadline): never a date Relay worked out.
-        var soon = by[k].filter(function (r) { var d = daysLeft(statedDeadline(r)); return d !== null && d >= 0 && d <= 7; }).length, n = by[k].length;
-        var t = el("button", { type: "button", className: "rl-tile", ariaLabel: (NAMES[k] || "Other") + ", " + n + (n === 1 ? " receipt" : " receipts") + (soon ? ", " + soon + " due soon" : ""), onclick: openCat(k), style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) });
-        var art = el("span", { className: "rl-tile-art" });
-        art.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (CAT_ICONS[k] || CAT_ICONS.other)[2] + "</svg>";
-        t.appendChild(art);
-        if (soon) t.appendChild(el("span", { className: "rl-tile-badge", text: soon + " due soon" }));
-        t.appendChild(el("b", { text: NAMES[k] || "Other" }));
-        grid.appendChild(t);
-      });
-      cats.appendChild(grid);
-    };
-    if (memo.receipts) drawCats(memo.receipts.rows); else for (var i = 0; i < 2; i++) cats.appendChild(el("div", { className: "rl-skel", style: "height:112px;border-radius:20px;margin:14px 0 0" }));
-    fresh.then(function (r) { if (r.ok && r.body) drawCats(r.body.receipts || []); else if (!memo.receipts) cats.textContent = ""; }, function () { if (!memo.receipts) cats.textContent = ""; });
     var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
     var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
     host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));

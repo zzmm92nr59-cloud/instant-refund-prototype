@@ -61,14 +61,14 @@ const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => e
 await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: "jess@example.com", expiresAt: Date.now() + 864e5 })));
 await page.reload();
-// Open every group (Browse's tiles open each kind's receipts) and read each row's picture.
-const browseTiles = page.locator("#browsePage .rl-tiles .rl-tile");
-await page.evaluate(() => window.go("discover"));
+// Open every group (Receipts' tiles open each kind's receipts) and read each row's picture.
+const browseTiles = page.locator("#receiptsPage .rl-tiles .rl-tile");
+await page.evaluate(() => window.go("receipts"));
 await browseTiles.first().waitFor();
 const seen = {};
 const groups = await browseTiles.allInnerTexts();
 for (let g = 0; g < groups.length; g++) {
-  if (g) { await page.evaluate(() => window.go("discover")); await browseTiles.first().waitFor(); }
+  if (g) { await page.waitForTimeout(450); await page.locator(".rl-cat-back").click(); await browseTiles.first().waitFor(); }
   await browseTiles.nth(g).click();
   await page.locator(".rl-rr").first().waitFor();
   await page.waitForTimeout(700);

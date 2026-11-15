@@ -196,11 +196,11 @@ await page.getByRole("heading", { name: "Price alerts", exact: true }).waitFor()
 await goTab(page, "Receipts"); await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 await openReceiptKind(page, "Returns and swaps");
 await page.getByRole("heading", { name: "Returns & swaps", exact: true }).waitFor();
-await goTab(page, "Browse");
+await goTab(page, "Receipts");
 await page.getByRole("button", { name: /^Relay Wrapped \d{4}/ }).click();
 await page.locator(".rl-wr-play").waitFor();
-assert.equal(await page.evaluate(() => window.page), "wrapped", "Wrapped opens its own page from Browse");
-console.log("ok - All receipts, Price alerts (2 watched) on Home's bell, Returns & swaps from Receipts and Wrapped from Browse each open their page");
+assert.equal(await page.evaluate(() => window.page), "wrapped", "Wrapped opens its own page from Receipts");
+console.log("ok - All receipts, Price alerts (2 watched) on Home's bell, Returns & swaps from Receipts and Wrapped from Receipts each open their page");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS the sign-in page and Home: Relay's navy, a wallet picture, return dates and countdowns, and the way to every page (stubbed server)");
 await browser.close(); server.close();

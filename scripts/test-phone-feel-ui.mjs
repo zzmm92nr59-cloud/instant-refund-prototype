@@ -202,8 +202,8 @@ assert.ok(y0 > 300, "Receipts scrolled down (" + y0 + ")");
 await drag(195, 300, 195, 560); await page.waitForTimeout(800);
 assert.equal(hits["GET /relay/my/receipts"] || 0, rec0, "scrolled down, pulling down just scrolls");
 assert.ok(await page.evaluate(() => window.scrollY) < y0, "it scrolled up instead");
-// At the top of Browse, pulling down asks again for what its tiles are made of (your receipts).
-await tab("Browse").click(); await page.locator("#browsePage .rl-tile").first().waitFor(); await settle();
+// At the top of Browse, pulling down asks again for what Your shops is made of (your receipts).
+await tab("Browse").click(); await page.locator("#browsePage .rl-ys-shop").first().waitFor(); await settle();
 await page.evaluate(() => window.scrollTo(0, 0)); await settle();
 const b0 = hits["GET /relay/my/receipts"] || 0;
 await drag(195, 240, 195, 520); await page.waitForFunction(() => !document.querySelector(".rl-ptr.on"), null, { timeout: 12000 });
@@ -330,7 +330,7 @@ await page.getByRole("button", { name: /Inboxes/ }).waitFor();
 assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("main.main")).transform), "none", "the screen is back in place");
 console.log("ok - installed app: a swipe in from the left edge goes back; a short one snaps back");
 
-await tab("Browse").click(); await page.locator("#browsePage .rl-tile").first().waitFor();
+await tab("Browse").click(); await page.locator("#browsePage .rl-ys-shop").first().waitFor();
 assert.deepEqual(errors, [], "no script errors");
 await polished("browse", "#view");
 await browser.close(); server.close();
