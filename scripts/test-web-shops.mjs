@@ -2,7 +2,7 @@
 // nothing leaves this machine. Made-up shops and products.
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
-import { parseRobots, robotsAllow, readShop, refreshWebShops, handleWebShopsRoute, webShopProducts, shopRows, USER_AGENT, PRODUCTS_PER_SHOP, SHOW_FOR, WEB_SHOPS } from "../worker/web-shops.js";
+import { parseRobots, robotsAllow, readShop, refreshWebShops, handleWebShopsRoute, webShopProducts, shopRows, pageRows, USER_AGENT, PRODUCTS_PER_SHOP, PAGES_PER_SHOP, SHOW_FOR, WEB_SHOPS } from "../worker/web-shops.js";
 
 // 1. robots.txt, as RFC 9309 reads it.
 const SHOPIFY_DEFAULT = `# we use Shopify as our ecommerce platform\r\n\r\nUser-agent: *\r\nDisallow: /a/downloads/-/*\r\nDisallow: /admin\r\nDisallow: /cart\r\nDisallow: /orders\r\nDisallow: /checkouts/\r\nDisallow: /checkout\r\nDisallow: /collections/*sort_by*\r\nDisallow: /*/collections/*sort_by*\r\nDisallow: /search\r\nDisallow: /policies/\r\nSitemap: https://shop.test/sitemap.xml\r\n`;
@@ -177,4 +177,51 @@ console.log("ok - 2 shops a run, each once a day; shops mixed, newest first; dow
 
 // 4. The real list: UK shops on Shopify, each once, with a name.
 assert.ok(WEB_SHOPS.length >= 10 && new Set(WEB_SHOPS.map(s => s.domain)).size === WEB_SHOPS.length && WEB_SHOPS.every(s => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(s.domain) && s.label));
+// 5. Shops read from their product pages (M&S, JD Sports and so on): the product sitemap (or the ones an index lists),
+// robots.txt for every page, then each page's schema.org Product data. Nothing guessed: no price or no picture, no product.
+{
+  const ld = (o) => '<html><head><script type="application/ld+json">' + JSON.stringify(o) + "</script></head><body>x</body></html>";
+  const page = (n) => ld({ "@context": "https://schema.org", "@type": "Product", name: "Wool Jumper " + n + " &quot;Navy&quot;", color: "navy", image: ["https://img.pages.test/j" + n + ".jpg"],
+    offers: { "@type": "Offer", priceSpecification: { price: String(40 + n), priceCurrency: "GBP" }, availability: "https://schema.org/InStock" } });
+  const asked = [];
+  const fx = async (u, init) => { asked.push(u); assert.equal(init.headers["User-Agent"], USER_AGENT);
+    const url = new URL(u), body = (t, ct) => new Response(t, { status: 200, headers: { "content-type": ct } });
+    if (url.pathname === "/robots.txt") return body("User-agent: *\nDisallow: /p/secret\n", "text/plain");
+    if (url.pathname === "/sitemap_index.xml") return body('<sitemapindex><sitemap><loc>https://www.pages.test/uk_products.xml</loc></sitemap><sitemap><loc>https://www.pages.test/ie_products.xml</loc></sitemap></sitemapindex>', "application/xml");
+    if (url.pathname === "/uk_products.xml") return body("<urlset>" + Array.from({ length: 60 }, (_, n) => "<url><loc>https://www.pages.test/p/jumper-" + n + "</loc></url>").join("") + "<url><loc>https://www.pages.test/p/secret</loc></url><url><loc>https://elsewhere.test/p/x</loc></url><url><loc>https://www.pages.test/help</loc></url></urlset>", "application/xml");
+    if (url.pathname === "/ie_products.xml") throw new Error("only UK product sitemaps are read");
+    const m = /^\/p\/jumper-(\d+)$/.exec(url.pathname);
+    if (m) return Number(m[1]) % 10 === 3 ? body("<html>no data</html>", "text/html") : body(page(Number(m[1])), "text/html");
+    throw new Error("unexpected " + u); };
+  const shop = { domain: "www.pages.test", label: "Pages & Co", reader: "pages", sitemap: "https://www.pages.test/sitemap_index.xml", childMatch: /uk_/, match: /^\/p\// };
+  const r = await readShop(fx, shop, NOW);
+  assert.equal(r.status, "ok");
+  const pages = asked.filter(u => /\/p\//.test(u));
+  assert.equal(pages.length, PAGES_PER_SHOP, "24 pages, spread across the list");
+  assert.ok(!asked.some(u => /secret|elsewhere|help/.test(u)), "never a page robots.txt forbids, another site's, or one that isn't a product");
+  assert.equal(r.rows.length, pages.filter(u => Number(/jumper-(\d+)/.exec(u)[1]) % 10 !== 3).length, "a page without Product data adds nothing");
+  const x = r.rows[0];
+  assert.match(x.product, /^Wool Jumper \d+ "Navy"$/, "names read as written, entities decoded");
+  assert.equal(x.variation, "navy"); assert.equal(x.available, 1); assert.match(x.imageUrl, /^https:\/\/img\.pages\.test\/j\d+\.jpg$/);
+  assert.equal(x.priceMinor, (40 + Number(/jumper-(\d+)/.exec(x.productUrl)[1])) * 100, "the price the page states, in pence");
+  assert.match(x.id, /^web:www\.pages\.test:/);
+  // Another day, another spread.
+  asked.length = 0; await readShop(fx, shop, NOW + 864e5);
+  assert.notDeepEqual(asked.filter(u => /\/p\//.test(u)), pages, "a different mix the next day");
+  // Not pounds, or no price: left out.
+  assert.deepEqual(pageRows(shop, "https://www.pages.test/p/a", ld({ "@type": "Product", name: "A", image: "https://i.test/a.jpg", offers: { price: "10", priceCurrency: "EUR" } }), 0, NOW), []);
+  assert.deepEqual(pageRows(shop, "https://www.pages.test/p/a", ld({ "@type": "Product", name: "A", image: "https://i.test/a.jpg", offers: {} }), 0, NOW), []);
+  assert.equal(pageRows({ ...shop, pagePrice: "currentPrice" }, "https://www.pages.test/p/a", ld({ "@type": "Product", name: "A", image: "https://i.test/a.jpg", offers: {} }) + '<script>{"currentPrice":99.5}</script>', 0, NOW)[0].priceMinor, 9950, "a shop's own stated price, where Relay is told where to read it");
+  // A shop that refuses product pages: blocked after three refusals, nothing kept.
+  const shut = async (u) => { const url = new URL(u); if (url.pathname === "/robots.txt") return new Response("", { status: 404 });
+    if (/products\.xml|sitemap_index/.test(url.pathname)) return fx(u, { headers: { "User-Agent": USER_AGENT } });
+    return new Response("no", { status: 403 }); };
+  let n403 = 0; const shutCount = async (u, i) => { const r = await shut(u, i); if (r.status === 403) n403++; return r; };
+  const b = await readShop(shutCount, shop, NOW);
+  assert.deepEqual([b.status, b.rows.length, n403], ["blocked", 0, 3], "stops after three refusals");
+  // The real list's page-read shops each say where their product list is and what a product page looks like.
+  for (const sh of WEB_SHOPS.filter(s => s.reader === "pages")) assert.ok(/^https:\/\//.test(sh.sitemap) && sh.match instanceof RegExp, sh.label);
+  // A run with one of them reads that shop alone (it makes about 27 requests).
+  console.log("ok - shops read from their product pages: robots.txt for each, 24 a day spread across the list, the page's own Product data, nothing guessed");
+}
 console.log("PASS shops' websites: robots.txt followed, read-only as RelayBot, pounds and UK delivery only, newest 24 a shop, once a day, hidden after 3 days");
