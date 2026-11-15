@@ -90,6 +90,12 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
         readings: (await rows("SELECT receipt_id AS receiptId, fields, failed, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? ORDER BY created_at", id))
           .map((r) => ({ receiptId: r.receiptId, read: parse(r.fields), couldNotRead: r.failed || null, at: iso(r.at) })) };
     })(),
+    // Banks and cards connected through open banking (never their passwords or keys), and the payments read from them.
+    banks: {
+      connections: (await rows("SELECT id, bank, connected_at AS at, synced_at AS synced FROM bank_links WHERE shopper_id = ? ORDER BY connected_at", id))
+        .map((r) => ({ id: r.id, bank: r.bank, connectedAt: iso(r.at), lastRead: iso(r.synced) })),
+      payments: (await rows("SELECT account, paid_on AS date, amount_minor AS pence, currency, description, merchant, receipt_id AS receiptId, match FROM bank_payments WHERE shopper_id = ? ORDER BY paid_on", id))
+    },
     // AI for picks: whether it's on, and what the AI made of each thing you bought (only item names were sent).
     aiForPicks: await (async () => {
       const on = await one("SELECT on_since AS since FROM picks_ai WHERE shopper_id = ?", id);

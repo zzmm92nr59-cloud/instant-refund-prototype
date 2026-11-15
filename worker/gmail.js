@@ -1613,6 +1613,13 @@ function isRelayEmail(c, env) {
 // only (no travel or apps, and no food unless it's something that has a companion, like coffee, tea or wine), across all their
 // receipts rather than just the newest.
 const COMPANION_FOOD = /coffee|espresso|nespresso|capsule|\bpods?\b|lungo|ristretto|\btea\b|teabag|\bwine\b|prosecco|champagne/i;
+// Each receipt's shop, date and total, for matching bank and card payments to receipts (bank.js).
+export async function receiptTotals(env, shopperId) {
+  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  return cards.filter((c) => c.kind !== "return_instructions" && Number.isInteger(c.totalPence) && c.totalPence > 0 && c.orderDate)
+    .map((c) => ({ id: c.id, shop: (c.retailer && (c.retailer.name || c.retailer.domain)) || "", domain: (c.retailer && c.retailer.domain) || "",
+      date: String(c.orderDate).slice(0, 10), totalPence: c.totalPence, currency: c.currency || "GBP" }));
+}
 export async function styleThings(env, shopperId) {
   const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
   const things = [];

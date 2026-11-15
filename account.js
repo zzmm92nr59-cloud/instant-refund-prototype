@@ -18,6 +18,8 @@
   // The link in the admins' morning email (#open=health) opens Relay health: straight away when the Profile tab already
   // knows it's an admin's, or as soon as it does.
   var openHealthPage = null, wantHealth = false;
+  // Coming back from the bank's own page (#bank=connected and so on): Profile opens Bank and cards with what happened.
+  var openBankPage = null, wantBank = null;
   window.relayOpenHealth = function () {
     wantHealth = true;
     // Opening the tab may draw it afresh (then the new drawing opens the page once it knows); otherwise open it here.
@@ -819,6 +821,10 @@
     ".rl-share-box i{display:block;margin-top:10px;font-style:normal;color:var(--rl-text2)}.rl-share-box:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-share-check{margin:0 0 12px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-fix [hidden],.rl-se [hidden]{display:none!important}" +
     // AI help: a switch with what it means underneath, on the Email connection page.
+    ".rl-bk-h{margin:22px 0 6px;font-size:20px;font-weight:700;color:var(--rl-text)}.rl-bk-list{border-radius:18px;background:var(--rl-card);padding:0 16px}" +
+    ".rl-bk-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-top:.5px solid var(--rl-line)}.rl-bk-row:first-child{border-top:0}" +
+    ".rl-bk-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-bk-t b{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rl-text)}.rl-bk-t span,.rl-bk-a span{font-size:14px;color:var(--rl-text2)}" +
+    ".rl-bk-a{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.rl-bk-a b{font-size:16px;font-weight:600;color:var(--rl-text)}" +
     ".rl-aih-picks{margin:16px 0 0;padding:16px 0 0;border-top:.5px solid var(--rl-line)}" +
     ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
     ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
@@ -4850,6 +4856,20 @@
         deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
       rows.push(deliveryRow);
     }
+    // Bank and cards (worker/bank.js): shown once Relay can offer it to this account.
+    var bankRow = accRow("card", "Bank and cards", "", function () { page("Bank and cards", function (b) { bankPage(b, null); }); });
+    bankRow.style.display = "none";
+    if (!review) {
+      rows.push(bankRow);
+      api("/relay/my/bank").then(function (r) {
+        if (!r.ok || !r.body || !r.body.available) return;
+        bankRow.style.display = "";
+        var n = (r.body.connections || []).length;
+        if (n && bankRow.setDetail) bankRow.setDetail(n === 1 ? (r.body.connections[0].bank || "1 connected") : n + " connected");
+      }, function () {});
+    }
+    openBankPage = function () { var note = wantBank; wantBank = null; page("Bank and cards", function (b) { bankPage(b, note); }); return true; };
+    if (wantBank) setTimeout(function () { if (wantBank && openBankPage) openBankPage(); }, 0);
     // What the shopper shops for (interests): change it any time.
     var interestsRow = accRow("bag", "Your interests", interestsWords(interestsCached() || []), function () { page("Your interests", function (b) {
       var chosen = (interestsCached() || []).slice(), msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
@@ -5149,6 +5169,74 @@
     }
     // Testers (worker/resale-admin.js): family and friends whose account shows shops' own websites in Browse, as the team's
     // does, before shops have agreed. Added by the email they sign in with; it turns on when they next open Browse.
+    // Bank and cards: connect a bank or card (read-only, on the bank's own page), see card payments and which receipt each
+    // one matches. While Relay uses test banks, only the team and testers see this.
+    function bankPage(b, back) {
+      var note = el("div", { className: "rl-msg", role: "status" }), list = el("div"), pays = el("div");
+      var NOTES = { connected: ["Connected. Relay is matching your payments to your receipts.", false], denied: ["Not connected. You can try again any time.", true],
+        failed: ["That didn't connect. Please try again.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
+      b.appendChild(el("p", { text: "Connect your bank or card and Relay matches your card payments to your receipts, and finds purchases that never sent one. You sign in on your bank's own page. Relay can only read payments: it can't move money." }));
+      var testLine = el("p", { className: "rl-anote" }); testLine.hidden = true; b.appendChild(testLine);
+      var go = el("button", { type: "button", className: "rl-btn", text: "Connect a bank or card" });
+      b.appendChild(go); b.appendChild(note); b.appendChild(list); b.appendChild(pays);
+      if (back && NOTES[back]) say(note, NOTES[back][0], NOTES[back][1]);
+      list.appendChild(el("div", { className: "rl-skel", style: "min-height:72px;border-radius:18px;margin-top:14px" }));
+      go.onclick = function () {
+        if (go.disabled) return;
+        go.disabled = true; go.textContent = "Opening your bank\u2026"; say(note, "");
+        api("/relay/my/bank/connect", { method: "POST" }).then(function (r) {
+          if (r.ok && r.body && /^https:\/\//.test(r.body.url || "")) { location.href = r.body.url; return; }
+          go.disabled = false; go.textContent = "Connect a bank or card";
+          say(note, r.status === 409 ? "That's the most banks and cards Relay can connect. Disconnect one first." : "Couldn't open your bank just now. Try again in a moment.", true);
+        }, function () { go.disabled = false; go.textContent = "Connect a bank or card"; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      function when(iso) { if (!iso) return "Not read yet"; var m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? "Read just now" : m < 60 ? "Read " + m + " minutes ago" : m < 1440 ? "Read " + Math.round(m / 60) + " hours ago" : "Read " + Math.round(m / 1440) + " days ago"; }
+      function drawLinks(body) {
+        list.textContent = "";
+        if (body.testBanks) { testLine.hidden = false; testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe."; }
+        var cs = body.connections || [];
+        if (!cs.length) return;
+        list.appendChild(accGroup("Connected", cs.map(function (c) {
+          return accRow("card", c.bank || "Bank", c.needsReconnect ? "Connect again to keep reading payments" : when(c.syncedAt) + (c.matched ? ", " + c.matched + (c.matched === 1 ? " receipt matched" : " receipts matched") : ""), function () {
+            ask("Disconnect " + (c.bank || "this bank") + "? Relay deletes the payments it read from it.", "Disconnect", function () {
+              api("/relay/my/bank/disconnect", { method: "POST", body: { id: c.id } }).then(function (r) {
+                if (!r.ok) return say(note, "Couldn't disconnect it. Try again in a moment.", true);
+                say(note, "Disconnected. The payments read from it are deleted."); load();
+              }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+            });
+          });
+        })));
+      }
+      function drawPays(body) {
+        pays.textContent = "";
+        var ps = (body && body.payments) || [];
+        if (!ps.length) return;
+        pays.appendChild(el("h3", { className: "rl-bk-h", text: "Card payments" }));
+        var box = el("div", { className: "rl-bk-list" });
+        ps.slice(0, 60).forEach(function (p) {
+          var shop = matchShop(p.receiptId);
+          box.appendChild(el("div", { className: "rl-bk-row" }, [
+            el("span", { className: "rl-bk-t" }, [el("b", { text: p.merchant || p.description || "Payment" }),
+              el("span", { text: !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches " : "Probably ") + (shop ? "your " + shop + " receipt" : "one of your receipts") })]),
+            el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency) }), el("span", { text: new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) })])]));
+        });
+        pays.appendChild(box);
+      }
+      var shops = {};
+      function matchShop(id) { return id && shops[id] || ""; }
+      function load() {
+        api("/relay/my/bank", { fresh: true }).then(function (r) {
+          if (!r.ok || !r.body) { list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
+          drawLinks(r.body);
+          if (!(r.body.connections || []).length) { pays.textContent = ""; return; }
+          return api("/relay/my/receipts", { fresh: false }).then(function (x) {
+            ((x.ok && x.body && x.body.receipts) || []).forEach(function (c) { shops[c.id] = (c.retailer && (c.retailer.name || c.retailer.domain)) || ""; });
+          }, function () {}).then(function () { return api("/relay/my/bank/payments", { fresh: true }); }).then(function (p) { if (p && p.ok) drawPays(p.body); });
+        }, function () { list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      }
+      // Read the banks again (at most every 10 minutes, on Relay's side), then show what's there.
+      api("/relay/my/bank/sync", { method: "POST" }).then(load, load);
+    }
     function testersPage(b) {
       var note = el("div", { className: "rl-msg" }), list = el("div");
       var input = el("input", { type: "email", placeholder: "Their email address", autocomplete: "off", inputMode: "email", ariaLabel: "Tester's email address", style: "width:100%;box-sizing:border-box;min-height:48px;padding:12px 16px;border:1px solid var(--rl-line);border-radius:14px;font-size:17px;background:var(--rl-card);color:var(--rl-text);font-family:inherit;margin:0 0 10px" });
@@ -5710,6 +5798,15 @@
     window.__relayAutoScan = m[2] === "connected" || m[2] === "reconnected";
     if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
     open(function (sheet) { gate(sheet, s.email || "", note); });
+  }
+  function completeBank() {
+    var m = /(?:^|[#&])bank=(connected|denied|failed|not_configured)(?:&|$)/.exec(location.hash || "");
+    if (!m) return;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    if (!load()) return;
+    wantBank = m[1];
+    if (window.go) window.go("me");
+    setTimeout(function () { if (wantBank && openBankPage) openBankPage(); }, 0);
   }
   function completeGoogleNote() {
     var m = /(?:^|[#&])(gsignin|msignin)=(denied|failed|other_address)(?:&|$)/.exec(location.hash || "");
@@ -8685,8 +8782,8 @@
     });
   }
   function start() {
-    keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail();
-    window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); });
+    keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank();
+    window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank(); });
     window.addEventListener("relay:session", function () { if (load()) unmountWelcome(); else mountWelcome(); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();

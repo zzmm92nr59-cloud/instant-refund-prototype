@@ -36,6 +36,8 @@ jobs:
         run: node scripts/test-ai-reader.mjs
       - name: AI for picks (item names only, opt-in)
         run: node scripts/test-item-kinds.mjs
+      - name: Open banking (read-only, team and testers on test banks)
+        run: node scripts/test-bank.mjs
       - name: Auctions (proxy bids, nobody sees who bid, the winner's unpaid order at the shop, 24 hours to pay, then the next bidder)
         run: node scripts/test-auctions.mjs
       - name: Interests (kept with the account, only ids on the list, each account its own, shops' categories never guessed)
