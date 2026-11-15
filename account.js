@@ -1026,6 +1026,22 @@
     ".h2-chip>span{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2);white-space:nowrap;transition:background .15s,color .15s}" +
     ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}" +
+    // Two other ways Home can look (Connor, 15 Nov), chosen in Profile, Home layout: "today" (what needs you, then a list) and
+    // "wallet" (your latest things as photo squares). Neither snaps one card per flick.
+    ".h2-feed.hl>*{scroll-snap-align:none}.h2-feed.hl{gap:0}" +
+    ".hl-sum{background:var(--rl-card);border-radius:22px;padding:6px 18px;margin:10px 0 22px}.hl-sum-h{font-size:22px;line-height:28px;font-weight:700;margin:12px 0 4px;color:var(--rl-text)}" +
+    ".hl-sum-r{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:52px;border-top:1px solid var(--rl-line);color:var(--rl-text);font-size:17px}.hl-sum-r:first-of-type{border-top:0}.hl-sum-r:active{opacity:.6}.hl-sum-r .hl-n{flex:none;min-width:30px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:15px;display:grid;place-items:center;font-weight:700;font-size:15px;background:var(--rl-fill)}.hl-sum-r .hl-n.urgent{background:#d92d20;color:#fff}.hl-sum-r .hl-n.soon{background:#f5a524;color:#3b2500}.hl-sum-r span.t{flex:1}.hl-sum-ok{margin:10px 0 14px;font-size:16px;color:var(--rl-text2)}" +
+    ".hl-h{font-size:20px;line-height:25px;font-weight:700;margin:4px 2px 10px;color:var(--rl-text)}" +
+    ".hl-list{background:var(--rl-card);border-radius:22px;overflow:hidden;margin:0 0 18px}" +
+    ".hl-row{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:14px;padding:12px 16px;min-height:88px;border-top:1px solid var(--rl-line)}.hl-row:first-child{border-top:0}.hl-row:active{background:var(--rl-fill)}.hl-row:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
+    ".hl-pic{position:relative;flex:none;width:64px;height:64px;border-radius:14px;overflow:hidden;background:var(--rl-fill)}.hl-pic .h2-art svg{max-width:52px;max-height:52px}" +
+    ".hl-mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.hl-mid b{font-size:16px;line-height:21px;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid span{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-mid em{font-style:normal;font-size:14px;line-height:19px;font-weight:600;color:var(--rl-text)}.hl-mid em.urgent{color:#b42318}.hl-mid em.soon{color:#93540a}" +
+    ".hl-row .rl-arow-c{flex:none;color:var(--rl-text2)}" +
+    ".hl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px;margin:10px 0 18px}@media(min-width:720px){.hl-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}" +
+    ".hl-sq{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;min-width:0;transition:transform .12s}.hl-sq:active{transform:scale(.97)}.hl-sq:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px;border-radius:18px}" +
+    ".hl-sqpic{position:relative;display:block;width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;background:var(--rl-fill)}.hl-sqpic .h2-art svg{max-width:62%;max-height:62%}" +
+    ".hl-tag{position:absolute;left:8px;top:8px;max-width:calc(100% - 16px);box-sizing:border-box;padding:4px 10px;border-radius:999px;font-size:13px;line-height:17px;font-weight:700;background:#fff;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 3px rgba(16,24,40,.18)}.hl-tag.urgent{background:#d92d20;color:#fff}.hl-tag.soon{background:#f5a524;color:#3b2500}" +
+    ".hl-sqs{margin:9px 0 2px;font-size:13px;line-height:17px;font-weight:600;color:var(--rl-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-sqn{font-size:14px;line-height:19px;color:var(--rl-text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hl-sqp{font-size:15px;line-height:20px;font-weight:700;color:var(--rl-text);margin-top:2px}" +
     ".h2-item{scroll-snap-stop:always;cursor:pointer;border-radius:28px;-webkit-tap-highlight-color:transparent;transition:transform .15s}.h2-item:active{transform:scale(.985)}.h2-item:focus-visible{outline:2px solid var(--rl-text);outline-offset:3px}" +
     ".h2-card{position:relative;z-index:1;display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:28px;background:var(--rl-card);color:var(--rl-text)}" +
     ".h2-head{display:flex;align-items:center;gap:10px;min-width:0}.h2-logo{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:var(--rl-fill);color:var(--rl-text);font-size:16px;font-weight:700}" +
@@ -7937,6 +7953,43 @@
   }
   // One card: the shop and the day, what was bought as large tiles with the price on each, one big line, and (only for a
   // return date inside a week) the days left as a strip under it. The whole card is one tap.
+  // Which Home: "cards" (big cards, one per flick), "today" or "wallet". Kept on this device; the app's own default otherwise.
+  var HOME_LOOKS = ["cards", "today", "wallet"], HOME_LOOK_KEY = "relay-home-look";
+  function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1]; var v = localStorage.getItem(HOME_LOOK_KEY); return HOME_LOOKS.indexOf(v) >= 0 ? v : "cards"; } catch (e) { return "cards"; } }
+  function setHomeLook(v) { try { localStorage.setItem(HOME_LOOK_KEY, v); } catch (e) {} }
+  var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
+  var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
+  // Today: a row per purchase, its picture small, the shop, what it is, and what's happening with it.
+  function todayRow(e) {
+    var t = e.tiles && e.tiles[0], what = e.title || (t && t.name) || "";
+    var r = el("button", { type: "button", className: "hl-row", ariaLabel: [e.shop, what, e.line, e.strip].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
+      hlPic(e, "hl-pic"),
+      el("span", { className: "hl-mid" }, [el("b", { text: e.shop || what }), what && e.shop ? el("span", { text: what }) : null, el("em", { className: e.stripKind || "", text: e.strip ? e.line + ", " + e.strip.charAt(0).toLowerCase() + e.strip.slice(1) : e.line })].filter(Boolean)),
+      accIc("chev", 16, "rl-arow-c")]);
+    return r;
+  }
+  // Wallet: the thing as a big square, a label on it only when something is happening, then the shop, what it is and the price.
+  function walletSquare(e) {
+    var t = e.tiles && e.tiles[0], what = e.title || (t && t.name) || "", tag = e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
+    var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
+    return el("button", { type: "button", className: "hl-sq", ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
+      pic, el("span", { className: "hl-sqs", text: e.shop || "" }), el("span", { className: "hl-sqn", text: what }), t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
+  }
+  // Today's summary: one line each for what needs the shopper, biggest first; each opens that list.
+  function todaySummary(sets, pickChip) {
+    var due = sets.back.filter(function (e) { return e.rank === 0 && !e.owes; }), urgent = due.filter(function (e) { return e.stripKind === "urgent"; }).length;
+    var owe = sets.you.filter(function (e) { return e.owes; }).length, refunds = sets.swaps.filter(function (e) { return !e.owes; }).length;
+    var rows = [];
+    var n = function (k, cls) { return el("span", { className: "hl-n " + (cls || ""), text: String(k) }); };
+    if (owe) rows.push([n(owe, "urgent"), owe === 1 ? "swap to pay for" : "swaps to pay for", "swaps"]);
+    if (due.length) rows.push([n(due.length, urgent ? "urgent" : "soon"), due.length === 1 ? "return due this week" : "returns due this week", "back"]);
+    if (sets.way.length) rows.push([n(sets.way.length), sets.way.length === 1 ? "parcel on its way" : "parcels on their way", "way"]);
+    if (refunds) rows.push([n(refunds), refunds === 1 ? "return waiting for its refund" : "returns waiting for their refunds", "swaps"]);
+    var box = el("div", { className: "hl-sum" }, [el("h2", { className: "hl-sum-h", text: "Today" })]);
+    if (!rows.length) box.appendChild(el("p", { className: "hl-sum-ok", text: "Nothing needs you right now." }));
+    rows.forEach(function (r) { box.appendChild(el("button", { type: "button", className: "hl-sum-r", onclick: function () { pickChip(r[2]); } }, [r[0], el("span", { className: "t", text: r[1] }), accIc("chev", 16, "rl-arow-c")])); });
+    return box;
+  }
   function feedCard(e) {
     var item = el("div", { className: "h2-item" + (e.small ? " small" : ""), tabIndex: 0 });
     item.setAttribute("role", "button");
@@ -8059,7 +8112,13 @@
         // For you: everything that needs something or is still in play, then the newest, about eight in all.
         var list = sets[state.pick], open2 = list.filter(function (e) { return e.rank < 2; });
         var shown = state.pick === "you" ? open2.slice(0, 8).concat(list.filter(function (e) { return e.rank === 2; }).slice(0, Math.max(0, 8 - open2.length))) : list.slice(0, 12);
-        shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
+        var look = homeLook(); feed.classList.toggle("hl", look !== "cards");
+        if (look === "today") {
+          if (state.pick === "you") { feed.appendChild(todaySummary(sets, function (k) { state.pick = memo.homeChip = k; draw(); try { window.scrollTo(0, 0); } catch (e) {} })); if (shown.length) feed.appendChild(el("h2", { className: "hl-h", text: "Latest" })); }
+          if (shown.length) feed.appendChild(el("div", { className: "hl-list" }, shown.map(todayRow)));
+        } else if (look === "wallet") {
+          if (shown.length) feed.appendChild(el("div", { className: "hl-grid" }, shown.map(walletSquare)));
+        } else shown.forEach(function (e) { feed.appendChild(feedCard(e)); });
         if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
       }
       if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));

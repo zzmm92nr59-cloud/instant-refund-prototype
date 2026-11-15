@@ -183,6 +183,29 @@ assert.ok(!/days? left/.test(await dsheet.innerText()), "no countdown on its pag
 await dsheet.getByRole("button", { name: "Close" }).click(); await dsheet.waitFor({ state: "detached" });
 await polished("home", "#view");
 console.log("ok - Home's cards show the return date, the last week's days left (amber, red) first, lead with what was bought, and open a page with the countdown, Start return and I'm sending this back");
+// The other two ways Home can look (Profile, Home layout): Today (what needs you, then a list) and Wallet (photo squares).
+for (const look of ["today", "wallet"]) {
+  await page.evaluate(l => { localStorage.setItem("relay-home-look", l); window.go("receipts"); }, look);
+  await page.evaluate(() => window.go("profile"));
+  if (look === "today") {
+    await page.locator(".hl-sum").waitFor();
+    const sum = await page.locator(".hl-sum").innerText();
+    assert.match(sum, /Today/); assert.match(sum, /due this week/, "the summary says what's due: " + sum);
+    assert.ok(await page.locator(".hl-row").count() >= 3, "a row per purchase");
+    assert.ok(await page.locator(".hl-row").first().evaluate(r => r.getBoundingClientRect().height) < 110, "rows are small, several a screen");
+  } else {
+    await page.locator(".hl-sq").first().waitFor();
+    const g = await page.evaluate(() => { const a = [...document.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
+    assert.ok(g.w > 150 && Math.abs(g.w - g.h) < 1 && g.row, "two big squares a row: " + JSON.stringify(g));
+    assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
+  }
+  await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+  await polished("home " + look, "#view");
+  await page.locator(look === "today" ? ".hl-row" : ".hl-sq").first().click();
+  await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(450); await page.locator(".rl-back").last().click({ position: { x: 20, y: 20 } }); await page.locator(".rl-back").waitFor({ state: "detached" });
+}
+await page.evaluate(() => localStorage.removeItem("relay-home-look"));
+console.log("ok - Home's other layouts: Today (summary, then small rows) and Wallet (two big squares a row, labels), polished, each opens its page");
 
 // 3. From Home: All receipts, the bell (how many things are watched) and, through Receipts and Browse, Returns & swaps and
 //    Wrapped, each open their page. (The four tiles under the old wallet are gone; these are where each now lives.)
