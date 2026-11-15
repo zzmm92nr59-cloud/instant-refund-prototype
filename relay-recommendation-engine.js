@@ -179,6 +179,17 @@
   const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
   return null;
  }
+ // What the AI made of an item name (AI for picks, worker/item-kinds.js), in the same shape as kindOf. Shoppers who switched it
+ // on only; anything else falls back to the word lists above.
+ const nameKey=n=>String(n||"").toLowerCase().replace(/\s+/g," ").trim().slice(0,120);
+ const esc=w=>w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+ function aiKindOf(name,ai){const d=ai&&ai[nameKey(name)];if(!d)return null;if(d.mode==="once")return {mode:"none"};
+  const look=(Array.isArray(d.look)?d.look:[]).filter(w=>typeof w==="string"&&w);if(!d.kind||!look.length)return null;
+  const want=new RegExp("\\b("+look.map(esc).join("|")+")");
+  const known=KINDS.find(x=>x[1]===d.kind||x[0]===d.kind||x[1]+"s"===d.kind);
+  return d.mode==="with"?{mode:"companion",key:"with:"+d.kind,noun:d.kind,want,better:null}:{mode:"similar",key:known?known[0]:d.kind,noun:d.kind,want};}
+ // A shop that sells one thing with a companion (Nespresso: coffee), when the item's own name doesn't say (Ispirazione Roma).
+ function shopCompanion(shop){const s=normal(shop);const c=COMPANIONS.find(x=>x[2].test(s));return c?{mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null}:null;}
  const possessiveShop=n=>/s$/i.test(n)?n+"'":n+"'s";
  // groups: what Browse shows, each {key, product, store, min (pence), options[], left}. Returns up to `limit` picks, best first,
  // each {g, score, why[]}. At most two of a kind (three when there's only one kind to go on), one companion per thing bought,
@@ -201,7 +212,7 @@
   const src=new Map(),owned=new Set();
   for(const p of bought){
    owned.add(normal(p.merchant)+"|"+normal(p.item));
-   const k=kindOf(p.item);if(!k||k.mode==="none")continue;
+   const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||shopCompanion(p.merchant);if(!k||k.mode==="none")continue;
    if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
    const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
    const c=colourOf(p.detail)||colourOf(p.item);if(c)x.colours.add(c);
@@ -243,9 +254,9 @@
    if(out.length>=limit)break;if(p.taken>=p.cap)continue;
    const x=p.list.find(y=>!used.has(y.g.key||y.g.product+"|"+y.g.store)&&(perShop.get(normal(y.g.store))||0)<3);if(!x)continue;
    used.add(x.g.key||x.g.product+"|"+x.g.store);perShop.set(normal(x.g.store),(perShop.get(normal(x.g.store))||0)+1);p.taken++;
-   out.push({g:x.g,score:x.score,why:x.why.slice(0,2)});
+   out.push({g:x.g,score:x.score,why:x.why.slice(0,2),kind:x.k.key,noun:x.k.noun});
   }
   return out;
  }
- return Object.freeze({rank,category,colourOf,getHistory,tapOf,profile,sizeOf,stylesOf,headline,kindOf,picks});
+ return Object.freeze({rank,category,colourOf,getHistory,tapOf,profile,sizeOf,stylesOf,headline,kindOf,aiKindOf,picks});
 });

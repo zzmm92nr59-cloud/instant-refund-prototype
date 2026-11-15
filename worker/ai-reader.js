@@ -21,6 +21,10 @@ export const AI_READS_SQL = `CREATE TABLE IF NOT EXISTS receipt_ai_reads (
   shopper_id TEXT NOT NULL, receipt_id TEXT NOT NULL, fields TEXT, failed TEXT, not_purchase INTEGER NOT NULL DEFAULT 0,
   shop INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL DEFAULT 0, date INTEGER NOT NULL DEFAULT 0, number INTEGER NOT NULL DEFAULT 0,
   items INTEGER NOT NULL DEFAULT 0, reader INTEGER, model TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, receipt_id))`;
+// AI for picks (worker/item-kinds.js): who switched it on, and what the AI made of each item name on their receipts.
+export const PICKS_AI_SQL = `CREATE TABLE IF NOT EXISTS picks_ai (shopper_id TEXT PRIMARY KEY, on_since INTEGER NOT NULL)`;
+export const ITEM_KINDS_SQL = `CREATE TABLE IF NOT EXISTS item_kinds (shopper_id TEXT NOT NULL, name_key TEXT NOT NULL, data TEXT NOT NULL,
+  created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, name_key))`;
 export const PARTS = ["shop", "total", "date", "number", "items"];
 export const FILLED = 1, AGREED = 2, DIFFER = 3, RULES_ONLY = 4;
 

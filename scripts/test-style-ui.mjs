@@ -46,10 +46,12 @@ const shopProducts = [
   { product: "Stoneware Espresso Cup", variation: "", catalogueId: "shopify:hg:8", sku: "shopify:hg:8", priceMinor: 1200, currency: "GBP", quantity: 9, storeName: "Home and Garden", provider: "shopify" },
   { product: "Breakfast Mug", variation: "", catalogueId: "shopify:hg:9", sku: "shopify:hg:9", priceMinor: 1400, currency: "GBP", quantity: 9, storeName: "Home and Garden", provider: "shopify" },
   { product: "Striped Phone Case", variation: "", catalogueId: "shopify:kick:7", sku: "shopify:kick:7", priceMinor: 3500, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
+  { product: "Studio Yoga Pants", variation: "Black / M", catalogueId: "shopify:kick:8", sku: "shopify:kick:8", priceMinor: 9000, currency: "GBP", quantity: 9, storeName: "Kick Lane", provider: "shopify" },
   { product: "Cosy Dog Bed", variation: "Large", catalogueId: "shopify:pets:1", sku: "shopify:pets:1", priceMinor: 3900, currency: "GBP", quantity: 12, storeName: "Pet Pantry", provider: "shopify" },
   // Two home shops (their products' names say what they are, or the shop's does).
   ...[["Linen Cushion", "Oat"], ["Metal Watering Can", ""], ["Knitted Throw Blanket", ""], ["Solar String Lights", ""]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hg:" + i, sku: "shopify:hg:" + i, priceMinor: 2500 + i * 100, currency: "GBP", quantity: 8, storeName: "Home and Garden", provider: "shopify" })),
   ...[["Claw Hammer", ""], ["Cordless Drill 18V", ""], ["Aluminium Step Ladder", "3 step"], ["Aluminium Step Ladder", "5 step"]].map(([n, v], i) => ({ product: n, variation: v, catalogueId: "shopify:hh:" + i, sku: "shopify:hh:" + i, priceMinor: 1500 + i * 2000, currency: "GBP", quantity: 5, storeName: "Hammer & Home", provider: "shopify" }))];
+const aiPicks = { available: true, on: false, posts: 0 };
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } }); await skipInterests(ctx);
 const imageAsks = [], wrappedAsks = [];
@@ -59,6 +61,8 @@ await ctx.route("https://**/*", route => { const u = new URL(route.request().url
   const im = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/image$/.exec(u.pathname);
   if (im) { imageAsks.push(im[1]); return im[1].startsWith("3") ? route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "{}" }) : route.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: PNG }); }
   if (u.pathname === "/relay/my/style") return j(style);
+  if (u.pathname === "/relay/my/item-kinds") { if (route.request().method() === "POST") { aiPicks.on = JSON.parse(route.request().postData()).on; aiPicks.posts++; return j({ available: true, on: aiPicks.on }); }
+    return j({ available: aiPicks.available, on: aiPicks.on, kinds: aiPicks.on ? { "align high-rise flared pant": { mode: "again", kind: "leggings", look: ["leggings", "yoga pants"] } } : {} }); }
   if (u.pathname === "/relay/shopify/catalogue") return j({ published: true, products: shopProducts });
   if (u.pathname === "/relay/my/wrapped") { wrappedAsks.push(u.searchParams.get("industry")); return j(W(u.searchParams.get("industry"))); }
   if (u.pathname === "/relay/my/gmail/history") return j({ years: [], earliest: 2020 });
@@ -111,6 +115,18 @@ assert.equal(await page.getByRole("button", { name: "Not for me" }).count(), 0);
 await page.getByRole("button", { name: "Back" }).first().click();
 await panel.getByRole("button", { name: "Forget my style" }).click();
 await panel.getByRole("button", { name: "Forget my style" }).waitFor({ state: "detached" });
+// AI for picks: offered in the panel, explained in a sheet, and only on once they say so. Then the AI's reading of their
+// receipts counts: it knows the Align pants are leggings, and that yoga pants are like them.
+assert.ok(!(await panel.locator(".dc-strip").innerText()).includes("Studio Yoga Pants"), "the word lists don't know yoga pants are leggings");
+await panel.locator(".dc-airow", { hasText: "Smarter picks with AI" }).click();
+const aiSheet = page.locator(".rl-sheet"); await aiSheet.getByRole("heading", { name: "Smarter picks with AI" }).waitFor();
+assert.match(await aiSheet.innerText(), /It gets the item names and the shop, nothing else: not your emails, address, order numbers or prices\./);
+assert.equal(aiPicks.posts, 0, "nothing changes until they choose");
+await aiSheet.getByRole("button", { name: "Turn on" }).click();
+await panel.locator(".dc-strip [data-card-select]", { hasText: "Studio Yoga Pants" }).waitFor();
+assert.equal(aiPicks.on, true);
+assert.equal(await panel.locator(".dc-airow").count(), 0, "not offered again once on");
+assert.match(await panel.locator(".dc-strip [data-card-select]", { hasText: "Studio Yoga Pants" }).locator(".dc-why").innerText(), /^Like the leggings you bought at Lululemon/);
 // Kinds of product: chips to narrow it down (and picks step aside while filtering).
 await openFilters(page);
 await page.locator("#dcKinds").getByRole("button", { name: "Pets" }).click();
@@ -158,7 +174,7 @@ await panel.getByRole("button", { name: "Turn off" }).click();
 style.receipts = wardrobe;
 await page.evaluate(() => { try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} });
 await page.reload(); await page.waitForTimeout(600);
-console.log("PASS Discover: opt-in picks from the things you bought (more of a kind you buy again, one companion, nothing for one-offs or food), each with a reason; Not for me, undo and forget; filters and turn off work");
+console.log("PASS Discover: opt-in picks from the things you bought (more of a kind you buy again, one companion, nothing for one-offs or food), each with a reason; Not for me, undo and forget; AI for picks only once chosen; filters and turn off work");
 
 // Wrapped: one story a year, on its own page (Browse's Wrapped card opens it). Total, where it went, a chapter (with its own scene) per kind of
 // shopping, then the year's highlights. Real photos only: a photo that can't be fetched is left out, never replaced.

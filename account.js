@@ -819,6 +819,7 @@
     ".rl-share-box i{display:block;margin-top:10px;font-style:normal;color:var(--rl-text2)}.rl-share-box:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-share-check{margin:0 0 12px;font-size:14px;line-height:1.4;color:var(--rl-text2)}.rl-fix [hidden],.rl-se [hidden]{display:none!important}" +
     // AI help: a switch with what it means underneath, on the Email connection page.
+    ".rl-aih-picks{margin:16px 0 0;padding:16px 0 0;border-top:.5px solid var(--rl-line)}" +
     ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
     ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
     ".rl-aih p{margin:8px 0 0;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-aih p.rl-msg{color:var(--rl-text)}.rl-aih p.rl-msg:empty{display:none}" +
@@ -5029,6 +5030,31 @@
           memo.receipts = null;
         }, function () { busy = false; sw.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
+      // AI for picks: its own switch, under AI help (worker/item-kinds.js). Off deletes what the AI worked out.
+      var pk = el("div", { className: "rl-aih-picks" }); pk.hidden = true;
+      var psw = el("button", { type: "button", className: "rl-sw" }, [el("i")]);
+      psw.setAttribute("role", "switch"); psw.setAttribute("aria-label", "AI for picks");
+      var pmsg = el("p", { className: "rl-msg" }); pmsg.setAttribute("role", "status");
+      pk.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI for picks" }), psw]));
+      pk.appendChild(el("p", { text: "Claude reads the names of the things you bought, and the shop, to make Browse's picks fit. Nothing else is sent: not your emails, address, order numbers or prices." }));
+      pk.appendChild(pmsg); box.appendChild(pk);
+      var pon = false, pbusy = false;
+      var pdraw = function () { psw.setAttribute("aria-checked", pon ? "true" : "false"); };
+      api("/relay/my/item-kinds", { fresh: true }).then(function (r) {
+        if (!r.ok || !r.body || !r.body.available) return;
+        pon = Boolean(r.body.on); pdraw(); pk.hidden = false; box.hidden = false;
+      }, function () {});
+      psw.onclick = function () {
+        if (pbusy) return;
+        var want = !pon; pbusy = true; psw.disabled = true; say(pmsg, "");
+        api("/relay/my/item-kinds", { method: "POST", body: { on: want } }).then(function (r) {
+          pbusy = false; psw.disabled = false;
+          if (!r.ok) return say(pmsg, r.status === 503 ? "AI isn't available right now. Try again later." : "Couldn't change that. Try again in a moment.", true);
+          pon = Boolean(r.body && r.body.on); pdraw();
+          say(pmsg, pon ? "On. Your picks will follow what the AI works out." : "Off. What the AI worked out has been deleted.");
+          if (window.relayAiPicksChanged) window.relayAiPicksChanged();
+        }, function () { pbusy = false; psw.disabled = false; say(pmsg, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
       return box;
     }
     function mailPage(b) {
@@ -7404,6 +7430,33 @@
   }
   // Buying from a shop's own website (Discover): Relay starts the shop's checkout with the shopper's email and delivery
   // address filled in, then the shopper opens it to choose delivery and pay. p: { sku, title, variation, price, shop, fallbackUrl }.
+  // AI for picks (worker/item-kinds.js): what it does, in plain words, and a choice. Opened from Browse's picks.
+  function picksAiSheet() {
+    if (!load()) return show();
+    open(function (sheet) {
+      sheet.setAttribute("aria-label", "Smarter picks with AI");
+      sheet.appendChild(el("h2", { text: "Smarter picks with AI" }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Claude, an AI made by Anthropic, reads the names of the things on your receipts, like \u201cAlign High-Rise Pant\u201d, to work out what each one is. Your picks then follow what you really buy." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "It gets the item names and the shop, nothing else: not your emails, address, order numbers or prices. Anthropic doesn't train its AI on them." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "You can switch it off any time: tap your picture, then Inboxes. Switching it off deletes what the AI worked out." }));
+      var note = el("div", { className: "rl-msg", role: "status" });
+      var go = el("button", { type: "button", className: "rl-btn", text: "Turn on" });
+      go.onclick = function () {
+        if (go.disabled) return;
+        go.disabled = true; go.textContent = "Turning on\u2026"; say(note, "");
+        api("/relay/my/item-kinds", { method: "POST", body: { on: true } }).then(function (r) {
+          if (r.ok) { close(); if (window.relayAiPicksChanged) window.relayAiPicksChanged(); return; }
+          go.disabled = false; go.textContent = "Turn on";
+          say(note, r.status === 503 ? "AI isn't available right now. Try again later." : "Couldn't turn it on. Try again in a moment.", true);
+        }, function () { go.disabled = false; go.textContent = "Turn on"; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      sheet.appendChild(go); sheet.appendChild(note);
+      sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Not now", onclick: function () {
+        try { localStorage.setItem("relay-picks-ai-asked", "1"); } catch (e) {}
+        close(); if (window.relayAiPicksChanged) window.relayAiPicksChanged();
+      } }));
+    });
+  }
   function buyAtShop(p) {
     if (!load()) return show();
     open(function (sheet) { buyView(sheet, p); });
@@ -8614,6 +8667,8 @@
     // Orders the shop confirmed (shares the wallet's request when one is already on its way).
     // Swap & resell from anywhere (Discover's row): a sheet over the page, starting on Browse.
     buyAtShop: buyAtShop,
+    picksAiSheet: picksAiSheet,
+    itemKinds: function () { return api("/relay/my/item-kinds", { fresh: true }).then(function (r) { return r.ok ? r.body : null; }, function () { return null; }); },
     openAuctions: openAuctions, openAuction: openAuction, mountAuctions: mountAuctions, mountAsk: mountAsk, askOn: askOn, mountBrowse: mountBrowse, auctionsLive: auctionsLive, auctionsCheck: auMineCheck,
     openMarket: function () { if (!load()) return show(); open(function (sh) { resaleView(sh, close, null, "browse"); }); },
     // Search by photo on Discover: whether it's on (asked once, then remembered), and the search itself.
