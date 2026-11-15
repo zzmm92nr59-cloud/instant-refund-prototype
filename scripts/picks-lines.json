@@ -1,0 +1,413 @@
+{
+ "_about": "Receipt lines and shop product names as shops write them, and what picks should make of each: a kind to pick more of, a companion (with:kind), none (a one-off, food, packaging, a service) or null (not placed). Checked by scripts/test-relay-recommendations.cjs. The product names are written the way UK shops name things, including the traps found by running every product Relay reads from shops' websites through the rules (15 Nov 2026). No personal data.",
+ "lines": [
+  [
+   "Align High-Rise Pant 25\"",
+   "leggings"
+  ],
+  [
+   "Wunder Train High-Rise Tight 25\"",
+   "leggings"
+  ],
+  [
+   "Vital Seamless 2.0 Leggings",
+   "leggings"
+  ],
+  [
+   "Nike One Women's High-Waisted 7/8 Leggings",
+   "leggings"
+  ],
+  [
+   "Define Jacket Nulu",
+   "jacket"
+  ],
+  [
+   "Scuba Oversized Half-Zip Hoodie",
+   "hoodie"
+  ],
+  [
+   "Essential Oversized Hoodie",
+   "hoodie"
+  ],
+  [
+   "Crew Neck Sweatshirt",
+   "hoodie"
+  ],
+  [
+   "Lambswool Crew Neck Jumper",
+   "jumper"
+  ],
+  [
+   "Cable Knit Cardigan",
+   "jumper"
+  ],
+  [
+   "Classic Cotton T-Shirt",
+   "tshirt"
+  ],
+  [
+   "Pima Cotton Tee",
+   "tshirt"
+  ],
+  [
+   "Ribbed Tank Top",
+   "tshirt"
+  ],
+  [
+   "Oxford Shirt",
+   "shirt"
+  ],
+  [
+   "Linen Overshirt",
+   "shirt"
+  ],
+  [
+   "Waxed Field Jacket",
+   "jacket"
+  ],
+  [
+   "Down Puffer Coat",
+   "jacket"
+  ],
+  [
+   "Quilted Gilet",
+   "jacket"
+  ],
+  [
+   "Wide Leg Jeans",
+   "jeans"
+  ],
+  [
+   "Slim Fit Chinos",
+   "trousers"
+  ],
+  [
+   "Tailored Trousers",
+   "trousers"
+  ],
+  [
+   "Joggers",
+   "joggers"
+  ],
+  [
+   "Tracksuit Bottoms",
+   "joggers"
+  ],
+  [
+   "Running Shorts 5\"",
+   "shorts"
+  ],
+  [
+   "Midi Wrap Dress",
+   "dress"
+  ],
+  [
+   "Pleated Midi Skirt",
+   "skirt"
+  ],
+  [
+   "Energy Bra Medium Support",
+   "sportsbra"
+  ],
+  [
+   "Air Max 90 Trainers",
+   "trainers"
+  ],
+  [
+   "Ultraboost Running Shoes",
+   "trainers"
+  ],
+  [
+   "Chelsea Boots",
+   "boots"
+  ],
+  [
+   "Leather Loafers",
+   "shoes"
+  ],
+  [
+   "Ankle Socks 3 Pack",
+   "socks"
+  ],
+  [
+   "Boxer Briefs 3 Pack",
+   "underwear"
+  ],
+  [
+   "Canvas Tote Bag",
+   "bag"
+  ],
+  [
+   "Leather Backpack",
+   "bag"
+  ],
+  [
+   "Ribbed Beanie",
+   "hat"
+  ],
+  [
+   "Fig Scented Candle",
+   "candle"
+  ],
+  [
+   "Hydrating Face Serum",
+   "skincare"
+  ],
+  [
+   "Daily Moisturiser SPF 30",
+   "skincare"
+  ],
+  [
+   "Hand Cream 75ml",
+   "skincare"
+  ],
+  [
+   "Ispirazione Roma",
+   null
+  ],
+  [
+   "Vertuo Double Espresso Scuro",
+   "with:coffee"
+  ],
+  [
+   "Espresso capsules, 50 pack",
+   "with:coffee"
+  ],
+  [
+   "Yorkshire Tea Bags x80",
+   "with:tea"
+  ],
+  [
+   "Prosecco 75cl",
+   "with:wine"
+  ],
+  [
+   "Duvet 10.5 Tog Double",
+   "with:bed"
+  ],
+  [
+   "Samsung 55\" QLED 4K Smart TV",
+   "none"
+  ],
+  [
+   "Apple MacBook Air 13\"",
+   "none"
+  ],
+  [
+   "PlayStation 5 Console",
+   "none"
+  ],
+  [
+   "Bosch Washing Machine",
+   "none"
+  ],
+  [
+   "Dyson V8 Cordless Vacuum",
+   "none"
+  ],
+  [
+   "Three Seater Sofa",
+   "none"
+  ],
+  [
+   "Gift Card £25",
+   "none"
+  ],
+  [
+   "Standard Delivery",
+   "none"
+  ],
+  [
+   "Next Day Delivery",
+   "none"
+  ],
+  [
+   "Sainsbury's Bag for Life",
+   "none"
+  ],
+  [
+   "Carrier Bag",
+   "none"
+  ],
+  [
+   "Large Reusable Shopping Bag",
+   "none"
+  ],
+  [
+   "Bin Bags x20",
+   "none"
+  ],
+  [
+   "Freezer Bags 50 pack",
+   "none"
+  ],
+  [
+   "Gift Wrap",
+   "none"
+  ],
+  [
+   "Apple One Subscription",
+   "none"
+  ],
+  [
+   "Bananas Loose",
+   null
+  ],
+  [
+   "Semi Skimmed Milk 4 Pints",
+   null
+  ],
+  [
+   "Hovis Wholemeal Bread",
+   null
+  ],
+  [
+   "Chicken Breast Fillets 500g",
+   null
+  ],
+  [
+   "Tesco Finest Sourdough",
+   null
+  ],
+  [
+   "Phone Case",
+   null
+  ],
+  [
+   "Wunder Train High-Rise Tight 25\"",
+   "leggings"
+  ],
+  [
+   "Boxer Shorts in Kelly Green",
+   "underwear"
+  ],
+  [
+   "Men's Sea Island Cotton Trunks in Black",
+   "underwear"
+  ],
+  [
+   "Bikini Bottom Shorts in Shell Print",
+   "swimwear"
+  ],
+  [
+   "Jacquard Knit Rams Jacket",
+   "jacket"
+  ],
+  [
+   "Train Hooded Track Jacket",
+   "jacket"
+  ],
+  [
+   "Cap Sleeve Cropped T Shirt",
+   "tshirt"
+  ],
+  [
+   "Riviera Midweight V‑neck T‑shirt in White",
+   "tshirt"
+  ],
+  [
+   "Everyday Seamless Tight Fit Crew Neck Tee",
+   "tshirt"
+  ],
+  [
+   "Inter Milan 2026/27 Third Shirt Junior",
+   "footballshirt"
+  ],
+  [
+   "Long Sleeve Classic Jersey Polo Shirt",
+   "shirt"
+  ],
+  [
+   "Koa Puff Ball Hem Top In Black",
+   "top"
+  ],
+  [
+   "Oversized Playsuit in Pink",
+   "jumpsuit"
+  ],
+  [
+   "Wide Leg Dungarees in Blue Gingham",
+   "jumpsuit"
+  ],
+  [
+   "Personalised Bumblebee Small Mug",
+   "mug"
+  ],
+  [
+   "Lambswool Blanket in Herringbone",
+   "blanket"
+  ],
+  [
+   "Puppy Scent Blanket in Emerald",
+   "pet"
+  ],
+  [
+   "Cosy & Calming Puppy Crate Bed",
+   "pet"
+  ],
+  [
+   "Top Entry Litter Box",
+   "pet"
+  ],
+  [
+   "Large Cushion Vegan Bristle Hairbrush",
+   "hairbrush"
+  ],
+  [
+   "6-Pack Trefoil Cushion Crew Socks",
+   "socks"
+  ],
+  [
+   "Stripe Tie Beanie In Cashmere Mix",
+   "hat"
+  ],
+  [
+   "Silk Tie",
+   "tie"
+  ],
+  [
+   "Tiro Training Pants",
+   "joggers"
+  ],
+  [
+   "Contrast Track Pants",
+   "joggers"
+  ],
+  [
+   "Air Max 90 LTR Men's Shoes",
+   "trainers"
+  ],
+  [
+   "Leather Slip On Court Shoes",
+   "shoes"
+  ],
+  [
+   "Guppyfriend Washing Bag",
+   "none"
+  ],
+  [
+   "Vintage Bundle - Builders' Tea",
+   null
+  ],
+  [
+   "Set Of Two Tea Towels",
+   null
+  ],
+  [
+   "Floral V-Neck Midi Tea Dress",
+   "dress"
+  ],
+  [
+   "Longline Stormbird Waterproof Raincoat",
+   "jacket"
+  ],
+  [
+   "Wool Bedsocks",
+   "socks"
+  ],
+  [
+   "Cashmere Wrist Warmers",
+   "gloves"
+  ]
+ ]
+}
