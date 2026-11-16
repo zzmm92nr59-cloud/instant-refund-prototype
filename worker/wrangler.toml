@@ -10,6 +10,10 @@ SHOPIFY_SHOP_DOMAIN = "relay-ltd.myshopify.com"
 AWIN_PUBLISHER_ID = "3134429"
 # Relay's app registration with Microsoft (personal accounts only). The matching MICROSOFT_CLIENT_SECRET is a Cloudflare secret.
 MICROSOFT_CLIENT_ID = "08207e63-9ef5-4a9c-ba4d-528e35f4c92a"
+# Relay's app with TrueLayer (open banking, worker/bank.js), on TrueLayer's test banks. It's an identifier, not a key: it
+# appears in every bank sign-in link. The matching TRUELAYER_CLIENT_SECRET is a Cloudflare secret. A variable added only
+# in Cloudflare's dashboard is wiped by the next deploy, so it lives here.
+TRUELAYER_CLIENT_ID = "sandbox-relay-b277af"
 # The prototype's test-only endpoints (worker/legacy-routes.js). "on" only for a testing session, then back to "off".
 LEGACY_TEST_ROUTES = "off"
 # Two-step sign-in for everyone (worker/second-step.js): every account needs a second step (Face ID or a passkey, codes by
