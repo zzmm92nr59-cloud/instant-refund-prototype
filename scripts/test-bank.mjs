@@ -29,6 +29,9 @@ import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping } from "../
   assert.deepEqual(["SAVE THE CHANGE", "PAYPAL BETFRED", "MT SECURETRADE LIM", "TRANSFER TO J SMITH", "CASH WITHDRAWAL"].map((d) => isShopping({ description: d })), [false, false, false, false, false], "not shopping");
   assert.equal(isShopping({ description: "NETFLIX.COM", transaction_category: "DIRECT_DEBIT" }), false);
   assert.equal(isShopping({ description: "TESCO EXTRA", transaction_category: "PURCHASE" }), true);
+  assert.deepEqual(["EDF ENERGY", "E.ON NEXT", "RENT", "VANQUIS BANK", "BROADWAY GAMING LT CD 0315", "EE & T-MOBILE", "CREDITREPORTSERVIC"].map((d) => isShopping({ description: d })),
+    [false, false, false, false, false, false, false], "bills, rent, credit and gaming aren't shopping");
+  assert.deepEqual(["NEXT RETAIL LTD", "WWW.TAILS.COM", "LAPTOP DIRECT LTD.", "MCDONALD'S", "W M MORRISONS PLC"].map((d) => shopName(d, null)), ["Next", "Tails.com", "Laptop Direct", "McDonald's", "Morrisons"]);
   console.log("ok - only shopping is kept (no round-ups, transfers, cash, bills or betting); shop names tidied");
   console.log("ok - matching: same amount, within a week, the bank's text names the shop (or it's the only one of that amount); nothing else guessed");
 }
