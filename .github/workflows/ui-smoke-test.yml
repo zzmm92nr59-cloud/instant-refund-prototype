@@ -95,6 +95,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-ai-help-ui.mjs
       - name: Bank and cards
         run: node --import ./scripts/record-app-requests.mjs scripts/test-bank-ui.mjs
+      - name: Smooth corners (iPhone-style; pills, circles and shadows left alone; borders drawn along the edge)
+        run: node scripts/test-corners-ui.mjs
       - name: Test Swap & resell without a tab (Discover, Profile and old receipts lead to it; plain words, once per tap, polished)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-market-ui.mjs
       - name: Test swapping with another shop (offered where there's a choice, plain words, once per tap, own checkout, polished)
