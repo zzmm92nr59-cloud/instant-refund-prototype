@@ -153,10 +153,14 @@ async function readConnection(env, db, shopperId, row, now, f) {
   }
   const q = "?from=" + encodeURIComponent(new Date(now - LOOK_BACK_DAYS * DAY).toISOString()) + "&to=" + encodeURIComponent(new Date(now).toISOString());
   const rows = [];
+  // What was read and why things were left out, for Relay's logs: counts and the bank's category words only, never a
+  // payment, amount, name or account.
+  const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, leftOutType: {}, leftOutWord: {} };
   for (const [list, kind] of [["/data/v1/accounts", "accounts"], ["/data/v1/cards", "cards"]]) {
     const got = await apiGet(env, t.access, list, f);
     if (got.gone) return { gone: true };
-    if (got.failed) continue;   // a bank with no cards (or no accounts) answers with an error: skip it
+    if (got.failed) { seen.failedLists++; continue; }   // a bank with no cards (or no accounts) answers with an error: skip it
+    seen[kind] += got.results.length;
     for (const a of got.results.slice(0, 10)) {
       const id = String(a.account_id || "");
       if (!/^[A-Za-z0-9_-]{1,100}$/.test(id)) continue;
@@ -165,18 +169,27 @@ async function readConnection(env, db, shopperId, row, now, f) {
       const label = name + (last4 && !name.includes(last4) ? " ending " + last4 : "");
       const tx = await apiGet(env, t.access, `/data/v1/${kind}/${id}/transactions${q}`, f);
       if (tx.gone) return { gone: true };
-      if (tx.failed) continue;
+      if (tx.failed) { seen.failedTx++; continue; }
+      seen.tx += tx.results.length;
       for (const x of tx.results.slice(0, 1000)) {
         const pid = String(x.transaction_id || ""), when = String(x.timestamp || "").slice(0, 10);
         if (!pid || pid.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(when)) continue;
         const debit = String(x.transaction_type || "").toUpperCase() === "DEBIT" || (!x.transaction_type && Number(x.amount) < 0);
-        if (debit && !isShopping(x)) continue;
+        if (debit) seen.debits++; else seen.credits++;
+        if (debit && !isShopping(x)) {
+          const cat = String(x.transaction_category || "").toUpperCase();
+          if (NOT_SHOPPING_TYPES.has(cat)) seen.leftOutType[cat] = (seen.leftOutType[cat] || 0) + 1;
+          else { const w = (NOT_SHOPPING.exec(String(x.description || "") + " " + String(x.merchant_name || "")) || ["?"])[0].toLowerCase().slice(0, 20); seen.leftOutWord[w] = (seen.leftOutWord[w] || 0) + 1; }
+          continue;
+        }
+        if (debit) seen.keptDebits++;
         const amount = minor(x.amount); if (!amount) continue;
         rows.push({ payment_id: row.id + ":" + pid, account: label, paid_on: when, amount_minor: debit ? amount : -amount,
           currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(x.merchant_name, 80) });
       }
     }
   }
+  console.log("bank: read", JSON.stringify(seen));
   // A full read of the last 90 days replaces what was read before for those days (so anything Relay no longer keeps goes).
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10)).run();
   if (rows.length) await db.batch(rows.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, created_at)
