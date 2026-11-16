@@ -3,8 +3,9 @@
 // and eases in. CSS's own way (corner-shape: squircle) isn't in Safari yet, so this draws the shape and clips to it.
 //
 // What gets smoothed: anything with a rounded corner of 6px or more that isn't a pill or a circle (those keep their
-// shape). Left alone: things with a visible border, a shadow, a blur behind them (the tab bar, sheets' glass) or
-// data-round="plain", because clipping would cut the border or shadow off. The CSS border-radius stays as it was, so if
+// shape). A thin even border (the outline round a shop's logo) is drawn again along the smooth edge, so it isn't cut.
+// Left alone: a shadow, a blur behind (the tab bar, sheets' glass), an uneven border, a border round something with its
+// own background picture, or data-round="plain", because clipping would cut those off. The CSS border-radius stays as it was, so if
 // this file doesn't run, everything still has ordinary rounded corners.
 //
 // The shape is Figma's corner smoothing at 60% (what Apple's corners match); the curve never goes outside the CSS
@@ -53,6 +54,14 @@
   const px = (v) => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
   const visibleBorder = (cs) => ["Top", "Right", "Bottom", "Left"].some((k) => px(cs["border" + k + "Width"]) > 0 && cs["border" + k + "Style"] !== "none" && !/rgba\([^)]*,\s*0\)|transparent/.test(cs["border" + k + "Color"]));
 
+  // An even border (same width and colour all round, 3px at most), or null.
+  function evenBorder(cs) {
+    const w = px(cs.borderTopWidth), c = cs.borderTopColor, st = cs.borderTopStyle;
+    if (w <= 0 || w > 3 || st !== "solid") return null;
+    for (const k of ["Right", "Bottom", "Left"]) if (px(cs["border" + k + "Width"]) !== w || cs["border" + k + "Color"] !== c || cs["border" + k + "Style"] !== st) return null;
+    return { w, c };
+  }
+
   // Is this element one to smooth? Returns its radii, or false.
   function look(el) {
     if (!(el instanceof HTMLElement)) return false;
@@ -63,11 +72,21 @@
     const radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map(px);
     if (Math.max(...radii) < MIN_R) return false;
     if (radii.some((r) => r >= 99)) return false;   // pills (999px, 99px)
-    if (cs.boxShadow !== "none" || visibleBorder(cs)) return false;
+    if (cs.boxShadow !== "none") return false;
+    if (visibleBorder(cs)) {
+      const b = evenBorder(cs);
+      if (!b || (cs.backgroundImage && cs.backgroundImage !== "none")) return false;
+      radii.border = b;
+    }
     if ((cs.backdropFilter && cs.backdropFilter !== "none") || (cs.webkitBackdropFilter && cs.webkitBackdropFilter !== "none")) return false;
     if (cs.clipPath && cs.clipPath !== "none" && !el.hasAttribute("data-rl-sq")) return false;   // already shaped by the app
     return radii;
   }
+
+  const DRAWN = ["clip-path", "border-color", "background-image", "background-origin", "background-size", "background-repeat"];
+  const before = new WeakMap();   // the app's own inline values of those, put back when the drawing comes off
+  const keep = (el) => { if (!before.has(el)) before.set(el, DRAWN.map((k) => el.style.getPropertyValue(k))); };
+  const unshape = (el) => { const v = before.get(el); DRAWN.forEach((k, i) => (v && v[i] ? el.style.setProperty(k, v[i]) : el.style.removeProperty(k))); before.delete(el); };
 
   const ro = new ResizeObserver((entries) => {
     for (const e of entries) {
@@ -76,12 +95,22 @@
       const w = el.offsetWidth, h = el.offsetHeight;
       if (!w || !h) continue;
       if (Math.max(...radii) * 2 >= Math.min(w, h) - 1) {   // rounded right round: a pill or circle at this size
-        if (el.hasAttribute("data-rl-sq")) { el.style.removeProperty("clip-path"); el.removeAttribute("data-rl-sq"); }
+        if (el.hasAttribute("data-rl-sq")) { unshape(el); el.removeAttribute("data-rl-sq"); }
         continue;
       }
-      const key = w + "x" + h;
+      const b = radii.border, key = w + "x" + h + (b ? b.c : "");
       if (el.getAttribute("data-rl-sq") === key) continue;
-      el.style.setProperty("clip-path", `path('${shape(w, h, radii)}')`);
+      const d = shape(w, h, radii);
+      keep(el);
+      el.style.setProperty("clip-path", `path('${d}')`);
+      if (b) {   // the border, drawn along the smooth edge (twice as wide, so the half inside the edge shows)
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${d}" fill="none" stroke="${b.c}" stroke-width="${b.w * 2}"/></svg>`;
+        el.style.setProperty("border-color", "transparent");
+        el.style.setProperty("background-image", `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+        el.style.setProperty("background-origin", "border-box");
+        el.style.setProperty("background-size", "100% 100%");
+        el.style.setProperty("background-repeat", "no-repeat");
+      }
       el.setAttribute("data-rl-sq", key);
     }
   });
@@ -115,7 +144,13 @@
   const mo = new MutationObserver((list) => {
     for (const m of list) {
       if (m.type === "childList") m.addedNodes.forEach((x) => { if (x.nodeType === 1) plan(x); });
-      else if (m.target.nodeType === 1 && !done.get(m.target)) { done.delete(m.target); plan(m.target); }
+      else if (m.target.nodeType === 1) {
+        const was = done.get(m.target);
+        if (!was) { done.delete(m.target); plan(m.target); }
+        else if (was.border) {   // a bordered one changed (picked, say): read its border colour again
+          unshape(m.target); m.target.removeAttribute("data-rl-sq"); ro.unobserve(m.target); done.delete(m.target); plan(m.target);
+        }
+      }
     }
   });
   function start() {
