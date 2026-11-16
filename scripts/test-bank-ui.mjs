@@ -28,8 +28,8 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/bank/sync") { st.syncs++; return j({ read: 0, gone: 0, matched: 1 }); }
   if (p === "/relay/my/bank/connect") return j({ url: "https://auth.truelayer-sandbox.com/?response_type=code&state=" + "s".repeat(43) });
   if (p === "/relay/my/bank/payments") return j({ payments: st.links.length ? [
-    { id: "a", account: "Current account", date: day(-4), amountPence: 4500, currency: "GBP", description: "BRINDLE AND CO LONDON", merchant: null, receiptId: ID1, match: "sure" },
-    { id: "b", account: "Credit card ending 4242", date: day(-2), amountPence: 320, currency: "GBP", description: "COFFEE CORNER", merchant: "Coffee Corner", receiptId: null, match: null }] : [] });
+    { id: "a", account: "Current account", date: day(-4), amountPence: 4500, currency: "GBP", description: "BRINDLE AND CO LONDON", merchant: null, shop: "Brindle and Co", receiptId: ID1, match: "sure" },
+    { id: "b", account: "Credit card ending 4242", date: day(-2), amountPence: 320, currency: "GBP", description: "COFFEE CORNER", merchant: "Coffee Corner", shop: "Coffee Corner", receiptId: null, match: null }] : [] });
   if (p === "/relay/my/bank/disconnect") { st.disconnects.push(JSON.parse(route.request().postData())); st.links = []; return j({ ok: true }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3, maxInboxes: 5 });
@@ -106,12 +106,23 @@ await view.getByText("Connected. Relay is matching your payments to your receipt
 assert.equal(await page.evaluate(() => location.hash), "", "the address is tidied");
 await view.locator(".rl-bk-row").first().waitFor();
 const rows = await view.locator(".rl-bk-row").allInnerTexts();
-assert.match(rows[0], /BRINDLE AND CO LONDON\s+Matches your Brindle & Co receipt\s+£45\.00/);
+assert.match(rows[0], /Brindle & Co\s+Matches your receipt\s+£45\.00/, "a matched payment carries its receipt's shop name");
 assert.match(rows[1], /Coffee Corner\s+No receipt yet\s+£3\.20/);
 assert.match(await view.locator(".rl-arow", { hasText: "Mock Bank" }).innerText(), /Read just now, 1 receipt matched/);
 await polished("bank page connected", "#mePage");
 console.log("ok - back from the bank: connected, card payments with the receipt each matches");
 
+// 3b. The receipt says which card paid for it.
+await page.evaluate(() => window.go("receipts"));
+await page.locator(".rl-rr-main", { hasText: "Brindle & Co" }).first().click().catch(async e => { await page.screenshot({ path: "/tmp/shots/bank-dbg.png" }); throw e; });
+await page.locator(".rl-rr-paid", { hasText: /^Paid with Current account on \d{1,2} [A-Z][a-z]{2}$/ }).waitFor();
+console.log("ok - a matched receipt says which account paid for it");
+// 3c. A try that took too long says so.
+await page.goto(origin + "/index.html#bank=expired");
+await view.getByText("That took too long, so it didn't connect. Start again and finish within 15 minutes.").waitFor();
+await page.evaluate(() => window.go("me"));
+await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
+await view.locator(".rl-bk-row").first().waitFor();
 // 4. Disconnecting asks first, then deletes.
 await view.locator(".rl-arow", { hasText: "Mock Bank" }).click();
 await page.getByText("Disconnect Mock Bank? Relay deletes the payments it read from it.").waitFor();

@@ -3248,6 +3248,14 @@
           }
           // Not in pounds: shown as it was charged, and left out of anything Relay adds up. Said once, here.
           if (notPounds(row)) detail.appendChild(el("p", { className: "rl-rr-items", text: "Paid in " + moneyName(row.currency) + ", so it isn't added to your totals in pounds." }));
+          // Which card paid for it, when a connected bank or card has the payment (Bank and cards).
+          var paidLine = el("p", { className: "rl-rr-items rl-rr-paid" }); paidLine.hidden = true; detail.appendChild(paidLine);
+          bankPaymentFor(row.id).then(function (p) {
+            if (!p) return;
+            var on = new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+            paidLine.textContent = (p.match === "sure" ? "Paid with " : "Probably paid with ") + p.account + " on " + on;
+            paidLine.hidden = false;
+          });
           detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
           // Its group, as a quiet setting: pick another and Relay moves it (and remembers that for this shop).
           var keys = GROUP_KEYS.indexOf(row.category) >= 0 || !groupNames[row.category] ? GROUP_KEYS : GROUP_KEYS.concat([row.category]);
@@ -5174,7 +5182,7 @@
     function bankPage(b, back) {
       var note = el("div", { className: "rl-msg", role: "status" }), list = el("div"), pays = el("div");
       var NOTES = { connected: ["Connected. Relay is matching your payments to your receipts.", false], denied: ["Not connected. You can try again any time.", true],
-        failed: ["That didn't connect. Please try again.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
+        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
       b.appendChild(el("p", { text: "Connect your bank or card and Relay matches your card payments to your receipts, and finds purchases that never sent one. You sign in on your bank's own page. Relay can only read payments: it can't move money." }));
       var testLine = el("p", { className: "rl-anote" }); testLine.hidden = true; b.appendChild(testLine);
       var go = el("button", { type: "button", className: "rl-btn", text: "Connect a bank or card" });
@@ -5216,8 +5224,8 @@
         ps.slice(0, 60).forEach(function (p) {
           var shop = matchShop(p.receiptId);
           box.appendChild(el("div", { className: "rl-bk-row" }, [
-            el("span", { className: "rl-bk-t" }, [el("b", { text: p.merchant || p.description || "Payment" }),
-              el("span", { text: !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches " : "Probably ") + (shop ? "your " + shop + " receipt" : "one of your receipts") })]),
+            el("span", { className: "rl-bk-t", title: p.description || "" }, [el("b", { text: shop || p.shop || p.merchant || p.description || "Payment" }),
+              el("span", { text: !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches your receipt" : "Probably your receipt") })]),
             el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency) }), el("span", { text: new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) })])]));
         });
         pays.appendChild(box);
@@ -5225,6 +5233,7 @@
       var shops = {};
       function matchShop(id) { return id && shops[id] || ""; }
       function load() {
+        memo.bankPays = null;   // receipts ask again for which card paid
         api("/relay/my/bank", { fresh: true }).then(function (r) {
           if (!r.ok || !r.body) { list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
           drawLinks(r.body);
@@ -5800,7 +5809,7 @@
     open(function (sheet) { gate(sheet, s.email || "", note); });
   }
   function completeBank() {
-    var m = /(?:^|[#&])bank=(connected|denied|failed|not_configured)(?:&|$)/.exec(location.hash || "");
+    var m = /(?:^|[#&])bank=(connected|denied|failed|expired|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     if (!load()) return;
@@ -7996,6 +8005,14 @@
     var named = (x.items || []).map(function (it, i) { return { it: it, i: i }; }).filter(function (e) { return e.it && e.it.name; });
     var marks = x.itemReturns || {};
     return named.map(function (e) { return { index: e.i, returning: marks[e.i] === "returning" }; });
+  }
+  // The bank payment that matches a receipt, if a bank or card is connected (one request each, reused: api()).
+  function bankPaymentFor(receiptId) {
+    if (!memo.bankPays) memo.bankPays = api("/relay/my/bank").then(function (r) {
+      if (!r.ok || !r.body || !r.body.available || !(r.body.connections || []).length) return [];
+      return api("/relay/my/bank/payments").then(function (x) { return x.ok && x.body && x.body.payments || []; }, function () { return []; });
+    }, function () { return []; });
+    return memo.bankPays.then(function (ps) { return ps.filter(function (p) { return p.receiptId === receiptId; })[0] || null; });
   }
   function loadBoth() {
     var p = memo.purchases || api(purchasesPath());

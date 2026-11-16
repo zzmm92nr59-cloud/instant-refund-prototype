@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -23,6 +23,13 @@ import { matchPayments, namesShop, BANK_SCOPES } from "../worker/bank.js";
   const m = matchPayments(P, R);
   assert.deepEqual(Object.fromEntries(m), { a: { receiptId: "r1", match: "sure" }, b: { receiptId: "r2", match: "likely" }, c: { receiptId: "r3", match: "likely" } },
     "the bank names the shop: sure; the only receipt of that amount that week: likely; too late, too small or money coming in: nothing");
+  assert.deepEqual(["ASDA STOES LTD", "PAYPAL *EBAY", "AMZNMKTPLACE AMAZON.CO.UK", "BRINDLE AND CO LONDON", "SQ *MARKET STALL", "H&M", "CARD PAYMENT 0412"].map((d) => shopName(d, null)),
+    ["Asda", "eBay", "Amazon", "Brindle and Co", "Market Stall", "H&M", null], "shop names as a person would say them");
+  assert.equal(shopName("CRD 1234", "Coffee Corner"), "Coffee Corner", "the bank's merchant name first");
+  assert.deepEqual(["SAVE THE CHANGE", "PAYPAL BETFRED", "MT SECURETRADE LIM", "TRANSFER TO J SMITH", "CASH WITHDRAWAL"].map((d) => isShopping({ description: d })), [false, false, false, false, false], "not shopping");
+  assert.equal(isShopping({ description: "NETFLIX.COM", transaction_category: "DIRECT_DEBIT" }), false);
+  assert.equal(isShopping({ description: "TESCO EXTRA", transaction_category: "PURCHASE" }), true);
+  console.log("ok - only shopping is kept (no round-ups, transfers, cash, bills or betting); shop names tidied");
   console.log("ok - matching: same amount, within a week, the bank's text names the shop (or it's the only one of that amount); nothing else guessed");
 }
 
@@ -59,12 +66,14 @@ const fetchImpl = async (url, init = {}) => {
     const auth = (init.headers || {}).Authorization;
     if (auth !== "Bearer acc-1" && auth !== "Bearer acc-2") return new Response("{}", { status: 401 });
     const p = new URL(url).pathname;
-    if (p === "/data/v1/me") return Response.json({ results: [{ provider: { display_name: "Mock Bank" } }] });
+    if (p === "/data/v1/me") return Response.json({ results: [{ provider: { display_name: "mock" } }] });
     if (p === "/data/v1/accounts") return Response.json({ results: [{ account_id: "acc0001", display_name: "Current account" }] });
     if (p === "/data/v1/cards") return Response.json({ results: [{ account_id: "card001", display_name: "Credit card", partial_card_number: "4242" }] });
     if (p === "/data/v1/accounts/acc0001/transactions") return Response.json({ results: [
       { transaction_id: "t1", timestamp: "2026-11-03T10:00:00Z", description: "BRINDLE AND CO LONDON", amount: -45.0, currency: "GBP", transaction_type: "DEBIT" },
-      { transaction_id: "t2", timestamp: "2026-11-04T10:00:00Z", description: "SALARY", amount: 2000, currency: "GBP", transaction_type: "CREDIT" }] });
+      { transaction_id: "t2", timestamp: "2026-11-04T10:00:00Z", description: "SALARY", amount: 2000, currency: "GBP", transaction_type: "CREDIT" },
+      { transaction_id: "t3", timestamp: "2026-11-04T10:00:00Z", description: "SAVE THE CHANGE", amount: -0.55, currency: "GBP", transaction_type: "DEBIT", transaction_category: "TRANSFER" },
+      { transaction_id: "t4", timestamp: "2026-11-05T10:00:00Z", description: "PAYPAL BETFRED", amount: -2, currency: "GBP", transaction_type: "DEBIT" }] });
     if (p === "/data/v1/cards/card001/transactions") return Response.json({ results: [
       { transaction_id: "c1", timestamp: "2026-11-08T10:00:00Z", description: "COFFEE CORNER", merchant_name: "Coffee Corner", amount: 3.2, currency: "GBP", transaction_type: "DEBIT" }] });
     return new Response("{}", { status: 404 });
@@ -108,6 +117,12 @@ assert.equal(u.searchParams.get("redirect_uri"), "https://w.test/relay/bank/call
 assert.match(u.searchParams.get("providers"), /uk-cs-mock/);
 const state = u.searchParams.get("state");
 assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + "x".repeat(43))), /#bank=failed$/, "an unknown state");
+{ // A try that took longer than 15 minutes says so.
+  const old = new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess })).json()).url).searchParams.get("state");
+  now += 16 * 60e3;
+  assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + old)), /#bank=expired$/);
+  now -= 16 * 60e3;
+}
 assert.match(loc(await call("/relay/bank/callback?error=access_denied&state=" + state)), /#bank=denied$/);
 assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + state)), /#bank=connected$/);
 assert.match(loc(await call("/relay/bank/callback?code=good-code&state=" + state)), /#bank=failed$/, "single-use");
@@ -118,6 +133,8 @@ console.log("ok - connect: the bank's own page, read-only, single-use state, tok
 
 // 3. Payments read straight away and matched to receipts; money coming in isn't kept.
 r = await (await call("/relay/my/bank/payments", { token: jess })).json();
+assert.deepEqual(r.payments.map((p) => p.shop), ["Coffee Corner", "Brindle and Co"], "tidy names; round-ups and betting never kept");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_payments WHERE description IN ('SAVE THE CHANGE', 'PAYPAL BETFRED')").get().n, 0);
 assert.deepEqual(r.payments.map((p) => [p.account, p.date, p.amountPence, p.receiptId, p.match]), [
   ["Credit card ending 4242", "2026-11-08", 320, null, null], ["Current account", "2026-11-03", 4500, "00000000-0000-4000-8000-000000000001", "sure"]]);
 r = await (await call("/relay/my/bank", { token: jess })).json();
