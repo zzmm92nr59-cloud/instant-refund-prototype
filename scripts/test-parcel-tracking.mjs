@@ -4,7 +4,9 @@
 // and never once delivered; Relay says only what the carrier said. Tracking numbers and parcels are made up.
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
-import { readShip24, applyTracked, liveParcel, readTrackedRows } from "../worker/parcel-tracking.js";
+import { readShip24, applyTracked, liveParcel, readTrackedRows, courierCode } from "../worker/parcel-tracking.js";
+assert.equal(courierCode("Royal Mail"), "gb-post"); assert.equal(courierCode("royalmail"), "gb-post");
+assert.equal(courierCode("Evri"), null); assert.equal(courierCode("Parcelforce Worldwide"), null); assert.equal(courierCode(null), null);
 
 const TODAY = "2026-11-16", NOW = Date.parse(TODAY + "T12:00:00Z");
 const ev = (m, d) => ({ statusMilestone: m, occurrenceDatetime: d + "T09:30:00", status: "made-up event" });
@@ -57,7 +59,7 @@ let r = await liveParcel(env, "s1", order("aa000000001gb"), { now: NOW, fetchImp
 assert.deepEqual(r.delivery, { status: "due", at: "2026-11-18", trackingNumber: "aa000000001gb", carrier: "Royal Mail", live: true });
 assert.equal(calls.length, 1);
 assert.equal(calls[0].url, "https://api.ship24.com/public/v1/trackers/track");
-assert.deepEqual(JSON.parse(calls[0].init.body), { trackingNumber: "AA000000001GB", destinationCountryCode: "GB" }, "only the tracking number");
+assert.deepEqual(JSON.parse(calls[0].init.body), { trackingNumber: "AA000000001GB", destinationCountryCode: "GB", courierCode: ["gb-post"] }, "only the tracking number (and Royal Mail's code, which Ship24 needs)");
 assert.equal(calls[0].init.headers.Authorization, "Bearer ship24-test-key");
 assert.equal((await db.prepare("SELECT n FROM parcel_track_uses WHERE month = '2026-11'").first()).n, 1);
 console.log("ok - off until the key is set; only the tracking number goes to Ship24");
@@ -106,4 +108,17 @@ assert.equal(r.delivery.status, "in_transit", "the last thing the carrier said")
 r = await liveParcel(env, "s50", order("EE000000001GB"), { now: Date.parse("2026-12-01T10:00:00Z"), fetchImpl: async () => new Response("{}", { status: 500 }) });
 assert.deepEqual([r.delivery, r.reason], [null, "carrier_unavailable"]);
 console.log("ok - when Ship24 can't be reached: the last news, or none");
+const DEC = Date.parse("2026-12-05T12:00:00Z");
+// No news yet (Ship24 still finding the carrier): asked again after 10 minutes, not 2 hours, and still not a new parcel.
+reply = () => Response.json(body("pending", []));
+r = await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC, fetchImpl });
+assert.equal(r.delivery, null);
+let n = calls.length;
+await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC + 5 * 60e3, fetchImpl });
+assert.equal(calls.length, n, "not within 10 minutes");
+reply = () => Response.json(body("in_transit", [ev("in_transit", "2026-11-15")]));
+r = await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC + 11 * 60e3, fetchImpl });
+assert.equal(calls.length, n + 1); assert.match(calls.at(-1).url, /search\/AB000000009GB\/results$/); assert.equal(r.delivery.status, "in_transit");
+console.log("ok - with no news yet, asked again after 10 minutes");
+
 console.log("parcel tracking: all checks passed");

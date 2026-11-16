@@ -4,13 +4,13 @@
 //
 // Rules (do not weaken):
 //  * Off for everyone until SHIP24_API_KEY is set (a Cloudflare secret, never in code).
-//  * Only the tracking number goes to Ship24 (and "GB" as where it's going). Never the shopper's name, email, address,
+//  * Only the tracking number goes to Ship24 (and "GB" as where it's going, and the carrier's code for Royal Mail). Never the shopper's name, email, address,
 //    order number or what they bought.
 //  * Only for a parcel on one of the shopper's own receipts, not yet delivered, ordered in the last 30 days, and only when
 //    they open that purchase's page. Nothing runs on a timer.
 //  * Ship24's free plan covers 10 new parcels a month for all of Relay, so each new tracking number counts once
 //    (PARCEL_TRACKS_PER_MONTH, 10 unless set) and each shopper starts at most 3 a month. A parcel already being tracked
-//    is looked up again at most every 2 hours, and never after it's delivered.
+//    is looked up again at most every 2 hours (10 minutes while the carrier has no news yet), and never after it's delivered.
 //  * Relay says only what the carrier said: the milestone and its date, or the carrier's own expected date. Nothing
 //    is guessed; with no news from the carrier, the email's word stands.
 //  * Kept with the shopper (parcel_tracks), shown in their export, deleted with their inbox, permission or account.
@@ -22,10 +22,14 @@ export const PARCEL_USES_SQL = `CREATE TABLE IF NOT EXISTS parcel_track_uses (mo
 
 export const trackingAvailable = (env) => Boolean(env && env.SHIP24_API_KEY);
 const API = "https://api.ship24.com/public/v1";
-const AGAIN_AFTER = 2 * 36e5, PER_SHOPPER = 3, DAY = 864e5;
+const AGAIN_AFTER = 2 * 36e5, NO_NEWS_AGAIN = 10 * 60e3,   // no news yet (Ship24 still finding the carrier): sooner
+  PER_SHOPPER = 3, DAY = 864e5;
 const FINAL = new Set(["delivered", "problem"]);
 // A tracking number as carriers print them: letters and digits, 8 to 40 of them.
 export const TRACKING_NUMBER = /^[A-Z0-9]{8,40}$/;
+// Ship24 can't find Royal Mail parcels on its own: it needs its code for Royal Mail, "gb-post" (help.ship24.com, "How to
+// track Royal Mail packages"). Other carriers it finds from the number.
+export const courierCode = (carrier) => (/royal\s*mail|parcelforce/i.test(String(carrier || "")) ? (/parcelforce/i.test(carrier) ? null : "gb-post") : null);
 const day = (s) => (typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null);
 
 // What Ship24 said, in Relay's words. Returns { status, at } or null when the carrier has no news yet.
@@ -90,7 +94,7 @@ export async function liveParcel(env, shopperId, order, o = {}) {
   await db.batch([db.prepare(PARCEL_TRACKS_SQL), db.prepare(PARCEL_USES_SQL)]);
   const mine = await db.prepare("SELECT status, at, checked_at, created_at FROM parcel_tracks WHERE shopper_id = ? AND tracking_number = ?").bind(shopperId, tn).first();
   const answer = (row) => ({ available: true, delivery: row && row.status ? { ...dv, status: row.status, at: row.at || null, live: true } : null });
-  if (mine && (FINAL.has(mine.status) || now - mine.checked_at < AGAIN_AFTER)) return answer(mine);
+  if (mine && (FINAL.has(mine.status) || now - mine.checked_at < (mine.status ? AGAIN_AFTER : NO_NEWS_AGAIN))) return answer(mine);
 
   // Tracked before (by anyone): look up the results again, which doesn't count as a new parcel.
   const known = mine || await db.prepare("SELECT 1 AS x FROM parcel_tracks WHERE tracking_number = ? LIMIT 1").bind(tn).first();
@@ -104,7 +108,8 @@ export async function liveParcel(env, shopperId, order, o = {}) {
     const took = await db.prepare(`INSERT INTO parcel_track_uses (month, n) VALUES (?, 1) ON CONFLICT(month) DO UPDATE SET n = n + 1 WHERE n < ?`)
       .bind(month, cap).run();
     if (!cap || !took.meta || !took.meta.changes) return { available: true, delivery: null, reason: "limit" };
-    res = await ask(env, fetchImpl, `${API}/trackers/track`, { method: "POST", body: JSON.stringify({ trackingNumber: tn, destinationCountryCode: "GB" }) });
+    const courier = courierCode(dv.carrier);
+    res = await ask(env, fetchImpl, `${API}/trackers/track`, { method: "POST", body: JSON.stringify({ trackingNumber: tn, destinationCountryCode: "GB", ...(courier ? { courierCode: [courier] } : {}) }) });
   }
   if (!res.ok) {
     if (mine) return answer(mine);
