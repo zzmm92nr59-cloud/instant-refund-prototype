@@ -106,4 +106,17 @@ assert.equal(r.delivery.status, "in_transit", "the last thing the carrier said")
 r = await liveParcel(env, "s50", order("EE000000001GB"), { now: Date.parse("2026-12-01T10:00:00Z"), fetchImpl: async () => new Response("{}", { status: 500 }) });
 assert.deepEqual([r.delivery, r.reason], [null, "carrier_unavailable"]);
 console.log("ok - when Ship24 can't be reached: the last news, or none");
+const DEC = Date.parse("2026-12-05T12:00:00Z");
+// No news yet (Ship24 still finding the carrier): asked again after 10 minutes, not 2 hours, and still not a new parcel.
+reply = () => Response.json(body("pending", []));
+r = await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC, fetchImpl });
+assert.equal(r.delivery, null);
+let n = calls.length;
+await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC + 5 * 60e3, fetchImpl });
+assert.equal(calls.length, n, "not within 10 minutes");
+reply = () => Response.json(body("in_transit", [ev("in_transit", "2026-11-15")]));
+r = await liveParcel(env, "s60", order("AB000000009GB"), { now: DEC + 11 * 60e3, fetchImpl });
+assert.equal(calls.length, n + 1); assert.match(calls.at(-1).url, /search\/AB000000009GB\/results$/); assert.equal(r.delivery.status, "in_transit");
+console.log("ok - with no news yet, asked again after 10 minutes");
+
 console.log("parcel tracking: all checks passed");
