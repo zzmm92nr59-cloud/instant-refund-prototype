@@ -30,7 +30,8 @@ await ctx.route("https://**/*", async route => {
   const body = () => { try { return JSON.parse(route.request().postData() || "{}"); } catch { return {}; } };
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
-  if (p === "/relay/my/gmail" && m === "GET") return j({ connected: true, provider: "google", email: EMAIL, googleEmail: EMAIL, lastScanAt: Date.now() - 6e5, needsReconnect: Boolean(st.mainProblem), others: st.others, maxInboxes: 5 });
+  if (p === "/relay/my/gmail" && m === "GET") return j({ connected: true, provider: "google", email: EMAIL, googleEmail: EMAIL, lastScanAt: Math.max(Date.now() - 6e5, new Date().setHours(0, 0, 0, 0)), // today, even just after midnight
+    needsReconnect: Boolean(st.mainProblem), others: st.others, maxInboxes: 5 });
   if (p === "/relay/my/gmail/connect") {
     st.connects.push(body());
     if (st.connectError) return j({ error: st.connectError, max: 5 }, 409);

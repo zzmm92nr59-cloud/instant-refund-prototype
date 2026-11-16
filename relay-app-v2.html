@@ -433,7 +433,7 @@ function togglePersonalise(){
 }
 function personalisationHistory(){return getPurchases().filter(p=>p.demo===true||p.verified===true).concat(receiptBuys)}
 // What Relay has noticed about taste: items from the shopper's own receipts and products they opened or watched. Stored on this device only.
-window.relayLocalWatches=()=>Object.entries(watch).map(([sku,w])=>{const p=catalog.find(x=>x.sku===sku);return{sku,product:w.name,variation:w.variant,priceMinor:w.baseline,store:p?storeOf(p):"",nowMinor:p&&Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null,currency:p&&p.currency||"GBP"}});
+window.relayLocalWatches=()=>Object.entries(watch).map(([sku,w])=>{const p=catalog.find(x=>x.sku===sku);return{sku,real:/^web:/.test(sku)||!!(p&&!p.testShop&&!p.fixture&&!demo),product:w.name,variation:w.variant,priceMinor:w.baseline,store:p?storeOf(p):"",nowMinor:p&&Number.isInteger(Number(p.priceMinor))?Number(p.priceMinor):null,currency:p&&p.currency||"GBP"}});
 let alertStores=[];
 function loadAlertState(){
  if(!window.RelayAccount||!RelayAccount.signedIn||!RelayAccount.signedIn()||!RelayAccount.alertStatus)return;
