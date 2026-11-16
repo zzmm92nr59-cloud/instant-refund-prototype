@@ -1829,7 +1829,9 @@
     { bg: "#E0446E", art: "deadline", title: "Never miss a return.", sub: "Shops' return dates count down, with a reminder if you want one." },
     { bg: "#4F72E0", art: "price", title: "Catch the price drop.", sub: "Watch what you want. Relay tells you when it's cheaper." },
     { bg: "#6662D9", art: "wrapped", title: "Your year, wrapped.", sub: "See where your money went, shop by shop." }];
-  // The pictures: made-up shops and things, drawn the way Relay shows your own.
+  // The pictures: real shops and real things with the price they were selling for when this was made (16 Nov 2026,
+  // Connor: no made-up shops), drawn the way Relay shows your own. No made-up price drops: the watch slide shows what's
+  // being watched and its price, not a drop that didn't happen.
   function welcomeArt(kind) {
     var art = el("div", { className: "rl-wart rl-wart-" + kind });
     art.setAttribute("aria-hidden", "true");
@@ -1839,20 +1841,20 @@
     };
     var note = function (text) { return el("div", { className: "rl-wnote" }, [el("img", { src: "icons/icon-192.png", alt: "" }), el("span", { text: text })]); };
     if (kind === "receipts") {
-      art.appendChild(card("K", "#E0446E", "Court Classic Trainers", "Kick Lane", "£85"));
-      art.appendChild(card("C", "#D47B1F", "Burr Coffee Grinder", "Crema & Co", "£129"));
-      art.appendChild(card("S", "#2E9E5B", "Linen Shirt", "Studio North", "£45"));
+      art.appendChild(card("L", "#E0446E", "Align High-Rise Pant", "lululemon", "£69"));
+      art.appendChild(card("A", "#D47B1F", "Canvas Cruiser", "Allbirds", "£60"));
+      art.appendChild(card("K", "#2E9E5B", "Hilda Midi Dress", "Kitri", "£35"));
       art.appendChild(el("span", { className: "rl-wpill", text: "3 receipts found" }));
     } else if (kind === "deadline") {
       var due = new Date(Date.now() + 3 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-      art.appendChild(note("Return the Wool Coat by " + due));
-      var c = card("H", "#101828", "Wool Coat", "Harlow & Co", "£120");
+      art.appendChild(note("Return the Restfeel Slides by " + due));
+      var c = card("L", "#101828", "Restfeel Slide", "lululemon", "£48");
       c.appendChild(el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "3 days left to return" })]));
       art.appendChild(c);
     } else if (kind === "price") {
-      art.appendChild(note("Price drop on Wireless Earbuds"));
-      var p = card("V", "#4F72E0", "Wireless Earbuds", "Voltline", "");
-      p.appendChild(el("div", { className: "rl-wdrop" }, [el("b", { text: "£59" }), el("s", { text: "£79" }), el("span", { text: "£20 less" })]));
+      art.appendChild(note("Watching the 3-Stripes Leggings for you"));
+      var p = card("J", "#4F72E0", "adidas 3-Stripes Leggings", "JD Sports", "");
+      p.appendChild(el("div", { className: "rl-wdrop" }, [el("b", { text: "£23" }), el("span", { text: "Watching" })]));
       art.appendChild(p);
     } else {
       var grid = el("div", { className: "rl-wtiles" });
@@ -1981,11 +1983,11 @@
       if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
     });
   }
-  // The sign-in page's picture: Relay's wallet, with a receipt (a made-up shop) counting down to its return date.
+  // The sign-in page's picture: Relay's wallet, with a receipt (a real shop and thing) counting down to its return date.
   function signInArt() {
     var due = new Date(Date.now() + 12 * 864e5).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    var front = el("div", { className: "rl-wcard rl-sfront" }, [el("span", { className: "rl-wini", text: "K", style: "background:#D47B1F" }),
-      el("span", { className: "rl-wcard-t" }, [el("b", { text: "Court Classic Trainers" }), el("span", { text: "Kick Lane" })]), el("b", { className: "rl-wprice", text: "£85" }),
+    var front = el("div", { className: "rl-wcard rl-sfront" }, [el("span", { className: "rl-wini", text: "A", style: "background:#D47B1F" }),
+      el("span", { className: "rl-wcard-t" }, [el("b", { text: "Canvas Cruiser" }), el("span", { text: "Allbirds" })]), el("b", { className: "rl-wprice", text: "£60" }),
       el("div", { className: "rl-wdue" }, [el("div", { className: "rl-wtrack" }, [el("i")]), el("span", { text: "Return by " + due + " · 12 days left" })])]);
     var stack = el("div", { className: "rl-sstack" }, [el("div", { className: "rl-sback b1 rl-rise" }), el("div", { className: "rl-sback b2 rl-rise" }), front]);
     front.classList.add("rl-rise");
