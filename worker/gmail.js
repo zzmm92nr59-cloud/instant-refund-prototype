@@ -21,6 +21,7 @@ import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads } from "./ai-reader.js";
+import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
@@ -230,6 +231,8 @@ async function ensureGmailTablesRun(db) {
     SHARED_EMAILS_SQL,
     // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
     AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
+    // Live parcel tracking (parcel-tracking.js): what the carrier said about a parcel, and how many new parcels this month.
+    PARCEL_TRACKS_SQL, PARCEL_USES_SQL,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -267,6 +270,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -604,6 +608,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -1670,7 +1675,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
@@ -1678,11 +1683,14 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, updated_at AS at FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId).all(),
     sharedByReceipt(env.RELAY_DB, shopperId, Date.now()),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? AND fields IS NOT NULL").bind(shopperId).all(),
+    readTrackedRows(env.RELAY_DB, shopperId),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   attachDeliveries(orders, deliveries);
+  // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
+  applyTracked(orders, tracked);
   for (const p of plans) {
     if (p.orderRef && dismissedRefs.has(p.orderRef)) continue;
     const o = p.orderRef && byOrder.get(p.orderRef);
@@ -2085,6 +2093,14 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     await markTestShopReceipts(env, list);
     timing.totalMs = Date.now() - t0;
     return json({ receipts: list, timing }, 200, cors);
+  }
+  // Where a parcel on one of their own receipts really is, from the carrier (parcel-tracking.js). Their own receipts only.
+  const parcel = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/parcel$/.exec(path);
+  if (parcel && m === "GET") {
+    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const mine = (await listReceipts(env, shopper.id, {})).find((r) => r.id === parcel[1]);
+    if (!mine) return json({ error: "not_found" }, 404, cors);
+    return json(await liveParcel(env, shopper.id, mine, opts), 200, cors);
   }
   const orig = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/original$/.exec(path);
   if (orig && m === "GET") {

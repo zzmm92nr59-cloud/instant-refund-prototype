@@ -38,6 +38,8 @@ jobs:
         run: node scripts/test-item-kinds.mjs
       - name: Open banking (read-only, team and testers on test banks)
         run: node scripts/test-bank.mjs
+      - name: Live parcel tracking (off until the key is set, tracking number only, 10 new parcels a month)
+        run: node scripts/test-parcel-tracking.mjs
       - name: Auctions (proxy bids, nobody sees who bid, the winner's unpaid order at the shop, 24 hours to pay, then the next bidder)
         run: node scripts/test-auctions.mjs
       - name: Interests (kept with the account, only ids on the list, each account its own, shops' categories never guessed)
