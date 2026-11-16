@@ -104,6 +104,32 @@ async function apiGet(env, token, path, f) {
 async function openTokens(env, row) { try { return JSON.parse(await openToken(env, row.token_iv, row.token_data)); } catch { return null; } }
 async function saveTokens(env, db, id, t) { const s = await sealToken(env, JSON.stringify(t)); await db.prepare("UPDATE bank_links SET token_iv = ?, token_data = ? WHERE id = ?").bind(s.iv, s.data, id).run(); }
 const minor = (n) => Math.round(Math.abs(Number(n) || 0) * 100);
+// Not shopping: money moved between accounts or to savings (round-ups like Save the Change), cash, bills by standing order or
+// direct debit, bank fees and interest, and betting. Relay keeps only purchases, so these are never stored.
+const NOT_SHOPPING_TYPES = new Set(["ATM", "CASH", "TRANSFER", "STANDING_ORDER", "DIRECT_DEBIT", "FEE_CHARGE", "INTEREST", "DIVIDEND", "CORRECTION", "CHEQUE"]);
+export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b/i;
+export function isShopping(x) {
+  const cat = String(x.transaction_category || "").toUpperCase();
+  if (NOT_SHOPPING_TYPES.has(cat)) return false;
+  return !NOT_SHOPPING.test(String(x.description || "") + " " + String(x.merchant_name || ""));
+}
+// A shop's name as a person would say it, from the bank's text: "ASDA STOES LTD" is Asda, "PAYPAL *EBAY" is eBay,
+// "AMZNMKTPLACE" is Amazon. The bank's own words stay with the payment too.
+const KNOWN_SHOPS = [[/amzn|amazon/i, "Amazon"], [/\bebay\b/i, "eBay"], [/sainsbury/i, "Sainsbury's"], [/\btesco\b/i, "Tesco"], [/\basda\b/i, "Asda"],
+  [/marks ?(and|&) ?spencer|\bm ?& ?s\b/i, "M&S"], [/john ?lewis/i, "John Lewis"], [/waitrose/i, "Waitrose"], [/morrisons/i, "Morrisons"], [/\baldi\b/i, "Aldi"], [/\blidl\b/i, "Lidl"],
+  [/\bboots\b/i, "Boots"], [/\bnext\b/i, "Next"], [/\bnike\b/i, "Nike"], [/jd sports/i, "JD Sports"], [/lululemon/i, "lululemon"], [/\basos\b/i, "ASOS"], [/\bzara\b/i, "Zara"],
+  [/primark/i, "Primark"], [/\bargos\b/i, "Argos"], [/\bcurrys\b/i, "Currys"], [/\bapple\b/i, "Apple"], [/uber ?eats/i, "Uber Eats"], [/deliveroo/i, "Deliveroo"], [/\bjust ?eat\b/i, "Just Eat"],
+  [/pret a manger|\bpret\b/i, "Pret"], [/starbucks/i, "Starbucks"], [/costa/i, "Costa"], [/nespresso/i, "Nespresso"], [/\bikea\b/i, "IKEA"]];
+const TIDY_DROP = /^(card|payment|purchase|pos|contactless|visa|debit|credit|online|to|at|ltd|limited|plc|stores?|stoes|s\/mkts|supermarkets?|uk|gb|gbr|london|www|com)$/i;
+export function shopName(description, merchant) {
+  const text = String(merchant || description || "").trim();
+  for (const [re, name] of KNOWN_SHOPS) if (re.test(text) || re.test(String(description || ""))) return name;
+  const words = text.replace(/^(paypal|sq|sumup|zettle|sp|pp)\s*\*\s*/i, "").replace(/[*#]/g, " ").split(/\s+/)
+    .filter((w) => w && !TIDY_DROP.test(w) && !/\d{3,}/.test(w)).slice(0, 4);
+  if (!words.length) return null;
+  return words.map((w, i) => i > 0 && /^(and|of|the|on|in)$/i.test(w) ? w.toLowerCase() : (w.length <= 2 || w.includes("&")) && /^[A-Z&]+$/.test(w) && !/^co$/i.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+const bankName = (n) => { const s = String(n || "").trim(); if (!s) return null; return /^mock$/i.test(s) ? "Mock Bank" : s.charAt(0).toUpperCase() + s.slice(1); };
 const clip = (s, n) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, n) : null) || null;
 
 // Reads a connection's payments for the last 90 days. Returns { ok } or { gone } (the bank's permission has ended).
@@ -134,12 +160,15 @@ async function readConnection(env, db, shopperId, row, now, f) {
         const pid = String(x.transaction_id || ""), when = String(x.timestamp || "").slice(0, 10);
         if (!pid || pid.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(when)) continue;
         const debit = String(x.transaction_type || "").toUpperCase() === "DEBIT" || (!x.transaction_type && Number(x.amount) < 0);
+        if (debit && !isShopping(x)) continue;
         const amount = minor(x.amount); if (!amount) continue;
         rows.push({ payment_id: row.id + ":" + pid, account: label, paid_on: when, amount_minor: debit ? amount : -amount,
           currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(x.merchant_name, 80) });
       }
     }
   }
+  // A full read of the last 90 days replaces what was read before for those days (so anything Relay no longer keeps goes).
+  await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10)).run();
   if (rows.length) await db.batch(rows.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant`)
     .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, now)));
@@ -176,9 +205,14 @@ export async function handleBankCallback(env, url, o) {
   const code = url.searchParams.get("code") || "", state = url.searchParams.get("state") || "";
   if (!code || code.length > 2000 || !/^[A-Za-z0-9_-]{43}$/.test(state)) return back("failed");
   const db = env.RELAY_DB; await ensureBankTables(db);
+  const hash = await sha256Hex(state);
   const claimed = await db.prepare("UPDATE bank_link_states SET used_at = ? WHERE state_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING shopper_id")
-    .bind(o.now, await sha256Hex(state), o.now).first();
-  if (!claimed) return back("failed");
+    .bind(o.now, hash, o.now).first();
+  if (!claimed) {
+    // Say why when it's only that it took too long (each try lasts 15 minutes).
+    const was = await db.prepare("SELECT expires_at, used_at FROM bank_link_states WHERE state_hash = ?").bind(hash).first();
+    return back(was && !was.used_at && was.expires_at <= o.now ? "expired" : "failed");
+  }
   const t = await tokenCall(env, { grant_type: "authorization_code", code, redirect_uri: redirectUri(env, url) }, o.fetchImpl);
   if (!t) return back("failed");
   let bank = null;
@@ -186,7 +220,7 @@ export async function handleBankCallback(env, url, o) {
     const me = await o.fetchImpl(hosts(env).api + "/data/v1/me", { headers: { Authorization: "Bearer " + t.access_token }, signal: AbortSignal.timeout(15000) });
     const b = me.ok ? await me.json().catch(() => null) : null;
     const p = b && Array.isArray(b.results) && b.results[0] && b.results[0].provider;
-    bank = clip(p && p.display_name, 60);
+    bank = bankName(clip(p && p.display_name, 60));
   } catch {}
   const id = crypto.randomUUID();
   const sealed = await sealToken(env, JSON.stringify({ access: t.access_token, refresh: t.refresh_token || null, expires: o.now + (Number(t.expires_in) || 3600) * 1000 }));
@@ -204,7 +238,7 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     if (!ok) return json({ available: false, connections: [] }, 200, cors);
     const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
       FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id WHERE c.shopper_id = ? GROUP BY c.id ORDER BY c.connected_at`).bind(shopper.id).all()).results || [];
-    return json({ available: true, testBanks: !bankLive(env), connections: conns.map((c) => ({ id: c.id, bank: c.bank, connectedAt: new Date(c.connected_at).toISOString(),
+    return json({ available: true, testBanks: !bankLive(env), connections: conns.map((c) => ({ id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(),
       syncedAt: c.synced_at ? new Date(c.synced_at).toISOString() : null, needsReconnect: c.status === "reconnect", payments: Number(c.payments) || 0, matched: Number(c.matched) || 0 })) }, 200, cors);
   }
   if (!ok) return json({ error: "not_found" }, 404, cors);
@@ -223,7 +257,7 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id, match FROM bank_payments
       WHERE shopper_id = ? AND amount_minor > 0 ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
     return json({ payments: rows.map((r) => ({ id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
-      description: r.description, merchant: r.merchant, receiptId: r.receipt_id || null, match: r.match || null })) }, 200, cors);
+      description: r.description, merchant: r.merchant, shop: shopName(r.description, r.merchant), receiptId: r.receipt_id || null, match: r.match || null })) }, 200, cors);
   }
   if (path === "/relay/my/bank/disconnect" && method === "POST") {
     const b = await request.json().catch(() => null);
