@@ -107,10 +107,16 @@ assert.deepEqual(await (await call("/relay/my/bank", { token: jess })).json(), {
 assert.equal((await call("/relay/my/bank/connect", { method: "POST", token: jess })).status, 404);
 env.TRUELAYER_CLIENT_ID = "relay-test-id"; env.TRUELAYER_CLIENT_SECRET = "tl-secret-test";
 assert.deepEqual(await (await call("/relay/my/bank", { token: jess })).json(), { available: false, connections: [] }, "test banks: not for shoppers");
+env.TRUELAYER_ENV = "live";
+assert.deepEqual(await (await call("/relay/my/bank", { token: jess })).json(), { available: false, connections: [] }, "real banks: still team only until BANK_FOR_EVERYONE");
+env.BANK_FOR_EVERYONE = "on";
+assert.equal((await (await call("/relay/my/bank", { token: jess })).json()).available, true, "real banks, switched on for everyone");
+assert.equal((await (await call("/relay/my/bank", { token: jess })).json()).testBanks, false);
+delete env.TRUELAYER_ENV; delete env.BANK_FOR_EVERYONE;
 env.RELAY_ADMIN_EMAILS = "jess.private@example.com"; env.SECOND_STEP = "off";
 let r = await (await call("/relay/my/bank", { token: jess })).json();
 assert.equal(r.available, true, "the team can"); assert.equal(r.testBanks, true);
-console.log("ok - off until the keys are set; on test banks, only Relay's team and testers");
+console.log("ok - off until the keys are set; only Relay's team and testers, on test banks or real ones until switched on for everyone");
 
 // 2. Connect: the bank's own page, read-only scopes, a single-use state; the code is swapped for tokens kept encrypted.
 const start = await (await call("/relay/my/bank/connect", { method: "POST", token: jess })).json();
