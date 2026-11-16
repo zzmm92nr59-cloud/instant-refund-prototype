@@ -157,6 +157,7 @@ assert.equal(await sheet.getByText(/We sent a sign-in link/).count(), 0, "it doe
 await polished("code", ".rl-sheet");
 await page.locator("#rl-signin-code").fill("000000");
 await sheet.getByText("That code is wrong or has expired").waitFor();
+st.catalogue = [];   // from here on, every catalogue request is the reviewer's
 await page.locator("#rl-signin-code").fill(CODE);
 await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
 await page.locator("#rl-onboard-name").fill("App Review");
@@ -200,7 +201,8 @@ assert.equal(await view.locator("#rl-wrapped").count(), 0, "no Wrapped: it's mad
 await polished("profile", "#mePage");
 await view.locator(".rl-arow", { hasText: "Shop orders" }).click();
 await view.getByText("None yet. An order shows up here when a shop that uses Relay confirms one placed with " + REVIEW + ".").waitFor();
-st.catalogue = [];
+// Discover asks for the catalogue when it's opened, or reuses the copy Home already asked for (either way, since the
+// reviewer signed in).
 await page.evaluate(() => window.go("discover"));
 await page.waitForFunction(() => true);
 for (let i = 0; i < 150 && !st.catalogue.length; i++) await page.waitForTimeout(100); // up to 15s: a busy test machine can be slow to open Browse
