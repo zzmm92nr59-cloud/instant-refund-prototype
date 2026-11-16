@@ -102,6 +102,8 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       return { on: Boolean(on), since: on ? iso(on.since) : null,
         items: (await rows("SELECT name_key AS item, data, created_at AS at FROM item_kinds WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ item: r.item, read: parse(r.data), at: iso(r.at) })) };
     })(),
+    // Live parcel tracking: each tracking number Relay asked the carrier about (through Ship24), and what it said.
+    parcels: (await rows("SELECT tracking_number AS trackingNumber, status, at, checked_at AS checkedAt FROM parcel_tracks WHERE shopper_id = ? ORDER BY created_at", id)).map((r) => ({ ...r, checkedAt: iso(r.checkedAt) })),
     // The help chat keeps no conversations: only how many messages you sent each day, and whether you asked for a person.
     helpChat: (await rows("SELECT day, messages, handoffs FROM support_chat_usage WHERE shopper_id = ? ORDER BY day", id)),
     alerts: {

@@ -3023,9 +3023,25 @@
   function shipWords(dv, short) {
     var day = function (d) { return new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); };
     var today = new Date().toISOString().slice(0, 10), done = dv.status === "delivered", by = dv.carrier && !short ? " with " + dv.carrier : "";
+    // collect, missed and problem come only from the carrier itself (live tracking, worker/parcel-tracking.js).
     return done ? "Delivered" + (dv.at ? " " + (dv.at === today ? "today" : day(dv.at)) : "")
       : dv.status === "out_for_delivery" ? "Out for delivery" + by
+      : dv.status === "collect" ? "Ready to collect" + by
+      : dv.status === "missed" ? "Delivery attempted" + (dv.at && dv.at !== today ? " " + day(dv.at) : "") + by
+      : dv.status === "problem" ? "Delivery problem" + (dv.carrier && !short ? ", check with " + dv.carrier : "")
       : dv.status === "due" ? (dv.at && dv.at !== today ? "Arriving " + day(dv.at) : "Arriving today") + by : "On its way" + by;
+  }
+  // Where a parcel really is, from the carrier, when its page is opened: only for one with a tracking number, not delivered,
+  // ordered in the last 30 days. Once Relay says live tracking is off, it isn't asked again this visit.
+  function liveParcel(x, show) {
+    var dv = x && x.delivery;
+    if (memo.parcelsOff || !x.id || !dv || !dv.trackingNumber || dv.status === "delivered" || !x.orderDate) return;
+    if (Date.now() - Date.parse(x.orderDate.slice(0, 10) + "T00:00:00Z") > 30 * 864e5) return;
+    api("/relay/my/receipts/" + x.id + "/parcel").then(function (r) {
+      if (!r.ok || !r.body) return;
+      if (r.body.available === false) { memo.parcelsOff = true; return; }
+      if (r.body.delivery && r.body.delivery.status) { x.delivery = r.body.delivery; show(r.body.delivery); }
+    }, function () {});
   }
   function shipLine(dv) {
     var done = dv.status === "delivered";
@@ -7366,7 +7382,10 @@
       open(function (sheet) {
         var pic = el("div", { className: "rl-po-img rl-dt-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, x, 40, 48);
         sheet.appendChild(el("div", { className: "rl-dt-head" }, [pic, el("div", { className: "rl-dt-name" }, [el("h2", { text: title }), el("p", { className: "rl-dt-sub", text: itemName ? who : date ? "Ordered " + date : "" })])]));
-        if (showShip) sheet.appendChild(shipLine(dv));
+        var shipSpot = el("div", { className: "rl-dt-ship" });
+        if (showShip) shipSpot.appendChild(shipLine(dv));
+        sheet.appendChild(shipSpot);
+        liveParcel(x, function (live) { shipSpot.textContent = ""; shipSpot.appendChild(shipLine(live)); });
         var acts = el("div", { className: "rl-dt-acts" });
         // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
         // through the shop's own returns page with the order number and email ready to copy.

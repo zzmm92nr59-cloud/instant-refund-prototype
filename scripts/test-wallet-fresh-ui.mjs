@@ -29,7 +29,7 @@ const receipts = [
 ];
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); await skipInterests(ctx); await bigCards(ctx);
-const logoAsks = [];
+const logoAsks = [], parcelAsks = [];
 await ctx.route("https://**/*", async route => {
   const u = new URL(route.request().url()), m = route.request().method(), p = u.pathname;
   const j = (b, status = 200) => route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" }, body: JSON.stringify(b) });
@@ -39,6 +39,9 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL });
   if (p === "/relay/my/receipts") return j({ receipts });
+  // Live tracking: what the carrier says about the trainers (asked only when their page opens).
+  const pa = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/parcel$/.exec(p);
+  if (pa) { parcelAsks.push(pa[1]); await new Promise(r => setTimeout(r, 400)); return j({ available: true, delivery: { ...ship(), status: "out_for_delivery", at: day(0), live: true } }); }
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Jess Tester", photo: null });
   if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
@@ -71,8 +74,13 @@ assert.deepEqual(logoAsks, ["kicklane.example"], "other shops' logos come from R
 // Its page says who's bringing it.
 const sh = await openHomeCard(page, "Court Classic Trainers");
 await sh.getByText(/On its way with Royal Mail/).first().waitFor();
+// Then the carrier's own news replaces the email's, asked once, only for this parcel.
+await sh.getByText(/Out for delivery with Royal Mail/).first().waitFor();
+assert.equal(await sh.getByText(/On its way with Royal Mail/).count(), 0, "the email's word is replaced, not shown twice");
+assert.deepEqual(parcelAsks, ["33333333-3333-4333-8333-333333333333"], "the carrier is asked only when a parcel's page is opened");
 await closeSheet(page);
 await page.screenshot({ path: "/tmp/shots/wallet-fresh.png" });
+console.log("ok - a parcel's page shows where the carrier says it is");
 console.log("ok - Home: old 'shipped' orders not shown as on their way, no delivery companies as shops; recent and returnable shown, each with the shop's logo");
 // Receipts: the year-old order is still there (it's a receipt), but without a stale "On its way".
 await page.evaluate(() => window.go("receipts"));
