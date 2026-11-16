@@ -90,9 +90,12 @@ async function tokenCall(env, form, f) {
   try {
     const r = await f(hosts(env).auth + "/connect/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ client_id: env.TRUELAYER_CLIENT_ID, client_secret: env.TRUELAYER_CLIENT_SECRET, ...form }), signal: AbortSignal.timeout(20000) });
-    const b = r.ok ? await r.json().catch(() => null) : null;
-    return b && b.access_token ? b : null;
-  } catch { return null; }
+    const b = await r.json().catch(() => null);
+    if (r.ok && b && b.access_token) return b;
+    // Why TrueLayer said no, for Relay's logs: its status and short error code only (never the code, token or secret).
+    console.log("bank: TrueLayer token refused", form.grant_type, r.status, String((b && b.error) || "").slice(0, 60), String((b && b.error_description) || "").slice(0, 160));
+    return null;
+  } catch (e) { console.log("bank: TrueLayer token call failed", form.grant_type, String(e && e.name || "")); return null; }
 }
 async function apiGet(env, token, path, f) {
   try {
