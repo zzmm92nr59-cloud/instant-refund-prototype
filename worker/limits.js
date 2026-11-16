@@ -30,7 +30,7 @@ export const LIMITS = {
 const SIGN_IN = new Set([
   "/relay/auth/request", "/relay/auth/verify", "/relay/auth/verify-code", "/relay/auth/google/start", "/relay/auth/microsoft/start",
   "/relay/auth/passkey/options", "/relay/auth/passkey/verify", "/relay/auth/2fa/verify", "/relay/auth/2fa/text",
-  "/relay/gmail/callback", "/relay/microsoft/callback",
+  "/relay/gmail/callback", "/relay/microsoft/callback", "/relay/bank/callback",
   "/relay/square/connect", "/relay/square/oauth/callback",
   "/relay/shopify/connect", "/relay/shopify/launch", "/relay/shopify/oauth/callback", "/relay/shopify/embedded/session"
 ]);

@@ -15,6 +15,7 @@ import { handleHealthEmailRoute } from "./health-digest.js";
 import { handleSharedEmailAdminRoute } from "./shared-emails.js";
 import { handleAiReadingRoute } from "./ai-runner.js";
 import { handleItemKindsRoute } from "./item-kinds.js";
+import { handleBankRoute, handleBankCallback, ensureBankTables, bankDeleteStatements } from "./bank.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -577,6 +578,7 @@ async function deleteShopper(env, shopper, o) {
   await ensureInterestsTable(env.RELAY_DB);
   await ensureTipsTable(env.RELAY_DB);
   await ensureDeliveryTables(env.RELAY_DB);
+  await ensureBankTables(env.RELAY_DB);
   for (const sql of SUPPORT_TABLE_SQL) await env.RELAY_DB.prepare(sql).run(); // the help chat's counts (made on first use)
   await forgetCard(env, shopper.id, o).catch(() => {});
   // Their maximums leave live auctions (the next bidder takes the lead) and their wins stop being theirs.
@@ -591,6 +593,7 @@ async function deleteShopper(env, shopper, o) {
     ...interestsDeleteStatements(env.RELAY_DB, shopper.id),
     ...tipsDeleteStatements(env.RELAY_DB, shopper.id),
     ...deliveryDeleteStatements(env.RELAY_DB, shopper.id),
+    ...bankDeleteStatements(env.RELAY_DB, shopper.id),
     ...gmailDeleteStatements(env.RELAY_DB, shopper.id),
     ...supportDeleteStatements(env.RELAY_DB, shopper.id),
     ...passkeyDeleteStatements(env.RELAY_DB, shopper.id),
@@ -614,7 +617,7 @@ async function deleteShopper(env, shopper, o) {
 
 export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
   const path = url.pathname;
-  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback" || path === "/relay/microsoft/callback";
+  const isAuthRoute = path.startsWith("/relay/auth/") || path === "/relay/me" || path.startsWith("/relay/my/") || path === "/relay/gmail/callback" || path === "/relay/microsoft/callback" || path === "/relay/bank/callback";
   if (!isAuthRoute) return null;
   const o = { now: Date.now(), fetchImpl: (...args) => fetch(...args), ...opts }; // arrow wrapper: a bare fetch called as o.fetchImpl() throws "Illegal invocation" on Workers
   // Strict checks on what's sent (validate.js). Sign-in routes are checked straight away; signed-in routes once the
@@ -652,6 +655,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (path === "/relay/gmail/callback" && request.method === "GET")
       return await handleGmailCallback(request, env, url, { ...o, appUrl: DEFAULT_APP_URL });
+    // The bank's page sends the browser back here after "Connect a bank" (bank.js). The single-use state identifies the shopper.
+    if (path === "/relay/bank/callback" && request.method === "GET") return await handleBankCallback(env, url, o);
     if (path === "/relay/microsoft/callback" && request.method === "GET") {
       const ms = await microsoftCallback(request, env, url, o);
       if (ms) return ms;
@@ -711,6 +716,9 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     // "AI for picks": Claude reads the names of the things bought, for Browse's picks, only for shoppers who switch it on.
     const kindsResponse = await handleItemKindsRoute(path, request.method, request, env, cors, shopper, o);
     if (kindsResponse) return kindsResponse;
+    // Bank and card payments through open banking (read-only), matched to receipts.
+    const bankResponse = await handleBankRoute(path, request.method, request, env, url, cors, shopper, o);
+    if (bankResponse) return bankResponse;
     // "Download my data": a copy of everything Relay keeps about the shopper.
     const exportResponse = await handleExportRoute(request, env, url, cors, shopper, o);
     if (exportResponse) return exportResponse;

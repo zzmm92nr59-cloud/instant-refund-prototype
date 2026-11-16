@@ -108,6 +108,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <tr><th>Google and Microsoft</th><td>Sign-in with Google or Microsoft, and reading your Gmail or Outlook when you connect it.</td></tr>
 <tr><th>Resend</th><td>Sends sign-in emails and return reminders, so it receives your email address and the message.</td></tr>
 <tr><th>Anthropic</th><td>Answers questions in the help chat, if you use it. It receives what you write in the chat, Relay's help pages, and which kinds of inbox you've connected, when Relay last checked them and whether two-step sign-in is on. Relay keeps no copy of the chat. If you ask the assistant about one of your receipts and choose Show it, it also receives what Relay read from that receipt (the shop, date, total, items and return date), never the email itself, its order number or your address, and only with that chat. If you switch on AI help, it also reads emails Relay's rules couldn't work out, with your personal details hidden (see Your email). If you switch on AI for picks, it receives the names of the things you bought and the shops' names, nothing else. If you search by photo, it receives the picture you chose (see How we use it), and no copy is kept. Otherwise it never receives your receipts, anything else from your email, or your email address.</td></tr>
+<tr><th>TrueLayer</th><td>Connects your bank or card, only if you choose to. You sign in with your bank through TrueLayer; it passes Relay your accounts, cards and payments, read-only.</td></tr>
 <tr><th>Twilio</th><td>Sends sign-in codes by text, only if you add a phone number, so it receives your number and the message.</td></tr>
 <tr><th>Stripe</th><td>Handles your card, only if you save one for swaps.</td></tr>
 <tr><th>Shops (through Shopify or Square)</th><td>When you start a return or swap, the shop receives the details it needs: the order, the item, the reason and a reference. When you swap with another shop, the second shop gets nothing from Relay: you buy from it at its own checkout.</td></tr>
@@ -122,10 +123,19 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding-top:18px;color:v
 <p>If you use swap and resell, other members see your listing and the messages you send them, but never your email address.</p>
 <p>We may also share information if the law requires it.</p>
 
+<h2 id="bank">Your bank and cards (if you connect them)</h2>
+<ul>
+<li><strong>How:</strong> through TrueLayer, an open banking company authorised by the Financial Conduct Authority. You sign in on your bank's own page; Relay never sees your bank password.</li>
+<li><strong>What Relay can do:</strong> read your accounts, cards and payments. It can't move money or make payments.</li>
+<li><strong>What it keeps:</strong> each payment out of your account or card from the last 90 days (date, amount, the bank's description and the shop's name, and which account), and which receipt it matches. Money coming in isn't kept.</li>
+<li><strong>Why:</strong> to match your card payments to your receipts, and to find purchases that never sent a receipt.</li>
+<li><strong>Stopping:</strong> disconnect a bank under Bank and cards (tap your picture) and Relay deletes it and every payment read from it. You can also end the permission at your bank.</li>
+</ul>
 <h2 id="keep">How long we keep it</h2>
 <table class="table">
 <tr><th>Receipts and purchase details from your email</th><td>Until you disconnect your email, withdraw your permission or delete your account.</td></tr>
 <tr><th>What the AI read, if you switch on AI help</th><td>Until you switch AI help off, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
+<tr><th>Payments from a bank or card you connect</th><td>13 months, or until you disconnect it or delete your account.</td></tr>
 <tr><th>What the AI worked out, if you switch on AI for picks</th><td>Until you switch AI for picks off, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>Emails you choose to send to Relay</th><td>30 days, or until you delete it, remove that receipt, disconnect that inbox, withdraw your permission or delete your account.</td></tr>
 <tr><th>The help chat</th><td>Relay keeps no copy of the chat: only how many messages you sent each day (to keep the chat within its limits), for 30 days. If you choose Talk to a person, the chat is emailed to Relay's team so they can reply, and kept in that email.</td></tr>
