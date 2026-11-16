@@ -8134,6 +8134,8 @@
     var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
     var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
     purchases.forEach(function (o) {
+      // Orders from Relay's test shops never show on Home, even with testing tools (Connor, 15 Nov 2026).
+      if (o.test) return;
       var items = (o.items || []).filter(Boolean); if (!items.length) return;
       var shop = o.store || "Shop", at = String(o.orderedAt || "").slice(0, 10);
       var owe = items.filter(function (it) { return it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo; })[0];
@@ -8360,7 +8362,8 @@
     var shopBox = el("div", { className: "h2-shopbox" }); host.appendChild(shopBox); mountInstore(shopBox, refresh, "box");
     for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
     var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
-    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product; }); } catch (e) { return []; } };
+    // Watching: real products only (a shop's website, or a shop on Relay that isn't one of Relay's test shops), newest first.
+    var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
     // A brand-new account: one card that says what to do first.
     var startCard = function () {
       return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
