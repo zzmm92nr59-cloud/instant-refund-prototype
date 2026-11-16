@@ -8128,21 +8128,40 @@
       var c = el("span", { className: "rl-rg-c", text: "Copy" });
       var b = el("button", { type: "button", className: "rl-rg-row" }, [el("span", { className: "rl-rg-l", text: label }), el("b", { text: value }), c]);
       b.setAttribute("aria-label", "Copy your " + label.toLowerCase() + ", " + value);
-      b.onclick = function () { copyText(value).then(function (ok) { c.textContent = ok ? "Copied" : "Select it to copy"; }); };
+      // Only the last one copied says so: the phone holds one copied thing at a time.
+      b.onclick = function () { copyText(value).then(function (ok) { sheet.querySelectorAll(".rl-rg-c").forEach(function (o) { o.textContent = "Copy"; }); c.textContent = ok ? "Copied" : "Select it to copy"; }); };
       return b;
     };
     if (x.orderRef) rows.appendChild(copyRow("Order number", String(x.orderRef)));
     sheet.appendChild(rows);
-    // The address the shop sent the order to (a Hide My Email address, say), else the inbox Relay reads.
-    if (x.sentTo) rows.appendChild(copyRow("Email address", String(x.sentTo)));
+    // The address the shop sent the order to (a Hide My Email address, say), else the inbox the receipt came from (not
+    // always the first one: Connor's lululemon order, 16 Nov 2026).
+    var mailSpot = el("div"); rows.appendChild(mailSpot);
+    if (x.sentTo) mailSpot.appendChild(copyRow("Email address", String(x.sentTo)));
     else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
-      var addr = g && g.ok && g.body && (g.body.email || g.body.googleEmail);
-      if (addr && document.body.contains(rows)) rows.appendChild(copyRow("Email address", String(addr)));
+      var b = g && g.ok && g.body, box = b && x.mailbox ? (b.others || []).filter(function (o) { return o.mailbox === x.mailbox; })[0] : null;
+      var addr = box ? box.email : b && (b.email || b.googleEmail);
+      if (addr && document.body.contains(rows)) mailSpot.appendChild(copyRow("Email address", String(addr)));
+    }, function () {});
+    // If the returns page asks who and where (a collection, say): the name and address from Relay's delivery details, one
+    // field at a time, the way shops' forms ask for them.
+    var addrBox = el("div"); sheet.appendChild(addrBox);
+    api("/relay/my/delivery").then(function (r) {
+      var d = r && r.ok && r.body && r.body.delivery;
+      if (!d || !document.body.contains(addrBox)) return;
+      addrBox.appendChild(el("p", { text: "If it asks for your name and address", style: "margin:14px 0 8px;font-size:15px;font-weight:700;color:var(--rl-text)" }));
+      var more = el("div");
+      var name = [d.firstName, d.lastName].filter(Boolean).join(" ");
+      [["Name", name], ["Address", d.line1], ["Address line 2", d.line2], ["Town or city", d.town], ["Postcode", d.postcode], ["Phone", d.phone]]
+        .forEach(function (f) { if (f[1]) more.appendChild(copyRow(f[0], String(f[1]))); });
+      addrBox.appendChild(more);
     }, function () {});
     var go = el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", style: "display:block;margin-top:14px;box-sizing:border-box",
       text: x.orderRef ? "Copy order number and open " + who : "Open " + who + "'s returns page" });
     go.onclick = function () { if (x.orderRef) copyText(String(x.orderRef)); };
-    sheet.appendChild(go);
+    // The phone can hold one copied thing at a time: the order number goes with the button; the rest is here to come back to.
+    sheet.insertBefore(go, rows.nextSibling);
+    sheet.insertBefore(el("p", { text: "Your phone keeps one copied thing at a time. Come back here to copy the next one, or let your phone's AutoFill fill in your email and address.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }), go.nextSibling);
     // Many shops run their returns page through a returns company (Narvar, Loop, ZigZag…), so the address can look unfamiliar.
     sheet.appendChild(el("p", { text: "This is the returns link from " + who + "'s own email. Some shops use a returns company, such as Narvar, to run the page.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }));
     sheet.appendChild(el("p", { className: "rl-rg-next", text: "What happens next: " + who + " emails you a return QR code or label. Relay shows it on this card, then follows the parcel back and shows when the refund comes through." }));

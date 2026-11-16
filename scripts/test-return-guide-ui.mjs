@@ -8,12 +8,12 @@ import { skipInterests, homeCard, bigCards } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const server = createServer(async (req, res) => { try { const p = resolve(".", "." + new URL(req.url, "http://x").pathname.replace(/\/$/, "/index.html")); res.setHeader("Content-Type", extname(p) === ".js" ? "text/javascript" : extname(p) === ".png" ? "image/png" : extname(p) === ".svg" ? "image/svg+xml" : "text/html"); res.end(await readFile(p)); } catch { res.statusCode = 404; res.end(); } });
 await new Promise(r => server.listen(0, "127.0.0.1", r)); const origin = "http://127.0.0.1:" + server.address().port;
-const EMAIL = "jess.tester@gmail.com", day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const EMAIL = "jess.tester@gmail.com", HOME_MAIL = "jess.home@outlook.com", day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 const QR = (await readFile("icons/icon-192.png")).toString("base64");
 const PORTAL = "https://click.e.shop.test/returns?o=1234567890";
 const receipts = [
   // Delivered, inside its return window, with the shop's returns link from its own email.
-  { id: "11111111-1111-4111-8111-111111111111", status: "pending", kind: "receipt", retailer: { name: "lululemon", domain: "e.lululemon.com", logoDomain: "lululemon.com" }, orderRef: "1234567890",
+  { id: "11111111-1111-4111-8111-111111111111", status: "pending", kind: "receipt", retailer: { name: "lululemon", domain: "e.lululemon.com", logoDomain: "lululemon.com" }, orderRef: "1234567890", mailbox: 2,
     orderDate: day(-6), totalPence: 9800, currency: "GBP", items: [{ name: "Align High-Rise Pant", qty: 1, pricePence: 9800, variant: "Black / 8" }], returnable: true,
     returns: { windowDays: 30, deadline: day(24), portalUrl: PORTAL, qrMentioned: true }, delivery: { status: "delivered", at: day(-3), carrier: "Royal Mail" } },
   // Ordered with a Hide My Email address: the shop's page wants that address, not the inbox it lands in.
@@ -41,7 +41,8 @@ await ctx.route("https://**/*", async route => {
   // Relay's server sends the email with its pictures already in place (see worker/original.js).
   if (orig) { originalAsks.push(orig[1]); return j({ html: '<table width="640" style="width:640px"><tr><td><p>Show this QR code at an Evri ParcelShop.</p><img alt="QR code" src="data:image/png;base64,' + QR + '"></td></tr></table>', links: [], extraImages: [] }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
-  if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() });
+  if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now(), others: [{ mailbox: 2, provider: "microsoft", email: HOME_MAIL }] });
+  if (p === "/relay/my/delivery") return j({ delivery: { firstName: "Jess", lastName: "Tester", line1: "1 Made-up Street", line2: null, town: "London", county: null, postcode: "E1 6AN", phone: "07700 900123" } });
   if (p === "/relay/my/receipts") return j({ receipts });
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Jess Tester", photo: null });
@@ -63,16 +64,26 @@ await sheet.getByRole("button", { name: "Start return" }).click();
 await sheet.getByRole("heading", { name: "Return to lululemon" }).waitFor();
 await sheet.getByText(/^Send it back by /).waitFor();
 const order = sheet.getByRole("button", { name: "Copy your order number, 1234567890" });
-const email = sheet.getByRole("button", { name: "Copy your email address, " + EMAIL });
+// lululemon's order came to Jess's second inbox (Outlook): that's the address offered, not the first inbox's.
+const email = sheet.getByRole("button", { name: "Copy your email address, " + HOME_MAIL });
 await order.waitFor(); await email.waitFor();
 await order.click();
 await order.getByText("Copied").waitFor();
 assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "1234567890", "the order number is copied");
 await email.click();
-assert.equal(await page.evaluate(() => navigator.clipboard.readText()), EMAIL, "and the email address");
+assert.equal(await page.evaluate(() => navigator.clipboard.readText()), HOME_MAIL, "and the email address of the inbox the order came to");
+// If the page asks who and where: name and address from the delivery details, a field at a time.
+await sheet.getByText("If it asks for your name and address").waitFor();
+for (const [label, value] of [["name", "Jess Tester"], ["address", "1 Made-up Street"], ["town or city", "London"], ["postcode", "E1 6AN"], ["phone", "07700 900123"]])
+  await sheet.getByRole("button", { name: "Copy your " + label + ", " + value }).waitFor();
+assert.equal(await sheet.getByRole("button", { name: /^Copy your address line 2/ }).count(), 0, "no empty rows");
+await sheet.getByRole("button", { name: "Copy your postcode, E1 6AN" }).click();
+assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "E1 6AN");
+assert.equal(await sheet.getByText("Copied", { exact: true }).count(), 1, "only the last one copied says Copied");
+await sheet.getByText(/Your phone keeps one copied thing at a time/).waitFor();
 for (const b of await sheet.locator("button, a").all()) { const box = await b.boundingBox(); if (box && box.width) assert.ok(box.height >= 44, "tap targets at least 44px: " + (await b.innerText())); }
 await page.screenshot({ path: "/tmp/shots/return-guide.png" });
-console.log("ok - Start return shows the order number and email the shop's page asks for, one tap to copy each");
+console.log("ok - Start return shows the order number, the email of the inbox the order came to, and name and address, one tap to copy each");
 
 // 2. The shop's returns page opens in a new tab, with the order number already copied (paste it straight in).
 await page.evaluate(() => navigator.clipboard.writeText("something else"));
