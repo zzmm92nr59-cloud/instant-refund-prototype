@@ -2,7 +2,7 @@
 // These prove the parser handles these layouts, not that any real retailer's
 // emails parse correctly. Real-world accuracy must be measured on real emails.
 import assert from "node:assert/strict";
-import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls, looksPromotional, foreignMinor } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, extractProductImageUrls, looksPromotional, foreignMinor, amazonItems } from "../worker/receipt-parser.js";
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed++; console.log("ok -", name); };
@@ -777,3 +777,32 @@ t("a receipt that isn't in pounds keeps its total in its own currency: nothing i
   assert.deepEqual(["12.345,6", "1,234,56", "1.2", "", "abc", "1,23.456"].map(foreignMinor), [null, null, null, null, null, null]);
 });
 console.log(`\n${passed} receipt-parser tests passed in all (synthetic emails only)`);
+
+// Amazon's two order email layouts (made-up items and order numbers, in Amazon's structure as of Nov 2026): the items sit in
+// little boxes, with the price split into "£", pounds and pence.
+const amzHtml = (body) => `From: "Amazon.co.uk" <auto-confirm@amazon.co.uk>
+Subject: Ordered: 'Garden Kneeler Pad...' and 1 more item
+Date: Tue, 10 Nov 2026 09:12:00 +0000
+Content-Type: text/html; charset=utf-8
+
+<html><head><style>.x{color:red}</style></head><body><div>Thanks for your order!</div>
+<span>Order #</span><span>&#8235;202-1111111-2222222</span>${body}<table><tr><td>Total</td><td>£19.48</td></tr></table>
+<p>This e-mail is only an acknowledgement of receipt of your order.</p></body></html>`;
+t("Amazon order email: each item from its own boxes, with pounds and pence put back together", () => {
+  const r = parseReceiptEmail(amzHtml(`<span>View or edit order</span>
+<a href="#">Garden Kneeler Pad with Handles, Extra Thick ...</a><span>Sold by Amazon.co.uk</span><span>Colour: Green</span><span>Condition: New</span><span>Quantity: 1</span><sup>£</sup><span>12</span><sup>49</sup>
+<a href="#">Pack of 6 Tea Lights</a><span>Sold by Candle Corner Ltd</span><span>Condition: New</span><span>Quantity: 2</span><sup>£</sup><span>3</span><sup>49</sup>`));
+  assert.equal(r.ok, true);
+  assert.equal(r.totalPence, 1948);
+  assert.deepEqual(r.items, [{ name: "Garden Kneeler Pad with Handles, Extra Thick", variant: "Green", qty: 1, pricePence: 1249 }, { name: "Pack of 6 Tea Lights", qty: 2, pricePence: 349 }]);
+});
+t("Amazon digital order: the title, then who sold it, then the price", () => {
+  assert.deepEqual(amazonItems(`<h2>Order details</h2><span>Order #</span><a>D01-1111111-2222222</a><span>Placed on Wednesday, April 22, 2026</span>
+<span>A Made-Up Film</span><span>Sold by:</span><b>Amazon Digital UK Limited</b><b>£3.49</b><th>Item Subtotal:</th><td>£2.91</td>`), [{ name: "A Made-Up Film", qty: 1, pricePence: 349 }]);
+  // Some Prime Video emails put a space before the colon.
+  assert.deepEqual(amazonItems(`<span>Another Made-Up Film</span><span>Sold by :</span><b>Amazon Digital UK Limited</b><b>£5.99</b>`), [{ name: "Another Made-Up Film", qty: 1, pricePence: 599 }]);
+});
+t("Amazon order where the seller sits under its own heading: one item, not two", () => {
+  assert.deepEqual(amazonItems(`<a>Made-Up Garden Hose 15m</a><span>Sold by:</span><span>Hose Co Ltd</span><span>Quantity: 1</span><sup>£</sup><span>19</span><sup>99</sup>`), [{ name: "Made-Up Garden Hose 15m", qty: 1, pricePence: 1999 }]);
+  assert.deepEqual(amazonItems("<p>Your Amazon.co.uk order has been dispatched</p>"), [], "nothing found, nothing made up");
+});
