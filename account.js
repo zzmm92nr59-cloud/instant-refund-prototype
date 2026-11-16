@@ -1813,6 +1813,8 @@
   }
   // Steps someone chose to leave for later, kept per account on this device so later sign-ins don't ask again.
   var ONBOARD_KEY = "relay.onboard.v1";
+  // Set by "See getting started again" (team): the next sign-in shows every step, whatever was done or skipped before.
+  var REPLAY_KEY = "relay.replay-setup.v1";
   function obKey(email) { var h = 0, s = String(email || ""); for (var i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0; return "a" + h.toString(36); }
   function obGet(email) { try { var all = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "{}"); return all[obKey(email)] || {}; } catch (e) { return {}; } }
   function obSet(email, patch) {
@@ -2115,21 +2117,22 @@
         if (r[1].status === 401) { save(null); return open(signedOutView); }
         var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {}, bk = r[4] && r[4].ok && r[4].body ? r[4].body : {};
         if (g && g.connected) rememberMailbox(g);
-        var fl = obGet(email);
-        var st = { email: email, consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null,
+        var replay = false; try { replay = localStorage.getItem(REPLAY_KEY) === "1"; localStorage.removeItem(REPLAY_KEY); } catch (e) {}
+        var fl = replay ? {} : obGet(email);
+        var st = { email: email, name: replay ? p.name || "" : undefined, interests: (r[3] || []).slice(), consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null,
           inboxes: g && g.connected ? [{ provider: g.provider, email: g.email }].concat((g.others || []).map(function (x) { return { provider: x.provider, email: x.email }; })) : [], maxInboxes: (g && g.maxInboxes) || 5,
           bankOn: bk.available === true, testBanks: bk.testBanks === true, banks: bk.connections || [], bankNote: info.bankNote || null };
         // Getting started, in this order: your name, your inboxes, your cards and banks, what you shop for, then all set.
         // Only what's still needed... but once someone is getting started, the inbox and bank steps stay in, so they can add
         // another (and coming back from Google, Microsoft or a bank lands on the step they left).
-        var need = { name: !p.name && !fl.nameSkipped, mail: !st.connected && !fl.mailLater && !isReview(), bank: st.bankOn && !st.banks.length && !fl.bankLater };
+        var need = { name: replay || (!p.name && !fl.nameSkipped), mail: replay || (!st.connected && !fl.mailLater && !isReview()), bank: st.bankOn && (replay || (!st.banks.length && !fl.bankLater)) };
         var started = need.name || need.mail || need.bank || st.justConnected || Boolean(info.at);
         if (!started) { close(); if (window.go) window.go("profile"); return; }
         if (st.connected && !isReview()) need.mail = true;
         if (st.bankOn && st.banks.length) need.bank = true;
         if (info.at) need[info.at] = true;
         // What they shop for: so Browse can show shops they'll like first (interests.js). Home asks anyone else once.
-        need.interests = r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview();
+        need.interests = replay || (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview());
         var steps = ["name", "mail", "bank", "interests"].filter(function (k) { return need[k]; });
         steps.push("done");
         runJourney(sheet, st, steps, Math.max(0, info.at ? steps.indexOf(info.at) : 0));
@@ -2332,7 +2335,9 @@
       var note4 = el("div", { className: "rl-msg" }); note4.setAttribute("role", "status");
       var save4 = interestsSaveButton("Continue", function () { return chosen; }, note4, function () { next(); });
       save4.disabled = true;
-      body4.appendChild(interestsPicker([], function (list) { chosen = list; save4.disabled = !list.length; }));
+      // What they picked before (seeing getting started again) starts picked.
+      chosen = (st.interests || []).slice(); save4.disabled = !chosen.length;
+      body4.appendChild(interestsPicker(chosen.slice(), function (list) { chosen = list; save4.disabled = !list.length; }));
       body4.appendChild(save4); body4.appendChild(note4);
       return;
     }
@@ -5120,7 +5125,15 @@
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
         accRow("flag", "Review reports", (r.body.openReports || 0) + " open", function () { screen(function (sh) { adminView(sh, home); }); }), revRow,
-        accRow("face", "Testers", "Who sees shops' websites in Browse", function () { page("Testers", testersPage); })]));
+        accRow("face", "Testers", "Who sees shops' websites in Browse", function () { page("Testers", testersPage); }),
+        // Relay from the very first screen, as a new person sees it: signs out to the welcome story, and signing back in runs
+        // every getting-started step with this account as it is. Nothing is deleted.
+        accRow("check", "See getting started again", "From the very first screen, with your own account", function () {
+          ask("See Relay from the very first screen? This signs you out. Sign back in the way you usually do and every getting-started step runs with your account as it is. Nothing is deleted.", "Sign out and start", function () {
+            try { localStorage.setItem(REPLAY_KEY, "1"); } catch (e) {}
+            api("/relay/auth/logout", { method: "POST" }).finally(function () { save(null); close(); if (window.go) window.go("profile"); });
+          });
+        })]));
       abox.appendChild(teamTesting());
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});

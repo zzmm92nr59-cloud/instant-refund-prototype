@@ -341,6 +341,27 @@ await sheet.getByRole("button", { name: "Later" }).click();
 await sheet.getByRole("heading", { name: "You're all set, Connor." }).waitFor();
 console.log("ok - cards and banks: connect through the bank's own page, straight back to the same step with it listed; no and Later handled");
 
+// 7. Seeing getting started again (Relay's team, from Profile): someone fully set up signs in and gets every step, with
+// what they have: their name filled in, their inboxes and banks listed, what they shop for already picked.
+await page.evaluate(() => localStorage.clear()); reset({ name: "Connor", accepted: true, connected: true, provider: "google", email: "connor.test@gmail.com", bankOn: true, interests: ["fashion"],
+  banks: [{ id: "11111111-1111-4111-8111-111111111111", bank: "Made-up Bank", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 3, matched: 0 }] });
+await page.goto("about:blank"); await page.goto(origin + "/index.html");
+await page.evaluate(() => { localStorage.setItem("relay_gnonce", "N".repeat(43)); localStorage.setItem("relay.replay-setup.v1", "1"); });
+await page.goto(origin + "/index.html#signin=" + LINK);
+await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 1 of 5" }).count(), 1, "every step: name, inboxes, cards and banks, what you shop for, all set");
+assert.equal(await page.locator("#rl-onboard-name").inputValue(), "Connor");
+await sheet.getByRole("button", { name: "Continue" }).click();
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
+await sheet.locator(".rl-jlist").getByText("Made-up Bank").waitFor();
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
+assert.equal(await sheet.getByRole("button", { name: "Fashion", exact: true }).getAttribute("aria-pressed"), "true", "what they picked before is picked");
+assert.equal(await page.evaluate(() => localStorage.getItem("relay.replay-setup.v1")), null, "once only");
+console.log("ok - seeing getting started again: every step, with the account as it is");
+
 // 5. "Just sign in" for people who already use Relay: no agreement sent, no inbox requested.
 await page.evaluate(() => localStorage.clear()); reset();
 await page.goto(origin + "/index.html");

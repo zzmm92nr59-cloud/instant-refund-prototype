@@ -223,6 +223,16 @@ await page.goto(origin + "/index.html#open=health"); // opening the app fresh fr
 await view.locator(".rl-hp-kpis").waitFor();
 assert.ok(!/open=/.test(await page.evaluate(() => location.hash)), "the address is tidied, so a reload doesn't open it again");
 console.log("ok - the link in the morning email opens Relay health");
+
+// 7. Team only: "See getting started again" asks first, signs out to the very first screen (the welcome story), and
+// leaves a note for the next sign-in to run every step (test-signup-ui checks that part).
+await profile();
+await view.locator(".rl-arow", { hasText: "See getting started again" }).click();
+await page.getByText(/See Relay from the very first screen\? This signs you out\./).waitFor();
+await page.getByRole("button", { name: "Sign out and start" }).click();
+await page.locator(".rl-welcome").waitFor();
+assert.equal(await page.evaluate(() => [localStorage.getItem("relay.session.v1"), localStorage.getItem("relay.replay-setup.v1")].join("|")), "|1", "signed out, the next sign-in shows every step");
+console.log("ok - team: See getting started again signs out to the very first screen");
 assert.deepEqual(errors, [], "no page errors");
 console.log("PASS Relay health page: admins only, outlines then numbers, chart and table, plain words, refresh once, polished in light and dark");
 await browser.close(); server.close();
