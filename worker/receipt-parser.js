@@ -561,6 +561,53 @@ const APPLE_SECTION = /^(app store|apple services|itunes store|apple books|apple
 const APPLE_NOISE = /report a problem|write a review|in-app purchase|^(iphone|ipad|ipod|ipod touch|mac|apple watch|apple vision pro|apple tv)(\s?\w+)?$|^renews\b|^(monthly|yearly|annual|weekly|1 month|1 year|7 days)\b|^device\b|^family sharing|^purchased by|^cancel|^manage|^subscription|^\(|^free trial/i;
 const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
 const PRICE_WORDS = /^(you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
+// Amazon's order emails put each thing bought in its own little boxes, so the usual line reading finds nothing. Two layouts:
+//  * things to be delivered: the item's name (Amazon cuts long ones short with "..."), "Sold by …", maybe "Colour: …" and
+//    "Size: …", "Condition: New", "Quantity: 2", then the price split into "£", "4" and "99" (pounds big, pence small);
+//  * digital (Prime Video, Kindle, music): the title, "Sold by:" (or "Sold by :"), the seller, then "£3.49".
+// Read from the HTML split at every tag, so each little box is its own line. Nothing is guessed: a price is kept only when
+// Amazon printed one next to the item.
+const AMZ_SKIP = /^(sold by\s*:?|condition:|quantity:|colou?r:|size:|style:|pattern:|edition:|format:|view or edit order|order #|placed on|order details|ordered|dispatched|out for delivery|delivered|£|total|item subtotal|\|)/i;
+export function amazonItems(html) {
+  const decode = (t) => t.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#39;|&rsquo;|&lsquo;/g, "'").replace(/&quot;|&ldquo;|&rdquo;/g, '"').replace(/&pound;/g, "£")
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16)));
+  const rows = String(html || "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").split(/<[^>]+>/)
+    .map((t) => decode(t).replace(/[\u034f\u200b-\u200f\u00ad\u2060\ufeff\u202a-\u202e]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const priceAt = (i) => {   // "£" "4" "99", or "£4.99", starting at row i
+    const one = /^£\s?(\d{1,5}(?:,\d{3})*)\.(\d{2})$/.exec(rows[i] || "");
+    if (one) return Number(one[1].replace(/,/g, "")) * 100 + Number(one[2]);
+    if (rows[i] === "£" && /^\d{1,5}$/.test(rows[i + 1] || "") && /^\d{2}$/.test(rows[i + 2] || "")) return Number(rows[i + 1]) * 100 + Number(rows[i + 2]);
+    return null;
+  };
+  const tidy = (n) => n.replace(/\s*(\.\.\.|…)$/, "").trim();
+  const items = [];
+  for (let i = 0; i < rows.length; i++) {
+    const q = /^Quantity:\s*(\d{1,3})$/i.exec(rows[i]);
+    if (q) {
+      let name = null; const bits = [];
+      for (let j = i - 1; j >= Math.max(0, i - 7); j--) {
+        const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[j]);
+        if (b) { bits.unshift(b[2]); continue; }
+        if (AMZ_SKIP.test(rows[j]) || /^amazon(\.co\.uk)?$/i.test(rows[j]) || /^Sold by\s*:?$/i.test(rows[j - 1] || "")) continue;   // the seller, under "Sold by:"
+        if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) { name = rows[j]; break; }
+      }
+      if (!name) continue;
+      let price = null;
+      for (let k = i + 1; k <= i + 3 && price == null; k++) price = priceAt(k);
+      items.push({ name: tidy(name), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: Number(q[1]), pricePence: price });
+      continue;
+    }
+    if (/^Sold by\s*:?$/i.test(rows[i]) && !rows.slice(i + 1, i + 8).some((t) => /^Quantity:/i.test(t))) {   // digital: title, "Sold by:", seller, price
+      const name = rows[i - 1];
+      if (!name || AMZ_SKIP.test(name) || name.length > 220) continue;
+      let price = null;
+      for (let k = i + 1; k <= i + 3 && price == null; k++) price = priceAt(k);
+      items.push({ name: tidy(name), qty: 1, pricePence: price });
+    }
+  }
+  return items;
+}
+
 export function appleItems(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   const items = [];
@@ -704,6 +751,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   };
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
+  if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
   if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
