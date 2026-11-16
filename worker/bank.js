@@ -7,7 +7,8 @@
 //  * The shopper signs in on their bank's page, never in Relay. Relay never sees bank passwords.
 //  * The bank's tokens are kept encrypted (gmail.js sealToken) and only on Relay's server.
 //  * Off until TRUELAYER_CLIENT_ID and TRUELAYER_CLIENT_SECRET are set as Cloudflare secrets. With TRUELAYER_ENV other than
-//    "live" it uses TrueLayer's test banks, and only Relay's team and testers can use it (it's no use to shoppers).
+//    "live" it uses TrueLayer's test banks. Only Relay's team and testers can use it, on test banks or real ones, until
+//    BANK_FOR_EVERYONE is "on" (Connor, 16 Nov 2026: real banks for the team first, to try with his own accounts).
 //  * Disconnecting deletes the connection and every payment read from it; so does deleting the account.
 //  * Only spending is kept: date, amount, the bank's description and merchant, which account, and the receipt it matches.
 //
@@ -48,7 +49,7 @@ async function sha256Hex(text) { const h = await crypto.subtle.digest("SHA-256",
 function randomToken() { const b = crypto.getRandomValues(new Uint8Array(32)); return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 
 // Who may connect a bank: anyone once it's live; while it uses test banks, only Relay's team and testers.
-async function allowed(env, shopper) { return bankConfigured(env) && (bankLive(env) || isAdmin(env, shopper) || await isTester(env, shopper)); }
+async function allowed(env, shopper) { return bankConfigured(env) && ((bankLive(env) && env.BANK_FOR_EVERYONE === "on") || isAdmin(env, shopper) || await isTester(env, shopper)); }
 
 // ---- Matching a payment to a receipt ------------------------------------------------------------------------------------
 // Words that say nothing about the shop in a bank's description.
