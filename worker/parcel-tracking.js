@@ -4,7 +4,7 @@
 //
 // Rules (do not weaken):
 //  * Off for everyone until SHIP24_API_KEY is set (a Cloudflare secret, never in code).
-//  * Only the tracking number goes to Ship24 (and "GB" as where it's going). Never the shopper's name, email, address,
+//  * Only the tracking number goes to Ship24 (and "GB" as where it's going, and the carrier's code for Royal Mail). Never the shopper's name, email, address,
 //    order number or what they bought.
 //  * Only for a parcel on one of the shopper's own receipts, not yet delivered, ordered in the last 30 days, and only when
 //    they open that purchase's page. Nothing runs on a timer.
@@ -27,6 +27,9 @@ const AGAIN_AFTER = 2 * 36e5, NO_NEWS_AGAIN = 10 * 60e3,   // no news yet (Ship2
 const FINAL = new Set(["delivered", "problem"]);
 // A tracking number as carriers print them: letters and digits, 8 to 40 of them.
 export const TRACKING_NUMBER = /^[A-Z0-9]{8,40}$/;
+// Ship24 can't find Royal Mail parcels on its own: it needs its code for Royal Mail, "gb-post" (help.ship24.com, "How to
+// track Royal Mail packages"). Other carriers it finds from the number.
+export const courierCode = (carrier) => (/royal\s*mail|parcelforce/i.test(String(carrier || "")) ? (/parcelforce/i.test(carrier) ? null : "gb-post") : null);
 const day = (s) => (typeof s === "string" && /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : null);
 
 // What Ship24 said, in Relay's words. Returns { status, at } or null when the carrier has no news yet.
@@ -105,7 +108,8 @@ export async function liveParcel(env, shopperId, order, o = {}) {
     const took = await db.prepare(`INSERT INTO parcel_track_uses (month, n) VALUES (?, 1) ON CONFLICT(month) DO UPDATE SET n = n + 1 WHERE n < ?`)
       .bind(month, cap).run();
     if (!cap || !took.meta || !took.meta.changes) return { available: true, delivery: null, reason: "limit" };
-    res = await ask(env, fetchImpl, `${API}/trackers/track`, { method: "POST", body: JSON.stringify({ trackingNumber: tn, destinationCountryCode: "GB" }) });
+    const courier = courierCode(dv.carrier);
+    res = await ask(env, fetchImpl, `${API}/trackers/track`, { method: "POST", body: JSON.stringify({ trackingNumber: tn, destinationCountryCode: "GB", ...(courier ? { courierCode: [courier] } : {}) }) });
   }
   if (!res.ok) {
     if (mine) return answer(mine);

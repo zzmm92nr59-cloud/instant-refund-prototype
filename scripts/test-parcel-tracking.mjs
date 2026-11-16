@@ -4,7 +4,9 @@
 // and never once delivered; Relay says only what the carrier said. Tracking numbers and parcels are made up.
 import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
-import { readShip24, applyTracked, liveParcel, readTrackedRows } from "../worker/parcel-tracking.js";
+import { readShip24, applyTracked, liveParcel, readTrackedRows, courierCode } from "../worker/parcel-tracking.js";
+assert.equal(courierCode("Royal Mail"), "gb-post"); assert.equal(courierCode("royalmail"), "gb-post");
+assert.equal(courierCode("Evri"), null); assert.equal(courierCode("Parcelforce Worldwide"), null); assert.equal(courierCode(null), null);
 
 const TODAY = "2026-11-16", NOW = Date.parse(TODAY + "T12:00:00Z");
 const ev = (m, d) => ({ statusMilestone: m, occurrenceDatetime: d + "T09:30:00", status: "made-up event" });
@@ -57,7 +59,7 @@ let r = await liveParcel(env, "s1", order("aa000000001gb"), { now: NOW, fetchImp
 assert.deepEqual(r.delivery, { status: "due", at: "2026-11-18", trackingNumber: "aa000000001gb", carrier: "Royal Mail", live: true });
 assert.equal(calls.length, 1);
 assert.equal(calls[0].url, "https://api.ship24.com/public/v1/trackers/track");
-assert.deepEqual(JSON.parse(calls[0].init.body), { trackingNumber: "AA000000001GB", destinationCountryCode: "GB" }, "only the tracking number");
+assert.deepEqual(JSON.parse(calls[0].init.body), { trackingNumber: "AA000000001GB", destinationCountryCode: "GB", courierCode: ["gb-post"] }, "only the tracking number (and Royal Mail's code, which Ship24 needs)");
 assert.equal(calls[0].init.headers.Authorization, "Bearer ship24-test-key");
 assert.equal((await db.prepare("SELECT n FROM parcel_track_uses WHERE month = '2026-11'").first()).n, 1);
 console.log("ok - off until the key is set; only the tracking number goes to Ship24");
