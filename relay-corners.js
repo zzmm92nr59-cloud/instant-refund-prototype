@@ -3,7 +3,7 @@
 // and eases in. CSS's own way (corner-shape: squircle) isn't in Safari yet, so this draws the shape and clips to it.
 //
 // What gets smoothed: anything with a rounded corner of 6px or more that isn't a pill or a circle (those keep their
-// shape). A thin even border (the outline round a shop's logo) is drawn again along the smooth edge, so it isn't cut.
+// shape). A thin even border, or a thin ring drawn as an inset shadow (the outline round a shop's logo), is drawn again along the smooth edge, so it isn't cut.
 // Left alone: a shadow, a blur behind (the tab bar, sheets' glass), an uneven border, a border round something with its
 // own background picture, or data-round="plain", because clipping would cut those off. The CSS border-radius stays as it was, so if
 // this file doesn't run, everything still has ordinary rounded corners.
@@ -72,8 +72,10 @@
     const radii = [cs.borderTopLeftRadius, cs.borderTopRightRadius, cs.borderBottomRightRadius, cs.borderBottomLeftRadius].map(px);
     if (Math.max(...radii) < MIN_R) return false;
     if (radii.some((r) => r >= 99)) return false;   // pills (999px, 99px)
-    if (cs.boxShadow !== "none") return false;
-    if (visibleBorder(cs)) {
+    const ring = /^(rgba?\([^)]*\)) 0px 0px 0px (\d+(?:\.\d+)?)px inset$/.exec(cs.boxShadow);   // a thin inset ring drawn as a shadow
+    if (ring && !visibleBorder(cs) && px(ring[2]) <= 3 && (!cs.backgroundImage || cs.backgroundImage === "none")) radii.border = { w: px(ring[2]), c: ring[1], ring: true };
+    else if (cs.boxShadow !== "none") return false;
+    if (!ring && visibleBorder(cs)) {
       const b = evenBorder(cs);
       if (!b || (cs.backgroundImage && cs.backgroundImage !== "none")) return false;
       radii.border = b;
@@ -83,7 +85,7 @@
     return radii;
   }
 
-  const DRAWN = ["clip-path", "border-color", "background-image", "background-origin", "background-size", "background-repeat"];
+  const DRAWN = ["clip-path", "border-color", "box-shadow", "background-image", "background-origin", "background-size", "background-repeat"];
   const before = new WeakMap();   // the app's own inline values of those, put back when the drawing comes off
   const keep = (el) => { if (!before.has(el)) before.set(el, DRAWN.map((k) => el.style.getPropertyValue(k))); };
   const unshape = (el) => { const v = before.get(el); DRAWN.forEach((k, i) => (v && v[i] ? el.style.setProperty(k, v[i]) : el.style.removeProperty(k))); before.delete(el); };
@@ -105,7 +107,7 @@
       el.style.setProperty("clip-path", `path('${d}')`);
       if (b) {   // the border, drawn along the smooth edge (twice as wide, so the half inside the edge shows)
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="${d}" fill="none" stroke="${b.c}" stroke-width="${b.w * 2}"/></svg>`;
-        el.style.setProperty("border-color", "transparent");
+        el.style.setProperty(b.ring ? "box-shadow" : "border-color", b.ring ? "none" : "transparent");
         el.style.setProperty("background-image", `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
         el.style.setProperty("background-origin", "border-box");
         el.style.setProperty("background-size", "100% 100%");
