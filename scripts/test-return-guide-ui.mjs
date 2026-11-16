@@ -19,7 +19,7 @@ const receipts = [
   // Ordered with a Hide My Email address: the shop's page wants that address, not the inbox it lands in.
   { id: "44444444-4444-4444-8444-444444444444", status: "pending", kind: "receipt", retailer: { name: "Rains", domain: "rains.com" }, orderRef: "RA-77812", sentTo: "quiet_fox_12@privaterelay.appleid.com",
     orderDate: day(-5), totalPence: 11000, currency: "GBP", items: [{ name: "Long Jacket", qty: 1, pricePence: 11000 }], returnable: true,
-    returns: { windowDays: 30, deadline: day(25), portalUrl: "https://rains.com/returns" } },
+    returns: { windowDays: 30, deadline: day(25), portalUrl: "https://rains.returnscenter.com/" } },
   // A return already started: the shop's return email (with its QR code) has arrived.
   { id: "22222222-2222-4222-8222-222222222222", status: "pending", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderRef: "1004",
     orderDate: day(-8), totalPence: 8500, currency: "GBP", items: [{ name: "Court Classic Trainers", qty: 1, pricePence: 8500 }], returnable: true,
@@ -104,8 +104,24 @@ await homeCard(page, "Long Jacket").click();
 await sheet.getByRole("button", { name: "Start return" }).click();
 await sheet.getByRole("button", { name: "Copy your email address, quiet_fox_12@privaterelay.appleid.com" }).waitFor();
 assert.equal(await sheet.getByRole("button", { name: /^Copy your email address/ }).count(), 1, "one address: the one the shop knows");
+// Rains' returns page is AfterShip's, which opens with the order filled in: the button says so and the link carries it.
+const filled = sheet.getByRole("link", { name: "Open Rains with your order filled in" });
+await filled.waitFor();
+assert.equal(await filled.getAttribute("href"), "https://rains.returnscenter.com/api/instant?order_number=RA-77812&email=quiet_fox_12%40privaterelay.appleid.com");
 await sheet.getByRole("button", { name: "Close" }).click();
-console.log("ok - the email address offered is the one the order was sent to");
+console.log("ok - the email address offered is the one the order was sent to, and a page that can open filled in does");
+
+// Which returns pages open filled in (from their makers' help pages); anything else keeps its own link.
+const pf = (...a) => page.evaluate(a => window.relayPrefilledReturn(...a), a);
+assert.equal(await pf("https://shop.loopreturns.com/#/", "#1001", "a@b.co", "E1 6AN"), "https://shop.loopreturns.com/?order=%231001&zip=E1%206AN", "Loop: order and postcode");
+assert.equal(await pf("https://shop.loopreturns.com/", "#1001", "a@b.co", null), null, "Loop needs the postcode");
+assert.equal(await pf("https://portal.example.co.uk/brand/returnPortal/Start", "R1", "a@b.co", "E1 6AN"), "https://portal.example.co.uk/brand/returnPortal/Details?OrderNumber=R1&deliveryPostcode=E1%206AN", "ZigZag: order and postcode");
+assert.equal(await pf("https://shop.example.com/apps/returnzap?x=1", "1001", "a@b.co", null), "https://shop.example.com/apps/returnzap?x=1&rzOrderNumber=1001&rzEmail=a%40b.co", "ReturnZap: order and email");
+assert.equal(await pf("https://returns.narvar.com/lululemon/returns", "1", "a@b.co", "E1 6AN"), null, "Narvar: left as it is");
+assert.equal(await pf("https://click.e.shop.test/returns?o=1", "1", "a@b.co", "E1 6AN"), null, "a link through the email's tracking: left as it is");
+assert.equal(await pf("http://x.returnscenter.com/", "1", "a@b.co", null), null, "only https");
+assert.equal(await sheet.count(), 0);
+console.log("ok - AfterShip, Loop, ZigZag and ReturnZap pages open filled in; others keep their own link");
 
 // 3. The shop's return email has arrived: the main button on the card's page shows the QR code from it.
 const kl = homeCard(page, "Court Classic Trainers");

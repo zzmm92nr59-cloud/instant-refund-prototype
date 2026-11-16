@@ -8118,6 +8118,26 @@
   // A return through the shop's own returns page, made quick: the order number and email the page asks for, one tap to copy
   // each; the page opens with the order number already copied; and once the shop emails the QR code or label, it shows on
   // the card. Relay doesn't submit the return itself: the shop's page does that.
+  // Returns pages that open with the order filled in, as their makers' own help pages describe (checked 16 Nov 2026):
+  //  * AfterShip (…returnscenter.com): /api/instant?order_number=…&email=… goes straight to choosing the items.
+  //  * Loop (…loopreturns.com): /?order=…&zip=… (the delivery postcode).
+  //  * ZigZag (a page under /returnPortal): /returnPortal/Details?OrderNumber=…&deliveryPostcode=… (postcode or email).
+  //  * ReturnZap (a store page with returnzap in its address): ?rzOrderNumber=…&rzEmail=…
+  // Anything else (Narvar, a shop's own page, a tracking redirect from the email): null, and the link stays as it was.
+  // Only the order number and the email or postcode the page asks for go in the link, to the shop's own returns page.
+  function prefilledReturn(portal, order, email, postcode) {
+    var u; try { u = new URL(portal); } catch (e) { return null; }
+    if (u.protocol !== "https:" || !order) return null;
+    var q = function (o) { return Object.keys(o).map(function (k) { return k + "=" + encodeURIComponent(o[k]); }).join("&"); };
+    var host = u.hostname.toLowerCase();
+    if (/(^|\.)returnscenter\.com$/.test(host)) return email ? u.origin + "/api/instant?" + q({ order_number: order, email: email }) : null;
+    if (/(^|\.)loopreturns\.com$/.test(host)) return postcode ? u.origin + "/?" + q({ order: order, zip: postcode }) : null;
+    var zz = u.pathname.indexOf("/returnPortal");
+    if (zz >= 0 && (postcode || email)) return u.origin + u.pathname.slice(0, zz) + "/returnPortal/Details?" + q({ OrderNumber: order, deliveryPostcode: postcode || email });
+    if (/returnzap/i.test(portal) && email) { u.searchParams.set("rzOrderNumber", order); u.searchParams.set("rzEmail", email); return u.toString(); }
+    return null;
+  }
+  window.relayPrefilledReturn = prefilledReturn;
   function returnGuide(sheet, x, who, portal) {
     sheet.appendChild(el("h2", { text: "Return to " + who, style: "margin:0 0 6px" }));
     var dl = statedDeadline(x);
@@ -8137,17 +8157,17 @@
     // The address the shop sent the order to (a Hide My Email address, say), else the inbox the receipt came from (not
     // always the first one: Connor's lululemon order, 16 Nov 2026).
     var mailSpot = el("div"); rows.appendChild(mailSpot);
-    if (x.sentTo) mailSpot.appendChild(copyRow("Email address", String(x.sentTo)));
-    else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
+    var emailP = x.sentTo ? Promise.resolve(String(x.sentTo)) : cachedGet("gmail", "/relay/my/gmail").then(function (g) {
       var b = g && g.ok && g.body, box = b && x.mailbox ? (b.others || []).filter(function (o) { return o.mailbox === x.mailbox; })[0] : null;
       var addr = box ? box.email : b && (b.email || b.googleEmail);
-      if (addr && document.body.contains(rows)) mailSpot.appendChild(copyRow("Email address", String(addr)));
-    }, function () {});
+      return addr ? String(addr) : null;
+    }, function () { return null; });
+    emailP.then(function (addr) { if (addr && document.body.contains(rows)) mailSpot.appendChild(copyRow("Email address", addr)); });
     // If the returns page asks who and where (a collection, say): the name and address from Relay's delivery details, one
     // field at a time, the way shops' forms ask for them.
     var addrBox = el("div"); sheet.appendChild(addrBox);
-    api("/relay/my/delivery").then(function (r) {
-      var d = r && r.ok && r.body && r.body.delivery;
+    var deliveryP = api("/relay/my/delivery").then(function (r) { return (r && r.ok && r.body && r.body.delivery) || null; }, function () { return null; });
+    deliveryP.then(function (d) {
       if (!d || !document.body.contains(addrBox)) return;
       addrBox.appendChild(el("p", { text: "If it asks for your name and address", style: "margin:14px 0 8px;font-size:15px;font-weight:700;color:var(--rl-text)" }));
       var more = el("div");
@@ -8159,6 +8179,13 @@
     var go = el("a", { className: "rl-po-primary", href: portal, target: "_blank", rel: "noopener noreferrer", style: "display:block;margin-top:14px;box-sizing:border-box",
       text: x.orderRef ? "Copy order number and open " + who : "Open " + who + "'s returns page" });
     go.onclick = function () { if (x.orderRef) copyText(String(x.orderRef)); };
+    // Where the shop's returns page is one that opens with the order already filled in, the link does that (the order
+    // number is still copied too, in case the page asks again).
+    if (x.orderRef) Promise.all([emailP, deliveryP]).then(function (got) {
+      var filled = prefilledReturn(portal, String(x.orderRef), got[0], got[1] && got[1].postcode);
+      if (!filled || !document.body.contains(go)) return;
+      go.href = filled; go.textContent = "Open " + who + " with your order filled in";
+    });
     // The phone can hold one copied thing at a time: the order number goes with the button; the rest is here to come back to.
     sheet.insertBefore(go, rows.nextSibling);
     sheet.insertBefore(el("p", { text: "Your phone keeps one copied thing at a time. Come back here to copy the next one, or let your phone's AutoFill fill in your email and address.", style: "margin:8px 0 0;font-size:13px;color:var(--rl-text2);line-height:1.4" }), go.nextSibling);
