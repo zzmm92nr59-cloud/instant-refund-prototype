@@ -656,6 +656,24 @@
     // Getting started: the journey from Welcome to "You're all set".
     ".rl-jr{padding-top:0}.rl-jtop{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;margin:0 -16px;padding:6px 8px;background:var(--rl-glass);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}" +
     ".rl-dots{display:flex;gap:6px}.rl-dots span{width:8px;height:8px;border-radius:99px;background:#d9d3c4;transition:width .2s,background .2s}.rl-dots span.on{width:22px;background:#101828}.rl-dots span.done{background:#7da23a}" +
+    // Getting started: one bar across the top that fills as you go, "2 of 5" above it, each step sliding in with its picture.
+    ".rl-jstep{font-size:13px;font-weight:700;color:var(--rl-text2);font-variant-numeric:tabular-nums}" +
+    ".rl-jpbar{grid-column:1/-1;height:4px;border-radius:99px;background:var(--rl-line);margin:6px 8px 2px;overflow:hidden}.rl-jpbar i{display:block;height:100%;border-radius:99px;background:#101828;transition:width .55s cubic-bezier(.2,.8,.2,1)}" +
+    ".rl-jbody.rl-jin{animation:rljin .42s cubic-bezier(.2,.8,.2,1) both}.rl-jbody.rl-jin.rl-jback{animation-name:rljback}" +
+    "@keyframes rljin{from{opacity:0;transform:translateX(34px)}to{opacity:1;transform:none}}@keyframes rljback{from{opacity:0;transform:translateX(-34px)}to{opacity:1;transform:none}}" +
+    ".rl-jart{position:relative;height:150px;margin:6px 0 14px;border-radius:22px;overflow:hidden;display:flex;align-items:center;justify-content:center}" +
+    ".rl-jart-mail{background:#4F72E0}.rl-jart-bank{background:#101828}.rl-jart-name{background:#D47B1F}.rl-jart-shop{background:#E0446E}.rl-jart-done{background:#2E9E5B}" +
+    ".rl-jart .rl-jbig{width:76px;height:76px;border-radius:22px;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;animation:rljpop .5s .05s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jart .rl-jbig .rl-jic{color:#fff}.rl-jart .rl-jhi{font-size:30px;font-weight:800;color:#fff;border-radius:99px}.rl-jchip{position:absolute;background:#fff;color:#101828;font-size:13px;font-weight:700;border-radius:99px;padding:7px 12px;box-shadow:0 6px 18px rgba(16,24,40,.18);animation:rljfloat .6s .15s cubic-bezier(.2,.8,.2,1) both}" +
+    ".rl-jchip+.rl-jchip{animation-delay:.3s}" +
+    ".rl-jcards{position:relative;width:190px;height:112px}.rl-jcardart{position:absolute;width:150px;height:94px;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;font-size:13px;font-weight:700;animation:rljfan .6s cubic-bezier(.2,.9,.3,1.1) both}" +
+    ".rl-jcardart:nth-child(1){background:#c7f567;color:#101828;left:0;top:14px;--r:-8deg}.rl-jcardart:nth-child(2){background:#4F72E0;color:#fff;left:40px;top:4px;--r:6deg;animation-delay:.12s}" +
+    ".rl-jcardart i{display:block;width:30px;height:22px;border-radius:5px;background:rgba(255,255,255,.55)}.rl-jcardart:nth-child(1) i{background:rgba(16,24,40,.18)}" +
+    "@keyframes rljpop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}@keyframes rljfloat{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}" +
+    "@keyframes rljfan{from{opacity:0;transform:translateY(24px) rotate(0)}to{opacity:1;transform:rotate(var(--r))}}" +
+    ".rl-jlist{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:2px 16px;margin:0 0 14px}.rl-jrow{display:flex;gap:12px;align-items:center;min-height:52px;padding:8px 0}.rl-jrow+.rl-jrow{border-top:1px solid var(--rl-line)}" +
+    ".rl-jrow>.rl-jic{width:36px;height:36px;border-radius:10px;background:var(--rl-bg);color:var(--rl-text);flex:none}.rl-jrow b{display:block;font-size:15px;color:var(--rl-text);word-break:break-word}.rl-jrow span.rl-jrs{display:block;font-size:13px;color:var(--rl-text2)}" +
+    "@media(prefers-reduced-motion:reduce){.rl-jbody.rl-jin,.rl-jart *{animation:none!important}.rl-jpbar i{transition:none}}" +
     ".rl-jbody{padding:8px 2px 4px}.rl-jkick{font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--rl-accent);margin:6px 0 6px}" +
     ".rl-sheet h2.rl-jh{font-family:var(--rl-sys);font-weight:800;font-size:30px;line-height:1.1;letter-spacing:-.02em;color:var(--rl-text);margin:6px 0 10px}" +
     ".rl-sheet p.rl-jsub{font-size:16px;color:var(--rl-text2);margin:0 0 20px}" +
@@ -1658,6 +1676,7 @@
     back: '<path d="m15 6-6 6 6 6"/>',
     ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
     ext: '<path d="M14 4.5h5.5V10"/><path d="m19.5 4.5-8 8"/><path d="M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5H10"/>',
     parcel: '<path d="M12 3.5 19.5 7.5v9L12 20.5 4.5 16.5v-9z"/><path d="m4.5 7.5 7.5 4 7.5-4M12 11.5v9"/>',
     dot: '<circle cx="12" cy="12" r="4.5"/>',
@@ -1742,20 +1761,43 @@
     show();
     return api;
   }
-  // The frame of every step: progress dots (when there is more than one step), Back or Close, then the step itself.
+  // The frame of every step: how far along (a bar that fills, when there is more than one step), Back or Close, a picture,
+  // then the step itself.
+  var jBarWas = 0;
+  // The picture at the top of a step: flat colour, one big drawn icon or a little scene, rising in once.
+  function jArt(kind) {
+    var art = el("div", { className: "rl-jart rl-jart-" + kind }); art.setAttribute("aria-hidden", "true");
+    if (kind === "bank") {
+      art.appendChild(el("div", { className: "rl-jcards" }, [el("div", { className: "rl-jcardart" }, [el("i"), el("span", { text: "Card" })]), el("div", { className: "rl-jcardart" }, [el("i"), el("span", { text: "Current account" })])]));
+      art.appendChild(el("span", { className: "rl-jchip", style: "right:14px;bottom:14px", text: "Read only" }));
+      return art;
+    }
+    if (kind === "name") { art.appendChild(el("div", { className: "rl-jbig rl-jhi", text: "Hi" })); return art; }
+    var icon = { mail: "mail", shop: "eye", done: "check" }[kind] || "check";
+    art.appendChild(el("div", { className: "rl-jbig" }, [jIc(icon, 38)]));
+    if (kind === "mail") { art.appendChild(el("span", { className: "rl-jchip", style: "left:14px;top:18px", text: "Order confirmed" })); art.appendChild(el("span", { className: "rl-jchip", style: "right:14px;bottom:18px", text: "Refund issued" })); }
+    return art;
+  }
   function jFrame(sheet, o) {
     sheet.textContent = ""; sheet.classList.remove("rl-signin"); sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
     try { sheet.scrollTop = 0; } catch (e) {}
     var top = el("div", { className: "rl-jtop" });
     top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", "data-back": "", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
+    var bar = null;
     if (o.of > 1) {
-      var dots = el("div", { className: "rl-dots" }); dots.setAttribute("role", "img"); dots.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
-      for (var i = 1; i <= o.of; i++) dots.appendChild(el("span", { className: i < o.at ? "done" : i === o.at ? "on" : "" }));
-      top.appendChild(dots);
+      var step = el("span", { className: "rl-jstep", text: o.at + " of " + o.of }); step.setAttribute("role", "img"); step.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
+      top.appendChild(step);
+      // The bar grows (or shrinks, going back) from where the last step left it.
+      bar = el("i", { style: "width:" + Math.round((jBarWas || 0) * 100) + "%" });
     } else top.appendChild(el("span"));
     top.appendChild(o.noClose ? el("span") : el("button", { type: "button", className: "rl-abtn done", text: o.closeText || "Close", onclick: o.onClose || close }));
+    if (bar) {
+      var to = o.at / o.of; top.appendChild(el("div", { className: "rl-jpbar" }, [bar]));
+      jBarWas = to; requestAnimationFrame(function () { requestAnimationFrame(function () { bar.style.width = Math.round(to * 100) + "%"; }); });
+    }
     sheet.appendChild(top);
-    var body = el("div", { className: "rl-jbody" });
+    var body = el("div", { className: "rl-jbody" + (o.of > 1 ? " rl-jin" + (o.goingBack ? " rl-jback" : "") : "") });
+    if (o.art) body.appendChild(jArt(o.art));
     if (o.kicker) body.appendChild(el("div", { className: "rl-jkick", text: o.kicker }));
     body.appendChild(el("h2", { className: "rl-jh", text: o.title }));
     if (o.sub) body.appendChild(el("p", { className: "rl-jsub", text: o.sub }));
@@ -1952,9 +1994,9 @@
   // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
   function providerStep(sheet, kind) {
     var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    // A new account goes on to its name, what it shops for, then "You're all set": four steps. Someone coming back usually
-    // has those already (before signing in Relay can't tell), so three.
-    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, of: signInOpts.returning ? 3 : 4, at: 1,
+    // A new account goes on to its name, its inboxes, what it shops for, then "You're all set": five steps. Someone coming
+    // back usually has some of those already (before signing in Relay can't tell), so four.
+    var body = jFrame(sheet, { art: "mail", back: function () { signedOutView(sheet, signInOpts); }, of: signInOpts.returning ? 4 : 5, at: 1,
       title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
     var points = el("div", { className: "rl-jcard" });
     [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
@@ -2068,22 +2110,29 @@
       api("/relay/my/second-step", { fresh: true }).then(function (ss) {
         // A second step comes first when the account needs one (it can't use anything else until then).
         if (ss.ok && ss.body.required && !ss.body.done) return protectAccount(function () { startJourney(info); });
-        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail"), interestsLoad(true)]).then(function (r) {
+        return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail"), interestsLoad(true), isReview() ? Promise.resolve({ ok: false }) : api("/relay/my/bank", { fresh: true })]).then(function (r) {
         if (!document.body.contains(sheet)) return;
         if (r[1].status === 401) { save(null); return open(signedOutView); }
-        var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {};
+        var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {}, bk = r[4] && r[4].ok && r[4].body ? r[4].body : {};
         if (g && g.connected) rememberMailbox(g);
         var fl = obGet(email);
-        var st = { email: email, consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null };
-        var steps = [];
-        if (!p.name && !fl.nameSkipped) steps.push("name");
-        if (!st.connected && !fl.mailLater && !isReview()) steps.push("mail");
-        // What they shop for, after the inbox: so Browse can show shops they'll like first (interests.js). Only as part of
-        // getting started: someone already set up who signs in again goes straight in (Home asks them once instead).
-        if ((steps.length || st.justConnected) && r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()) steps.push("interests");
-        if (!steps.length && !st.justConnected) { close(); if (window.go) window.go("profile"); return; }
+        var st = { email: email, consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null,
+          inboxes: g && g.connected ? [{ provider: g.provider, email: g.email }].concat((g.others || []).map(function (x) { return { provider: x.provider, email: x.email }; })) : [], maxInboxes: (g && g.maxInboxes) || 5,
+          bankOn: bk.available === true, testBanks: bk.testBanks === true, banks: bk.connections || [], bankNote: info.bankNote || null };
+        // Getting started, in this order: your name, your inboxes, your cards and banks, what you shop for, then all set.
+        // Only what's still needed... but once someone is getting started, the inbox and bank steps stay in, so they can add
+        // another (and coming back from Google, Microsoft or a bank lands on the step they left).
+        var need = { name: !p.name && !fl.nameSkipped, mail: !st.connected && !fl.mailLater && !isReview(), bank: st.bankOn && !st.banks.length && !fl.bankLater };
+        var started = need.name || need.mail || need.bank || st.justConnected || Boolean(info.at);
+        if (!started) { close(); if (window.go) window.go("profile"); return; }
+        if (st.connected && !isReview()) need.mail = true;
+        if (st.bankOn && st.banks.length) need.bank = true;
+        if (info.at) need[info.at] = true;
+        // What they shop for: so Browse can show shops they'll like first (interests.js). Home asks anyone else once.
+        need.interests = r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview();
+        var steps = ["name", "mail", "bank", "interests"].filter(function (k) { return need[k]; });
         steps.push("done");
-        runJourney(sheet, st, steps, 0);
+        runJourney(sheet, st, steps, Math.max(0, info.at ? steps.indexOf(info.at) : 0));
         });
       }).catch(function () {
         if (!document.body.contains(sheet)) return;
@@ -2150,11 +2199,12 @@
   function runJourney(sheet, st, steps, i) {
     // Through Google or Microsoft the permission step was step 1, so the count carries on from there.
     var off = st.justConnected && st.viaProvider ? 1 : 0, kind = steps[i], of = steps.length + off, at = i + 1 + off;
+    var wentBack = Boolean(st.wentBack); st.wentBack = false;
     var next = function () { runJourney(sheet, st, steps, i + 1); };
-    var back = i > 0 ? function () { runJourney(sheet, st, steps, i - 1); } : null;
-    var leave = function () { if (st.scanner) st.scanner.stop(); close(); };
+    var back = i > 0 ? function () { st.wentBack = true; runJourney(sheet, st, steps, i - 1); } : null;
+    var leave = function () { if (st.scanner) st.scanner.stop(); jBarWas = 0; close(); };
     if (kind === "name") {
-      var body = jFrame(sheet, { back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
+      var body = jFrame(sheet, { goingBack: wentBack, art: "name", back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
         title: "What should we call you?", sub: "Your first name is fine. Only you see it." });
       if (st.connected) body.appendChild(scanCard(sheet, st));
       var input = el("input", { type: "text", id: "rl-onboard-name", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: st.name || st.suggested || "" });
@@ -2176,9 +2226,34 @@
       if (st.suggested && !st.name) body.appendChild(el("p", { className: "rl-jnote", text: "Filled in from your " + (st.provider === "microsoft" ? "Microsoft" : "Google") + " account. Change it if you like." }));
       return;
     }
+    if (kind === "mail" && st.connected) {
+      // Connected: the inboxes so far, the first read counting, and a quick way to add every other address they shop with.
+      var bodyM = jFrame(sheet, { goingBack: wentBack, art: "mail", back: back, of: of, at: at, closeText: "Skip", onClose: next,
+        title: "Your inboxes", sub: "Relay reads each one for receipts by itself. Add every email address you shop with." });
+      bodyM.appendChild(scanCard(sheet, st));
+      var listM = el("div", { className: "rl-jlist" });
+      st.inboxes.forEach(function (x) {
+        listM.appendChild(el("div", { className: "rl-jrow" }, [jIc("mail"), el("div", {}, [el("b", { text: x.email || mailNameOf(x.provider) }), el("span", { className: "rl-jrs", text: mailNameOf(x.provider) + ", connected" })])]));
+      });
+      bodyM.appendChild(listM);
+      var noteM = el("div", { className: "rl-msg" }); noteM.setAttribute("role", "status");
+      if (st.mailNote) { say(noteM, st.mailNote.text, st.mailNote.bad); listM.parentNode.insertBefore(noteM, listM); }
+      var cM = st.consent || {};
+      bodyM.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
+      if (st.inboxes.length < st.maxInboxes) {
+        [["google", "Gmail", cM.gmailAvailable !== false], ["microsoft", "Outlook", Boolean(cM.outlookAvailable)]].forEach(function (k) {
+          if (!k[2]) return;
+          var b = el("button", { type: "button", className: "rl-btn ghost", text: "Add another " + k[1] + " inbox" });
+          b.onclick = function () { obSet(st.email, { back: "mail" }); addAnotherInbox(k[0], b, noteM); };
+          bodyM.appendChild(b);
+        });
+      }
+      if (!noteM.parentNode) bodyM.appendChild(noteM);
+      return;
+    }
     if (kind === "mail") {
       var c = st.consent || {}, first = mailKindOf(st.email) || (c.gmailAvailable ? "google" : "microsoft");
-      var body2 = jFrame(sheet, { back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { mailLater: true }); next(); },
+      var body2 = jFrame(sheet, { goingBack: wentBack, art: "mail", back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { mailLater: true }); next(); },
         title: "Bring in your receipts", sub: "Connect the email you shop with. Relay reads it once now, then keeps up with new receipts by itself." });
       var pts = el("div", { className: "rl-jcard" });
       [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["trash", "Disconnect and delete everything at any time"]]
@@ -2201,7 +2276,7 @@
           return api("/relay/my/gmail/connect", { method: "POST", body: provider ? { provider: provider } : undefined });
         }).then(function (x) {
           // Coming back from Google or Microsoft carries on here, at "You're all set".
-          if (x.ok && x.body && host.test(x.body.url || "")) { obSet(st.email, { back: "done" }); location.href = x.body.url; return; }
+          if (x.ok && x.body && host.test(x.body.url || "")) { obSet(st.email, { back: "mail" }); location.href = x.body.url; return; }
           button.disabled = false; say(note2, "Couldn't start the " + label + " connection. Please try again.", true);
         }).catch(function () { button.disabled = false; say(note2, "Couldn't reach Relay. Check your connection.", true); });
       };
@@ -2216,9 +2291,42 @@
       if (st.mailNote) say(note2, st.mailNote.text, st.mailNote.bad);
       return;
     }
+    if (kind === "bank") {
+      // Cards and banks, through TrueLayer: each one is its bank's own sign-in, then back here with it listed.
+      var bodyB = jFrame(sheet, { goingBack: wentBack, art: "bank", back: back, of: of, at: at, closeText: st.banks.length ? "Skip" : "Later",
+        onClose: function () { if (!st.banks.length) obSet(st.email, { bankLater: true }); next(); },
+        title: "Your cards and banks", sub: "Connect the cards and accounts you pay with. Relay matches payments to receipts and finds purchases that never sent one. It can only read: it can't move money." });
+      if (st.connected) bodyB.appendChild(scanCard(sheet, st));
+      if (st.testBanks) bodyB.appendChild(el("p", { className: "rl-jnote", text: "Test banks only for now. Choose Mock Bank, then sign in with john and doe." }));
+      var noteB = el("div", { className: "rl-msg" }); noteB.setAttribute("role", "status");
+      var BN = { connected: ["Connected. Relay has read your payments and is matching them to your receipts.", false], denied: ["Not connected. You can try again, or add it later from your picture, then Bank and cards.", true],
+        failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
+      if (st.bankNote && BN[st.bankNote]) { say(noteB, BN[st.bankNote][0], BN[st.bankNote][1]); bodyB.appendChild(noteB); }
+      if (st.banks.length) {
+        var listB = el("div", { className: "rl-jlist" });
+        st.banks.forEach(function (x) {
+          listB.appendChild(el("div", { className: "rl-jrow" }, [jIc("card"), el("div", {}, [el("b", { text: x.bank || "Bank" }),
+            el("span", { className: "rl-jrs", text: x.needsReconnect ? "Connect again to keep reading payments" : x.payments ? x.payments + (x.payments === 1 ? " payment read" : " payments read") + (x.matched ? ", " + x.matched + " matched to receipts" : "") : "Connected" })])]));
+        });
+        bodyB.appendChild(listB);
+      }
+      var goB = el("button", { type: "button", className: "rl-btn" + (st.banks.length ? " ghost" : ""), text: st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
+      goB.onclick = function () {
+        if (goB.disabled) return;
+        goB.disabled = true; say(noteB, "Opening your bank\u2026");
+        api("/relay/my/bank/connect", { method: "POST" }).then(function (r) {
+          if (r.ok && r.body && /^https:\/\//.test(r.body.url || "")) { obSet(st.email, { back: "bank" }); location.href = r.body.url; return; }
+          goB.disabled = false;
+          say(noteB, r.status === 409 ? "That's the most banks and cards Relay can connect." : "Couldn't open your bank just now. Try again in a moment.", true);
+        }, function () { goB.disabled = false; say(noteB, "Couldn't reach Relay. Check your connection and try again.", true); });
+      };
+      if (st.banks.length) bodyB.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
+      bodyB.appendChild(goB); if (!noteB.parentNode) bodyB.appendChild(noteB);
+      return;
+    }
     if (kind === "interests") {
       var chosen = [];
-      var body4 = jFrame(sheet, { back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
+      var body4 = jFrame(sheet, { goingBack: wentBack, art: "shop", back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
         title: "What do you shop for?", sub: "Pick a few and Relay shows shops you'll like first." });
       if (st.connected) body4.appendChild(scanCard(sheet, st));
       var note4 = el("div", { className: "rl-msg" }); note4.setAttribute("role", "status");
@@ -2230,11 +2338,17 @@
     }
     // Done: a short welcome, the scan still counting, and where to go first.
     var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
-    var body3 = jFrame(sheet, { of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
+    var body3 = jFrame(sheet, { goingBack: wentBack, art: "done", of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
       kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
       sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app."
         : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time: tap your picture at the top of the screen, then Inboxes." });
     if (st.connected) body3.appendChild(scanCard(sheet, st));
+    if (st.inboxes.length || st.banks.length) {
+      var got = el("div", { className: "rl-jlist" });
+      if (st.inboxes.length) got.appendChild(el("div", { className: "rl-jrow" }, [jIc("mail"), el("div", {}, [el("b", { text: st.inboxes.length === 1 ? "1 inbox connected" : st.inboxes.length + " inboxes connected" }), el("span", { className: "rl-jrs", text: "Read for receipts, by itself" })])]));
+      if (st.banks.length) got.appendChild(el("div", { className: "rl-jrow" }, [jIc("card"), el("div", {}, [el("b", { text: st.banks.length === 1 ? "1 bank or card connected" : st.banks.length + " banks and cards connected" }), el("span", { className: "rl-jrs", text: "Payments matched to receipts" })])]));
+      body3.appendChild(got);
+    }
     var tips = el("div", { className: "rl-jcard" });
     (isReview() ? [["check", "Swap a size or colour before the shop sends your order"], ["eye", "Price drops on things you watch, sent to your phone"]]
       : [["check", "Return deadlines from your receipts, counted down for you"], ["eye", "Price drops on things you watch, sent to your phone"]]).forEach(function (x) { tips.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
@@ -5818,7 +5932,12 @@
     memo.gmail = null; memo.receipts = null;
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
-    if (obGet(s.email).back) { obSet(s.email, { back: null }); return startJourney(m[2] === "connected" ? { justConnected: true } : { mailNote: note }); }
+    var wasAt = obGet(s.email).back;
+    if (wasAt) {
+      obSet(s.email, { back: null });
+      var ok = m[2] === "connected" || m[2] === "added" || m[2] === "already_connected";
+      return startJourney({ justConnected: m[2] === "connected", at: wasAt === "done" ? null : wasAt, mailNote: m[2] === "connected" ? null : note, okNote: ok });
+    }
     // Connected (or connected again, to catch up on what was missed): the Receipts page reads it straight away, with progress.
     window.__relayAutoScan = m[2] === "connected" || m[2] === "reconnected";
     if (window.go) { window.__relayReceiptsNote = note; window.go("receipts"); return; }
@@ -5828,7 +5947,8 @@
     var m = /(?:^|[#&])bank=(connected|denied|failed|expired|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
-    if (!load()) return;
+    var s = load(); if (!s) return;
+    if (obGet(s.email).back === "bank") { obSet(s.email, { back: null }); return startJourney({ at: "bank", bankNote: m[1] }); }
     wantBank = m[1];
     if (window.go) window.go("me");
     setTimeout(function () { if (wantBank && openBankPage) openBankPage(); }, 0);

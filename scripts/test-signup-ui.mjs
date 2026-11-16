@@ -43,6 +43,9 @@ await ctx.route("https://**/*", async route => {
     return j({ ok: true, more, added: 0, cursor: more ? "c" + n : null, job: { state: more ? "running" : "done", found, scannedBack: more ? "2026-0" + (8 - n * 2) + "-01" : "2025-07-01" } });
   }
   if (p === "/relay/my/receipts") return j({ receipts: [] });
+  // Cards and banks (worker/bank.js): offered to Relay's team and testers for now.
+  if (p === "/relay/my/bank" && m === "GET") return j(st.bankOn ? { available: true, testBanks: false, connections: st.banks || [] } : { available: false, connections: [] });
+  if (p === "/relay/my/bank/connect" && m === "POST") { st.bankConnects = (st.bankConnects || 0) + 1; return j({ url: "https://auth.truelayer.com/?response_type=code&state=" + "s".repeat(43) }); }
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
   return j({});
@@ -50,6 +53,7 @@ await ctx.route("https://**/*", async route => {
 // Registered last so they win over the catch-all above: stand-ins for Google's and Microsoft's own pages.
 await ctx.route("https://accounts.google.com/**", r => r.fulfill({ status: 200, contentType: "text/html", body: "<h1>FAKE Google</h1>" }));
 await ctx.route("https://login.microsoftonline.com/**", r => r.fulfill({ status: 200, contentType: "text/html", body: "<h1>FAKE Microsoft</h1>" }));
+await ctx.route("https://auth.truelayer.com/**", r => r.fulfill({ status: 200, contentType: "text/html", body: "<h1>FAKE bank</h1>" }));
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
 const sheet = page.locator(".rl-sheet");
 // The polish rules on whatever step is showing.
@@ -151,7 +155,7 @@ await sheet.getByRole("button", { name: "Continue with Google" }).click();
 await sheet.getByRole("heading", { name: "Sign in and bring in your receipts" }).waitFor();
 await sheet.getByText(CONSENT.text[1]).waitFor();
 assert.ok(await sheet.getByText(CONSENT.text[1]).isVisible(), "the full wording is shown, not hidden behind a link");
-assert.equal(await sheet.getByRole("img", { name: "Step 1 of 4" }).count(), 1, "the journey shows where you are (permission, name, what you shop for, all set)");
+assert.equal(await sheet.getByRole("img", { name: "Step 1 of 5" }).count(), 1, "the journey shows where you are (permission, name, your inboxes, what you shop for, all set)");
 await polished("permission"); await page.screenshot({ path: "/tmp/shots/signup-2-permission.png" });
 st.verify = { mailConnected: "google", suggestedName: "Jess Tester" };
 st.onVerify = { connected: true, provider: "google", accepted: true };
@@ -162,15 +166,24 @@ await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor()
 assert.equal(await page.locator("#rl-onboard-name").inputValue(), "Jess Tester", "the name Google holds is offered");
 assert.equal(st.profilePosts.length, 0, "and not saved without asking");
 await sheet.locator(".rl-jscan").getByText(/receipts? found so far/).waitFor();
-assert.equal(await sheet.getByRole("img", { name: "Step 2 of 4" }).count(), 1, "the count carries on from the permission step");
+assert.equal(await sheet.getByRole("img", { name: "Step 2 of 5" }).count(), 1, "the count carries on from the permission step");
+assert.ok(await sheet.locator(".rl-jpbar i").count(), "one bar across the top shows how far along");
 await polished("name"); await page.screenshot({ path: "/tmp/shots/signup-3-name.png" });
 // The first read finishes while the name is being added: "You're all set" shows the count it reached straight away
 // (it used to go back to "Reading your Gmail…" and stay there).
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
 await sheet.getByRole("button", { name: "Continue" }).click();
+// Then their inboxes: the one just connected, the read counting, and adding another inbox is one tap.
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 3 of 5" }).count(), 1);
+await sheet.locator(".rl-jlist").getByText("Gmail, connected").waitFor();
+assert.ok(await sheet.getByRole("button", { name: "Add another Gmail inbox" }).isVisible(), "another inbox is one tap away");
+await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor();
+await polished("your inboxes"); await page.screenshot({ path: "/tmp/shots/signup-3b-inboxes.png" });
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 // Then what they shop for: a few to pick (or Later), saved with the account once, and the read carries on counting.
 await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
-assert.equal(await sheet.getByRole("img", { name: "Step 3 of 4" }).count(), 1);
+assert.equal(await sheet.getByRole("img", { name: "Step 4 of 5" }).count(), 1);
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor();
 await polished("what you shop for");
 await sheet.getByRole("button", { name: "Fashion", exact: true }).click(); await page.waitForTimeout(500);
@@ -180,6 +193,7 @@ await sheet.getByRole("button", { name: "Continue" }).dblclick();
 await sheet.getByRole("heading", { name: "You're all set, Jess." }).waitFor();
 assert.deepEqual(st.interestPuts, [{ interests: ["fashion", "tech"] }], "saved with the account, once for a double tap");
 assert.match(await sheet.locator(".rl-jscan").innerText(), /12 receipts found/, "the count carries over to 'You're all set' at once");
+await sheet.getByText("1 inbox connected").waitFor();
 assert.deepEqual(st.profilePosts, [{ name: "Jess Tester" }]);
 assert.equal(st.connects, 0, "no second visit to Google to connect Gmail");
 assert.equal(st.consentPosts, 0, "the agreement made before Google isn't asked for again");
@@ -204,7 +218,7 @@ assert.equal(await sheet.count(), 0, "returning: straight to Home");
 console.log("ok - someone already set up lands on Home");
 
 // 3. Email link with a Gmail address: pointed at the one-step route; choosing email anyway, they connect Gmail once
-// (agreeing there), and coming back from Google lands on "You're all set".
+// (agreeing there), and coming back from Google lands back on their inboxes, ready to add another or carry on.
 await page.evaluate(() => localStorage.clear()); reset({ email: "sam.new@gmail.com" });
 await page.goto(origin + "/index.html");
 await page.getByRole("button", { name: "Get started" }).click();
@@ -237,6 +251,9 @@ await page.waitForURL(/accounts\.google\.com/);
 assert.equal(st.consentPosts, 1); assert.equal(st.connects, 1);
 st.connected = true; st.provider = "google"; st.scanCalls = 0;
 await page.goto(origin + "/index.html#gmail=connected");
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await sheet.locator(".rl-jscan").waitFor();
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 // What they shop for comes after the inbox; Later moves on and isn't asked again on this phone.
 await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
 await sheet.getByRole("button", { name: "Later" }).click();
@@ -244,7 +261,7 @@ await sheet.getByRole("heading", { name: "You're all set, Sam." }).waitFor();
 await sheet.locator(".rl-jscan").getByText(/receipts? found/).waitFor();
 await sheet.getByRole("button", { name: "Go to Home" }).click();
 await homeShows(page, "S");
-console.log("ok - email sign-in: Gmail users are pointed to the one-step route; otherwise they connect once and return to 'all set'");
+console.log("ok - email sign-in: Gmail users are pointed to the one-step route; otherwise they connect once and come back to their inboxes");
 
 // 4. Microsoft, one step, and "Later" for the name: never asked again on this device.
 await page.evaluate(() => localStorage.clear()); reset({ email: "amy@outlook.com" });
@@ -259,6 +276,12 @@ assert.equal(st.starts[0].consentVersion, CONSENT.version);
 await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
 await sheet.getByText("Reading your Outlook").or(sheet.getByText(/found so far/)).first().waitFor();
 await sheet.getByRole("button", { name: "Skip" }).click();
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+// A second "Skip" in the same spot within 0.4s is a double tap (index.html's guard), so it doesn't skip two steps.
+await sheet.getByRole("button", { name: "Skip" }).click();
+assert.equal(await sheet.getByRole("heading", { name: "Your inboxes" }).count(), 1, "a double tap on Skip doesn't skip two steps");
+await page.waitForTimeout(450);
+await sheet.getByRole("button", { name: "Skip" }).click();
 await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
 await sheet.getByRole("button", { name: "Later" }).click();
 await sheet.getByRole("heading", { name: "You're all set." }).waitFor();
@@ -269,6 +292,54 @@ await page.goto(origin + "/index.html#signin=" + LINK);
 await homeReady(page); await page.waitForTimeout(500);
 assert.equal(await sheet.count(), 0, "a skipped name (and what they shop for, left for later) isn't asked for again");
 console.log("ok - Microsoft: one step too; a skipped name isn't asked again");
+
+// 6. Cards and banks: someone with an inbox but no bank yet (where Relay offers banks) gets their inboxes, then their
+// cards and banks: connect one through TrueLayer, come straight back to the same step with it listed, add another or carry
+// on, and "You're all set" says what's connected.
+await page.evaluate(() => localStorage.clear()); reset({ name: "Connor", accepted: true, connected: true, provider: "google", email: "connor.test@gmail.com", bankOn: true, banks: [] });
+await page.goto("about:blank"); await page.goto(origin + "/index.html");
+await page.evaluate(() => localStorage.setItem("relay_gnonce", "N".repeat(43)));
+await page.goto(origin + "/index.html#signin=" + LINK);
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 1 of 4" }).count(), 1, "inboxes, cards and banks, what you shop for, all set");
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 2 of 4" }).count(), 1);
+assert.match(await sheet.locator(".rl-jbody").innerText(), /can only read: it can't move money/, "says plainly it can't move money");
+await polished("cards and banks"); await page.screenshot({ path: "/tmp/shots/signup-banks.png" });
+await sheet.getByRole("button", { name: "Connect a bank or card" }).dblclick();
+await page.waitForURL(/auth\.truelayer\.com/);
+assert.equal(st.bankConnects, 1, "one bank sign-in for a double tap");
+st.banks = [{ id: "11111111-1111-4111-8111-111111111111", bank: "Made-up Bank", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 12, matched: 3 }];
+await page.goto(origin + "/index.html#bank=connected");
+await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
+await sheet.getByText("Connected. Relay has read your payments and is matching them to your receipts.").waitFor();
+await sheet.locator(".rl-jlist").getByText("Made-up Bank").waitFor();
+assert.match(await sheet.locator(".rl-jlist").innerText(), /12 payments read, 3 matched to receipts/);
+assert.ok(await sheet.getByRole("button", { name: "Add another bank or card" }).isVisible(), "another is one tap away");
+await polished("cards and banks, one connected"); await page.screenshot({ path: "/tmp/shots/signup-banks-2.png" });
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
+await sheet.getByRole("button", { name: "Later" }).click();
+await sheet.getByRole("heading", { name: "You're all set, Connor." }).waitFor();
+await sheet.getByText("1 inbox connected").waitFor();
+await sheet.getByText("1 bank or card connected").waitFor();
+await polished("all set, with a bank"); await page.screenshot({ path: "/tmp/shots/signup-banks-done.png" });
+// Coming back from the bank having said no: the same step, saying so, nothing listed.
+await page.evaluate(() => localStorage.clear()); reset({ name: "Connor", accepted: true, connected: true, provider: "google", email: "connor.test@gmail.com", bankOn: true, banks: [], interests: ["fashion"] });
+await page.goto("about:blank"); await page.goto(origin + "/index.html");
+await page.evaluate(() => localStorage.setItem("relay_gnonce", "N".repeat(43)));
+await page.goto(origin + "/index.html#signin=" + LINK);
+await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await sheet.getByRole("button", { name: "Continue", exact: true }).click();
+await sheet.getByRole("button", { name: "Connect a bank or card" }).click();
+await page.waitForURL(/auth\.truelayer\.com/);
+await page.goto(origin + "/index.html#bank=denied");
+await sheet.getByText(/Not connected\. You can try again/).waitFor();
+assert.equal(await sheet.locator(".rl-jlist").count(), 0);
+await sheet.getByRole("button", { name: "Later" }).click();
+await sheet.getByRole("heading", { name: "You're all set, Connor." }).waitFor();
+console.log("ok - cards and banks: connect through the bank's own page, straight back to the same step with it listed; no and Later handled");
 
 // 5. "Just sign in" for people who already use Relay: no agreement sent, no inbox requested.
 await page.evaluate(() => localStorage.clear()); reset();

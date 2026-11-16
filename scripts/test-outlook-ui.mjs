@@ -94,7 +94,10 @@ await page.waitForTimeout(800);
 assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself, straight away");
 await page.locator(".rl-jscan").waitFor();
 await page.getByRole("button", { name: "Skip" }).click();
-// Then what they shop for (they can choose later), then "See my receipts".
+// Then their inboxes (the Outlook one listed, another one tap away), then what they shop for, then "See my receipts".
+await page.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await page.getByText("Outlook, connected").waitFor();
+await page.getByRole("button", { name: "Continue", exact: true }).click();
 await page.getByRole("heading", { name: "What do you shop for?" }).waitFor();
 await page.getByRole("button", { name: "Later" }).click();
 await page.getByRole("button", { name: "See my receipts" }).click();
