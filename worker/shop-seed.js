@@ -1,0 +1,201 @@
+// Relay's starting list of real UK shops, by kind (Connor, 17 Nov 2026: "How can we ensure Relay knows all shops?").
+// Used by bank.js to tell which card payments are at a shop that sells things (so they likely should have a receipt).
+// It's one of three sources (see shop-directory.js): this list, TrueLayer's own labels on each payment, and shops Relay
+// has seen send receipts to at least two shoppers.
+//
+// Rules for adding a shop:
+//  * Only a real retailer that sells to people in the UK, that we're sure of. No guessing.
+//  * Its kind is what it mostly sells. "supermarket" means groceries: those payments are NOT highlighted (a weekly shop
+//    rarely needs its receipt kept), but the shopper can still add a photo of the receipt from the payment.
+//  * How a name is found in the bank's text: the name as whole words ("River Island" in "RIVER ISLAND 0412 LEEDS"), or
+//    written together when it's 7 letters or more ("RIVERISLAND"). Extra spellings go after "|" and are matched the same
+//    way. A name that is also an everyday word, a place or a surname ("Next", "Very", "Office", "Liberty") has its own
+//    pattern in PATTERNS instead, so "NEXT LEVEL BARBERS" isn't taken for Next.
+export const SHOP_KINDS = ["clothing", "shoes", "department", "sport", "electronics", "home", "diy", "beauty", "toys", "books", "jewellery", "pets", "marketplace", "supermarket"];
+
+export const SEED = {
+  clothing: [
+    "H&M|hennes|hm com", "Zara", "Uniqlo", "Primark", "Next", "ASOS", "boohoo", "boohooMAN", "PrettyLittleThing|pretty little thing", "River Island",
+    "New Look", "Topshop", "Topman", "Mango", "COS", "Arket", "& Other Stories|other stories", "Monki", "Weekday", "Massimo Dutti", "Bershka",
+    "Pull&Bear", "Stradivarius", "Gap", "Levi's|levis", "AllSaints|all saints", "Reiss", "Ted Baker", "Whistles", "Jigsaw", "Hobbs", "White Stuff",
+    "FatFace|fat face", "Joules", "Seasalt Cornwall|seasalt", "Superdry", "TK Maxx|tkmaxx", "Matalan", "Peacocks", "Bonmarché|bonmarche", "Monsoon",
+    "Accessorize", "Karen Millen", "Phase Eight", "Boden", "Me+Em|me and em", "Urban Outfitters", "Free People", "Abercrombie & Fitch|abercrombie",
+    "Hollister", "Jack Wills", "Crew Clothing", "Barbour", "Hackett", "Charles Tyrwhitt", "T.M. Lewin|tm lewin", "Moss Bros|moss", "Burton", "Slaters",
+    "Jacamo", "JD Williams", "Simply Be", "Very", "Littlewoods", "Quiz", "In The Style", "Nasty Gal", "Lipsy", "Dorothy Perkins", "Miss Selfridge",
+    "Yours Clothing", "Zalando", "Ralph Lauren", "Tommy Hilfiger", "Calvin Klein", "Hugo Boss", "Lacoste", "Fred Perry", "Ben Sherman", "Pretty Green",
+    "Belstaff", "Burberry", "Paul Smith", "Vivienne Westwood", "Stone Island", "Cotton Traders", "Lands' End|lands end", "Mint Velvet", "Sosandar",
+    "Nobody's Child|nobodys child", "Rixo", "Fenn Wright Manson", "Damart", "Jaeger", "Sunspel", "Pep&Co|pep and co", "Bravissimo", "Ann Summers",
+    "Boux Avenue", "Hunkemöller|hunkemoller", "Pour Moi", "Jack & Jones", "Gant", "Mulberry", "Radley", "Aspinal of London|aspinal",
+    "Cambridge Satchel", "Anthropologie", "Cath Kidston", "Select Fashion", "JoJo Maman Bébé|jojo maman bebe|jojo maman", "Mothercare",
+    "Mamas & Papas", "Diesel", "Guess", "Michael Kors", "Coach", "Kate Spade", "Hush", "Coast", "Wallis", "Shein", "Look Again", "Joe Browns",
+    "Long Tall Sally", "Never Fully Dressed", "Baukjen", "Celtic & Co", "Finisterre", "Rohan", "Hawes & Curtis", "Spoke", "Percival", "Universal Works",
+    "Oliver Spencer", "Gieves & Hawkes", "Turnbull & Asser", "New & Lingwood", "Lyle & Scott", "Farah", "Weird Fish", "Saltrock", "Howies", "Frugi",
+    "Polarn O. Pyret|polarn o pyret", "Trotters", "End Clothing|end clothing", "Mr Porter", "Net-a-Porter|net a porter", "Farfetch", "Browns Fashion",
+  ],
+  shoes: [
+    "Schuh", "Clarks", "Dr. Martens|dr martens|drmartens", "Office", "Kurt Geiger", "Russell & Bromley", "Dune", "Skechers", "Timberland", "UGG", "Crocs",
+    "Birkenstock", "Hotter", "Pavers", "Shoe Zone", "Deichmann", "Charles Clinkard", "Jones Bootmaker", "Loake", "Grenson", "Converse", "Size?",
+    "Footasylum", "Foot Locker|footlocker", "Moda in Pelle", "Sole Trader", "Oliver Sweeney", "Vans Store|vans uk",
+  ],
+  department: [
+    "John Lewis|johnlewis|peter jones", "Selfridges", "Harrods", "Liberty", "Harvey Nichols", "House of Fraser", "Fenwick", "Flannels", "Frasers",
+    "Debenhams", "Marks & Spencer|marks and spencer|m and s|marksandspencer", "Fortnum & Mason|fortnum", "Beales", "Bentalls", "Jarrold", "TJ Hughes",
+    "Dunnes Stores",
+  ],
+  sport: [
+    "JD Sports|jdsports", "Sports Direct|sportsdirect", "Nike", "Adidas", "Puma", "New Balance", "Under Armour", "Reebok", "ASICS", "lululemon",
+    "Sweaty Betty", "Gymshark", "Decathlon", "Mountain Warehouse", "Go Outdoors", "Cotswold Outdoor", "Blacks", "Millets", "Snow+Rock|snow and rock|snowandrock",
+    "Runners Need", "Ellis Brigham", "Trespass", "Regatta", "Berghaus", "The North Face|north face", "Patagonia", "Craghoppers", "Pro:Direct|prodirect",
+    "Wiggle", "Chain Reaction Cycles", "Evans Cycles", "Sigma Sports", "Rapha", "Castore", "MandM Direct|mandmdirect", "Start Fitness",
+    "SportsShoes.com|sportsshoes", "American Golf", "Golf Support", "Angling Direct", "Tredz", "Leisure Lakes", "Fitness Superstore", "Kitbag",
+    "Lovell Soccer", "Columbia Sportswear", "Absolute Snow",
+  ],
+  electronics: [
+    "Currys|currys pc world", "Argos", "Apple Store", "Samsung", "Dyson", "CeX|cex webuy", "Richer Sounds", "AO.com", "Box.co.uk", "Scan Computers",
+    "Overclockers UK|overclockers", "Ebuyer", "Novatech", "GAME", "Bose", "Sonos", "Bang & Olufsen", "Bowers & Wilkins", "Google Store", "CCL Computers",
+    "Laptops Direct|laptopsdirect", "Appliances Direct|appliancesdirect", "Hughes", "Euronics", "Sevenoaks Sound and Vision", "Peter Tyson",
+    "Wex Photo Video|wex photographic|wexphotovideo", "Jessops", "Park Cameras", "Gear4music", "Andertons", "musicMagpie|music magpie",
+    "Back Market|backmarket", "Maplin", "Lenovo", "Dell", "HP Store", "Raspberry Pi", "Pimoroni", "The Pi Hut|pi hut", "Mobile Fun", "Clove Technology",
+  ],
+  home: [
+    "IKEA", "Dunelm", "Habitat", "The Range|range retail", "Oliver Bonas", "Muji", "Wayfair", "Made.com", "Furniture Village", "DFS", "ScS", "Sofology",
+    "Oak Furnitureland|oak furniture land", "Loaf", "Heal's|heals", "Swoon", "Cox & Cox", "The White Company|white company", "Laura Ashley",
+    "Home Bargains", "B&M|b and m bargains|b and m retail", "Wilko", "Poundland", "Poundstretcher", "Lakeland", "Robert Dyas", "ProCook", "Le Creuset",
+    "Joseph Joseph", "Emma Sleep", "Simba Sleep", "Silentnight", "Bensons for Beds|bensons", "Dreams", "Barker and Stonehouse", "Neptune", "Sofa.com",
+    "Graham & Green", "Rockett St George", "Zara Home", "HomeSense", "Flying Tiger|tiger copenhagen", "Søstrene Grene|sostrene grene",
+    "Emma Bridgewater", "Denby", "Portmeirion", "Wedgwood", "Carpetright", "Tapi Carpets", "Time4Sleep", "Happy Beds", "Furniture123", "Next Home",
+    "Ercol", "Garden Trading", "Pooky", "Lights.co.uk", "Dusk", "Bedeck", "Christy", "Divertimenti", "Nisbets", "Snug", "Hillarys", "Terrys Fabrics",
+    "Original BTC", "La Redoute", "QVC", "Annie Sloan", "Sweetpea and Willow",
+  ],
+  diy: [
+    "B&Q|b and q|diy com", "Wickes", "Homebase", "Screwfix", "Toolstation", "Travis Perkins", "Jewson", "Selco", "Topps Tiles", "Tile Giant",
+    "Dulux Decorator Centre", "Machine Mart", "Halfords", "Dobbies", "Notcutts", "Blue Diamond", "Hillier Garden Centres|hillier garden", "Klondyke",
+    "Squire's Garden Centres|squires garden", "Thompson & Morgan", "Suttons Seeds", "Crocus.co.uk", "Primrose.co.uk", "Victorian Plumbing",
+    "Plumbworld", "Bathstore", "Howdens", "Magnet Kitchens", "Wren Kitchens", "Axminster Tools", "Hayes Garden World", "Haskins Garden Centres|haskins",
+    "Webbs Garden Centre", "Bents Garden", "Van Hage", "Burford Garden Company", "Harrod Horticultural", "Gardening Naturally", "Ernest Charles",
+    "Bathroom Takeaway", "Builder Depot", "Buildbase", "City Plumbing", "Plumbase", "Graham Plumbers Merchant", "CEF", "Edmundson Electrical", "Toolden",
+    "Leyland SDM", "Brewers Decorator Centres|brewers decorator", "Crown Decorating Centre", "Tile Mountain", "Victoria Plum|victoriaplum",
+    "Mr Fothergill's|mr fothergills", "Unwins Seeds",
+  ],
+  beauty: [
+    "Boots", "Superdrug", "Sephora", "Space NK|spacenk", "Lush", "The Body Shop|body shop", "Cult Beauty", "Lookfantastic|look fantastic",
+    "Charlotte Tilbury", "Rituals", "L'Occitane|loccitane", "Kiehl's|kiehls", "MAC Cosmetics", "Molton Brown", "Jo Malone", "The Perfume Shop|perfume shop",
+    "Fragrance Direct", "The Fragrance Shop|fragrance shop", "Feelunique", "Beauty Bay", "Glossier", "Deciem|the ordinary", "Holland & Barrett",
+    "Savers", "Neal's Yard Remedies|neals yard", "Liz Earle", "Elemis", "Clarins", "Benefit Cosmetics", "Sally Beauty", "Salon Services",
+    "Specsavers", "Vision Express", "Escentual", "Allbeauty", "Beauty Expert", "Aesop", "Penhaligon's|penhaligons", "Floris", "Nails Inc",
+    "Bobbi Brown", "Estée Lauder|estee lauder", "Clinique", "Dermalogica", "Trinny London", "Victoria Health", "Well Pharmacy", "Chemist4U",
+    "Pharmacy2U", "Medino", "Simply Supplements", "Myvitamins", "Feel Good Contacts", "Vision Direct", "Glasses Direct", "Leightons",
+  ],
+  toys: [
+    "Smyths", "Hamleys", "The Entertainer|entertainer toys|thetoyshop", "LEGO", "Build-A-Bear|build a bear", "Hobbycraft", "Games Workshop|warhammer",
+    "Forbidden Planet", "Toys R Us|toysrus", "Jellycat", "Kiddies Kingdom", "Hornby", "Zatu Games", "Cass Art", "Bargain Max", "Character Online",
+    "Orchard Toys", "Pokemon Center", "Element Games", "Firestorm Games", "Wayland Games", "Magic Madhouse", "Chaos Cards", "Create and Craft",
+    "Fred Aldous", "Cowling & Wilcox", "Jackson's Art|jacksons art", "Great Art", "Wool Warehouse", "LoveCrafts", "Minerva Crafts", "HMV",
+    "Rough Trade", "Fopp", "Banquet Records", "Musicroom", "Coda Music", "Rimmers Music", "Guitar Guitar", "Rails of Sheffield",
+  ],
+  books: [
+    "Waterstones", "WHSmith|wh smith|w h smith", "Foyles", "Blackwell's|blackwells", "Daunt Books", "Hatchards", "World of Books", "Wordery",
+    "Bookshop.org", "Paperchase", "Ryman", "Smythson", "Cult Pens", "The Works", "Card Factory", "Clintons", "Moonpig", "Funky Pigeon", "Scribbler",
+    "Papier", "Viking Direct", "Abebooks", "Hive.co.uk", "Topping & Company", "Heffers", "John Smith's Bookshops", "Mr B's Emporium", "Pen Heaven",
+    "Pure Pens", "Bureau Direct", "Choosing Keeping", "Present & Correct", "Folio Society",
+  ],
+  jewellery: [
+    "Pandora", "H. Samuel|h samuel|hsamuel", "Ernest Jones", "Goldsmiths", "Beaverbrooks", "Swarovski", "Mappin & Webb", "Warren James",
+    "F.Hinds|f hinds", "Claire's|claires accessories", "Monica Vinader", "Missoma", "Astrid & Miyu", "Daisy London", "Abbott Lyon", "Thomas Sabo",
+    "Watch Shop|watchshop", "Watches of Switzerland", "Fraser Hart", "Tiffany & Co", "Cartier", "Boodles", "Laings", "Chisholm Hunter", "Lovisa",
+    "Clogau", "Fossil", "Sunglass Hut", "Berry's Jewellers|berrys jewellers", "Steven Stone", "Vashi", "Austen & Blake", "Taylor & Hart", "Hockley Mint",
+    "Seol & Gold", "Edge of Ember", "Tilly Sveaas", "Alex Monroe", "Annoushka", "Dinny Hall",
+  ],
+  pets: [
+    "Pets at Home|petsathome", "Jollyes", "Zooplus", "VioVet", "Animed Direct|animed", "Pet Planet", "Pets Corner", "Monster Pet Supplies",
+    "Pet Drugs Online|petdrugsonline", "Just for Pets", "Pet Supermarket", "Seapets", "Fishkeeper", "Swell UK", "Naylors Equestrian", "Ride-away|rideaway",
+    "Robinsons Equestrian", "Harry Hall", "Millbry Hill", "Pet Shop Bowl", "Medicanimal", "Petshop.co.uk",
+  ],
+  marketplace: [
+    "Amazon|amzn|amzn mktp|amazon co uk|amazon eu", "eBay", "Etsy", "Vinted", "Depop", "OnBuy", "Not On The High Street|notonthehighstreet|noths",
+    "Temu", "AliExpress", "Fruugo", "THG", "Wish", "Freemans", "Grattan", "Fashion World", "Marisota", "Ambrose Wilson", "House of Bath",
+    "Secret Sales", "Brand Alley", "Atterley", "Mytheresa", "Wolf & Badger", "Gifts from Handpicked", "Prezzybox", "Firebox", "Menkind",
+    "IWOOT|i want one of those", "Find Me A Gift", "Red Candy",
+  ],
+  supermarket: [
+    "Tesco", "Sainsbury's|sainsbury|js online", "Asda", "Morrisons", "Aldi", "Lidl", "Waitrose", "Co-op|coop|co operative|cooperative food",
+    "M&S Food|m and s food|simply food|marks and spencer food", "Iceland", "Ocado", "Farmfoods", "Booths", "Spar", "Costcutter", "Londis", "Budgens",
+    "Nisa", "Costco", "Amazon Fresh", "Whole Foods Market", "Planet Organic", "Heron Foods", "Scotmid", "One Stop", "McColl's|mccolls", "Premier Stores",
+    "Bargain Booze", "Abel & Cole", "Riverford", "Oddbox", "Milk & More", "Fultons Foods",
+  ],
+};
+
+// Names that are also everyday words, places or surnames: only these patterns count for them. Each is tested on the
+// bank's text made plain (lower case, "&" as "and", other marks as spaces), with the shop name Relay shows, the bank's
+// merchant and its statement words joined by " | ". (^| \| ) ... ( \| |$) means "that word on its own".
+const alone = (w) => new RegExp(`(^|\\| )${w}( \\||$)`);
+const either = (...res) => new RegExp(res.map((r) => r.source).join("|"));
+export const PATTERNS = {
+  "Next": either(alone("next"), /next retail|next plc|next directory|next online|next co uk|^next \d|\| next \d|next (uk|ltd|stores?)\b/),
+  "Next Home": /next home/,
+  "Very": either(alone("very"), /very co uk|very catalogue|very (uk|ltd|group)\b|\bvery com\b/),
+  "Office": either(alone("office"), /office shoes|office co uk|office holdings|^office \d|\| office \d/),
+  "GAME": either(alone("game"), /game digital|game co uk|game retail|game stores?\b/),
+  "Liberty": either(alone("liberty"), /liberty london|liberty of london|liberty retail/),
+  "Coast": either(alone("coast"), /coast stores|coast fashion/),
+  "Hush": either(alone("hush"), /hush uk|hush homewear/),
+  "Wallis": either(alone("wallis"), /wallis fashion|wallis co uk/),
+  "Burton": either(alone("burton"), /burton menswear|burton co uk/),
+  "Hobbs": either(alone("hobbs"), /hobbs london|hobbs com/),
+  "Quiz": either(alone("quiz"), /quiz clothing|quizclothing/),
+  "Dune": either(alone("dune"), /dune london/),
+  "Dreams": either(alone("dreams"), /dreams ltd|dreams beds|dreams co uk/),
+  "Hughes": /hughes co uk|hughes electrical|hughes direct/,
+  "Wish": /wish com|contextlogic/,
+  "Coach": /coach (stores?|outlet|uk)\b|coach com/,
+  "Guess": /guess (europe|stores?|uk)\b|guess eu\b/,
+  "Diesel": /diesel (stores?|uk|london)\b|diesel com/,
+  "Fossil": /fossil (stores?|uk|group)\b|fossil com/,
+  "Gap": either(alone("gap"), /\bgap (stores?|uk|online|outlet|kids|\d)\b|\bgap co uk/),
+  "Lush": either(alone("lush"), /lush (retail|cosmetics|ltd|online|\d)|lush com/),
+  "Mango": either(alone("mango"), /mango (uk|stores?|online|\d)|mango com/),
+  "Loaf": either(alone("loaf"), /loaf com|loaf ltd/),
+  "Snug": /snug sofa|snugsofa/,
+  "Dusk": /dusk com|dusk ltd/,
+  "Denby": /denby pottery|denby retail|denbypottery/,
+  "Christy": /christy towels/,
+  "Savers": either(alone("savers"), /savers health|savers stores/),
+  "Iceland": either(alone("iceland"), /iceland foods|iceland stores|^iceland \S|\biceland \d/),
+  "Booths": either(alone("booths"), /booths supermarket|e h booth/),
+  "Spar": /\bspar\b/,
+  "Nisa": /\bnisa\b/,
+  "Wilko": /\bwilko\b|wilkinson (stores|hardware)/,
+  "Hornby": /hornby (hobbies|shop)|hornby com/,
+  "Dell": /\bdell (uk|computer|technologies)\b|dell co uk/,
+  "HP Store": /hp store|hp inc uk|hpstore/,
+  "Neptune": /neptune (home|classics|ltd)\b|neptune com/,
+  "Swoon": /swoon (editions|ltd|london)\b|swooneditions|swoon com/,
+  "Floris": /floris london|floris com/,
+  "Rituals": either(alone("rituals"), /rituals cosmetics/),
+  "Papier": either(alone("papier"), /papier com/),
+  "Hive.co.uk": /hive co uk|\bhive books\b/,
+  "CEF": /\bcef\b|city electrical factors/,
+  "THG": /\bthg\b|the hut group|thehut/,
+  "COS": either(alone("cos"), /^cos \S|\| cos \S|\bcos (stores?|uk|london)\b|cosstores|\bcos com/),
+  "Weekday": either(alone("weekday"), /weekday (stores?|ltd|brands)\b|weekday com/),
+  "Blacks": either(alone("blacks"), /blacks (outdoor|leisure)\b|blacks co uk/),
+  "Regatta": either(alone("regatta"), /regatta (great outdoors|ltd|outlet)\b|regatta com/),
+  "Spoke": /spoke london|spoke co uk/,
+  "Percival": /percival (clothing|menswear)|percivalclothing/,
+  "Trotters": /trotters (childrenswear|london)|trotters co uk/,
+  "Farah": either(alone("farah"), /farah (clothing|uk)|farah com/),
+  "Saltrock": /\bsaltrock\b/,
+  "Rohan": /rohan (designs|clothing)|rohan co uk|(^|\| )rohan( \||$)/,
+  "Howies": /\bhowies\b/,
+  "Moss Bros": /moss bros|mossbros|moss co uk|(^|\| )moss( \||$)/,
+  "Size?": /\bsize\?|size ?official|sizeofficial/,
+  "Look Again": /look ?again/,
+  "Seol & Gold": /seol and gold|seolgold/,
+  "Wolf & Badger": /wolf and badger|wolfandbadger/,
+  "Pure Pens": /pure ?pens/,
+  "Red Candy": /red ?candy/,
+  "Swell UK": /swell ?uk|swelluk/,
+  "Brand Alley": /brand ?alley/,
+  "Laings": /laings (jewellers|of)/,
+  "Beales": /\bbeales\b/,
+};
