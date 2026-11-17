@@ -122,7 +122,8 @@ const body = (page) => page.locator(".rl-story-body").innerText();
     }
     if (/Some things you brought home/.test(t)) {
       assert.equal(await page.locator(".rl-story-body .ph.tumble").count(), 1);
-      assert.equal(await page.locator(".rl-story-frame").evaluate(n => getComputedStyle(n).backgroundColor), "rgb(255, 255, 255)", "white, not beige");
+      // The frame fades from the last slide's colour (.5s): read it once that fade has finished.
+      assert.equal(await page.locator(".rl-story-frame").evaluate(async n => { await Promise.all(n.getAnimations().map(a => a.finished.catch(() => {}))); return getComputedStyle(n).backgroundColor; }), "rgb(255, 255, 255)", "white, not beige");
       assert.ok(await page.locator(".rl-story-body .belt span").count() >= 8, "a belt of the year's things goes by");
       await page.waitForTimeout(350); await page.screenshot({ path: SHOTS + "/5-things-mid-animation.png" }); sawTumble = true;
     }
