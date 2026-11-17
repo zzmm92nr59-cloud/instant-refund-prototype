@@ -54,6 +54,7 @@
     var c = diskRead(); if (!c) return;
     if (Array.isArray(c.receipts)) memo.receipts = { rows: c.receipts, sig: JSON.stringify(c.receipts), at: 0 };
     if (Array.isArray(c.purchases)) memo.walletPurchases = c.purchases;
+    if (Array.isArray(c.needReceipt)) memo.needReceipt = c.needReceipt;
   })();
   // Asks the server only when the answer isn't already remembered (and recent enough).
   function cachedGet(kind, path) {
@@ -918,6 +919,17 @@
     ".rl-bk-row.rl-bk-not .rl-bk-t,.rl-bk-row.rl-bk-not .rl-bk-a{opacity:.5}" +
     ".rl-bk-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-bk-t b{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rl-text)}.rl-bk-t span,.rl-bk-a span{font-size:14px;color:var(--rl-text2)}" +
     ".rl-bk-a{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.rl-bk-a b{font-size:16px;font-weight:600;color:var(--rl-text)}" +
+    // A payment that likely should have a receipt, and the sheet for adding a photo of it (receiptPhotoSheet).
+    ".rl-bk-row.rl-bk-need .rl-bk-t span{color:var(--rl-accent);font-weight:600}.rl-bk-need-note{margin:6px 0 10px;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
+    ".rl-rp .rl-rp-h{margin:0 0 6px;font-size:22px;line-height:1.25;color:var(--rl-text)}.rl-rp-lead{margin:0 0 16px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-rp-add{display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;font-size:17px}.rl-rp-ic{display:inline-flex}" +
+    ".rl-rp-how{margin:14px 0 4px;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-rp .rl-msg:empty{display:none}" +
+    ".rl-rp-tag{display:inline-block;margin:0 0 10px;padding:4px 10px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:13px;font-weight:700}" +
+    ".rl-rp-items{margin:4px 0 6px}.rl-rp-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-top:1px solid var(--rl-line);font-size:16px;color:var(--rl-text)}.rl-rp-total b{font-weight:700}" +
+    ".rl-rp-warn{margin:6px 0 8px;padding:10px 12px;border-radius:12px;background:#fdecc8;color:#5c3b00;font-size:15px;line-height:1.4;font-weight:600}" +
+    ".rl-rp-note{margin:6px 0 8px;font-size:14px;line-height:1.45;color:var(--rl-text2)}" +
+    ".rl-rp-photo{display:block;width:100%;max-height:340px;min-height:120px;object-fit:contain;border-radius:14px;background:var(--rl-fill);margin:10px 0 14px}.rl-rr-detail .rl-rp-photo{max-height:240px}" +
+    ".rl-rp .rl-bk-list{background:var(--rl-fill);margin:0 0 10px}" +
     ".rl-aih-picks{margin:16px 0 0;padding:16px 0 0;border-top:.5px solid var(--rl-line)}" +
     ".rl-aih{margin:22px 0 6px;padding:16px 18px;border-radius:18px;background:var(--rl-card);border:1px solid var(--rl-line)}" +
     ".rl-aih-top{display:flex;align-items:center;justify-content:space-between;gap:12px}.rl-aih-top b{font-size:16px;line-height:1.3;color:var(--rl-text)}" +
@@ -3623,12 +3635,14 @@
           }
           // Not in pounds: shown as it was charged, and left out of anything Relay adds up. Said once, here.
           if (notPounds(row)) detail.appendChild(el("p", { className: "rl-rr-items", text: "Paid in " + moneyName(row.currency) + ", so it isn't added to your totals in pounds." }));
+          // Made from the shopper's own photo of a paper receipt: said plainly, with the photo, never as the shop's own.
+          if (row.photoReceipt) { detail.appendChild(el("span", { className: "rl-rp-tag", text: "Receipt from your photo" })); rpFacts(detail, row); rpPhoto(detail, row.id); }
           // Which card paid for it, when a connected bank or card has the payment (Bank and cards).
           var paidLine = el("p", { className: "rl-rr-items rl-rr-paid" }); paidLine.hidden = true; detail.appendChild(paidLine);
           bankPaymentFor(row.id).then(function (p) {
             if (!p) return;
             var on = new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-            paidLine.textContent = (p.match === "sure" ? "Paid with " : "Probably paid with ") + p.account + " on " + on;
+            paidLine.textContent = (p.match === "sure" || p.match === "photo" ? "Paid with " : "Probably paid with ") + p.account + " on " + on;
             paidLine.hidden = false;
           });
           detail.appendChild(receiptCard(row, loadList, true, { inRow: true }));
@@ -5674,17 +5688,28 @@
         var ps = (body && body.payments) || [];
         if (!ps.length) return;
         pays.appendChild(el("h3", { className: "rl-bk-h", text: "Card payments" }));
+        // Shop payments that likely should have a receipt and don't (an H&M payment, say): said once, and each row says so.
+        var needN = ps.slice(0, 60).filter(function (p) { return p.needsReceipt && !p.notMine; }).length;
+        if (needN) pays.appendChild(el("p", { className: "rl-bk-need-note", text: needN === 1 ? "1 shop payment has no receipt. Tap it to add a photo of the receipt."
+          : needN + " shop payments have no receipt. Tap one to add a photo of its receipt." }));
+        var again = function () { memo.bankPays = null; api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); }); };
         var box = el("div", { className: "rl-bk-list" });
         ps.slice(0, 60).forEach(function (p) {
           var shop = matchShop(p.receiptId), name = shop || p.shop || p.merchant || p.description || "Payment";
           var day = new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
           // Tap a payment to say it isn't yours (a card someone else also uses), or that it is after all.
-          var row = el("button", { type: "button", className: "rl-bk-row" + (p.notMine ? " rl-bk-not" : "") }, [
+          var need = p.needsReceipt && !p.notMine;
+          var row = el("button", { type: "button", className: "rl-bk-row" + (p.notMine ? " rl-bk-not" : "") + (need ? " rl-bk-need" : "") }, [
             el("span", { className: "rl-bk-t", title: p.description || "" }, [el("b", { text: name }),
-              el("span", { text: p.notMine ? "Not yours" : !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches your receipt" : "Probably your receipt") })]),
+              el("span", { text: p.notMine ? "Not yours" : need ? "No receipt yet. Add a photo" : p.match === "photo" ? "Receipt from your photo" : p.noReceipt ? "Not a shop purchase"
+                : !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches your receipt" : "Probably your receipt") })]),
             el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency) }), el("span", { text: day })])]);
-          row.setAttribute("aria-label", name + ", " + money(p.amountPence, p.currency) + ", " + day + (p.notMine ? ", not yours" : ""));
+          row.setAttribute("aria-label", name + ", " + money(p.amountPence, p.currency) + ", " + day + (p.notMine ? ", not yours" : need ? ", no receipt yet" : ""));
+          var photoSheet = function () { receiptPhotoSheet({ id: p.id, shop: p.shop || name, amountPence: p.amountPence, currency: p.currency, date: p.date, account: p.account, photoRead: Boolean(body && body.photoRead) }, function (what) {
+            say(note, what === "photo" ? "Added. It's in Receipts as a receipt from your photo." : what === "no_receipt" ? "Got it: Relay won't ask for that receipt." : "Got it: that one isn't yours.");
+            again(); }); };
           row.onclick = function () {
+            if (need) return photoSheet();
             var set = function (on, every) {
               api("/relay/my/bank/not-mine", { method: "POST", body: { id: p.id, on: on, everyFromShop: Boolean(every) } }).then(function (r) {
                 if (!r.ok) return say(note, "Couldn't change that. Try again in a moment.", true);
@@ -5694,7 +5719,12 @@
             };
             var what = name + ", " + money(p.amountPence, p.currency) + " on " + day;
             if (p.notMine) chooseBox(what, [["This is mine", function () { set(false); }]]);
-            else chooseBox(what, [["Not mine", function () { set(true); }]].concat(p.shop ? [["Nothing from " + p.shop + " is mine", function () { set(true, true); }]] : []));
+            else if (p.noReceipt) chooseBox(what, [["It was a shop purchase", function () {
+              api("/relay/my/bank/not-mine", { method: "POST", body: { id: p.id, on: false, reason: "no_receipt" } }).then(function (r) {
+                if (!r.ok) return say(note, "Couldn't change that. Try again in a moment.", true);
+                say(note, "Got it: that was a shop purchase."); again();
+              }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); }); }], ["Not mine", function () { set(true); }]]);
+            else chooseBox(what, (!p.receiptId ? [["Add a photo of the receipt", photoSheet]] : []).concat([["Not mine", function () { set(true); }]]).concat(p.shop ? [["Nothing from " + p.shop + " is mine", function () { set(true, true); }]] : []));
           };
           box.appendChild(row);
         });
@@ -8589,6 +8619,177 @@
     var marks = x.itemReturns || {};
     return named.map(function (e) { return { index: e.i, returning: marks[e.i] === "returning" }; });
   }
+  // ---- A bank or card payment with no receipt that likely should have one (worker/bank.js) --------------------------------
+  // Shown on Bank and cards and as one small card on Home. A tap opens a sheet: what the payment was, "Add a photo of the
+  // receipt", "This wasn't a shop purchase" and "This isn't mine". A photo becomes a receipt marked everywhere as
+  // "Receipt from your photo", never as the shop's own. p: { id, shop, amountPence, currency, date, account }.
+  function payDay(d, long) { return new Date(d + "T12:00:00Z").toLocaleDateString("en-GB", long ? { weekday: "long", day: "numeric", month: "long" } : { day: "numeric", month: "short" }); }
+  function payWhat(p) { return (p.shop || "A shop") + ", " + money(p.amountPence, p.currency || "GBP") + " on " + payDay(p.date); }
+  // What Home shows (from /relay/my/receipts, which Home already loads), kept with the receipts on this device.
+  function needReceiptNow() { return (memo.needReceipt || []).filter(function (p) { return p && p.id; }); }
+  function forgetPayment(id) {
+    memo.needReceipt = needReceiptNow().filter(function (p) { return p.id !== id; }); diskWrite("needReceipt", memo.needReceipt);
+    memo.receipts = null; memo.bankPays = null;
+  }
+  // The photo, at most 1600 pixels on its longest side, as a JPEG small enough to send (at most about 1 MB). A HEIC photo
+  // from an iPhone comes through the same way, as the phone opens it. null if it can't be opened.
+  function shrinkReceiptPhoto(file) {
+    return new Promise(function (done) {
+      if (!file || (file.type && !/^image\//.test(file.type))) return done(null);
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var out = null;
+        try {
+          [[1600, 0.85], [1600, 0.72], [1280, 0.7], [1024, 0.65]].some(function (t) {
+            var k = Math.min(1, t[0] / Math.max(im.naturalWidth || 1, im.naturalHeight || 1)), c = document.createElement("canvas");
+            c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+            var g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+            out = c.toDataURL("image/jpeg", t[1]);
+            return out.length <= 1450000;
+          });
+        } catch (e) { out = null; }
+        URL.revokeObjectURL(url);
+        done(out && out.length <= 1450000 && /^data:image\/jpeg;base64,/.test(out) ? out : null);
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); done(null); };
+      im.src = url;
+    });
+  }
+  var RP_ERR = { photo_too_big: "That photo is too big to send. Take it again a little further away.", bad_photo: "That doesn't look like a photo. Try again with a photo of the receipt.",
+    too_many_requests: "That's as many receipt photos as Relay can take today. Try again tomorrow.", has_receipt: "This payment already has a receipt. You'll find it in Receipts.",
+    not_found: "Relay can't find that payment any more. Pull down on Bank and cards to see your latest payments." };
+  // Its own layer over whatever is showing (Bank and cards is a page of Profile, Home a tab), closed by Close, a tap outside,
+  // Escape or a swipe down. after(what) runs once something changed: "photo", "no_receipt" or "not_mine".
+  function receiptPhotoSheet(p, after) {
+    var sheet = el("div", { className: "rl-sheet rl-rp", role: "dialog", ariaModal: "true", ariaLabel: "No receipt for " + payWhat(p) });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [sheet]);
+    function shut() { if (layer.parentNode) layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    rpAsk(sheet, p, after, shut, "");
+    var first = sheet.querySelector("button"); if (first) first.focus();
+  }
+  function rpAsk(sheet, p, after, shut, problem) {
+    sheet.textContent = "";
+    sheet.appendChild(el("h2", { className: "rl-rp-h", text: p.shop || "Shop payment" }));
+    sheet.appendChild(el("p", { className: "rl-rp-lead", text: "You paid " + money(p.amountPence, p.currency || "GBP") + " on " + payDay(p.date, true) + (p.account ? " with " + p.account : "") + ". Relay hasn't found a receipt for it." }));
+    var file = el("input", { type: "file", accept: "image/*", hidden: true, tabIndex: -1 });
+    file.setAttribute("capture", "environment"); file.setAttribute("aria-hidden", "true");
+    var add = el("button", { type: "button", className: "rl-btn rl-rp-add" }, [accIc("camera", 22, "rl-rp-ic"), el("span", { text: "Add a photo of the receipt" })]);
+    var note = el("p", { className: "rl-msg", role: "status" });
+    var noShop = el("button", { type: "button", className: "rl-btn ghost", text: "This wasn't a shop purchase" });
+    var notMine = el("button", { type: "button", className: "rl-btn ghost", text: "This isn't mine" });
+    var shutBtn = el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Close", onclick: shut });
+    sheet.appendChild(add); sheet.appendChild(file);
+    sheet.appendChild(el("p", { className: "rl-rp-how", text: (p.photoRead ? "Relay keeps your photo with the receipt and reads the shop, date, items and total from it."
+      : "Relay keeps your photo with the receipt, and fills in the shop, amount and date from your bank.") + " It's marked as a receipt from your photo, not one the shop sent." }));
+    sheet.appendChild(note); sheet.appendChild(noShop); sheet.appendChild(notMine); sheet.appendChild(shutBtn);
+    if (problem) say(note, problem, true);
+    var busy = false, btns = [add, noShop, notMine];
+    var lock = function (on) { busy = on; btns.forEach(function (b) { b.disabled = on; }); };
+    add.onclick = function () { if (busy) return; file.value = ""; file.click(); };
+    file.onchange = function () {
+      var f = file.files && file.files[0];
+      if (!f || busy) return;
+      lock(true); say(note, "");
+      shrinkReceiptPhoto(f).then(function (img) {
+        if (!img) { lock(false); return say(note, "Relay couldn't open that photo. Take it again, or choose another photo of the receipt.", true); }
+        rpReading(sheet, p);
+        api("/relay/my/bank/receipt-photo", { method: "POST", body: { id: p.id, image: img } }).then(function (r) {
+          if (!sheet.isConnected) return;
+          if (r.ok && r.body && r.body.receipt) { forgetPayment(p.id); rpReceipt(sheet, r.body.receipt, shut); if (after) after("photo"); return; }
+          var code = r.body && r.body.error;
+          if (code === "has_receipt") forgetPayment(p.id);
+          rpAsk(sheet, p, after, shut, RP_ERR[code] || (r.status === 413 ? RP_ERR.photo_too_big : r.status === 429 ? RP_ERR.too_many_requests : "Couldn't add the photo just now. Try again in a moment."));
+        }, function () { if (sheet.isConnected) rpAsk(sheet, p, after, shut, "Couldn't reach Relay. Check your connection and try again."); });
+      });
+    };
+    var mark = function (body, what) {
+      if (busy) return;
+      lock(true); say(note, "");
+      api("/relay/my/bank/not-mine", { method: "POST", body: body }).then(function (r) {
+        if (!r.ok) { lock(false); return say(note, "Couldn't change that. Try again in a moment.", true); }
+        forgetPayment(p.id); shut(); if (after) after(what);
+      }, function () { lock(false); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    };
+    noShop.onclick = function () { mark({ id: p.id, on: true, reason: "no_receipt" }, "no_receipt"); };
+    notMine.onclick = function () { mark({ id: p.id, on: true }, "not_mine"); };
+  }
+  // While the photo is sent and read: the receipt's outline, greyed out (never a spinner).
+  function rpReading(sheet, p) {
+    sheet.textContent = "";
+    var bone = function (w, h, m) { return el("div", { className: "rl-skel", style: "min-height:0;width:" + w + ";height:" + h + "px;border-radius:10px;margin:" + (m || "0 0 10px") }); };
+    sheet.appendChild(el("span", { className: "rl-rp-tag", text: "Receipt from your photo" }));
+    sheet.appendChild(el("h2", { className: "rl-rp-h", text: p.shop || "Shop payment" }));
+    var st = el("p", { className: "rl-rp-lead", text: "Reading your photo of the receipt" }); st.setAttribute("role", "status"); sheet.appendChild(st);
+    var sk = el("div", { className: "rl-rp-sk" }, [bone("70%", 18), bone("55%", 18), bone("62%", 18), bone("100%", 1, "6px 0 12px"), bone("40%", 22, "0 0 16px"), bone("100%", 180, "0")]);
+    sk.setAttribute("aria-hidden", "true"); sheet.appendChild(sk);
+  }
+  // What a receipt from a photo shows, here and in Receipts: that it's from the shopper's photo, a total that isn't what
+  // the bank paid, why nothing could be read, and the photo itself.
+  function rpFacts(host, x) {
+    var bank = x.bankPaid || null;
+    if (x.totalMismatch && bank) host.appendChild(el("p", { className: "rl-rp-warn", text: "The total on the photo is " + money(x.totalPence, x.currency || "GBP") + "; your bank paid " + money(bank.amountPence, bank.currency || "GBP") + "." }));
+    var why = x.photoNotRead === "off" ? "Relay made this from your bank payment: the shop, the amount and the day it was paid. Your photo is kept with it."
+      : x.photoNotRead === "unclear" ? "Relay couldn't read a receipt in this photo, so this uses what your bank says: the shop, the amount and the day it was paid."
+      : x.photoNotRead === "busy" ? "Relay couldn't read the photo just now, so this uses what your bank says: the shop, the amount and the day it was paid."
+      : x.readBy === "ai" ? "Read from your photo by AI. Check it's right, and use Fix details in Receipts if anything isn't." : "";
+    if (why) host.appendChild(el("p", { className: "rl-rp-note", text: why }));
+  }
+  function rpPhoto(host, id) {
+    var ph = el("img", { className: "rl-rp-photo rl-skel", alt: "Your photo of the receipt" });
+    host.appendChild(ph);
+    apiBlob("/relay/my/receipts/" + id + "/receipt-photo").then(function (u) { if (u) { ph.src = u; ph.classList.remove("rl-skel"); } else ph.remove(); });
+  }
+  // The new receipt, straight after it's made.
+  function rpReceipt(sheet, rc, shut) {
+    sheet.textContent = "";
+    sheet.appendChild(el("span", { className: "rl-rp-tag", text: "Receipt from your photo" }));
+    sheet.appendChild(el("h2", { className: "rl-rp-h", text: rc.shop || "Shop" }));
+    sheet.appendChild(el("p", { className: "rl-rp-lead", text: (rc.dateFrom === "photo" ? "Bought on " : "Paid on ") + payDay(rc.date, true) }));
+    var items = (rc.items || []).filter(function (i) { return i && i.name; });
+    if (items.length) {
+      var ul = el("ul", { className: "rl-rr-list rl-rp-items" });
+      items.forEach(function (i) { ul.appendChild(el("li", {}, [el("span", { text: (Number(i.qty) > 1 ? i.qty + " × " : "") + i.name }),
+        Number.isInteger(i.pricePence) ? el("b", { text: money(i.pricePence, rc.currency || "GBP") }) : null].filter(Boolean))); });
+      sheet.appendChild(ul);
+    } else if (rc.readBy === "ai") sheet.appendChild(el("p", { className: "rl-rp-note", text: "Relay couldn't read the items on your photo. You can add them with Fix details in Receipts." }));
+    sheet.appendChild(el("div", { className: "rl-rp-total" }, [el("span", { text: rc.totalFrom === "photo" ? "Total on the photo" : "Total your bank paid" }), el("b", { text: money(rc.totalPence, rc.currency || "GBP") })]));
+    rpFacts(sheet, rc);
+    rpPhoto(sheet, rc.id);
+    sheet.appendChild(el("button", { type: "button", className: "rl-btn", text: "See it in Receipts", onclick: tapOnce(function () { shut(); if (window.go) window.go("receipts"); }) }));
+    sheet.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Done", onclick: shut }));
+  }
+  // Home's small card: one payment opens its sheet; several open a short list of them.
+  function needReceiptCard(list, changed) {
+    var one = list.length === 1, p = list[0];
+    return feedCard({ small: true, icon: "camera", line: one ? payWhat(p) : list.length + " shop payments with no receipt", sub: one ? "No receipt yet. Add a photo of it" : "Add photos of their receipts",
+      open: function () { if (one) receiptPhotoSheet(p, changed); else needReceiptList(list, changed); } });
+  }
+  function needReceiptList(list, changed) {
+    var card = el("div", { className: "rl-sheet rl-rp", role: "dialog", ariaModal: "true", ariaLabel: "Shop payments with no receipt" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { if (layer.parentNode) layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    card.appendChild(el("h2", { className: "rl-rp-h", text: "No receipt yet" }));
+    card.appendChild(el("p", { className: "rl-rp-lead", text: "Your bank shows these shop payments, but Relay hasn't found their receipts. Tap one to add a photo of its receipt." }));
+    var box = el("div", { className: "rl-bk-list" });
+    list.forEach(function (p) {
+      var row = el("button", { type: "button", className: "rl-bk-row" }, [el("span", { className: "rl-bk-t" }, [el("b", { text: p.shop || "Shop" }), el("span", { text: payDay(p.date) })]),
+        el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency || "GBP") })])]);
+      row.setAttribute("aria-label", payWhat(p));
+      row.onclick = tapOnce(function () { shut(); receiptPhotoSheet(p, changed); });
+      box.appendChild(row);
+    });
+    card.appendChild(box);
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Close", onclick: shut }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    card.querySelector("button").focus();
+  }
   // The bank payment that matches a receipt, if a bank or card is connected (one request each, reused: api()).
   function bankPaymentFor(receiptId) {
     if (!memo.bankPays) memo.bankPays = api("/relay/my/bank").then(function (r) {
@@ -8600,7 +8801,11 @@
   function loadBoth() {
     var p = memo.purchases || api(purchasesPath());
     return Promise.all([p.then(function (r) { return r.ok ? (r.body && r.body.purchases) || [] : null; }, function () { return null; }),
-      api("/relay/my/receipts").then(function (r) { return r.ok ? (r.body && r.body.receipts) || [] : null; }, function () { return null; })]).then(function (both) {
+      api("/relay/my/receipts").then(function (r) {
+        // Shop payments with no receipt yet (Bank and cards), which come with the receipts: Home shows one small card.
+        if (r.ok) { memo.needReceipt = (r.body && r.body.needReceipt) || []; diskWrite("needReceipt", memo.needReceipt); }
+        return r.ok ? (r.body && r.body.receipts) || [] : null;
+      }, function () { return null; })]).then(function (both) {
       // Remember what came back, so the next visit shows it straight away.
       if (both[0]) { memo.walletPurchases = both[0]; diskWrite("purchases", both[0]); }
       if (both[1]) { memo.receipts = { rows: both[1], sig: JSON.stringify(both[1]), at: Date.now() }; diskWrite("receipts", both[1]); }
@@ -9025,6 +9230,9 @@
         if (state.mail.length) { var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
           feed.appendChild(feedCard({ small: true, icon: "mail", line: oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again", sub: oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment",
             open: function () { if (window.go) window.go("receipts"); } })); }
+        // A shop payment from a connected bank or card with no receipt yet (an H&M payment, say): one small card.
+        var needs = isReview() ? [] : needReceiptNow();
+        if (needs.length) feed.appendChild(needReceiptCard(needs, function () { draw(); loadBoth().then(function (both) { state.both = both; draw(); }); }));
         if (state.wins.length) { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
           feed.appendChild(feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
             sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }

@@ -56,6 +56,7 @@ jobs:
           node scripts/test-ai-reader.mjs
           node scripts/test-item-kinds.mjs
           node scripts/test-bank.mjs
+          node scripts/test-receipt-photo.mjs
           node scripts/test-parcel-tracking.mjs
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs

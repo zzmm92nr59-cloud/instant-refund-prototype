@@ -89,7 +89,10 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/ai-reading": { fields: { on: bool } },
   "/relay/my/item-kinds": { fields: { on: bool } },
   "/relay/my/bank/disconnect": { fields: { id: str(36) } },
-  "/relay/my/bank/not-mine": { fields: { id: str(200), on: bool, everyFromShop: bool } },
+  "/relay/my/bank/not-mine": { fields: { id: str(200), on: bool, everyFromShop: bool, reason: one("no_receipt") } },
+  // A photo of the paper receipt for one of the shopper's own payments, made smaller on the phone first (bank.js checks it
+  // really is a picture of at most 1.1 MB).
+  "/relay/my/bank/receipt-photo": { limit: 1650 * KB, tooLarge: "photo_too_big", fields: { id: str(200), image: str(1600000) } },
   "/relay/my/bank/connect": { fields: { bank: str(20) } },
   "/relay/my/bank/sync": NOTHING,
   "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })), receiptId: id(64) } },

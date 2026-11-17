@@ -13,7 +13,8 @@
 //  * Everything captured is shopper-supplied evidence: refundEligible is always false.
 //  * Disconnect revokes the token at Google and deletes the token and captured receipts. (Microsoft has no
 //    revoke call for personal accounts: the token is deleted, and the shopper can remove Relay at account.live.com.)
-import { decodePhoto } from "./photos.js";
+import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
+import { receiptsToAdd } from "./bank.js";
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
@@ -198,6 +199,8 @@ async function ensureGmailTablesRun(db) {
     `CREATE INDEX IF NOT EXISTS idx_captured_receipts_shopper ON captured_receipts(shopper_id, created_at)`,
     `CREATE TABLE IF NOT EXISTS receipt_images (
        receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, type TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL)`,
+    // A shopper's photo of a paper receipt, kept with the receipt Relay made from it (bank.js, "Add a photo of the receipt").
+    ...RECEIPT_PHOTOS_SQL,
     `CREATE TABLE IF NOT EXISTS return_reminders (
        receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, deadline TEXT NOT NULL, remind_at INTEGER NOT NULL,
        title TEXT NOT NULL, sent_at INTEGER)`,
@@ -259,6 +262,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched')").bind(shopperId),
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_photos WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -540,9 +544,10 @@ export async function revokeAllMailboxes(env, shopperId, fetchImpl) {
   return first;
 }
 // The receipts read from one inbox (slot null: the first inbox), and what hangs off them: photos, reminders, which items
-// are going back, and any listing made from them. Receipts pasted in by hand belong to no inbox and are kept.
+// are going back, and any listing made from them. Receipts pasted in by hand, or made from a photo of a paper receipt,
+// belong to no inbox and are kept.
 function inboxReceiptDeletes(db, shopperId, slot) {
-  const pick = slot ? "json_extract(details, '$.mailbox') = ?" : "json_extract(details, '$.mailbox') IS NULL AND json_extract(details, '$.pasted') IS NULL";
+  const pick = slot ? "json_extract(details, '$.mailbox') = ?" : "json_extract(details, '$.mailbox') IS NULL AND json_extract(details, '$.pasted') IS NULL AND json_extract(details, '$.photoReceipt') IS NULL";
   const args = slot ? [shopperId, slot] : [shopperId];
   const ids = `SELECT id FROM captured_receipts WHERE shopper_id = ? AND ${pick}`;
   return [
@@ -598,6 +603,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched')").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
@@ -1621,9 +1627,9 @@ const COMPANION_FOOD = /coffee|espresso|nespresso|capsule|\bpods?\b|lungo|ristre
 // Each receipt's shop, date and total, for matching bank and card payments to receipts (bank.js).
 export async function receiptTotals(env, shopperId) {
   const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
-  return cards.filter((c) => c.kind !== "return_instructions" && Number.isInteger(c.totalPence) && c.totalPence > 0 && c.orderDate)
+  return cards.filter((c) => c.kind !== "return_instructions" && ((c.photoReceipt && c.bankPaymentId) || (Number.isInteger(c.totalPence) && c.totalPence > 0 && c.orderDate)))
     .map((c) => ({ id: c.id, shop: (c.retailer && (c.retailer.name || c.retailer.domain)) || "", domain: (c.retailer && c.retailer.domain) || "",
-      date: String(c.orderDate).slice(0, 10), totalPence: c.totalPence, currency: c.currency || "GBP" }));
+      date: String(c.orderDate).slice(0, 10), totalPence: c.totalPence, currency: c.currency || "GBP", bankPaymentId: c.photoReceipt && c.bankPaymentId ? String(c.bankPaymentId) : null }));
 }
 export async function styleThings(env, shopperId) {
   const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
@@ -2091,8 +2097,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const all = url.searchParams.get("all") === "1";
     const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? { rows: 3000, cards: 3000 } : {});
     await markTestShopReceipts(env, list);
+    // Shop payments from a connected bank or card with no receipt yet (bank.js), so Home can say so without asking again.
+    const needReceipt = await receiptsToAdd(env, shopper.id, opts.now || Date.now());
     timing.totalMs = Date.now() - t0;
-    return json({ receipts: list, timing }, 200, cors);
+    return json({ receipts: list, ...(needReceipt.length ? { needReceipt } : {}), timing }, 200, cors);
   }
   // Where a parcel on one of their own receipts really is, from the carrier (parcel-tracking.js). Their own receipts only.
   const parcel = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/parcel$/.exec(path);
@@ -2202,7 +2210,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       env.RELAY_DB.prepare("DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
-      env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
+      env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
+      env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
     // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
     const b = await request.json().catch(() => ({}));
     if (act[2] === "dismiss" && b && b.reason === "promo") {
@@ -2327,6 +2336,14 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (img && m === "GET") {
     const row = await env.RELAY_DB.prepare(
       "SELECT type, data FROM receipt_images WHERE receipt_id = ? AND shopper_id = ?").bind(img[1], shopper.id).first();
+    if (!row) return json({ error: "not_found" }, 404, cors);
+    return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
+      status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
+  }
+  // The shopper's photo of a paper receipt, on the receipt Relay made from it. Their own receipts only.
+  const rph = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/receipt-photo$/.exec(path);
+  if (rph && m === "GET") {
+    const row = await env.RELAY_DB.prepare("SELECT type, data FROM receipt_photos WHERE receipt_id = ? AND shopper_id = ?").bind(rph[1], shopper.id).first();
     if (!row) return json({ error: "not_found" }, 404, cors);
     return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
       status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
