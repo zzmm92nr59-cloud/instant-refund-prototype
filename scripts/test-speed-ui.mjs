@@ -63,9 +63,10 @@ await page.locator("#rl-name").fill("Jess T");
 await page.getByRole("button", { name: /^Save/ }).first().click();
 await page.waitForTimeout(800);
 assert.ok(count("/relay/my/profile", t2, "POST") >= 1, "the name was saved");
-const t3 = Date.now();
+const t3 = calls.filter(c => c.at >= t2 && c.m === "POST" && c.p === "/relay/my/profile").at(-1).at;
 await page.evaluate(() => window.go("profile")); await page.waitForTimeout(900);
-assert.ok(count("/relay/my/receipts", t3) + count("/relay/my/profile", t3) >= 1, "after a change, the next read goes to Relay");
+// (Profile, shown again after saving, may make that read itself; Home then reuses it.)
+assert.ok(count("/relay/my/receipts", t3 + 1) + count("/relay/my/profile", t3 + 1) >= 1, "after a change, the next read goes to Relay");
 console.log("ok - after a change, reads go to Relay again");
 
 // The catalogue was asked for once, a few seconds after start, and opening Discover doesn't ask again. Only the shops'

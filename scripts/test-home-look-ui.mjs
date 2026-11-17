@@ -125,7 +125,8 @@ assert.equal(await sheet.locator(".rl-jh").evaluate(n => getComputedStyle(n).ani
 await sheet.getByRole("button", { name: "Continue with email" }).click();
 await sheet.getByRole("heading", { name: "Continue with email" }).waitFor();
 assert.equal(await sheet.evaluate(n => n.classList.contains("rl-signin")), false);
-assert.equal(await bgIs(".rl-sheet"), "rgb(255, 255, 255)", "the email step is the app's own white in light mode");
+assert.equal(await bgIs(".rl-sheet"), NAVY, "the email step carries on in Relay's navy (Connor, 17 Nov 2026)");
+assert.equal(await sheet.getByRole("heading", { name: "Continue with email" }).evaluate(n => getComputedStyle(n).color), "rgb(255, 255, 255)", "in white");
 await sheet.getByRole("button", { name: "Back" }).click();
 await sheet.getByRole("heading", { name: "Welcome back" }).waitFor();
 assert.equal(await bgIs(".rl-sheet"), NAVY);
@@ -135,7 +136,7 @@ await page.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await page.waitForTimeout(300);
 await polished("sign-in page, new", ".rl-sheet");
-console.log("ok - the sign-in page: Relay's navy in light and dark, a wallet picture, white buttons, Face ID in lime, readable; the next step is the app's own colours");
+console.log("ok - the sign-in page: Relay's navy in light and dark, a wallet picture, white buttons, Face ID in lime, readable; the next step carries on in navy");
 
 // 2. Home: each card shows its return date; in the last week, the days left, with those cards first.
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: 9e12 })), EMAIL);
@@ -209,6 +210,19 @@ for (const look of ["today", "wallet"]) {
     const g = await page.evaluate(() => { const a = [...document.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
     assert.ok(g.w > 150 && Math.abs(g.w - g.h) < 1 && g.row, "two big squares a row: " + JSON.stringify(g));
     assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
+    // Under each square, the product as a person would say it, never the shop's name twice (Connor, 17 Nov 2026).
+    const caps = await page.locator(".hl-sq").evaluateAll(b => b.map(x => [x.querySelector(".hl-sqs")?.textContent, x.querySelector(".hl-sqn")?.textContent || null]));
+    assert.ok(caps.every(([shop, name]) => !name || name.toLowerCase() !== String(shop).toLowerCase()), "no shop name twice: " + JSON.stringify(caps));
+    assert.deepEqual(await page.evaluate(() => [window.relayCleanName("lululemon Align™ High-Rise Pant", "lululemon"), window.relayCleanName("Nespresso", "Nespresso"),
+      window.relayCleanName("W Restfeel Slide TOPK/TOPK/SODA", "lululemon"), window.relayCleanName("iPhone 15 Case", "Apple")]), ["Align High-Rise Pant", "", "W Restfeel Slide", "iPhone 15 Case"]);
+    // The top row: what's on Home, then the rest of Relay, scrolled sideways.
+    const chipNames = await page.locator("#view .h2-chip").allInnerTexts();
+    assert.deepEqual(chipNames.slice(0, 2), ["For you", "Watching"]);
+    for (const c of ["Swap & resell", "Auctions", "Shops on Relay", "Wrapped"]) assert.ok(chipNames.includes(c), c + " is on the top row");
+    assert.equal(await page.locator("#view .h2-chips").evaluate(n => getComputedStyle(n).overflowX), "auto", "scrolls sideways");
+    await page.locator("#view .h2-chip", { hasText: "Watching" }).click();
+    await page.getByText("Nothing watched yet.", { exact: false }).waitFor();
+    await page.locator("#view .h2-chip", { hasText: "For you" }).click(); await page.locator(".hl-sq").first().waitFor();
   }
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Match Masters" }).count(), 0, look + ": an app that can't be returned isn't on Home");
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Vertuo Pods" }).count(), 1, look + ": something bought this week is on Home, even if it can't go back");

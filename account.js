@@ -597,6 +597,19 @@
     ".rl-aout{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:52px;margin-top:22px;text-align:center;background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;font-size:16px;font-weight:700;color:var(--rl-danger);transition:background .15s}" +
     ".rl-aout:active{background:var(--rl-fill)}.rl-aout:disabled{opacity:.6}.rl-aout:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-afoot{text-align:center;font-size:13px!important;color:var(--rl-text2);margin:14px 0 0!important;word-break:break-all}" +
+    // Profile laid out like Shop's account page: a header card, two big tiles, recent purchases as pictures, settings.
+    ".rl-me-tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0 0}" +
+    ".rl-me-tile{all:unset;box-sizing:border-box;cursor:pointer;min-height:124px;padding:16px;border-radius:22px;background:var(--rl-card);border:1px solid var(--rl-line);display:flex;flex-direction:column;justify-content:space-between;gap:12px;transition:transform .12s,background-color .12s}" +
+    ".rl-me-tile:active{transform:scale(.97);background:var(--rl-fill)}.rl-me-tile:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-me-tic{width:48px;height:48px;border-radius:50%;background:var(--rl-fill);display:flex;align-items:center;justify-content:center;color:var(--rl-text)}" +
+    ".rl-me-tt{display:flex;flex-direction:column;gap:2px}.rl-me-tt b{font-size:17px;font-weight:700;color:var(--rl-text)}.rl-me-tt span{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-me-h{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:44px;margin:22px 0 6px;font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--rl-text)}" +
+    ".rl-me-h2{cursor:default;margin-bottom:0}.rl-me-hc{width:28px;height:28px;border-radius:50%;background:var(--rl-fill);display:inline-flex;align-items:center;justify-content:center}" +
+    ".rl-me-row{display:flex;gap:10px;overflow-x:auto;margin:0;padding:2px 0 4px;scrollbar-width:none;scroll-snap-type:x mandatory}.rl-me-row::-webkit-scrollbar{display:none}" +
+    ".rl-me-it{all:unset;box-sizing:border-box;cursor:pointer;flex:none;width:140px;height:140px;scroll-snap-align:start;transition:transform .12s}.rl-me-it:active{transform:scale(.96)}.rl-me-it:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px;border-radius:22px}" +
+    ".rl-me-pic.hl-sqpic{display:block;width:140px;height:140px;aspect-ratio:auto;box-sizing:border-box}" +
+    ".rl-me-links{display:flex;justify-content:center;gap:18px;word-break:normal}.rl-me-links a{color:var(--rl-text2);text-decoration:none;font-weight:600;min-height:44px;display:inline-flex;align-items:center}" +
+    ".rl-aout{display:flex;align-items:center;justify-content:center;gap:8px}" +
     ".rl-asub{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:18px 16px;margin-top:8px}" +
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
@@ -704,6 +717,9 @@
     "@media(prefers-reduced-motion:reduce){.rl-jbar i,.rl-dots span{transition:none}}" +
     // Full pages: every step of signing in and getting started fills the screen, in a column, instead of a sheet over the app.
     ".rl-back:has(>.rl-jr){background:var(--rl-bg);align-items:stretch;justify-content:stretch}" +
+    // Getting started carries on in Relay's navy from the welcome story and the sign-in page (Connor, 17 Nov 2026: the
+    // white steps looked blank). Its own colours, so every card, row, field and button on these steps follows.
+    ".rl-back:has(>.rl-jr){--rl-bg:#101828;--rl-sheet:#101828;--rl-card:#1c2740;--rl-text:#fff;--rl-text2:rgba(235,235,245,.72);--rl-line:rgba(255,255,255,.14);--rl-fill:rgba(255,255,255,.1);--rl-accent:#c7f567;--rl-accent-bg:rgba(199,245,103,.15);color:#fff;color-scheme:dark}" +
     ".rl-back:has(>.rl-jr)>.rl-sheet{max-width:none;width:100%;height:100%;min-height:100%;max-height:none;border-radius:0;box-shadow:none;background:var(--rl-bg);padding:env(safe-area-inset-top) max(18px,calc((100% - 480px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--rl-kb,0px))}" +
     ".rl-back:has(>.rl-jr) .rl-jtop{margin:0 -8px;padding:6px 0;background:var(--rl-bg);-webkit-backdrop-filter:none;backdrop-filter:none}" +
     // The sign-in page: Relay's navy whatever the phone's setting (as the welcome story), the name, a little wallet of
@@ -2090,6 +2106,7 @@
     } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
     // Back from Google or Microsoft without signing in (the phone's back, or Done): the buttons work again.
     providerFree = function () { free(); say(note, ""); };
+    claiming = false;
     var body2 = { nonce: nonce }; if (consent) body2.consentVersion = consent.version;
     var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
     api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
@@ -4508,6 +4525,8 @@
     bag: '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M16.5 6.5l2.5 2.5M14 9l2 2"/>',
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    heart: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/>',
+    spark: '<path d="M12 3.5l2.1 5.6 5.9 2.1-5.9 2.1L12 19l-2.1-5.7L4 11.2l5.9-2.1Z"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
     phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>',
@@ -5070,6 +5089,32 @@
     }
     sheet.appendChild(head); sheet.appendChild(msg);
     drawHead(); profileWatchers.push(drawHead); loadProfile();
+    // Profile, the way Shop's account page is laid out (Connor, 17 Nov 2026: it looked basic): who you are, two big tiles
+    // for what you keep an eye on, what you bought lately as pictures, then the settings list.
+    if (inPage && !isReview()) {
+      var nWatch = 0; try { nWatch = (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.real; }).length; } catch (e) {}
+      var tile = function (icon, name, detail, go) {
+        return el("button", { type: "button", className: "rl-me-tile", onclick: tapOnce(go) }, [el("span", { className: "rl-me-tic" }, [accIc(icon, 24)]),
+          el("span", { className: "rl-me-tt" }, [el("b", { text: name }), detail ? el("span", { text: detail }) : null].filter(Boolean))]);
+      };
+      sheet.appendChild(el("div", { className: "rl-me-tiles" }, [
+        tile("heart", "Watching", nWatch ? nWatch + (nWatch === 1 ? " thing" : " things") : "", function () { if (window.go) window.go("radar"); }),
+        tile("spark", "Wrapped", String(new Date().getFullYear()), function () { if (window.go) window.go("wrapped"); })]));
+      var recent = el("div", { className: "rl-me-recent" }); recent.hidden = true; sheet.appendChild(recent);
+      Promise.all([api(purchasesPath()), api("/relay/my/receipts")]).then(function (r) {
+        if (!recent.isConnected) return;
+        var all = feedEntries((r[0].ok && r[0].body && r[0].body.purchases) || [], (r[1].ok && r[1].body && r[1].body.receipts) || [], function () {})
+          .filter(function (e) { return !e.digital; }).sort(function (a, b) { return String(b.at || "").localeCompare(String(a.at || "")); }).slice(0, 10);
+        if (!all.length) return;
+        recent.hidden = false;
+        recent.appendChild(el("button", { type: "button", className: "rl-me-h", onclick: function () { if (window.go) window.go("receipts"); } }, [el("span", { text: "Recently bought" }), el("span", { className: "rl-me-hc" }, [accIc("chev", 16)])]));
+        recent.appendChild(el("div", { className: "rl-me-row" }, all.map(function (e) {
+          var name = cleanName(e.title || (e.tiles && e.tiles[0] && e.tiles[0].name) || "", e.shop) || e.shop || "";
+          return el("button", { type: "button", className: "rl-me-it", ariaLabel: [e.shop, name].filter(Boolean).join(", "), onclick: tapOnce(e.open) }, [hlPic(e, "hl-sqpic rl-me-pic")]);
+        })));
+      }, function () {});
+      sheet.appendChild(el("h2", { className: "rl-me-h rl-me-h2", text: "Settings" }));
+    }
     // On the Profile page, this year's Wrapped comes first.
     // The reviewer account (isReview) can't have an inbox or sign-in settings, so those rows, and Wrapped (made from inbox
     // receipts), are left out for it.
@@ -5234,8 +5279,10 @@
     // Signing out (or deleting the account) from the Profile page goes back to the welcome screen on Home.
     var leave = function () { save(null); close(); if (inPage && window.go) window.go("profile"); };
     outBtn.onclick = function () { outBtn.disabled = true; api("/relay/auth/logout", { method: "POST" }).finally(leave); };
+    if (inPage) outBtn.insertBefore(accIc("out", 20), outBtn.firstChild);
     sheet.appendChild(outBtn);
     sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
+    if (inPage) sheet.appendChild(el("p", { className: "rl-afoot rl-me-links" }, [el("a", { href: "./terms.html", text: "Terms of use" }), el("a", { href: "./privacy.html", text: "Privacy policy" })]));
 
     // Two switches for Relay's team, each changing only what this device shows (so they also work in the app on the home
     // screen, which a link can't reach). Shoppers never see them.
@@ -6068,13 +6115,16 @@
   // Relay whether that sign-in finished, a few times while it's on screen, then gives the buttons back.
   var claiming = false;
   function claimPending() {
-    if (claiming || load()) return;
+    if (load()) return;
+    // The buttons work again every time the page is back (Connor, 17 Nov 2026: a second trip to Google and back left them
+    // stuck while the first check was still going).
+    if (providerFree) providerFree();
+    if (claiming) return;
     var gn = "", at = 0;
     try { gn = localStorage.getItem("relay_gnonce") || ""; at = Number(localStorage.getItem("relay_gnonce_at")) || 0; } catch (e) {}
     if (!gn || /(?:^|[#&])signin=/.test(location.hash || "")) return;
     if (Date.now() - at > 15 * 60000) { try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); } catch (e) {} if (providerFree) providerFree(); return; }
     claiming = true;
-    if (providerFree) providerFree();   // the buttons work again straight away; the check carries on behind
     var tries = 0;
     (function ask() {
       api("/relay/auth/claim", { method: "POST", body: { nonce: gn } }).then(function (r) {
@@ -8602,11 +8652,22 @@
     return r;
   }
   // Wallet: the thing as a big square, a label on it only when something is happening, then the shop, what it is and the price.
+  // A product's name as a person would say it under its picture (Connor, 17 Nov 2026: Home showed "lululemon
+  // lululemon Align™ High-R…", "Nespresso Nespresso" and "W Restfeel Slide TOPK/TOPK…"): no shop name in front of it, no
+  // ™ or ®, no stock codes on the end, and nothing at all when it's only the shop's name again.
+  function cleanName(name, shop) {
+    var n = String(name || "").replace(/[™®©]/g, "").replace(/\s+/g, " ").trim(), sh = String(shop || "").trim();
+    if (sh && n.toLowerCase().indexOf(sh.toLowerCase() + " ") === 0) n = n.slice(sh.length).trim();
+    n = n.replace(/(\s+[A-Z0-9]{3,}(\/[A-Z0-9]{2,})+.*)$/, "").replace(/\s+[A-Z]{2,}\d[A-Z0-9-]*$/, "").replace(/^[\s,:-]+|[\s,:-]+$/g, "");
+    if (!n || (sh && n.toLowerCase() === sh.toLowerCase())) return "";
+    return n;
+  }
+  window.relayCleanName = cleanName;
   function walletSquare(e) {
-    var t = e.tiles && e.tiles[0], what = e.title || (t && t.name) || "", tag = e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
+    var t = e.tiles && e.tiles[0], what = cleanName(e.title || (t && t.name) || "", e.shop), tag = e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
     var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
     return el("button", { type: "button", className: "hl-sq", ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
-      pic, el("span", { className: "hl-sqs", text: e.shop || "" }), el("span", { className: "hl-sqn", text: what }), t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
+      pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
   }
   // Today's summary: one line each for what needs the shopper, biggest first; each opens that list.
   function todaySummary(sets, pickChip) {
@@ -8769,16 +8830,24 @@
       var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
       // "To return" runs soonest date first; the others keep the feed's order.
       sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
-      if (!sets[state.pick] || (state.pick !== "you" && !sets[state.pick].length)) state.pick = "you";
+      if (!sets[state.pick] || (state.pick !== "you" && state.pick !== "watch" && !sets[state.pick].length)) state.pick = "you";
       chips.textContent = "";
-      [["you", "For you"], ["back", "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"], ["watch", "Watching"]].forEach(function (c) {
-        if (c[0] !== "you" && !sets[c[0]].length) return;
+      [["you", "For you"], ["watch", "Watching"], ["back", "To return"], ["way", "On the way"], ["swaps", "Swaps and returns"]].forEach(function (c) {
+        if (c[0] !== "you" && c[0] !== "watch" && !sets[c[0]].length) return;
         var b = el("button", { type: "button", className: "h2-chip", onclick: function () { if (state.pick === c[0]) return; state.pick = memo.homeChip = c[0]; draw(); try { window.scrollTo(0, 0); } catch (e) {} } });
         b.appendChild(el("span", { text: c[1] }));
         b.setAttribute("aria-pressed", state.pick === c[0] ? "true" : "false");
         chips.appendChild(b);
       });
-      chips.style.display = chips.children.length > 1 ? "" : "none";
+      // The rest of Relay, a tap from Home and scrolled to sideways (Connor, 17 Nov 2026): these open their own pages.
+      [["Swap & resell", function () { window.dcShow && window.dcShow("market"); }], ["Auctions", function () { window.dcShow && window.dcShow("auctions"); }],
+        ["Shops on Relay", function () { window.dcShow && window.dcShow("shops"); }], isReview() ? null : ["Wrapped", function () { window.go && window.go("wrapped"); }]].forEach(function (c) {
+        if (!c) return;
+        var b = el("button", { type: "button", className: "h2-chip h2-chip-go", onclick: tapOnce(c[1]) });
+        b.appendChild(el("span", { text: c[0] }));
+        chips.appendChild(b);
+      });
+      chips.style.display = "";
       feed.textContent = "";
       if (state.pick === "you") {
         if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
@@ -8793,6 +8862,7 @@
           feed.appendChild(feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
             sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }
       }
+      if (state.pick === "watch" && !watched.length) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
       if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
         var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
         feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
