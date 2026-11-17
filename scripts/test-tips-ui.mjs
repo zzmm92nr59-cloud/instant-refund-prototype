@@ -34,7 +34,7 @@ async function phone(email, { scheme = "light", view = { width: 390, height: 844
     if (p === "/relay/my/receipts") return j({ receipts });
     if (p === "/relay/my/purchases") return j({ purchases: [] });
     if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
-    if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: who, lastScanAt: Date.now() });
+    if (p === "/relay/my/gmail") return j(who === "sam@example.com" ? { connected: false } : { connected: true, provider: "google", email: who, lastScanAt: Date.now() });
     if (p === "/relay/my/profile") return j({ email: who, name: "Jess Tester", photo: null });
     if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
     return j({});
@@ -136,7 +136,7 @@ console.log("ok - straight away when there's no interests sheet: four tips, tab 
 }
 console.log("ok - another phone doesn't show them again; Show the tips again does; Escape skips them all");
 
-// 3. A new account with no interests: the interests sheet first, then (after Not now) the tips. Without the assistant,
+// 3. A new account with no interests and no inbox (with one, Browse goes by receipts, so it isn't asked): the interests sheet first, then (after Not now) the tips. Without the assistant,
 //    there's no Ask tab, so no Ask tip, and Receipts says Done. Skip ends them.
 st.ai = false;
 {

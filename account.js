@@ -65,6 +65,7 @@
   function rememberMailbox(g) {
     try { if (g && g.connected) localStorage.setItem(MAILBOX_KEY, g.provider === "microsoft" ? "outlook" : "gmail"); else if (g) localStorage.removeItem(MAILBOX_KEY); } catch (e) {}
   }
+  function hasMailbox() { try { return Boolean(localStorage.getItem(MAILBOX_KEY)); } catch (e) { return false; } }
   function mailName() { try { return localStorage.getItem(MAILBOX_KEY) === "outlook" ? "Outlook" : "Gmail"; } catch (e) { return "Gmail"; } }
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
@@ -714,11 +715,24 @@
     ".rl-choice:focus-visible,.rl-textbtn:focus-visible{outline:2px solid #fff;outline-offset:3px}" +
     ".rl-back:has(>.rl-signin),.rl-back>.rl-sheet.rl-signin{background:#101828;color:#fff}" +
     ".rl-back>.rl-sheet.rl-signin{display:flex;flex-direction:column}.rl-signin .rl-jbody{flex:1;display:flex;flex-direction:column;padding-top:0}" +
-    ".rl-back:has(>.rl-signin) .rl-jtop{background:transparent}.rl-signin .rl-abtn{color:#fff}.rl-signin .rl-abtn .rl-jic{color:#fff}" +
+    ".rl-back:has(>.rl-signin) .rl-jtop{background:#101828}.rl-signin .rl-abtn{color:#fff}.rl-signin .rl-abtn .rl-jic{color:#fff}" +
     ".rl-signin .rl-abtn:active{background:rgba(255,255,255,.12)}.rl-signin .rl-abtn:focus-visible{outline-color:#fff}.rl-signin .rl-wbrand{margin:6px 0 0}" +
     ".rl-sheet.rl-signin h2.rl-jh{color:#fff;font-size:clamp(30px,9vw,36px);margin:0 0 8px}.rl-sheet.rl-signin p.rl-jsub{color:rgba(255,255,255,.8);font-size:17px;line-height:1.4;margin:0 0 22px}" +
     ".rl-sheet.rl-signin p.rl-jlegal{color:rgba(255,255,255,.72);margin-top:18px}.rl-signin .rl-jlegal a{color:#c7f567}" +
     ".rl-signin .rl-msg{color:#c7f567}.rl-signin .rl-msg.err{color:#ffb4ab}" +
+    // What Relay does with the inbox, on the navy page: four short lines with lime icons, the full wording a tap away.
+    // Getting started's banks and cards: a tile each, three to a row, its logo over its name.
+    ".rl-jbanks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}" +
+    ".rl-jbank{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:84px;padding:10px 6px;border-radius:16px;background:var(--rl-card);box-shadow:inset 0 0 0 1px var(--rl-line);color:var(--rl-text);font-size:13.5px;font-weight:650;text-align:center;cursor:pointer;transition:transform .12s,background-color .12s}" +
+    ".rl-jbank:active{transform:scale(.95);background:var(--rl-fill)}.rl-jbank:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-jbank:disabled{opacity:.55}" +
+    ".rl-jbank-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;overflow:hidden}.rl-jbank-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:inset 0 0 0 1px rgba(60,60,67,.14)}" +
+    ".rl-jbank>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}" +
+    ".rl-sperm{margin:18px 0 0;padding:16px;border-radius:18px;background:rgba(255,255,255,.07)}.rl-sperm-h{display:block;font-size:16px;margin:0 0 6px}" +
+    ".rl-sperm .rl-jpt{color:#fff;font-size:15px;padding:6px 0}.rl-sperm .rl-jpt .rl-jic{color:#c7f567}" +
+    ".rl-sperm .rl-sperm-more{min-height:44px;margin:6px 0 0;justify-content:flex-start;font-size:15px}" +
+    ".rl-sperm .rl-jpt+.rl-jpt{border-top-color:rgba(255,255,255,.12)}" +
+    ".rl-sperm .rl-jwords{background:transparent;padding:0;margin:4px 0 0}.rl-sperm .rl-jwords:focus-visible{outline-color:#fff}" +
+    ".rl-sperm .rl-jwords p{color:rgba(255,255,255,.86)!important;background:rgba(255,255,255,.07)!important}" +
     ".rl-sart{flex:1;min-height:170px;display:flex;align-items:flex-end;justify-content:center;padding:18px 0 30px}" +
     ".rl-sstack{position:relative;width:100%;max-width:340px;padding-top:30px}" +
     ".rl-sback{position:absolute;height:64px;border-radius:18px}.rl-sback.b1{top:0;left:30px;right:30px;background:#E0446E}.rl-sback.b2{top:15px;left:15px;right:15px;background:#4F72E0}" +
@@ -1821,6 +1835,13 @@
   // same steps and the same "3 of 5" (Connor, 17 Nov 2026: the count jumped back after connecting a bank). Kept for an
   // hour, for that account only.
   var PLAN_KEY = "relay.journey-plan.v1";
+  // The banks and cards offered as one tap each in getting started: the id worker/bank.js knows (BANK_CHOICES), the
+  // name, the website its logo comes from, how a connected one is named, and a colour behind its letter while there's no logo.
+  var BANK_TILES = [["amex", "Amex", "americanexpress.com", /american express|amex/i, "#016FD0"], ["barclays", "Barclays", "barclays.co.uk", /barclays/i, "#00AEEF"],
+    ["chase", "Chase", "chase.co.uk", /chase/i, "#117ACA"], ["halifax", "Halifax", "halifax.co.uk", /halifax/i, "#005EB8"], ["hsbc", "HSBC", "hsbc.co.uk", /hsbc/i, "#DB0011"],
+    ["lloyds", "Lloyds", "lloydsbank.com", /lloyds/i, "#006A4D"], ["monzo", "Monzo", "monzo.com", /monzo/i, "#FF4F40"], ["nationwide", "Nationwide", "nationwide.co.uk", /nationwide/i, "#1A2D6B"],
+    ["natwest", "NatWest", "natwest.com", /natwest/i, "#5A287D"], ["revolut", "Revolut", "revolut.com", /revolut/i, "#191C1F"], ["santander", "Santander", "santander.co.uk", /santander/i, "#EC0000"],
+    ["starling", "Starling", "starlingbank.com", /starling/i, "#6935D3"]];
   function planGet(email) { try { var x = JSON.parse(localStorage.getItem(PLAN_KEY) || "null"); return x && x.email === obKey(email) && Date.now() - x.t < 36e5 && Array.isArray(x.steps) ? x : null; } catch (e) { return null; } }
   function planSet(email, steps, off) { try { localStorage.setItem(PLAN_KEY, JSON.stringify({ email: obKey(email), steps: steps, off: off, t: Date.now() })); } catch (e) {} }
   function planDrop() { try { localStorage.removeItem(PLAN_KEY); } catch (e) {} }
@@ -1954,41 +1975,70 @@
   // The sign-in page: Relay's icon, one heading, three equal ways in, Face ID quietly underneath, and the legal line.
   // Signing in and creating an account are the same steps, so the heading just matches the button that led here.
   var signInOpts = {}; // so Back from a later step returns to the same page ("Welcome back" stays "Welcome back")
+  // The way in. Creating an account with Google or Microsoft is one tap (Connor, 17 Nov 2026: it used to be a second
+  // screen of permission): what Relay will do with the inbox is on this page, under the buttons, with the exact wording
+  // a tap away, and "Continue with Google" agrees to it, signs in and connects Gmail in one visit. Someone coming back
+  // ("Welcome back") just signs in; if their inbox isn't connected, getting started offers it.
   function signedOutView(sheet, opts) {
     opts = signInOpts = opts || {};
     signInExtra = {};
+    var fresh = !opts.returning;
     var fromWelcome = Boolean(document.querySelector(".rl-welcome"));
     var body = jFrame(sheet, { back: fromWelcome ? close : null, noClose: fromWelcome,
-      title: opts.returning ? "Welcome back" : "Create your account",
-      sub: opts.returning ? "Sign in the way you did last time. No password needed." : "Use the email you shop with. No password needed." });
+      title: fresh ? "Create your account" : "Welcome back",
+      sub: fresh ? "Continue with Google or Microsoft and Relay starts finding your receipts straight away. No password needed." : "Sign in the way you did last time. No password needed." });
     // On Relay's navy, as the welcome story ends: the name, a little wallet of receipts, then the ways in, rising in turn.
     sheet.classList.add("rl-signin");
     body.insertBefore(el("div", { className: "rl-wbrand rl-rise" }, [el("img", { src: "icons/icon-192.png", alt: "" }), el("b", { text: "Relay" })]), body.firstChild);
     body.insertBefore(signInArt(), body.querySelector(".rl-jh"));
     var msg = el("div", { className: "rl-msg" });
     var choices = el("div", { className: "rl-choices" });
-    var gBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Google", onclick: function () { providerStep(sheet, "google"); } });
-    var mBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Microsoft", onclick: function () { providerStep(sheet, "microsoft"); } });
+    var consent = null;
+    var gBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Google", onclick: function () { goProvider("google", fresh && consent, msg, choices); } });
+    var mBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with Microsoft", onclick: function () { goProvider("microsoft", fresh && consent, msg, choices); } });
     gBtn.style.display = mBtn.style.display = "none";
     var eBtn = el("button", { type: "button", className: "rl-choice", text: "Continue with email", onclick: function () { emailStep(sheet); } });
     [gBtn, mBtn, eBtn].forEach(function (n) { choices.appendChild(n); });
     body.appendChild(choices);
-    if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; pk.insertBefore(jIc("face", 22), pk.firstChild); body.appendChild(pk); }
     body.appendChild(msg);
+    if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; pk.insertBefore(jIc("face", 22), pk.firstChild); body.appendChild(pk); }
+    // What Relay does with the inbox, before anyone goes to Google or Microsoft.
+    var perm = null;
+    if (fresh) {
+      perm = el("div", { className: "rl-sperm" });
+      perm.style.display = "none";
+      perm.appendChild(el("b", { className: "rl-sperm-h", text: "With Google or Microsoft, Relay reads your inbox" }));
+      [["eye", "Only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
+        .forEach(function (x) { perm.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+      var words = el("div", { className: "rl-jwords", id: "rl-consent-words", role: "region", tabIndex: 0 });
+      words.setAttribute("aria-label", "Relay's permission wording"); words.hidden = true;
+      var more = el("button", { type: "button", className: "rl-textbtn rl-sperm-more", text: "Read exactly what you're agreeing to" });
+      more.setAttribute("aria-expanded", "false"); more.setAttribute("aria-controls", "rl-consent-words");
+      more.onclick = function () { var on = words.hidden; words.hidden = !on; more.setAttribute("aria-expanded", on ? "true" : "false"); more.textContent = on ? "Hide the wording" : "Read exactly what you're agreeing to"; };
+      perm.appendChild(more); perm.appendChild(words);
+      body.appendChild(perm);
+    }
     var legal = el("p", { className: "rl-jlegal" });
-    legal.appendChild(document.createTextNode("By continuing you agree to Relay's "));
+    legal.appendChild(document.createTextNode(fresh ? "By continuing you agree to Relay's " : "Relay's "));
     legal.appendChild(el("a", { href: "./terms.html", text: "Terms of use" }));
     legal.appendChild(document.createTextNode(" and "));
     legal.appendChild(el("a", { href: "./privacy.html", text: "Privacy policy" }));
-    legal.appendChild(document.createTextNode("."));
+    legal.appendChild(document.createTextNode(fresh ? ", and with Google or Microsoft to Relay reading your receipts as above." : " still apply."));
     body.appendChild(legal);
     // Each part rises in a moment after the one above it (not at all where the phone asks for less motion).
-    var rise = [body.querySelector(".rl-jh"), body.querySelector(".rl-jsub"), choices, body.querySelector(".rl-textbtn"), legal];
+    var rise = [body.querySelector(".rl-jh"), body.querySelector(".rl-jsub"), choices, body.querySelector(".rl-textbtn"), perm, legal];
     rise.forEach(function (n, k) { if (n) { n.classList.add("rl-rise"); n.style.setProperty("--d", (0.18 + k * 0.06).toFixed(2) + "s"); } });
     signInProviders().then(function (p) {
       if (!document.body.contains(body)) return;
-      if (p && p.google) gBtn.style.display = "";
-      if (p && p.microsoft) mBtn.style.display = "";
+      consent = p && p.consent && p.consent.text ? p.consent : null;
+      // Creating an account with Google or Microsoft needs the wording to show first; without it, only email.
+      var can = function (on) { return on && (!fresh || consent); };
+      if (p && can(p.google)) gBtn.style.display = "";
+      if (p && can(p.microsoft)) mBtn.style.display = "";
+      if (perm && consent && (p.google || p.microsoft)) {
+        consent.text.forEach(function (t) { words.appendChild(el("p", { text: t })); });
+        perm.style.display = "";
+      }
       if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
     });
   }
@@ -2004,50 +2054,24 @@
     art.setAttribute("aria-hidden", "true");
     return art;
   }
-  // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
-  function providerStep(sheet, kind) {
-    var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    // A new account goes on to its inboxes, its cards and banks (where Relay offers them to everyone), what it shops for,
-    // then "You're all set" (its name comes from Google or Microsoft): four or five steps. Someone coming back usually has
-    // some of those already (before signing in Relay can't tell), so one fewer.
-    var steps = (signInOpts.returning ? 3 : 4) + (providersKnown && providersKnown.banks ? 1 : 0);
-    var body = jFrame(sheet, { art: "mail", back: function () { signedOutView(sheet, signInOpts); }, of: steps, at: 1,
-      title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
-    var points = el("div", { className: "rl-jcard" });
-    [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
-      .forEach(function (x) { points.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
-    body.appendChild(points);
-    var words = el("div", { className: "rl-jwords", role: "region", tabIndex: 0 }, [el("b", { text: "What you're agreeing to" })]);
-    words.setAttribute("aria-label", "Relay's permission wording");
-    body.appendChild(words);
-    var note = el("div", { className: "rl-msg" });
-    var agree = el("button", { type: "button", className: "rl-btn", text: "Agree and continue with " + who, disabled: true });
-    var just = el("button", { type: "button", className: "rl-btn ghost", text: "Just sign in for now" });
-    body.appendChild(agree); body.appendChild(just); body.appendChild(note);
-    body.appendChild(el("p", { className: "rl-jnote", text: "Already use Relay? “Just sign in” skips the permission step." }));
-    var consent = null;
-    signInProviders().then(function (p) {
-      consent = p && p.consent;
-      if (consent && consent.text) { consent.text.forEach(function (t) { words.appendChild(el("p", { text: t })); }); agree.disabled = false; }
-      else { agree.style.display = "none"; words.style.display = "none"; }
-    });
-    function go(button, withMail) {
-      if (agree.dataset.busy) return;
-      agree.dataset.busy = "1"; agree.disabled = just.disabled = true; say(note, "Opening " + who + "…");
-      var free = function () { delete agree.dataset.busy; agree.disabled = !consent; just.disabled = false; };
-      var nonce = newNonce();
-      try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
-      var body2 = { nonce: nonce }; if (withMail && consent) body2.consentVersion = consent.version;
-      var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
-      api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
-        if (r.ok && r.body && host.test(r.body.url || "")) { location.href = r.body.url; return; }
-        free();
-        if (r.body && r.body.error === "consent_version_mismatch") providersAsked = null;
-        say(note, r.status === 503 ? who + " sign-in isn't switched on yet. Continue with email instead." : r.body && r.body.error === "consent_version_mismatch" ? "Relay's wording has just changed. Go back and try again." : "Couldn't open " + who + ". Please try again.", true);
-      }).catch(function () { free(); say(note, "Couldn't reach Relay. Check your connection.", true); });
-    }
-    agree.onclick = function () { go(agree, true); };
-    just.onclick = function () { go(just, false); };
+  // Off to Google or Microsoft. With `consent` (creating an account): agreeing to that wording, signing in and connecting
+  // the inbox in one visit. Without: just signing in.
+  function goProvider(kind, consent, note, buttons) {
+    var g = kind === "google", who = g ? "Google" : "Microsoft";
+    if (buttons.dataset.busy) return;
+    var all = Array.prototype.slice.call(buttons.querySelectorAll("button"));
+    buttons.dataset.busy = "1"; all.forEach(function (b) { b.disabled = true; }); say(note, "Opening " + who + "…");
+    var free = function () { delete buttons.dataset.busy; all.forEach(function (b) { b.disabled = false; }); };
+    var nonce = newNonce();
+    try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
+    var body2 = { nonce: nonce }; if (consent) body2.consentVersion = consent.version;
+    var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
+    api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
+      if (r.ok && r.body && host.test(r.body.url || "")) { location.href = r.body.url; return; }
+      free();
+      if (r.body && r.body.error === "consent_version_mismatch") providersAsked = null;
+      say(note, r.status === 503 ? who + " sign-in isn't switched on yet. Continue with email instead." : r.body && r.body.error === "consent_version_mismatch" ? "Relay's wording has just changed. Please try again." : "Couldn't open " + who + ". Please try again.", true);
+    }).catch(function () { free(); say(note, "Couldn't reach Relay. Check your connection.", true); });
   }
   // Step 2 by email: a one-time link or code.
   function emailStep(sheet, typed) {
@@ -2062,8 +2086,8 @@
       var k = mailKindOf(input.value.trim()); hint.textContent = "";
       if (!k) return;
       var who = k === "google" ? "Google" : "Microsoft";
-      hint.appendChild(el("p", { text: "Using " + (k === "google" ? "Gmail" : "Outlook") + "? Continue with " + who + " instead and you'll be signed in with your receipts on their way, in one step." }));
-      hint.appendChild(el("button", { type: "button", className: "rl-btn rl-prov", text: "Continue with " + who, onclick: function () { providerStep(sheet, k); } }));
+      hint.appendChild(el("p", { text: "Using " + (k === "google" ? "Gmail" : "Outlook") + "? With " + who + " you're signed in with your receipts on their way, in one step." }));
+      hint.appendChild(el("button", { type: "button", className: "rl-btn rl-prov", text: "Use " + who + " instead", onclick: function () { signedOutView(sheet, signInOpts); } }));
     }
     input.addEventListener("input", showHint);
     go.onclick = function () {
@@ -2153,14 +2177,18 @@
         if (st.bankOn && st.banks.length) need.bank = true;
         if (info.at) need[info.at] = true;
         // What they shop for: so Browse can show shops they'll like first (interests.js). Home asks anyone else once.
-        need.interests = replay || (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview());
+        // Not asked once an inbox is connected (Connor, 17 Nov 2026): Browse goes by their receipts then, and interests
+        // would only break ties. Someone without one is still asked, so Browse has something to go on.
+        need.interests = !st.connected && (replay || (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview()));
         var steps = ["name", "mail", "bank", "interests"].filter(function (k) { return need[k]; });
         steps.push("done");
-        st.off = st.justConnected && st.viaProvider ? 1 : 0;
+        st.off = 0;
         // Back from Google, Microsoft or a bank: the same steps as before going there.
         var was = info.at ? planGet(email) : null;
         if (was && was.steps.indexOf(info.at) >= 0) { steps = was.steps; st.off = was.off || 0; }
-        else planSet(email, steps, st.off);
+        // An inbox connected along the way: no question about what they shop for after all.
+        if (st.connected && steps.indexOf("interests") >= 0) steps = steps.filter(function (k) { return k !== "interests"; });
+        planSet(email, steps, st.off);
         runJourney(sheet, st, steps, Math.max(0, info.at ? steps.indexOf(info.at) : 0));
         });
         });
@@ -2340,17 +2368,33 @@
         });
         bodyB.appendChild(listB);
       }
-      var goB = el("button", { type: "button", className: "rl-btn" + (st.banks.length ? " ghost" : ""), text: st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
-      goB.onclick = function () {
-        if (goB.disabled) return;
-        goB.disabled = true; say(noteB, "Opening your bank\u2026");
-        api("/relay/my/bank/connect", { method: "POST" }).then(function (r) {
+      // The UK's usual banks and cards as one tap each, straight to that bank's own sign-in (Connor, 17 Nov 2026), and
+      // any other through TrueLayer's list. Ones already connected aren't offered again. Not with test banks.
+      var tiles = st.testBanks ? [] : BANK_TILES.filter(function (t) { return !st.banks.some(function (x) { return t[3].test(x.bank || ""); }); });
+      var grid = tiles.length ? el("div", { className: "rl-jbanks", role: "group" }) : null;
+      if (grid) grid.setAttribute("aria-label", "Choose your bank or card");
+      var goB = el("button", { type: "button", className: "rl-btn" + (st.banks.length || grid ? " ghost" : ""), text: grid ? "Another bank or card" : st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
+      var openBank = function (choice, label) {
+        var btns = Array.prototype.slice.call(bodyB.querySelectorAll(".rl-jbank")).concat([goB]);
+        if (goB.dataset.busy) return;
+        goB.dataset.busy = "1"; btns.forEach(function (b) { b.disabled = true; });
+        say(noteB, "Opening " + (label || "your bank") + "\u2026");
+        var free = function () { delete goB.dataset.busy; btns.forEach(function (b) { b.disabled = false; }); };
+        api("/relay/my/bank/connect", { method: "POST", body: choice ? { bank: choice } : undefined }).then(function (r) {
           if (r.ok && r.body && /^https:\/\//.test(r.body.url || "")) { obSet(st.email, { back: "bank" }); location.href = r.body.url; return; }
-          goB.disabled = false;
+          free();
           say(noteB, r.status === 409 ? "That's the most banks and cards Relay can connect." : "Couldn't open your bank just now. Try again in a moment.", true);
-        }, function () { goB.disabled = false; say(noteB, "Couldn't reach Relay. Check your connection and try again.", true); });
+        }, function () { free(); say(noteB, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
+      if (grid) tiles.forEach(function (t) {
+        var logo = el("span", { className: "rl-jbank-logo", text: t[1].charAt(0), style: "background:" + t[4] });
+        logo.setAttribute("aria-hidden", "true");
+        grid.appendChild(el("button", { type: "button", className: "rl-jbank", onclick: function () { openBank(t[0], t[1]); } }, [logo, el("span", { text: t[1] })]));
+        shopLogo(logo, t[2], 30, function () {});
+      });
+      goB.onclick = function () { openBank(null); };
       if (st.banks.length) bodyB.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
+      if (grid) bodyB.appendChild(grid);
       bodyB.appendChild(goB); if (!noteB.parentNode) bodyB.appendChild(noteB);
       return;
     }
@@ -4622,16 +4666,19 @@
   // The first-run tips come after the interests sheet, or straight away when it isn't shown (on the same terms).
   function interestsMaybeAsk(host) {
     var s = load(); if (!s || !s.token || isReview()) return;
-    if (interestsAsked || interestsLater()) return tipsMaybe(host);
+    if (interestsAsked || interestsLater() || hasMailbox()) return tipsMaybe(host);   // receipts go first: see startJourney
     var c = interestsCached(); if (c && c.length) { interestsPublish(c); return tipsMaybe(host); }
     interestsAsked = true;
     var acted = false, mark = function () { acted = true; }, evs = ["pointerdown", "keydown", "wheel", "touchstart"];
     evs.forEach(function (n) { document.addEventListener(n, mark, { capture: true, passive: true }); });
-    interestsLoad(true).then(function (list) {
+    // With an inbox connected, Browse goes by their receipts, so it isn't asked (Connor, 17 Nov 2026).
+    var inbox = api("/relay/my/gmail").then(function (g) { if (g.ok && g.body) rememberMailbox(g.body); return Boolean(g.ok && g.body && g.body.connected); }, function () { return false; });
+    Promise.all([interestsLoad(true), inbox]).then(function (r) {
+      var list = r[0];
       evs.forEach(function (n) { document.removeEventListener(n, mark, { capture: true }); });
       var still = host && host.isConnected && !acted && !document.querySelector(".rl-back, .rl-sheet");
       if (!still) { interestsAsked = false; return; }
-      if (list && !list.length && !interestsLater()) interestsSheet(); else tipsMaybe(host);
+      if (list && !list.length && !r[1] && !interestsLater()) interestsSheet(); else tipsMaybe(host);
     });
   }
   function interestsSheet() {
