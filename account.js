@@ -841,6 +841,8 @@
     // AI help: a switch with what it means underneath, on the Email connection page.
     ".rl-bk-h{margin:22px 0 6px;font-size:20px;font-weight:700;color:var(--rl-text)}.rl-bk-list{border-radius:18px;background:var(--rl-card);padding:0 16px}" +
     ".rl-bk-row{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 0;border-top:.5px solid var(--rl-line)}.rl-bk-row:first-child{border-top:0}" +
+    "button.rl-bk-row{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:opacity .15s}button.rl-bk-row:active{opacity:.55}" +
+    ".rl-bk-row.rl-bk-not .rl-bk-t,.rl-bk-row.rl-bk-not .rl-bk-a{opacity:.5}" +
     ".rl-bk-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.rl-bk-t b{font-size:16px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rl-text)}.rl-bk-t span,.rl-bk-a span{font-size:14px;color:var(--rl-text2)}" +
     ".rl-bk-a{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px}.rl-bk-a b{font-size:16px;font-weight:600;color:var(--rl-text)}" +
     ".rl-aih-picks{margin:16px 0 0;padding:16px 0 0;border-top:.5px solid var(--rl-line)}" +
@@ -5367,11 +5369,27 @@
         pays.appendChild(el("h3", { className: "rl-bk-h", text: "Card payments" }));
         var box = el("div", { className: "rl-bk-list" });
         ps.slice(0, 60).forEach(function (p) {
-          var shop = matchShop(p.receiptId);
-          box.appendChild(el("div", { className: "rl-bk-row" }, [
-            el("span", { className: "rl-bk-t", title: p.description || "" }, [el("b", { text: shop || p.shop || p.merchant || p.description || "Payment" }),
-              el("span", { text: !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches your receipt" : "Probably your receipt") })]),
-            el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency) }), el("span", { text: new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" }) })])]));
+          var shop = matchShop(p.receiptId), name = shop || p.shop || p.merchant || p.description || "Payment";
+          var day = new Date(p.date + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+          // Tap a payment to say it isn't yours (a card someone else also uses), or that it is after all.
+          var row = el("button", { type: "button", className: "rl-bk-row" + (p.notMine ? " rl-bk-not" : "") }, [
+            el("span", { className: "rl-bk-t", title: p.description || "" }, [el("b", { text: name }),
+              el("span", { text: p.notMine ? "Not yours" : !p.receiptId ? "No receipt yet" : (p.match === "sure" ? "Matches your receipt" : "Probably your receipt") })]),
+            el("span", { className: "rl-bk-a" }, [el("b", { text: money(p.amountPence, p.currency) }), el("span", { text: day })])]);
+          row.setAttribute("aria-label", name + ", " + money(p.amountPence, p.currency) + ", " + day + (p.notMine ? ", not yours" : ""));
+          row.onclick = function () {
+            var set = function (on, every) {
+              api("/relay/my/bank/not-mine", { method: "POST", body: { id: p.id, on: on, everyFromShop: Boolean(every) } }).then(function (r) {
+                if (!r.ok) return say(note, "Couldn't change that. Try again in a moment.", true);
+                memo.bankPays = null; say(note, on ? (every ? "Got it: nothing from " + (p.shop || name) + " is yours." : "Got it: that one isn't yours.") : "Got it: that one's yours.");
+                api("/relay/my/bank/payments", { fresh: true }).then(function (x) { if (x && x.ok) drawPays(x.body); });
+              }, function () { say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+            };
+            var what = name + ", " + money(p.amountPence, p.currency) + " on " + day;
+            if (p.notMine) chooseBox(what, [["This is mine", function () { set(false); }]]);
+            else chooseBox(what, [["Not mine", function () { set(true); }]].concat(p.shop ? [["Nothing from " + p.shop + " is mine", function () { set(true, true); }]] : []));
+          };
+          box.appendChild(row);
         });
         pays.appendChild(box);
       }

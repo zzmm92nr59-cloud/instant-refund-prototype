@@ -37,12 +37,16 @@ export const BANK_SQL = [
     connected_at INTEGER NOT NULL, synced_at INTEGER, status TEXT NOT NULL DEFAULT 'ok')`,
   `CREATE TABLE IF NOT EXISTS bank_payments (shopper_id TEXT NOT NULL, payment_id TEXT NOT NULL, connection_id TEXT NOT NULL, account TEXT,
     paid_on TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, description TEXT, merchant TEXT, receipt_id TEXT, match TEXT,
-    created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, payment_id))`
+    created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, payment_id))`,
+  // "Not mine" (a shared card: Connor, 17 Nov 2026): one payment (kind 'payment', key = its id), or everything from a shop
+  // (kind 'shop', key = the shop's name, lower case). Not matched to receipts, shown apart.
+  `CREATE TABLE IF NOT EXISTS bank_not_mine (shopper_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created_at INTEGER NOT NULL,
+    PRIMARY KEY (shopper_id, kind, key))`
 ];
 export async function ensureBankTables(db) { await db.batch(BANK_SQL.map((s) => db.prepare(s))); }
 // For account deletion (auth.js): everything bank-related for one shopper.
 export function bankDeleteStatements(db, shopperId) {
-  return ["bank_payments", "bank_links", "bank_link_states"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
+  return ["bank_payments", "bank_links", "bank_link_states", "bank_not_mine"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
 }
 
 async function sha256Hex(text) { const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)); return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join(""); }
@@ -78,7 +82,7 @@ export function matchPayments(payments, receipts) {
     if (out.has(p.payment_id)) continue;
     const fits = receipts.filter((r) => !used.has(r.id) && r.totalPence === p.amount_minor && String(r.currency || "GBP") === String(p.currency || "GBP")
       && dayDiff(p.paid_on, r.date) >= -1 && dayDiff(p.paid_on, r.date) <= 7);
-    const named = fits.filter((r) => namesShop((p.merchant || "") + " " + (p.description || ""), r.shop, r.domain));
+    const named = fits.filter((r) => namesShop((p.merchant || "") + " " + statementShop(p.description), r.shop, r.domain));
     const pick = pass === "sure" ? (named.length === 1 ? named[0] : null) : (fits.length === 1 && p.amount_minor >= 500 ? fits[0] : null);
     if (pick) { used.add(pick.id); out.set(p.payment_id, { receiptId: pick.id, match: pass }); }
   }
@@ -113,12 +117,23 @@ const minor = (n) => Math.round(Math.abs(Number(n) || 0) * 100);
 const NOT_SHOPPING_TYPES = new Set(["ATM", "CASH", "TRANSFER", "STANDING_ORDER", "DIRECT_DEBIT", "FEE_CHARGE", "INTEREST", "DIVIDEND", "CORRECTION", "CHEQUE"]);
 // The shop's name as the bank gives it: TrueLayer's merchant_name, or the card company's own (Amex sends it in
 // meta.provider_merchant_name on nearly every payment, 17 Nov 2026), before falling back to the statement text.
+// A bank's statement line without what isn't the shop: how it was paid ("(VIA APPLE PAY)", which made Santander payments
+// all look like Apple: Connor, 17 Nov 2026), "CARD PAYMENT TO", the date ("ON 14-11-2026") and a foreign-currency tail
+// (",5.00 USD, RATE 0.79…").
+export function statementShop(text) {
+  return String(text || "")
+    .replace(/\(?\s*via (apple|google|samsung) pay\s*\)?/ig, " ")
+    .replace(/^\s*(card payment|contactless payment|debit card payment|purchase)( to)?\s+/i, "")
+    .replace(/,?\s+on \d{1,2}[-/]\d{1,2}[-/]\d{2,4}.*$/i, "")
+    .replace(/,?\s*\d+(\.\d+)?\s*(usd|eur|chf|aud|cad|jpy|sek|nok|dkk|pln)\b.*$/i, "")
+    .replace(/\s*,\s*$/, "").replace(/\s+/g, " ").trim();
+}
 export const merchantOf = (x) => (x && (x.merchant_name || (x.meta && x.meta.provider_merchant_name))) || null;
-export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b|gaming|betropolis|\bbingo\b|\bslots?\b|\bpoker\b|\brent\b|mortgage|council tax|insurance|\bloan\b|credit ?report|vanquis|capital one|barclaycard|\bamex\b|american express|klarna repayment|\benergy\b|\bedf\b|e\.?on\b|octopus|british gas|ovo\b|\bwater\b|thames water|\bee & t-mobile\b|\bvodafone\b|\bo2\b|virgin media|\bbt\b|tv licen[cs]e|housing|regenda|tesco mobile|giffgaff|talk ?talk|plusnet|\bsky (digital|broadband|uk)\b|\brevolut\b|\bmonzo\b|\bstarling\b|\bhalifax\b|\blloyds\b|\bnatwest\b|\bsantander\b|\bhsbc\b|\bbarclays\b|\bnationwide\b|ulster bank|\bfinance\b|\bwise\b|\bchase\b|tfl travel charge/i;
+export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b|gaming|betropolis|\bbingo\b|\bslots?\b|\bpoker\b|\brent\b|mortgage|council tax|insurance|\bloan\b|credit ?report|vanquis|capital one|barclaycard|\bamex\b|american express|klarna repayment|\benergy\b|\bedf\b|e\.?on\b|octopus|british gas|ovo\b|\bwater\b|thames water|\bee & t-mobile\b|\bvodafone\b|\bo2\b|virgin media|\bbt\b|tv licen[cs]e|housing|regenda|tesco mobile|giffgaff|talk ?talk|plusnet|\bsky (digital|broadband|uk)\b|\brevolut\b|\bmonzo\b|\bstarling\b|\bhalifax\b|\blloyds\b|\bnatwest\b|\bsantander\b|\bhsbc\b|\bbarclays\b|\bnationwide\b|ulster bank|\bfinance\b|\bwise\b|\bchase\b|tfl travel charge|novuna|personal financ|ee device payment/i;
 export function isShopping(x) {
   const cat = String(x.transaction_category || "").toUpperCase();
   if (NOT_SHOPPING_TYPES.has(cat)) return false;
-  return !NOT_SHOPPING.test(String(x.description || "") + " " + String(merchantOf(x) || ""));
+  return !NOT_SHOPPING.test(statementShop(x.description) + " " + String(merchantOf(x) || ""));
 }
 // A shop's name as a person would say it, from the bank's text: "ASDA STOES LTD" is Asda, "PAYPAL *EBAY" is eBay,
 // "AMZNMKTPLACE" is Amazon. The bank's own words stay with the payment too.
@@ -129,8 +144,8 @@ const KNOWN_SHOPS = [[/amzn|amazon/i, "Amazon"], [/\bebay\b/i, "eBay"], [/sainsb
   [/pret a manger|\bpret\b/i, "Pret"], [/mcdonald/i, "McDonald's"], [/greggs/i, "Greggs"], [/\bspar\b/i, "Spar"], [/home bargains/i, "Home Bargains"], [/google play/i, "Google Play"], [/starbucks/i, "Starbucks"], [/costa/i, "Costa"], [/nespresso/i, "Nespresso"], [/\bikea\b/i, "IKEA"]];
 const TIDY_DROP = /^(card|payment|purchase|pos|contactless|visa|debit|credit|online|to|at|ltd|limited|plc|stores?|stoes|s\/mkts|supermarkets?|uk|gb|gbr|london|www|com)$/i;
 export function shopName(description, merchant) {
-  const text = String(merchant || description || "").trim();
-  for (const [re, name] of KNOWN_SHOPS) if (re.test(text) || re.test(String(description || ""))) return name;
+  const said = statementShop(description), text = String(merchant || said || "").trim();
+  for (const [re, name] of KNOWN_SHOPS) if (re.test(text) || re.test(said)) return name;
   // A website stays a website, tidied: WWW.TAILS.COM is Tails.com.
   const site = /^(?:www\.)?([a-z0-9-]{2,30})\.(com|co\.uk|uk|net)$/i.exec(text);
   if (site) return site[1].charAt(0).toUpperCase() + site[1].slice(1).toLowerCase() + "." + site[2].toLowerCase();
@@ -205,9 +220,11 @@ async function readConnection(env, db, shopperId, row, now, f) {
 }
 
 // Reads every connection of a shopper (at most once every 10 minutes unless forced), then matches payments to receipts.
-export async function syncBank(env, shopperId, now, f, force) {
+export async function syncBank(env, shopperId, now, f, force, matchOnly) {
   const db = env.RELAY_DB;
-  const conns = (await db.prepare("SELECT * FROM bank_links WHERE shopper_id = ?").bind(shopperId).all()).results || [];
+  now = now || Date.now();
+  // matchOnly: no reading from the banks, just matching again (after "Not mine").
+  const conns = matchOnly ? [] : (await db.prepare("SELECT * FROM bank_links WHERE shopper_id = ?").bind(shopperId).all()).results || [];
   let read = 0, gone = 0;
   for (const c of conns) {
     if (!force && c.synced_at && now - c.synced_at < SYNC_GAP) continue;
@@ -217,12 +234,22 @@ export async function syncBank(env, shopperId, now, f, force) {
   }
   // Payments older than 13 months go.
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND paid_on < ?").bind(shopperId, new Date(now - 400 * DAY).toISOString().slice(0, 10)).run();
-  const payments = (await db.prepare("SELECT payment_id, paid_on, amount_minor, currency, description, merchant FROM bank_payments WHERE shopper_id = ?").bind(shopperId).all()).results || [];
+  const not = await notMineOf(db, shopperId);
+  const payments = ((await db.prepare("SELECT payment_id, paid_on, amount_minor, currency, description, merchant FROM bank_payments WHERE shopper_id = ?").bind(shopperId).all()).results || [])
+    .filter((p) => !isNotMine(not, p.payment_id, shopName(p.description, p.merchant)));
   const matches = matchPayments(payments, await receiptTotals(env, shopperId));
   await db.batch([db.prepare("UPDATE bank_payments SET receipt_id = NULL, match = NULL WHERE shopper_id = ?").bind(shopperId),
     ...[...matches].map(([pid, m]) => db.prepare("UPDATE bank_payments SET receipt_id = ?, match = ? WHERE shopper_id = ? AND payment_id = ?").bind(m.receiptId, m.match, shopperId, pid))]);
   return { read, gone, matched: matches.size };
 }
+
+// What the shopper said isn't theirs: { payments: Set, shops: Set }.
+async function notMineOf(db, shopperId) {
+  const rows = (await db.prepare("SELECT kind, key FROM bank_not_mine WHERE shopper_id = ?").bind(shopperId).all().catch(() => ({ results: [] }))).results || [];
+  return { payments: new Set(rows.filter((r) => r.kind === "payment").map((r) => r.key)), shops: new Set(rows.filter((r) => r.kind === "shop").map((r) => r.key)) };
+}
+const shopKey = (name) => String(name || "").toLowerCase().trim().slice(0, 80);
+export const isNotMine = (not, paymentId, shop) => not.payments.has(String(paymentId)) || (Boolean(shop) && not.shops.has(shopKey(shop)));
 
 // The bank's page sends the browser back here with a code. The single-use state ties it to the shopper who started.
 export async function handleBankCallback(env, url, o) {
@@ -284,8 +311,27 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
   if (path === "/relay/my/bank/payments" && method === "GET") {
     const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id, match FROM bank_payments
       WHERE shopper_id = ? AND amount_minor > 0 ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
-    return json({ payments: rows.map((r) => ({ id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
-      description: r.description, merchant: r.merchant, shop: shopName(r.description, r.merchant), receiptId: r.receipt_id || null, match: r.match || null })) }, 200, cors);
+    const not = await notMineOf(db, shopper.id);
+    return json({ payments: rows.map((r) => { const shop = shopName(r.description, r.merchant); return { id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
+      description: r.description, merchant: r.merchant, shop, receiptId: r.receipt_id || null, match: r.match || null,
+      notMine: isNotMine(not, r.payment_id, shop) ? (not.payments.has(String(r.payment_id)) ? "payment" : "shop") : null }; }) }, 200, cors);
+  }
+  // POST { id, on, everyFromShop }: a payment isn't theirs (someone else's card on a shared account), or is after all.
+  // With everyFromShop, every payment from that shop too. Then matching runs again without them.
+  if (path === "/relay/my/bank/not-mine" && method === "POST") {
+    const b = await request.json().catch(() => null);
+    if (!b || typeof b.id !== "string" || !b.id || b.id.length > 200 || typeof b.on !== "boolean") return json({ error: "invalid_request" }, 400, cors);
+    const p = await db.prepare("SELECT payment_id, description, merchant FROM bank_payments WHERE shopper_id = ? AND payment_id = ?").bind(shopper.id, b.id).first();
+    if (!p) return json({ error: "not_found" }, 404, cors);
+    const key = shopKey(shopName(p.description, p.merchant)), now = o.now || Date.now();
+    const st = b.on
+      ? [db.prepare("INSERT OR IGNORE INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?, 'payment', ?, ?)").bind(shopper.id, p.payment_id, now),
+        ...(b.everyFromShop === true && key ? [db.prepare("INSERT OR IGNORE INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?, 'shop', ?, ?)").bind(shopper.id, key, now)] : [])]
+      : [db.prepare("DELETE FROM bank_not_mine WHERE shopper_id = ? AND kind = 'payment' AND key = ?").bind(shopper.id, p.payment_id),
+        ...(key ? [db.prepare("DELETE FROM bank_not_mine WHERE shopper_id = ? AND kind = 'shop' AND key = ?").bind(shopper.id, key)] : [])];
+    await db.batch(st);
+    const r = await syncBank(env, shopper.id, o.now, o.fetchImpl, false, true);
+    return json({ ok: true, matched: r.matched }, 200, cors);
   }
   if (path === "/relay/my/bank/disconnect" && method === "POST") {
     const b = await request.json().catch(() => null);
