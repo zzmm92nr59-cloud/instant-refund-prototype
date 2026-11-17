@@ -119,7 +119,10 @@ assert.equal(await kettle.locator(".h2-line-t b").innerText(), "Glass Kettle 1.7
 assert.match(await kettle.getAttribute("aria-label"), /^Tesco\. Glass Kettle 1\.7L, /, "the kettle leads the order's card");
 assert.ok(!/Bananas|Kitchen Roll|Milk/.test(await kettle.locator(".h2-line-t").innerText()), "the food isn't said to go back");
 assert.ok(!/return by|days? left/i.test(await kettle.innerText()), "a date Relay worked out isn't shown as a deadline: " + await kettle.innerText());
-assert.ok(!/returned|Return by|days? left/i.test(await card("Wool Coat").innerText()), "the coat whose worked-out date passed isn't shown as returnable");
+// (Home's Recent is its latest eight: the coat, bought a month ago and past its date, is the ninth, so it isn't on Home
+// at all; how Receipts shows it is checked in part 5.)
+assert.equal(await card("Wool Coat").count(), 0, "the coat whose worked-out date passed isn't on Home's latest, so not shown as returnable there");
+assert.equal(await page.locator("#homePage .h2-feed", { hasText: /Wool Coat/ }).count(), 0);
 for (const t of await page.locator("#homePage .h2-feed > .h2-item").allInnerTexts()) assert.ok(!/days? left|Return by/.test(t), "no countdown or return date Relay worked out: " + t);
 // No "back by" strip above the tab bar either: none of these dates came from a shop.
 await page.waitForTimeout(400);

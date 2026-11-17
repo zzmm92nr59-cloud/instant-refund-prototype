@@ -151,8 +151,10 @@ assert.equal(await strip("Vitamin C Serum").innerText(), "2 days left");
 assert.equal(await strip("Vitamin C Serum").getAttribute("class"), "h2-strip urgent", "red in the last three days");
 assert.equal(await strip("Wool Coat").innerText(), "6 days left");
 assert.equal(await strip("Wool Coat").getAttribute("class"), "h2-strip soon", "amber in the last week");
-const order = await page.locator("#homePage .h2-feed > .h2-item .h2-one-n").allInnerTexts();
+// (Receipts first, Home's default focus: they lead the page under "Needs you", one small card each.)
+const order = await page.locator("#homePage .h2-feed > .h2-item.small .h2-line-t b").allInnerTexts();
 assert.deepEqual(order.slice(0, 2), ["Vitamin C Serum", "Wool Coat"], "the ones about to run out come first");
+assert.equal(await page.locator("#homePage .h2-feed > .h2-sec").first().innerText(), "Needs you", "under Needs you, at the top");
 // No buttons on a card: the whole card opens its page, which has what you can do (Start return first when the shop has a
 // returns page, then I'm sending this back).
 assert.equal(await card("Court Classic Trainers").locator("button").count(), 0, "no buttons on the card itself");
@@ -206,7 +208,8 @@ for (const look of ["today", "wallet"]) {
     continue;
   } else {
     await page.locator(".hl-sq").first().waitFor();
-    const g = await page.evaluate(() => { const a = [...document.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
+    // (Each part of Home has its own grid, so the two squares are looked for in one with two or more.)
+    const g = await page.evaluate(() => { const grid = [...document.querySelectorAll(".hl-grid")].find(x => x.querySelectorAll(".hl-sqpic").length >= 2); const a = [...grid.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
     assert.ok(g.w > 150 && Math.abs(g.w - g.h) < 1 && g.row, "two big squares a row: " + JSON.stringify(g));
     assert.ok(await page.locator(".hl-tag").count() >= 1, "a label on what needs something");
     // Under each square, the product as a person would say it, never the shop's name twice (Connor, 17 Nov 2026).
