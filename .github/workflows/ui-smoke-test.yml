@@ -85,6 +85,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-review-ui.mjs
       - name: Test gifts (tag a receipt, who it's for, the Gifts tile and page, untag, Wrapped's gifts slide)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-gifts-ui.mjs
+      - name: Test the better Wrapped (memorable opening, right kinds, plain words, travel train and UK map, moving things, reduced motion)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-better-ui.mjs
       - name: Test the Relay health page (admins only, numbers, chart and table, plain words)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-health-ui.mjs
       - name: Test Fix this receipt (from the details or 'Is this right?', plain-English checks, changes only, undo)

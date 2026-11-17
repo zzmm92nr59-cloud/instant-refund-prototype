@@ -1,6 +1,7 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
-import { PERSONAL_MAIL, CATEGORIES, itemKind, categoryShares } from "./receipt-category.js";
+import { PERSONAL_MAIL, CATEGORIES, itemKind, categoryShares, isGrocer, lastingThing, knownShop } from "./receipt-category.js";
+import { placeAt } from "./uk-places.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -44,8 +45,19 @@ function partsOf(c) {
   }).filter(p => p.totalPence > 0 || p.part === "main");
 }
 
+// A supermarket shop is the groceries: its kitchen roll, shower gel and batteries count as Food & drink in Wrapped, so a
+// supermarket is never anyone's "go-to for the home". Only a thing that lasts (a kettle, a duvet, a jumper, headphones)
+// counts as what it is.
+function asGroceries(c) {
+  if (!c || !isGrocer(c)) return c;
+  const items = Array.isArray(c.items) ? c.items.map(it => (!it || typeof it.category !== "string" || it.category === "food" || lastingThing(it.name, it.category) ? it : { ...it, category: "food", kindOwn: it.category })) : c.items;
+  const lasting = (items || []).some(it => it && it.category && it.category !== "food");
+  return { ...c, items, ...(!lasting && c.category !== "food" ? { category: "food", categoryLabel: CATEGORIES.food } : {}) };
+}
+
 export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   year = Number(year) || new Date(now).getUTCFullYear();
+  if (!opts.groceries) { cards = (cards || []).map(asGroceries); opts = { ...opts, groceries: true }; }
   const industry = opts && INDUSTRIES.includes(opts.industry) ? opts.industry : null;
   // One order can arrive as several emails (confirmation, dispatch). It counts once.
   const seen = new Set();
@@ -115,7 +127,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // by price) isn't one of its things.
   const otherKind = (it, c) => {
     if (!industry) return false;
-    const k = it && typeof it.category === "string" ? kindOfItem(it, c) : itemKind(it && it.name);
+    const k = it && typeof it.kindOwn === "string" ? it.kindOwn : it && typeof it.category === "string" ? kindOfItem(it, c) : itemKind(it && it.name);
     return Boolean(k) && k !== industry;
   };
   const itemCount = mine.reduce((s, c) => s + (Array.isArray(c.items) ? c.items.reduce((n, i) => n + (otherKind(i, c) ? 0 : Number(i && i.qty) > 0 ? Number(i.qty) : 1), 0) : 0), 0);
@@ -146,8 +158,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   const activeMonths = byMonth.filter(m => m.receipts > 0).length;
   const firstDate = mine.map(whenOf).sort()[0] || null;
   // The first thing bought this year (by date), named when the receipt names it.
-  const first = mine.slice().sort((a, b) => whenOf(a).localeCompare(whenOf(b)) || (a.createdAt || 0) - (b.createdAt || 0))[0];
-  const firstBuy = first ? { shop: forwarded(first) ? null : shopName(first), item: itemName((first.items || [])[0]), date: whenOf(first) } : null;
+  const firstBuy = industry ? null : memorableFirst(mine);
   // Real photos of things bought: only from receipts where Relay checked the photo is of the item (hasImage), never a stand-in.
   const photos = mine.filter(c => c.hasImage && c.id && THINGS.has(c.category || "other") && !forwarded(c))
     .sort((a, b) => (b.totalPence || 0) - (a.totalPence || 0)).slice(0, 9)
@@ -158,7 +169,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // someone else says nothing about your own style, so gifts are left out.
   for (const c of mine) {
     if (forwarded(c) || c.gift) continue;
-    for (const it of (c.items || [])) { const n = itemName(it); if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
+    for (const it of (c.items || [])) { const n = itemName(it); if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, kind: kindOfItem(it, c), variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
   }
   // ---- The Spotify-style parts, each counted straight from the receipts. ----
   // Your year's list (like "Your Top Songs"): every named thing, ranked by how many separate orders it was in, then spend.
@@ -251,14 +262,18 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // A kind gets its own chapter when some receipt was mostly that kind, or its things turned up in at least three
   // receipts (one pack of batteries in a supermarket shop isn't a year in electronics).
   const chapters = industry || opts.noChapters ? undefined : industries.filter(k => k.category !== "other" && k.receipts > 0 && (mainly.get(k.category) || k.receipts >= 3)).map(k => {
-    const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true });
+    const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true, groceries: true });
     const weeks = Math.max(1, Math.ceil((Math.min(now, Date.UTC(year + 1, 0, 1)) - Date.UTC(year, 0, 1)) / (7 * 864e5)));
     const named = (w.topItems || []).filter(x => x.name);
     const fact = chapterFact(k.category, w, weeks);
+    const goTo = w.topShops.filter(t => t.receipts >= 2).sort((a, b) => b.receipts - a.receipts || b.spentPence - a.spentPence)[0] || null;
     return {
       category: k.category, label: CATEGORIES[k.category], receipts: w.receipts, spentPence: w.spentPence, withTotal: w.coverage.withTotal,
       share: spentPence > 0 && w.spentPence > 0 ? Math.max(1, Math.round(w.spentPence / spentPence * 100)) : null,
-      topShop: w.topShops[0] ? { name: w.topShops[0].name, receipts: w.topShops[0].receipts, spentPence: w.topShops[0].spentPence } : null,
+      // "Your go-to" is a shop this kind of shopping went back to: two orders or more (most orders, then most spent). With
+      // no such shop, the shop that took the most money is named as just that, when there was more than one shop.
+      topShop: goTo ? { name: goTo.name, receipts: goTo.receipts, spentPence: goTo.spentPence } : null,
+      mostSpent: !goTo && w.shops > 1 && w.topShops[0] && w.topShops[0].spentPence > 0 ? { name: w.topShops[0].name, spentPence: w.topShops[0].spentPence } : null,
       shops: w.shops, items: w.items, topItem: named[0] && named[0].times >= 2 ? { name: named[0].name, times: named[0].times } : null,
       things: named.slice(0, 3).map(x => x.name),
       biggest: w.biggest ? { shop: w.biggest.shop, item: w.biggest.item, totalPence: w.biggest.totalPence, photoId: w.biggest.photoId } : null,
@@ -276,8 +291,82 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     biggest: biggest ? { shop: shopName(biggest), totalPence: biggest.totalPence, date: whenOf(biggest), item: (biggest.items || []).length === 1 ? itemName(biggest.items[0]) : null,
       photoId: biggest.hasImage && biggest.id && THINGS.has(biggest.category || "other") ? biggest.id : null } : null,
     firstBuy, photos, things, topItems, yearList, topBuys, shoppingTime, sprint, subscriptions, badges, gifts,
+    travel: industry ? null : travelOf(mine),
     returnsStarted: withReturn, personality,
     note: "Based on the receipts and order emails Relay found. In-store card purchases without an email receipt aren't included."
+  };
+}
+
+// The story opens on the first thing worth remembering, not the first bottle of water: the year's first thing (clothes,
+// tech, something for the home, a beauty buy, tickets) with a name, from a shop rather than a forwarded email, and never
+// a supermarket's groceries. Within a month of that, one with a photo of it is preferred. Null when there is none (the
+// story then opens with the count instead). Nothing is made up: the shop, the thing and the date are the receipt's.
+const KEEPSAKE = new Set(["fashion", "electronics", "home", "beauty", "experiences"]);
+function memorableFirst(list) {
+  const found = [];
+  const sorted = list.slice().sort((a, b) => whenOf(a).localeCompare(whenOf(b)) || (a.createdAt || 0) - (b.createdAt || 0));
+  for (const c of sorted) {
+    if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
+    const grocer = isGrocer(c);
+    for (const it of (c.items || [])) {
+      const n = itemName(it), k = kindOfItem(it, c);
+      if (!n || !KEEPSAKE.has(k) || !/[a-z]{3}/i.test(n)) continue;
+      // From a supermarket only something that lasts; from anywhere, never what gets used up (kitchen roll, refills).
+      if (grocer ? !lastingThing(n, k) : (k === "home" || k === "electronics") && !lastingThing(n, k)) continue;
+      found.push({ c, n, k }); break;
+    }
+    if (found.length >= 40) break;
+  }
+  if (!found.length) return null;
+  const limit = Date.parse(whenOf(found[0].c)) + 31 * 864e5;
+  const hasPhoto = (f) => Boolean(f.c.hasImage && f.c.id && THINGS.has(f.c.category || "other") && itemName((f.c.items || [])[0]) === f.n);
+  const pick = found.find(f => Date.parse(whenOf(f.c)) <= limit && hasPhoto(f)) || found[0];
+  return { shop: shopName(pick.c), item: pick.n, kind: pick.k, date: whenOf(pick.c), photoId: hasPhoto(pick) ? pick.c.id : null };
+}
+
+// Travel: the journeys the receipts name ("London Euston to Manchester Piccadilly", read from a booking's items or its
+// subject by the receipt reader), only as written. How each was made comes from the shop (a rail company or Trainline is a
+// train, an airline a flight, a coach company a coach); otherwise it's just a journey. Places Relay knows the position of
+// come with it, for the map; any other place is listed by name only.
+const RAIL = new Set("trainline lner avanti avantiwestcoast gwr southeastern southernrailway thameslink northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar nationalrail heathrowexpress gatwickexpress stanstedexpress".split(" "));
+const AIR = new Set("ryanair easyjet britishairways ba jet2 wizzair virginatlantic emirates qatarairways klm airfrance lufthansa loganair aerlingus vueling iberia norwegian turkishairlines".split(" "));
+const COACH = new Set("megabus nationalexpress flixbus".split(" "));
+const JOURNEY = /^\s*(?:from\s+)?(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s+(?:to|→|->)\s+(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s*(\((return|single|open return)\))?\s*$/u;
+export function journeysOf(c) {
+  const out = [];
+  const shop = knownShop(c), key = shop && shop.key;
+  const words = (c.items || []).map(it => (it && it.name) || "").join(" ");
+  const mode = RAIL.has(key) || /\b(train|rail|railcard)\b/i.test(words) ? "train" : AIR.has(key) || /\b(flight|airport)\b/i.test(words) ? "flight" : COACH.has(key) || /\bcoach\b/i.test(words) ? "coach" : "trip";
+  for (const it of (c.items || [])) {
+    const m = JOURNEY.exec(String((it && it.name) || ""));
+    if (!m) continue;
+    const from = m[1].replace(/\s+/g, " ").trim(), to = m[2].replace(/\s+/g, " ").trim();
+    if (from.toLowerCase() === to.toLowerCase()) continue;
+    out.push({ from, to, return: Boolean(m[4] && /return/i.test(m[4])), mode, date: whenOf(c) });
+  }
+  return out;
+}
+function travelOf(list) {
+  const trips = list.filter(c => c.category === "travel").flatMap(journeysOf);
+  if (!trips.length) return null;
+  const routes = new Map(), places = new Map();
+  for (const t of trips) {
+    const ends = [t.from, t.to], k = ends.map(x => x.toLowerCase()).sort().join("|");
+    const r = routes.get(k) || { from: t.from, to: t.to, times: 0, mode: t.mode };
+    r.times += t.return ? 2 : 1; routes.set(k, r);
+    for (const p of ends) { const e = places.get(p.toLowerCase()) || { name: p, visits: 0 }; e.visits++; places.set(p.toLowerCase(), e); }
+  }
+  const ranked = [...routes.values()].sort((a, b) => b.times - a.times);
+  const known = [], unknown = [];
+  for (const p of places.values()) { const at = placeAt(p.name); if (at) known.push({ name: p.name, lat: at.lat, lon: at.lon, visits: p.visits }); else unknown.push(p.name); }
+  const by = (m) => trips.filter(t => t.mode === m).reduce((n, t) => n + (t.return ? 2 : 1), 0);
+  return {
+    // A return ticket is two journeys: there and back.
+    journeys: trips.reduce((n, t) => n + (t.return ? 2 : 1), 0), bookings: trips.length,
+    trains: by("train"), flights: by("flight"), coaches: by("coach"),
+    routes: ranked.slice(0, 12).map(r => ({ from: r.from, to: r.to, times: r.times, mode: r.mode })),
+    topRoute: ranked[0] && ranked[0].times >= 2 ? { from: ranked[0].from, to: ranked[0].to, times: ranked[0].times } : null,
+    places: known.sort((a, b) => b.visits - a.visits).slice(0, 30), unplotted: unknown.slice(0, 10),
   };
 }
 

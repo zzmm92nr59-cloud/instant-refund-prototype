@@ -181,7 +181,7 @@ console.log("PASS Discover: opt-in picks from the things you bought (more of a k
 await page.evaluate(() => window.go("wrapped"));
 assert.equal(await page.evaluate(() => window.page), "wrapped", "Wrapped has its own page");
 await page.getByRole("button", { name: "Play your 2026 story" }).waitFor();
-assert.match(await page.locator(".rl-wr-cover").innerText(), /Your 2026 in purchases\.\s+£336\.00 · 4 receipts · 2 chapters/);
+assert.match(await page.locator(".rl-wr-cover").innerText(), /Your 2026 in purchases\.\s+£336\.00 over 4 receipts\. 2 chapters in your story\./);
 assert.equal(await page.locator(".rl-wr-kinds").count(), 0, "no separate Wrapped per kind any more: one story");
 assert.equal(await page.locator(".rl-wr-cover .rl-wr-dots i").count(), 2, "the card's colour strip shows how the year split");
 await page.getByRole("button", { name: "Play your 2026 story" }).click();
@@ -198,10 +198,10 @@ for (let k = 0; k < 20; k++) {
   await page.keyboard.press("ArrowRight");
 }
 const story = texts.join("\n");
-const order = [/RELAY WRAPPED 2026/, /In 2026 you spent/, /Where it went/, /CHAPTER 1 · FASHION/, /CHAPTER 2 · DIGITAL & SUBSCRIPTIONS/, /Your top shops/, /Your busiest month/, /MY 2026 ON RELAY/];
+const order = [/RELAY WRAPPED 2026/, /In 2026 you spent/, /Where it went/, /CHAPTER 1\s+Fashion/, /CHAPTER 2\s+Digital & subscriptions/, /Your top shops/, /Your busiest month/, /MY 2026 ON RELAY/];
 let at = -1; for (const re of order) { const i = texts.findIndex((x, n) => n > at && re.test(x)); assert.ok(i > at, "in order: " + re); at = i; }
-for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Fashion\s+89% · £336\.00|Fashion\s+\d+% · £/, /Digital & subscriptions/,
-  /89% of your year · 4 orders · 3 places/, /5 pieces added to your wardrobe, about £67\.20 each\./, /Your go-to shop\s+Kick Lane · 2×/, /Bought again and again\s+Align Pant · 3×/, /Your style\s+Sporty & Relaxed/,
+for (const re of [/It started on 4 January with Court Classic Trainers from Kick Lane\./, /Fashion\s+£[\d,]+\.\d\d\s+\d+%/, /Digital & subscriptions/,
+  /4 orders from 3 places\. That's 89% of your year\./, /5 pieces added to your wardrobe, about £67\.20 each\./, /Your go-to shop\s+Kick Lane\s+2 orders/, /Bought again and again\s+Align Pant\s+3 times/, /Your style\s+Sporty & Relaxed/,
   /About £4\.99 a month on apps and subscriptions\./, /Your badges\s+Loyal to Lululemon/, /Biggest chapter\s+Fashion/]) assert.match(story, re);
 assert.deepEqual(scenes.map(c => c.replace("scene ", "")), ["sc-fashion", "sc-digital"], "each chapter has its own scene");
 for (const re of [/Your top 5/, /Your shop sprint/, /Your favourite kind of shopping/]) assert.doesNotMatch(story, re);

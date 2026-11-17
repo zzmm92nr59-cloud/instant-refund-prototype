@@ -37,7 +37,7 @@ await page.goto(origin + "/index.html"); await page.waitForTimeout(800);
 await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("heading", { name: "Your 2026 in purchases." }).waitFor();
 assert.deepEqual(await page.locator(".rl-wr-years").first().locator("button").allInnerTexts(), ["2026", "2024"], "only years with receipts (plus this year) are offered");
-await page.locator("#rl-wrapped").getByText("£122.00 · 5 receipts", { exact: true }).waitFor();
+await page.locator("#rl-wrapped").getByText("£122.00 over 5 receipts.", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Play your 2026 story" }).click();
 const texts = [];
 for (let k = 0; k < 20; k++) {

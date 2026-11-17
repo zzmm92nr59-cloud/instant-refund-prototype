@@ -10,6 +10,7 @@ on:
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
+      - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -25,6 +26,7 @@ on:
       - 'scripts/test-outlook*.mjs'
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
+      - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -49,6 +51,7 @@ jobs:
           node scripts/test-receipt-reader.mjs
           node scripts/test-receipt-category.mjs
           node scripts/test-wrapped.mjs
+          node scripts/test-wrapped-better.mjs
       - name: Gmail
         run: |
           node scripts/test-gmail.mjs
