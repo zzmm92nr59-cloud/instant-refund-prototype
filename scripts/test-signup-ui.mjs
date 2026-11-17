@@ -132,7 +132,8 @@ assert.equal(await story.locator(".rl-wslide").count(), 1);
 assert.equal(await story.locator(".rl-wgo").evaluate(n => n.classList.contains("rl-nudge")), true, "tapping on at the end nudges Get started");
 console.log("ok - the welcome story: four slides by tap, hold or arrow keys, moving on by itself, readable on every colour, no flash at the end");
 
-// 1. Google, one step: the story → "Get started" → the sign-in page → (Google once) → name, with the scan counting → all set.
+// 1. Google, one step: the story → "Get started" → the sign-in page → (Google once) → inboxes, with the scan counting →
+// all set. The name Google holds is used as it is (Connor, 17 Nov 2026: one screen fewer), so there's no name step.
 await story.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.getByRole("button", { name: "Continue with Google" }).waitFor();
@@ -158,27 +159,23 @@ await sheet.getByRole("button", { name: "Continue with Google" }).click();
 await sheet.getByRole("heading", { name: "Sign in and bring in your receipts" }).waitFor();
 await sheet.getByText(CONSENT.text[1]).waitFor();
 assert.ok(await sheet.getByText(CONSENT.text[1]).isVisible(), "the full wording is shown, not hidden behind a link");
-assert.equal(await sheet.getByRole("img", { name: "Step 1 of 5" }).count(), 1, "the journey shows where you are (permission, name, your inboxes, what you shop for, all set)");
+assert.equal(await sheet.getByRole("img", { name: "Step 1 of 4" }).count(), 1, "the journey shows where you are (permission, your inboxes, what you shop for, all set)");
 await polished("permission"); await page.screenshot({ path: "/tmp/shots/signup-2-permission.png" });
 st.verify = { mailConnected: "google", suggestedName: "Jess Tester" };
 st.onVerify = { connected: true, provider: "google", accepted: true };
 await sheet.getByRole("button", { name: "Agree and continue with Google" }).click();
 await backFrom("accounts.google.com", "#signin=" + LINK);
 assert.deepEqual(st.starts.map(s => [s.p, s.consentVersion]), [["/relay/auth/google/start", CONSENT.version]], "one visit to Google, carrying the agreement");
-await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
-assert.equal(await page.locator("#rl-onboard-name").inputValue(), "Jess Tester", "the name Google holds is offered");
-assert.equal(st.profilePosts.length, 0, "and not saved without asking");
-await sheet.locator(".rl-jscan").getByText(/receipts? found so far/).waitFor();
-assert.equal(await sheet.getByRole("img", { name: "Step 2 of 5" }).count(), 1, "the count carries on from the permission step");
-assert.ok(await sheet.locator(".rl-jpbar i").count(), "one bar across the top shows how far along");
-await polished("name"); await page.screenshot({ path: "/tmp/shots/signup-3-name.png" });
-// The first read finishes while the name is being added: "You're all set" shows the count it reached straight away
-// (it used to go back to "Reading your Gmail…" and stay there).
-await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
-await sheet.getByRole("button", { name: "Continue" }).click();
-// Then their inboxes: the one just connected, the read counting, and adding another inbox is one tap.
+// Straight to their inboxes: the one just connected, the read counting, and adding another inbox is one tap.
 await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
-assert.equal(await sheet.getByRole("img", { name: "Step 3 of 5" }).count(), 1);
+assert.equal(await sheet.getByRole("heading", { name: "What should we call you?" }).count(), 0, "no name step: Google gave one");
+assert.deepEqual(st.profilePosts, [{ name: "Jess Tester" }], "the name Google holds is kept");
+await sheet.locator(".rl-jscan").getByText(/receipts? found so far/).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 2 of 4" }).count(), 1, "the count carries on from the permission step");
+assert.ok(await sheet.locator(".rl-jpbar i").count(), "one bar across the top shows how far along");
+// The first read finishes here: "You're all set" shows the count it reached straight away (it used to go back to
+// "Reading your Gmail…" and stay there).
+await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
 await sheet.locator(".rl-jlist").getByText("Gmail, connected").waitFor();
 assert.ok(await sheet.getByRole("button", { name: "Add another Gmail inbox" }).isVisible(), "another inbox is one tap away");
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor();
@@ -186,7 +183,7 @@ await polished("your inboxes"); await page.screenshot({ path: "/tmp/shots/signup
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 // Then what they shop for: a few to pick (or Later), saved with the account once, and the read carries on counting.
 await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
-assert.equal(await sheet.getByRole("img", { name: "Step 4 of 5" }).count(), 1);
+assert.equal(await sheet.getByRole("img", { name: "Step 3 of 4" }).count(), 1);
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor();
 await polished("what you shop for");
 await sheet.getByRole("button", { name: "Fashion", exact: true }).click(); await page.waitForTimeout(500);
@@ -207,7 +204,7 @@ await polished("all set"); await page.screenshot({ path: "/tmp/shots/signup-4-do
 await sheet.getByRole("button", { name: "See my receipts" }).click();
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
 assert.equal(await sheet.count(), 0);
-console.log("ok - Google: one visit signs in and connects Gmail, the scan counts from the start, the offered name is saved only on Continue");
+console.log("ok - Google: one visit signs in and connects Gmail, the scan counts from the start, Google's name is used with no name step");
 
 // 2. Someone already set up who signs in again goes straight to Home: no journey.
 await page.evaluate(() => localStorage.clear()); reset({ name: "Jess Tester", accepted: true, connected: true, provider: "google" });
@@ -318,6 +315,7 @@ await page.goto(origin + "/index.html#bank=connected");
 await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
 await sheet.getByText("Connected. Relay has read your payments and is matching them to your receipts.").waitFor();
 await sheet.locator(".rl-jlist").getByText("Made-up Bank").waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 2 of 4" }).count(), 1, "back from the bank, the same step count (it used to start again)");
 assert.match(await sheet.locator(".rl-jlist").innerText(), /12 payments read, 3 matched to receipts/);
 assert.ok(await sheet.getByRole("button", { name: "Add another bank or card" }).isVisible(), "another is one tap away");
 await polished("cards and banks, one connected"); await page.screenshot({ path: "/tmp/shots/signup-banks-2.png" });
@@ -359,6 +357,13 @@ await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
 await sheet.locator(".rl-jlist").getByText("Made-up Bank").waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 3 of 5" }).count(), 1);
+// Adding another bank and coming back carries on with the same steps and count (it used to start again at "2 of 4").
+await sheet.getByRole("button", { name: "Add another bank or card" }).click();
+await page.waitForURL(/auth\.truelayer\.com/);
+await page.goto(origin + "/index.html#bank=connected");
+await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
+assert.equal(await sheet.getByRole("img", { name: "Step 3 of 5" }).count(), 1, "back from the bank: still step 3 of 5");
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "What do you shop for?" }).waitFor();
 assert.equal(await sheet.getByRole("button", { name: "Fashion", exact: true }).getAttribute("aria-pressed"), "true", "what they picked before is picked");

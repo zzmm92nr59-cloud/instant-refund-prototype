@@ -349,6 +349,7 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   claims = {}; grant = {};
   const pv = await (await gcall("/relay/auth/providers")).json();
   assert.equal(pv.consent.version, CONSENT_VERSION, "the wording is served for Google sign-in too");
+  assert.equal(pv.banks, undefined, "banks aren't said to be offered to everyone unless they are");
   console.log("ok - one step: Agree and continue with Google signs in, connects Gmail and starts the first scan");
 }
 

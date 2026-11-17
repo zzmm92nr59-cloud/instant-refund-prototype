@@ -53,6 +53,8 @@ async function sha256Hex(text) { const h = await crypto.subtle.digest("SHA-256",
 function randomToken() { const b = crypto.getRandomValues(new Uint8Array(32)); return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 
 // Who may connect a bank: anyone once it's live; while it uses test banks, only Relay's team and testers.
+// Banks offered to every new account (said before sign-in, so getting started can count its steps). Nothing about anyone.
+export const bankForEveryone = (env) => bankConfigured(env) && bankLive(env) && env.BANK_FOR_EVERYONE === "on";
 async function allowed(env, shopper) { return bankConfigured(env) && ((bankLive(env) && env.BANK_FOR_EVERYONE === "on") || isAdmin(env, shopper) || await isTester(env, shopper)); }
 
 // ---- Matching a payment to a receipt ------------------------------------------------------------------------------------

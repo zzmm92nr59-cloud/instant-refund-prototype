@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop, bankForEveryone } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -218,4 +218,13 @@ assert.equal((await call("/relay/my/bank/disconnect", { method: "POST", token: j
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_payments WHERE shopper_id = ?").get(J).n, 0);
 assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_links WHERE shopper_id = ?").get(J).n, 0);
 console.log("ok - in Download my data; disconnecting deletes the connection and its payments");
+// Said before sign-in (so getting started can count its steps): only when live and switched on for everyone.
+{
+  const k = { TRUELAYER_CLIENT_ID: "x", TRUELAYER_CLIENT_SECRET: "y" };
+  assert.equal(bankForEveryone({ ...k, TRUELAYER_ENV: "live" }), false);
+  assert.equal(bankForEveryone({ ...k, TRUELAYER_ENV: "sandbox", BANK_FOR_EVERYONE: "on" }), false);
+  assert.equal(bankForEveryone({ TRUELAYER_ENV: "live", BANK_FOR_EVERYONE: "on" }), false);
+  assert.equal(bankForEveryone({ ...k, TRUELAYER_ENV: "live", BANK_FOR_EVERYONE: "on" }), true);
+  console.log("ok - banks are said to be offered to everyone only when live and switched on");
+}
 console.log("PASS open banking: off until set up, team and testers on test banks, read-only, single-use state, encrypted tokens, matching, disconnect");
