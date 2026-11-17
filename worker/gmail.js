@@ -15,6 +15,7 @@
 //    revoke call for personal accounts: the token is deleted, and the shopper can remove Relay at account.live.com.)
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
+import { recordReceiptShops } from "./shop-directory.js";
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
@@ -952,7 +953,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       const sn = known.get(refs[i]);
       if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
     }
-    const rawById = new Map(), writes = [], par = box.parallel || FETCH_PARALLEL;
+    const rawById = new Map(), writes = [], fresh = [], par = box.parallel || FETCH_PARALLEL;
     for (let i = 0; i < toRead.length; i += par) {
       await Promise.all(toRead.slice(i, i + par).map(async (mid) => {
         try { rawById.set(mid, await box.read(mid)); } catch (e) { rawById.set(mid, null); }
@@ -1025,10 +1026,12 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
         .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now));
       if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
-      if (status !== "not_receipt") added++;
+      if (status !== "not_receipt") { added++; fresh.push({ id: receiptId, details }); }
     }
     // Everything read in this window is saved in one database call.
     if (writes.length) await env.RELAY_DB.batch(writes.splice(0));
+    // The shops of new receipts are counted in Relay's shop directory (shop-directory.js: the shop only, never who).
+    if (fresh.length) await recordReceiptShops(env, shopperId, fresh.splice(0), now);
     windows++;
     if (incomplete) break;       // stay on this window until every email in it is read
     // An Outlook window with more emails than one round lists carries on from the day of the oldest one listed
@@ -1361,6 +1364,7 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
   } else {
     await env.RELAY_DB.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
       .bind(receiptId, shopperId, ref, "pending", JSON.stringify(details), now).run();
+    await recordReceiptShops(env, shopperId, [{ id: receiptId, details }], now);
   }
   if (image) await saveImage(env, shopperId, { receiptId, ...image }, now);
   return { status: 200, body: { ok: true, kind: details.kind, store: (details.retailer && (details.retailer.name || details.retailer.domain)) || null, orderRef: details.orderRef || null } };
@@ -2194,6 +2198,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (seen) await env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = 'pending' WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(details), seen.id, shopper.id).run();
     else await env.RELAY_DB.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
       .bind(id, shopper.id, ref, "pending", JSON.stringify(details), opts.now).run();
+    if (!seen) await recordReceiptShops(env, shopper.id, [{ id, details }], opts.now);
     const r = details.retailer || {};
     return json({ ok: true, id, again: Boolean(seen && seen.status !== "dismissed"), kind: details.kind, store: r.name || r.domain || null, orderRef: details.orderRef || null,
       orderDate: details.orderDate || null, totalPence: details.totalPence == null ? null : details.totalPence, currency: details.currency || null,

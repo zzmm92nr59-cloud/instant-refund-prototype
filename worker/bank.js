@@ -10,7 +10,8 @@
 //    "live" it uses TrueLayer's test banks. Only Relay's team and testers can use it, on test banks or real ones, until
 //    BANK_FOR_EVERYONE is "on" (Connor, 16 Nov 2026: real banks for the team first, to try with his own accounts).
 //  * Disconnecting deletes the connection and every payment read from it; so does deleting the account.
-//  * Only spending is kept: date, amount, the bank's description and merchant, which account, and the receipt it matches.
+//  * Only spending is kept: date, amount, the bank's description and merchant, TrueLayer's label for it (e.g. Shopping,
+//    Clothing), which account, and the receipt it matches.
 //
 // Routes: GET /relay/my/bank, POST /relay/my/bank/connect, GET /relay/bank/callback (the bank's page sends the browser back
 // here), POST /relay/my/bank/sync, GET /relay/my/bank/payments, POST /relay/my/bank/disconnect { id },
@@ -20,6 +21,7 @@ import { isAdmin, isTester } from "./resale-admin.js";
 import { decodePhoto, MAX_RECEIPT_PHOTO_BYTES } from "./photos.js";
 import { readReceiptPhoto } from "./receipt-photo.js";
 import { aiAvailable } from "./ai-reader.js";
+import { seedShops, classificationSays, classificationToKeep, loadShopDirectory, learnedShop, EXCLUDED_KINDS } from "./shop-directory.js";
 
 const DAY = 864e5;
 export const BANK_SCOPES = "info accounts balance cards transactions offline_access";
@@ -41,14 +43,23 @@ export const BANK_SQL = [
     connected_at INTEGER NOT NULL, synced_at INTEGER, status TEXT NOT NULL DEFAULT 'ok')`,
   `CREATE TABLE IF NOT EXISTS bank_payments (shopper_id TEXT NOT NULL, payment_id TEXT NOT NULL, connection_id TEXT NOT NULL, account TEXT,
     paid_on TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, description TEXT, merchant TEXT, receipt_id TEXT, match TEXT,
-    created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, payment_id))`,
+    created_at INTEGER NOT NULL, classification TEXT, PRIMARY KEY (shopper_id, payment_id))`,
   // "Not mine" (a shared card: Connor, 17 Nov 2026): one payment (kind 'payment', key = its id), or everything from a shop
   // (kind 'shop', key = the shop's name, lower case). Not matched to receipts, shown apart. Kind 'no_receipt' (key = the
   // payment's id): "This wasn't a shop purchase", so Relay stops asking for its receipt; it's still matched as usual.
   `CREATE TABLE IF NOT EXISTS bank_not_mine (shopper_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created_at INTEGER NOT NULL,
     PRIMARY KEY (shopper_id, kind, key))`
 ];
-export async function ensureBankTables(db) { await db.batch(BANK_SQL.map((s) => db.prepare(s))); }
+// Columns added after the tables were first made (tried once per copy of the Worker; "already there" is fine).
+// classification: TrueLayer's own label for the payment, as a short JSON list of words (17 Nov 2026, shop-directory.js).
+// The shop's name TrueLayer gives (merchant_name) was already kept, in merchant.
+let bankColumnsReady = false;
+export async function ensureBankColumns(db) {
+  if (bankColumnsReady) return;
+  try { await db.prepare("ALTER TABLE bank_payments ADD COLUMN classification TEXT").run(); } catch { /* already there, or no table yet (it's made with it) */ }
+  bankColumnsReady = true;
+}
+export async function ensureBankTables(db) { await db.batch(BANK_SQL.map((s) => db.prepare(s))); await ensureBankColumns(db); }
 // For account deletion (auth.js): everything bank-related for one shopper.
 export function bankDeleteStatements(db, shopperId) {
   return ["bank_payments", "bank_links", "bank_link_states", "bank_not_mine"].map((t) => db.prepare(`DELETE FROM ${t} WHERE shopper_id = ?`).bind(shopperId));
@@ -146,7 +157,7 @@ export function isShopping(x) {
 // "AMZNMKTPLACE" is Amazon. The bank's own words stay with the payment too.
 const KNOWN_SHOPS = [[/amzn|amazon/i, "Amazon"], [/\bebay\b/i, "eBay"], [/sainsbury/i, "Sainsbury's"], [/\btesco\b/i, "Tesco"], [/\basda\b/i, "Asda"],
   [/marks ?(and|&) ?spencer|\bm ?& ?s\b/i, "M&S"], [/john ?lewis/i, "John Lewis"], [/waitrose/i, "Waitrose"], [/morrisons/i, "Morrisons"], [/\baldi\b/i, "Aldi"], [/\blidl\b/i, "Lidl"],
-  [/\bboots\b/i, "Boots"], [/^next\b|next retail|next plc|next directory/i, "Next"], [/\bnike\b/i, "Nike"], [/jd sports/i, "JD Sports"], [/lululemon/i, "lululemon"], [/\basos\b/i, "ASOS"], [/\bzara\b/i, "Zara"],
+  [/\bboots\b/i, "Boots"], [/^next(\s+\d|\s*$)|next retail|next plc|next directory/i, "Next"], [/\bnike\b/i, "Nike"], [/jd sports/i, "JD Sports"], [/lululemon/i, "lululemon"], [/\basos\b/i, "ASOS"], [/\bzara\b/i, "Zara"],
   [/primark/i, "Primark"], [/\bargos\b/i, "Argos"], [/\bcurrys\b/i, "Currys"], [/\bapple\b/i, "Apple"], [/uber ?eats/i, "Uber Eats"], [/deliveroo/i, "Deliveroo"], [/\bjust ?eat\b/i, "Just Eat"],
   [/pret a manger|\bpret\b/i, "Pret"], [/mcdonald/i, "McDonald's"], [/greggs/i, "Greggs"], [/\bspar\b/i, "Spar"], [/home bargains/i, "Home Bargains"], [/google play/i, "Google Play"], [/starbucks/i, "Starbucks"], [/costa/i, "Costa"], [/nespresso/i, "Nespresso"], [/\bikea\b/i, "IKEA"]];
 const TIDY_DROP = /^(card|payment|purchase|pos|contactless|visa|debit|credit|online|to|at|ltd|limited|plc|stores?|stoes|s\/mkts|supermarkets?|uk|gb|gbr|london|www|com)$/i;
@@ -159,7 +170,8 @@ export function shopName(description, merchant) {
   let words = text.replace(/^(paypal|sq|sumup|zettle|sp|pp)\s*\*\s*/i, "").replace(/[*#]/g, " ").split(/\s+/)
     .map((w) => w.replace(/[.,]+$/, "")).filter((w) => w && !/^[-–]+$/.test(w) && !TIDY_DROP.test(w) && !/\d/.test(w));
   // A bank's short codes at the end (LT, CD, LC) and a cut-off last word aren't part of the name.
-  while (words.length > 1 && /^[A-Z]{2,3}$/.test(words[words.length - 1]) && !/^(UK|BP|CO)$/.test(words[words.length - 1])) words.pop();
+  // A word after "&" is part of the name ("BRINDLE & FOX" is Brindle & Fox, not "Brindle &").
+  while (words.length > 1 && /^[A-Z]{2,3}$/.test(words[words.length - 1]) && !/^(UK|BP|CO)$/.test(words[words.length - 1]) && !/^(&|and)$/i.test(words[words.length - 2])) words.pop();
   words = words.slice(0, 4);
   if (!words.length) return null;
   return words.map((w, i) => i > 0 && /^(and|of|the|on|in)$/i.test(w) ? w.toLowerCase() : (w.length <= 2 || w.includes("&")) && /^[A-Z&]+$/.test(w) && !/^co$/i.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
@@ -212,16 +224,18 @@ async function readConnection(env, db, shopperId, row, now, f) {
         if (debit) seen.keptDebits++;
         const amount = minor(x.amount); if (!amount) continue;
         rows.push({ payment_id: row.id + ":" + pid, account: label, paid_on: when, amount_minor: debit ? amount : -amount,
-          currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(merchantOf(x), 80) });
+          currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(merchantOf(x), 80),
+          classification: classificationToKeep(x) });
       }
     }
   }
   console.log("bank: read", JSON.stringify(seen));
   // A full read of the last 90 days replaces what was read before for those days (so anything Relay no longer keeps goes).
   await db.prepare("DELETE FROM bank_payments WHERE shopper_id = ? AND connection_id = ? AND paid_on >= ?").bind(shopperId, row.id, new Date(now - LOOK_BACK_DAYS * DAY).toISOString().slice(0, 10)).run();
-  if (rows.length) await db.batch(rows.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant`)
-    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, now)));
+  if (rows.length) await db.batch(rows.map((r) => db.prepare(`INSERT INTO bank_payments (shopper_id, payment_id, connection_id, account, paid_on, amount_minor, currency, description, merchant, classification, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(shopper_id, payment_id) DO UPDATE SET account = excluded.account, description = excluded.description, merchant = excluded.merchant,
+      classification = excluded.classification`)
+    .bind(shopperId, r.payment_id, row.id, r.account, r.paid_on, r.amount_minor, r.currency, r.description, r.merchant, r.classification, now)));
   await db.prepare("UPDATE bank_links SET synced_at = ?, status = 'ok' WHERE id = ?").bind(now, row.id).run();
   return { ok: true, read: rows.length };
 }
@@ -265,38 +279,54 @@ export const isNotMine = (not, paymentId, shop) => not.payments.has(String(payme
 
 // ---- Payments that likely should have a receipt ---------------------------------------------------------------------------
 // Connor (17 Nov 2026): "When we find a transaction from banks that don't have receipts, but likely should (eg H&M purchase)
-// the app should highlight this". The rule, all of it:
-//   a card payment out (not money coming in) of at least £5 (RECEIPT_MIN_PENCE),
-//   with no receipt matched to it, that the shopper hasn't said is not theirs or wasn't a shop purchase,
-//   whose shop is a known shop that sells things (RETAIL_SHOPS: clothes, shoes, beauty, electricals, home, department stores,
-//   big online shops) or whose name says it is one (RETAIL_WORDS: "clothing", "boutique", "furniture" and so on),
-//   and isn't food or drink, groceries, food delivery, transport, fuel, an app, a subscription or a donation (NO_RECEIPT),
-//   nor anything else that isn't shopping (bills, transfers, cash, rent: NOT_SHOPPING; those are never kept anyway).
-// A shop Relay doesn't know is left alone rather than guessed at.
+// the app should highlight this", and "How can we ensure Relay knows all shops?" (shop-directory.js). The rule, all of it:
+//   a card payment out (not money coming in) of at least £5 (RECEIPT_MIN_PENCE), with no receipt matched to it; then
+//   the first of these that has something to say decides:
+//   1. The shopper's own word: not theirs (one payment, or every one from that shop), or "This wasn't a shop purchase": no.
+//   2. Things that never need a receipt kept: bills, transfers, cash, rent (NOT_SHOPPING; never kept anyway), food and
+//      drink, groceries, food delivery, transport, fuel, apps, subscriptions, donations (NO_RECEIPT), and a shop on the
+//      seed list of one of those kinds (supermarkets: EXCLUDED_KINDS): no.
+//   3. A shop on the seed list (shop-seed.js: 600+ real UK shops that sell things): yes.
+//   4. TrueLayer's own label for the payment (classificationSays): Shopping (not Groceries), Books & Supplies, Gift,
+//      Office Supplies: yes. Food & Dining, Bills, Transport, Travel, Entertainment, Home (rent, mortgage), Groceries…: no.
+//   5. A shop Relay has seen send receipts to at least two different shoppers (shop_directory, loaded once per request): yes.
+//   6. Its name says it's a shop (RETAIL_WORDS: "clothing", "boutique", "furniture" and so on): yes.
+//   Otherwise no: a shop Relay doesn't know is left alone rather than guessed at.
+// A supermarket payment isn't highlighted, but like any payment without a receipt the shopper can still add a photo of it.
 export const RECEIPT_MIN_PENCE = 500;
-const RETAIL_SHOPS = /\bh ?(&|and) ?m\b|\bhm\.com\b|\bzara\b|uniqlo|primark|^next$|next retail|next directory|\basos\b|boohoo|pretty ?little ?thing|river island|new look|topshop|\bmango\b|\bcos\b|\barket\b|other stories|\bmonki\b|massimo dutti|bershka|pull ?(&|and) ?bear|stradivarius|\bgap\b|levi'?s|all ?saints|\breiss\b|ted baker|whistles|jigsaw|\bhobbs\b|white stuff|fat ?face|\bjoules\b|seasalt|superdry|t\.? ?k\.? ?maxx|matalan|^m&s$|marks (and|&) spencer|marks ?& ?spencer|john ?lewis|selfridges|harrods|\bliberty\b|harvey nichols|house of fraser|fenwick|flannels|frasers|debenhams|jd sports|sports direct|foot ?locker|\bnike\b|adidas|\bpuma\b|lululemon|sweaty betty|\bschuh\b|\bclarks\b|dr\.? ?martens|^boots$|superdrug|sephora|space ?nk|^lush$|body shop|cult beauty|look ?fantastic|charlotte tilbury|currys|\bargos\b|apple store|samsung|\bdyson\b|\bcex\b|richer sounds|\bikea\b|dunelm|habitat|the range|\bb ?(&|and) ?q\b|wickes|homebase|oliver bonas|\bmuji\b|wayfair|\bamazon\b|amzn|\bebay\b|zalando|waterstones|wh ?smith|smyths|hamleys|the entertainer|\blego\b|pandora|h\.? ?samuel|ernest jones|goldsmiths|swarovski|accessorize|hobbycraft|home bargains|\bb ?& ?m\b|wilko/i;
 const RETAIL_WORDS = /\b(clothing|clothes|fashion|boutique|apparel|outfitters?|footwear|shoes?|jewell?e?ry|jewellers?|cosmetics|perfumery|electricals?|electronics|furniture|homewares?|interiors|department store|bookshop|toys?)\b/i;
 const NO_RECEIPT = /prime video|amazon prime|prime member|\baudible\b|\bkindle\b|amazon music|amazon digital|apple\.com\/bill|\bitunes\b|app ?store|google play|netflix|spotify|disney|youtube|\buber\b|\bbolt\b|trainline|\btfl\b|national rail|\brail\b|parking|ringgo|paybyphone|\bfuel\b|petrol|\besso\b|texaco|deliveroo|just ?eat|food|\bcaf(e|é)\b|coffee|restaurant|takeaway|pizza|burger|\bbar\b|\bpub\b|tesco|sainsbury|\basda\b|morrisons|\baldi\b|\blidl\b|waitrose|co-?op\b|iceland|ocado|greggs|\bpret\b|costa|starbucks|mcdonald|\bkfc\b|subway|nando|charity|donation|patreon/i;
-export function likelyNeedsReceipt(p, not) {
-  if (!p || p.receipt_id || !(Number(p.amount_minor) >= RECEIPT_MIN_PENCE)) return false;
+// Which source decided: "seed", "truelayer", "learned" or "words"; null when the payment isn't highlighted.
+// dir: the learned shops (shop-directory.js loadShopDirectory), loaded once for all of a request's payments.
+export function whyNeedsReceipt(p, not, dir) {
+  if (!p || p.receipt_id || !(Number(p.amount_minor) >= RECEIPT_MIN_PENCE)) return null;
   const shop = shopName(p.description, p.merchant);
-  if (not && (isNotMine(not, p.payment_id, shop) || (not.noReceipt && not.noReceipt.has(String(p.payment_id))))) return false;
-  const text = [shop, p.merchant, statementShop(p.description)].filter(Boolean).join(" | ");
-  if (!text || NOT_SHOPPING.test(text) || NO_RECEIPT.test(text)) return false;
-  return RETAIL_SHOPS.test(shop || "") || RETAIL_SHOPS.test(text) || RETAIL_WORDS.test(text);
+  if (not && (isNotMine(not, p.payment_id, shop) || (not.noReceipt && not.noReceipt.has(String(p.payment_id))))) return null;
+  const parts = [shop, p.merchant, statementShop(p.description)].filter(Boolean);
+  const text = parts.join(" | ");
+  if (!text || NOT_SHOPPING.test(text) || NO_RECEIPT.test(text)) return null;
+  const seed = seedShops(parts);
+  if (seed.some((s) => EXCLUDED_KINDS.has(s.kind))) return null;
+  if (seed.length) return "seed";
+  const said = classificationSays(p.classification);
+  if (said) return said === "yes" ? "truelayer" : null;
+  if (learnedShop(dir, parts)) return "learned";
+  return RETAIL_WORDS.test(text) ? "words" : null;
 }
+export const likelyNeedsReceipt = (p, not, dir) => whyNeedsReceipt(p, not, dir) !== null;
 const paymentForApp = (r) => ({ id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency, shop: shopName(r.description, r.merchant) });
 // For Home (gmail.js adds these to /relay/my/receipts, which Home already asks for, so it costs no extra request): the
 // newest payments of the last 30 days that likely should have a receipt and don't. Nothing when no bank is connected.
 export async function receiptsToAdd(env, shopperId, now) {
   try {
     const since = new Date((now || Date.now()) - 30 * DAY).toISOString().slice(0, 10);
-    const rows = (await env.RELAY_DB.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id FROM bank_payments
+    await ensureBankColumns(env.RELAY_DB);
+    const rows = (await env.RELAY_DB.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, classification, receipt_id FROM bank_payments
       WHERE shopper_id = ? AND receipt_id IS NULL AND amount_minor >= ? AND paid_on >= ? ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopperId, RECEIPT_MIN_PENCE, since).all()).results || [];
     if (!rows.length) return [];
-    const not = await notMineOf(env.RELAY_DB, shopperId);
+    const not = await notMineOf(env.RELAY_DB, shopperId), dir = await loadShopDirectory(env.RELAY_DB);
     // photoRead: whether Relay can read a photo of the receipt (the AI reader is on), so the app says what will happen.
-    return rows.filter((r) => likelyNeedsReceipt(r, not)).slice(0, 5).map((r) => ({ ...paymentForApp(r), photoRead: aiAvailable(env) }));
+    return rows.filter((r) => likelyNeedsReceipt(r, not, dir)).slice(0, 5).map((r) => ({ ...paymentForApp(r), photoRead: aiAvailable(env) }));
   } catch { return []; }   // no bank tables yet: nothing to say
 }
 
@@ -405,13 +435,13 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
   }
   if (path === "/relay/my/bank/sync" && method === "POST") return json(await syncBank(env, shopper.id, o.now, o.fetchImpl, false), 200, cors);
   if (path === "/relay/my/bank/payments" && method === "GET") {
-    const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id, match FROM bank_payments
+    const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, classification, receipt_id, match FROM bank_payments
       WHERE shopper_id = ? AND amount_minor > 0 ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
-    const not = await notMineOf(db, shopper.id);
+    const not = await notMineOf(db, shopper.id), dir = rows.length ? await loadShopDirectory(db) : null;
     return json({ photoRead: aiAvailable(env), payments: rows.map((r) => { const shop = shopName(r.description, r.merchant); return { id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
       description: r.description, merchant: r.merchant, shop, receiptId: r.receipt_id || null, match: r.match || null,
       notMine: isNotMine(not, r.payment_id, shop) ? (not.payments.has(String(r.payment_id)) ? "payment" : "shop") : null,
-      ...(not.noReceipt.has(String(r.payment_id)) ? { noReceipt: true } : {}), ...(likelyNeedsReceipt(r, not) ? { needsReceipt: true } : {}) }; }) }, 200, cors);
+      ...(not.noReceipt.has(String(r.payment_id)) ? { noReceipt: true } : {}), ...(likelyNeedsReceipt(r, not, dir) ? { needsReceipt: true } : {}) }; }) }, 200, cors);
   }
   // POST { id, on, everyFromShop }: a payment isn't theirs (someone else's card on a shared account), or is after all.
   // With everyFromShop, every payment from that shop too. Then matching runs again without them.

@@ -40,6 +40,8 @@ jobs:
         run: node scripts/test-bank.mjs
       - name: Receipt photos (which payments likely need a receipt, own payments only, checked photos, nothing invented, mismatches shown)
         run: node scripts/test-receipt-photo.mjs
+      - name: Shop directory (seed list, TrueLayer's labels, shops learned from two shoppers' receipts, nothing about anyone kept)
+        run: node scripts/test-shop-directory.mjs
       - name: Live parcel tracking (off until the key is set, tracking number only, 10 new parcels a month)
         run: node scripts/test-parcel-tracking.mjs
       - name: Auctions (proxy bids, nobody sees who bid, the winner's unpaid order at the shop, 24 hours to pay, then the next bidder)
