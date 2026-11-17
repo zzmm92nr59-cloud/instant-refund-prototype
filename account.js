@@ -1132,7 +1132,7 @@
     ".h2-chips{display:flex;gap:4px;overflow-x:auto;margin:0 -16px 6px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
     ".h2-chip{all:unset;box-sizing:border-box;flex:none;height:44px;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
     ".h2-chip>span{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2);white-space:nowrap;transition:background .15s,color .15s}" +
-    ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip>span{border:1px solid transparent}.h2-chip[aria-pressed=true]>span{background:#101828;color:#fff}.h2-chip-go>span{gap:7px;padding:0 14px 0 11px;background:var(--rl-card);color:var(--rl-text);border-color:var(--rl-line);box-shadow:0 1px 3px rgba(16,24,40,.08)}.h2-chip-go .h2-chip-ic{display:inline-flex}.h2-chip-first{margin-left:8px}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip>span{background:var(--rl-fill);color:var(--rl-text);height:36px;padding:0 14px}.h2-chip[aria-pressed=true]>span{background:#101828;color:#fff}.h2-chip-go>span{gap:6px;padding:0 14px 0 11px}.h2-chip-go .h2-chip-ic{display:inline-flex}.h2-chip-first{margin-left:10px;position:relative}.h2-chip-first::before{content:\"\";position:absolute;left:-6px;top:12px;bottom:12px;width:1px;background:var(--rl-line)}.hl-sq.has-c{background:color-mix(in srgb,var(--h2-b) 17%,#fff);border-radius:22px;padding:8px 8px 12px}.hl-sq.has-c .hl-sqpic{border-radius:16px;background:#fff}.hl-sq.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}.hl-sq.has-c .hl-sqs,.hl-sq.has-c .hl-sqn,.hl-sq.has-c .hl-sqp{padding:0 4px;color:#000}.hl-sq.has-c .hl-sqn{color:rgba(0,0,0,.66)}.hl-grid{gap:12px 10px}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}" +
     // Two other ways Home can look (Connor, 15 Nov), chosen in Profile, Home layout: "today" (what needs you, then a list) and
     // "wallet" (your latest things as photo squares). Neither snaps one card per flick.
@@ -1180,7 +1180,7 @@
     "html.look-n .footnav button.active{background:#C9D8FF!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#C9D8FF}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#C9D8FF;color:#101828}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
     // S, softer: the same category colours at lower strength; dark text on the pale cards, white on the deep ones.
-    "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 16%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
+    "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-b,var(--h2-c)) 17%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
     "html.look-s .h2-feed.tint .h2-card.has-c .h2-go{background:var(--h2-c);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c+.h2-strip{background:color-mix(in srgb,var(--h2-c) 30%,#fff);box-shadow:none;color:#000}" +
     "html.look-s .h2-feed.tint .h2-card.has-c .h2-art.rl-ill{background:#fff!important;color:var(--h2-c)!important}html.look-s .rl-ask-qi{background:color-mix(in srgb,var(--qi) 18%,var(--rl-bg));color:var(--qi)}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 34%,#000);color:#fff}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(255,255,255,.75)}" +
@@ -8723,6 +8723,9 @@
   var CARD_INK = { shop: "#101828", other: "#1F2937" }, cardColours = {};
   function hexRgb(h) { var n = parseInt(String(h).replace("#", ""), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
   function whiteOn(rgb) { var l = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 1.05 / (0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] + 0.05); }
+  // The light boxes' colour for each kind: its own colour, except food, whose orange went beige when pale (Connor, 17 Nov
+  // 2026): a clear yellow instead.
+  function lightBase(cat) { return cat === "food" ? "#F5B800" : TILE_COLOURS[cat]; }
   function cardColour(cat) {
     if (cardColours[cat]) return cardColours[cat];
     var base = hexRgb(TILE_COLOURS[cat]), ink = hexRgb((cat !== "shop" && cat !== "other" && CAT_ICONS[cat] && CAT_ICONS[cat][1]) || CARD_INK[cat] || "#101828"), out = base;
@@ -8832,8 +8835,11 @@
   function walletSquare(e) {
     var t = e.tiles && e.tiles[0], what = cleanName(e.title || (t && t.name) || "", e.shop), tag = e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
     var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
-    return el("button", { type: "button", className: "hl-sq", ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
+    var sq = el("button", { type: "button", className: "hl-sq" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : ""), ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
       pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
+    // Each purchase in its own coloured box, its kind of shopping's colour, as on the big cards (Connor, 17 Nov 2026).
+    if (e.cat && TILE_COLOURS[e.cat]) { sq.style.setProperty("--h2-b", lightBase(e.cat)); sq.style.setProperty("--h2-c", cardColour(e.cat)); }
+    return sq;
   }
   // Today's summary: one line each for what needs the shopper, biggest first; each opens that list.
   function todaySummary(sets, pickChip) {
@@ -8904,7 +8910,7 @@
     var item = el("div", { className: "h2-item" + (e.small ? " small" : ""), tabIndex: 0 });
     item.setAttribute("role", "button");
     var card = el("div", { className: "h2-card" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : "") });
-    if (e.cat && TILE_COLOURS[e.cat]) item.style.setProperty("--h2-c", cardColour(e.cat));
+    if (e.cat && TILE_COLOURS[e.cat]) { item.style.setProperty("--h2-c", cardColour(e.cat)); item.style.setProperty("--h2-b", lightBase(e.cat)); }
     item.style.setProperty("--h2-ink", e.cat && e.cat !== "shop" && e.cat !== "other" && TILE_COLOURS[e.cat] ? TILE_COLOURS[e.cat] : "#C9D0DF");
     if (e.shop) {
       var logo = el("span", { className: "h2-logo", text: String(e.shop).trim().charAt(0).toUpperCase() }); logo.setAttribute("aria-hidden", "true");
