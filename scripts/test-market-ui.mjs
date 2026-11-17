@@ -159,7 +159,7 @@ console.log("ok - Yours: requests accepted once, statuses in words, taking down 
 await sheet.getByRole("button", { name: "Sell" }).click();
 const vase = sheet.locator(".rl-order", { hasText: "Ceramic Vase" });
 await vase.waitFor();
-assert.match(await vase.innerText(), /Larkspur Home · Paid £40\.00 · 1 Sept? 2026/);
+assert.match(await vase.innerText(), /Paid £40\.00 at Larkspur Home on 1 Sept? 2026/);
 assert.match(await sheet.locator(".rl-order", { hasText: "Brass Lamp" }).innerText(), /You can still return this to the shop for a refund until 20 Nov 2026\./);
 await vase.getByRole("button", { name: "List this" }).click();
 await vase.getByLabel("Condition", { exact: true }).selectOption("good");
