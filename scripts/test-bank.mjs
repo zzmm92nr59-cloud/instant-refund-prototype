@@ -32,6 +32,10 @@ import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping } from "../
   assert.deepEqual(["EDF ENERGY", "E.ON NEXT", "RENT", "VANQUIS BANK", "BROADWAY GAMING LT CD 0315", "EE & T-MOBILE", "CREDITREPORTSERVIC", "REVOLUT", "HALIFAX", "NUDE FINANCE", "TALKTALK TELECOM"].map((d) => isShopping({ description: d })),
     [false, false, false, false, false, false, false, false, false, false, false], "bills, rent, credit, money to other banks and gaming aren't shopping");
   assert.equal(isShopping({ description: "CIRCLE K" }), true, "fuel is shopping");
+  // Seen on a real Amex statement (16 Nov 2026): TfL fares are not shopping; a hyphen on its own is not part of a name.
+  assert.equal(isShopping({ description: "TFL TRAVEL CHARGE TFL.GOV.UK/CP" }), false, "TfL fares");
+  assert.equal(shopName("1234 - GUN -"), "Gun", "no stray hyphens");
+  assert.equal(shopName("5678 - MADE-UP CAFE LONDON"), "Made-up Cafe", "and a place name at the end is dropped as before");
   assert.deepEqual(["NEXT RETAIL LTD", "WWW.TAILS.COM", "LAPTOP DIRECT LTD.", "MCDONALD'S", "W M MORRISONS PLC"].map((d) => shopName(d, null)), ["Next", "Tails.com", "Laptop Direct", "McDonald's", "Morrisons"]);
   console.log("ok - only shopping is kept (no round-ups, transfers, cash, bills or betting); shop names tidied");
   console.log("ok - matching: same amount, within a week, the bank's text names the shop (or it's the only one of that amount); nothing else guessed");
