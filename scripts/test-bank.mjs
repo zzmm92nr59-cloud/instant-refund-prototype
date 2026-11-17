@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -35,6 +35,10 @@ import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping } from "../
   // Seen on a real Amex statement (16 Nov 2026): TfL fares are not shopping; a hyphen on its own is not part of a name.
   assert.equal(isShopping({ description: "TFL TRAVEL CHARGE TFL.GOV.UK/CP" }), false, "TfL fares");
   assert.equal(shopName("1234 - GUN -"), "Gun", "no stray hyphens");
+  // Amex puts the shop's own name in meta.provider_merchant_name; it's used before the statement text.
+  assert.equal(merchantOf({ description: "1234 - MADE-UP CAFE LON", meta: { provider_merchant_name: "Made-up Cafe" } }), "Made-up Cafe");
+  assert.equal(merchantOf({ merchant_name: "Coffee Corner", meta: { provider_merchant_name: "Other" } }), "Coffee Corner", "TrueLayer's own first");
+  assert.equal(merchantOf({ description: "X" }), null);
   assert.equal(shopName("5678 - MADE-UP CAFE LONDON"), "Made-up Cafe", "and a place name at the end is dropped as before");
   assert.deepEqual(["NEXT RETAIL LTD", "WWW.TAILS.COM", "LAPTOP DIRECT LTD.", "MCDONALD'S", "W M MORRISONS PLC"].map((d) => shopName(d, null)), ["Next", "Tails.com", "Laptop Direct", "McDonald's", "Morrisons"]);
   console.log("ok - only shopping is kept (no round-ups, transfers, cash, bills or betting); shop names tidied");

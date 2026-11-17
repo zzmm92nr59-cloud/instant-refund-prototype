@@ -111,11 +111,14 @@ const minor = (n) => Math.round(Math.abs(Number(n) || 0) * 100);
 // Not shopping: money moved between accounts or to savings (round-ups like Save the Change), cash, bills by standing order or
 // direct debit, bank fees and interest, and betting. Relay keeps only purchases, so these are never stored.
 const NOT_SHOPPING_TYPES = new Set(["ATM", "CASH", "TRANSFER", "STANDING_ORDER", "DIRECT_DEBIT", "FEE_CHARGE", "INTEREST", "DIVIDEND", "CORRECTION", "CHEQUE"]);
+// The shop's name as the bank gives it: TrueLayer's merchant_name, or the card company's own (Amex sends it in
+// meta.provider_merchant_name on nearly every payment, 17 Nov 2026), before falling back to the statement text.
+export const merchantOf = (x) => (x && (x.merchant_name || (x.meta && x.meta.provider_merchant_name))) || null;
 export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b|gaming|betropolis|\bbingo\b|\bslots?\b|\bpoker\b|\brent\b|mortgage|council tax|insurance|\bloan\b|credit ?report|vanquis|capital one|barclaycard|\bamex\b|american express|klarna repayment|\benergy\b|\bedf\b|e\.?on\b|octopus|british gas|ovo\b|\bwater\b|thames water|\bee & t-mobile\b|\bvodafone\b|\bo2\b|virgin media|\bbt\b|tv licen[cs]e|housing|regenda|tesco mobile|giffgaff|talk ?talk|plusnet|\bsky (digital|broadband|uk)\b|\brevolut\b|\bmonzo\b|\bstarling\b|\bhalifax\b|\blloyds\b|\bnatwest\b|\bsantander\b|\bhsbc\b|\bbarclays\b|\bnationwide\b|ulster bank|\bfinance\b|\bwise\b|\bchase\b|tfl travel charge/i;
 export function isShopping(x) {
   const cat = String(x.transaction_category || "").toUpperCase();
   if (NOT_SHOPPING_TYPES.has(cat)) return false;
-  return !NOT_SHOPPING.test(String(x.description || "") + " " + String(x.merchant_name || ""));
+  return !NOT_SHOPPING.test(String(x.description || "") + " " + String(merchantOf(x) || ""));
 }
 // A shop's name as a person would say it, from the bank's text: "ASDA STOES LTD" is Asda, "PAYPAL *EBAY" is eBay,
 // "AMZNMKTPLACE" is Amazon. The bank's own words stay with the payment too.
@@ -181,13 +184,13 @@ async function readConnection(env, db, shopperId, row, now, f) {
         if (debit && !isShopping(x)) {
           const cat = String(x.transaction_category || "").toUpperCase();
           if (NOT_SHOPPING_TYPES.has(cat)) seen.leftOutType[cat] = (seen.leftOutType[cat] || 0) + 1;
-          else { const w = (NOT_SHOPPING.exec(String(x.description || "") + " " + String(x.merchant_name || "")) || ["?"])[0].toLowerCase().slice(0, 20); seen.leftOutWord[w] = (seen.leftOutWord[w] || 0) + 1; }
+          else { const w = (NOT_SHOPPING.exec(String(x.description || "") + " " + String(merchantOf(x) || "")) || ["?"])[0].toLowerCase().slice(0, 20); seen.leftOutWord[w] = (seen.leftOutWord[w] || 0) + 1; }
           continue;
         }
         if (debit) seen.keptDebits++;
         const amount = minor(x.amount); if (!amount) continue;
         rows.push({ payment_id: row.id + ":" + pid, account: label, paid_on: when, amount_minor: debit ? amount : -amount,
-          currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(x.merchant_name, 80) });
+          currency: /^[A-Z]{3}$/.test(String(x.currency || "")) ? x.currency : "GBP", description: clip(x.description, 140), merchant: clip(merchantOf(x), 80) });
       }
     }
   }
