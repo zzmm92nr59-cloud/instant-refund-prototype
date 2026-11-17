@@ -18,6 +18,7 @@ import { receiptsToAdd } from "./bank.js";
 import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
+import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
 import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
@@ -1681,7 +1682,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, shopKinds, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
@@ -1690,6 +1691,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     sharedByReceipt(env.RELAY_DB, shopperId, Date.now()),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? AND fields IS NOT NULL").bind(shopperId).all(),
     readTrackedRows(env.RELAY_DB, shopperId),
+    // What Claude said about shops whose names don't say what they sell (shop-kind-ai.js): nothing personal, one per shop.
+    readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
@@ -1753,7 +1756,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
     // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).
     retailer.logoDomain = logoDomainFor(retailer);
-    c = { ...c, retailer, items: cleanItems(c.items) };
+    c = { ...c, retailer, items: cleanItems(c.items), ...(shopKinds.get(k) ? { shopKindAi: shopKinds.get(k) } : {}) };
     const group = categorise(c, learned);
     // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
     // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
@@ -2086,7 +2089,10 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: false })) }, 200, cors);
   }
   if (path === "/relay/my/wrapped" && m === "GET") {
-    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    let cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    // Shops whose names don't say what they sell are asked about once (only with the AI on, only the shop's name): when
+    // any were learned, the receipts are sorted again with the answers.
+    if (await learnShopKinds(env, cards, { fetchImpl: opts.fetchImpl, now: opts.now }).catch(() => 0)) cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
     return json(buildWrapped(cards, url.searchParams.get("year"), opts.now, { industry: url.searchParams.get("industry") }), 200, cors);
   }
   // Everything the shopper bought that their style can be learned from: physical things only (no food, travel or apps),

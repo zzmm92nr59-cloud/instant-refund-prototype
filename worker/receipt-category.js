@@ -8,6 +8,7 @@
 // Every item also gets its own group (itemCategories), so a supermarket shop's kitchen roll is Home & garden and its
 // bananas are Food & drink. Wrapped uses those to count each thing, and the money spent on it, where it belongs.
 import { cleanShopName, isVia, looksLikePerson, nameFromDomain, domainBase as readerBase, GAME_SHOP } from "./receipt-reader.js";
+import { shopKind, spellOut } from "./shop-kind.js";
 export const CATEGORIES = {
   fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden",
   beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other",
@@ -99,6 +100,8 @@ for (const k of MIXED) if (!SHOPS.has(k)) SHOPS.set(k, null);
 // items wins. Kitchen things named after food come first ("tea towel" is Home, not Food), and words that are also
 // colours or flavours ("chocolate", "coffee", "wine") only count when nothing else fits ("Long Jacket Chocolate" is Fashion).
 const ITEM_RULES = [
+  // Furniture named after what it holds or goes with ("TV Bed", "Ottoman Bed", "TV Stand"): the last word says what it is.
+  ["home", /\b((tv|ottoman|divan|storage|sofa|bunk|cabin|day|guest|kids'?|childrens|single|double|small double|king( size)?|super ?king|4ft6?|5ft|3ft|platform|sleigh|upholstered|velvet|fabric|wooden|metal) ?beds?|tv ?beds?|bed ?frames?|bed ?bases?|divans?( bases?)?|headboards?|tv (stands?|units?|cabinets?|benches|tables?)|media (units?|consoles?)|bean ?bags?)\b/i],
   ["home", /\b(tea ?towels?|wine ?glass(es)?|champagne flutes?|coffee tables?|coffee machines?|espresso machines?|bean to cup|milk frothers?|aeroccino|frothers?|coffee grinders?|grinders?|kettles?|toasters?|blenders?|cheese ?boards?|bread ?bins?|bread makers?|cake tins?|ice cream makers?|cafeti[eè]res?|french press|travel mugs?|mugs?|espresso cups?|tumblers?|flasks?|water filters?|lunch ?box(es)?|pasta makers?|dishwasher (tablets?|capsules?|pods?)|laundry (capsules?|pods?)|washing (capsules?|pods?)|toilet (rolls?|tissue|paper)|kitchen (rolls?|foil)|(tin|baking|aluminium) foil|cling ?film|baking (paper|parchment)|(sandwich|freezer|food) bags|refuse sacks?|bin liners|bleach|fabric (conditioner|softener)|laundry (liquid|detergent|powder|gel)|washing (liquid|powder)|(surface|kitchen|bathroom|toilet|antibacterial|multi-?surface) (spray|wipes|cleaner)|(washing up|kitchen|cleaning|scrub) sponges?|scourers?|dish ?cloths?|air fresheners?|(reusable|insulated|sports|stainless steel|thermal|kids) (water )?bottles?|(vertuo|nespresso|tassimo|dolce gusto|lattissima|essenza|citiz|pixie|inissia|creatista)[a-z ]{0,20}machines?|(dog|cat|puppy|kitten|pet) (food|biscuits|treats|pouches|chews))\b/i],
   ["food", /\b(espresso|ristretto|lungo|decaf(feinated)?|cappuccino|latte macchiato|(coffee|espresso|nespresso|vertuo|tassimo|dolce gusto) (capsules?|pods?)|coffee beans|ground coffee|instant coffee|tea ?bags|loose leaf|matcha|groceries|grocery|bananas|avocados?|vegetables|veg box|fruit box|meal kit|recipe box|pizzas?|burgers?|fries|chips and|nuggets|chicken wings|onion rings|kebab|sushi|ramen|noodles|curry|biryani|dumplings|burrito|tacos?|sandwich(es)?|salads?|soup|pasta|risotto|bagels?|croissants?|pastr(y|ies)|doughnuts?|donuts?|muffins?|brownies|cookies|biscuits|crisps|snacks?|cereal|granola|porridge|protein (powder|bars?|shake)|whey|beers?|lagers?|ales|ciders?|gin|vodka|rum|whisk(e)?y|tequila|prosecco|champagne|red wine|white wine|ros[eé] wine|wines|spirits|cocktails|soft drinks?|cola|lemonade|smoothies?|juices?|milkshakes?|bubble tea|kombucha|takeaway|delivery fee|meal deal|breakfast|lunch|dinner|(still|sparkling|spring|mineral|bottled) water|semi[- ]?skimmed|skimmed milk|whole milk|oat milk|cheddar|mozzarella|parmesan|halloumi|feta|yoghurts?|yogurts?|fromage frais|free range|chicken (breasts?|thighs|fillets|drumsticks)|mince|sausages?|bacon|prawns|haddock|baked beans|beanz|chopped tomatoes|passata|stock cubes|ketchup|mayonnaise|peanut butter|marmalade|crumpets|baguettes?|pitta|naan|fish fingers|oven chips|broccoli|cauliflower|carrots?|onions?|lettuce|spinach|courgettes?|sweetcorn|chickpeas|lentils|tortilla wraps|lasagne|lasagna|nori|filo|tortellini|ravioli|gnocchi|penne|fusilli|linguine|tagliatelle|macaroni|couscous|quinoa|noodle|garden peas|jacket potato(es)?|plant[- ]based|(chia|sunflower|pumpkin|sesame|flax|poppy) seeds|linseeds?|pineapple rings)\b/i],
   ["digital", /\b(subscriptions?|membership|premium plan|monthly plan|annual plan|gift ?cards?|e-?gift|e-?vouchers?|in-app purchase|game credits?|v-?bucks|robux|top-?up|sim only|airtime|data (plan|bundle|add-?on)|e-?books?|kindle edition|audiobooks?|digital (download|edition|copy)|downloads?|licen[cs]e key|software licen[cs]e|cloud storage|icloud\+?)\b/i],
@@ -218,8 +221,16 @@ function shopClues(card) {
   const shop = knownShop({ retailer: { name: named || r.name, domain: isVia(r.domain) ? null : r.domain } }) || knownShop({ retailer: { name: r.legalName } });
   const nameText = [spaced(named), spaced(r.name), spaced(r.legalName)].filter(Boolean).join(" ");
   const domainText = isVia(r.domain) ? "" : (nameFromDomain(r.domain) || "");
+  // For a shop Relay doesn't know: what its name says, read word by word (shop-kind.js: "Tvbedsnorthwest" is TV Beds North
+  // West, which sells beds), when that is clear; else a kind-of-shop word anywhere in its name; else what Claude said about
+  // the shop's name once (shop-kind-ai.js, `shopKindAi`), unless that was "other".
   let nameGroup = null;
-  for (const [c, re] of NAME_WORDS) if (re.test(nameText) || re.test(domainText)) { nameGroup = c; break; }
+  if (!shop) {
+    const k = shopKind(named || r.name || r.legalName, isVia(r.domain) ? null : r.domain);
+    nameGroup = k.category || (!named && !r.name ? null : shopKind(null, isVia(r.domain) ? null : r.domain).category);
+  }
+  if (!nameGroup) for (const [c, re] of NAME_WORDS) if (re.test(nameText) || re.test(domainText)) { nameGroup = c; break; }
+  if (!nameGroup && !shop && CATEGORIES[card.shopKindAi] && card.shopKindAi !== "other") nameGroup = card.shopKindAi;
   return { shop, nameGroup };
 }
 
@@ -315,6 +326,16 @@ export function categorise(card, learned) {
   return finish(best || "other", items, noReturn, best === "food" && Boolean(shop && GROCER.has(shop.key)));
 }
 
+// A supermarket or food delivery receipt (Sainsbury's, Tesco, Ocado…): its food, cleaning things and toiletries are the
+// groceries. Wrapped counts those as Food & drink, so a supermarket is never anyone's "go-to for the home".
+export function isGrocer(card) { const { shop } = shopClues(card || {}); return Boolean(shop && GROCER.has(shop.key)); }
+// A thing that lasts (a kettle, a duvet, a lamp, a jumper, headphones) rather than gets used up: bought at a supermarket,
+// it counts as what it is.
+export function lastingThing(name, category) {
+  const n = typeof name === "string" ? name : "";
+  if (!n || USED_UP.test(n)) return false;
+  return category === "fashion" || category === "electronics" || (category === "home" && LASTS.test(n));
+}
 // What one thing bought is, from its name alone, when that is clear ("Kitchen Towels" is Home & garden, "Greek Yoghurt"
 // is Food & drink); null when the name doesn't say. Used to keep each Wrapped chapter's top items to that kind of thing.
 export function itemKind(name) {
@@ -335,7 +356,8 @@ const EATERY = new Set(("starbucks costa costacoffee caffenero nero pret pretama
 const EATERY_NAME = /\b(pub|tavern|inn|arms|restaurant|cafe|café|coffee house|bakery|patisserie|takeaway|pizza|pizzeria|burgers?|sushi|ramen|curry|grill|deli|bistro|brasserie|diner|eatery|noodles?|dumplings?|bubble tea|kebabs?|chippy|fish (and|&) chips|bar)\b/i;
 const USED_UP = /\b(kitchen (rolls?|towels?|paper)|paper towels?|toilet (rolls?|tissue|paper)|tissues?|napkins?|serviettes?|wipes|foil|cling ?film|baking (paper|parchment)|greaseproof|(sandwich|freezer|food|bin|refuse|rubbish) (bags|liners|sacks)|bin liners|bin bags|bags? for life|carrier bags?|plastic bags?|paper bags?|bag charge|dishwasher|laundry|washing (up|liquid|powder|capsules?|pods?|gel)|fabric (conditioner|softener)|detergent|bleach|cleaners?|cleaning|disinfectant|(surface|kitchen|bathroom|toilet|antibacterial|multi-?surface) (spray|gel)|sponges?|scourers?|dish ?cloths?|cloths|air fresheners?|polish|batter(y|ies)|light ?bulbs?|bulbs?|ink|toner|cartridges?|candles?|matches|charcoal|lighters?|(dog|cat|puppy|kitten|pet|bird) (food|biscuits|treats|pouches|chews)|litter|seeds|compost|soil|plants?|flowers?|bouquets?|refills?|pods?|capsules?)\b/i;
 const LASTS = /\b(kettles?|toasters?|blenders?|mixers?|food processors?|coffee (machines?|makers?|grinders?)|espresso machines?|grinders?|frothers?|microwaves?|air fryers?|slow cookers?|pressure cookers?|rice cookers?|irons?|ironing boards?|vacuums?|hoovers?|fans?|heaters?|dehumidifiers?|lamps?|mugs?|cups|glass(es)?|tumblers?|flasks?|carafes?|cafeti[eè]res?|french press|teapots?|jugs?|plates?|bowls?|dinner sets?|cutlery|knives|knife|pans?|saucepans?|woks?|casserole dish(es)?|cookware|bakeware|baking (trays?|tins?|dish(es)?)|(cake|roasting|loaf) tins?|chopping boards?|utensils?|whisks?|graters?|colanders?|sieves?|storage (boxes|box|containers?|jars?|sets?)|lunch ?box(es)?|bread bins?|duvets?|duvet covers?|pillows?|pillowcases?|cushions?|throws?|blankets?|bedding|bed ?sheets?|towels?|bath mats?|tea ?towels?|oven gloves?|aprons?|curtains?|rugs?|mirrors?|(photo |picture )?frames?|vases?|clocks?|baskets?|hangers?|airers?|drying racks?|pedal bins?|chairs?|tables?|desks?|stools?|shelv(es|ing)|wardrobes?|beds?|mattress(es)?|sofas?|tool ?(kits?|sets?|box(es)?)|drills?|toys?)\b/i;
-const KITCHEN_KIT = ITEM_RULES[0][1], STRONG_FOOD = ITEM_RULES[1][1];
+// (The first rule is furniture named after what it goes with; kitchen kit and clear food come next.)
+const KITCHEN_KIT = ITEM_RULES[1][1], STRONG_FOOD = ITEM_RULES[2][1];
 export function returnableItems(card, kinds) {
   card = card || {};
   const { shop } = shopClues(card), r = card.retailer || {};
@@ -386,7 +408,10 @@ export function shopDisplayName(retailer) {
     // "Anthropic Ireland, Limited" → "Anthropic"; "Anthropic, PBC" → "Anthropic"; "Acme UK Ltd." → "Acme"
     const short = raw.replace(/,?\s+((ireland|uk|europe|emea|international|holdings|group)\s*,?\s+)?(limited|ltd\.?|llc|l\.l\.c\.|inc\.?|incorporated|plc|pbc|gmbh|b\.?v\.?|s\.?a\.?r\.?l\.?|sas|ag|pty)\s*$/i, "").trim() || raw;
     // "Swarovski Customer Service GB" → "Swarovski"; "Groupon 🎄" → "Groupon".
-    const clean = cleanShopName(short);
+    let clean = cleanShopName(short);
+    // A name written as one run of words, as in a web address ("Tvbedsnorthwest"), is spelt out when every piece is a known
+    // word ("TV Beds North West"); a brand Relay can't split ("Lululemon") keeps its own spelling.
+    if (clean && /^[A-Za-z][a-z]+$/.test(clean) && clean.length >= 8 && !KNOWN_NAMES[letters(clean)] && (!r.domain || via || letters(clean) === domainBase(r.domain))) clean = spellOut(clean) || clean;
     const known = clean && KNOWN_NAMES[letters(clean)];
     if (known) return known;
     // A person's name from the shop's own address ("Liam Hartley" at clarechampion.ie): the address names the shop instead.

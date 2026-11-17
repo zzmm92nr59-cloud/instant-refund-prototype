@@ -504,6 +504,34 @@
     ".sc-gifts .lid{transform-origin:100px 62px;animation:rllid 3s ease-in-out infinite}.sc-gifts .tw{fill:currentColor;fill-opacity:.3;transform-box:fill-box;transform-origin:center;animation:rltwinkle 2s ease-in-out infinite}.sc-gifts .t2{animation-delay:.6s}.sc-gifts .t3{animation-delay:1.2s}" +
     "@keyframes rllid{0%,50%,100%{transform:translateY(0) rotate(0)}64%{transform:translateY(-12px) rotate(-6deg)}78%{transform:translateY(-5px) rotate(4deg)}90%{transform:translateY(-1px) rotate(-1deg)}}" +
     "@media(prefers-reduced-motion:reduce){.rl-story-slide .scene *{animation:none!important}.rl-story-slide .stack i{animation:none;width:var(--w)}}" +
+    // Wrapped's moving parts (transform and opacity only). With reduced motion everything is simply in place.
+    ".rl-story-slide h2.ch{font-size:40px;line-height:1.05;letter-spacing:-1.2px;margin:6px 0 4px}.rl-story-slide .facts b small{display:block;font-size:13px;font-weight:600;opacity:.8}" +
+    ".rl-story-slide .kindlist li{grid-template-columns:14px 1fr auto auto}.rl-story-slide .kindlist li b{font-size:13px;font-weight:700;opacity:.7;min-width:34px;text-align:right}" +
+    ".rl-story-slide .rl-wr-hero{width:140px;height:140px;border-radius:22px;background:#fff;overflow:hidden;margin:16px 0 4px;display:flex;align-items:center;justify-content:center;color:#101828;opacity:0;animation:rltumble .9s cubic-bezier(.2,.9,.25,1.15) .25s forwards;--r:-6deg}" +
+    ".rl-story-slide .rl-wr-hero img{width:100%;height:100%;object-fit:cover;object-position:top}.rl-story-slide .rl-wr-hero svg{width:64px;height:64px}" +
+    "@keyframes rltumble{0%{opacity:0;transform:translateY(-120px) rotate(calc(var(--r) * -4))}60%{opacity:1}100%{opacity:1;transform:rotate(var(--r))}}" +
+    ".rl-story-slide .bag{position:relative;width:200px;height:190px;margin:14px 0 0}.rl-story-slide .bag>svg{position:absolute;left:30px;bottom:0;width:140px;height:130px;color:var(--accent)}" +
+    ".rl-story-slide .bag .it{position:absolute;top:0;width:52px;height:52px;border-radius:14px;background:#fff;color:#101828;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:rldrop 1.1s cubic-bezier(.45,0,.55,1) forwards}" +
+    ".rl-story-slide .bag .it img{width:100%;height:100%;object-fit:cover;object-position:top}.rl-story-slide .bag .it svg{width:28px;height:28px}" +
+    "@keyframes rldrop{0%{opacity:0;transform:translateY(-60px) rotate(var(--r))}20%{opacity:1}70%{opacity:1;transform:translateY(96px) rotate(0)}100%{opacity:0;transform:translateY(118px) scale(.6)}}" +
+    ".rl-story-slide .ph.tumble figure{animation-name:rltumble;animation-duration:.8s;--r:0deg}.rl-story-slide .ph.tumble figure:nth-child(3n+1){--r:-3deg}.rl-story-slide .ph.tumble figure:nth-child(3n+2){--r:2deg}" +
+    ".rl-story-slide .belt{overflow:hidden;margin:14px -30px 0;padding:6px 0;border-top:2px dashed currentColor;border-bottom:2px dashed currentColor}.rl-story-slide .belt>div{display:flex;gap:10px;width:max-content;animation:rlbelt 18s linear infinite}" +
+    ".rl-story-slide .belt span{display:inline-flex;align-items:center;gap:8px;background:rgba(16,24,40,.08);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:700;white-space:nowrap}.rl-story-slide .belt svg{width:20px;height:20px;flex:none}" +
+    "@keyframes rlbelt{to{transform:translateX(-50%)}}" +
+    ".rl-story-slide .train{container-type:inline-size;overflow:hidden;margin:18px -30px 6px;height:96px;position:relative;color:var(--accent)}.rl-story-slide .train svg{position:absolute;bottom:0;left:0}" +
+    ".rl-story-slide .train .loco{width:250px;height:80px;bottom:10px;animation:rltrain 5.5s linear infinite}.rl-story-slide .train .rails{width:100%;height:12px}" +
+    ".rl-story-slide .train .rails .sl{animation:rlsleep .6s linear infinite}@keyframes rlsleep{to{transform:translateX(-24px)}}" +
+    ".rl-story-slide .train .wh{transform-box:fill-box;transform-origin:center;animation:rlspin .6s linear infinite}@keyframes rlspin{to{transform:rotate(360deg)}}" +
+    ".rl-story-slide .train .puff{opacity:0;transform-box:fill-box;transform-origin:center;animation:rlpuff 1.2s ease-out infinite}.rl-story-slide .train .p2{animation-delay:.4s}.rl-story-slide .train .p3{animation-delay:.8s}" +
+    "@keyframes rlpuff{0%{opacity:.8;transform:translate(0,0) scale(.6)}100%{opacity:0;transform:translate(-30px,-26px) scale(1.4)}}" +
+    "@keyframes rltrain{from{transform:translateX(-260px)}to{transform:translateX(100cqw)}}" +
+    ".rl-story-slide .map{margin:12px auto 0;width:min(100%,250px)}.rl-story-slide .map svg{display:block;width:100%;height:auto;max-height:52vh}" +
+    ".rl-story-slide .map .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.6;stroke-width:1.2;stroke-linejoin:round}" +
+    ".rl-story-slide .map .arc{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rlarc 1.2s cubic-bezier(.4,0,.2,1) forwards}@keyframes rlarc{to{stroke-dashoffset:0}}" +
+    ".rl-story-slide .map .dot{fill:var(--accent);stroke:currentColor;stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0;animation:rldot .5s cubic-bezier(.2,.9,.3,1.4) forwards}@keyframes rldot{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}" +
+    "@media(prefers-reduced-motion:reduce){.rl-story-slide .rl-wr-hero,.rl-story-slide .ph.tumble figure{animation:none;opacity:1;transform:rotate(var(--r))}.rl-story-slide .bag .it{animation:none;opacity:1;transform:translateY(calc(30px + var(--k) * 12px)) rotate(var(--r))}" +
+    ".rl-story-slide .belt>div{animation:none;flex-wrap:wrap;width:auto}.rl-story-slide .belt span.dup{display:none}.rl-story-slide .train *{animation:none!important}.rl-story-slide .train .loco{transform:translateX(calc(50cqw - 125px))}.rl-story-slide .train .puff{opacity:.5}" +
+    ".rl-story-slide .map .arc{animation:none;stroke-dashoffset:0}.rl-story-slide .map .dot{animation:none;opacity:1}}" +
     ".rl-inpage .rl-ahead{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:14px 16px}.rl-inpage .rl-agroup:first-of-type{margin-top:18px}.rl-inpage .rl-wr-cover{margin-bottom:10px}" +
     ".rl-story-slide .badges{display:grid;gap:10px;margin-top:16px}.rl-story-slide .badges div{border:2px solid currentColor;border-radius:18px;padding:12px 14px;opacity:0;animation:rlup .5s forwards}.rl-story-slide .badges b{display:block;font-size:19px;color:var(--accent)}.rl-story-slide .badges small{font-size:13px;opacity:.85}" +
     ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:var(--rl-fill);overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:12px;color:var(--rl-text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
@@ -6671,8 +6699,10 @@
         card.appendChild(el("p", { text: year < thisYear ? "Relay hasn't read your " + year + " emails. Add earlier years below." : "Once Relay has found your receipts, your year's story appears here." }));
       } else {
         card.appendChild(el("h2", { text: "Your " + year + " in purchases." }));
-        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " · " : "") + w.receipts + (w.receipts === 1 ? " receipt" : " receipts") + ((w.chapters || []).length ? " · " + w.chapters.length + (w.chapters.length === 1 ? " chapter" : " chapters") : "") +
-          (w.gifts && w.gifts.count ? " · " + w.gifts.count + (w.gifts.count === 1 ? " gift" : " gifts") : "") }));
+        // Said once and plainly (no facts joined with dots): what was spent over how many receipts, then the story's parts.
+        var nCh = (w.chapters || []).length, nGift = w.gifts && w.gifts.count;
+        card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " over " : "") + w.receipts + (w.receipts === 1 ? " receipt." : " receipts.") +
+          (nCh || nGift ? " " + [nCh ? nCh + (nCh === 1 ? " chapter" : " chapters") : null, nGift ? nGift + (nGift === 1 ? " gift" : " gifts") : null].filter(Boolean).join(" and ") + " in your story." : "") }));
         var dots = el("div", { className: "rl-wr-dots" });
         var tot = (w.industries || []).reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
         if (tot) (w.industries || []).forEach(function (k) { var pct = k.spentPence / tot * 100; if (pct >= 0.5) dots.appendChild(el("i", { title: (KIND[k.category] || KIND.other).label, style: "flex:" + pct.toFixed(1) + ";background:" + (KIND[k.category] || KIND.other).bar })); });
@@ -6706,7 +6736,7 @@
       var earliest = (r.ok && r.body.earliest) || thisYear - 10;
       for (var y = thisYear - 1; y >= Math.max(earliest, thisYear - 8); y--) (function (y) {
         // A year already read gets a small drawn tick (never a symbol character).
-        var b = el("button", { type: "button", text: String(y), className: doneYears[y] ? "read" : "", title: doneYears[y] ? "Already read" + (have[y] ? " · " + have[y] + " receipts" : "") : "", ariaLabel: doneYears[y] ? y + ", already read" : String(y), ariaPressed: "false",
+        var b = el("button", { type: "button", text: String(y), className: doneYears[y] ? "read" : "", title: doneYears[y] ? "Already read" + (have[y] ? ", " + have[y] + " receipts" : "") : "", ariaLabel: doneYears[y] ? y + ", already read" : String(y), ariaPressed: "false",
           onclick: function () { picked[y] = !picked[y]; b.className = (picked[y] ? "on " : "") + (doneYears[y] ? "read" : ""); b.ariaPressed = picked[y] ? "true" : "false"; go.disabled = !Object.keys(picked).some(function (k) { return picked[k]; }); } });
         if (doneYears[y]) b.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:6px"><path d="m5 12.5 4.2 4.2L19 7"/></svg>');
         chips.appendChild(b);
@@ -6759,7 +6789,7 @@
     var g = el("div", { className: cls + " n" + list.length });
     var gone = function (f) { f.remove(); g.className = cls + " n" + g.children.length; };
     list.forEach(function (p, i) {
-      var f = el("figure", { style: "animation-delay:" + (0.2 + i * 0.12) + "s" }), cap = p.item ? p.item + (p.more ? " +" + p.more : "") : p.shop;
+      var f = el("figure", { style: "animation-delay:" + (0.2 + i * 0.12) + "s" }), cap = p.item ? (cleanName(p.item, p.shop) || p.item) + (p.more ? " +" + p.more : "") : p.shop;
       if (cls === "rl-wr-strip") { var box = el("div", { className: "im" }); f.appendChild(box); f.appendChild(el("figcaption", { text: cap })); apiBlob("/relay/my/receipts/" + p.id + "/image").then(function (u) { if (u) box.appendChild(el("img", { src: u, alt: cap })); else gone(f); }); }
       else { f.appendChild(el("figcaption", { text: cap })); apiBlob("/relay/my/receipts/" + p.id + "/image").then(function (u) { if (u) f.insertBefore(el("img", { src: u, alt: cap }), f.firstChild); else gone(f); }); }
       g.appendChild(f);
@@ -6822,6 +6852,81 @@
     if (f.kind === "outings") return f.count + (f.count === 1 ? " day out" : " days out") + " booked.";
     return null;
   }
+  // The UK's coast, drawn simply (latitude, longitude pairs traced from well-known headlands, ports and estuaries), so the
+  // map is recognisable and the journeys' places sit where they really are. Great Britain, then the islands, then Northern
+  // Ireland. Positions of places come from the server (worker/uk-places.js) and use the same projection.
+  var UK_COAST = [
+    [51.13,1.31,51.38,1.45,51.36,1.03,51.44,0.76,51.49,0.45,51.53,0.71,51.6,0.95,51.79,1.15,51.94,1.29,52.09,1.57,52.48,1.76,52.61,1.73,52.93,1.3,52.96,0.85,52.94,0.49,
+     52.78,0.38,52.97,0.02,53.14,0.34,53.34,0.26,53.58,0.11,53.73,0.03,54.12,-0.08,54.28,-0.4,54.49,-0.61,54.62,-1.07,54.69,-1.21,54.91,-1.37,55.02,-1.42,55.33,-1.58,
+     55.61,-1.71,55.77,-2.0,55.9,-2.13,56.0,-2.52,56.06,-2.72,55.98,-3.17,56.02,-3.55,56.11,-3.16,56.19,-2.82,56.28,-2.58,56.34,-2.79,56.46,-2.87,56.56,-2.58,56.71,-2.47,
+     56.96,-2.21,57.15,-2.08,57.51,-1.78,57.69,-2.0,57.67,-2.52,57.72,-3.28,57.59,-3.87,57.48,-4.22,57.68,-4.03,57.86,-3.78,57.88,-4.03,58.12,-3.65,58.44,-3.09,58.64,-3.03,
+     58.67,-3.38,58.6,-3.52,58.53,-4.42,58.62,-5.0,58.46,-5.05,58.15,-5.24,57.9,-5.16,57.73,-5.7,57.43,-5.81,57.28,-5.71,57.0,-5.83,56.73,-6.23,56.41,-5.47,56.0,-5.6,
+     55.31,-5.8,55.42,-5.6,55.7,-5.45,55.96,-4.82,55.79,-4.87,55.46,-4.63,55.24,-4.86,55.1,-5.0,55.01,-5.16,54.84,-5.12,54.64,-4.86,54.8,-4.75,54.68,-4.39,54.8,-4.05,
+     54.87,-3.6,54.98,-3.26,54.87,-3.39,54.71,-3.5,54.55,-3.59,54.51,-3.64,54.1,-3.23,54.07,-2.86,53.92,-3.01,53.82,-3.06,53.65,-3.01,53.55,-3.07,53.39,-3.18,53.34,-3.41,
+     53.33,-3.83,53.23,-4.13,53.41,-4.34,53.31,-4.63,53.23,-4.52,53.14,-4.27,52.94,-4.52,52.8,-4.71,52.89,-4.41,52.92,-4.13,52.72,-4.05,52.41,-4.09,52.1,-4.66,52.0,-4.98,
+     51.9,-5.31,51.71,-5.04,51.6,-4.93,51.67,-4.7,51.7,-4.4,51.68,-4.25,51.56,-4.33,51.57,-3.98,51.62,-3.93,51.48,-3.7,51.39,-3.27,51.46,-3.16,51.55,-2.97,51.64,-2.67,
+     51.6,-2.62,51.5,-2.7,51.35,-2.98,51.24,-3.0,51.21,-3.47,51.23,-3.83,51.21,-4.12,51.02,-4.52,50.83,-4.55,50.54,-4.94,50.42,-5.08,50.21,-5.48,50.07,-5.71,49.96,-5.2,
+     50.15,-5.07,50.33,-4.64,50.36,-4.14,50.22,-3.64,50.46,-3.53,50.62,-3.41,50.72,-2.94,50.61,-2.45,50.58,-2.06,50.72,-1.88,50.75,-1.54,50.85,-1.4,50.79,-1.1,50.72,-0.79,
+     50.81,-0.37,50.82,-0.14,50.73,0.24,50.85,0.57,50.91,0.98,51.08,1.17],
+    [50.77,-1.3,50.72,-1.07,50.59,-1.29,50.66,-1.58,50.7,-1.5],
+    [58.52,-6.26,58.2,-6.37,57.75,-6.8,57.88,-7.1,58.25,-7.05],
+    [57.65,-7.25,57.1,-7.35,57.05,-7.45,57.6,-7.55],
+    [57.7,-6.35,57.52,-6.15,57.27,-5.75,57.08,-5.95,57.2,-6.2,57.4,-6.75,57.55,-6.65],
+    [56.6,-6.2,56.55,-5.75,56.32,-5.7,56.3,-6.35],
+    [55.9,-6.1,55.65,-6.1,55.65,-6.5,55.85,-6.45],
+    [59.1,-3.35,59.05,-2.8,58.85,-2.9,58.8,-3.3],
+    [54.6,-5.93,54.66,-5.67,54.5,-5.43,54.37,-5.55,54.26,-5.61,54.21,-5.89,54.06,-6.0,54.1,-6.27,54.18,-6.34,54.08,-6.61,54.26,-6.9,54.4,-7.04,54.12,-7.3,54.3,-7.88,
+     54.48,-8.09,54.62,-7.85,54.83,-7.47,55.0,-7.32,55.17,-6.96,55.18,-6.72,55.24,-6.51,55.2,-6.24,55.22,-6.15,55.08,-6.06,54.86,-5.81,54.82,-5.7,54.71,-5.81]
+  ];
+  var UK_LAT0 = 59.4, UK_LON0 = -8.3, UK_K = Math.cos(54.5 * Math.PI / 180), UK_S = 30;
+  // Longitude and latitude to the map's x and y (a flat projection squeezed east to west, fine for a country this size).
+  function ukXY(lat, lon) { return [Math.round((lon - UK_LON0) * UK_K * UK_S * 10) / 10, Math.round((UK_LAT0 - lat) * UK_S * 10) / 10]; }
+  function ukMapSvg(travel) {
+    var paths = UK_COAST.map(function (a) { var d = ""; for (var i = 0; i < a.length; i += 2) { var p = ukXY(a[i], a[i + 1]); d += (i ? "L" : "M") + p[0] + " " + p[1]; } return '<path class="land" d="' + d + 'Z"/>'; }).join("");
+    var at = {}; (travel.places || []).forEach(function (p) { at[p.name.toLowerCase()] = ukXY(p.lat, p.lon); });
+    var arcs = "", n = 0;
+    (travel.routes || []).forEach(function (r) {
+      var a = at[r.from.toLowerCase()], b = at[r.to.toLowerCase()];
+      if (!a || !b || n >= 10) return;
+      // A gentle curve between the two places, bowed to one side.
+      var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.min(40, len * 0.3);
+      var cx = Math.round((mx - dy / len * bow) * 10) / 10, cy = Math.round((my + dx / len * bow) * 10) / 10;
+      arcs += '<path class="arc" pathLength="1" style="animation-delay:' + (0.5 + n * 0.25).toFixed(2) + 's;stroke-width:' + Math.min(5, 2 + r.times * 0.5) + '" d="M' + a[0] + " " + a[1] + "Q" + cx + " " + cy + " " + b[0] + " " + b[1] + '"/>';
+      n++;
+    });
+    var dots = (travel.places || []).map(function (p, i) { var q = ukXY(p.lat, p.lon); return '<circle class="dot" style="animation-delay:' + (0.3 + i * 0.08).toFixed(2) + 's" cx="' + q[0] + '" cy="' + q[1] + '" r="' + (p.visits > 2 ? 6 : 4.5) + '"/>'; }).join("");
+    return '<svg viewBox="-6 -4 ' + Math.ceil(10.3 * UK_K * UK_S + 12) + " " + Math.ceil(9.6 * UK_S + 8) + '" role="img" aria-label="Map of the UK with your journeys">' + paths + arcs + dots + "</svg>";
+  }
+
+  // Small drawn icons for each kind of thing (no emoji), for things with no photo of their own.
+  var KIND_ICON = {
+    fashion: '<path d="M8.5 4 4 7l2 3.2 2-1.1V20h8V9.1l2 1.1L20 7l-4.5-3c-.9 1.4-2.1 2-3.5 2s-2.6-.6-3.5-2Z"/>',
+    electronics: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
+    home: '<path d="M4 11 12 4l8 7M6 9.5V20h12V9.5M10 20v-5h4v5"/>',
+    beauty: '<path d="M10 2.5h4v3.5h-4zM9 6h6l1.2 3.5V20a1.5 1.5 0 0 1-1.5 1.5H9.3A1.5 1.5 0 0 1 7.8 20V9.5Z"/>',
+    food: '<path d="M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5ZM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8.5 3v2.5M11.5 3v2.5"/>',
+    travel: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 14h.01M15 14h.01M8 21l2-4M16 21l-2-4"/>',
+    digital: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="m10 8.5 5 2.5-5 2.5ZM8 21h8"/>',
+    experiences: '<path d="M3.5 7h17v3a2 2 0 0 0 0 4v3h-17v-3a2 2 0 0 0 0-4ZM14.5 7v10"/>',
+    other: '<path d="M6 8h12l-1 12.5H7ZM9 8V6.5a3 3 0 0 1 6 0V8"/>'
+  };
+  function kindIcon(kind) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (KIND_ICON[kind] || KIND_ICON.other) + "</svg>"; }
+  // A photo from the shopper's own receipt (only one Relay checked is of the thing), else the thing's drawn icon.
+  function ownPhoto(box, id, alt, kind) {
+    box.innerHTML = kindIcon(kind);
+    if (id) apiBlob("/relay/my/receipts/" + id + "/image").then(function (u) { if (u && box.isConnected) { box.textContent = ""; box.appendChild(el("img", { src: u, alt: alt || "" })); } });
+    return box;
+  }
+  // A plain-line steam train on its rails, puffing across the screen (drawn here, in the slide's own colours).
+  var TRAIN_SVG = '<svg class="loco" viewBox="0 0 250 80" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<circle class="puff p1" cx="214" cy="12" r="6"/><circle class="puff p2" cx="214" cy="12" r="5"/><circle class="puff p3" cx="214" cy="12" r="4"/>' +
+    '<rect x="4" y="26" width="62" height="34" rx="6"/><path d="M14 36h14M40 36h14"/><rect x="76" y="26" width="62" height="34" rx="6"/><path d="M86 36h14M112 36h14"/>' +
+    '<path d="M66 50h10M138 50h10"/><path d="M148 60V30h30v-8h14v8h8l18-6v8l14 10v18Z"/><path d="M156 38h14v10h-14z"/><path d="M210 30v-12"/>' +
+    '<circle class="wh" cx="20" cy="66" r="7"/><circle class="wh" cx="50" cy="66" r="7"/><circle class="wh" cx="92" cy="66" r="7"/><circle class="wh" cx="122" cy="66" r="7"/>' +
+    '<circle class="wh" cx="166" cy="64" r="9"/><circle class="wh" cx="196" cy="64" r="9"/><circle class="wh" cx="226" cy="66" r="6"/></svg>' +
+    '<svg class="rails" viewBox="0 0 400 12" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M0 3h400"/><g class="sl">' +
+    (function () { var g = ""; for (var x = 0; x < 424; x += 24) g += '<path d="M' + x + ' 3v8"/>'; return g; })() + "</g></svg>";
+  function journeysWord(n) { return n + (n === 1 ? " journey" : " journeys"); }
   function storySlides(w) {
     var S = [], top = w.topShops[0], gbp = function (p) { return money(p, "GBP"); };
     var chapters = (w.chapters || []).filter(function (c) { return KIND[c.category] && KIND[c.category].scene; });
@@ -6829,12 +6934,22 @@
     var fashion = chapters.filter(function (c) { return c.category === "fashion"; })[0];
     var style = fashion ? wrappedStyle(w) : null;
     // 1. The year.
+    // It opens on the first thing worth remembering (the server skips the groceries, coffees, travel and subscriptions), with
+    // its photo from the receipt or its drawn icon. Without one, it opens on the count.
     S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("div", { className: "k", text: "RELAY WRAPPED " + w.year }));
       b.appendChild(el("h1", { text: "Your " + w.year + ", one receipt at a time." }));
-      var fb = w.firstBuy;
-      if (fb && fb.date) b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + (fb.item ? " with " + fb.item : "") + (fb.shop ? (fb.item ? " from " : " at ") + fb.shop : "") + "." }));
-      b.appendChild(el("p", { text: w.receipts + " receipts and " + w.shops + (w.shops === 1 ? " shop" : " shops") + " later, here's your year." }));
+      var fb = w.firstBuy, what = fb && fb.item ? cleanName(fb.item, fb.shop) || fb.item : "";
+      var shopIn = fb && fb.shop && what.toLowerCase().indexOf(String(fb.shop).toLowerCase()) >= 0;
+      var many = w.receipts + (w.receipts === 1 ? " receipt" : " receipts"), shopsN = w.shops + (w.shops === 1 ? " shop" : " shops");
+      if (what && fb.date) {
+        b.appendChild(ownPhoto(el("div", { className: "rl-wr-hero" }), fb.photoId, what, fb.kind));
+        b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + " with " + what + (fb.shop && !shopIn ? " from " + fb.shop : "") + "." }));
+        b.appendChild(el("p", { text: many + " and " + shopsN + " later, here's your year." }));
+      } else {
+        var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.receipts, function (x) { return String(x); }, 1100);
+        b.appendChild(el("p", { text: (w.receipts === 1 ? "receipt" : "receipts") + " from " + shopsN + ". Here's your year." }));
+      }
     } });
     // 2. The total.
     if (w.coverage.withTotal) S.push({ bg: "#14532d", fg: "#fff", accent: "#C9D8FF", build: function (b) {
@@ -6845,6 +6960,15 @@
       var unread = w.coverage.noTotal || 0, abroad = w.coverage.otherCurrency || 0;
       if (unread || abroad) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts." +
         (unread ? " " + unread + " had no amount Relay could read." : "") + (abroad ? " " + abroad + (abroad === 1 ? " wasn't in pounds, so it isn't" : " weren't in pounds, so they aren't") + " added in." : "") }));
+      // The year's things dropping into a bag: their own photos first, then a drawn icon for each other kind bought.
+      var drops = photos.slice(0, 3).map(function (p) { return { id: p.id, alt: p.item || p.shop, kind: "other" }; });
+      (w.industries || []).forEach(function (k) { if (drops.length < 6 && k.category !== "other" && KIND[k.category]) drops.push({ kind: k.category, alt: "" }); });
+      if (drops.length) {
+        var bag = el("div", { className: "bag", ariaHidden: "true" });
+        bag.innerHTML = '<svg viewBox="0 0 140 130" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 40h112l-8 84H22Z" fill="currentColor" fill-opacity=".14"/><path d="M46 40V28a24 24 0 0 1 48 0v12"/></svg>';
+        drops.forEach(function (d, k) { var it = ownPhoto(el("span", { className: "it", style: "left:" + (44 + (k % 3) * 38) + "px;--k:" + k + ";--r:" + (k % 2 ? 8 : -9) + "deg;animation-delay:" + (0.5 + k * 0.45).toFixed(2) + "s" }), d.id, d.alt, d.kind); bag.insertBefore(it, bag.firstChild); });
+        b.appendChild(bag);
+      }
     } });
     // 3. Where it went: every kind of shopping as one bar, then a line each.
     var kinds = (w.industries || []).filter(function (k) { return k.spentPence > 0 || k.receipts > 0; });
@@ -6859,7 +6983,7 @@
       kinds.slice(0, 7).forEach(function (k, i) {
         var pct = Math.round(k.spentPence / total * 100);
         ol.appendChild(el("li", { style: "animation-delay:" + (0.3 + i * 0.12) + "s" }, [el("i", { style: "background:" + (KIND[k.category] || KIND.other).bar }),
-          el("span", { text: (KIND[k.category] || KIND.other).label }), el("em", { text: (pct < 1 ? "<1" : pct) + "% · " + gbp(k.spentPence) })]));
+          el("span", { text: (KIND[k.category] || KIND.other).label }), el("em", { text: gbp(k.spentPence) }), el("b", { text: (pct < 1 ? "<1" : pct) + "%" })]));
       });
       b.appendChild(ol);
     } });
@@ -6867,21 +6991,29 @@
     chapters.forEach(function (c, ci) {
       var K = KIND[c.category];
       S.push({ bg: K.bg, fg: K.fg, accent: K.accent, build: function (b) {
-        b.appendChild(el("div", { className: "k", text: "CHAPTER " + (ci + 1) + " · " + K.label.toUpperCase() }));
+        // A small label, then the kind as a heading (no "CHAPTER 1 · ELECTRONICS").
+        b.appendChild(el("div", { className: "k", text: "CHAPTER " + (ci + 1) }));
+        b.appendChild(el("h2", { className: "ch", text: K.label }));
         b.appendChild(scene(c.category));
         if (c.withTotal) { var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, c.spentPence, gbp, 1100); }
         else b.appendChild(el("div", { className: "big", text: c.receipts + (c.receipts === 1 ? " receipt" : " receipts") }));
-        var sub = [c.share ? c.share + "% of your year" : null, c.receipts + (c.receipts === 1 ? " order" : " orders"), c.shops > 1 ? c.shops + " places" : null].filter(Boolean).join(" · ");
-        b.appendChild(el("p", { text: sub }));
+        // Plain sentences: how many orders from how many places, then the share of the year.
+        b.appendChild(el("p", { text: c.receipts + (c.receipts === 1 ? " order" : " orders") + (c.shops > 1 ? " from " + c.shops + " places" : "") + "." + (c.share ? " That's " + c.share + "% of your year." : "") }));
         var fact = factLine(c); if (fact) b.appendChild(el("p", { className: "fact", text: fact }));
         var lines = el("div", { className: "facts" });
-        if (c.topShop) lines.appendChild(el("div", {}, [el("span", { text: K.go }), el("b", { text: c.topShop.name + (c.topShop.receipts > 1 ? " · " + c.topShop.receipts + "×" : "") })]));
-        if (c.topItem) lines.appendChild(el("div", {}, [el("span", { text: K.repeat }), el("b", { text: c.topItem.name + " · " + c.topItem.times + "×" })]));
-        else if (c.biggest && c.biggest.item) lines.appendChild(el("div", {}, [el("span", { text: "Biggest" }), el("b", { text: c.biggest.item + " · " + gbp(c.biggest.totalPence) })]));
-        if (c.category === "fashion" && style && style.styles.length) lines.appendChild(el("div", {}, [el("span", { text: "Your style" }), el("b", { text: style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & ") })]));
+        var row = function (label, value, more) { lines.appendChild(el("div", {}, [el("span", { text: label }), el("b", {}, [document.createTextNode(value)].concat(more ? [el("small", { text: more })] : []))])); };
+        // A go-to is a shop gone back to (two orders or more); otherwise the shop that took the most is named as that.
+        if (c.topShop) row(K.go, c.topShop.name, c.topShop.receipts + " orders");
+        else if (c.mostSpent) row("Most spent at", c.mostSpent.name, gbp(c.mostSpent.spentPence));
+        if (c.topItem) row(K.repeat, c.topItem.name, c.topItem.times + " times");
+        else if (c.biggest && c.biggest.item) row("Biggest", c.biggest.item, gbp(c.biggest.totalPence));
+        if (c.category === "fashion" && style && style.styles.length) row("Your style", style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & "));
         if (lines.childNodes.length) b.appendChild(lines);
       } });
+      if (c.category === "travel") travelSlides(S, w.travel);
     });
+    // A year with journeys but no travel chapter of its own still gets them.
+    if (!chapters.some(function (c) { return c.category === "travel"; })) travelSlides(S, w.travel);
     // 5. The rest of the year's highlights.
     if (top && w.topShops.length > 1) S.push({ bg: "#172554", fg: "#fff", accent: "#93c5fd", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your top shops" }));
@@ -6893,7 +7025,14 @@
     } });
     if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#101828", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: photos.length === 1 ? "One thing you brought home" : "Some things you brought home" }));
-      b.appendChild(photoGrid(photos, "ph"));
+      var grid = photoGrid(photos, "ph"); grid.classList.add("tumble"); b.appendChild(grid);
+      // And a belt of the year's other things going by, each with its drawn icon (names from the receipts).
+      var seen = {}, names = (w.things || []).filter(function (t) { var k = String(t.name).toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, 10);
+      if (names.length >= 4) {
+        var belt = el("div", { className: "belt" }), track = el("div");
+        [false, true].forEach(function (dup) { names.forEach(function (t) { var sp = el("span", { className: dup ? "dup" : "" }); sp.innerHTML = kindIcon(t.kind || "other"); sp.appendChild(document.createTextNode(cleanName(t.name, t.shop) || t.name)); if (dup) sp.setAttribute("aria-hidden", "true"); track.appendChild(sp); }); });
+        belt.appendChild(track); b.appendChild(belt);
+      }
     } });
     if (w.busiestMonth) S.push({ bg: "#0f3d5c", fg: "#fff", accent: "#bae6fd", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your busiest month" }));
@@ -6903,7 +7042,7 @@
       w.byMonth.forEach(function (m, i) { chart.appendChild(el("div", {}, [el("i", { className: m.month === w.busiestMonth ? "hot" : "", style: "--h:" + Math.max(4, Math.round(m.receipts / max * 100)) + "%;animation-delay:" + (0.1 + i * 0.05) + "s" }), el("span", { text: m.month.slice(0, 1) })])); });
       b.appendChild(chart);
       var bm = w.byMonth.filter(function (m) { return m.month === w.busiestMonth; })[0];
-      if (bm) b.appendChild(el("p", { text: bm.receipts + " receipts" + (bm.spentPence ? " · " + gbp(bm.spentPence) : "") + "." }));
+      if (bm) b.appendChild(el("p", { text: bm.receipts + " receipts" + (bm.spentPence ? ", " + gbp(bm.spentPence) + " in all" : "") + "." }));
     } });
     if (w.biggest) S.push({ bg: "#0f5132", fg: "#fff", accent: "#b7f0cf", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your biggest treat" }));
@@ -6920,14 +7059,14 @@
       else b.appendChild(el("div", { className: "big", text: many(gf.count, "gift", "gifts") }));
       // "For 3 people" only when every gift says who it was for.
       var ppl = gf.people || [], allNamed = gf.named === gf.count && ppl.length > 0;
-      var sub = [gf.withTotal ? "on " + many(gf.count, "gift", "gifts") : null, allNamed ? "for " + (ppl.length === 1 ? ppl[0].name : ppl.length + " people") : null,
-        gf.share ? gf.share + "% of your spending" : null].filter(Boolean).join(" · ");
+      var sub = (gf.withTotal ? "On " + many(gf.count, "gift", "gifts") : "") + (allNamed ? (gf.withTotal ? " for " : "For ") + (ppl.length === 1 ? ppl[0].name : ppl.length + " people") : "") + (gf.withTotal || allNamed ? "." : "") +
+        (gf.share ? (gf.withTotal || allNamed ? " " : "") + "That's " + gf.share + "% of your spending." : "");
       if (sub) b.appendChild(el("p", { text: sub }));
       if (gf.withTotal < gf.count) b.appendChild(el("p", { className: "fine", text: "Added up from " + gf.withTotal + " of " + many(gf.count, "gift", "gifts") + ". The others had no amount Relay could read." }));
       var lines = el("div", { className: "facts" }), top = ppl[0], big = (gf.list || [])[0];
       if (top && top.gifts >= 2 && (ppl.length === 1 || top.gifts > ppl[1].gifts) && !(allNamed && ppl.length === 1))
-        lines.appendChild(el("div", {}, [el("span", { text: "Most went to" }), el("b", { text: top.name + " · " + many(top.gifts, "gift", "gifts") })]));
-      if (big && big.totalPence && gf.count > 1) lines.appendChild(el("div", {}, [el("span", { text: "Biggest gift" }), el("b", { text: (big.item || big.shop || "A gift") + (big.for ? " for " + big.for : "") + " · " + gbp(big.totalPence) })]));
+        lines.appendChild(el("div", {}, [el("span", { text: "Most went to" }), el("b", {}, [document.createTextNode(top.name), el("small", { text: many(top.gifts, "gift", "gifts") })])]));
+      if (big && big.totalPence && gf.count > 1) lines.appendChild(el("div", {}, [el("span", { text: "Biggest gift" }), el("b", {}, [document.createTextNode((big.item || big.shop || "A gift") + (big.for ? " for " + big.for : "")), el("small", { text: gbp(big.totalPence) })])]));
       if (gf.busiestMonth) lines.appendChild(el("div", {}, [el("span", { text: "Most giving month" }), el("b", { text: MONTH_FULL[gf.busiestMonth] || gf.busiestMonth })]));
       if (lines.childNodes.length) b.appendChild(lines);
     } });
@@ -6957,7 +7096,7 @@
       var g = el("div", { className: "sumgrid" }); rows.forEach(function (r) { g.appendChild(el("div", {}, [el("span", { text: r[0] }), el("strong", { text: r[1] })])); }); card.appendChild(g);
       if (kinds.length > 1 && total > 0) { var st = el("div", { className: "stack small" }); kinds.forEach(function (k) { var pct = k.spentPence / total * 100; if (pct >= 0.5) st.appendChild(el("i", { style: "--w:" + pct.toFixed(1) + "%;background:" + (KIND[k.category] || KIND.other).bar })); }); card.appendChild(st); }
       b.appendChild(card);
-      var text = title + ": " + rows.map(function (r) { return r[0] + " " + r[1]; }).join(" · ");
+      var text = title + "\n" + rows.filter(function (r) { return r[1] !== "—"; }).map(function (r) { return r[0] + ": " + r[1]; }).join("\n");
       var msg = el("p", { className: "fine" });
       b.appendChild(el("div", { className: "acts" }, [
         el("button", { type: "button", text: "Share", onclick: function (e) { e.stopPropagation();
@@ -7064,6 +7203,35 @@
   }
   var SOUND_ON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.3a4 4 0 0 1 0 5.4M18.2 6.8a7.5 7.5 0 0 1 0 10.4"/></svg>';
   var SOUND_OFF = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>';
+  // Travel: the journeys the receipts name. A train runs across the first slide; the second puts the places on a map of the
+  // UK with each route drawn between them. Places Relay can't position are named in words, never guessed onto the map.
+  function travelSlides(S, t) {
+    if (!t || !t.journeys || S._travel) return;
+    S._travel = true;
+    var modes = [[t.trains, "by train"], [t.flights, "by air"], [t.coaches, "by coach"]].filter(function (m) { return m[0]; });
+    S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+      b.appendChild(el("div", { className: "k", text: "ON THE MOVE" }));
+      var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, t.journeys, function (x) { return String(x); }, 1000);
+      b.appendChild(el("p", { className: "lead", text: (t.journeys === 1 ? "journey" : "journeys") + " on your receipts." }));
+      if (modes.length && !(modes.length === 1 && modes[0][0] === t.journeys && modes[0][1] === "by train")) b.appendChild(el("p", { text: modes.map(function (m) { return m[0] + " " + m[1]; }).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
+      else if (t.trains === t.journeys) b.appendChild(el("p", { text: t.journeys === 1 ? "By train." : "All of them by train." }));
+      if (t.trains) { var tr = el("div", { className: "train", ariaHidden: "true" }); tr.innerHTML = TRAIN_SVG; b.appendChild(tr); }
+      else b.appendChild(scene("travel"));
+      if (t.topRoute) {
+        var f = el("div", { className: "facts" });
+        f.appendChild(el("div", {}, [el("span", { text: "Most travelled" }), el("b", {}, [document.createTextNode(t.topRoute.from + " to " + t.topRoute.to), el("small", { text: journeysWord(t.topRoute.times) })])]));
+        b.appendChild(f);
+      }
+    } });
+    if (!(t.places || []).length) return;
+    S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+      b.appendChild(el("p", { className: "lead", text: "Where you went" }));
+      var m = el("div", { className: "map" }); m.innerHTML = ukMapSvg(t); b.appendChild(m);
+      var names = t.places.slice(0, 4).map(function (p) { return p.name; });
+      b.appendChild(el("p", { className: "fine", text: (t.places.length > 4 ? "Including " : "") + names.join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
+      if ((t.unplotted || []).length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + t.unplotted.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
+    } });
+  }
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
     var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });

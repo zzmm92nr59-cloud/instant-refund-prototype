@@ -162,7 +162,7 @@ console.log("ok - untagging takes the gift off straight away");
 // 5. Wrapped: the cover counts gifts, the story has a gifts slide, and the biggest treat isn't a gift.
 await page.evaluate(() => window.go("wrapped"));
 await page.getByRole("heading", { name: "Your " + Y + " in purchases." }).waitFor();
-assert.match(await page.locator(".rl-wr-cover p").first().innerText(), / · 2 gifts$/, "the cover counts gifts");
+assert.match(await page.locator(".rl-wr-cover p").first().innerText(), / 2 gifts in your story\.$/, "the cover counts gifts");
 await page.getByRole("button", { name: "Play your " + Y + " story" }).click();
 const texts = [];
 for (let k = 0; k < 25; k++) {
@@ -178,8 +178,8 @@ for (let k = 0; k < 25; k++) {
 const slide = texts.find(t => /FOR EVERYONE ELSE/.test(t));
 assert.ok(slide, "a gifts slide: " + texts.map(t => t.split("\n")[0]).join(" | "));
 assert.match(slide, /£380\.00/, "the vase and the lamp");
-assert.match(slide, /on 2 gifts · for 2 people · \d+% of your spending/);
-assert.match(slide, /Biggest gift\s+Hand-thrown Ceramic Vase for Sam · £320\.00/);
+assert.match(slide, /On 2 gifts for 2 people\. That's \d+% of your spending\./);
+assert.match(slide, /Biggest gift\s+Hand-thrown Ceramic Vase for Sam\s+£320\.00/);
 assert.match(slide, /Most giving month\s+\w+/);
 const treat = texts.find(t => /Your biggest treat/.test(t));
 assert.ok(treat && /£180\.00/.test(treat) && /Waxed Cotton Jacket/.test(treat) && !/Vase/.test(treat), "your biggest treat is the jacket you kept: " + treat);
