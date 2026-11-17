@@ -89,7 +89,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/item-kinds": { fields: { on: bool } },
   "/relay/my/bank/disconnect": { fields: { id: str(36) } },
   "/relay/my/bank/not-mine": { fields: { id: str(200), on: bool, everyFromShop: bool } },
-  "/relay/my/bank/connect": NOTHING,
+  "/relay/my/bank/connect": { fields: { bank: str(20) } },
   "/relay/my/bank/sync": NOTHING,
   "/relay/my/help/chat": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })), receiptId: id(64) } },
   "/relay/my/help/handoff": { limit: 64 * KB, fields: { messages: list(40, obj({ role: one("user", "assistant"), text: text(1000) })) } },

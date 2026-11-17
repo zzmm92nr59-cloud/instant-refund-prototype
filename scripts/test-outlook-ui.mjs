@@ -24,7 +24,7 @@ await ctx.route("https://**/*", route => {
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (!u.pathname.startsWith("/relay/")) return route.abort();
   if (m === "POST") posts.push({ path: u.pathname, body: route.request().postData() ? JSON.parse(route.request().postData()) : null });
-  if (u.pathname === "/relay/auth/providers") return j({ email: true, google: true, microsoft: state.microsoft, ...(state.microsoft ? { consent: { version: "v5", text: WORDING } } : {}) });
+  if (u.pathname === "/relay/auth/providers") return j({ email: true, google: true, microsoft: state.microsoft, consent: { version: "v5", text: WORDING } });
   if (u.pathname === "/relay/auth/microsoft/start") return j({ url: MS_URL });
   if (u.pathname === "/relay/auth/verify") return j({ sessionToken: "T".repeat(43), email: "jess.tester@outlook.com", expiresAt: Date.now() + 864e5, ...(state.oneStep ? { outlookConnected: true } : {}) });
   if (u.pathname === "/relay/my/consent" && m === "GET") return j({ version: "v5", accepted: state.accepted, acceptedEarlier: state.earlier, gmailAvailable: true, outlookAvailable: true,
@@ -57,20 +57,17 @@ await page.evaluate(() => window.RelayAccount.open());
 const msBtn = page.getByRole("button", { name: "Continue with Microsoft" });
 await msBtn.waitFor();
 await page.screenshot({ path: "/tmp/shots/signin-microsoft.png" });
-// One step: the wording is shown first, then "Agree and continue" signs in and connects Outlook together.
-await msBtn.click();
-await page.getByRole("heading", { name: "Sign in and bring in your receipts" }).waitFor();
-assert.ok(await page.getByText(WORDING[0]).count(), "Relay's wording is shown before going to Microsoft");
-await page.getByRole("button", { name: "Back" }).click();
-await page.getByRole("button", { name: "Continue with Google" }).waitFor();
-await page.getByRole("button", { name: "Continue with Microsoft" }).click();
-await page.getByRole("button", { name: "Agree and continue with Microsoft" }).waitFor();
+// One tap: what Relay reads is on the sign-in page (the exact wording a tap away), and Continue with Microsoft agrees to
+// it, signs in and connects Outlook together.
+await page.locator(".rl-sperm").waitFor();
+await page.getByRole("button", { name: "Read exactly what you're agreeing to" }).click();
+assert.ok(await page.getByText(WORDING[0]).isVisible(), "Relay's wording is shown before going to Microsoft");
 await page.screenshot({ path: "/tmp/shots/signin-microsoft-agree.png" });
-await Promise.all([page.waitForURL(/login\.microsoftonline\.com/), page.getByRole("button", { name: "Agree and continue with Microsoft" }).click()]);
+await Promise.all([page.waitForURL(/login\.microsoftonline\.com/), msBtn.click()]);
 const start = posts.find(p => p.path === "/relay/auth/microsoft/start");
 assert.match(start.body.nonce, /^[A-Za-z0-9_-]{43}$/);
 assert.equal(start.body.consentVersion, "v5", "the wording version shown is the one agreed to");
-console.log("ok - Continue with Microsoft shows Relay's wording, then Agree and continue goes to Microsoft with this browser's nonce");
+console.log("ok - the sign-in page shows Relay's wording, then Continue with Microsoft goes to Microsoft with this browser's nonce");
 
 // 2. Back from Microsoft: the one-time token and this browser's nonce sign the shopper in.
 await page.goto(origin + "/index.html#signin=" + "A".repeat(43)); await page.waitForTimeout(900);
@@ -94,12 +91,11 @@ await page.waitForTimeout(800);
 assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself, straight away");
 await page.locator(".rl-jscan").waitFor();
 await page.getByRole("button", { name: "Skip" }).click();
-// Then their inboxes (the Outlook one listed, another one tap away), then what they shop for, then "See my receipts".
+// Then their inboxes (the Outlook one listed, another one tap away), then "See my receipts" (with an inbox, what they
+// shop for isn't asked: Browse goes by their receipts).
 await page.getByRole("heading", { name: "Your inboxes" }).waitFor();
 await page.getByText("Outlook, connected").waitFor();
 await page.getByRole("button", { name: "Continue", exact: true }).click();
-await page.getByRole("heading", { name: "What do you shop for?" }).waitFor();
-await page.getByRole("button", { name: "Later" }).click();
 await page.getByRole("button", { name: "See my receipts" }).click();
 await page.getByText(/Found or updated 1 receipt/).waitFor();
 assert.equal(await page.getByRole("button", { name: "Connect Outlook" }).count(), 0, "no second Microsoft step");

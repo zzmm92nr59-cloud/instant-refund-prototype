@@ -93,7 +93,7 @@ const stub = async ctx => {
     if (p === "/relay/auth/logout") return j({ ok: true });
     if (p === "/relay/my/profile") return j({ email: EMAILS[token] || "", name: token === TEAM ? "Ops" : "Member", photo: null });
     if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [], gmailAvailable: true, outlookAvailable: true });
-    if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAILS[token] || "", others: [] });
+    if (p === "/relay/my/gmail") return j(st.noInbox ? { connected: false } : { connected: true, provider: "google", email: EMAILS[token] || "", others: [] });
     if (p === "/relay/my/receipts") return j({ receipts: st.receipts && token === TEAM ? (st.pictures ? pictured() : RECEIPTS) : [] });
     if (p === "/relay/my/purchases") return j({ purchases: st.pictures && token === TEAM ? ORDERS : [] });
     if (p === "/relay/my/alerts/status") return j({ devices: 0, watches: [], stores: [] });
@@ -357,8 +357,13 @@ console.log("ok - an offered question has no search under it; the heading opens 
   await page.emulateMedia({ colorScheme: "light" });
   await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({ path: "/tmp/shots/layout-preview-ask-pictures.png" });
   st.pictures = false; }
-// 15. Interests: asked once, saved, not asked again; Profile shows them; Browse puts matching shops first.
+// 15. Interests: asked once (only without an inbox: with one, Browse goes by their receipts), saved, not asked again;
+// Profile shows them; Browse puts matching shops first.
 { st.interests = {}; st.interestPuts = []; st.shops = true; st.receipts = false; st.pictures = false;
+  await signIn(TEAM);
+  await page.goto(origin + "/index.html"); await page.waitForTimeout(2500);
+  assert.equal(await page.locator(".rl-int-sheet").count(), 0, "with an inbox connected, not asked");
+  st.noInbox = true;
   await signIn(TEAM);
   await page.goto(origin + "/index.html");
   const sheet = page.locator(".rl-int-sheet");
@@ -411,7 +416,7 @@ console.log("ok - an offered question has no search under it; the heading opens 
   await page.goto(origin + "/index.html"); await page.waitForTimeout(2500);
   assert.equal(await page.locator(".rl-int-sheet").count(), 0, "after Not now it isn't shown again on this phone");
   assert.equal(st.interestPuts.length, 2, "Not now saves nothing");
-  st.shops = false; }
+  st.shops = false; st.noInbox = false; }
 console.log("ok - interests: asked once, saved once, not asked again; Profile shows and changes them; Shops on Relay puts matching shops first, normal order when nothing matches");
 console.log("ok - pictures: photos fill their squares with their middle in the middle (a tall one its top), logos sit whole on white with no ring, one thing has its name and price beside it, in light and dark");
 assert.deepEqual(errors, [], "no script errors");

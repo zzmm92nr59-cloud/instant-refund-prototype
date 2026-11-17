@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop, bankForEveryone } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop, bankForEveryone, pickProvider, BANK_CHOICES } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -74,8 +74,14 @@ const MAIL = (ref) => ["From: Brindle & Co <orders@brindle.example>", "To: Jess 
   "Delivery address", "Jess Private", "12 High Street", "London", "SW1A 1AA", "", "Questions? Call 0800 123 4567 or email help@brindle.example"].join("\r\n");
 let calls = [];
 const TL = { code: "good-code", access: "acc-1", refresh: "ref-1" };
+// TrueLayer's public list of banks (made up, in its shape).
+const PROVIDERS = [{ provider_id: "ob-amex", display_name: "American Express", country: "uk" }, { provider_id: "ob-chase", display_name: "Chase", country: "uk" },
+  { provider_id: "ob-santander-business", display_name: "Santander Business", country: "uk" }, { provider_id: "ob-santander", display_name: "Santander", country: "uk" },
+  { provider_id: "oauth-santander", display_name: "Santander", country: "uk" }, { provider_id: "ob-hsbc-business", display_name: "HSBC Business", country: "uk" }];
+let providerAsks = 0, providersDown = false;
 const fetchImpl = async (url, init = {}) => {
   url = String(url); calls.push({ url, init });
+  if (url.startsWith("https://auth.truelayer.com/api/providers?")) { providerAsks++; return providersDown ? new Response("{}", { status: 500 }) : Response.json(PROVIDERS); }
   if (url.startsWith("https://api.resend.com/emails")) { emails.push(JSON.parse(init.body)); return new Response("{}"); }
   if (url === "https://auth.truelayer-sandbox.com/connect/token") {
     const f = new URLSearchParams(init.body);
@@ -158,6 +164,34 @@ const row = sqlite.prepare("SELECT * FROM bank_links WHERE shopper_id = ?").get(
 assert.equal(row.bank, "Mock Bank");
 for (const secret of ["acc-1", "ref-1"]) assert.ok(!JSON.stringify(row).includes(secret), "tokens kept encrypted");
 console.log("ok - connect: the bank's own page, read-only, single-use state, tokens kept encrypted");
+
+// 2b. A bank chosen in Relay goes straight to that bank (TrueLayer's own id for it, from TrueLayer's list); anything
+// else, or the list not answering, shows TrueLayer's list of banks as before.
+assert.equal(pickProvider(PROVIDERS, "santander"), "ob-santander", "personal, open banking");
+assert.equal(pickProvider(PROVIDERS, "amex"), "ob-amex");
+assert.equal(pickProvider(PROVIDERS, "hsbc"), null, "only a business account: not offered");
+assert.equal(pickProvider(PROVIDERS, "nobank"), null); assert.equal(pickProvider(null, "amex"), null);
+{
+  const pid = async (body) => new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess, body })).json()).url).searchParams.get("provider_id");
+  assert.equal(await pid({ bank: "chase" }), null, "test banks: never skipped");
+  env.TRUELAYER_ENV = "live";
+  assert.equal(await pid({ bank: "chase" }), "ob-chase");
+  assert.equal(await pid({ bank: "amex" }), "ob-amex");
+  assert.equal(providerAsks, 1, "TrueLayer's list is read once an hour");
+  assert.equal(await pid({ bank: "<script>" }), null); assert.equal(await pid(undefined), null);
+  const asked = calls.filter((c) => c.url.startsWith("https://auth.truelayer.com/api/providers?"));
+  assert.ok(asked.every((c) => c.url === "https://auth.truelayer.com/api/providers?clientId=relay-test-id" && !c.init.headers), "only Relay's public app id is sent");
+  now += 2 * 36e5; providersDown = true;
+  assert.equal(await pid({ bank: "amex" }), "ob-amex", "an hour on, the list is read again; if it can't be, the last one");
+  delete env.TRUELAYER_ENV; now -= 2 * 36e5; providersDown = false;
+}
+{ // Every bank the app offers as a tile is one the server knows.
+  const app = (await import("node:fs")).readFileSync(new URL("../account.js", import.meta.url), "utf8");
+  const tileIds = [...app.slice(app.indexOf("var BANK_TILES"), app.indexOf("]];", app.indexOf("var BANK_TILES"))).matchAll(/\["([a-z]+)", "[^"]+", "[a-z.]+"/g)].map((m) => m[1]);
+  assert.equal(tileIds.length, 12);
+  for (const t of tileIds) assert.ok(BANK_CHOICES[t], t + " is known to the server");
+}
+console.log("ok - a bank chosen in Relay opens that bank straight away (TrueLayer's own id for it), or TrueLayer's list");
 
 // 3. Payments read straight away and matched to receipts; money coming in isn't kept.
 r = await (await call("/relay/my/bank/payments", { token: jess })).json();

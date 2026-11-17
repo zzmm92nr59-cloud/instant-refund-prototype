@@ -287,6 +287,37 @@ export async function handleBankCallback(env, url, o) {
   return back("connected");
 }
 
+// The banks offered as one tap in getting started (Connor, 17 Nov 2026), so TrueLayer can skip its own list of banks.
+// Relay doesn't keep TrueLayer's ids itself: it reads TrueLayer's public list of banks for this app and takes the one
+// whose name matches (open banking, personal), so a tap goes straight to that bank. If the list can't be read or nothing
+// matches, TrueLayer shows its own list as before. Nothing about the shopper is sent to read the list.
+export const BANK_CHOICES = {
+  amex: /^american express\b/i, barclays: /^barclays( uk| bank)?$/i, chase: /^chase\b/i, firstdirect: /^first ?direct\b/i,
+  halifax: /^halifax\b/i, hsbc: /^hsbc( uk)?$/i, lloyds: /^lloyds( bank)?$/i, monzo: /^monzo\b/i, nationwide: /^nationwide\b/i,
+  natwest: /^natwest\b/i, revolut: /^revolut\b/i, santander: /^santander( uk)?\b/i, starling: /^starling\b/i, tsb: /^tsb\b/i,
+};
+const NOT_PERSONAL = /business|corporate|commercial|bankline|kinetic|private|wealth|premier|international|isle of man|jersey|guernsey|gibraltar/i;
+let providerList = null;   // { at, list } for an hour in this copy of the Worker
+export function pickProvider(list, choice) {
+  const want = BANK_CHOICES[choice];
+  if (!want || !Array.isArray(list)) return null;
+  const hits = list.map((p) => ({ id: String((p && (p.provider_id || p.id)) || ""), name: String((p && p.display_name) || "").trim(), country: String((p && p.country) || "").toLowerCase() }))
+    .filter((p) => /^[a-z0-9-]{3,60}$/.test(p.id) && want.test(p.name) && !NOT_PERSONAL.test(p.name) && (!p.country || p.country === "uk" || p.country === "gb"));
+  hits.sort((a, b) => (b.id.startsWith("ob-") - a.id.startsWith("ob-")) || a.name.length - b.name.length);
+  return hits[0] ? hits[0].id : null;
+}
+async function providerFor(env, choice, now, fetchImpl) {
+  if (!BANK_CHOICES[choice] || !bankLive(env)) return null;
+  if (!providerList || now - providerList.at > 36e5) {
+    try {
+      const r = await (fetchImpl || fetch)(hosts(env).auth + "/api/providers?clientId=" + encodeURIComponent(env.TRUELAYER_CLIENT_ID), { signal: AbortSignal.timeout(5000) });
+      const list = r.ok ? await r.json() : null;
+      if (Array.isArray(list)) providerList = { at: now, list };
+    } catch {}   // not answering: the last list, if there is one
+  }
+  return providerList ? pickProvider(providerList.list, choice) : null;
+}
+
 export async function handleBankRoute(path, method, request, env, url, cors, shopper, o) {
   if (!path.startsWith("/relay/my/bank")) return null;
   const db = env.RELAY_DB; await ensureBankTables(db);
@@ -305,8 +336,12 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     const state = randomToken();
     await db.prepare("DELETE FROM bank_link_states WHERE expires_at < ?").bind(o.now).run();
     await db.prepare("INSERT INTO bank_link_states (state_hash, shopper_id, expires_at) VALUES (?,?,?)").bind(await sha256Hex(state), shopper.id, o.now + STATE_LIFE).run();
+    const b = await request.json().catch(() => null);
+    const choice = b && typeof b.bank === "string" ? b.bank : null;
     const q = new URLSearchParams({ response_type: "code", client_id: env.TRUELAYER_CLIENT_ID, redirect_uri: redirectUri(env, url), scope: BANK_SCOPES, state,
       providers: bankLive(env) ? "uk-ob-all uk-oauth-all" : "uk-cs-mock uk-ob-all uk-oauth-all" });
+    const providerId = choice ? await providerFor(env, choice, o.now, o.fetchImpl) : null;
+    if (providerId) q.set("provider_id", providerId);
     return json({ url: hosts(env).auth + "/?" + q.toString().replace(/\+/g, "%20") }, 200, cors);
   }
   if (path === "/relay/my/bank/sync" && method === "POST") return json(await syncBank(env, shopper.id, o.now, o.fetchImpl, false), 200, cors);
