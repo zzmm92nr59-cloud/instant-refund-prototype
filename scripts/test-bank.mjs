@@ -174,10 +174,14 @@ assert.equal(pickProvider(PROVIDERS, "nobank"), null); assert.equal(pickProvider
 {
   const pid = async (body) => new URL((await (await call("/relay/my/bank/connect", { method: "POST", token: jess, body })).json()).url).searchParams.get("provider_id");
   assert.equal(await pid({ bank: "chase" }), null, "test banks: never skipped");
+  assert.equal((await (await call("/relay/my/bank", { token: jess })).json()).choices, undefined, "test banks: no tiles to choose");
   env.TRUELAYER_ENV = "live";
   assert.equal(await pid({ bank: "chase" }), "ob-chase");
   assert.equal(await pid({ bank: "amex" }), "ob-amex");
   assert.equal(providerAsks, 1, "TrueLayer's list is read once an hour");
+  // Which tiles to show: the listed banks TrueLayer can connect (Chase here; not HSBC, which is business only).
+  assert.deepEqual((await (await call("/relay/my/bank", { token: jess })).json()).choices, ["amex", "chase", "santander"]);
+  assert.equal(providerAsks, 1);
   assert.equal(await pid({ bank: "<script>" }), null); assert.equal(await pid(undefined), null);
   const asked = calls.filter((c) => c.url.startsWith("https://auth.truelayer.com/api/providers?"));
   assert.ok(asked.every((c) => c.url === "https://auth.truelayer.com/api/providers?clientId=relay-test-id" && !c.init.headers), "only Relay's public app id is sent");

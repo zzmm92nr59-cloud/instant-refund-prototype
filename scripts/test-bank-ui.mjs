@@ -24,8 +24,9 @@ await ctx.route("https://**/*", async route => {
   if (u.hostname === "auth.truelayer-sandbox.com") { st.went = u.toString(); return route.fulfill({ status: 200, contentType: "text/html", body: "<title>Your bank</title><p>Bank sign-in</p>" }); }
   if (!p.startsWith("/relay/")) return route.abort();
   if (p.startsWith("/relay/my/logo/")) return route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, body: "" });
-  if (p === "/relay/my/bank") return j(st.available ? { available: true, testBanks: true, connections: st.links } : { available: false, connections: [] });
-  if (p === "/relay/my/bank/sync") { st.syncs++; return j({ read: 0, gone: 0, matched: 1 }); }
+  if (p === "/relay/my/bank") return j(st.available ? { available: true, testBanks: !st.live, ...(st.live ? { choices: st.choices } : {}), connections: st.links } : { available: false, connections: [] });
+  if (p === "/relay/my/bank/sync") { st.syncs++; if (st.syncDelay) await new Promise(r => setTimeout(r, st.syncDelay)); return j({ read: 0, gone: 0, matched: 1 }); }
+  if (p === "/relay/my/bank/connect") { st.connectBodies = (st.connectBodies || []).concat([route.request().postData() ? JSON.parse(route.request().postData()) : null]); } 
   if (p === "/relay/my/bank/connect") return j({ url: "https://auth.truelayer-sandbox.com/?response_type=code&state=" + "s".repeat(43) });
   if (p === "/relay/my/bank/payments") return j({ payments: st.links.length ? [
     { id: "a", account: "Current account", date: day(-4), amountPence: 4500, currency: "GBP", description: "BRINDLE AND CO LONDON", merchant: null, shop: "Brindle and Co", receiptId: ID1, match: "sure" },
@@ -142,6 +143,31 @@ await view.getByText("That took too long, so it didn't connect. Start again and 
 await page.evaluate(() => window.go("me"));
 await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
 await view.locator(".rl-bk-row").first().waitFor();
+// 3d. Real banks (Connor, 17 Nov 2026): the page shows what Relay already has straight away, not after the banks are
+// read again (seconds); the usual banks TrueLayer offers are a tap each, less ones connected; a tap opens that bank.
+st.live = true; st.choices = ["amex", "santander", "monzo"]; st.syncDelay = 8000;
+const realLink = { id: "00000000-0000-4000-8000-0000000000bb", bank: "Santander Personal", connectedAt: new Date().toISOString(), syncedAt: new Date().toISOString(), needsReconnect: false, payments: 2, matched: 1 };
+st.links = [realLink, ...st.links];
+await page.goto(origin + "/index.html"); await openProfile();
+const opened = Date.now(), syncsBefore = st.syncs;
+await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
+await view.locator(".rl-bk-row").first().waitFor();
+assert.ok(Date.now() - opened < 4000, "payments show before the banks are read again");
+assert.ok(await view.locator(".rl-arow", { hasText: "Santander Personal" }).isVisible());
+const bankTiles = view.getByRole("group", { name: "Choose your bank or card" }).getByRole("button");
+assert.deepEqual(await bankTiles.evaluateAll(b => b.map(x => x.lastChild.textContent)), ["Amex", "Monzo"], "only banks TrueLayer offers, less the one connected");
+assert.ok(await view.getByRole("button", { name: "Another bank or card" }).isVisible());
+await polished("bank page with tiles", "#mePage");
+assert.equal(st.syncs, syncsBefore + 1, "the banks are still read again, behind");
+st.syncDelay = 0;
+await bankTiles.filter({ hasText: "Amex" }).dblclick();
+await page.waitForURL(/auth\.truelayer-sandbox\.com/);
+assert.deepEqual(st.connectBodies.at(-1), { bank: "amex" }); assert.equal(st.connectBodies.filter(b => b && b.bank).length, 1, "once for a double tap");
+st.live = false; st.links = st.links.filter(l => l !== realLink);
+await page.goto(origin + "/index.html"); await openProfile();
+await view.locator(".rl-arow", { hasText: "Bank and cards" }).click();
+await view.locator(".rl-bk-row").first().waitFor();
+console.log("ok - real banks: shown at once while read again behind; the usual banks TrueLayer offers, a tap each, straight to that bank");
 // 4. Disconnecting asks first, then deletes.
 await view.locator(".rl-arow", { hasText: "Mock Bank" }).click();
 await page.getByText("Disconnect Mock Bank? Relay deletes the payments it read from it.").waitFor();
