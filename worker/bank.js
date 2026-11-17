@@ -13,9 +13,13 @@
 //  * Only spending is kept: date, amount, the bank's description and merchant, which account, and the receipt it matches.
 //
 // Routes: GET /relay/my/bank, POST /relay/my/bank/connect, GET /relay/bank/callback (the bank's page sends the browser back
-// here), POST /relay/my/bank/sync, GET /relay/my/bank/payments, POST /relay/my/bank/disconnect { id }.
-import { sealToken, openToken, receiptTotals } from "./gmail.js";
+// here), POST /relay/my/bank/sync, GET /relay/my/bank/payments, POST /relay/my/bank/disconnect { id },
+// POST /relay/my/bank/not-mine { id, on, everyFromShop, reason }, POST /relay/my/bank/receipt-photo { id, image }.
+import { sealToken, openToken, receiptTotals, ensureGmailTables } from "./gmail.js";
 import { isAdmin, isTester } from "./resale-admin.js";
+import { decodePhoto, MAX_RECEIPT_PHOTO_BYTES } from "./photos.js";
+import { readReceiptPhoto } from "./receipt-photo.js";
+import { aiAvailable } from "./ai-reader.js";
 
 const DAY = 864e5;
 export const BANK_SCOPES = "info accounts balance cards transactions offline_access";
@@ -39,7 +43,8 @@ export const BANK_SQL = [
     paid_on TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, description TEXT, merchant TEXT, receipt_id TEXT, match TEXT,
     created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, payment_id))`,
   // "Not mine" (a shared card: Connor, 17 Nov 2026): one payment (kind 'payment', key = its id), or everything from a shop
-  // (kind 'shop', key = the shop's name, lower case). Not matched to receipts, shown apart.
+  // (kind 'shop', key = the shop's name, lower case). Not matched to receipts, shown apart. Kind 'no_receipt' (key = the
+  // payment's id): "This wasn't a shop purchase", so Relay stops asking for its receipt; it's still matched as usual.
   `CREATE TABLE IF NOT EXISTS bank_not_mine (shopper_id TEXT NOT NULL, kind TEXT NOT NULL, key TEXT NOT NULL, created_at INTEGER NOT NULL,
     PRIMARY KEY (shopper_id, kind, key))`
 ];
@@ -239,19 +244,61 @@ export async function syncBank(env, shopperId, now, f, force, matchOnly) {
   const not = await notMineOf(db, shopperId);
   const payments = ((await db.prepare("SELECT payment_id, paid_on, amount_minor, currency, description, merchant FROM bank_payments WHERE shopper_id = ?").bind(shopperId).all()).results || [])
     .filter((p) => !isNotMine(not, p.payment_id, shopName(p.description, p.merchant)));
-  const matches = matchPayments(payments, await receiptTotals(env, shopperId));
+  // A receipt made from the shopper's own photo belongs to the payment it was added for, whatever the amounts say.
+  const receipts = await receiptTotals(env, shopperId);
+  const photoLinks = new Map(receipts.filter((r) => r.bankPaymentId).map((r) => [r.bankPaymentId, r.id]));
+  const matches = matchPayments(payments.filter((p) => !photoLinks.has(p.payment_id)), receipts.filter((r) => !r.bankPaymentId));
+  for (const p of payments) if (photoLinks.has(p.payment_id)) matches.set(p.payment_id, { receiptId: photoLinks.get(p.payment_id), match: "photo" });
   await db.batch([db.prepare("UPDATE bank_payments SET receipt_id = NULL, match = NULL WHERE shopper_id = ?").bind(shopperId),
     ...[...matches].map(([pid, m]) => db.prepare("UPDATE bank_payments SET receipt_id = ?, match = ? WHERE shopper_id = ? AND payment_id = ?").bind(m.receiptId, m.match, shopperId, pid))]);
   return { read, gone, matched: matches.size };
 }
 
-// What the shopper said isn't theirs: { payments: Set, shops: Set }.
+// What the shopper said isn't theirs: { payments: Set, shops: Set }, and which payments weren't a shop purchase (noReceipt).
 async function notMineOf(db, shopperId) {
   const rows = (await db.prepare("SELECT kind, key FROM bank_not_mine WHERE shopper_id = ?").bind(shopperId).all().catch(() => ({ results: [] }))).results || [];
-  return { payments: new Set(rows.filter((r) => r.kind === "payment").map((r) => r.key)), shops: new Set(rows.filter((r) => r.kind === "shop").map((r) => r.key)) };
+  const of = (k) => new Set(rows.filter((r) => r.kind === k).map((r) => r.key));
+  return { payments: of("payment"), shops: of("shop"), noReceipt: of("no_receipt") };
 }
 const shopKey = (name) => String(name || "").toLowerCase().trim().slice(0, 80);
 export const isNotMine = (not, paymentId, shop) => not.payments.has(String(paymentId)) || (Boolean(shop) && not.shops.has(shopKey(shop)));
+
+// ---- Payments that likely should have a receipt ---------------------------------------------------------------------------
+// Connor (17 Nov 2026): "When we find a transaction from banks that don't have receipts, but likely should (eg H&M purchase)
+// the app should highlight this". The rule, all of it:
+//   a card payment out (not money coming in) of at least £5 (RECEIPT_MIN_PENCE),
+//   with no receipt matched to it, that the shopper hasn't said is not theirs or wasn't a shop purchase,
+//   whose shop is a known shop that sells things (RETAIL_SHOPS: clothes, shoes, beauty, electricals, home, department stores,
+//   big online shops) or whose name says it is one (RETAIL_WORDS: "clothing", "boutique", "furniture" and so on),
+//   and isn't food or drink, groceries, food delivery, transport, fuel, an app, a subscription or a donation (NO_RECEIPT),
+//   nor anything else that isn't shopping (bills, transfers, cash, rent: NOT_SHOPPING; those are never kept anyway).
+// A shop Relay doesn't know is left alone rather than guessed at.
+export const RECEIPT_MIN_PENCE = 500;
+const RETAIL_SHOPS = /\bh ?(&|and) ?m\b|\bhm\.com\b|\bzara\b|uniqlo|primark|^next$|next retail|next directory|\basos\b|boohoo|pretty ?little ?thing|river island|new look|topshop|\bmango\b|\bcos\b|\barket\b|other stories|\bmonki\b|massimo dutti|bershka|pull ?(&|and) ?bear|stradivarius|\bgap\b|levi'?s|all ?saints|\breiss\b|ted baker|whistles|jigsaw|\bhobbs\b|white stuff|fat ?face|\bjoules\b|seasalt|superdry|t\.? ?k\.? ?maxx|matalan|^m&s$|marks (and|&) spencer|marks ?& ?spencer|john ?lewis|selfridges|harrods|\bliberty\b|harvey nichols|house of fraser|fenwick|flannels|frasers|debenhams|jd sports|sports direct|foot ?locker|\bnike\b|adidas|\bpuma\b|lululemon|sweaty betty|\bschuh\b|\bclarks\b|dr\.? ?martens|^boots$|superdrug|sephora|space ?nk|^lush$|body shop|cult beauty|look ?fantastic|charlotte tilbury|currys|\bargos\b|apple store|samsung|\bdyson\b|\bcex\b|richer sounds|\bikea\b|dunelm|habitat|the range|\bb ?(&|and) ?q\b|wickes|homebase|oliver bonas|\bmuji\b|wayfair|\bamazon\b|amzn|\bebay\b|zalando|waterstones|wh ?smith|smyths|hamleys|the entertainer|\blego\b|pandora|h\.? ?samuel|ernest jones|goldsmiths|swarovski|accessorize|hobbycraft|home bargains|\bb ?& ?m\b|wilko/i;
+const RETAIL_WORDS = /\b(clothing|clothes|fashion|boutique|apparel|outfitters?|footwear|shoes?|jewell?e?ry|jewellers?|cosmetics|perfumery|electricals?|electronics|furniture|homewares?|interiors|department store|bookshop|toys?)\b/i;
+const NO_RECEIPT = /prime video|amazon prime|prime member|\baudible\b|\bkindle\b|amazon music|amazon digital|apple\.com\/bill|\bitunes\b|app ?store|google play|netflix|spotify|disney|youtube|\buber\b|\bbolt\b|trainline|\btfl\b|national rail|\brail\b|parking|ringgo|paybyphone|\bfuel\b|petrol|\besso\b|texaco|deliveroo|just ?eat|food|\bcaf(e|é)\b|coffee|restaurant|takeaway|pizza|burger|\bbar\b|\bpub\b|tesco|sainsbury|\basda\b|morrisons|\baldi\b|\blidl\b|waitrose|co-?op\b|iceland|ocado|greggs|\bpret\b|costa|starbucks|mcdonald|\bkfc\b|subway|nando|charity|donation|patreon/i;
+export function likelyNeedsReceipt(p, not) {
+  if (!p || p.receipt_id || !(Number(p.amount_minor) >= RECEIPT_MIN_PENCE)) return false;
+  const shop = shopName(p.description, p.merchant);
+  if (not && (isNotMine(not, p.payment_id, shop) || (not.noReceipt && not.noReceipt.has(String(p.payment_id))))) return false;
+  const text = [shop, p.merchant, statementShop(p.description)].filter(Boolean).join(" | ");
+  if (!text || NOT_SHOPPING.test(text) || NO_RECEIPT.test(text)) return false;
+  return RETAIL_SHOPS.test(shop || "") || RETAIL_SHOPS.test(text) || RETAIL_WORDS.test(text);
+}
+const paymentForApp = (r) => ({ id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency, shop: shopName(r.description, r.merchant) });
+// For Home (gmail.js adds these to /relay/my/receipts, which Home already asks for, so it costs no extra request): the
+// newest payments of the last 30 days that likely should have a receipt and don't. Nothing when no bank is connected.
+export async function receiptsToAdd(env, shopperId, now) {
+  try {
+    const since = new Date((now || Date.now()) - 30 * DAY).toISOString().slice(0, 10);
+    const rows = (await env.RELAY_DB.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id FROM bank_payments
+      WHERE shopper_id = ? AND receipt_id IS NULL AND amount_minor >= ? AND paid_on >= ? ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopperId, RECEIPT_MIN_PENCE, since).all()).results || [];
+    if (!rows.length) return [];
+    const not = await notMineOf(env.RELAY_DB, shopperId);
+    // photoRead: whether Relay can read a photo of the receipt (the AI reader is on), so the app says what will happen.
+    return rows.filter((r) => likelyNeedsReceipt(r, not)).slice(0, 5).map((r) => ({ ...paymentForApp(r), photoRead: aiAvailable(env) }));
+  } catch { return []; }   // no bank tables yet: nothing to say
+}
 
 // The bank's page sends the browser back here with a code. The single-use state ties it to the shopper who started.
 export async function handleBankCallback(env, url, o) {
@@ -361,17 +408,24 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     const rows = (await db.prepare(`SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id, match FROM bank_payments
       WHERE shopper_id = ? AND amount_minor > 0 ORDER BY paid_on DESC, payment_id LIMIT 200`).bind(shopper.id).all()).results || [];
     const not = await notMineOf(db, shopper.id);
-    return json({ payments: rows.map((r) => { const shop = shopName(r.description, r.merchant); return { id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
+    return json({ photoRead: aiAvailable(env), payments: rows.map((r) => { const shop = shopName(r.description, r.merchant); return { id: r.payment_id, account: r.account, date: r.paid_on, amountPence: r.amount_minor, currency: r.currency,
       description: r.description, merchant: r.merchant, shop, receiptId: r.receipt_id || null, match: r.match || null,
-      notMine: isNotMine(not, r.payment_id, shop) ? (not.payments.has(String(r.payment_id)) ? "payment" : "shop") : null }; }) }, 200, cors);
+      notMine: isNotMine(not, r.payment_id, shop) ? (not.payments.has(String(r.payment_id)) ? "payment" : "shop") : null,
+      ...(not.noReceipt.has(String(r.payment_id)) ? { noReceipt: true } : {}), ...(likelyNeedsReceipt(r, not) ? { needsReceipt: true } : {}) }; }) }, 200, cors);
   }
   // POST { id, on, everyFromShop }: a payment isn't theirs (someone else's card on a shared account), or is after all.
   // With everyFromShop, every payment from that shop too. Then matching runs again without them.
+  // With reason "no_receipt": the payment wasn't a shop purchase, so Relay stops asking for its receipt (or, off, asks again).
   if (path === "/relay/my/bank/not-mine" && method === "POST") {
     const b = await request.json().catch(() => null);
-    if (!b || typeof b.id !== "string" || !b.id || b.id.length > 200 || typeof b.on !== "boolean") return json({ error: "invalid_request" }, 400, cors);
+    if (!b || typeof b.id !== "string" || !b.id || b.id.length > 200 || typeof b.on !== "boolean" || (b.reason != null && b.reason !== "no_receipt")) return json({ error: "invalid_request" }, 400, cors);
     const p = await db.prepare("SELECT payment_id, description, merchant FROM bank_payments WHERE shopper_id = ? AND payment_id = ?").bind(shopper.id, b.id).first();
     if (!p) return json({ error: "not_found" }, 404, cors);
+    if (b.reason === "no_receipt") {
+      await (b.on ? db.prepare("INSERT OR IGNORE INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?, 'no_receipt', ?, ?)").bind(shopper.id, p.payment_id, o.now || Date.now())
+        : db.prepare("DELETE FROM bank_not_mine WHERE shopper_id = ? AND kind = 'no_receipt' AND key = ?").bind(shopper.id, p.payment_id)).run();
+      return json({ ok: true }, 200, cors);
+    }
     const key = shopKey(shopName(p.description, p.merchant)), now = o.now || Date.now();
     const st = b.on
       ? [db.prepare("INSERT OR IGNORE INTO bank_not_mine (shopper_id, kind, key, created_at) VALUES (?, 'payment', ?, ?)").bind(shopper.id, p.payment_id, now),
@@ -382,6 +436,7 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     const r = await syncBank(env, shopper.id, o.now, o.fetchImpl, false, true);
     return json({ ok: true, matched: r.matched }, 200, cors);
   }
+  if (path === "/relay/my/bank/receipt-photo" && method === "POST") return addReceiptPhoto(env, request, cors, shopper, o);
   if (path === "/relay/my/bank/disconnect" && method === "POST") {
     const b = await request.json().catch(() => null);
     if (!b || typeof b.id !== "string" || !/^[0-9a-f-]{36}$/.test(b.id)) return json({ error: "invalid_request" }, 400, cors);
@@ -392,4 +447,66 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     return json({ ok: true }, 200, cors);
   }
   return json({ error: "not_found" }, 404, cors);
+}
+
+// ---- "Add a photo of the receipt" -------------------------------------------------------------------------------------------
+// POST /relay/my/bank/receipt-photo { id, image }: the shopper's photo of the paper receipt for one of their own payments
+// (made smaller on their phone first: a JPEG, PNG or WebP of at most 1.1 MB, checked by its bytes). Relay keeps the photo
+// and makes a receipt from it, linked to that payment, marked everywhere as "Receipt from your photo", never as the shop's
+// own. With the AI reader on (receipt-photo.js), what Claude read from the photo; otherwise, or when it can't read it, only
+// what the bank says (shop, amount, date) and no items. A total on the photo that isn't what the bank paid is kept as it is,
+// and the app shows both. 20 photos a shopper a day; 1,000 read by AI a day across Relay (after that, kept without reading).
+export const RECEIPT_PHOTOS_PER_DAY = 20;
+export const RECEIPT_PHOTO_AI_ALL_DAY = 1000;
+async function addReceiptPhoto(env, request, cors, shopper, o) {
+  const db = env.RELAY_DB, now = o.now || Date.now();
+  const b = await request.json().catch(() => null);
+  if (!b || typeof b.id !== "string" || !b.id || b.id.length > 200 || typeof b.image !== "string") return json({ error: "invalid_request" }, 400, cors);
+  const photo = decodePhoto(b.image, MAX_RECEIPT_PHOTO_BYTES);
+  if (photo && photo.error) return json({ error: "photo_too_big" }, 413, cors);
+  if (!photo) return json({ error: "bad_photo" }, 400, cors);
+  const p = await db.prepare("SELECT payment_id, account, paid_on, amount_minor, currency, description, merchant, receipt_id FROM bank_payments WHERE shopper_id = ? AND payment_id = ?")
+    .bind(shopper.id, b.id).first();
+  if (!p || !(p.amount_minor > 0)) return json({ error: "not_found" }, 404, cors);
+  await ensureGmailTables(db);
+  if (p.receipt_id) {
+    const has = await db.prepare("SELECT 1 AS x FROM captured_receipts WHERE id = ? AND shopper_id = ? AND status NOT IN ('dismissed','not_receipt')").bind(p.receipt_id, shopper.id).first();
+    if (has) return json({ error: "has_receipt", receiptId: p.receipt_id }, 409, cors);
+  }
+  const mine = await db.prepare("SELECT COUNT(*) AS n FROM receipt_photos WHERE shopper_id = ? AND created_at > ?").bind(shopper.id, now - DAY).first();
+  if (Number((mine && mine.n) || 0) >= RECEIPT_PHOTOS_PER_DAY) return json({ error: "too_many_requests" }, 429, cors);
+  const all = await db.prepare("SELECT COUNT(*) AS n FROM receipt_photos WHERE ai = 1 AND created_at > ?").bind(now - DAY).first();
+  const full = Number((all && all.n) || 0) >= RECEIPT_PHOTO_AI_ALL_DAY;
+  const got = full ? { error: "ai_busy" } : await readReceiptPhoto(env, photo, new Date(now + DAY).toISOString().slice(0, 10), o.fetchImpl || fetch);
+  const asked = !full && got.error !== "ai_off";   // a read was asked of Anthropic (counted for the limit across Relay)
+  const read = got.reading && got.reading.isPurchase ? got.reading : null;
+  const bankCurrency = p.currency || "GBP";
+  const bankPaid = { amountPence: p.amount_minor, currency: bankCurrency, date: p.paid_on, account: p.account || null };
+  const photoTotal = read && read.totalPence != null ? read.totalPence : null;
+  const photoCurrency = photoTotal != null ? (read.currency || bankCurrency) : null;
+  const details = {
+    kind: "receipt", source: "receipt_photo", photoReceipt: true, bankPaymentId: p.payment_id,
+    retailer: { name: (read && read.shop) || shopName(p.description, p.merchant) || "Shop", domain: null },
+    orderDate: (read && read.orderDate) || p.paid_on, orderDateFrom: read && read.orderDate ? "photo" : "bank",
+    // The total is what the photo says when it says one, otherwise what the bank paid: never one forced to fit the other.
+    totalPence: photoTotal != null ? photoTotal : p.amount_minor, currency: photoTotal != null ? photoCurrency : bankCurrency,
+    totalFrom: photoTotal != null ? "photo" : "bank",
+    items: read ? read.items : [],
+    receiptNumber: read && read.orderRef ? read.orderRef : null,
+    readBy: read ? "ai" : null, confidence: read ? got.confidence : null,
+    // Why nothing was read from the photo: "off" (no AI reader), "unclear" (no receipt could be read in it), "busy".
+    ...(read ? {} : { photoNotRead: got.error === "ai_off" ? "off" : got.reading || got.error === "unreadable" ? "unclear" : "busy" }),
+    bankPaid,
+    ...(photoTotal != null && (photoTotal !== p.amount_minor || photoCurrency !== bankCurrency) ? { totalMismatch: true } : {}),
+    needsShopperConfirmation: Boolean(read), refundEligible: false
+  };
+  const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+      .bind(id, shopper.id, "photo:" + p.payment_id + ":" + now, "pending", JSON.stringify(details), now),
+    db.prepare("INSERT INTO receipt_photos (receipt_id, shopper_id, type, data, ai, created_at) VALUES (?,?,?,?,?,?)").bind(id, shopper.id, photo.type, photo.data, asked ? 1 : 0, now),
+    db.prepare("UPDATE bank_payments SET receipt_id = ?, match = 'photo' WHERE shopper_id = ? AND payment_id = ?").bind(id, shopper.id, p.payment_id)]);
+  return json({ ok: true, receipt: { id, shop: details.retailer.name, date: details.orderDate, dateFrom: details.orderDateFrom, items: details.items,
+    totalPence: details.totalPence, currency: details.currency, totalFrom: details.totalFrom, readBy: details.readBy, confidence: details.confidence,
+    photoNotRead: details.photoNotRead || null, totalMismatch: Boolean(details.totalMismatch), bankPaid, receiptNumber: details.receiptNumber } }, 200, cors);
 }
