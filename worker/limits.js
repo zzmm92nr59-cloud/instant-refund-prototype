@@ -35,10 +35,11 @@ const SIGN_IN = new Set([
   "/relay/shopify/connect", "/relay/shopify/launch", "/relay/shopify/oauth/callback", "/relay/shopify/embedded/session"
 ]);
 // Each of these asks Google or Microsoft for someone's email (or reads a long pasted one).
-const MAIL = new Set(["/relay/my/gmail/find", "/relay/my/gmail/add", "/relay/my/gmail/connect", "/relay/my/receipts/add-pasted", "/relay/my/receipts/parse"]);
+// A photo of a paper receipt (bank.js) is big and may be read by AI, so it counts here too.
+const MAIL = new Set(["/relay/my/gmail/find", "/relay/my/gmail/add", "/relay/my/gmail/connect", "/relay/my/receipts/add-pasted", "/relay/my/receipts/parse", "/relay/my/bank/receipt-photo"]);
 const MAIL_RE = /^\/relay\/my\/receipts\/[0-9a-f-]{36}\/original$/;
 // A long receipts list asks for many pictures at once; they're light and count only towards the address's allowance.
-const PICTURE_RE = /^\/relay\/my\/(logo\/[^/]{1,100}|receipts\/[0-9a-f-]{36}\/image|resale\/listings\/[0-9a-f-]{36}\/image)$/;
+const PICTURE_RE = /^\/relay\/my\/(logo\/[^/]{1,100}|receipts\/[0-9a-f-]{36}\/image|receipts\/[0-9a-f-]{36}\/receipt-photo|resale\/listings\/[0-9a-f-]{36}\/image)$/;
 // Signed by Shopify or Square; checked there. Gmail's notices come signed by Google, and Outlook's carry each subscription's
 // secret (mail-push.js): they come in bursts from a few of Google's and Microsoft's addresses, for every shopper at once.
 const WEBHOOKS = new Set(["/relay/webhooks/shopify", "/relay/webhooks/square", "/relay/webhooks/gmail", "/relay/webhooks/outlook", "/relay/webhooks/outlook/lifecycle"]);
