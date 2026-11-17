@@ -1177,6 +1177,10 @@
     // Two other ways Home can look (Connor, 15 Nov), chosen in Profile, Home layout: "today" (what needs you, then a list) and
     // "wallet" (your latest things as photo squares). Neither snaps one card per flick.
     ".h2-feed.hl>*{scroll-snap-align:none}.h2-feed.hl{gap:0}" +
+    // Home's parts (Settings, Home layout, What Home shows first): a heading over each, a calm line when there's nothing.
+    ".h2-feed>.h2-sec{margin:10px 2px 0}.h2-feed>.h2-sec:first-child{margin-top:4px}.h2-feed>.h2-sec:not(:first-child){scroll-snap-align:none}.h2-feed.hl>.h2-sec{margin:14px 2px 10px}.h2-feed.hl>.h2-sec:first-child{margin-top:4px}" +
+    ".h2-calm{margin:0;padding:16px 18px;border-radius:22px;background:var(--rl-card);font-size:16px;line-height:22px;color:var(--rl-text2)}.h2-feed.hl>.h2-item.small{margin-bottom:10px}.h2-feed.hl>.h2-start{margin-bottom:10px!important}" +
+    ".h2-shops{margin:0 -16px 6px;padding:4px 16px 8px;scroll-padding-inline:16px}.h2-shop-dot:not(.rl-has-logo){background:#C9D8FF!important;color:#101828!important}.h2-shops-all{background:var(--rl-fill);color:var(--rl-text)}.rl-po-now{margin:0 0 10px;font-size:16px;line-height:22px;font-weight:600;color:var(--rl-text)}" +
     ".hl-sum{background:var(--rl-card);border-radius:22px;padding:6px 18px;margin:10px 0 22px}.hl-sum-h{font-size:22px;line-height:28px;font-weight:700;margin:12px 0 4px;color:var(--rl-text)}" +
     ".hl-sum-r{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;min-height:52px;border-top:1px solid var(--rl-line);color:var(--rl-text);font-size:17px}.hl-sum-r:first-of-type{border-top:0}.hl-sum-r:active{opacity:.6}.hl-sum-r .hl-n{flex:none;min-width:30px;height:30px;padding:0 8px;box-sizing:border-box;border-radius:15px;display:grid;place-items:center;font-weight:700;font-size:15px;background:var(--rl-fill)}.hl-sum-r .hl-n.urgent{background:#d92d20;color:#fff}.hl-sum-r .hl-n.soon{background:#f5a524;color:#3b2500}.hl-sum-r span.t{flex:1}.hl-sum-ok{margin:10px 0 14px;font-size:16px;color:var(--rl-text2)}" +
     ".hl-h{font-size:20px;line-height:25px;font-weight:700;margin:4px 2px 10px;color:var(--rl-text)}" +
@@ -5394,6 +5398,14 @@
         if (o[0] === now) r.replaceChild(el("span", { className: "rl-jok rl-look-on" }, [jIc("check", 16)]), r.lastChild);
         return r;
       })));
+      // What Home leads with: either can be picked at any time, whichever look is chosen above.
+      var focus = homeFocus(), fopts = [["receipts", "Receipts first", "What needs you, then your latest receipts"], ["orders", "Orders first", "Orders from shops on Relay, then other receipts"]];
+      b.appendChild(accGroup("What Home shows first", fopts.map(function (o) {
+        var r = accRow(o[0] === "orders" ? "bag" : "doc", o[1], o[2], function () { setHomeFocus(o[0]); memo.homeChip = "you"; say(msg2, o[1] + " is on your Home now."); setTimeout(settingsAgain, 500); });
+        r.setAttribute("aria-pressed", o[0] === focus ? "true" : "false");
+        if (o[0] === focus) r.replaceChild(el("span", { className: "rl-jok rl-look-on" }, [jIc("check", 16)]), r.lastChild);
+        return r;
+      })));
       b.appendChild(msg2);
     }
     function secHub(b) {
@@ -9118,19 +9130,21 @@
     return (cardColours[cat] = "#" + out.map(function (v) { return (v < 16 ? "0" : "") + v.toString(16); }).join(""));
   }
   var homeSizes = null;    // watches the feed's size, so the first screen is worked out again when text or pictures change it
-  function feedEntries(purchases, receipts, refresh) {
+  function feedEntries(purchases, receipts, refresh, opts) {
+    opts = opts || {};
     var today = new Date().toISOString().slice(0, 10), fresh = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), out = [];
     var soon = function (e, dl) { var d = daysLeft(dl); if (d !== null && d >= 0 && d <= 7) { e.rank = 0; e.strip = leftWords(d) + (d === 0 ? " to return it" : ""); e.stripKind = d <= 3 ? "urgent" : "soon"; } else e.rank = 1; };
     purchases.forEach(function (o) {
-      // Orders from Relay's test shops never show on Home, even with testing tools (Connor, 15 Nov 2026).
-      if (o.test) return;
+      // Orders from Relay's test shops never show on Home, even with testing tools (Connor, 15 Nov 2026), except on Orders
+      // first with testing tools on (opts.withTest), where trying the shops-first Home needs an order to try it with.
+      if (o.test && !opts.withTest) return;
       var items = (o.items || []).filter(Boolean); if (!items.length) return;
       var shop = o.store || "Shop", at = String(o.orderedAt || "").slice(0, 10);
       var owe = items.filter(function (it) { return it.exchange && it.exchange.balance && !it.exchange.balance.paid && !it.returnInfo; })[0];
       var back = items.filter(function (it) { return it.returnInfo; })[0], swapped = items.filter(function (it) { return it.exchange; })[0];
       var dates = items.map(function (it) { return (it.returnable || it.exchangeable) && !it.returnInfo && it.returnBy && it.returnBy.date ? it.returnBy.date : null; }).filter(function (d) { return d && d >= today; }).sort();
       var dl = dates[0] || null;
-      var e = { key: "o" + o.id, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2, title: items[0].title + (items.length > 1 ? " + " + (items.length - 1) + " more" : "") };
+      var e = { key: "o" + o.id, order: o, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2, title: items[0].title + (items.length > 1 ? " + " + (items.length - 1) + " more" : "") };
       e.tiles = items.slice(0, 6).map(function (it) { return { name: it.title, price: Number.isInteger(it.priceMinor) ? money(it.priceMinor, it.currency) : "", draw: function (box) {
         var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 96); };
         // The shop's own photo of the item gets the tall picture area; a drawing gets the short one.
@@ -9145,7 +9159,10 @@
       var lead = owe || back || items.filter(function (it) { return dl && it.returnBy && it.returnBy.date === dl; })[0] || items[0];
       e.open = function () { open(function (sheet) {
         sheet.appendChild(el("h2", { text: shop }));
+        if (e.status) sheet.appendChild(el("p", { className: "rl-po-now", text: e.status }));
         [lead].concat(items.filter(function (it) { return it !== lead; })).forEach(function (it) { sheet.appendChild(confirmedCard(o, it, function () { close(); refresh(); }, it.returnBy && it.returnBy.date)); });
+        // The parcel, when the shop's own email about this order says where it is (Orders first sets e.track).
+        if (e.track) { var tx = e.track; sheet.appendChild(el("button", { type: "button", className: "rl-btn", text: "Track your parcel", style: "margin-top:14px", onclick: tapOnce(function () { close(); emailCard(tx, { markable: true, changed: refresh }).onclick(); }) })); }
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
       }); };
       out.push(e);
@@ -9194,6 +9211,14 @@
   var HOME_LOOKS = ["cards", "today", "wallet"], HOME_LOOK_KEY = "relay-home-look";
   function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1] === "cards" ? "cards" : "wallet"; var v = localStorage.getItem(HOME_LOOK_KEY); return v === "cards" ? v : "wallet"; } catch (e) { return "wallet"; } }
   function setHomeLook(v) { try { localStorage.setItem(HOME_LOOK_KEY, v); } catch (e) {} }
+  // What Home leads with (Connor, 17 Nov 2026: "if we try to get users first then the receipt is the way, if we go to shops
+  // first then it'll be order based. Try both"): "receipts" (what needs you, on the way, your latest receipts) or "orders"
+  // (orders from shops on Relay, those shops, then other receipts). Chosen in Settings, Home layout, kept on this phone
+  // (relay-home-focus); ?focus=receipts|orders tries one without keeping it. Independent of Wallet or Cards.
+  var HOME_FOCUS_KEY = "relay-home-focus";
+  function homeFocus() { try { var q = /[?&]focus=(receipts|orders)\b/.exec(location.search); if (q) return q[1]; return localStorage.getItem(HOME_FOCUS_KEY) === "orders" ? "orders" : "receipts"; } catch (e) { return "receipts"; } }
+  function setHomeFocus(v) { try { localStorage.setItem(HOME_FOCUS_KEY, v === "orders" ? "orders" : "receipts"); } catch (e) {} }
+  function testToolsOn() { try { return window.testTools ? Boolean(window.testTools()) : testingOn(); } catch (e) { return false; } }
   var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
   var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
   // Today: a row per purchase, its picture small, the shop, what it is, and what's happening with it.
@@ -9218,7 +9243,7 @@
   }
   window.relayCleanName = cleanName;
   function walletSquare(e) {
-    var t = e.tiles && e.tiles[0], what = cleanName(e.title || (t && t.name) || "", e.shop), tag = e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
+    var t = e.tiles && e.tiles[0], what = cleanName(e.title || (t && t.name) || "", e.shop), tag = e.tag || e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
     var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
     var sq = el("button", { type: "button", className: "hl-sq" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : ""), ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
       pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
@@ -9407,22 +9432,9 @@
       });
       chips.style.display = "";
       feed.textContent = "";
-      if (state.pick === "you") {
-        if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
-          el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
-          el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
-        else if (state.connected === false) feed.appendChild(startCard());
-        // Inboxes to connect again and auctions waiting on the shopper come before any order: one small card each.
-        if (state.mail.length) { var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
-          feed.appendChild(feedCard({ small: true, icon: "mail", line: oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again", sub: oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment",
-            open: function () { if (window.go) window.go("receipts"); } })); }
-        // A shop payment from a connected bank or card with no receipt yet (an H&M payment, say): one small card.
-        var needs = isReview() ? [] : needReceiptNow();
-        if (needs.length) feed.appendChild(needReceiptCard(needs, function () { draw(); loadBoth().then(function (both) { state.both = both; draw(); }); }));
-        if (state.wins.length) { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
-          feed.appendChild(feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
-            sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }
-      }
+      var look = homeLook(); feed.classList.toggle("hl", look !== "cards");
+      // For you leads with what the chosen focus puts first (Settings, Home layout: Receipts first or Orders first).
+      if (state.pick === "you") { if (homeFocus() === "orders") drawOrders(all); else drawReceipts(all, watched); }
       if (state.pick === "watch" && !watched.length) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
       // Watched things without a photo yet: Browse's products give it (asked once, only when Watching is opened).
       if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
@@ -9437,13 +9449,10 @@
           line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
           open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
       });
-      else {
-        // For you: everything that needs something or is still in play, then the newest, about eight in all.
-        var list = sets[state.pick], open2 = list.filter(function (e) { return e.rank < 2; });
-        var shown = state.pick === "you" ? open2.slice(0, 8).concat(list.filter(function (e) { return e.rank === 2; }).slice(0, Math.max(0, 8 - open2.length))) : list.slice(0, 12);
-        var look = homeLook(); feed.classList.toggle("hl", look !== "cards");
+      else if (state.pick !== "you") {
+        // The other chips: that list, about twelve of it.
+        var list = sets[state.pick], shown = list.slice(0, 12);
         if (look === "today") {
-          if (state.pick === "you") { feed.appendChild(todaySummary(sets, function (k) { state.pick = memo.homeChip = k; draw(); try { window.scrollTo(0, 0); } catch (e) {} })); if (shown.length) feed.appendChild(el("h2", { className: "hl-h", text: "Latest" })); }
           if (shown.length) feed.appendChild(el("div", { className: "hl-list" }, shown.map(todayRow)));
         } else if (look === "wallet") {
           if (shown.length) feed.appendChild(el("div", { className: "hl-grid" }, shown.map(walletSquare)));
@@ -9452,6 +9461,131 @@
       }
       if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
       firstScreen();
+    };
+    // Home's parts: a heading, and things drawn the way Home looks (Wallet squares or Cards).
+    var heading = function (text) { feed.appendChild(el("h2", { className: "hl-h h2-sec", text: text })); };
+    var drawSet = function (list) {
+      if (!list.length) return;
+      if (homeLook() === "cards") list.forEach(function (e) { feed.appendChild(feedCard(e)); });
+      else feed.appendChild(el("div", { className: "hl-grid" }, list.map(walletSquare)));
+    };
+    var calm = function (text) { feed.appendChild(el("p", { className: "h2-calm", text: text })); };
+    var reviewCard = function () {
+      return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
+        el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
+        el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]);
+    };
+    var mailCard = function () { var oneBox = state.mail.length === 1, boxName = mailNameOf(state.mail[0].provider);
+      return feedCard({ small: true, icon: "mail", line: oneBox ? "Connect " + boxName + " again" : "Connect " + state.mail.length + " inboxes again", sub: oneBox ? "Relay can't read it at the moment" : "Relay can't read them at the moment",
+        open: function () { if (window.go) window.go("receipts"); } }); };
+    var winsCard = function () { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
+      return feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
+        sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } }); };
+    var receiptsChanged = function () { draw(); loadBoth().then(function (both) { state.both = both; draw(); }); };
+    // Receipts first (the users-first Home): what needs you, most urgent first; then parcels on their way; then the
+    // latest receipts. Only what is really there: when nothing needs you, one calm line says so.
+    var drawReceipts = function (all, watched) {
+      if (isReview()) feed.appendChild(reviewCard());
+      else if (state.connected === false) feed.appendChild(startCard());
+      var needs = [], used = {};
+      // How soon each one matters, in days: an auction win has a day to be paid, a return its days left.
+      all.forEach(function (e) {
+        if (e.owes) { used[e.key] = 1; needs.push({ u: 3.5, card: feedCard({ small: true, line: e.line, sub: [e.shop, cleanName(e.title, e.shop)].filter(Boolean).join(", "), open: e.open }) }); }
+        else if (e.rank === 0 && e.strip && e.when) {
+          used[e.key] = 1; var d = daysLeft(e.when);
+          needs.push({ u: d === null ? 7 : d, card: feedCard({ small: true, line: cleanName(e.title, e.shop) || e.shop, sub: "Return to " + e.shop + " by " + dayWords(e.when), strip: e.strip, stripKind: e.stripKind, open: e.open }) });
+        }
+      });
+      if (state.wins.length) needs.push({ u: 0.5, card: winsCard() });
+      if (state.mail.length) needs.push({ u: 8, card: mailCard() });
+      var payments = isReview() ? [] : needReceiptNow();
+      if (payments.length) needs.push({ u: 9, card: needReceiptCard(payments, receiptsChanged) });
+      // Watched things whose price has really dropped since the shopper started watching.
+      watched.forEach(function (w) {
+        var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null;
+        if (now === null || was === null || now >= was) return;
+        needs.push({ u: 10, card: feedCard({ small: true, line: w.product + " is " + money(was - now, w.currency || "GBP") + " cheaper", sub: w.store || "", open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }) });
+      });
+      needs.sort(function (a, b) { return a.u - b.u; });
+      // A brand-new account already has its first step (the card above); "Nothing needs you" would only be noise.
+      var fresh = (state.connected === false || isReview()) && !all.length;
+      if (needs.length || !fresh) {
+        heading("Needs you");
+        if (needs.length) needs.forEach(function (n) { feed.appendChild(n.card); });
+        else calm("Nothing needs you right now.");
+      }
+      var rest = all.filter(function (e) { return !used[e.key]; });
+      var way = rest.filter(function (e) { return e.onWay; });
+      if (way.length) { heading("On the way"); drawSet(way); }
+      var recent = rest.filter(function (e) { return !e.onWay; }).sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; }).slice(0, 8);
+      // The latest eight, as many as Home showed before; the rest are a tap away in All receipts.
+      if (recent.length) { heading("Recent"); drawSet(recent); }
+      else if (!way.length && state.connected !== false && !isReview()) calm("What you buy shows up here as Relay finds the receipts.");
+    };
+    // Orders first (the shops-first Home): orders from shops on Relay, each with where it has got to and, on its page,
+    // what can be done now; then those shops; then receipts from everywhere else, compact. Test shops' orders only with
+    // testing tools on.
+    var drawOrders = function (all) {
+      var receipts = state.both[1], byOrder = {};
+      // The shop's own emails about an order (matched as Home already matches them: shop and amount) say where its parcel is.
+      receipts.forEach(function (x) { if (x && x.retailer && x.delivery) byOrder[label(x.retailer.name) + "|" + x.totalPence] = x; });
+      var orders = feedEntries(state.both[0], [], refresh, { withTest: testToolsOn() });
+      orders.forEach(function (e) {
+        var o = e.order, x = byOrder[label(o.store) + "|" + o.amountMinor] || null, dv = x && x.delivery;
+        if (dv) e.track = x;
+        if (e.owes) e.tag = "Swap to pay for";
+        else if (/^Refunded/.test(e.line)) e.tag = "Refunded";
+        else if (e.swaps) e.tag = "Return started";
+        else if (dv && freshDelivery(x)) { e.line = e.tag = e.status = shipWords(dv, true); e.onWay = true; }
+        else if (e.strip) e.tag = e.strip;
+        else if (/^Swapped/.test(e.line)) e.tag = "Swapped";
+        else if (dv && dv.status === "delivered" && !e.toReturn) { e.line = e.status = shipWords(dv, true); e.tag = "Delivered"; }
+        else if (!e.toReturn) { e.line = e.status = e.at ? "Ordered " + dayWords(e.at) : "Ordered"; e.tag = "Ordered"; }
+      });
+      // What needs the shopper first (a swap to pay for, a return about to close), then what's moving (a parcel on its
+      // way, a return under way), then the rest, newest first.
+      var stage = function (e) { return e.owes ? 0 : e.strip ? 1 : e.onWay ? 2 : e.swaps ? 3 : 4; };
+      orders.sort(function (a, b) { return stage(a) - stage(b) || (a.strip && b.strip ? (a.when < b.when ? -1 : a.when > b.when ? 1 : 0) : 0) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0); });
+      var known = ysRelayShops(), shops = (known || []).filter(function (sh) { return sh && sh.name && (!sh.test || testToolsOn()); });
+      // Relay's shops become known once Browse's products are in (asked for by Browse, never by Home): drawn again then.
+      if (known === null && !memo.homeShopsWait) { memo.homeShopsWait = true; window.addEventListener("relay-catalogue", function () { memo.homeShopsWait = false; if (feed.isConnected && state.pick === "you" && homeFocus() === "orders") draw(); }, { once: true }); }
+      var logoFor = function (name) { var k = label(name), m = shops.filter(function (sh) { return label(sh.name) === k; })[0]; return m && m.domain && !/\.myshopify\.com$/.test(m.domain) ? m.domain : ""; };
+      // A shop's round logo, or its first letter in Relay's soft blue and navy until there is one.
+      var shopDot = function (name) { var d = ysLogo({ name: name, cat: "other", logo: logoFor(name) }, 64); d.classList.add("h2-shop-dot"); return d; };
+      var shopRow = function (list) {
+        var row = el("div", { className: "rl-ys-row h2-shops", role: "list" });
+        list.forEach(function (name) {
+          row.appendChild(el("button", { type: "button", className: "rl-ys-shop", role: "listitem", ariaLabel: name, onclick: tapOnce(function () { if (window.relayOpenShop) window.relayOpenShop(name); }) },
+            [shopDot(name), el("span", { className: "rl-ys-name", text: name })]));
+        });
+        var all2 = el("span", { className: "rl-ys-logo h2-shops-all", style: "width:64px;height:64px" }, [accIc("bag", 26)]); all2.setAttribute("aria-hidden", "true");
+        row.appendChild(el("button", { type: "button", className: "rl-ys-shop", role: "listitem", ariaLabel: "All shops on Relay", onclick: tapOnce(function () { if (window.dcShow) window.dcShow("shops"); }) }, [all2, el("span", { className: "rl-ys-name", text: "All shops" })]));
+        return row;
+      };
+      if (orders.length || state.wins.length) {
+        heading("Your orders");
+        if (state.wins.length) feed.appendChild(winsCard());
+        drawSet(orders);
+        var mine = []; orders.forEach(function (e) { if (mine.indexOf(e.shop) < 0) mine.push(e.shop); });
+        heading("Shops on Relay"); feed.appendChild(shopRow(mine));
+      } else {
+        // No orders from shops on Relay yet: what they are and where to find them, never an order that isn't there.
+        feed.appendChild(el("div", { className: "rl-po h2-start h2-orders-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
+          el("h3", { text: "Orders from shops on Relay show here", style: "margin:0;font-size:19px" }),
+          el("p", { text: "Buy from a shop that uses Relay with " + (s.email || "this account's email") + " and you can swap a size, start a return or follow the parcel from here.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" }),
+          el("button", { className: "rl-po-primary", text: "See shops on Relay", style: "max-width:280px", onclick: tapOnce(function () { if (window.dcShow) window.dcShow("shops"); }) })]));
+        if (shops.length) { heading("Shops on Relay"); feed.appendChild(shopRow(shops.slice(0, 12).map(function (sh) { return sh.name; }))); }
+      }
+      // Everything else: receipts from other shops, compact.
+      // A return closing within the week leads (soonest first), then the newest.
+      var others = all.filter(function (e) { return e.key.charAt(0) === "r"; }).sort(function (a, b) { var ua = a.rank === 0 && a.when ? 0 : 1, ub = b.rank === 0 && b.when ? 0 : 1;
+        return ua - ub || (ua === 0 ? (a.when < b.when ? -1 : a.when > b.when ? 1 : 0) : 0) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0); });
+      var payments = isReview() ? [] : needReceiptNow();
+      if (others.length || state.mail.length || payments.length || (state.connected === false && !isReview())) heading("Other receipts");
+      if (!isReview() && state.connected === false) feed.appendChild(startCard());
+      if (state.mail.length) feed.appendChild(mailCard());
+      if (payments.length) feed.appendChild(needReceiptCard(payments, receiptsChanged));
+      if (others.length) feed.appendChild(el("div", { className: "hl-list" }, others.slice(0, 5).map(todayRow)));
     };
     // Which cards are stopping places. The band stays pinned, so a card at rest sits just under it (the page's scroll
     // padding is the band's height). The first thing in the feed is the stop at the very top of the page, which pull to
@@ -9470,7 +9604,7 @@
         var fits = c.getBoundingClientRect().bottom - nudge + y <= limit;
         c.classList.toggle("h2-nosnap", i > 0 && leading && fits);
         c.style.scrollMarginTop = i === 0 ? Math.max(0, Math.ceil(feedTop - bandH)) + 4 + "px" : "";
-        if (!c.classList.contains("small") && !c.classList.contains("h2-start")) leading = false;
+        if (!c.classList.contains("small") && !c.classList.contains("h2-start") && !c.classList.contains("h2-sec")) leading = false;
       });
     };
     // Bigger text, a photo arriving or the phone turning changes what fits: a card that no longer fits the first screen
