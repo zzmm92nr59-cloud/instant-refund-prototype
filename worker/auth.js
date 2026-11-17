@@ -15,7 +15,7 @@ import { handleHealthEmailRoute } from "./health-digest.js";
 import { handleSharedEmailAdminRoute } from "./shared-emails.js";
 import { handleAiReadingRoute } from "./ai-runner.js";
 import { handleItemKindsRoute } from "./item-kinds.js";
-import { handleBankRoute, handleBankCallback, ensureBankTables, bankDeleteStatements } from "./bank.js";
+import { handleBankRoute, handleBankCallback, ensureBankTables, bankDeleteStatements, bankForEveryone } from "./bank.js";
 import { handleSupportRoute, supportDeleteStatements, SUPPORT_TABLE_SQL } from "./support-chat.js";
 import { parseReceiptEmail } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
@@ -634,7 +634,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (path === "/relay/auth/providers" && request.method === "GET") {
       const microsoft = configured(env) && outlookConfigured(env), google = configured(env) && googleConfigured(env);
       // The wording a Google or Microsoft sign-in agrees to (it also connects Gmail or Outlook), shown before going there.
-      return json({ email: configured(env), google, microsoft,
+      return json({ email: configured(env), google, microsoft, ...(bankForEveryone(env) ? { banks: true } : {}),
         ...(microsoft || google ? { consent: { version: CONSENT_VERSION, text: CONSENT_TEXT } } : {}) }, 200, cors);
     }
     if (path.startsWith("/relay/auth/passkey/") && configured(env)) {

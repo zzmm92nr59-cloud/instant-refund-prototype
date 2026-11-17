@@ -1817,6 +1817,13 @@
   var ONBOARD_KEY = "relay.onboard.v1";
   // Set by "See getting started again" (team): the next sign-in shows every step, whatever was done or skipped before.
   var REPLAY_KEY = "relay.replay-setup.v1";
+  // The steps of the getting-started run under way, so coming back from Google, Microsoft or a bank carries on with the
+  // same steps and the same "3 of 5" (Connor, 17 Nov 2026: the count jumped back after connecting a bank). Kept for an
+  // hour, for that account only.
+  var PLAN_KEY = "relay.journey-plan.v1";
+  function planGet(email) { try { var x = JSON.parse(localStorage.getItem(PLAN_KEY) || "null"); return x && x.email === obKey(email) && Date.now() - x.t < 36e5 && Array.isArray(x.steps) ? x : null; } catch (e) { return null; } }
+  function planSet(email, steps, off) { try { localStorage.setItem(PLAN_KEY, JSON.stringify({ email: obKey(email), steps: steps, off: off, t: Date.now() })); } catch (e) {} }
+  function planDrop() { try { localStorage.removeItem(PLAN_KEY); } catch (e) {} }
   function obKey(email) { var h = 0, s = String(email || ""); for (var i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0; return "a" + h.toString(36); }
   function obGet(email) { try { var all = JSON.parse(localStorage.getItem(ONBOARD_KEY) || "{}"); return all[obKey(email)] || {}; } catch (e) { return {}; } }
   function obSet(email, patch) {
@@ -2000,9 +2007,11 @@
   // Step 2 for Google or Microsoft: what Relay will do with your email, agreed once, before going there.
   function providerStep(sheet, kind) {
     var g = kind === "google", who = g ? "Google" : "Microsoft", box = g ? "Gmail" : "Outlook";
-    // A new account goes on to its name, its inboxes, what it shops for, then "You're all set": five steps. Someone coming
-    // back usually has some of those already (before signing in Relay can't tell), so four.
-    var body = jFrame(sheet, { art: "mail", back: function () { signedOutView(sheet, signInOpts); }, of: signInOpts.returning ? 4 : 5, at: 1,
+    // A new account goes on to its inboxes, its cards and banks (where Relay offers them to everyone), what it shops for,
+    // then "You're all set" (its name comes from Google or Microsoft): four or five steps. Someone coming back usually has
+    // some of those already (before signing in Relay can't tell), so one fewer.
+    var steps = (signInOpts.returning ? 3 : 4) + (providersKnown && providersKnown.banks ? 1 : 0);
+    var body = jFrame(sheet, { art: "mail", back: function () { signedOutView(sheet, signInOpts); }, of: steps, at: 1,
       title: "Sign in and bring in your receipts", sub: "One visit to " + who + " signs you in and connects your " + box + ", so Relay can start finding your receipts straight away." });
     var points = el("div", { className: "rl-jcard" });
     [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything in your inbox"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
@@ -2119,7 +2128,13 @@
         return Promise.all([loadProfile(), api("/relay/my/consent"), api("/relay/my/gmail"), interestsLoad(true), isReview() ? Promise.resolve({ ok: false }) : api("/relay/my/bank", { fresh: true })]).then(function (r) {
         if (!document.body.contains(sheet)) return;
         if (r[1].status === 401) { save(null); return open(signedOutView); }
-        var p = r[0] || {}, c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {}, bk = r[4] && r[4].ok && r[4].body ? r[4].body : {};
+        var p = r[0] || {};
+        // No name yet, and Google or Microsoft gave one: keep it (only ever when there's no name, so a chosen one stays).
+        var nameSave = !p.name && info.suggestedName ? api("/relay/my/profile", { method: "POST", body: { name: String(info.suggestedName).trim().slice(0, 40) } }).then(function (x) { if (x.ok) { keepProfile(x.body); profileChanged(); } return x.ok ? x.body : null; }, function () { return null; }) : Promise.resolve(null);
+        return nameSave.then(function (saved) {
+        if (!document.body.contains(sheet)) return;
+        if (saved) p = saved;
+        var c = r[1].ok ? r[1].body : {}, g = r[2].ok ? r[2].body : {}, bk = r[4] && r[4].ok && r[4].body ? r[4].body : {};
         if (g && g.connected) rememberMailbox(g);
         var replay = false; try { replay = localStorage.getItem(REPLAY_KEY) === "1"; localStorage.removeItem(REPLAY_KEY); } catch (e) {}
         var fl = replay ? {} : obGet(email);
@@ -2129,7 +2144,9 @@
         // Getting started, in this order: your name, your inboxes, your cards and banks, what you shop for, then all set.
         // Only what's still needed... but once someone is getting started, the inbox and bank steps stay in, so they can add
         // another (and coming back from Google, Microsoft or a bank lands on the step they left).
-        var need = { name: replay || (!p.name && !fl.nameSkipped), mail: replay || (!st.connected && !fl.mailLater && !isReview()), bank: st.bankOn && (replay || (!st.banks.length && !fl.bankLater)) };
+        // A name from Google or Microsoft is used as it is (changed any time in Profile), so there's no name step for it.
+        var named = Boolean(st.suggested && p.name);
+        var need = { name: !named && (replay || (!p.name && !fl.nameSkipped)), mail: replay || (!st.connected && !fl.mailLater && !isReview()), bank: st.bankOn && (replay || (!st.banks.length && !fl.bankLater)) };
         var started = need.name || need.mail || need.bank || st.justConnected || Boolean(info.at);
         if (!started) { close(); if (window.go) window.go("profile"); return; }
         if (st.connected && !isReview()) need.mail = true;
@@ -2139,7 +2156,13 @@
         need.interests = replay || (r[3] && !r[3].length && !fl.interestsLater && !interestsLater() && !isReview());
         var steps = ["name", "mail", "bank", "interests"].filter(function (k) { return need[k]; });
         steps.push("done");
+        st.off = st.justConnected && st.viaProvider ? 1 : 0;
+        // Back from Google, Microsoft or a bank: the same steps as before going there.
+        var was = info.at ? planGet(email) : null;
+        if (was && was.steps.indexOf(info.at) >= 0) { steps = was.steps; st.off = was.off || 0; }
+        else planSet(email, steps, st.off);
         runJourney(sheet, st, steps, Math.max(0, info.at ? steps.indexOf(info.at) : 0));
+        });
         });
       }).catch(function () {
         if (!document.body.contains(sheet)) return;
@@ -2205,11 +2228,11 @@
   function mailNameOf(provider) { return provider === "microsoft" ? "Outlook" : "Gmail"; }
   function runJourney(sheet, st, steps, i) {
     // Through Google or Microsoft the permission step was step 1, so the count carries on from there.
-    var off = st.justConnected && st.viaProvider ? 1 : 0, kind = steps[i], of = steps.length + off, at = i + 1 + off;
+    var off = st.off || 0, kind = steps[i], of = steps.length + off, at = i + 1 + off;
     var wentBack = Boolean(st.wentBack); st.wentBack = false;
     var next = function () { runJourney(sheet, st, steps, i + 1); };
     var back = i > 0 ? function () { st.wentBack = true; runJourney(sheet, st, steps, i - 1); } : null;
-    var leave = function () { if (st.scanner) st.scanner.stop(); jBarWas = 0; close(); };
+    var leave = function () { if (st.scanner) st.scanner.stop(); jBarWas = 0; planDrop(); close(); };
     if (kind === "name") {
       var body = jFrame(sheet, { goingBack: wentBack, art: "name", back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
         title: "What should we call you?", sub: "Your first name is fine. Only you see it." });
@@ -2367,9 +2390,9 @@
       body3.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
     } else body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
   }
-  var providersAsked = null;
+  var providersAsked = null, providersKnown = null;
   function signInProviders() {
-    if (!providersAsked) providersAsked = api("/relay/auth/providers").then(function (r) { if (!r.ok) providersAsked = null; return r.ok ? r.body : null; }, function () { providersAsked = null; return null; });
+    if (!providersAsked) providersAsked = api("/relay/auth/providers").then(function (r) { if (!r.ok) providersAsked = null; if (r.ok) providersKnown = r.body; return r.ok ? r.body : null; }, function () { providersAsked = null; return null; });
     return providersAsked;
   }
   function newNonce() {
