@@ -115,7 +115,7 @@ for (const name of ["Continue with Google", "Continue with Microsoft", "Continue
 const face = sheet.getByRole("button", { name: "Sign in with Face ID or a passkey" });
 await face.waitFor();
 assert.equal(await face.locator("svg").count(), 1, "Face ID has its drawn icon");
-assert.equal(await face.evaluate(n => getComputedStyle(n).color), "rgb(199, 245, 103)", "in lime");
+assert.equal(await face.evaluate(n => getComputedStyle(n).color), "rgb(201, 216, 255)", "in Relay's soft blue (no lime, Connor 17 Nov 2026)");
 assert.equal(await sheet.locator(".rl-jh").evaluate(n => getComputedStyle(n).animationName), "rlup", "the page rises in");
 await polished("sign-in page", ".rl-sheet");
 // Less motion: nothing moves.
@@ -196,15 +196,14 @@ await page.evaluate(() => { localStorage.removeItem("relay-home-look"); window.g
 await page.evaluate(() => window.go("profile"));
 await page.locator("#homePage .hl-sq").first().waitFor();
 assert.equal(await page.locator("#homePage .h2-feed > .h2-item:not(.small)").count(), 0, "no big cards by default");
+// Today was taken away (Connor, 17 Nov 2026): a phone that had it shows Wallet.
 for (const look of ["today", "wallet"]) {
   await page.evaluate(l => { localStorage.setItem("relay-home-look", l); window.go("receipts"); }, look);
   await page.evaluate(() => window.go("profile"));
   if (look === "today") {
-    await page.locator(".hl-sum").waitFor();
-    const sum = await page.locator(".hl-sum").innerText();
-    assert.match(sum, /Today/); assert.match(sum, /due this week/, "the summary says what's due: " + sum);
-    assert.ok(await page.locator(".hl-row").count() >= 3, "a row per purchase");
-    assert.ok(await page.locator(".hl-row").first().evaluate(r => r.getBoundingClientRect().height) < 110, "rows are small, several a screen");
+    await page.locator(".hl-sq").first().waitFor();
+    assert.equal(await page.locator(".hl-row").count(), 0, "no Today rows: a phone that had Today shows Wallet");
+    continue;
   } else {
     await page.locator(".hl-sq").first().waitFor();
     const g = await page.evaluate(() => { const a = [...document.querySelectorAll(".hl-sqpic")].map(x => x.getBoundingClientRect()); return { w: a[0].width, h: a[0].height, row: Math.abs(a[0].top - a[1].top) < 1 }; });
@@ -233,7 +232,7 @@ for (const look of ["today", "wallet"]) {
   await page.locator(".rl-sheet").last().waitFor(); await page.waitForTimeout(450); await page.locator(".rl-back").last().click({ position: { x: 20, y: 20 } }); await page.locator(".rl-back").waitFor({ state: "detached" });
 }
 await page.evaluate(() => localStorage.setItem("relay-home-look", "cards"));
-console.log("ok - Home's other layouts: Today (summary, then small rows) and Wallet (two big squares a row, labels), polished, each opens its page");
+console.log("ok - Home's other layouts: Today is gone (it shows Wallet) and Wallet (two big squares a row, labels), polished, each opens its page");
 
 // 3. From Home: All receipts, the bell (how many things are watched) and, through Receipts and Browse, Returns & swaps and
 //    Wrapped, each open their page. (The four tiles under the old wallet are gone; these are where each now lives.)

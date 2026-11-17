@@ -419,7 +419,7 @@
     ".rl-sheet h2{font-family:var(--rl-sys);font-weight:700;font-size:24px;margin:0 0 6px;letter-spacing:-.01em}" +
     ".rl-sheet p{margin:0 0 14px;color:var(--rl-text2);font-size:15px;line-height:1.45}" +
     ".rl-sheet input{width:100%;box-sizing:border-box;padding:14px 16px;border:1px solid var(--rl-line);border-radius:16px;font-size:16px;background:var(--rl-card);margin-bottom:12px}" +
-    ".rl-btn{display:block;width:100%;border:0;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;background:#c7f567;color:#0f1b33;cursor:pointer}" +
+    ".rl-btn{display:block;width:100%;border:0;border-radius:999px;padding:14px 18px;font-size:16px;font-weight:600;background:#101828;color:#fff;cursor:pointer}.rl-jr .rl-btn:not(.ghost),.rl-signin .rl-btn:not(.ghost),.rl-sperm .rl-btn:not(.ghost){background:#fff;color:#101828}.rl-mk-tabs button[aria-pressed=true],.rl-pill.rl-pill-on,.rl-wr-kinds button.on{background:#101828!important;color:#fff!important}" +
     ".rl-btn.ghost{background:transparent;border:1px solid var(--rl-line);color:var(--rl-text);margin-top:10px}" +
     ".rl-btn:disabled{opacity:.6}.rl-msg{min-height:20px;font-size:14px;margin:8px 0 0;color:var(--rl-accent)}.rl-msg.err{color:var(--rl-danger)}" +
     ".rl-order{border:1px solid var(--rl-line);border-radius:18px;padding:12px 14px;margin:10px 0;background:var(--rl-card)}" +
@@ -461,9 +461,9 @@
     ".rl-rg-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'l c' 'v c';align-items:center;column-gap:12px;row-gap:1px;width:100%;box-sizing:border-box;min-height:56px;padding:10px 14px;margin:0 0 8px;border:1px solid var(--rl-line);border-radius:14px;background:var(--rl-card);font:inherit;text-align:left;cursor:pointer;color:var(--rl-text)}" +
     ".rl-rg-l{grid-area:l;font-size:13px;color:var(--rl-text2)}.rl-rg-row b{grid-area:v;min-width:0;font-size:16px;overflow-wrap:anywhere}.rl-rg-c{grid-area:c;display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:700;color:var(--rl-accent)}" +
     ".rl-rg-next{margin:14px 0 0;padding:12px 14px;border-radius:14px;background:var(--rl-accent-bg);color:var(--rl-accent);font-size:14px;line-height:1.45}" +
-    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:7px 18px;border-radius:999px;border:1px solid var(--rl-line);font-weight:800;font-size:14px;background:var(--rl-card);color:var(--rl-text)}.rl-wr-years button.on{background:#101828;color:#c7f567;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:8px 17px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#c7f567;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
-    ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:#101828;color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#c7f567;font-size:12px;font-weight:900;letter-spacing:2px}@media(max-width:520px){.rl-wr-cover{padding:24px 22px}}" +
-    ".rl-wr-play{all:unset;cursor:pointer;box-sizing:border-box;display:inline-flex;align-items:center;min-height:52px;background:#c7f567;color:#16210a;font-weight:900;padding:0 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(199,245,103,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
+    ".rl-wr-years{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}.rl-wr-years button{all:unset;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:7px 18px;border-radius:999px;border:1px solid var(--rl-line);font-weight:800;font-size:14px;background:var(--rl-card);color:var(--rl-text)}.rl-wr-years button.on{background:#101828;color:#C9D8FF;border-color:#101828}.rl-wr-kinds{display:flex;gap:8px;overflow-x:auto;margin:-4px -2px 14px;padding:2px;scrollbar-width:none}.rl-wr-kinds::-webkit-scrollbar{display:none}.rl-wr-kinds button{all:unset;flex:none;cursor:pointer;box-sizing:border-box;min-height:44px;display:inline-flex;align-items:center;padding:8px 17px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-weight:750;font-size:14px}.rl-wr-kinds button.on{background:#C9D8FF;color:#16210a;box-shadow:inset 0 0 0 1.5px #16210a}" +
+    ".rl-wr-cover{position:relative;overflow:hidden;border-radius:28px;padding:30px 28px;background:#101828;color:#fff;margin-bottom:16px}.rl-wr-cover h2{font-size:clamp(30px,4vw,44px);letter-spacing:-1.5px;line-height:1.05;margin:10px 0;color:#fff;max-width:560px}.rl-wr-cover p{color:#d4d4e5;margin:0 0 18px;font-size:15px}.rl-wr-kicker{color:#C9D8FF;font-size:12px;font-weight:900;letter-spacing:2px}@media(max-width:520px){.rl-wr-cover{padding:24px 22px}}" +
+    ".rl-wr-play{all:unset;cursor:pointer;box-sizing:border-box;display:inline-flex;align-items:center;min-height:52px;background:#C9D8FF;color:#16210a;font-weight:900;padding:0 26px;border-radius:999px;font-size:16px;box-shadow:0 10px 30px rgba(201,216,255,.25)}.rl-wr-play:hover{transform:translateY(-1px)}" +
     ".rl-wr-glance{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:24px;padding:20px;margin-bottom:16px}.rl-wr-glance h3{margin:0 0 12px;font-size:18px;color:var(--rl-text)}.rl-wr-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rl-wr-stats div{background:var(--rl-fill);border-radius:16px;padding:14px}.rl-wr-stats span{display:block;font-size:13px;color:var(--rl-text2);font-weight:700}.rl-wr-stats strong{display:block;font-size:20px;color:var(--rl-text);margin:4px 0;word-break:break-word}.rl-wr-stats small{font-size:13px;color:var(--rl-text2)}.rl-wr-note{font-size:12px;color:var(--rl-text2);margin:12px 0 0}" +
     ".rl-story{position:fixed;inset:0;z-index:10050;background:rgba(5,8,18,.92);display:flex;align-items:center;justify-content:center}.rl-story-frame{position:relative;width:min(440px,100vw);height:min(820px,100dvh);border-radius:26px;overflow:hidden;transition:background .5s,color .5s;cursor:pointer;user-select:none;-webkit-user-select:none}@media(max-width:500px){.rl-story-frame{border-radius:0}}" +
     ".rl-story-bars{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:4px;z-index:2}.rl-story-bars div{flex:1;height:3px;border-radius:3px;background:rgba(127,127,127,.35);overflow:hidden}.rl-story-bars i{display:block;height:100%;width:0;background:currentColor}.rl-story-bars .done i{width:100%}.rl-story-bars .now i{animation:rlbar linear forwards}.rl-story-frame.paused .rl-story-bars .now i{animation-play-state:paused}@keyframes rlbar{to{width:100%}}" +
@@ -506,14 +506,14 @@
     ".rl-inpage .rl-ahead{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:14px 16px}.rl-inpage .rl-agroup:first-of-type{margin-top:18px}.rl-inpage .rl-wr-cover{margin-bottom:10px}" +
     ".rl-story-slide .badges{display:grid;gap:10px;margin-top:16px}.rl-story-slide .badges div{border:2px solid currentColor;border-radius:18px;padding:12px 14px;opacity:0;animation:rlup .5s forwards}.rl-story-slide .badges b{display:block;font-size:19px;color:var(--accent)}.rl-story-slide .badges small{font-size:13px;opacity:.85}" +
     ".rl-wr-strip{display:flex;gap:8px;overflow-x:auto;margin:4px 0 2px}.rl-wr-strip figure{margin:0;flex:none;width:96px}.rl-wr-strip .im{width:96px;height:96px;border-radius:14px;background:var(--rl-fill);overflow:hidden}.rl-wr-strip img{width:100%;height:100%;object-fit:contain}.rl-wr-strip figcaption{font-size:12px;color:var(--rl-text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-    ".rl-story-slide .sum{background:#1f3d2b;border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#c7f567;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
+    ".rl-story-slide .sum{background:#1f3d2b;border-radius:24px;padding:22px}.rl-story-slide .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.rl-story-slide .sumgrid span{display:block;font-size:12px;opacity:.75;font-weight:700}.rl-story-slide .sumgrid strong{display:block;font-size:20px;word-break:break-word}.rl-story-slide .acts{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}.rl-story-slide .acts button{all:unset;cursor:pointer;background:#C9D8FF;color:#16210a;font-weight:900;padding:12px 20px;border-radius:999px}.rl-story-slide .acts button.ghost{background:transparent;color:inherit;border:1px solid rgba(255,255,255,.4)}" +
     ".rl-po-status.urgent{background:#fde7e4;color:#a5281d}.rl-skel{min-height:132px;background:linear-gradient(90deg,var(--rl-card),var(--rl-fill),var(--rl-card));background-size:200% 100%;animation:rlsk 1.2s infinite}@keyframes rlsk{to{background-position:-200% 0}}" +
     ".rl-empty{background:var(--rl-card);border:1px dashed var(--rl-line);border-radius:22px;padding:22px}.rl-empty h3{margin:0 0 6px;font-size:18px;color:var(--rl-text)}.rl-empty p{margin:0 0 12px;color:var(--rl-text2);font-size:14px}" +
     ".rl-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));grid-auto-rows:1fr;gap:12px;margin-top:8px}" +
     // Receipts as a grid of colourful tiles, one per kind of shopping, each with a tinted photo of something bought there.
     ".rl-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:2px 0 0}@media(min-width:761px){.rl-tiles{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}}" +
     ".rl-tile{all:unset;box-sizing:border-box;position:relative;display:block;overflow:hidden;isolation:isolate;aspect-ratio:16/10;min-height:100px;border-radius:14px;color:#fff;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .16s ease}" +
-    ".rl-tile:active{transform:scale(.96);transition-duration:.06s}.rl-tile:focus-visible{outline:3px solid var(--rl-accent,#c7f567);outline-offset:3px}" +
+    ".rl-tile:active{transform:scale(.96);transition-duration:.06s}.rl-tile:focus-visible{outline:3px solid var(--rl-accent,#C9D8FF);outline-offset:3px}" +
     ".rl-tile b{position:absolute;left:13px;right:10px;bottom:11px;z-index:2;font-size:20px;line-height:1.12;font-weight:700;letter-spacing:-.2px;text-wrap:balance;overflow-wrap:anywhere}" +
     ".rl-tile .rl-tile-pic{position:absolute;z-index:1;top:-16%;right:-20%;height:140%;width:auto;aspect-ratio:1;object-fit:cover;mix-blend-mode:multiply;filter:grayscale(1) contrast(1.2) brightness(1.04)}" +
     ".rl-tile .rl-tile-art{position:absolute;z-index:1;top:-14%;right:-12%;width:68%;height:auto;color:rgba(0,0,0,.2)}" +
@@ -525,7 +525,7 @@
     "#view .rl-ptiles .rl-tile.rl-ptile{min-height:112px}" +
     ".rl-tile.rl-ptile b{position:static;font-size:19px;padding-right:6px}.rl-tile.rl-ptile .rl-tile-badge{position:static;align-self:flex-start;max-width:100%;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".rl-tile.rl-ptile .rl-tile-art{width:62%;top:-10%;right:-10%;color:rgba(0,0,0,.18)}.rl-tile.rl-ptile .rl-tile-badge[style*='none']+b{margin-top:auto}" +
-    ".rl-tile.rl-year{background:#c7f567;color:#101828}.rl-tile.rl-year .rl-year-n{position:absolute;left:11px;top:8px;z-index:1;font-size:clamp(44px,13.5vw,60px);line-height:1;font-weight:900;letter-spacing:-.06em;color:inherit}" +
+    ".rl-tile.rl-year{background:#C9D8FF;color:#101828}.rl-tile.rl-year .rl-year-n{position:absolute;left:11px;top:8px;z-index:1;font-size:clamp(44px,13.5vw,60px);line-height:1;font-weight:900;letter-spacing:-.06em;color:inherit}" +
     ".rl-search{display:flex;align-items:center;gap:8px;min-height:44px;margin:0 0 16px;padding:0 14px;border-radius:12px;background:var(--rl-fill);color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input{all:unset;flex:1;min-width:0;min-height:44px;font-size:17px;color:var(--rl-text)}.rl-search input::placeholder{color:var(--rl-text2,rgba(60,60,67,.6))}" +
     ".rl-search input::-webkit-search-cancel-button{-webkit-appearance:none}" +
@@ -541,7 +541,7 @@
     ".rl-ar-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}" +
     ".rl-ar-t b{font-size:15px;font-weight:600;line-height:1.3;color:var(--rl-text);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
     ".rl-ar-t span{font-size:13px;line-height:1.35;color:var(--rl-text2);overflow-wrap:anywhere}.rl-ar-t .rl-ar-note{color:var(--rl-accent);font-weight:600}.rl-ar-note:empty{display:none}" +
-    ".rl-ar-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;min-height:44px;min-width:72px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#c7f567;color:#101828;font-size:15px;font-weight:700}" +
+    ".rl-ar-add{all:unset;box-sizing:border-box;cursor:pointer;flex:none;min-height:44px;min-width:72px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;background:#C9D8FF;color:#101828;font-size:15px;font-weight:700}" +
     ".rl-ar-add:disabled{cursor:default}.rl-ar-add.done{background:var(--rl-accent-bg);color:var(--rl-accent)}" +
     ".rl-ar-h{margin:28px 2px 4px;font-size:20px;font-weight:700;letter-spacing:-.01em;color:var(--rl-text)}" +
     ".rl-ar-help{margin:0 2px 12px;font-size:15px;line-height:1.4;color:var(--rl-text2)}" +
@@ -592,7 +592,7 @@
     ".rl-acard{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;overflow:hidden}" +
     ".rl-arow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:56px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
     ".rl-arow+.rl-arow{border-top:1px solid var(--rl-line)}.rl-arow:active{background:var(--rl-fill)}.rl-arow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
-    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.rl-ai.rl-ai-tint{color:#fff}" +
+    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.rl-ai.rl-ai-tint{background:none;color:var(--rl-text2);width:28px;border-radius:0}.rl-arow .rl-ai svg{width:22px;height:22px}html:not(.ri-colour):not(.ri-soft) .rl-arow .rl-ai,html:not(.ri-colour):not(.ri-soft) .rl-aout .rl-ai{background:none;width:28px;border-radius:0}html:not(.ri-colour):not(.ri-soft) .rl-arow:not(.danger) .rl-ai{color:var(--rl-text2)}html.ri-colour .rl-ai.rl-ai-tint{background:var(--ai);color:#fff;width:34px;border-radius:10px}html.ri-soft .rl-ai.rl-ai-tint{background:color-mix(in srgb,var(--ai) 14%,transparent);color:var(--ai);width:34px;border-radius:10px}" +
     ".rl-arow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}.rl-arow-t b{font-size:16px;font-weight:650;color:var(--rl-text)}.rl-arow-d{font-size:13.5px;color:var(--rl-text2)}" +
     ".rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2)}" +
     ".rl-arow.danger b{color:var(--rl-danger)}.rl-arow.danger .rl-ai{background:#fde8e6;color:#b3261e}" +
@@ -684,7 +684,7 @@
     ".rl-jart .rl-jbig .rl-jic{color:#fff}.rl-jart .rl-jhi{font-size:30px;font-weight:800;color:#fff;border-radius:99px}.rl-jchip{position:absolute;background:#fff;color:#101828;font-size:13px;font-weight:700;border-radius:99px;padding:7px 12px;box-shadow:0 6px 18px rgba(16,24,40,.18);animation:rljfloat .6s .15s cubic-bezier(.2,.8,.2,1) both}" +
     ".rl-jchip+.rl-jchip{animation-delay:.3s}" +
     ".rl-jcards{position:relative;width:190px;height:112px}.rl-jcardart{position:absolute;width:150px;height:94px;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;justify-content:space-between;font-size:13px;font-weight:700;animation:rljfan .6s cubic-bezier(.2,.9,.3,1.1) both}" +
-    ".rl-jcardart:nth-child(1){background:#c7f567;color:#101828;left:0;top:14px;--r:-8deg}.rl-jcardart:nth-child(2){background:#4F72E0;color:#fff;left:40px;top:4px;--r:6deg;animation-delay:.12s}" +
+    ".rl-jcardart:nth-child(1){background:#C9D8FF;color:#101828;left:0;top:14px;--r:-8deg}.rl-jcardart:nth-child(2){background:#4F72E0;color:#fff;left:40px;top:4px;--r:6deg;animation-delay:.12s}" +
     ".rl-jcardart i{display:block;width:30px;height:22px;border-radius:5px;background:rgba(255,255,255,.55)}.rl-jcardart:nth-child(1) i{background:rgba(16,24,40,.18)}" +
     "@keyframes rljpop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}@keyframes rljfloat{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}" +
     "@keyframes rljfan{from{opacity:0;transform:translateY(24px) rotate(0)}to{opacity:1;transform:rotate(var(--r))}}" +
@@ -694,7 +694,7 @@
     // Getting started, Relay's navy throughout (Connor, 17 Nov 2026): segments for the steps, a picture made of real things,
     // short words, and the buttons kept at the bottom.
     ".rl-jsegs{display:flex;gap:6px;justify-content:center;align-items:center}.rl-jsegs i{display:block;width:26px;height:5px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;position:relative}" +
-    ".rl-jsegs i.on{background:#c7f567}.rl-jsegs i.now{background:rgba(255,255,255,.18)}.rl-jsegs i.now::after{content:\"\";position:absolute;inset:0;background:#c7f567;transform-origin:left;animation:rljseg .5s .1s cubic-bezier(.2,.8,.2,1) both}" +
+    ".rl-jsegs i.on{background:#C9D8FF}.rl-jsegs i.now{background:rgba(255,255,255,.18)}.rl-jsegs i.now::after{content:\"\";position:absolute;inset:0;background:#C9D8FF;transform-origin:left;animation:rljseg .5s .1s cubic-bezier(.2,.8,.2,1) both}" +
     "@keyframes rljseg{from{transform:scaleX(0)}to{transform:scaleX(1)}}" +
     ".rl-jr .rl-jbody{display:flex;flex-direction:column;min-height:calc(100dvh - 76px - env(safe-area-inset-top))}" +
     ".rl-jr h2.rl-jh{font-size:clamp(28px,8.4vw,34px);line-height:1.08;letter-spacing:-.02em;margin:0 0 8px}.rl-jr p.rl-jsub{font-size:16px;line-height:1.42;margin:0 0 18px}" +
@@ -709,25 +709,25 @@
     ".rl-jfan1{top:110px;z-index:3;--r:-2deg;animation-delay:.22s}.rl-jfan2{top:56px;z-index:2;--r:4deg;transform:rotate(4deg) scale(.95);opacity:.9;animation-delay:.12s}.rl-jfan3{top:8px;z-index:1;--r:-5deg;transform:rotate(-5deg) scale(.9);opacity:.75;animation-delay:.02s}" +
     "@keyframes rljcard{from{opacity:0;transform:translateY(26px) rotate(var(--r,0deg)) scale(.92)}}" +
     ".rl-jrc.rl-jfan1{transform:rotate(-2deg)}" +
-    ".rl-jtick{position:absolute;right:-8px;top:-10px;width:30px;height:30px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}.rl-jtick .rl-jic{color:#101828;margin:0}" +
+    ".rl-jtick{position:absolute;right:-8px;top:-10px;width:30px;height:30px;border-radius:50%;background:#C9D8FF;color:#101828;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}.rl-jtick .rl-jic{color:#101828;margin:0}" +
     "@keyframes rljpop{from{transform:scale(0)}to{transform:scale(1)}}" +
     ".rl-jbfan{width:250px;height:196px}.rl-jbc{position:absolute;left:0;width:236px;height:146px;border-radius:20px;padding:16px;box-sizing:border-box;color:#fff;box-shadow:0 16px 32px rgba(0,0,0,.32);display:flex;flex-direction:column;justify-content:space-between;animation:rljcard .7s cubic-bezier(.2,.8,.2,1) both}" +
     ".rl-jbc b{font-size:16px;letter-spacing:.01em;text-shadow:0 1px 2px rgba(0,0,0,.2)}.rl-jbc .rl-jmark{width:38px;height:38px;border-radius:10px}" +
     ".rl-jbc-chip{position:absolute;right:18px;top:20px;width:34px;height:26px;border-radius:6px;background:rgba(255,255,255,.35)}" +
     ".rl-jbc.rl-jfan1{top:50px;left:10px;z-index:3;transform:rotate(-3deg);--r:-3deg;animation-delay:.22s}.rl-jbc.rl-jfan2{top:14px;left:40px;z-index:2;transform:rotate(8deg) scale(.92);--r:8deg;animation-delay:.12s}.rl-jbc.rl-jfan3{top:6px;left:-26px;z-index:1;transform:rotate(-13deg) scale(.88);--r:-13deg;animation-delay:.02s}" +
-    ".rl-jpill{position:absolute;right:-10px;bottom:-12px;padding:7px 12px;border-radius:99px;background:#c7f567;color:#101828;font-size:13px;font-weight:800;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}" +
-    ".rl-jface{width:116px;height:116px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;letter-spacing:-.02em;animation:rljpop .5s .1s cubic-bezier(.2,1.4,.4,1) both}" +
-    ".rl-jorbit{position:relative;width:100%;height:216px}.rl-jbigtick{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;animation:rljpop .5s .05s cubic-bezier(.2,1.4,.4,1) both}.rl-jbigtick .rl-jic{color:#101828;margin:0}" +
+    ".rl-jpill{position:absolute;right:-10px;bottom:-12px;padding:7px 12px;border-radius:99px;background:#C9D8FF;color:#101828;font-size:13px;font-weight:800;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jface{width:116px;height:116px;border-radius:50%;background:#C9D8FF;color:#101828;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;letter-spacing:-.02em;animation:rljpop .5s .1s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jorbit{position:relative;width:100%;height:216px}.rl-jbigtick{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;background:#C9D8FF;color:#101828;display:flex;align-items:center;justify-content:center;animation:rljpop .5s .05s cubic-bezier(.2,1.4,.4,1) both}.rl-jbigtick .rl-jic{color:#101828;margin:0}" +
     ".rl-jorb{position:absolute;width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 3px #101828;animation:rljpop .45s cubic-bezier(.2,1.4,.4,1) both}" +
     ".rl-jconn{padding:4px 14px}.rl-jconn .rl-jrow{gap:12px}.rl-jconn .rl-jlogo{width:36px;height:36px;border-radius:10px}.rl-jconn .rl-jrow>div{flex:1;min-width:0}.rl-jconn .rl-jrow b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-    ".rl-jok{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(199,245,103,.16);color:#c7f567;display:flex;align-items:center;justify-content:center}.rl-jok .rl-jic{color:#c7f567;margin:0}" +
+    ".rl-jok{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(201,216,255,.16);color:#C9D8FF;display:flex;align-items:center;justify-content:center}.rl-jok .rl-jic{color:#C9D8FF;margin:0}" +
     ".rl-jsmall{font-size:13px!important;font-weight:700;color:var(--rl-text2);margin:18px 0 8px!important}" +
     ".rl-jadds{display:flex;gap:10px}.rl-jadd{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-height:48px;border-radius:14px;border:1px dashed rgba(255,255,255,.28);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px;color:#fff;transition:transform .12s,background-color .12s}" +
-    ".rl-jadd:active{transform:scale(.97);background:rgba(255,255,255,.06)}.rl-jadd:focus-visible{outline:2px solid #fff;outline-offset:2px}.rl-jadd .rl-jic{color:#c7f567;margin:0}.rl-jadd:disabled{opacity:.5}" +
-    ".rl-jstats{display:flex;gap:10px;margin:4px 0 0}.rl-jstat{flex:1;padding:16px 14px;border-radius:18px;background:var(--rl-card);display:flex;flex-direction:column;gap:2px}.rl-jstat b{font-size:30px;font-weight:800;letter-spacing:-.02em;color:#c7f567;line-height:1.1}.rl-jstat span{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-jadd:active{transform:scale(.97);background:rgba(255,255,255,.06)}.rl-jadd:focus-visible{outline:2px solid #fff;outline-offset:2px}.rl-jadd .rl-jic{color:#C9D8FF;margin:0}.rl-jadd:disabled{opacity:.5}" +
+    ".rl-jstats{display:flex;gap:10px;margin:4px 0 0}.rl-jstat{flex:1;padding:16px 14px;border-radius:18px;background:var(--rl-card);display:flex;flex-direction:column;gap:2px}.rl-jstat b{font-size:30px;font-weight:800;letter-spacing:-.02em;color:#C9D8FF;line-height:1.1}.rl-jstat span{font-size:13px;color:var(--rl-text2)}" +
     ".rl-jr .rl-jscan{background:transparent;padding:0;margin:0 0 16px}.rl-jr .rl-jscan[hidden]{display:none}.rl-jr .rl-jscan-t{gap:10px}.rl-jr .rl-jscan b{font-size:15px}.rl-jr .rl-jscan span{font-size:13px}" +
-    ".rl-jdot{flex:none;width:10px;height:10px;border-radius:50%;background:#c7f567;box-shadow:0 0 0 0 rgba(199,245,103,.6);animation:rljdot 1.6s infinite}.rl-jscan.done .rl-jdot{animation:none}" +
-    "@keyframes rljdot{70%{box-shadow:0 0 0 10px rgba(199,245,103,0)}100%{box-shadow:0 0 0 0 rgba(199,245,103,0)}}" +
+    ".rl-jdot{flex:none;width:10px;height:10px;border-radius:50%;background:#C9D8FF;box-shadow:0 0 0 0 rgba(201,216,255,.6);animation:rljdot 1.6s infinite}.rl-jscan.done .rl-jdot{animation:none}" +
+    "@keyframes rljdot{70%{box-shadow:0 0 0 10px rgba(201,216,255,0)}100%{box-shadow:0 0 0 0 rgba(201,216,255,0)}}" +
     ".rl-jr .rl-jscan .rl-jbar{margin-top:10px}.rl-jr .rl-jscan.done .rl-jbar{display:none}.rl-jr .rl-jscan-t{align-items:center}" +
     "@media(prefers-reduced-motion:reduce){.rl-jrc,.rl-jbc,.rl-jtick,.rl-jpill,.rl-jface,.rl-jbigtick,.rl-jorb,.rl-jsegs i.now::after,.rl-jdot{animation:none!important}}" +
     ".rl-jbody{padding:8px 2px 4px}.rl-jkick{font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--rl-accent);margin:6px 0 6px}" +
@@ -753,15 +753,15 @@
     ".rl-2s-st{flex:none;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text2)}.rl-2s-st.on{background:var(--rl-accent-bg);color:var(--rl-accent)}" +
     ".rl-sheet .rl-2s p{font-size:14px;margin:0 0 12px}.rl-2s .rl-btn.ghost{margin-top:0}" +
     ".rl-codes{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:16px;line-height:1.9;white-space:pre-line;word-break:break-all;-webkit-user-select:all;user-select:all;border:1px solid var(--rl-line);border-radius:14px;padding:10px 14px;margin:0 0 12px;background:var(--rl-sheet);color:var(--rl-text)}" +
-    ".rl-jscan{background:#101828;color:#fff;border-radius:18px;padding:16px;margin:0 0 18px}.rl-jscan-t{display:flex;gap:12px;align-items:center}.rl-jscan .rl-jic{color:#c7f567;width:36px;height:36px;border-radius:10px;background:rgba(199,245,103,.12)}" +
+    ".rl-jscan{background:#101828;color:#fff;border-radius:18px;padding:16px;margin:0 0 18px}.rl-jscan-t{display:flex;gap:12px;align-items:center}.rl-jscan .rl-jic{color:#C9D8FF;width:36px;height:36px;border-radius:10px;background:rgba(201,216,255,.12)}" +
     ".rl-jscan b{display:block;font-size:17px}.rl-jscan span{display:block;font-size:13.5px;color:#c9d0df}" +
-    ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#c7f567;border-radius:99px;transition:width .6s ease}" +
+    ".rl-jbar{height:6px;border-radius:99px;background:rgba(255,255,255,.14);margin-top:14px;overflow:hidden}.rl-jbar i{display:block;height:100%;width:6%;background:#C9D8FF;border-radius:99px;transition:width .6s ease}" +
     "@media(prefers-reduced-motion:reduce){.rl-jbar i,.rl-dots span{transition:none}}" +
     // Full pages: every step of signing in and getting started fills the screen, in a column, instead of a sheet over the app.
     ".rl-back:has(>.rl-jr){background:var(--rl-bg);align-items:stretch;justify-content:stretch}" +
     // Getting started carries on in Relay's navy from the welcome story and the sign-in page (Connor, 17 Nov 2026: the
     // white steps looked blank). Its own colours, so every card, row, field and button on these steps follows.
-    ".rl-back:has(>.rl-jr){--rl-bg:#101828;--rl-sheet:#101828;--rl-card:#1c2740;--rl-text:#fff;--rl-text2:rgba(235,235,245,.72);--rl-line:rgba(255,255,255,.14);--rl-fill:rgba(255,255,255,.1);--rl-accent:#c7f567;--rl-accent-bg:rgba(199,245,103,.15);color:#fff;color-scheme:dark}" +
+    ".rl-back:has(>.rl-jr){--rl-bg:#101828;--rl-sheet:#101828;--rl-card:#1c2740;--rl-text:#fff;--rl-text2:rgba(235,235,245,.72);--rl-line:rgba(255,255,255,.14);--rl-fill:rgba(255,255,255,.1);--rl-accent:#C9D8FF;--rl-accent-bg:rgba(201,216,255,.15);color:#fff;color-scheme:dark}" +
     ".rl-back:has(>.rl-jr)>.rl-sheet{max-width:none;width:100%;height:100%;min-height:100%;max-height:none;border-radius:0;box-shadow:none;background:var(--rl-bg);padding:env(safe-area-inset-top) max(18px,calc((100% - 480px) / 2)) calc(28px + env(safe-area-inset-bottom) + var(--rl-kb,0px))}" +
     ".rl-back:has(>.rl-jr) .rl-jtop{margin:0 -8px;padding:6px 0;background:var(--rl-bg);-webkit-backdrop-filter:none;backdrop-filter:none}" +
     // The sign-in page: Relay's navy whatever the phone's setting (as the welcome story), the name, a little wallet of
@@ -769,15 +769,15 @@
     ".rl-choices{display:grid;gap:10px;margin:6px 0 4px}" +
     ".rl-choice,.rl-textbtn{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;cursor:pointer;text-align:center;transition:transform .12s,background-color .12s,opacity .12s}" +
     ".rl-choice{min-height:54px;padding:0 18px;border-radius:999px;background:#fff;color:#101828;font-size:17px;font-weight:700}.rl-choice:active{transform:scale(.97);background:#dfe5f0}" +
-    ".rl-textbtn{min-height:48px;margin-top:8px;color:#c7f567;font-size:16px;font-weight:700}.rl-textbtn:active{opacity:.6}.rl-textbtn .rl-jic{color:inherit;margin:0}" +
+    ".rl-textbtn{min-height:48px;margin-top:8px;color:#C9D8FF;font-size:16px;font-weight:700}.rl-textbtn:active{opacity:.6}.rl-textbtn .rl-jic{color:inherit;margin:0}" +
     ".rl-choice:focus-visible,.rl-textbtn:focus-visible{outline:2px solid #fff;outline-offset:3px}" +
     ".rl-back:has(>.rl-signin),.rl-back>.rl-sheet.rl-signin{background:#101828;color:#fff}" +
     ".rl-back>.rl-sheet.rl-signin{display:flex;flex-direction:column}.rl-signin .rl-jbody{flex:1;display:flex;flex-direction:column;padding-top:0}" +
     ".rl-back:has(>.rl-signin) .rl-jtop{background:#101828}.rl-signin .rl-abtn{color:#fff}.rl-signin .rl-abtn .rl-jic{color:#fff}" +
     ".rl-signin .rl-abtn:active{background:rgba(255,255,255,.12)}.rl-signin .rl-abtn:focus-visible{outline-color:#fff}.rl-signin .rl-wbrand{margin:6px 0 0}" +
     ".rl-sheet.rl-signin h2.rl-jh{color:#fff;font-size:clamp(30px,9vw,36px);margin:0 0 8px}.rl-sheet.rl-signin p.rl-jsub{color:rgba(255,255,255,.8);font-size:17px;line-height:1.4;margin:0 0 22px}" +
-    ".rl-sheet.rl-signin p.rl-jlegal{color:rgba(255,255,255,.72);margin-top:18px}.rl-signin .rl-jlegal a{color:#c7f567}" +
-    ".rl-signin .rl-msg{color:#c7f567}.rl-signin .rl-msg.err{color:#ffb4ab}" +
+    ".rl-sheet.rl-signin p.rl-jlegal{color:rgba(255,255,255,.72);margin-top:18px}.rl-signin .rl-jlegal a{color:#C9D8FF}" +
+    ".rl-signin .rl-msg{color:#C9D8FF}.rl-signin .rl-msg.err{color:#ffb4ab}" +
     // What Relay does with the inbox, on the navy page: four short lines with lime icons, the full wording a tap away.
     // Getting started's banks and cards: a tile each, three to a row, its logo over its name.
     ".rl-jbanks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}" +
@@ -787,7 +787,7 @@
     ".rl-jbank-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;overflow:hidden}.rl-jbank-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:inset 0 0 0 1px rgba(60,60,67,.14)}" +
     ".rl-jbank>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}" +
     ".rl-sperm{margin:4px 0 0;text-align:center}.rl-sperm-panel{text-align:left;margin:4px 0 0;padding:6px 16px 14px;border-radius:18px;background:rgba(255,255,255,.07)}" +
-    ".rl-sperm .rl-jpt{color:#fff;font-size:15px;padding:6px 0}.rl-sperm .rl-jpt .rl-jic{color:#c7f567}" +
+    ".rl-sperm .rl-jpt{color:#fff;font-size:15px;padding:6px 0}.rl-sperm .rl-jpt .rl-jic{color:#C9D8FF}" +
     ".rl-sperm .rl-sperm-more{min-height:44px;margin:0 auto;font-size:15px}" +
     ".rl-sperm .rl-jpt+.rl-jpt{border-top-color:rgba(255,255,255,.12)}" +
     ".rl-sperm .rl-jwords{background:transparent;padding:0;margin:4px 0 0}.rl-sperm .rl-jwords:focus-visible{outline-color:#fff}" +
@@ -822,10 +822,10 @@
     ".rl-wini{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px}" +
     ".rl-wcard-t{min-width:0}.rl-wcard-t b{display:block;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-wcard-t span{display:block;font-size:13px;color:#4b5563}.rl-wprice{font-size:16px}" +
     ".rl-wart-receipts .rl-wcard:nth-child(1){rotate:-3deg}.rl-wart-receipts .rl-wcard:nth-child(2){rotate:2deg;translate:14px 0}.rl-wart-receipts .rl-wcard:nth-child(3){rotate:-1.5deg;translate:-4px 0}" +
-    ".rl-wpill{justify-self:start;background:#c7f567;color:#16210a;border-radius:999px;padding:8px 14px;font-weight:800;font-size:14px;margin-top:4px}" +
+    ".rl-wpill{justify-self:start;background:#C9D8FF;color:#16210a;border-radius:999px;padding:8px 14px;font-weight:800;font-size:14px;margin-top:4px}" +
     ".rl-wnote{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.92);border-radius:18px;padding:10px 14px 10px 10px;font-weight:700;font-size:15px;color:#101828;box-shadow:0 8px 24px rgba(0,0,0,.14);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}.rl-wnote img{width:26px;height:26px;border-radius:7px;flex:none}" +
     ".rl-wdue{grid-column:1/-1;margin-top:8px}.rl-wtrack{height:8px;border-radius:99px;background:#f3dde5;overflow:hidden}.rl-wtrack i{display:block;height:100%;width:78%;background:#E0446E;border-radius:99px}.rl-wdue span{display:block;margin-top:6px;font-size:13px;font-weight:700;color:#a61e47}" +
-    ".rl-wdrop{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;margin-top:4px}.rl-wdrop b{font-size:30px;letter-spacing:-.02em}.rl-wdrop s{color:#4b5563;font-size:16px}.rl-wdrop span{margin-left:auto;background:#c7f567;color:#16210a;border-radius:999px;padding:5px 10px;font-weight:800;font-size:13px}" +
+    ".rl-wdrop{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;margin-top:4px}.rl-wdrop b{font-size:30px;letter-spacing:-.02em}.rl-wdrop s{color:#4b5563;font-size:16px}.rl-wdrop span{margin-left:auto;background:#C9D8FF;color:#16210a;border-radius:999px;padding:5px 10px;font-weight:800;font-size:13px}" +
     ".rl-wyear{font-size:15px;font-weight:800}.rl-wtiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
     ".rl-wtile{border-radius:18px;padding:14px;min-height:84px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18)}.rl-wtile span{font-size:14px;font-weight:700}.rl-wtile b{font-size:22px;letter-spacing:-.01em}" +
     // One reveal per slide.
@@ -873,7 +873,7 @@
     ".rl-ret-steps{display:flex;flex-direction:column;gap:4px;margin:4px 0}.rl-ret-steps>span{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--rl-text2)}.rl-ret-steps>span.done{color:var(--rl-accent);font-weight:600}.rl-ret-steps .rl-jic{margin:0;flex:none}" +
     ".rl-rc-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}" +
     ".rl-pill{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:999px;background:rgba(120,120,128,.16);color:var(--rl-text);font-size:15px;font-weight:700;text-align:center;text-decoration:none;transition:transform .12s,opacity .12s}" +
-    ".rl-pill:active{transform:scale(.96)}.rl-pill:disabled{opacity:.5;cursor:default}.rl-pill:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pill.rl-pill-on{background:var(--lime,#c7f567);color:var(--navy,#101828)}" +
+    ".rl-pill:active{transform:scale(.96)}.rl-pill:disabled{opacity:.5;cursor:default}.rl-pill:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pill.rl-pill-on{background:var(--lime,#C9D8FF);color:var(--navy,#101828)}" +
     ".rl-rc-ask{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rl-line)}.rl-rc-ask>span{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.35;color:var(--rl-text)}.rl-rc-ask .rl-pill{padding:0 20px}" +
     ".rl-rc-group{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:12px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}" +
     ".rl-rc-pickw{position:relative;display:inline-flex;align-items:center}.rl-rc-pickw .rl-jic{position:absolute;right:0;pointer-events:none;margin:0;color:var(--rl-text2)}" +
@@ -926,7 +926,7 @@
     // Swap & resell: a segmented switch between its three parts, and its cards and form.
     ".rl-mk-tabs{display:flex;gap:4px;margin:10px 0 6px;padding:4px;border-radius:14px;background:var(--rl-fill)}" +
     ".rl-mk-tabs button{all:unset;box-sizing:border-box;flex:1;min-height:44px;display:grid;place-items:center;border-radius:11px;font-size:15px;font-weight:700;color:var(--rl-text);cursor:pointer;-webkit-tap-highlight-color:transparent}" +
-    ".rl-mk-tabs button[aria-pressed=true]{background:#c7f567;color:#101828}.rl-mk-tabs button:active{transform:scale(.97)}.rl-mk-tabs button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".rl-mk-tabs button[aria-pressed=true]{background:#C9D8FF;color:#101828}.rl-mk-tabs button:active{transform:scale(.97)}.rl-mk-tabs button:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".rl-mk-lead{font-size:15px;line-height:1.45;color:var(--rl-text2)}.rl-mk-skel{min-height:110px;margin:10px 0;border-radius:18px}" +
     ".rl-mk-area{display:flex;gap:8px;align-items:center;margin:12px 0;color:var(--rl-text2)}.rl-mk-area .rl-jic{margin:0;flex:none}" +
     ".rl-mk-area input,.rl-mk-form input:not([type=checkbox]),.rl-mk-form select,.rl-mk-select{box-sizing:border-box;width:100%;min-width:0;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--rl-line);border-radius:12px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text)}" +
@@ -973,7 +973,7 @@
     ".rl-se-card>span{display:block;margin-top:2px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-se-note{margin:8px 0 0;font-size:15px;line-height:1.4;color:var(--rl-text)}" +
     ".rl-se-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.rl-se-acts .rl-pill{padding:0 16px}.rl-se-body{margin-top:12px}.rl-se-body .rl-hp-rows{margin:0 0 10px}" +
     ".rl-se-body .rl-hp-row:first-child{border-top:0}" +
-    ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#c7f567;color:#101828;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
+    ".rl-rr-picw{position:relative;flex:none;display:block}.rl-rr-gift{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:999px;display:grid;place-items:center;background:#C9D8FF;color:#101828;box-shadow:0 0 0 2px var(--rl-card)}.rl-rr-gift.rl-jic{margin:0}" +
     ".rl-btn.ghost.rl-plain{border-color:transparent;margin-top:2px}" +
     ".rl-mk-photos{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.rl-mk-photos img{width:72px;height:72px;object-fit:cover;border-radius:12px;background:var(--rl-fill)}.rl-mk-thumb{all:unset;cursor:pointer;position:relative;width:72px;height:72px;border-radius:12px;overflow:hidden}.rl-mk-thumb img{width:100%;height:100%;object-fit:cover;display:block}.rl-mk-thumb-x{position:absolute;right:4px;top:4px;background:rgba(255,255,255,.92);border-radius:8px;padding:3px;color:#101828}.rl-mk-thumb:active{opacity:.7}.rl-mk-addph{display:inline-flex;align-items:center;gap:6px;min-height:44px;max-width:220px}" +
     ".rl-rr-detail{padding:0 14px 14px}.rl-rr-items{font-size:14px;color:var(--rl-text2);margin:0 0 8px}.rl-rr-list{list-style:none;margin:0 0 8px;padding:0}.rl-rr-list li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-top:1px solid var(--rl-line);font-size:15px;line-height:20px;color:var(--rl-text)}.rl-rr-list li:first-child{border-top:0}.rl-rr-list li b{flex:none;font-weight:600}.rl-rr-more{all:unset;cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:15px;font-weight:600;color:var(--rl-accent)}.rl-rr-more:active{opacity:.6}.rl-rr-acts{display:flex;gap:8px;margin:10px 0 0}.rl-rr-move{margin-top:10px;width:100%;min-height:44px}.rl-rr-note{display:block;font-size:13px;color:var(--rl-text2);margin-top:4px}" +
@@ -1084,9 +1084,9 @@
     ".rl-slide-t{position:absolute;top:0;bottom:0;left:56px;right:0;display:flex;align-items:center;justify-content:center;padding:0 12px;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;pointer-events:none}" +
     ".rl-slide-tl{left:0;right:auto;justify-content:center;padding:0 0 0 12px;color:#fff}.rl-slide-t[hidden]{display:none}" +
     ".rl-slide-m{position:absolute;visibility:hidden;white-space:nowrap;font-size:17px;font-weight:600;left:0;top:0;pointer-events:none}" +
-    ".rl-slide-k{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:#c7f567;color:#101828;display:grid;place-items:center;cursor:grab;touch-action:none}" +
+    ".rl-slide-k{position:absolute;left:4px;top:4px;width:48px;height:48px;border-radius:50%;background:#C9D8FF;color:#101828;display:grid;place-items:center;cursor:grab;touch-action:none}" +
     ".rl-slide-k:active{cursor:grabbing}.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:transform .28s cubic-bezier(.2,.9,.3,1.2),width .28s cubic-bezier(.2,.9,.3,1.2)}" +
-    ".rl-slide.busy .rl-slide-k,.rl-slide.off .rl-slide-k{cursor:default}.rl-slide.off{opacity:.55}.rl-slide.done{background:#c7f567;color:#101828}.rl-slide.done .rl-slide-fill{opacity:0}" +
+    ".rl-slide.busy .rl-slide-k,.rl-slide.off .rl-slide-k{cursor:default}.rl-slide.off{opacity:.55}.rl-slide.done{background:#C9D8FF;color:#101828}.rl-slide.done .rl-slide-fill{opacity:0}" +
     ".rl-slide-k .rl-jic{color:#101828!important;margin:0}" +
     "@media(prefers-reduced-motion:reduce){.rl-slide.back .rl-slide-k,.rl-slide.back .rl-slide-fill{transition:none}}" +
     // For screen readers and keyboards: the same bid as an ordinary button, shown when it has the keyboard's focus.
@@ -1108,8 +1108,8 @@
     ".rl-calm-door{margin-top:16px}" +
     ".rl-wr-door{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:12px;margin-top:14px;padding:16px 16px 16px 18px;border-radius:20px;background:#101828;border:1px solid rgba(255,255,255,.1);color:#fff;transition:transform .15s,opacity .15s;-webkit-tap-highlight-color:transparent}" +
     ".rl-wr-door:active{transform:scale(.985);opacity:.9}.rl-wr-door:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}" +
-    ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#c7f567;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
-    ".rl-wr-door-t b{font-size:19px;line-height:24px;font-weight:700;color:#fff}.rl-wr-door-t span{font-size:14px;line-height:19px;color:#d4d4e5}.rl-wr-door .rl-arow-c{flex:none;color:#c7f567}" +
+    ".rl-wr-door-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:3px}.rl-wr-door-t i{font-style:normal;color:#C9D8FF;font-size:12px;line-height:16px;font-weight:800;letter-spacing:1.6px}" +
+    ".rl-wr-door-t b{font-size:19px;line-height:24px;font-weight:700;color:#fff}.rl-wr-door-t span{font-size:14px;line-height:19px;color:#d4d4e5}.rl-wr-door .rl-arow-c{flex:none;color:#C9D8FF}" +
     "@media(prefers-reduced-motion:reduce){.rl-wr-door{transition:none}.rl-wr-door:active{transform:none}}" +
     ".rl-calm-bar{display:flex;gap:8px;align-items:center;margin:0 0 2px}" +
     ".rl-calm-filter{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;min-height:44px;display:flex;align-items:center;gap:10px;padding:0 12px 0 14px;border-radius:12px;background:var(--rl-card);color:var(--rl-text);font-size:16px;font-weight:600;transition:background .15s;-webkit-tap-highlight-color:transparent}" +
@@ -1132,7 +1132,7 @@
     ".h2-chips{display:flex;gap:4px;overflow-x:auto;margin:0 -16px 6px;padding:0 16px;scrollbar-width:none}.h2-chips::-webkit-scrollbar{display:none}" +
     ".h2-chip{all:unset;box-sizing:border-box;flex:none;height:44px;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent}" +
     ".h2-chip>span{display:inline-flex;align-items:center;height:38px;padding:0 16px;border-radius:999px;font-size:15px;line-height:20px;font-weight:600;color:var(--rl-text2);white-space:nowrap;transition:background .15s,color .15s}" +
-    ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
+    ".h2-chip[aria-pressed=true]>span{background:var(--rl-fill);color:var(--rl-text)}.h2-chip>span{border:1px solid transparent}.h2-chip[aria-pressed=true]>span{background:#101828;color:#fff}.h2-chip-go>span{gap:7px;padding:0 14px 0 11px;background:var(--rl-card);color:var(--rl-text);border-color:var(--rl-line);box-shadow:0 1px 3px rgba(16,24,40,.08)}.h2-chip-go .h2-chip-ic{display:inline-flex}.h2-chip-first{margin-left:8px}.h2-chip:active>span{opacity:.7}.h2-chip:focus-visible>span{outline:2px solid var(--rl-text);outline-offset:2px}" +
     ".h2-feed{display:flex;flex-direction:column;gap:16px}.h2-feed>*{scroll-snap-align:start}.h2-feed>.h2-nosnap{scroll-snap-align:none}" +
     // Two other ways Home can look (Connor, 15 Nov), chosen in Profile, Home layout: "today" (what needs you, then a list) and
     // "wallet" (your latest things as photo squares). Neither snaps one card per flick.
@@ -1175,9 +1175,9 @@
     "html.look-q .h2-feed.tint .h2-card.has-c+.h2-strip{background:var(--h2-c);box-shadow:none;color:#fff}" +
     // N, navy and lime: every card Relay's navy (a step lighter than the black page in dark), lime for the arrow and the open tab.
     "html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#101828;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-head-t span,html.look-n .h2-feed.tint .h2-card .h2-line-t span{color:rgba(255,255,255,.72)}" +
-    "html.look-n .h2-feed.tint .h2-card .h2-go{background:#c7f567;color:#101828}html.look-n .h2-feed.tint .h2-card .h2-logo:not(.rl-has-logo){background:#fff;color:#101828}" +
-    "html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#1d2a44;box-shadow:none;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:#c7f567!important}html.look-n .h2-feed.tint .h2-card .h2-pic:has(.rl-ill){background:transparent}" +
-    "html.look-n .footnav button.active{background:#c7f567!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#c7f567}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#c7f567;color:#101828}" +
+    "html.look-n .h2-feed.tint .h2-card .h2-go{background:#C9D8FF;color:#101828}html.look-n .h2-feed.tint .h2-card .h2-logo:not(.rl-has-logo){background:#fff;color:#101828}" +
+    "html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#1d2a44;box-shadow:none;color:#fff}html.look-n .h2-feed.tint .h2-card .h2-art.rl-ill{background:rgba(255,255,255,.08)!important;color:#C9D8FF!important}html.look-n .h2-feed.tint .h2-card .h2-pic:has(.rl-ill){background:transparent}" +
+    "html.look-n .footnav button.active{background:#C9D8FF!important;color:#101828!important}html.look-n .rl-ask-qi{background:#101828;color:#C9D8FF}html.look-n .rl-asktab .rl-chat-send .rl-jic{background:#C9D8FF;color:#101828}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){html.look-n .h2-feed.tint .h2-card,html.look-n .h2-feed.tint .h2-card.has-c{background:#17223a}html.look-n .h2-feed.tint .h2-card+.h2-strip{background:#223050}html.look-n .rl-ask-qi{background:#17223a}}" +
     // S, softer: the same category colours at lower strength; dark text on the pale cards, white on the deep ones.
     "html.look-s .h2-feed.tint .h2-card.has-c{background:color-mix(in srgb,var(--h2-c) 16%,#fff);color:#000}html.look-s .h2-feed.tint .h2-card.has-c .h2-head-t span,html.look-s .h2-feed.tint .h2-card.has-c .h2-line-t span{color:rgba(0,0,0,.66)}" +
@@ -1188,7 +1188,7 @@
     // Interests: chips of 44px or more with one of Relay's drawings; the chosen ones in the accent colour.
     // First-run tips: the page dimmed except the tab the tip is about (lit, with a lime ring), and a card pointing at it.
     ".rl-tip-layer{position:fixed;inset:0;z-index:9990}" +
-    ".rl-tip-ring{position:fixed;border-radius:999px;box-shadow:0 0 0 200vmax rgba(0,0,0,.55);border:3px solid #c7f567;box-sizing:border-box;pointer-events:none;transition:left .25s,top .25s,width .25s,height .25s}" +
+    ".rl-tip-ring{position:fixed;border-radius:999px;box-shadow:0 0 0 200vmax rgba(0,0,0,.55);border:3px solid #C9D8FF;box-sizing:border-box;pointer-events:none;transition:left .25s,top .25s,width .25s,height .25s}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-tip-ring{box-shadow:0 0 0 200vmax rgba(0,0,0,.7)}}" +
     ".rl-tip{position:fixed;left:16px;right:16px;max-width:420px;margin:0 auto;background:var(--rl-sheet);color:var(--rl-text);border-radius:22px;padding:18px 18px 16px;box-shadow:0 12px 40px rgba(0,0,0,.25)}" +
     ".rl-tip-layer.side .rl-tip{right:auto;width:340px;margin:0}" +
@@ -1266,7 +1266,7 @@
     ".rl-ask-find{all:unset;box-sizing:border-box;cursor:pointer;align-self:flex-end;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--rl-accent);font-size:15px;font-weight:600;text-align:right;transition:opacity .12s}.rl-ask-find:active{opacity:.55}.rl-ask-find:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px;border-radius:10px}" +
     // Outlines while the page is being worked out.
     ".rl-ask-sk .rl-skel{display:block;min-height:0;margin:0;border:0}.rl-ask-sk-t{display:flex;gap:8px;margin:0 0 20px}.rl-ask-sk-r{display:flex;align-items:center;gap:12px;height:64px}" +
-    ".rl-b2-doors{margin-top:22px}.rl-b2-doors .rl-agroup{margin-top:0}" +
+    ".rl-b2-doors{margin-top:22px}#dcRoot:has(#browseGrid .bg-sec) .rl-b2-doors{display:none}#browsePage .rl-ys{margin-bottom:18px}.rl-b2-doors .rl-agroup{margin-top:0}" +
     ".rl-arow-t b{font-weight:600}.rl-arow-d{font-size:14px}.rl-rr-mid b{font-size:16px;font-weight:600}.rl-rr-mid span{font-size:14px}.rl-rr-end b{font-size:16px;font-weight:600}";
   document.head.appendChild(calmCss);
   function el(tag, props, kids) {
@@ -1280,7 +1280,7 @@
   var TILE_COLOURS = { fashion: "#E0446E", food: "#D47B1F", electronics: "#4F72E0", home: "#2E9E5B", beauty: "#B455C9", travel: "#6662D9",
     digital: "#14918A", experiences: "#E0612F", other: "#7A7F8C", shop: "#2B3A5C",
     // Gifts aren't a kind of shopping: the tile of what you bought for other people is Relay's own lime, with navy text.
-    gifts: "#C7F567" };
+    gifts: "#C9D8FF" };
   // A wrapped present, for gifts (drawn lines, never an emoji).
   var GIFT_PATH = '<rect x="3.5" y="8" width="17" height="4.5" rx="1.2"/><path d="M5 12.5v8h14v-8M12 8v12.5"/><path d="M12 8C10.6 5.2 7.6 4 6.8 5.6 6.1 7 8.4 8 12 8Zm0 0c1.4-2.8 4.4-4 5.2-2.4.7 1.4-1.6 2.4-5.2 2.4Z"/>';
   var CAT_ICONS = {
@@ -1293,7 +1293,7 @@
     experiences: ["#FFEDD5", "#9A3412", '<path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5v2a2.5 2.5 0 0 0 0 5v2a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5v-2a2.5 2.5 0 0 0 0-5Z"/><path d="M14.5 6v12" stroke-dasharray="1.5 2"/>'],
     digital: ["#CCFBF1", "#115E59", '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M10 9.2v5.6l4.6-2.8Z"/>'],
     other: ["#F1F5F9", "#334155", '<path d="M6.5 3.5h11v17l-1.85-1.2-1.85 1.2-1.8-1.2-1.85 1.2-1.8-1.2-1.85 1.2Z"/><path d="M9.5 8h5M9.5 11.5h5M9.5 15h3"/>'],
-    shop: ["rgba(199,245,103,.16)", "#c7f567", '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>'],
+    shop: ["rgba(201,216,255,.16)", "#C9D8FF", '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>'],
     gifts: ["rgba(16,24,40,.1)", "#101828", GIFT_PATH]
   };
   function catIcon(k, size) {
@@ -4364,7 +4364,7 @@
         if (!b.messages.length) log.appendChild(el("p", { text: "No messages yet. Say hello and agree how this will work." }));
         b.messages.forEach(function (m) {
           log.appendChild(el("div", { text: m.body, style: "margin:6px 0;padding:8px 12px;border-radius:14px;max-width:85%;font-size:15px;" +
-            (m.mine ? "margin-left:auto;background:#c7f567;color:#0f1b33" : "background:var(--rl-fill);color:var(--rl-text)") }));
+            (m.mine ? "margin-left:auto;background:#101828;color:#fff" : "background:var(--rl-fill);color:var(--rl-text)") }));
         });
         log.scrollTop = log.scrollHeight;
         input.style.display = send.style.display = isOpen ? "" : "none";
@@ -4586,7 +4586,8 @@
       });
     }
     function sellCard(i) {
-      var card = el("div", { className: "rl-order" }, [el("b", { text: i.title }), el("span", { text: [i.store, i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : null, dayOf(i.orderDate)].filter(Boolean).join(" · ") })]);
+      var paidAt = (i.pricePence != null ? "Paid " + money(i.pricePence, i.currency) : "Bought") + (i.store ? " at " + i.store : "") + (dayOf(i.orderDate) ? " on " + dayOf(i.orderDate) : "");
+      var card = el("div", { className: "rl-order" }, [el("b", { text: cleanName(i.title, i.store) || i.title }), el("span", { text: paidAt })]);
       if (i.returnWindowOpen === true) card.appendChild(el("span", { className: "rl-mk-warn", text: "You can still return this to the shop for a refund" + (dayOf(i.returnDeadline) ? " until " + dayOf(i.returnDeadline) : "") + "." }));
       var start = el("button", { type: "button", className: "rl-btn", text: "List this", onclick: function () {
         start.remove();
@@ -4649,6 +4650,7 @@
   // and Back returns here. Detail that used to crowd one long sheet now sits one tap away. ----
   var ACC_IC = {
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     camera: '<path d="M4 8h3.2L9 5.5h6L16.8 8H20v11H4z"/><circle cx="12" cy="13.2" r="3.4"/>',
     image: '<rect x="4" y="5" width="16" height="14" rx="2.2"/><circle cx="9.2" cy="10" r="1.6"/><path d="M20 15.5l-4.5-4.5L7 19"/>',
     filter: '<path d="M4 7h8.5M19.5 7h.5M4 17h.5M11.5 17H20"/><circle cx="16" cy="7" r="2.6"/><circle cx="8" cy="17" r="2.6"/>',
@@ -4690,7 +4692,7 @@
   // Profile's colours, from the Receipts tiles' set (TILE_COLOURS): each kind of thing keeps its own, as tile or row icon.
   var ACC_TINT = { mail: "#4F72E0", pin: "#14918A", bell: "#6662D9", swap: "#E0446E", gavel: "#E0612F", paste: "#B455C9", doc: "#7A7F8C", bag: "#2B3A5C",
     face: "#2E9E5B", lock: "#4F72E0", devices: "#6662D9", phone: "#2E9E5B", card: "#B455C9", shield: "#14918A", download: "#4F72E0", help: "#D47B1F",
-    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E", gear: "#7A7F8C", layout: "#E0446E" };
+    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E", gear: "#7A7F8C", layout: "#E0446E", check: "#2E9E5B" };
   // One row: icon (a white drawing on its colour), label, an optional line underneath, and a chevron (or an arrow for pages
   // that open outside the app).
   function accRow(icon, label, detail, onclick, opts) {
@@ -4701,7 +4703,7 @@
     var props = { className: "rl-arow" + (opts.danger ? " danger" : "") };
     if (opts.href) { props.href = opts.href; } else { props.type = "button"; props.onclick = onclick; }
     var pic = accIc(icon);
-    if (!opts.danger && ACC_TINT[icon]) { pic.classList.add("rl-ai-tint"); pic.style.background = ACC_TINT[icon]; }
+    if (!opts.danger && ACC_TINT[icon]) { pic.classList.add("rl-ai-tint"); pic.style.setProperty("--ai", ACC_TINT[icon]); }
     var row = el(tag, props, [pic, el("span", { className: "rl-arow-t" }, [el("b", { text: label }), sub]), accIc(opts.href ? "ext" : "chev", 18, "rl-arow-c")]);
     row.setDetail = function (t) { sub.textContent = t || ""; sub.style.display = t ? "" : "none"; };
     return row;
@@ -5339,10 +5341,10 @@
       var ver = el("p", { className: "rl-afoot rl-aver" }); b.appendChild(ver);
       try { caches.keys().then(function (k) { var v = k.map(function (x) { return (/^relay-shell-v(\d+)$/.exec(x) || [])[1]; }).filter(Boolean).sort(function (a, c) { return c - a; })[0]; if (v) ver.textContent = "Version " + v; }, function () {}); } catch (e) {}
     }
-    // Which Home: Wallet (photo squares), Today (a list) or Cards (one big card at a time). Kept on this phone.
+    // Which Home: Wallet (photo squares) or Cards (Today was taken away, Connor 17 Nov 2026; anyone on it has Wallet) (one big card at a time). Kept on this phone.
     function homeLookPage(b) {
       var now = homeLook(), msg2 = el("div", { className: "rl-msg" }); msg2.setAttribute("role", "status");
-      var opts = [["wallet", "Wallet", "Big photos of what you bought, four to a screen"], ["today", "Today", "A list, with what's happening to each order"], ["cards", "Cards", "One big card at a time"]];
+      var opts = [["wallet", "Wallet", "Big photos of what you bought, four to a screen"], ["cards", "Cards", "One big card at a time"]];
       b.appendChild(accGroup("", opts.map(function (o) {
         var r = accRow("layout", o[1], o[2], function () { setHomeLook(o[0]); say(msg2, o[1] + " is your Home now."); setTimeout(settingsAgain, 500); });
         r.setAttribute("aria-pressed", o[0] === now ? "true" : "false");
@@ -6597,6 +6599,10 @@
     if (!s || !s.token) return;
     var fresh = api("/relay/my/receipts?all=1");
     var shops = el("div", { className: "rl-ys" }); host.appendChild(shops); mountYourShops(shops, fresh);
+    // Swap & resell, Auctions, Shops on Relay and Wrapped are in Home's top bar now, not under Browse's endless products
+    // (Connor, 17 Nov 2026). Your shops comes first.
+    // Without products to browse (most shoppers, before shops agree), they stay here too, so Browse is never bare; with
+    // products they're hidden (CSS: #dcRoot:has(.bg-sec)), as nobody reaches the end of those.
     var go = function (m) { return function () { if (opts.open) opts.open(m); }; };
     var auRow = accRow("gavel", "Auctions", opts.auctions ? opts.auctions + " live now" : "", go("auctions")); auRow.setAttribute("data-door", "auctions");
     host.appendChild(el("div", { className: "rl-b2-doors" }, [accGroup("", [accRow("swap", "Swap & resell", "", go("market")), auRow, accRow("bag", "Shops on Relay", "", go("shops"))])]));
@@ -6789,7 +6795,7 @@
     var fashion = chapters.filter(function (c) { return c.category === "fashion"; })[0];
     var style = fashion ? wrappedStyle(w) : null;
     // 1. The year.
-    S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
+    S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("div", { className: "k", text: "RELAY WRAPPED " + w.year }));
       b.appendChild(el("h1", { text: "Your " + w.year + ", one receipt at a time." }));
       var fb = w.firstBuy;
@@ -6797,7 +6803,7 @@
       b.appendChild(el("p", { text: w.receipts + " receipts and " + w.shops + (w.shops === 1 ? " shop" : " shops") + " later, here's your year." }));
     } });
     // 2. The total.
-    if (w.coverage.withTotal) S.push({ bg: "#14532d", fg: "#fff", accent: "#c7f567", build: function (b) {
+    if (w.coverage.withTotal) S.push({ bg: "#14532d", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
       b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
@@ -6809,7 +6815,7 @@
     // 3. Where it went: every kind of shopping as one bar, then a line each.
     var kinds = (w.industries || []).filter(function (k) { return k.spentPence > 0 || k.receipts > 0; });
     var total = kinds.reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
-    if (kinds.length > 1 && total > 0) S.push({ bg: "#111827", fg: "#fff", accent: "#c7f567", build: function (b) {
+    if (kinds.length > 1 && total > 0) S.push({ bg: "#111827", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Where it went" }));
       var stack = el("div", { className: "stack" });
       kinds.forEach(function (k, i) { var pct = k.spentPence / total * 100; if (pct < 0.5) return;
@@ -6873,7 +6879,7 @@
     } });
     // For everyone else: the receipts the shopper tagged as presents, and who for (only names they typed themselves).
     var gf = w.gifts, many = function (n, one, more) { return n + " " + (n === 1 ? one : more); };
-    if (gf && gf.count) S.push({ bg: "#c7f567", fg: "#101828", accent: "#101828", build: function (b) {
+    if (gf && gf.count) S.push({ bg: "#C9D8FF", fg: "#101828", accent: "#101828", build: function (b) {
       b.appendChild(el("div", { className: "k", text: "FOR EVERYONE ELSE" }));
       b.appendChild(scene("gifts"));
       if (gf.withTotal) { var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, gf.spentPence, gbp, 1100); }
@@ -6892,12 +6898,12 @@
       if (lines.childNodes.length) b.appendChild(lines);
     } });
     var giftPhotos = gf ? (gf.list || []).filter(function (x) { return x.photoId; }).slice(0, 4).map(function (x) { return { id: x.photoId, item: x.item, more: x.more, shop: x.shop }; }) : [];
-    if (giftPhotos.length) S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", build: function (b) {
+    if (giftPhotos.length) S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: giftPhotos.length === 1 ? "Something you gave" : "Some things you gave" }));
       b.appendChild(photoGrid(giftPhotos, "ph"));
     } });
     var bd = w.badges || [];
-    if (bd.length) S.push({ bg: "#c7f567", fg: "#16210a", accent: "#16210a", build: function (b) {
+    if (bd.length) S.push({ bg: "#C9D8FF", fg: "#16210a", accent: "#16210a", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: bd.length === 1 ? "Your badge" : "Your badges" }));
       var g = el("div", { className: "badges" });
       bd.slice(0, 4).forEach(function (x, i) { g.appendChild(el("div", { style: "animation-delay:" + (0.2 + i * 0.2) + "s" }, [el("b", { text: x.label }), el("small", { text: x.why })])); });
@@ -6909,7 +6915,7 @@
       b.appendChild(el("p", { text: w.personality.why }));
     } });
     // 6. The card to keep or share.
-    S.push({ bg: "#101828", fg: "#fff", accent: "#c7f567", summary: true, build: function (b, again, close) {
+    S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", summary: true, build: function (b, again, close) {
       var title = "My " + w.year + " on Relay", c0 = chapters[0];
       var card = el("div", { className: "sum" }, [el("div", { className: "k", text: title.toUpperCase() })]);
       var rows = [["Spent", w.coverage.withTotal ? gbp(w.spentPence) : "—"], ["Top shop", top ? top.name : "—"], ["Biggest chapter", c0 ? KIND[c0.category].label : "—"],
@@ -7095,7 +7101,7 @@
       b.setAttribute("data-tab", t[0]); tabs.appendChild(b);
     });
     function draw() {
-      Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "#c7f567" : "transparent"; });
+      Array.prototype.forEach.call(tabs.children, function (b) { b.style.background = b.getAttribute("data-tab") === cur ? "var(--rl-accent-bg)" : "transparent"; });
       body.textContent = "";
       if (cur === "browse") browse(); else if (cur === "mine") mine(); else sell();
     }
@@ -8630,12 +8636,12 @@
     var foot = el("div"); host.appendChild(foot);
     // A new shopper with no email connected yet: the first thing they see is how to bring their receipts in.
     var start = el("div"); host.insertBefore(start, head);
-    if (isReview()) start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+    if (isReview()) start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
       el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
       el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
     else cachedGet("gmail", "/relay/my/gmail").then(function (g) {
       if (!g.ok || !g.body || g.body.connected || !document.body.contains(start)) return;
-      start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+      start.appendChild(el("div", { className: "rl-po", style: "margin:0 0 16px;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
         el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
         el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and fills in your wallet.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
         el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } })]));
@@ -8695,7 +8701,7 @@
     kids.push(accIc("chev", 18, "rl-arow-c"));
     return el("button", { type: "button", className: "rl-crow", onclick: onTap }, kids);
   }
-  function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.background = ACC_TINT[name]; } return i; }
+  function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.setProperty("--ai", ACC_TINT[name]); } return i; }
   function leftWords(d) { return d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left"; }
   function dayWords(day) { return new Date(String(day).slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); }
   // ---- Draft 2: Home is a feed, one card for each order ----
@@ -8798,7 +8804,7 @@
   // Which Home: "wallet" (the default since Connor chose it, 15 Nov), "today", or "cards" (the big cards, one per flick).
   // Kept on this device with ?home=… or relay-home-look; the app's own default otherwise.
   var HOME_LOOKS = ["cards", "today", "wallet"], HOME_LOOK_KEY = "relay-home-look";
-  function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1]; var v = localStorage.getItem(HOME_LOOK_KEY); return HOME_LOOKS.indexOf(v) >= 0 ? v : "wallet"; } catch (e) { return "wallet"; } }
+  function homeLook() { try { var q = /[?&]home=(cards|today|wallet)\b/.exec(location.search); if (q) return q[1] === "cards" ? "cards" : "wallet"; var v = localStorage.getItem(HOME_LOOK_KEY); return v === "cards" ? v : "wallet"; } catch (e) { return "wallet"; } }
   function setHomeLook(v) { try { localStorage.setItem(HOME_LOOK_KEY, v); } catch (e) {} }
   var tapOnce = function (fn) { var busy = false; return function () { if (busy) return; busy = true; setTimeout(function () { busy = false; }, 600); fn(); }; };
   var hlPic = function (e, cls) { var box = el("span", { className: cls }), art = el("span", { className: "h2-art" }); art.setAttribute("aria-hidden", "true"); box.appendChild(art); if (e.tiles && e.tiles[0]) e.tiles[0].draw(art); return box; };
@@ -8816,7 +8822,7 @@
   // lululemon Align™ High-R…", "Nespresso Nespresso" and "W Restfeel Slide TOPK/TOPK…"): no shop name in front of it, no
   // ™ or ®, no stock codes on the end, and nothing at all when it's only the shop's name again.
   function cleanName(name, shop) {
-    var n = String(name || "").replace(/[™®©]/g, "").replace(/\s+/g, " ").trim(), sh = String(shop || "").trim();
+    var n = String(name || "").replace(/[™®©]/g, "").replace(/\s+/g, " ").trim().replace(/^(item|product)\s*:\s*/i, ""), sh = String(shop || "").trim();
     if (sh && n.toLowerCase().indexOf(sh.toLowerCase() + " ") === 0) n = n.slice(sh.length).trim();
     n = n.replace(/(\s+[A-Z0-9]{3,}(\/[A-Z0-9]{2,})+.*)$/, "").replace(/\s+[A-Z]{2,}\d[A-Z0-9-]*$/, "").replace(/^[\s,:-]+|[\s,:-]+$/g, "");
     if (!n || (sh && n.toLowerCase() === sh.toLowerCase())) return "";
@@ -8971,7 +8977,7 @@
     var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
     // A brand-new account: one card that says what to do first.
     var startCard = function () {
-      return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+      return el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
         el("h3", { text: "Bring in your receipts", style: "margin:0;font-size:19px" }),
         el("p", { text: "Connect Gmail or Outlook and Relay finds your order emails, keeps track of return deadlines and shows them here.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45" }),
         el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } }),
@@ -9000,17 +9006,18 @@
         chips.appendChild(b);
       });
       // The rest of Relay, a tap from Home and scrolled to sideways (Connor, 17 Nov 2026): these open their own pages.
-      [["Swap & resell", function () { window.dcShow && window.dcShow("market"); }], ["Auctions", function () { window.dcShow && window.dcShow("auctions"); }],
-        ["Shops on Relay", function () { window.dcShow && window.dcShow("shops"); }], isReview() ? null : ["Wrapped", function () { window.go && window.go("wrapped"); }]].forEach(function (c) {
+      [["Swap & resell", function () { window.dcShow && window.dcShow("market"); }, "swap"], ["Auctions", function () { window.dcShow && window.dcShow("auctions"); }, "gavel"],
+        ["Shops on Relay", function () { window.dcShow && window.dcShow("shops"); }, "bag"], isReview() ? null : ["Wrapped", function () { window.go && window.go("wrapped"); }, "spark"]].forEach(function (c, i) {
         if (!c) return;
-        var b = el("button", { type: "button", className: "h2-chip h2-chip-go", onclick: tapOnce(c[1]) });
-        b.appendChild(el("span", { text: c[0] }));
+        var b = el("button", { type: "button", className: "h2-chip h2-chip-go" + (i === 0 ? " h2-chip-first" : ""), onclick: tapOnce(c[1]) });
+        var ico = accIc(c[2], 18, "h2-chip-ic"); ico.style.color = ACC_TINT[c[2]] || "#D47B1F";
+        b.appendChild(el("span", {}, [ico, el("span", { text: c[0] })]));
         chips.appendChild(b);
       });
       chips.style.display = "";
       feed.textContent = "";
       if (state.pick === "you") {
-        if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #cfe3a6;background:var(--rl-accent-bg)" }, [
+        if (isReview()) feed.appendChild(el("div", { className: "rl-po h2-start", style: "margin:0;border:1.5px solid #c7d5f5;background:var(--rl-accent-bg)" }, [
           el("h3", { text: "Shop with this email", style: "margin:0;font-size:19px" }),
           el("p", { text: "Orders you place at shops that use Relay with " + (s.email || "this account's email") + " show up here. You can swap a size or colour until the shop sends the order.", style: "margin:0;color:var(--rl-text2);font-size:15px;line-height:1.45;overflow-wrap:anywhere" })]));
         else if (state.connected === false) feed.appendChild(startCard());
@@ -9023,10 +9030,16 @@
             sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } })); }
       }
       if (state.pick === "watch" && !watched.length) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "Nothing watched yet. Tap the heart on something in Browse and Relay tells you when its price drops." }));
+      // Watched things without a photo yet: Browse's products give it (asked once, only when Watching is opened).
+      if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
+        memo.watchPicsAsked = true;
+        if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(); }, { once: true }); }
       if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
         var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
         feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
-            draw: function (box) { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); } }],
+            draw: function (box) { var drawIt = function () { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); };
+              // The shop's own photo of what's watched (Connor, 17 Nov 2026), or a drawing when there isn't one.
+              if (w.image && /^https:\/\//.test(w.image)) { var ph = el("img", { src: w.image, alt: "", referrerPolicy: "no-referrer" }); ph.onerror = function () { ph.remove(); box.classList.remove("rl-has-photo"); drawIt(); }; box.classList.add("rl-has-photo"); box.appendChild(ph); } else drawIt(); } }],
           line: drop ? "Down " + money(was - now, w.currency || "GBP") + " since you started watching" : now !== null ? "Watching the price" : was !== null ? "Watching since it was " + money(was, w.currency || "GBP") : "Watching the price",
           open: function () { if (window.relayOpenProduct) window.relayOpenProduct(w.sku, w.product); } }));
       });
@@ -9175,7 +9188,7 @@
       var list = part === "box" ? [] : (r.body && r.body.suggestions) || [];
       list.forEach(function (x) {
         var when = x.paidAt ? new Date(x.paidAt).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-        var card = el("div", { className: "rl-po", style: "margin:0 0 18px;border:2px solid #cfe3a6" });
+        var card = el("div", { className: "rl-po", style: "margin:0 0 18px;border:2px solid #c7d5f5" });
         card.appendChild(el("div", { className: "eyebrow", text: "IS THIS YOURS?" }));
         card.appendChild(el("h3", { text: money(x.amountMinor, x.currency) + " at " + x.store, style: "margin:4px 0" }));
         card.appendChild(el("p", { className: "small muted", style: "margin:0 0 10px", text: when + (x.last4 ? " · " + (x.brand ? x.brand.charAt(0) + x.brand.slice(1).toLowerCase().replace(/_/g, " ") : "Card") + " ending " + x.last4 : "") +
