@@ -8,6 +8,7 @@ import { sharedForExport } from "./shared-emails.js";
 import { crossSwapsForExport } from "./cross-swap.js";
 import { deliveryForExport } from "./delivery.js";
 import { auctionsForExport } from "./auctions.js";
+import { ensureBankColumns } from "./bank.js";
 const json = (body, status, cors) => Response.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
 const iso = (ms) => (Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null);
 
@@ -35,6 +36,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
   const totp = await one("SELECT enabled, enabled_at AS enabledAt FROM auth_totp WHERE shopper_id = ?", id);
   const devices = await one("SELECT COUNT(*) AS n FROM push_subscriptions WHERE shopper_id = ?", id);
   const sessions = await rows("SELECT created_at AS createdAt, expires_at AS expiresAt FROM auth_sessions WHERE shopper_id = ? AND expires_at > ?", id, now);
+  await ensureBankColumns(db);   // TrueLayer's label column (added 17 Nov 2026), so the payments below are always read
   const myRequests = "(SELECT id FROM resale_requests WHERE asker_id = ? OR listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ?))";
 
   return {
@@ -94,7 +96,7 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
     banks: {
       connections: (await rows("SELECT id, bank, connected_at AS at, synced_at AS synced FROM bank_links WHERE shopper_id = ? ORDER BY connected_at", id))
         .map((r) => ({ id: r.id, bank: r.bank, connectedAt: iso(r.at), lastRead: iso(r.synced) })),
-      payments: (await rows("SELECT account, paid_on AS date, amount_minor AS pence, currency, description, merchant, receipt_id AS receiptId, match FROM bank_payments WHERE shopper_id = ? ORDER BY paid_on", id)),
+      payments: (await rows("SELECT account, paid_on AS date, amount_minor AS pence, currency, description, merchant, classification AS bankLabel, receipt_id AS receiptId, match FROM bank_payments WHERE shopper_id = ? ORDER BY paid_on", id)),
       // Payments you said weren't yours, and shops you said nothing from is yours.
       notMine: (await rows("SELECT kind, key, created_at AS at FROM bank_not_mine WHERE shopper_id = ? ORDER BY created_at", id).catch(() => [])).map((r) => ({ kind: r.kind, key: r.key, at: iso(r.at) }))
     },
