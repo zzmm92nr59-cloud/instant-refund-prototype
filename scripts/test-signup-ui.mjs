@@ -331,6 +331,8 @@ await sheet.getByText("1 inbox connected").waitFor();
 await sheet.getByText("1 bank or card connected").waitFor();
 await polished("all set, with a bank"); await page.screenshot({ path: "/tmp/shots/signup-banks-done.png" });
 // Coming back from the bank having said no: the same step, saying so, nothing listed.
+// (Off the page first: clearing storage under the open app makes it sign out and reload, which can cut across the next goto.)
+await page.goto("about:blank"); await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.clear()); reset({ name: "Connor", accepted: true, connected: true, provider: "google", email: "connor.test@gmail.com", bankOn: true, banks: [], interests: ["fashion"] });
 await page.goto("about:blank"); await page.goto(origin + "/index.html");
 await page.evaluate(() => localStorage.setItem("relay_gnonce", "N".repeat(43)));

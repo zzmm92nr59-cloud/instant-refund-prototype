@@ -308,6 +308,17 @@ export function pickProvider(list, choice) {
 }
 async function providerFor(env, choice, now, fetchImpl) {
   if (!BANK_CHOICES[choice] || !bankLive(env)) return null;
+  const list = await providers(env, now, fetchImpl);
+  return list ? pickProvider(list, choice) : null;
+}
+// Which of the listed banks TrueLayer can connect for Relay's app (Connor, 17 Nov 2026: Chase and Halifax aren't on its
+// list, so their tiles went to TrueLayer's list instead, and Chase can't be connected at all). null when it can't be told.
+async function choicesOffered(env, now, fetchImpl) {
+  if (!bankLive(env)) return null;
+  const list = await providers(env, now, fetchImpl);
+  return list ? Object.keys(BANK_CHOICES).filter((k) => pickProvider(list, k)) : null;
+}
+async function providers(env, now, fetchImpl) {
   if (!providerList || now - providerList.at > 36e5) {
     try {
       const r = await (fetchImpl || fetch)(hosts(env).auth + "/api/providers?clientId=" + encodeURIComponent(env.TRUELAYER_CLIENT_ID), { signal: AbortSignal.timeout(5000) });
@@ -315,7 +326,7 @@ async function providerFor(env, choice, now, fetchImpl) {
       if (Array.isArray(list)) providerList = { at: now, list };
     } catch {}   // not answering: the last list, if there is one
   }
-  return providerList ? pickProvider(providerList.list, choice) : null;
+  return providerList ? providerList.list : null;
 }
 
 export async function handleBankRoute(path, method, request, env, url, cors, shopper, o) {
@@ -326,7 +337,8 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
     if (!ok) return json({ available: false, connections: [] }, 200, cors);
     const conns = (await db.prepare(`SELECT c.id, c.bank, c.connected_at, c.synced_at, c.status, COUNT(p.payment_id) AS payments, SUM(CASE WHEN p.receipt_id IS NOT NULL THEN 1 ELSE 0 END) AS matched
       FROM bank_links c LEFT JOIN bank_payments p ON p.connection_id = c.id AND p.shopper_id = c.shopper_id WHERE c.shopper_id = ? GROUP BY c.id ORDER BY c.connected_at`).bind(shopper.id).all()).results || [];
-    return json({ available: true, testBanks: !bankLive(env), connections: conns.map((c) => ({ id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(),
+    const choices = await choicesOffered(env, o.now, o.fetchImpl);
+    return json({ available: true, testBanks: !bankLive(env), ...(choices ? { choices } : {}), connections: conns.map((c) => ({ id: c.id, bank: bankName(c.bank), connectedAt: new Date(c.connected_at).toISOString(),
       syncedAt: c.synced_at ? new Date(c.synced_at).toISOString() : null, needsReconnect: c.status === "reconnect", payments: Number(c.payments) || 0, matched: Number(c.matched) || 0 })) }, 200, cors);
   }
   if (!ok) return json({ error: "not_found" }, 404, cors);

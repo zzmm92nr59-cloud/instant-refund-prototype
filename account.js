@@ -723,6 +723,7 @@
     // What Relay does with the inbox, on the navy page: four short lines with lime icons, the full wording a tap away.
     // Getting started's banks and cards: a tile each, three to a row, its logo over its name.
     ".rl-jbanks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 14px}" +
+    ".rl-inpage .rl-jbanks{margin:18px 0 12px}" +
     ".rl-jbank{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:84px;padding:10px 6px;border-radius:16px;background:var(--rl-card);box-shadow:inset 0 0 0 1px var(--rl-line);color:var(--rl-text);font-size:13.5px;font-weight:650;text-align:center;cursor:pointer;transition:transform .12s,background-color .12s}" +
     ".rl-jbank:active{transform:scale(.95);background:var(--rl-fill)}.rl-jbank:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-jbank:disabled{opacity:.55}" +
     ".rl-jbank-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;overflow:hidden}.rl-jbank-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:inset 0 0 0 1px rgba(60,60,67,.14)}" +
@@ -1842,6 +1843,21 @@
     ["lloyds", "Lloyds", "lloydsbank.com", /lloyds/i, "#006A4D"], ["monzo", "Monzo", "monzo.com", /monzo/i, "#FF4F40"], ["nationwide", "Nationwide", "nationwide.co.uk", /nationwide/i, "#1A2D6B"],
     ["natwest", "NatWest", "natwest.com", /natwest/i, "#5A287D"], ["revolut", "Revolut", "revolut.com", /revolut/i, "#191C1F"], ["santander", "Santander", "santander.co.uk", /santander/i, "#EC0000"],
     ["starling", "Starling", "starlingbank.com", /starling/i, "#6935D3"]];
+  // The tiles for the banks TrueLayer can connect (choices from /relay/my/bank; all when it can't tell), less those
+  // already connected. null when there are none.
+  function bankTiles(choices, connected, pick) {
+    var tiles = BANK_TILES.filter(function (t) { return (!choices || choices.indexOf(t[0]) >= 0) && !(connected || []).some(function (x) { return t[3].test(x.bank || ""); }); });
+    if (!tiles.length) return null;
+    var grid = el("div", { className: "rl-jbanks", role: "group" });
+    grid.setAttribute("aria-label", "Choose your bank or card");
+    tiles.forEach(function (t) {
+      var logo = el("span", { className: "rl-jbank-logo", text: t[1].charAt(0), style: "background:" + t[4] });
+      logo.setAttribute("aria-hidden", "true");
+      grid.appendChild(el("button", { type: "button", className: "rl-jbank", onclick: function () { pick(t[0], t[1]); } }, [logo, el("span", { text: t[1] })]));
+      shopLogo(logo, t[2], 30, function () {});
+    });
+    return grid;
+  }
   function planGet(email) { try { var x = JSON.parse(localStorage.getItem(PLAN_KEY) || "null"); return x && x.email === obKey(email) && Date.now() - x.t < 36e5 && Array.isArray(x.steps) ? x : null; } catch (e) { return null; } }
   function planSet(email, steps, off) { try { localStorage.setItem(PLAN_KEY, JSON.stringify({ email: obKey(email), steps: steps, off: off, t: Date.now() })); } catch (e) {} }
   function planDrop() { try { localStorage.removeItem(PLAN_KEY); } catch (e) {} }
@@ -2164,7 +2180,7 @@
         var fl = replay ? {} : obGet(email);
         var st = { email: email, name: replay ? p.name || "" : undefined, interests: (r[3] || []).slice(), consent: c, connected: Boolean(g && g.connected), provider: g && g.provider, scan: g && g.scan, suggested: info.suggestedName || "", justConnected: Boolean(info.justConnected), viaProvider: Boolean(info.viaProvider), mailNote: info.mailNote || null,
           inboxes: g && g.connected ? [{ provider: g.provider, email: g.email }].concat((g.others || []).map(function (x) { return { provider: x.provider, email: x.email }; })) : [], maxInboxes: (g && g.maxInboxes) || 5,
-          bankOn: bk.available === true, testBanks: bk.testBanks === true, banks: bk.connections || [], bankNote: info.bankNote || null };
+          bankOn: bk.available === true, testBanks: bk.testBanks === true, bankChoices: Array.isArray(bk.choices) ? bk.choices : null, banks: bk.connections || [], bankNote: info.bankNote || null };
         // Getting started, in this order: your name, your inboxes, your cards and banks, what you shop for, then all set.
         // Only what's still needed... but once someone is getting started, the inbox and bank steps stay in, so they can add
         // another (and coming back from Google, Microsoft or a bank lands on the step they left).
@@ -2370,9 +2386,7 @@
       }
       // The UK's usual banks and cards as one tap each, straight to that bank's own sign-in (Connor, 17 Nov 2026), and
       // any other through TrueLayer's list. Ones already connected aren't offered again. Not with test banks.
-      var tiles = st.testBanks ? [] : BANK_TILES.filter(function (t) { return !st.banks.some(function (x) { return t[3].test(x.bank || ""); }); });
-      var grid = tiles.length ? el("div", { className: "rl-jbanks", role: "group" }) : null;
-      if (grid) grid.setAttribute("aria-label", "Choose your bank or card");
+      var grid = st.testBanks ? null : bankTiles(st.bankChoices, st.banks, function (id, name) { openBank(id, name); });
       var goB = el("button", { type: "button", className: "rl-btn" + (st.banks.length || grid ? " ghost" : ""), text: grid ? "Another bank or card" : st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
       var openBank = function (choice, label) {
         var btns = Array.prototype.slice.call(bodyB.querySelectorAll(".rl-jbank")).concat([goB]);
@@ -2386,12 +2400,6 @@
           say(noteB, r.status === 409 ? "That's the most banks and cards Relay can connect." : "Couldn't open your bank just now. Try again in a moment.", true);
         }, function () { free(); say(noteB, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
-      if (grid) tiles.forEach(function (t) {
-        var logo = el("span", { className: "rl-jbank-logo", text: t[1].charAt(0), style: "background:" + t[4] });
-        logo.setAttribute("aria-hidden", "true");
-        grid.appendChild(el("button", { type: "button", className: "rl-jbank", onclick: function () { openBank(t[0], t[1]); } }, [logo, el("span", { text: t[1] })]));
-        shopLogo(logo, t[2], 30, function () {});
-      });
       goB.onclick = function () { openBank(null); };
       if (st.banks.length) bodyB.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
       if (grid) bodyB.appendChild(grid);
@@ -5403,21 +5411,31 @@
       b.appendChild(el("p", { text: "Connect your bank or card and Relay matches your card payments to your receipts, and finds purchases that never sent one. You sign in on your bank's own page. Relay can only read payments: it can't move money." }));
       var testLine = el("p", { className: "rl-anote" }); testLine.hidden = true; b.appendChild(testLine);
       var go = el("button", { type: "button", className: "rl-btn", text: "Connect a bank or card" });
-      b.appendChild(go); b.appendChild(note); b.appendChild(list); b.appendChild(pays);
+      var tilesBox = el("div");   // the usual banks, one tap each, once Relay knows which TrueLayer offers
+      b.appendChild(list); b.appendChild(tilesBox); b.appendChild(go); b.appendChild(note); b.appendChild(pays);
       if (back && NOTES[back]) say(note, NOTES[back][0], NOTES[back][1]);
       list.appendChild(el("div", { className: "rl-skel", style: "min-height:72px;border-radius:18px;margin-top:14px" }));
-      go.onclick = function () {
+      var goWord = function () { return tilesBox.firstChild ? "Another bank or card" : "Connect a bank or card"; };
+      var connectTo = function (choice, label) {
         if (go.disabled) return;
-        go.disabled = true; go.textContent = "Opening your bank\u2026"; say(note, "");
-        api("/relay/my/bank/connect", { method: "POST" }).then(function (r) {
+        var btns = Array.prototype.slice.call(tilesBox.querySelectorAll("button"));
+        go.disabled = true; btns.forEach(function (x) { x.disabled = true; });
+        go.textContent = "Opening " + (label || "your bank") + "\u2026"; say(note, "");
+        var free = function () { go.disabled = false; btns.forEach(function (x) { x.disabled = false; }); go.textContent = goWord(); };
+        api("/relay/my/bank/connect", { method: "POST", body: choice ? { bank: choice } : undefined }).then(function (r) {
           if (r.ok && r.body && /^https:\/\//.test(r.body.url || "")) { location.href = r.body.url; return; }
-          go.disabled = false; go.textContent = "Connect a bank or card";
+          free();
           say(note, r.status === 409 ? "That's the most banks and cards Relay can connect. Disconnect one first." : "Couldn't open your bank just now. Try again in a moment.", true);
-        }, function () { go.disabled = false; go.textContent = "Connect a bank or card"; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        }, function () { free(); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
+      go.onclick = function () { connectTo(null); };
       function when(iso) { if (!iso) return "Not read yet"; var m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 2 ? "Read just now" : m < 60 ? "Read " + m + " minutes ago" : m < 1440 ? "Read " + Math.round(m / 60) + " hours ago" : "Read " + Math.round(m / 1440) + " days ago"; }
       function drawLinks(body) {
         list.textContent = "";
+        tilesBox.textContent = "";
+        var grid = body.testBanks ? null : bankTiles(Array.isArray(body.choices) ? body.choices : null, body.connections || [], connectTo);
+        if (grid) tilesBox.appendChild(grid);
+        go.className = "rl-btn" + (grid ? " ghost" : ""); if (!go.disabled) go.textContent = goWord();
         if (body.testBanks) { testLine.hidden = false; testLine.textContent = "Test banks only for now. Choose Mock Bank, then sign in with john and doe."; }
         var cs = body.connections || [];
         if (!cs.length) return;
@@ -5467,17 +5485,23 @@
       function matchShop(id) { return id && shops[id] || ""; }
       function load() {
         memo.bankPays = null;   // receipts ask again for which card paid
-        api("/relay/my/bank", { fresh: true }).then(function (r) {
-          if (!r.ok || !r.body) { list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
+        // The banks, the receipts (for shop names) and the payments together, not one after another.
+        var rs = api("/relay/my/receipts", { fresh: false }).then(function (x) {
+          ((x.ok && x.body && x.body.receipts) || []).forEach(function (c) { shops[c.id] = (c.retailer && (c.retailer.name || c.retailer.domain)) || ""; });
+        }, function () {});
+        var ps = api("/relay/my/bank/payments", { fresh: true });
+        return api("/relay/my/bank", { fresh: true }).then(function (r) {
+          if (!r.ok || !r.body) { if (!list.querySelector(".rl-agroup, .rl-arow")) list.textContent = ""; return say(note, "Couldn't load this. Try again in a moment.", true); }
           drawLinks(r.body);
           if (!(r.body.connections || []).length) { pays.textContent = ""; return; }
-          return api("/relay/my/receipts", { fresh: false }).then(function (x) {
-            ((x.ok && x.body && x.body.receipts) || []).forEach(function (c) { shops[c.id] = (c.retailer && (c.retailer.name || c.retailer.domain)) || ""; });
-          }, function () {}).then(function () { return api("/relay/my/bank/payments", { fresh: true }); }).then(function (p) { if (p && p.ok) drawPays(p.body); });
-        }, function () { list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+          return Promise.all([rs, ps]).then(function (x) { if (x[1] && x[1].ok) drawPays(x[1].body); });
+        }, function () { if (!list.querySelector(".rl-agroup, .rl-arow")) list.textContent = ""; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
       }
-      // Read the banks again (at most every 10 minutes, on Relay's side), then show what's there.
-      api("/relay/my/bank/sync", { method: "POST" }).then(load, load);
+      // What Relay already has shows straight away (Connor, 17 Nov 2026: it used to wait for the banks to be read first,
+      // which takes seconds); the banks are read again behind it (at most every 10 minutes, on Relay's side) and the page
+      // updates quietly when that's done.
+      var first = load();
+      api("/relay/my/bank/sync", { method: "POST" }).then(function (r) { if (r && r.ok) Promise.resolve(first).then(function () { if (b.isConnected) load(); }); }, function () {});
     }
     function testersPage(b) {
       var note = el("div", { className: "rl-msg" }), list = el("div");
