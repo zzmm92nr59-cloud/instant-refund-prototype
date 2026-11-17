@@ -111,7 +111,7 @@ const minor = (n) => Math.round(Math.abs(Number(n) || 0) * 100);
 // Not shopping: money moved between accounts or to savings (round-ups like Save the Change), cash, bills by standing order or
 // direct debit, bank fees and interest, and betting. Relay keeps only purchases, so these are never stored.
 const NOT_SHOPPING_TYPES = new Set(["ATM", "CASH", "TRANSFER", "STANDING_ORDER", "DIRECT_DEBIT", "FEE_CHARGE", "INTEREST", "DIVIDEND", "CORRECTION", "CHEQUE"]);
-export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b|gaming|betropolis|\bbingo\b|\bslots?\b|\bpoker\b|\brent\b|mortgage|council tax|insurance|\bloan\b|credit ?report|vanquis|capital one|barclaycard|\bamex\b|american express|klarna repayment|\benergy\b|\bedf\b|e\.?on\b|octopus|british gas|ovo\b|\bwater\b|thames water|\bee & t-mobile\b|\bvodafone\b|\bo2\b|virgin media|\bbt\b|tv licen[cs]e|housing|regenda|tesco mobile|giffgaff|talk ?talk|plusnet|\bsky (digital|broadband|uk)\b|\brevolut\b|\bmonzo\b|\bstarling\b|\bhalifax\b|\blloyds\b|\bnatwest\b|\bsantander\b|\bhsbc\b|\bbarclays\b|\bnationwide\b|ulster bank|\bfinance\b|\bwise\b|\bchase\b/i;
+export const NOT_SHOPPING = /save the change|round ?-?ups?|\btransfer\b|\bto savings\b|\bsavings\b|standing order|direct debit|cash withdrawal|\batm\b|\binterest\b|overdraft|\bfee\b|betfred|bet365|paddy ?power|ladbrokes|william hill|sky ?bet|\bcoral\b|betway|betfair|\bbetting\b|\bcasino\b|national lottery|\blotto\b|securetrade|forex|\bcrypto|coinbase|binance|trading 212|\bisa\b|gaming|betropolis|\bbingo\b|\bslots?\b|\bpoker\b|\brent\b|mortgage|council tax|insurance|\bloan\b|credit ?report|vanquis|capital one|barclaycard|\bamex\b|american express|klarna repayment|\benergy\b|\bedf\b|e\.?on\b|octopus|british gas|ovo\b|\bwater\b|thames water|\bee & t-mobile\b|\bvodafone\b|\bo2\b|virgin media|\bbt\b|tv licen[cs]e|housing|regenda|tesco mobile|giffgaff|talk ?talk|plusnet|\bsky (digital|broadband|uk)\b|\brevolut\b|\bmonzo\b|\bstarling\b|\bhalifax\b|\blloyds\b|\bnatwest\b|\bsantander\b|\bhsbc\b|\bbarclays\b|\bnationwide\b|ulster bank|\bfinance\b|\bwise\b|\bchase\b|tfl travel charge/i;
 export function isShopping(x) {
   const cat = String(x.transaction_category || "").toUpperCase();
   if (NOT_SHOPPING_TYPES.has(cat)) return false;
@@ -132,7 +132,7 @@ export function shopName(description, merchant) {
   const site = /^(?:www\.)?([a-z0-9-]{2,30})\.(com|co\.uk|uk|net)$/i.exec(text);
   if (site) return site[1].charAt(0).toUpperCase() + site[1].slice(1).toLowerCase() + "." + site[2].toLowerCase();
   let words = text.replace(/^(paypal|sq|sumup|zettle|sp|pp)\s*\*\s*/i, "").replace(/[*#]/g, " ").split(/\s+/)
-    .map((w) => w.replace(/[.,]+$/, "")).filter((w) => w && !TIDY_DROP.test(w) && !/\d/.test(w));
+    .map((w) => w.replace(/[.,]+$/, "")).filter((w) => w && !/^[-–]+$/.test(w) && !TIDY_DROP.test(w) && !/\d/.test(w));
   // A bank's short codes at the end (LT, CD, LC) and a cut-off last word aren't part of the name.
   while (words.length > 1 && /^[A-Z]{2,3}$/.test(words[words.length - 1]) && !/^(UK|BP|CO)$/.test(words[words.length - 1])) words.pop();
   words = words.slice(0, 4);
@@ -153,9 +153,9 @@ async function readConnection(env, db, shopperId, row, now, f) {
   }
   const q = "?from=" + encodeURIComponent(new Date(now - LOOK_BACK_DAYS * DAY).toISOString()) + "&to=" + encodeURIComponent(new Date(now).toISOString());
   const rows = [];
-  // What was read and why things were left out, for Relay's logs: counts and the bank's category words only, never a
-  // payment, amount, name or account.
-  const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, leftOutType: {}, leftOutWord: {} };
+  // What was read and why things were left out, for Relay's logs: counts, the bank's category words and the names of the
+  // fields it sends (not their values), never a payment, amount, name or account.
+  const seen = { accounts: 0, cards: 0, failedLists: 0, failedTx: 0, tx: 0, debits: 0, keptDebits: 0, credits: 0, leftOutType: {}, leftOutWord: {}, fields: {} };
   for (const [list, kind] of [["/data/v1/accounts", "accounts"], ["/data/v1/cards", "cards"]]) {
     const got = await apiGet(env, t.access, list, f);
     if (got.gone) return { gone: true };
@@ -176,6 +176,8 @@ async function readConnection(env, db, shopperId, row, now, f) {
         if (!pid || pid.length > 120 || !/^\d{4}-\d{2}-\d{2}$/.test(when)) continue;
         const debit = String(x.transaction_type || "").toUpperCase() === "DEBIT" || (!x.transaction_type && Number(x.amount) < 0);
         if (debit) seen.debits++; else seen.credits++;
+        for (const k of Object.keys(x)) seen.fields[k] = (seen.fields[k] || 0) + 1;
+        for (const k of Object.keys((x && x.meta) || {})) seen.fields["meta." + k] = (seen.fields["meta." + k] || 0) + 1;
         if (debit && !isShopping(x)) {
           const cat = String(x.transaction_category || "").toUpperCase();
           if (NOT_SHOPPING_TYPES.has(cat)) seen.leftOutType[cat] = (seen.leftOutType[cat] || 0) + 1;
