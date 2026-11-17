@@ -176,6 +176,7 @@ console.log("ok - plain English when the email can't be read");
 // 5. Admins: Emails shoppers sent.
 await page.evaluate(() => window.go("me"));
 const view = page.locator("#mePage");
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await view.locator(".rl-arow", { hasText: "Emails shoppers sent" }).click();
 await view.locator(".rl-se .rl-skel").first().waitFor();
 const item = view.locator(".rl-se-card").filter({ hasText: "Brindle & Co" });

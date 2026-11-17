@@ -156,7 +156,7 @@ assert.equal(await page.getByRole("button", { name: "Done" }).count(), 0, "a pag
 let sheet = await page.locator("#mePage").innerText();
 assert.doesNotMatch(sheet, /TEST MODE|No purchases matched/);
 assert.doesNotMatch(sheet, SHOPPER_NEVER_SEES);
-await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).click();
 await page.locator("#mePage .rl-arow", { hasText: "Two-step sign-in" }).waitFor(); await page.waitForTimeout(500);
 sheet = await page.locator("#mePage").innerText();
 assert.doesNotMatch(sheet, /TEST MODE|Card for swaps/, "no test card in Security and privacy either");
@@ -169,7 +169,7 @@ await homeShows(page, "J");
 await openAccountRow(page, "Card for swaps");
 await page.getByRole("button", { name: "Remove card" }).waitFor();
 await page.getByText("TEST MODE · no real money").waitFor();
-await page.getByRole("button", { name: "Back to Security" }).click();
+await page.getByRole("button", { name: "Back to Settings" }).click();
 cardSaved = false;
 console.log("ok - Receipts, Wrapped and the Account page carry no test wording; Swap & resell is on Browse, not a tab; the test card is hidden (a saved card can still be removed)");
 
@@ -218,6 +218,7 @@ const p2 = await ctx.newPage();
 await p2.goto(origin + "/index.html");
 await homeShows(p2, "J");
 await openProfile(p2);
+await p2.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await p2.waitForTimeout(450);   // (most rows are in Settings now)
 await p2.getByRole("button", { name: "Sign out" }).click();
 await p2.locator(".rl-welcome").getByRole("heading", { name: "Every receipt, in one place." }).waitFor();
 await p2.goto(origin + "/index.html#signin=" + "L".repeat(43));

@@ -98,7 +98,7 @@ const view = page.locator("#mePage");
 reset({ member: true });
 await signedInAs(MEMBER);
 await profile();
-await view.locator(".rl-arow", { hasText: "Security and privacy" }).waitFor();
+await view.locator(".rl-arow", { hasText: "Settings" }).waitFor();
 await page.waitForTimeout(300);
 assert.equal(await view.getByText("Sign-in for app reviewers").count(), 0);
 assert.equal(await view.locator(".rl-arow", { hasText: "Inboxes" }).count(), 1, "members keep the inbox rows");
@@ -108,6 +108,7 @@ console.log("ok - members don't see the reviewer sign-in, and keep every row of 
 reset({ admin: true });
 await signedInAs(ADMIN);
 await profile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 const revRow = view.locator(".rl-arow", { hasText: "Sign-in for app reviewers" });
 await revRow.getByText("Off").waitFor();
 await revRow.click();
@@ -137,7 +138,7 @@ await dialog.getByRole("button", { name: "Turn off" }).click();
 await view.getByRole("button", { name: "Turn on" }).waitFor();
 await view.getByText("Off. The account and everything in it are deleted.").waitFor();
 assert.deepEqual(st.posts, [{ on: true }, { on: false }]);
-await view.getByRole("button", { name: "Back to Profile" }).click();
+await view.getByRole("button", { name: "Back to Settings" }).click();
 await revRow.getByText("Off").waitFor();
 console.log("ok - an admin turns it on (once, even on a double tap), copies the address and code, and turns it off after confirming");
 
@@ -189,7 +190,7 @@ await page.waitForTimeout(400);
 for (const gone of ["Inboxes", "Add a missing receipt", "Delivery details"])
   assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");
 // One level down, under Security and privacy: Devices, and none of the ways of signing in that can't be added.
-await view.locator(".rl-arow", { hasText: "Security and privacy" }).click();
+await view.locator(".rl-arow", { hasText: "Settings" }).click();
 await view.locator(".rl-arow", { hasText: "Devices" }).waitFor(); await page.waitForTimeout(400);
 for (const gone of ["Face ID & passkeys", "Two-step sign-in", "Phone number", "Card for swaps", "Email permission"])
   assert.equal(await view.locator(".rl-arow, .rl-ptile", { hasText: gone }).count(), 0, gone + " isn't offered");

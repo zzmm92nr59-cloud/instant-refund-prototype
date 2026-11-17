@@ -97,11 +97,12 @@ await homeReady(page);
 
 // 1. Profile: a Delivery details row, and the form.
 await page.evaluate(() => window.go("me"));
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 const row = page.locator("#mePage .rl-arow", { hasText: "Delivery details" });
 await row.getByText("Add your address").waitFor();
-assert.equal(await row.evaluate(n => n.tagName), "BUTTON", "a row on Profile you tap");
+assert.equal(await row.evaluate(n => n.tagName), "BUTTON", "a row in Settings you tap");
 await row.click();
-await page.getByRole("button", { name: "Back to Profile" }).waitFor();
+await page.getByRole("button", { name: "Back to Settings" }).waitFor();
 const field = name => page.getByLabel(name, { exact: true });
 await field("First name").waitFor();
 assert.equal(await field("Postcode").getAttribute("autocomplete"), "postal-code", "the phone can fill it in from your contacts");
@@ -168,6 +169,7 @@ console.log("ok - when the shop doesn't take the address it says so; when the sh
 
 // 4. Without delivery details: add them first, or go without.
 await page.evaluate(() => window.go("me"));
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 await row.click();
 await page.getByRole("button", { name: "Remove my delivery details" }).click();
 await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
@@ -193,6 +195,7 @@ console.log("ok - without delivery details, Buy offers to add them first (then c
 assert.equal(await page.getByRole("button", { name: "Find address" }).count(), 0, "no Find address while Relay's postcode lookup is off");
 st.lookup = true;
 await openShops(page); await page.evaluate(() => window.go("me"));
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 await row.click();
 const find = page.getByRole("button", { name: "Find address" });
 await find.waitFor();

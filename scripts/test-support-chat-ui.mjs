@@ -87,7 +87,7 @@ const open = async () => {
 // 1. Chat off and nobody to write to: no row.
 st.available = false; st.handoff = false;
 await open();
-await view.locator(".rl-arow", { hasText: "Help and legal" }).click();
+await view.locator(".rl-arow", { hasText: "Settings" }).click();
 await view.locator(".rl-arow", { hasText: "Terms of use" }).waitFor();
 await page.waitForTimeout(400);
 assert.equal(await view.locator(".rl-arow", { hasText: /Chat with us|Contact us/ }).isVisible(), false);
@@ -96,7 +96,7 @@ console.log("ok - no chat row when there's no assistant and no one to write to")
 // 2. The assistant is on: it is the Ask tab (and not a row in Help and legal any more).
 st.available = true; st.handoff = true;
 await open();
-await view.locator(".rl-arow", { hasText: "Help and legal" }).click();
+await view.locator(".rl-arow", { hasText: "Settings" }).click();
 await view.locator(".rl-arow", { hasText: "Terms of use" }).waitFor(); await page.waitForTimeout(400);
 assert.equal(await view.locator(".rl-arow", { hasText: /Chat with us|Contact us/ }).count(), 0, "with the assistant on, it's the Ask tab, not a row");
 await page.evaluate(() => window.tabTap("ask"));
@@ -153,7 +153,7 @@ console.log("ok - Talk to a person asks first, then sends the chat");
 // 4. Assistant off, a person on: "Contact us".
 st.available = false; st.handoff = true; st.handoffs = [];
 await open();
-await view.locator(".rl-arow", { hasText: "Help and legal" }).click();
+await view.locator(".rl-arow", { hasText: "Settings" }).click();
 const contact = view.locator(".rl-arow", { hasText: "Contact us" });
 await contact.waitFor();
 await contact.click();

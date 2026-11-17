@@ -300,7 +300,7 @@ const TEN_MINUTES = 600000;
   // Profile, and its Security and privacy (where the phone, card and sign-in settings are).
   const visit = async () => {
     await page.evaluate(() => window.go("me")); await pass(page, 3000); await settle(page, 500);
-    await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click(); await pass(page, 3000); await settle(page, 500);
+    await page.locator("#mePage .rl-arow", { hasText: "Settings" }).click(); await pass(page, 3000); await settle(page, 500);
   };
   await visit();
   const first = log.filter(x => OWN.test(x)).sort();

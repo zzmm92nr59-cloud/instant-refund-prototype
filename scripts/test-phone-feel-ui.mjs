@@ -308,6 +308,7 @@ await arBack.click(); await settle();
 // Signing out (Profile) removes it.
 await openProfileHere();
 assert.ok(await page.evaluate(() => localStorage.getItem("relay.drafts.v1")), "kept while signed in");
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await page.locator(".rl-aout").click();
 await page.waitForFunction(() => !localStorage.getItem("relay.session.v1"), null, { timeout: 5000 });
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.drafts.v1")), null, "signing out removes drafts");

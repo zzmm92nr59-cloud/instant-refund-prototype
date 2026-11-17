@@ -45,6 +45,7 @@ await page.goto(origin + "/index.html");
 await page.evaluate(e => localStorage.setItem("relay.session.v1", JSON.stringify({ token: "T".repeat(43), email: e, expiresAt: Date.now() + 864e5 })), EMAIL);
 await page.reload();
 await page.evaluate(() => window.go("me"));
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await page.locator(".rl-arow", { hasText: "Review reports" }).click();
 const sheet = page.locator("#mePage"); // the review screen opens in place of Profile
 await sheet.getByText("Looks like a counterfeit").waitFor();

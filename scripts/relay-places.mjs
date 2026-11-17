@@ -40,15 +40,19 @@ export async function closeSheet(page) {
 }
 
 // Profile: opens from the picture. Its rows, and the rows one level down.
+// (Connor, 17 Nov 2026: Profile like Shop's: everything but your inboxes and banks is in Settings, Sign out too.)
 const UNDER = {
-  "Security and privacy": ["Face ID & passkeys", "Phone number", "Two-step sign-in", "Devices", "Card for swaps", "Email permission", "Download my data", "Delete my account"],
-  "Help and legal": ["Help", "Chat with us", "Contact us", "Terms of use", "Privacy policy"]
+  "Settings": ["Delivery details", "Your interests", "Home layout", "Notifications", "Face ID & passkeys", "Phone number", "Two-step sign-in", "Devices", "Card for swaps",
+    "Email permission", "Download my data", "Delete my account", "Help", "Chat with us", "Contact us", "Show the tips again", "Terms of use", "Privacy policy",
+    "Relay health", "Emails shoppers sent", "Review reports", "Sign-in for app reviewers", "Testers", "See getting started again", "Sign in again for team tools"]
 };
+// What used to be a section on Profile and is now part of Settings.
+const SECTIONS = { "Security and privacy": "Settings", "Help and legal": "Settings" };
 // The old names of things that were renamed.
 const RENAMED = { "Email connection": "Inboxes" };
 export async function openProfile(page) {
   await page.evaluate(() => window.go("me"));
-  await page.locator("#mePage .rl-arow:visible", { hasText: "Security and privacy" }).first().waitFor();
+  await page.locator("#mePage .rl-arow:visible", { hasText: "Settings" }).first().waitFor();
 }
 // The picture that opens Profile, as a person would tap it: top left on Home, top right on the other tabs.
 // (Home's own picture comes after the page's top line in the page, so the last one showing is Home's when on Home.)
@@ -64,7 +68,7 @@ export async function tapPicture(page) {
 }
 // Opens a Profile row by name, going through its section first when it lives one level down.
 export async function openAccountRow(page, name) {
-  name = RENAMED[name] || name;
+  name = SECTIONS[name] || RENAMED[name] || name;
   const hub = Object.keys(UNDER).find((h) => UNDER[h].includes(name));
   if (!(await page.locator("#mePage .rl-arow:visible").count())) await openProfile(page);
   if (hub && !(await page.locator("#mePage .rl-arow:visible", { hasText: name }).count())) {
@@ -146,4 +150,12 @@ export async function goTo(page, url) {
   for (let i = 0; ; i++) {
     try { return await page.goto(url); } catch (e) { if (i === 2 || !/ERR_ABORTED/.test(String(e && e.message))) throw e; await page.waitForTimeout(300); }
   }
+}
+
+// Opens Settings (from Profile), where Sign out and most rows are.
+export async function openSettings(page) {
+  if (!(await page.locator("#mePage .rl-arow:visible", { hasText: "Settings" }).count())) await openProfile(page);
+  await waitOutDoubleTap(page);
+  await page.locator("#mePage .rl-arow:visible", { hasText: "Settings" }).first().click();
+  await page.getByRole("button", { name: "Sign out" }).waitFor();
 }

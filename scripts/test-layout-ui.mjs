@@ -392,8 +392,9 @@ console.log("ok - an offered question has no search under it; the heading opens 
   assert.equal(await page.locator(".rl-int-sheet").count(), 0, "not asked again once saved");
   // Profile shows them, and can change them.
   await page.locator(".h2-me").click();
+  await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
   const row = page.locator('#mePage [data-row="interests"]'); await row.waitFor();
-  assert.equal((await row.innerText()).replace(/\s+/g, " ").trim(), "Your interests Tech and Games and apps", "the Profile row says what was chosen");
+  assert.equal((await row.innerText()).replace(/\s+/g, " ").trim(), "Your interests Tech and Games and apps", "the Settings row says what was chosen");
   await row.click();
   await page.locator('#mePage .rl-int[data-interest="travel"]').click();
   await page.locator("#mePage .rl-int-save").click();
