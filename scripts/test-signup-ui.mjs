@@ -26,7 +26,8 @@ await ctx.route("https://**/*", async route => {
   const body = () => { try { return JSON.parse(route.request().postData() || "{}"); } catch { return {}; } };
   if (p === "/relay/auth/providers") return j({ email: true, google: true, microsoft: true, consent: CONSENT });
   if (p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") { st.starts.push({ p, ...body() }); return j({ url: p.includes("google") ? "https://accounts.google.com/o/oauth2/v2/auth?x=1" : "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?x=1" }); }
-  if (p === "/relay/auth/verify") { Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
+  if (p === "/relay/auth/claim") { st.claims = (st.claims || 0) + 1; if (!st.claimReady) return j({ error: "not_yet" }, 404); st.claimReady = false; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
+  if (p === "/relay/auth/verify") { st.verifies = (st.verifies || 0) + 1; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
   if (p === "/relay/auth/request") return j({ ok: true });
   if (p === "/relay/auth/verify-code") return body().code === "123456" ? j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5 }) : j({ error: "invalid_or_expired_code" }, 400);
   if (p === "/relay/my/interests" && m === "GET") return j({ interests: st.interests || [], updatedAt: null });
@@ -144,17 +145,19 @@ for (const fake of ["Kick Lane", "Crema & Co", "Studio North", "Harlow & Co", "V
 assert.ok(await sheet.getByRole("button", { name: "Continue with Microsoft" }).isVisible());
 assert.ok(await sheet.getByRole("button", { name: "Continue with email" }).isVisible());
 assert.ok(await sheet.getByRole("link", { name: "Terms of use" }).count() && await sheet.getByRole("link", { name: "Privacy policy" }).count(), "terms and privacy linked before anything is agreed");
-// What Relay does with the inbox is on the page before anyone goes to Google, with the exact wording one tap away.
-const perm = sheet.locator(".rl-sperm");
-await perm.getByText("Only order confirmations, receipts and return emails").waitFor();
-for (const t of ["Read-only: never sends, deletes or changes anything", "Never sells or shares what it finds", "Disconnect and delete everything at any time"]) assert.ok(await perm.getByText(t).isVisible(), t);
-const more = sheet.getByRole("button", { name: "Read exactly what you're agreeing to" });
+// What Relay does with the inbox is said in one line before anyone goes to Google (Connor, 17 Nov 2026: a panel of
+// points made the page busy); the points and the exact wording open under it with one tap.
+await sheet.locator(".rl-sperm").waitFor();
+assert.match(await sheet.locator(".rl-jlegal").innerText(), /^With Google or Microsoft, Relay reads only your order, receipt and return emails, and never changes anything\. By continuing you agree to Relay's Terms of use and Privacy policy\.$/);
+const more = sheet.getByRole("button", { name: "What Relay reads" });
 assert.equal(await more.getAttribute("aria-expanded"), "false");
+assert.equal(await sheet.getByText("Never sells or shares what it finds").isVisible(), false, "the page stays clean until asked");
 assert.equal(await sheet.getByText(CONSENT.text[1]).isVisible(), false);
+await polished("sign-in page, clean"); await page.screenshot({ path: "/tmp/shots/signup-1-signin-clean.png" });
 await more.click();
-for (const t of CONSENT.text) assert.ok(await sheet.getByText(t).isVisible(), "the whole wording: " + t.slice(0, 30));
-assert.equal(await sheet.getByRole("button", { name: "Hide the wording" }).getAttribute("aria-expanded"), "true");
-assert.match(await sheet.locator(".rl-jlegal").innerText(), /and with Google or Microsoft to Relay reading your receipts as above\./);
+for (const t of ["Only order confirmations, receipts and return emails", "Read-only: never sends, deletes or changes anything", "Never sells or shares what it finds", "Disconnect and delete everything at any time", ...CONSENT.text]) assert.ok(await sheet.getByText(t).isVisible(), "shown: " + t.slice(0, 30));
+assert.equal(await sheet.getByRole("button", { name: "Hide" }).getAttribute("aria-expanded"), "true");
+await sheet.getByRole("button", { name: "Hide" }).click();
 assert.equal(await sheet.getByRole("button", { name: "Close" }).count(), 0, "from the story, the way out is Back");
 await polished("sign-in page"); await page.screenshot({ path: "/tmp/shots/signup-1-signin.png" });
 // Back returns to the story; "I already have an account" opens the same three ways in, worded for coming back.
@@ -169,6 +172,14 @@ assert.equal(await sheet.count(), 0);
 await story.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.locator(".rl-sperm").waitFor();
+// Off to Google, then the phone's back without signing in: the buttons work again (they used to stay stuck).
+await sheet.getByRole("button", { name: "Continue with Google" }).click();
+await page.waitForURL(/accounts\.google\.com/);
+await page.goBack();
+await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
+await sheet.getByRole("button", { name: "Continue with Google", disabled: false }).waitFor({ timeout: 5000 });
+assert.equal(await sheet.getByRole("button", { name: "Continue with Microsoft" }).isDisabled(), false);
+st.starts = []; await page.waitForTimeout(450);
 st.verify = { mailConnected: "google", suggestedName: "Jess Tester" };
 st.onVerify = { connected: true, provider: "google", accepted: true };
 await sheet.getByRole("button", { name: "Continue with Google" }).dblclick();
@@ -360,6 +371,7 @@ assert.equal(await sheet.getByRole("img", { name: "Step 1 of 4" }).count(), 1, "
 assert.equal(await page.locator("#rl-onboard-name").inputValue(), "Connor");
 await sheet.getByRole("button", { name: "Continue" }).click();
 await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await page.waitForTimeout(450);   // a second "Continue" in the same place within 400ms is taken as a double tap (index.html)
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
 await sheet.locator(".rl-jlist").getByText("Made-up Bank").waitFor();
@@ -375,6 +387,35 @@ await sheet.getByRole("heading", { name: "You're all set, Connor." }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.replay-setup.v1")), null, "once only");
 console.log("ok - seeing getting started again: every step, with the account as it is");
 
+// 4b. From the iPhone home-screen app, Google opens in a separate browser and comes back there, without the app's
+// secret: that page says to go back (and doesn't use the sign-in up); the app, back on screen, finishes signing in.
+{
+  await page.evaluate(() => localStorage.clear()); reset({ email: "jess.tester@gmail.com" });
+  const app = await ctx.newPage(); await app.addInitScript(() => { Object.defineProperty(navigator, "standalone", { get: () => true }); });
+  await app.goto(origin + "/index.html");
+  await app.getByRole("button", { name: "Get started" }).click();
+  const appSheet = app.locator(".rl-back .rl-sheet").last();
+  await appSheet.locator(".rl-sperm").waitFor();
+  st.verify = { mailConnected: "google", suggestedName: "Jess Tester" };
+  st.onVerify = { connected: true, provider: "google", accepted: true };
+  await appSheet.getByRole("button", { name: "Continue with Google" }).click();
+  await app.waitForURL(/accounts\.google\.com/);
+  // The separate browser (same storage here, as on newer iPhones; not the home-screen app): it says to go back, no sign-in.
+  const other = await ctx.newPage();
+  await other.goto(origin + "/index.html#signin=" + LINK);
+  await other.getByRole("heading", { name: "Nearly there" }).waitFor();
+  assert.equal(st.verifies || 0, 0, "the separate browser doesn't use the sign-in up");
+  await other.close();
+  // The app back on screen: it asks, and finishes signing in.
+  st.claimReady = true;
+  await app.goto(origin + "/index.html");
+  await appSheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+  assert.ok(st.claims >= 1);
+  assert.equal(await app.evaluate(() => localStorage.getItem("relay_gnonce")), null, "the secret is gone once used");
+  await app.close();
+}
+console.log("ok - from the home-screen app: the separate browser says to go back; the app finishes signing in");
+
 // 5. Coming back ("I already have an account"): Google just signs in. No agreement sent, no inbox requested.
 await page.evaluate(() => localStorage.clear()); reset();
 await page.goto(origin + "/index.html");
@@ -385,7 +426,7 @@ assert.equal(st.starts[0].consentVersion, undefined, "identity only");
 console.log("ok - coming back, Continue with Google asks Google for nothing but who you are");
 
 // 8. Without an inbox (email, inbox left for later): asked what they shop for, so Browse has something to go on.
-await page.evaluate(() => localStorage.clear()); reset({ email: "kai@example.com" });
+await page.goto(origin + "/terms.html"); await page.evaluate(() => localStorage.clear()); reset({ email: "kai@example.com" });
 await page.goto(origin + "/index.html");
 await page.getByRole("button", { name: "Get started" }).click();
 await sheet.getByRole("button", { name: "Continue with email" }).click();

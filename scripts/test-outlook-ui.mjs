@@ -57,10 +57,10 @@ await page.evaluate(() => window.RelayAccount.open());
 const msBtn = page.getByRole("button", { name: "Continue with Microsoft" });
 await msBtn.waitFor();
 await page.screenshot({ path: "/tmp/shots/signin-microsoft.png" });
-// One tap: what Relay reads is on the sign-in page (the exact wording a tap away), and Continue with Microsoft agrees to
+// One tap: what Relay reads is said on the sign-in page (the points and exact wording a tap away), and Continue with Microsoft agrees to
 // it, signs in and connects Outlook together.
 await page.locator(".rl-sperm").waitFor();
-await page.getByRole("button", { name: "Read exactly what you're agreeing to" }).click();
+await page.getByRole("button", { name: "What Relay reads" }).click();
 assert.ok(await page.getByText(WORDING[0]).isVisible(), "Relay's wording is shown before going to Microsoft");
 await page.screenshot({ path: "/tmp/shots/signin-microsoft-agree.png" });
 await Promise.all([page.waitForURL(/login\.microsoftonline\.com/), msBtn.click()]);

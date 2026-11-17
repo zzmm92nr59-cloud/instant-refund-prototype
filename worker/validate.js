@@ -50,6 +50,7 @@ const ROUTES = new Map(Object.entries({
   // Signing in (no session yet).
   "/relay/auth/request": { fields: { email: str(320) } },
   "/relay/auth/verify": { fields: { token: str(200), nonce: str(200) } },
+  "/relay/auth/claim": { fields: { nonce: str(200) } },
   "/relay/auth/verify-code": { fields: { email: str(320), code: str(40) } },
   "/relay/auth/google/start": { fields: { nonce: str(200), consentVersion: str(40) } },
   "/relay/auth/microsoft/start": { fields: { nonce: str(200), consentVersion: str(40) } },

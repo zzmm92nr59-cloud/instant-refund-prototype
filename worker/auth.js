@@ -234,21 +234,43 @@ async function verifyLink(request, env, cors, opts) {
   const token = body && typeof body.token === "string" ? body.token : "";
   if (!TOKEN_SHAPE.test(token)) return json({ error: "invalid_or_expired_link" }, 400, cors);
   await ensureAuthTables(env.RELAY_DB);
-  // Single atomic claim: only one request can ever turn a link into a session.
+  // Single atomic claim: only one request can ever turn a link into a session. A Google or Microsoft sign-in is tied to
+  // the browser that started it (its nonce), and is only used up by that browser: opened anywhere else (someone else,
+  // or the separate browser an iPhone home-screen app hands Google to), it stays for the app to claim (claimSignIn).
+  const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
+  const theirs = nonce ? "gnonce:" + (await sha256Hex("gnonce:" + nonce)) : "";
   const claimed = await env.RELAY_DB.prepare(
     `UPDATE auth_login_tokens SET used_at = ?
-     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email, client_hash, suggested_name`)
-    .bind(now, await sha256Hex(token), now).first();
+     WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? AND (client_hash NOT LIKE 'gnonce:%' OR client_hash = ?) RETURNING token_hash, email, client_hash, suggested_name`)
+    .bind(now, await sha256Hex(token), now, theirs).first();
   if (!claimed) return json({ error: "invalid_or_expired_link" }, 400, cors);
+  return finishSignIn(env, claimed, now, cors);
+}
+
+// The app that started a Google or Microsoft sign-in, back on screen: finished, if Google or Microsoft has sent the
+// shopper back (somewhere), by the nonce only it holds. Nothing yet: a plain "not yet", so it can ask again.
+async function claimSignIn(request, env, cors, opts) {
+  const { now } = opts;
+  if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
+  const body = await readJson(request);
+  const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
+  if (!nonce) return json({ error: "invalid_request" }, 400, cors);
+  await ensureAuthTables(env.RELAY_DB);
+  const claimed = await env.RELAY_DB.prepare(
+    `UPDATE auth_login_tokens SET used_at = ? WHERE token_hash = (SELECT token_hash FROM auth_login_tokens WHERE client_hash = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1)
+     AND used_at IS NULL RETURNING token_hash, email, client_hash, suggested_name`)
+    .bind(now, "gnonce:" + (await sha256Hex("gnonce:" + nonce)), now).first();
+  if (!claimed) return json({ error: "not_yet" }, 404, cors);
+  return finishSignIn(env, claimed, now, cors);
+}
+
+async function finishSignIn(env, claimed, now, cors) {
   const named = claimed.suggested_name ? { suggestedName: claimed.suggested_name } : {};
-  // Google sign-ins are tied to the browser that started them, so a link someone else triggers is useless.
   if (String(claimed.client_hash).startsWith("gnonce:")) {
-    const nonce = body && typeof body.nonce === "string" && TOKEN_SHAPE.test(body.nonce) ? body.nonce : "";
-    if (!nonce || claimed.client_hash !== "gnonce:" + (await sha256Hex("gnonce:" + nonce))) return json({ error: "invalid_or_expired_link" }, 400, cors);
     // "Sign in and connect your email": the shopper agreed to the wording on the sign-in screen of this same browser,
     // so the agreement is recorded and Gmail or Outlook connected now, in one step. Connecting starts the first scan.
     const pending = await env.RELAY_DB.prepare(
-      "DELETE FROM auth_pending_mailbox WHERE token_hash = ? AND expires_at > ? RETURNING address, token_iv, token_data, provider, consent_version").bind(await sha256Hex(token), now).first();
+      "DELETE FROM auth_pending_mailbox WHERE token_hash = ? AND expires_at > ? RETURNING address, token_iv, token_data, provider, consent_version").bind(claimed.token_hash, now).first();
     if (pending) {
       const provider = pending.provider === "google" ? "google" : "microsoft";
       const shopperId = await ensureShopper(env, claimed.email, now);
@@ -627,6 +649,7 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     if (!signedInRoute) { const v = await checkBody(request, path, cors); if (v.response) return v.response; request = v.request; }
     if (path === "/relay/auth/request" && request.method === "POST") return await requestLink(request, env, cors, o);
     if (path === "/relay/auth/verify" && request.method === "POST") return await verifyLink(request, env, cors, o);
+    if (path === "/relay/auth/claim" && request.method === "POST") return await claimSignIn(request, env, cors, o);
     if (path === "/relay/auth/verify-code" && request.method === "POST") return await verifyCode(request, env, cors, o);
     if (path === "/relay/auth/google/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await googleStart(request, env, url, cors, o); }
     if (path === "/relay/auth/microsoft/start" && request.method === "POST" && configured(env)) { await ensureAuthTables(env.RELAY_DB); return await microsoftStart(request, env, url, cors, o); }

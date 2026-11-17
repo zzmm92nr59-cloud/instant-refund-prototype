@@ -728,9 +728,9 @@
     ".rl-jbank:active{transform:scale(.95);background:var(--rl-fill)}.rl-jbank:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-jbank:disabled{opacity:.55}" +
     ".rl-jbank-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:17px;overflow:hidden}.rl-jbank-logo.rl-has-logo{background:var(--logo-bg,#fff)!important;box-shadow:inset 0 0 0 1px rgba(60,60,67,.14)}" +
     ".rl-jbank>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}" +
-    ".rl-sperm{margin:18px 0 0;padding:16px;border-radius:18px;background:rgba(255,255,255,.07)}.rl-sperm-h{display:block;font-size:16px;margin:0 0 6px}" +
+    ".rl-sperm{margin:4px 0 0;text-align:center}.rl-sperm-panel{text-align:left;margin:4px 0 0;padding:6px 16px 14px;border-radius:18px;background:rgba(255,255,255,.07)}" +
     ".rl-sperm .rl-jpt{color:#fff;font-size:15px;padding:6px 0}.rl-sperm .rl-jpt .rl-jic{color:#c7f567}" +
-    ".rl-sperm .rl-sperm-more{min-height:44px;margin:6px 0 0;justify-content:flex-start;font-size:15px}" +
+    ".rl-sperm .rl-sperm-more{min-height:44px;margin:0 auto;font-size:15px}" +
     ".rl-sperm .rl-jpt+.rl-jpt{border-top-color:rgba(255,255,255,.12)}" +
     ".rl-sperm .rl-jwords{background:transparent;padding:0;margin:4px 0 0}.rl-sperm .rl-jwords:focus-visible{outline-color:#fff}" +
     ".rl-sperm .rl-jwords p{color:rgba(255,255,255,.86)!important;background:rgba(255,255,255,.07)!important}" +
@@ -2018,31 +2018,35 @@
     body.appendChild(choices);
     body.appendChild(msg);
     if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; pk.insertBefore(jIc("face", 22), pk.firstChild); body.appendChild(pk); }
-    // What Relay does with the inbox, before anyone goes to Google or Microsoft.
-    var perm = null;
-    if (fresh) {
-      perm = el("div", { className: "rl-sperm" });
-      perm.style.display = "none";
-      perm.appendChild(el("b", { className: "rl-sperm-h", text: "With Google or Microsoft, Relay reads your inbox" }));
-      [["eye", "Only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
-        .forEach(function (x) { perm.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
-      var words = el("div", { className: "rl-jwords", id: "rl-consent-words", role: "region", tabIndex: 0 });
-      words.setAttribute("aria-label", "Relay's permission wording"); words.hidden = true;
-      var more = el("button", { type: "button", className: "rl-textbtn rl-sperm-more", text: "Read exactly what you're agreeing to" });
-      more.setAttribute("aria-expanded", "false"); more.setAttribute("aria-controls", "rl-consent-words");
-      more.onclick = function () { var on = words.hidden; words.hidden = !on; more.setAttribute("aria-expanded", on ? "true" : "false"); more.textContent = on ? "Hide the wording" : "Read exactly what you're agreeing to"; };
-      perm.appendChild(more); perm.appendChild(words);
-      body.appendChild(perm);
-    }
+    // What Relay does with the inbox, said in one line before anyone goes to Google or Microsoft (Connor, 17 Nov 2026: a
+    // panel of points made the page busy). The points and the exact wording open under it with one tap.
+    var perm = null, words = null;
     var legal = el("p", { className: "rl-jlegal" });
-    legal.appendChild(document.createTextNode(fresh ? "By continuing you agree to Relay's " : "Relay's "));
+    if (fresh) {
+      legal.appendChild(document.createTextNode("With Google or Microsoft, Relay reads only your order, receipt and return emails, and never changes anything. By continuing you agree to Relay's "));
+    } else legal.appendChild(document.createTextNode("Relay's "));
     legal.appendChild(el("a", { href: "./terms.html", text: "Terms of use" }));
     legal.appendChild(document.createTextNode(" and "));
     legal.appendChild(el("a", { href: "./privacy.html", text: "Privacy policy" }));
-    legal.appendChild(document.createTextNode(fresh ? ", and with Google or Microsoft to Relay reading your receipts as above." : " still apply."));
+    legal.appendChild(document.createTextNode(fresh ? "." : " still apply."));
     body.appendChild(legal);
+    if (fresh) {
+      perm = el("div", { className: "rl-sperm" });
+      perm.style.display = "none";
+      var more = el("button", { type: "button", className: "rl-textbtn rl-sperm-more", text: "What Relay reads" });
+      var panel = el("div", { id: "rl-consent-words", className: "rl-sperm-panel" }); panel.hidden = true;
+      more.setAttribute("aria-expanded", "false"); more.setAttribute("aria-controls", "rl-consent-words");
+      more.onclick = function () { var on = panel.hidden; panel.hidden = !on; more.setAttribute("aria-expanded", on ? "true" : "false"); more.textContent = on ? "Hide" : "What Relay reads"; if (on && panel.scrollIntoView) panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); };
+      [["eye", "Only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["check", "Never sells or shares what it finds"], ["trash", "Disconnect and delete everything at any time"]]
+        .forEach(function (x) { panel.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
+      words = el("div", { className: "rl-jwords", role: "region", tabIndex: 0 });
+      words.setAttribute("aria-label", "Relay's permission wording");
+      panel.appendChild(words);
+      perm.appendChild(more); perm.appendChild(panel);
+      body.appendChild(perm);
+    }
     // Each part rises in a moment after the one above it (not at all where the phone asks for less motion).
-    var rise = [body.querySelector(".rl-jh"), body.querySelector(".rl-jsub"), choices, body.querySelector(".rl-textbtn"), perm, legal];
+    var rise = [body.querySelector(".rl-jh"), body.querySelector(".rl-jsub"), choices, body.querySelector(".rl-textbtn"), legal, perm];
     rise.forEach(function (n, k) { if (n) { n.classList.add("rl-rise"); n.style.setProperty("--d", (0.18 + k * 0.06).toFixed(2) + "s"); } });
     signInProviders().then(function (p) {
       if (!document.body.contains(body)) return;
@@ -2054,7 +2058,7 @@
       if (perm && consent && (p.google || p.microsoft)) {
         consent.text.forEach(function (t) { words.appendChild(el("p", { text: t })); });
         perm.style.display = "";
-      }
+      } else if (fresh && legal.firstChild && legal.firstChild.nodeType === 3) legal.firstChild.textContent = "By continuing you agree to Relay's ";
       if (!p) say(msg, "Couldn't reach Relay. Check your connection.", true);
     });
   }
@@ -2072,6 +2076,7 @@
   }
   // Off to Google or Microsoft. With `consent` (creating an account): agreeing to that wording, signing in and connecting
   // the inbox in one visit. Without: just signing in.
+  var providerFree = null;
   function goProvider(kind, consent, note, buttons) {
     var g = kind === "google", who = g ? "Google" : "Microsoft";
     if (buttons.dataset.busy) return;
@@ -2079,7 +2084,12 @@
     buttons.dataset.busy = "1"; all.forEach(function (b) { b.disabled = true; }); say(note, "Opening " + who + "…");
     var free = function () { delete buttons.dataset.busy; all.forEach(function (b) { b.disabled = false; }); };
     var nonce = newNonce();
-    try { localStorage.setItem("relay_gnonce", nonce); } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
+    try {
+      localStorage.setItem("relay_gnonce", nonce); localStorage.setItem("relay_gnonce_at", String(Date.now()));
+      if (navigator.standalone) localStorage.setItem("relay_gstandalone", "1"); else localStorage.removeItem("relay_gstandalone");
+    } catch (e) { free(); return say(note, "Your browser is blocking storage, so " + who + " sign-in can't work here. Continue with email instead.", true); }
+    // Back from Google or Microsoft without signing in (the phone's back, or Done): the buttons work again.
+    providerFree = function () { free(); say(note, ""); };
     var body2 = { nonce: nonce }; if (consent) body2.consentVersion = consent.version;
     var host = g ? /^https:\/\/accounts\.google\.com\// : /^https:\/\/login\.microsoftonline\.com\//;
     api("/relay/auth/" + (g ? "google" : "microsoft") + "/start", { method: "POST", body: body2 }).then(function (r) {
@@ -6025,15 +6035,60 @@
       jFrame(sheet, { noClose: true, title: "Signing you in…", sub: "Just a moment." });
       sheet.appendChild(el("div", { className: "rl-skel", style: "min-height:160px;border-radius:18px" }));
     });
-    var gn = ""; try { gn = localStorage.getItem("relay_gnonce") || ""; localStorage.removeItem("relay_gnonce"); } catch (e) {}
+    var gn = "", fromApp = false;
+    try { gn = localStorage.getItem("relay_gnonce") || ""; fromApp = localStorage.getItem("relay_gstandalone") === "1"; } catch (e) {}
+    // Started in the iPhone home-screen app, which hands Google to a separate browser: this is that browser. The app
+    // finishes signing in when it's back on screen (claimSignIn), so this page only says to go back.
+    if (fromApp && !navigator.standalone) return backToApp();
+    try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
     api("/relay/auth/verify", { method: "POST", body: gn ? { token: m[1], nonce: gn } : { token: m[1] } }).then(function (r) {
-      if (!r.ok) return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
-        sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
-        sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
-      // Signed in (and, through Google or Microsoft, the inbox connected and its first scan started): on to what's still needed.
-      if (r.body.needsSecondStep) { signInExtra = { mailConnected: r.body.mailConnected, outlookConnected: r.body.outlookConnected, suggestedName: r.body.suggestedName }; return open(function (sheet) { secondStepView(sheet, r.body); }); }
-      signedIn(r.body);
+      if (!r.ok) {
+        // No secret here (a different browser from the one that started): the one that started can still finish.
+        if (!gn) return backToApp();
+        return open(function (sheet) { sheet.appendChild(el("h2", { text: "Sign-in failed" }));
+          sheet.appendChild(el("p", { text: errors[r.body.error] || "Something went wrong." }));
+          sheet.appendChild(el("button", { className: "rl-btn", text: "Try again", onclick: show })); });
+      }
+      afterSignIn(r.body);
     }).catch(function () { open(function (sheet) { sheet.appendChild(el("h2", { text: "Couldn't reach Relay" })); sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", onclick: close })); }); });
+  }
+  // Signed in (and, through Google or Microsoft, the inbox connected and its first scan started): on to what's still needed.
+  function afterSignIn(body) {
+    if (body.needsSecondStep) { signInExtra = { mailConnected: body.mailConnected, outlookConnected: body.outlookConnected, suggestedName: body.suggestedName }; return open(function (sheet) { secondStepView(sheet, body); }); }
+    signedIn(body);
+  }
+  function backToApp() {
+    open(function (sheet) {
+      sheet.classList.add("rl-full", "rl-jr");
+      jFrame(sheet, { noClose: true, art: "done", title: "Nearly there", sub: "Close this window (Done, at the top) and Relay finishes signing you in." });
+    });
+  }
+  // The app that started a Google or Microsoft sign-in, back on screen (Connor, 17 Nov 2026: from the home-screen app,
+  // Google came back in a separate browser and the app was left on the sign-in page with its buttons stuck): it asks
+  // Relay whether that sign-in finished, a few times while it's on screen, then gives the buttons back.
+  var claiming = false;
+  function claimPending() {
+    if (claiming || load()) return;
+    var gn = "", at = 0;
+    try { gn = localStorage.getItem("relay_gnonce") || ""; at = Number(localStorage.getItem("relay_gnonce_at")) || 0; } catch (e) {}
+    if (!gn || /(?:^|[#&])signin=/.test(location.hash || "")) return;
+    if (Date.now() - at > 15 * 60000) { try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); } catch (e) {} if (providerFree) providerFree(); return; }
+    claiming = true;
+    if (providerFree) providerFree();   // the buttons work again straight away; the check carries on behind
+    var tries = 0;
+    (function ask() {
+      api("/relay/auth/claim", { method: "POST", body: { nonce: gn } }).then(function (r) {
+        if (r.ok && r.body && (r.body.sessionToken || r.body.needsSecondStep)) {
+          claiming = false;
+          try { localStorage.removeItem("relay_gnonce"); localStorage.removeItem("relay_gnonce_at"); localStorage.removeItem("relay_gstandalone"); } catch (e) {}
+          return afterSignIn(r.body);
+        }
+        // Not signed in (yet): back where they were, on the sign-in page, if the page started again without it.
+        if (tries === 0 && !document.querySelector(".rl-back .rl-sheet")) open(function (sheet) { signedOutView(sheet, {}); });
+        if (++tries < 4 && document.visibilityState === "visible") return setTimeout(ask, 2500);
+        claiming = false;
+      }, function () { claiming = false; });
+    })();
   }
   // What to say when Google or Microsoft sends the shopper back after "Connect Gmail" / "Connect Outlook".
   function mailNote(result, name) {
@@ -9114,7 +9169,11 @@
     });
   }
   function start() {
-    keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank();
+    keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank(); claimPending();
+    // Back on screen (from Google or Microsoft's separate browser, or the phone's back from their page): finish or give the buttons back.
+    window.addEventListener("pageshow", function (e) { if (e.persisted) claimPending(); });
+    window.addEventListener("focus", claimPending);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") claimPending(); });
     window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank(); });
     window.addEventListener("relay:session", function () { if (load()) unmountWelcome(); else mountWelcome(); });
   }

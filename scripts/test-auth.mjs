@@ -262,7 +262,9 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   const b = await flow();
   const tokB = /#signin=([A-Za-z0-9_-]{43})$/.exec(b.loc)[1];
   assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: nonceOf() } })).status, 400, "someone else's secret");
-  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: b.nonce } })).status, 400, "link is single-use even then");
+  // Opened in the wrong browser, the link isn't used up: the browser that started it can still finish (once).
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: b.nonce } })).status, 200, "not used up by the wrong browser");
+  assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: tokB, nonce: b.nonce } })).status, 400, "single-use");
   const c = await flow();
   const tokC = /#signin=([A-Za-z0-9_-]{43})$/.exec(c.loc)[1];
   const ok = await gcall("/relay/auth/verify", { method: "POST", body: { token: tokC, nonce: c.nonce } });
@@ -304,6 +306,25 @@ assert.equal(await handleAuthRoute(new Request("https://w.test/relay/shopify/sta
   assert.equal(v2.suggestedName, "Alice Example", "the name Google holds is offered");
   assert.equal(v2.outlookConnected, undefined);
   const aliceId = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'alice@example.com'").get().id;
+  // An iPhone home-screen app hands Google to a separate browser, which comes back to Relay without the app's secret:
+  // it can't finish (and doesn't use the sign-in up); the app, back on screen, claims it with its secret, once.
+  {
+    const o6 = await flow("good-code", "", { consentVersion: CONSENT_VERSION });
+    const t6 = /#signin=([A-Za-z0-9_-]{43})$/.exec(o6.loc)[1];
+    assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: t6 } })).status, 400, "the other browser can't finish it");
+    assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: nonceOf() } })).status, 404, "someone else's secret: nothing");
+    assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: "short" } })).status, 400);
+    const c6 = await gcall("/relay/auth/claim", { method: "POST", body: { nonce: o6.nonce } });
+    assert.equal(c6.status, 200, "the app claims it");
+    const v6 = await c6.json();
+    assert.ok(v6.sessionToken && v6.email === "alice@example.com"); assert.equal(v6.mailConnected, "google", "and Gmail is connected, as with verify");
+    assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: o6.nonce } })).status, 404, "once");
+    assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: t6, nonce: o6.nonce } })).status, 400, "and the link is used up");
+    const o7 = await flow("good-code", "", {});
+    assert.equal((await gcall("/relay/auth/verify", { method: "POST", body: { token: /#signin=([A-Za-z0-9_-]{43})$/.exec(o7.loc)[1], nonce: o7.nonce } })).status, 200);
+    assert.equal((await gcall("/relay/auth/claim", { method: "POST", body: { nonce: o7.nonce } })).status, 404, "nothing to claim once the link was used");
+    console.log("ok - a sign-in finished in another browser is claimed by the app that started it, once, with its secret");
+  }
   assert.equal(sqlite.prepare("SELECT google_email FROM gmail_connections WHERE shopper_id = ?").get(aliceId).google_email, "alice@example.com", "Gmail connected for the account that signed in");
   assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM shopper_consents WHERE shopper_id = ? AND version = ? AND withdrawn_at IS NULL").get(aliceId, CONSENT_VERSION).n, 1, "agreement recorded");
   assert.equal(sqlite.prepare("SELECT state FROM mail_scan_jobs WHERE shopper_id = ?").get(aliceId).state, "running", "the first scan starts straight away");
