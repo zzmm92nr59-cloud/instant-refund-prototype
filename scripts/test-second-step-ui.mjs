@@ -120,7 +120,7 @@ console.log("ok - the authenticator app set up (once per tap), recovery codes sh
 
 // 3. The last second step can't be turned off: said in plain words.
 await page.evaluate(() => window.go("me"));
-await page.locator(".rl-arow", { hasText: "Security and privacy" }).click();
+await page.locator(".rl-arow", { hasText: "Settings" }).click();
 await page.locator(".rl-arow", { hasText: "Two-step sign-in" }).click();
 await page.getByRole("button", { name: "Turn off the app" }).click();
 await page.getByLabel("App code or recovery code").fill("654321"); // six digits send it by themselves
@@ -132,6 +132,7 @@ console.log("ok - the last second step can't be turned off, in plain words");
 reset({ done: true, app: true, admin: { admin: false, signInAgain: true } });
 await signedIn();
 await page.evaluate(() => window.go("me"));
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await page.locator(".rl-arow", { hasText: "Sign in again for team tools" }).waitFor();
 assert.equal(await page.locator(".rl-arow", { hasText: "Relay health" }).count(), 0, "no team tools until then");
 await polished("team sign in again", "#mePage");

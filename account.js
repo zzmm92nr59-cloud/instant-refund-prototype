@@ -106,6 +106,8 @@
         return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }, function () { return { ok: r.ok, status: r.status, text: "" }; });
       });
     answer.then(settled, settled);
+    // A change, once done: reads that started while it was on its way may be from before it, so none is reused.
+    if (method !== "GET") answer.then(function () { reads = {}; }, function () { reads = {}; });
     answer.then(function (r) { if (r.status === 403 && /"second_step_needed"/.test(r.text || "")) needSecondStep(); }, function () {});
     if (key) {
       var entry = { answer: answer, waiting: true, at: 0 };
@@ -610,6 +612,7 @@
     ".rl-me-pic.hl-sqpic{display:block;width:140px;height:140px;aspect-ratio:auto;box-sizing:border-box}" +
     ".rl-me-links{display:flex;justify-content:center;gap:18px;word-break:normal}.rl-me-links a{color:var(--rl-text2);text-decoration:none;font-weight:600;min-height:44px;display:inline-flex;align-items:center}" +
     ".rl-aout{display:flex;align-items:center;justify-content:center;gap:8px}" +
+    ".rl-look-on{background:var(--rl-accent-bg)!important;color:var(--rl-accent)!important}.rl-look-on .rl-jic{color:var(--rl-accent)!important}" +
     ".rl-asub{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:18px 16px;margin-top:8px}" +
     ".rl-asub>div>h2:first-child,.rl-asub>h2:first-child{display:none}" +
     ".rl-anote{font-size:13.5px!important;margin:6px 2px 16px!important}.rl-aterm{color:var(--rl-text)!important}" +
@@ -4656,6 +4659,8 @@
     bag: '<path d="M5 8h14l-1.2 12.5H6.2Z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
     key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M16.5 6.5l2.5 2.5M14 9l2 2"/>',
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15Z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>',
+    layout: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
     heart: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z"/>',
     spark: '<path d="M12 3.5l2.1 5.6 5.9 2.1-5.9 2.1L12 19l-2.1-5.7L4 11.2l5.9-2.1Z"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
@@ -4685,7 +4690,7 @@
   // Profile's colours, from the Receipts tiles' set (TILE_COLOURS): each kind of thing keeps its own, as tile or row icon.
   var ACC_TINT = { mail: "#4F72E0", pin: "#14918A", bell: "#6662D9", swap: "#E0446E", gavel: "#E0612F", paste: "#B455C9", doc: "#7A7F8C", bag: "#2B3A5C",
     face: "#2E9E5B", lock: "#4F72E0", devices: "#6662D9", phone: "#2E9E5B", card: "#B455C9", shield: "#14918A", download: "#4F72E0", help: "#D47B1F",
-    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E" };
+    chat: "#14918A", key: "#D47B1F", flag: "#E0612F", pulse: "#E0446E", gear: "#7A7F8C", layout: "#E0446E" };
   // One row: icon (a white drawing on its colour), label, an optional line underneath, and a chevron (or an arrow for pages
   // that open outside the app).
   function accRow(icon, label, detail, onclick, opts) {
@@ -5244,7 +5249,6 @@
           return el("button", { type: "button", className: "rl-me-it", ariaLabel: [e.shop, name].filter(Boolean).join(", "), onclick: tapOnce(e.open) }, [hlPic(e, "hl-sqpic rl-me-pic")]);
         })));
       }, function () {});
-      sheet.appendChild(el("h2", { className: "rl-me-h rl-me-h2", text: "Settings" }));
     }
     // On the Profile page, this year's Wrapped comes first.
     // The reviewer account (isReview) can't have an inbox or sign-in settings, so those rows, and Wrapped (made from inbox
@@ -5257,15 +5261,16 @@
     // on Receipts; the assistant is the Ask tab.
     // The reviewer account (isReview) can't have an inbox or delivery details, so those rows, and Wrapped (made from inbox
     // receipts), are left out for it.
+    // Profile, like Shop's (Connor, 17 Nov 2026): who you are, what you keep an eye on, what you bought, your inboxes and
+    // banks, then one row into Settings, which has everything else (and Sign out).
     var rows = [];
     var mailRow = accRow("mail", "Inboxes", "", function () { page("Inboxes", mailPage); });
     if (!review) rows.push(mailRow);
     var deliveryRow = null;
     if (!review) {
-      // The delivery details Relay fills in at shops' checkouts.
+      // The delivery details Relay fills in at shops' checkouts (in Settings).
       deliveryRow = accRow("pin", "Delivery details", "", function () { page("Delivery details", function (b) {
-        deliveryForm(b, { onSaved: function () { home(); }, onRemoved: function () { home(); } }); }); });
-      rows.push(deliveryRow);
+        deliveryForm(b, { onSaved: function () { settingsAgain(); }, onRemoved: function () { settingsAgain(); } }); }); });
     }
     // Bank and cards (worker/bank.js): shown once Relay can offer it to this account.
     var bankRow = accRow("card", "Bank and cards", "", function () { page("Bank and cards", function (b) { bankPage(b, null); }); });
@@ -5285,19 +5290,17 @@
     var interestsRow = accRow("bag", "Your interests", interestsWords(interestsCached() || []), function () { page("Your interests", function (b) {
       var chosen = (interestsCached() || []).slice(), msg = el("p", { className: "rl-msg" }); msg.setAttribute("role", "status");
       b.appendChild(el("p", { className: "rl-int-p", text: "Pick what you shop for and Relay shows shops you'll like first in Browse. What you buy counts for more once Relay has your receipts." }));
-      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { home(); });
+      var save = interestsSaveButton("Save", function () { return chosen; }, msg, function () { settingsAgain(); });
       save.disabled = !chosen.length;
       b.appendChild(interestsPicker(chosen, function (list) { chosen = list; save.disabled = !list.length; }));
       b.appendChild(msg); b.appendChild(save);
     }); });
     interestsRow.setAttribute("data-row", "interests");
-    rows.push(interestsRow);
-    interestsLoad().then(function (list) { if (list && interestsRow.isConnected) interestsRow.setDetail(interestsWords(list)); });
     // The reviewer account has no inbox, so its orders from shops stay one tap away here. Everyone else finds them on Receipts.
     var ordersRow = accRow("bag", "Shop orders", "None yet", function () { page("Shop orders", ordersPage); });
     if (review) rows.push(ordersRow);
-    rows.push(accRow("lock", "Security and privacy", "", function () { hub("Security and privacy", "Security", secHub); }));
-    rows.push(accRow("help", "Help and legal", "", function () { hub("Help and legal", "Back", helpHub); }));
+    var settingsAgain = function () { hub("Settings", "Settings", settingsPage); };
+    rows.push(accRow("gear", "Settings", "", settingsAgain));
     sheet.appendChild(accGroup("", rows));
     var mailState = null;
     api("/relay/my/gmail").then(function (g) {
@@ -5313,9 +5316,41 @@
       orders = (r.ok && r.body && r.body.purchases) || [];
       if (orders.length) ordersRow.setDetail(orders.length + (orders.length === 1 ? " order" : " orders"));
     }).catch(function () {});
-    if (deliveryRow) api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? r.body.delivery.postcode : "Add your address"); }).catch(function () {});
 
-    // Security and privacy: signing in, and what Relay keeps. Asked for when the page is opened, so it is current each time.
+    // Settings: everything about the account in one page of groups, like Shop's Account page. Each row opens its page, and
+    // Back from there returns here. Asked for when the page is opened, so it is current each time.
+    function settingsPage(b) {
+      // Your details and how Relay works for you.
+      var notifRow = accRow("bell", "Notifications", "", function () { if (window.go) window.go("radar"); });
+      try { notifRow.setDetail(!("Notification" in window) ? "" : Notification.permission === "granted" ? "On on this phone" : Notification.permission === "denied" ? "Blocked in this phone's settings" : "Off"); } catch (e) {}
+      var lookNames = { wallet: "Wallet", today: "Today", cards: "Cards" };
+      var lookRow = accRow("layout", "Home layout", lookNames[homeLook()] || "", function () { page("Home layout", homeLookPage); });
+      b.appendChild(accGroup("You", [deliveryRow, interestsRow, lookRow, notifRow].filter(Boolean)));
+      // What each row says, read again each time Settings opens (after saving an address or interests, say).
+      if (deliveryRow) api("/relay/my/delivery").then(function (r) { if (r.ok && r.body) deliveryRow.setDetail(r.body.delivery ? r.body.delivery.postcode : "Add your address"); }).catch(function () {});
+      interestsLoad().then(function (list) { if (list && interestsRow.isConnected) interestsRow.setDetail(interestsWords(list)); });
+      secHub(b);
+      helpHub(b);
+      b.appendChild(abox);
+      var out = el("button", { type: "button", className: "rl-aout" }, [accIc("out", 20), el("span", { text: "Sign out" })]);
+      out.onclick = function () { out.disabled = true; api("/relay/auth/logout", { method: "POST" }).finally(leave); };
+      b.appendChild(out);
+      b.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
+      var ver = el("p", { className: "rl-afoot rl-aver" }); b.appendChild(ver);
+      try { caches.keys().then(function (k) { var v = k.map(function (x) { return (/^relay-shell-v(\d+)$/.exec(x) || [])[1]; }).filter(Boolean).sort(function (a, c) { return c - a; })[0]; if (v) ver.textContent = "Version " + v; }, function () {}); } catch (e) {}
+    }
+    // Which Home: Wallet (photo squares), Today (a list) or Cards (one big card at a time). Kept on this phone.
+    function homeLookPage(b) {
+      var now = homeLook(), msg2 = el("div", { className: "rl-msg" }); msg2.setAttribute("role", "status");
+      var opts = [["wallet", "Wallet", "Big photos of what you bought, four to a screen"], ["today", "Today", "A list, with what's happening to each order"], ["cards", "Cards", "One big card at a time"]];
+      b.appendChild(accGroup("", opts.map(function (o) {
+        var r = accRow("layout", o[1], o[2], function () { setHomeLook(o[0]); say(msg2, o[1] + " is your Home now."); setTimeout(settingsAgain, 500); });
+        r.setAttribute("aria-pressed", o[0] === now ? "true" : "false");
+        if (o[0] === now) r.replaceChild(el("span", { className: "rl-jok rl-look-on" }, [jIc("check", 16)]), r.lastChild);
+        return r;
+      })));
+      b.appendChild(msg2);
+    }
     function secHub(b) {
       var secRows = [];
       if (passkeysSupported()) secRows.push(accRow("face", "Face ID & passkeys", "Sign in without an email", function () { page("Face ID & passkeys", function (b) { passkeySection(b, el("div")); }); }));
@@ -5368,7 +5403,7 @@
       if (wantChatAbout) setTimeout(function () { if (wantChatAbout && openChatAbout()) wantChatAbout = null; }, 0);
     });
     function helpHub(b) {
-      b.appendChild(accGroup("", [
+      b.appendChild(accGroup("Help and legal", [
         accRow("help", "Help", "Common questions", function () { page("Help", helpPage); })].concat(chatRow._ai ? [] : [chatRow], [
         accRow("help", "Show the tips again", "A tip for each tab, from Home", function () { tipsAgain(); }),
         accRow("doc", "Terms of use", "", null, { href: "./terms.html" }),
@@ -5376,7 +5411,7 @@
     }
 
     // Reviewing member reports: only for the people who do that.
-    var abox = el("div"); sheet.appendChild(abox);
+    var abox = el("div");   // Relay's team tools, shown at the foot of Settings
     api("/relay/my/admin/me").then(function (r) {
       // Relay's team signs in with their second step to use the team tools (worker/second-step.js).
       if (r.ok && r.body && r.body.signInAgain) {
@@ -5388,7 +5423,7 @@
       }
       if (!r.ok || !r.body || r.body.admin !== true) return;
       var revRow = accRow("key", "Sign-in for app reviewers", "", function () { page("Sign-in for app reviewers", reviewerPage); });
-      openHealthPage = function () { if (!abox.isConnected) return false; page("Relay health", healthPage); return true; };
+      openHealthPage = function () { if (!head.isConnected) return false; page("Relay health", healthPage); return true; };
       if (wantHealth) setTimeout(function () { if (wantHealth && openHealthPage()) wantHealth = false; }, 0);
       abox.appendChild(accGroup("Team", [accRow("pulse", "Relay health", "How well emails are read, and how Relay is used", function () { page("Relay health", healthPage); }),
         accRow("mail", "Emails shoppers sent", "Receipts read wrong, sent in to be read", function () { page("Emails shoppers sent", sharedPage); }),
@@ -5406,14 +5441,8 @@
       api("/relay/my/admin/review-account").then(function (x) { if (x.ok && x.body) revRow.setDetail(x.body.on ? "On" : "Off"); }).catch(function () {});
     }).catch(function () {});
 
-    var outBtn = el("button", { type: "button", className: "rl-aout", text: "Sign out" });
-    // Signing out (or deleting the account) from the Profile page goes back to the welcome screen on Home.
+    // Signing out (in Settings), or deleting the account, goes back to the welcome screen on Home.
     var leave = function () { save(null); close(); if (inPage && window.go) window.go("profile"); };
-    outBtn.onclick = function () { outBtn.disabled = true; api("/relay/auth/logout", { method: "POST" }).finally(leave); };
-    if (inPage) outBtn.insertBefore(accIc("out", 20), outBtn.firstChild);
-    sheet.appendChild(outBtn);
-    sheet.appendChild(el("p", { className: "rl-afoot", text: "Signed in as " + email }));
-    if (inPage) sheet.appendChild(el("p", { className: "rl-afoot rl-me-links" }, [el("a", { href: "./terms.html", text: "Terms of use" }), el("a", { href: "./privacy.html", text: "Privacy policy" })]));
 
     // Two switches for Relay's team, each changing only what this device shows (so they also work in the app on the home
     // screen, which a link can't reach). Shoppers never see them.

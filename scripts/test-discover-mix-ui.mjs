@@ -175,6 +175,7 @@ console.log("ok - shoppers never see the Testing tools switch");
 st.admin = { admin: false, signInAgain: true };
 await page.reload();
 await openProfile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await me.locator(".rl-arow", { hasText: "Sign in again for team tools" }).waitFor();
 const sw = me.getByRole("switch", { name: "Testing tools on this device" });
 await sw.waitFor();
@@ -192,6 +193,7 @@ await page.reload();
 await discover("Wool Beanie");
 console.log("ok - the team's switch turns the shops' websites preview on, and the device remembers it");
 await openProfile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await me.getByRole("switch", { name: "Testing tools on this device" }).click();
 assert.equal(await me.getByRole("switch", { name: "Testing tools on this device" }).getAttribute("aria-checked"), "false");
 await discover();
@@ -204,6 +206,7 @@ console.log("ok - off again: the preview goes");
 st.admin = { admin: true, openReports: 0 };
 await page.reload();
 await openProfile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 await me.locator(".rl-arow", { hasText: "Relay health" }).waitFor();
 await me.getByRole("switch", { name: "Testing tools on this device" }).waitFor();
 await polished("team tools", "#mePage");
@@ -246,6 +249,7 @@ console.log("ok - the shops' websites switch: real shops only; clothes are fashi
 // 9. The team's two switches, and a device that had testing tools on moves to the shops' websites once.
 st.admin = { admin: false, signInAgain: true };
 await openProfile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 const webSw = me.getByRole("switch", { name: "Shops' websites in Browse on this device" }), testSw = me.getByRole("switch", { name: "Testing tools on this device" });
 assert.equal(await webSw.getAttribute("aria-checked"), "true");
 assert.equal(await testSw.getAttribute("aria-checked"), "false");

@@ -94,7 +94,7 @@ const saved = JSON.parse(await (await import("node:fs/promises")).readFile(await
 assert.equal(saved.account.email, EMAIL); assert.equal(saved.receipts.length, 2);
 await page.getByText("Your file is downloading.").waitFor();
 assert.equal(state.exports, 1, "a second tap while it's preparing doesn't make a second file");
-await page.getByRole("button", { name: "Back to Security" }).click();
+await page.getByRole("button", { name: "Back to Settings" }).click();
 console.log("ok - Download my data gives one file with the shopper's data, once per tap");
 // The legal pages are real pages, reachable from Profile's Help and legal.
 await openProfile(page); await openAccountRow(page, "Help and legal"); await page.locator(".rl-arow", { hasText: "Terms of use" }).waitFor();
@@ -185,6 +185,7 @@ console.log("ok - watches come back from the account when this device lost them"
 // Signing out removes the copy kept on this device.
 assert.ok(await page.evaluate(() => !!localStorage.getItem("relay.cache.v1")));
 await tapPicture(page);
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 await page.getByRole("button", { name: "Sign out" }).click();
 await page.locator(".rl-welcome").getByRole("button", { name: "Get started" }).waitFor();
 assert.equal(await page.evaluate(() => localStorage.getItem("relay.cache.v1")), null, "nothing of the account left on the device");

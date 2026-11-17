@@ -395,6 +395,7 @@ for (const scheme of ["light", "dark"]) {
   const adm = await newPage("light", false, true);
   await signIn(adm);
   await adm.evaluate(() => window.go("me"));
+  await adm.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await adm.waitForTimeout(450);   // (most rows are in Settings now)
   await adm.locator(".rl-arow", { hasText: "Testers" }).click();
   await adm.getByText("No testers yet.").waitFor();
   await adm.getByLabel("Tester's email address").fill("mum@example.com");

@@ -121,7 +121,7 @@ console.log("ok - straight away when there's no interests sheet: four tips, tab 
   assert.equal(await tip(page).count(), 0, "not shown on another phone");
   // Profile, Help and legal: Show the tips again.
   await page.evaluate(() => window.go("me"));
-  await page.locator("#mePage .rl-arow", { hasText: "Help and legal" }).click();
+  await page.locator("#mePage .rl-arow", { hasText: "Settings" }).click();
   await page.locator("#mePage .rl-arow", { hasText: "Show the tips again" }).click();
   await checkTip(page, "Home");
   assert.equal(await page.evaluate(() => window.page), "profile", "on Home");

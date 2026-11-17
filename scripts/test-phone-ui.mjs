@@ -107,10 +107,10 @@ const signedInAt = async () => {
   await page.reload(); await tapPicture(page);
   await page.getByRole("heading", { name: "Profile", exact: true }).waitFor(); await page.locator("#mePage .rl-arow").first().waitFor();
   // Phone number, Two-step sign-in and Devices live in Profile's Security and privacy.
-  await page.locator("#mePage .rl-arow", { hasText: "Security and privacy" }).click();
+  await page.locator("#mePage .rl-arow", { hasText: "Settings" }).click();
   await page.locator("#mePage .rl-arow", { hasText: "Delete my account" }).waitFor(); await page.waitForTimeout(500);
 };
-const openRow = async label => { await page.locator(".rl-arow", { hasText: label }).first().click(); await page.getByRole("button", { name: "Back to Security" }).waitFor(); };
+const openRow = async label => { await page.locator(".rl-arow", { hasText: label }).first().click(); await page.getByRole("button", { name: "Back to Settings" }).waitFor(); };
 
 // 1. Phone number shows in Account only when Relay can send texts.
 reset({ available: false });
@@ -174,12 +174,12 @@ assert.equal(await page.getByRole("button", { name: "Set up authenticator app" }
 await page.getByText("One way at a time. To switch, turn this one off first.").waitFor();
 await polished("two-step: on");
 // The number can't be changed while codes go to it.
-await page.getByRole("button", { name: "Back to Security" }).click();
+await page.getByRole("button", { name: "Back to Settings" }).click();
 await page.locator(".rl-arow", { hasText: "Two-step sign-in" }).getByText("On: text message").waitFor();
 await openRow("Phone number");
 await page.getByText("To change or remove this number, turn off codes by text under Two-step sign-in first.").waitFor();
 assert.equal(await page.getByRole("button", { name: "Remove number" }).count(), 0);
-await page.getByRole("button", { name: "Back to Security" }).click();
+await page.getByRole("button", { name: "Back to Settings" }).click();
 console.log("ok - codes by text: switched on with a code texted now, recovery codes shown once, the number locked while it's on");
 
 // 4. Signing in with codes by text: "Check your phone", the code texted at once, finished by the texted code.
@@ -245,7 +245,7 @@ await page.locator("#rl-2s-manage").fill(RECOVERY[1]);
 await page.getByRole("button", { name: "Turn off", exact: true }).click();
 await page.getByText("Codes by text are off.").waitFor();
 assert.equal(st.twoStep, false);
-await page.getByRole("button", { name: "Back to Security" }).click();
+await page.getByRole("button", { name: "Back to Settings" }).click();
 await openRow("Phone number");
 await page.getByRole("button", { name: "Remove number" }).click();
 await page.getByRole("button", { name: "Remove number" }).last().click();

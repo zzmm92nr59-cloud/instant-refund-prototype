@@ -120,7 +120,7 @@ const profile = async () => { await page.evaluate(() => window.go("me")); await 
 st.admin = false;
 await signedInAs(MEMBER);
 await profile();
-await view.locator(".rl-arow", { hasText: "Security and privacy" }).waitFor();
+await view.locator(".rl-arow", { hasText: "Settings" }).waitFor();
 await page.waitForTimeout(400);
 assert.equal(await view.getByText("Relay health").count(), 0, "members don't see Relay health");
 console.log("ok - only admins see Relay health");
@@ -129,6 +129,7 @@ console.log("ok - only admins see Relay health");
 st.admin = true;
 await signedInAs(ADMIN);
 await profile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);   // (most rows are in Settings now)
 const row = view.locator(".rl-arow", { hasText: "Relay health" });
 await row.waitFor();
 await row.click();
@@ -227,6 +228,7 @@ console.log("ok - the link in the morning email opens Relay health");
 // 7. Team only: "See getting started again" asks first, signs out to the very first screen (the welcome story), and
 // leaves a note for the next sign-in to run every step (test-signup-ui checks that part).
 await profile();
+await page.locator("#mePage .rl-arow", { hasText: "Settings" }).first().click(); await page.waitForTimeout(450);
 await view.locator(".rl-arow", { hasText: "See getting started again" }).click();
 await page.getByText(/See Relay from the very first screen\? This signs you out\./).waitFor();
 await page.getByRole("button", { name: "Sign out and start" }).click();
