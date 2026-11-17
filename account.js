@@ -592,7 +592,7 @@
     ".rl-acard{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;overflow:hidden}" +
     ".rl-arow{all:unset;box-sizing:border-box;cursor:pointer;width:100%;min-height:56px;display:flex;align-items:center;gap:12px;padding:10px 14px;transition:background .15s}" +
     ".rl-arow+.rl-arow{border-top:1px solid var(--rl-line)}.rl-arow:active{background:var(--rl-fill)}.rl-arow:focus-visible{outline:2px solid var(--rl-text);outline-offset:-2px}" +
-    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.rl-ai.rl-ai-tint{background:none;color:var(--rl-text2);width:28px;border-radius:0}.rl-arow .rl-ai svg{width:22px;height:22px}html:not(.ri-colour):not(.ri-soft) .rl-arow .rl-ai,html:not(.ri-colour):not(.ri-soft) .rl-aout .rl-ai{background:none;width:28px;border-radius:0}html:not(.ri-colour):not(.ri-soft) .rl-arow:not(.danger) .rl-ai{color:var(--rl-text2)}html.ri-colour .rl-ai.rl-ai-tint{background:var(--ai);color:#fff;width:34px;border-radius:10px}html.ri-soft .rl-ai.rl-ai-tint{background:color-mix(in srgb,var(--ai) 14%,transparent);color:var(--ai);width:34px;border-radius:10px}" +
+    ".rl-ai{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text)}.rl-ai.rl-ai-tint{background:color-mix(in srgb,var(--ai) 15%,transparent);color:var(--ai);width:34px;border-radius:10px}html.ri-plain .rl-ai.rl-ai-tint{background:none;color:var(--rl-text2);width:28px;border-radius:0}.rl-arow .rl-ai svg{width:22px;height:22px}html.ri-plain .rl-arow .rl-ai,html.ri-plain .rl-aout .rl-ai{background:none;width:28px;border-radius:0}html.ri-plain .rl-arow:not(.danger) .rl-ai{color:var(--rl-text2)}html.ri-colour .rl-ai.rl-ai-tint{background:var(--ai);color:#fff;width:34px;border-radius:10px}html.ri-soft .rl-ai.rl-ai-tint{background:color-mix(in srgb,var(--ai) 14%,transparent);color:var(--ai);width:34px;border-radius:10px}" +
     ".rl-arow-t{min-width:0;flex:1;display:flex;flex-direction:column;gap:1px}.rl-arow-t b{font-size:16px;font-weight:650;color:var(--rl-text)}.rl-arow-d{font-size:13.5px;color:var(--rl-text2)}" +
     ".rl-arow-c{flex:none;display:inline-flex;color:var(--rl-text2)}" +
     ".rl-arow.danger b{color:var(--rl-danger)}.rl-arow.danger .rl-ai{background:#fde8e6;color:#b3261e}" +
@@ -4143,6 +4143,7 @@
       else { lead.remove(); connectPart(inbox); }
     }, unsure);
     pastePart(pasted);
+    var shopPart = el("div", { style: "margin-top:14px" }); wrap.insertBefore(shopPart, wrap.querySelector("[data-back]")); mountInstore(shopPart, function () {}, "box");
   }
   // Search the inbox as you type: a pause in typing (or a tap on a shop) searches, and only the newest search is shown.
   function searchPart(host, g) {
@@ -5472,6 +5473,9 @@
         "Real products and prices from shops' own websites, read once a day, in Browse and search by photo. Only Relay's team and its testers see them.", "relay-web-preview"));
       box.appendChild(teamSwitch("Testing tools", "Testing tools on this device",
         "Relay's test shops, test orders and sample items, for trying things out. Off shows Relay as shoppers see it.", "relay-testing-tools"));
+      if (testingOn()) box.appendChild(accGroup("", [
+        accRow("bag", "Place a test order", "At Relay's test shops, no real money", function () { page("Place a test order", function (b) { var t = el("div"); b.appendChild(t); mountSquareTest(t, function () {}); mountShopifyTest(t, function () {}); }); }),
+        accRow("pulse", "More testing tools", "", null, { href: "./testing.html" })]));
       return box;
     }
     // AI help (worker/ai-reader.js): Claude reads emails Relay's own reader isn't sure about, only once switched on here.
@@ -8976,7 +8980,7 @@
     host.appendChild(feed);
     // Bought in a shop: adding a purchase from its receipt (only once shops on Relay take card payments in person, or with
     // testing tools). It sat under the wallet before; it goes after the cards.
-    var shopBox = el("div", { className: "h2-shopbox" }); host.appendChild(shopBox); mountInstore(shopBox, refresh, "box");
+    // (Adding an in-shop purchase from its receipt is in Add a receipt; test orders are in Settings, Team: Connor, 17 Nov 2026.)
     for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
     var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
     // Watching: real products only (a shop's website, or a shop on Relay that isn't one of Relay's test shops), newest first.
@@ -9063,7 +9067,6 @@
         if (!list.length && state.connected !== false && !isReview()) feed.appendChild(el("p", { className: "rl-calm-none h2-none", text: "What you buy shows up here as Relay finds the receipts." }));
       }
       if (state.both[1].length || state.both[0].length) feed.appendChild(feedCard({ small: true, icon: "doc", line: "All receipts", open: function () { if (window.go) window.go("receipts"); } }));
-      if (testingOn()) { var t = el("div", { className: "h2-tools" }); feed.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
       firstScreen();
     };
     // Which cards are stopping places. The band stays pinned, so a card at rest sits just under it (the page's scroll
