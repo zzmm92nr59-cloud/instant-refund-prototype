@@ -180,8 +180,16 @@ const asksBefore = catalogueAsks.length;
 await page.goto(origin + "/index.html?testtools=1");
 await homeShows(page, "J");
 assert.deepEqual(await tabs(), [...TABS, "Market"]);
-await page.getByRole("heading", { name: "Testing tools" }).waitFor();
+// Nothing for testing under Home's cards (Connor, 17 Nov 2026): the switch is in Settings, Team; adding an in-shop
+// purchase from its receipt is in Add a receipt.
+await page.waitForTimeout(800);
+assert.equal(await page.getByRole("heading", { name: "Testing tools" }).count(), 0, "no testing card on Home");
+assert.equal(await page.locator("#homePage").getByText("Bought in a shop?").count(), 0, "no in-shop box on Home");
+await page.evaluate(() => window.go("receipts"));
+await page.getByRole("button", { name: "Add a missing receipt" }).first().click();
 await page.getByText("Bought in a shop? Add it from the receipt").waitFor();
+await page.locator(".rl-sheet [data-back]").last().click(); await page.waitForTimeout(500);
+await page.evaluate(() => window.go("profile"));
 await openShops(page);
 // Even with testing tools on, Browse shows real shops only (Connor, 15 Nov): test shops' products never show there.
 await page.locator('[data-card-select="shopify-v-1"]').waitFor();
