@@ -25,6 +25,7 @@ await ctx.route("https://**/*", async route => {
   if (!p.startsWith("/relay/")) return route.abort();
   const body = () => { try { return JSON.parse(route.request().postData() || "{}"); } catch { return {}; } };
   if (p === "/relay/auth/providers") return j({ email: true, google: true, microsoft: true, consent: CONSENT });
+  if ((p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") && st.slowStart) { await new Promise(r => setTimeout(r, 2500)); return j({ error: "google_not_configured" }, 503); }
   if (p === "/relay/auth/google/start" || p === "/relay/auth/microsoft/start") { st.starts.push({ p, ...body() }); return j({ url: p.includes("google") ? "https://accounts.google.com/o/oauth2/v2/auth?x=1" : "https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?x=1" }); }
   if (p === "/relay/auth/claim") { st.claims = (st.claims || 0) + 1; if (!st.claimReady) return j({ error: "not_yet" }, 404); st.claimReady = false; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
   if (p === "/relay/auth/verify") { st.verifies = (st.verifies || 0) + 1; Object.assign(st, st.onVerify || {}); return j({ sessionToken: TOKEN, email: st.email, expiresAt: Date.now() + 864e5, ...st.verify }); }
@@ -179,6 +180,24 @@ await page.goBack();
 await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
 await sheet.getByRole("button", { name: "Continue with Google", disabled: false }).waitFor({ timeout: 5000 });
 assert.equal(await sheet.getByRole("button", { name: "Continue with Microsoft" }).isDisabled(), false);
+// And again (Connor, 17 Nov 2026: the second time back, they stayed stuck).
+await page.waitForTimeout(450);
+await sheet.getByRole("button", { name: "Continue with Google" }).click();
+await page.waitForURL(/accounts\.google\.com/);
+await page.goBack();
+await sheet.getByRole("heading", { name: "Create your account" }).waitFor();
+await sheet.getByRole("button", { name: "Continue with Google", disabled: false }).waitFor({ timeout: 3000 });
+assert.equal(await sheet.getByRole("button", { name: "Continue with email" }).isDisabled(), false);
+// The phone putting the page back as it was (iPhone keeps it, buttons and all), twice while a check is still going.
+st.slowStart = true; await page.waitForTimeout(450);
+for (let k = 0; k < 2; k++) {
+  await sheet.getByRole("button", { name: "Continue with Google" }).click();
+  await sheet.getByRole("button", { name: "Continue with Google", disabled: true }).waitFor();
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })));
+  await sheet.getByRole("button", { name: "Continue with Google", disabled: false }).waitFor({ timeout: 1500 });
+  await page.waitForTimeout(450);
+}
+st.slowStart = false; await page.waitForTimeout(2600);
 st.starts = []; await page.waitForTimeout(450);
 st.verify = { mailConnected: "google", suggestedName: "Jess Tester" };
 st.onVerify = { connected: true, provider: "google", accepted: true };
