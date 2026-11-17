@@ -74,14 +74,28 @@ const body = (page) => page.locator(".rl-story-body").innerText();
   await page.locator(".rl-story-body .rl-wr-hero img").waitFor();
   await page.waitForTimeout(700);
   await page.screenshot({ path: SHOTS + "/1-opening.png" });
-  const texts = [first]; let sawBag = false, sawTrain = false, sawMap = false, sawTumble = false;
+  const texts = [first], bgs = []; let sawBag = false, sawTrain = false, sawMap = false, sawTumble = false;
   for (let k = 0; k < 30; k++) {
     await page.keyboard.press("ArrowRight"); await page.waitForTimeout(450);
     const t = await body(page); texts.push(t);
     if (/In 2026 you spent/.test(t)) {
       assert.ok(await page.locator(".rl-story-body .bag .it").count() >= 3, "things drop into a bag on the total");
       assert.ok(await page.locator(".rl-story-body .bag .it img").count() >= 1 || await page.locator(".rl-story-body .bag .it").count() >= 3);
-      await page.waitForTimeout(1000); await page.screenshot({ path: SHOTS + "/2-bag-mid-animation.png" }); sawBag = true;
+      // Things falling into the bag never cross the words: shown afresh, checked at 0.3s, 0.8s and 1.5s.
+      await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight");
+      const t0 = Date.now();
+      for (const at of [300, 800, 1500]) {
+        await page.waitForTimeout(Math.max(0, at - (Date.now() - t0)));
+        const hits = await page.evaluate(() => {
+          const over = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+          const words = [...document.querySelectorAll(".rl-story-body .rl-story-slide > :not(.bag)")].map(n => n.getBoundingClientRect());
+          return [...document.querySelectorAll(".rl-story-body .bag .it")].filter(n => Number(getComputedStyle(n).opacity) > 0.01)
+            .filter(n => words.some(w => over(n.getBoundingClientRect(), w))).length;
+        });
+        assert.equal(hits, 0, "no falling thing crosses the words at " + at + "ms");
+        if (at === 800) await page.screenshot({ path: SHOTS + "/2-bag-mid-animation.png" });
+      }
+      sawBag = true;
     }
     if (/ON THE MOVE/.test(t)) {
       assert.match(t, /Most travelled\s+London Euston to Manchester Piccadilly\s+3 journeys/);
@@ -94,17 +108,29 @@ const body = (page) => page.locator(".rl-story-body").innerText();
     if (/Where you went/.test(t)) {
       assert.ok(await page.locator(".rl-story-body .map path.land").count() >= 5, "Great Britain, its islands and Northern Ireland");
       assert.equal(await page.locator(".rl-story-body .map circle.dot").count(), wrapped.travel.places.length, "a dot for each place Relay can position");
-      assert.equal(await page.locator(".rl-story-body .map path.arc").count(), 2, "Euston to Manchester and Edinburgh to Glasgow; the journey to an unknown halt isn't drawn");
+      const known = new Set(wrapped.travel.places.map(p => p.name.toLowerCase()));
+      const drawable = wrapped.travel.routes.filter(r => known.has(r.from.toLowerCase()) && known.has(r.to.toLowerCase())).length;
+      assert.equal(drawable, 2, "the fixture has two routes with both ends known: Euston to Manchester and Edinburgh to Glasgow Queen Street");
+      assert.equal(await page.locator(".rl-story-body .map path.arc").count(), drawable, "an arc for every route with both ends known; the journey to an unknown halt isn't drawn");
+      const delays = await page.locator(".rl-story-body .map path.arc").evaluateAll(ns => ns.map(n => parseFloat(getComputedStyle(n).animationDelay)));
+      assert.ok(delays.every((d, i) => i === 0 || d >= delays[i - 1] + 0.8), "the arcs are drawn one after another: " + delays);
+      await page.waitForTimeout(400 + delays.at(-1) * 1000 + 1000);
+      const arcs = await page.locator(".rl-story-body .map path.arc").evaluateAll(ns => ns.map(n => ({ len: n.getTotalLength(), off: parseFloat(getComputedStyle(n).strokeDashoffset) })));
+      for (const a of arcs) { assert.ok(a.len >= 20, "each arc is long enough to see beside its dots: " + a.len); assert.ok(Math.abs(a.off) < 0.01, "each arc is fully drawn"); }
       assert.match(t, /Not on the map: Little Snoring Halt\./);
-      await page.waitForTimeout(1800); await page.screenshot({ path: SHOTS + "/4-map.png" }); sawMap = true;
+      await page.screenshot({ path: SHOTS + "/4-map.png" }); sawMap = true;
     }
     if (/Some things you brought home/.test(t)) {
       assert.equal(await page.locator(".rl-story-body .ph.tumble").count(), 1);
+      assert.equal(await page.locator(".rl-story-frame").evaluate(n => getComputedStyle(n).backgroundColor), "rgb(255, 255, 255)", "white, not beige");
       assert.ok(await page.locator(".rl-story-body .belt span").count() >= 8, "a belt of the year's things goes by");
       await page.waitForTimeout(350); await page.screenshot({ path: SHOTS + "/5-things-mid-animation.png" }); sawTumble = true;
     }
+    bgs.push(await page.locator(".rl-story-frame").evaluate(n => getComputedStyle(n).backgroundColor));
     if (await page.getByRole("button", { name: "Watch again" }).count()) break;
   }
+  // No cream or beige backgrounds (warm, pale, low-saturation colours) anywhere in the story.
+  for (const c of bgs) { const [r, g, b] = c.match(/\d+/g).map(Number); assert.ok(!(r > 200 && g > 190 && b > 160 && r - b >= 8 && r >= g), "no beige slide: " + c); }
   assert.ok(sawBag && sawTrain && sawMap && sawTumble, "every new moving slide was shown");
   const story = texts.join("\n");
   assert.match(story, /CHAPTER \d\s+Home & garden/, "the TV bed makes a Home & garden chapter");

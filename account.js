@@ -510,10 +510,10 @@
     ".rl-story-slide .rl-wr-hero{width:140px;height:140px;border-radius:22px;background:#fff;overflow:hidden;margin:16px 0 4px;display:flex;align-items:center;justify-content:center;color:#101828;opacity:0;animation:rltumble .9s cubic-bezier(.2,.9,.25,1.15) .25s forwards;--r:-6deg}" +
     ".rl-story-slide .rl-wr-hero img{width:100%;height:100%;object-fit:cover;object-position:top}.rl-story-slide .rl-wr-hero svg{width:64px;height:64px}" +
     "@keyframes rltumble{0%{opacity:0;transform:translateY(-120px) rotate(calc(var(--r) * -4))}60%{opacity:1}100%{opacity:1;transform:rotate(var(--r))}}" +
-    ".rl-story-slide .bag{position:relative;width:200px;height:190px;margin:14px 0 0}.rl-story-slide .bag>svg{position:absolute;left:30px;bottom:0;width:140px;height:130px;color:var(--accent)}" +
+    ".rl-story-slide .bag{position:relative;width:200px;height:190px;margin:18px 0 0;overflow:hidden}.rl-story-slide .bag>svg{position:absolute;left:30px;bottom:0;width:140px;height:130px;color:var(--accent)}" +
     ".rl-story-slide .bag .it{position:absolute;top:0;width:52px;height:52px;border-radius:14px;background:#fff;color:#101828;overflow:hidden;display:flex;align-items:center;justify-content:center;opacity:0;animation:rldrop 1.1s cubic-bezier(.45,0,.55,1) forwards}" +
     ".rl-story-slide .bag .it img{width:100%;height:100%;object-fit:cover;object-position:top}.rl-story-slide .bag .it svg{width:28px;height:28px}" +
-    "@keyframes rldrop{0%{opacity:0;transform:translateY(-60px) rotate(var(--r))}20%{opacity:1}70%{opacity:1;transform:translateY(96px) rotate(0)}100%{opacity:0;transform:translateY(118px) scale(.6)}}" +
+    "@keyframes rldrop{0%{opacity:0;transform:translateY(0) rotate(var(--r))}15%{opacity:1}70%{opacity:1;transform:translateY(80px) rotate(0)}100%{opacity:0;transform:translateY(104px) scale(.6)}}" +
     ".rl-story-slide .ph.tumble figure{animation-name:rltumble;animation-duration:.8s;--r:0deg}.rl-story-slide .ph.tumble figure:nth-child(3n+1){--r:-3deg}.rl-story-slide .ph.tumble figure:nth-child(3n+2){--r:2deg}" +
     ".rl-story-slide .belt{overflow:hidden;margin:14px -30px 0;padding:6px 0;border-top:2px dashed currentColor;border-bottom:2px dashed currentColor}.rl-story-slide .belt>div{display:flex;gap:10px;width:max-content;animation:rlbelt 18s linear infinite}" +
     ".rl-story-slide .belt span{display:inline-flex;align-items:center;gap:8px;background:rgba(16,24,40,.08);border-radius:999px;padding:8px 14px;font-size:14px;font-weight:700;white-space:nowrap}.rl-story-slide .belt svg{width:20px;height:20px;flex:none}" +
@@ -527,7 +527,7 @@
     "@keyframes rltrain{from{transform:translateX(-260px)}to{transform:translateX(100cqw)}}" +
     ".rl-story-slide .map{margin:12px auto 0;width:min(100%,250px)}.rl-story-slide .map svg{display:block;width:100%;height:auto;max-height:52vh}" +
     ".rl-story-slide .map .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.6;stroke-width:1.2;stroke-linejoin:round}" +
-    ".rl-story-slide .map .arc{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rlarc 1.2s cubic-bezier(.4,0,.2,1) forwards}@keyframes rlarc{to{stroke-dashoffset:0}}" +
+    ".rl-story-slide .map .arc{fill:none;stroke:currentColor;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rlarc .9s cubic-bezier(.4,0,.2,1) forwards}@keyframes rlarc{to{stroke-dashoffset:0}}" +
     ".rl-story-slide .map .dot{fill:var(--accent);stroke:currentColor;stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0;animation:rldot .5s cubic-bezier(.2,.9,.3,1.4) forwards}@keyframes rldot{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}" +
     "@media(prefers-reduced-motion:reduce){.rl-story-slide .rl-wr-hero,.rl-story-slide .ph.tumble figure{animation:none;opacity:1;transform:rotate(var(--r))}.rl-story-slide .bag .it{animation:none;opacity:1;transform:translateY(calc(30px + var(--k) * 12px)) rotate(var(--r))}" +
     ".rl-story-slide .belt>div{animation:none;flex-wrap:wrap;width:auto}.rl-story-slide .belt span.dup{display:none}.rl-story-slide .train *{animation:none!important}.rl-story-slide .train .loco{transform:translateX(calc(50cqw - 125px))}.rl-story-slide .train .puff{opacity:.5}" +
@@ -6882,16 +6882,24 @@
   // Longitude and latitude to the map's x and y (a flat projection squeezed east to west, fine for a country this size).
   function ukXY(lat, lon) { return [Math.round((lon - UK_LON0) * UK_K * UK_S * 10) / 10, Math.round((UK_LAT0 - lat) * UK_S * 10) / 10]; }
   function ukMapSvg(travel) {
-    var paths = UK_COAST.map(function (a) { var d = ""; for (var i = 0; i < a.length; i += 2) { var p = ukXY(a[i], a[i + 1]); d += (i ? "L" : "M") + p[0] + " " + p[1]; } return '<path class="land" d="' + d + 'Z"/>'; }).join("");
+    // Each coast is drawn through the middles of its edges, curving round its points, so it reads smooth rather than spiky.
+    var r1 = function (v) { return Math.round(v * 10) / 10; };
+    var paths = UK_COAST.map(function (a) {
+      var pts = []; for (var i = 0; i < a.length; i += 2) pts.push(ukXY(a[i], a[i + 1]));
+      var mid = function (k) { var p = pts[k % pts.length], q = pts[(k + 1) % pts.length]; return r1((p[0] + q[0]) / 2) + " " + r1((p[1] + q[1]) / 2); };
+      var d = "M" + mid(0);
+      for (var k = 1; k <= pts.length; k++) { var c = pts[k % pts.length]; d += "Q" + c[0] + " " + c[1] + " " + mid(k); }
+      return '<path class="land" d="' + d + 'Z"/>';
+    }).join("");
     var at = {}; (travel.places || []).forEach(function (p) { at[p.name.toLowerCase()] = ukXY(p.lat, p.lon); });
     var arcs = "", n = 0;
     (travel.routes || []).forEach(function (r) {
       var a = at[r.from.toLowerCase()], b = at[r.to.toLowerCase()];
       if (!a || !b || n >= 10) return;
       // A gentle curve between the two places, bowed to one side.
-      var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.min(40, len * 0.3);
+      var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.max(16, Math.min(40, len * 0.35));
       var cx = Math.round((mx - dy / len * bow) * 10) / 10, cy = Math.round((my + dx / len * bow) * 10) / 10;
-      arcs += '<path class="arc" pathLength="1" style="animation-delay:' + (0.5 + n * 0.25).toFixed(2) + 's;stroke-width:' + Math.min(5, 2 + r.times * 0.5) + '" d="M' + a[0] + " " + a[1] + "Q" + cx + " " + cy + " " + b[0] + " " + b[1] + '"/>';
+      arcs += '<path class="arc" pathLength="1" data-route="' + n + '" style="animation-delay:' + (0.4 + n * 0.9).toFixed(2) + 's;stroke-width:' + Math.min(5, 2 + r.times * 0.5) + '" d="M' + a[0] + " " + a[1] + "Q" + cx + " " + cy + " " + b[0] + " " + b[1] + '"/>';
       n++;
     });
     var dots = (travel.places || []).map(function (p, i) { var q = ukXY(p.lat, p.lon); return '<circle class="dot" style="animation-delay:' + (0.3 + i * 0.08).toFixed(2) + 's" cx="' + q[0] + '" cy="' + q[1] + '" r="' + (p.visits > 2 ? 6 : 4.5) + '"/>'; }).join("");
@@ -7023,7 +7031,7 @@
       });
       b.appendChild(ol);
     } });
-    if (photos.length) S.push({ bg: "#f6f3ec", fg: "#101828", accent: "#101828", build: function (b) {
+    if (photos.length) S.push({ bg: "#ffffff", fg: "#101828", accent: "#2B59C3", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: photos.length === 1 ? "One thing you brought home" : "Some things you brought home" }));
       var grid = photoGrid(photos, "ph"); grid.classList.add("tumble"); b.appendChild(grid);
       // And a belt of the year's other things going by, each with its drawn icon (names from the receipts).
