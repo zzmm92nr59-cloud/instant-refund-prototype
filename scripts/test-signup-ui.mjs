@@ -210,11 +210,12 @@ assert.equal(await sheet.getByRole("heading", { name: "What should we call you?"
 assert.deepEqual(st.profilePosts, [{ name: "Jess Tester" }], "the name Google holds is kept");
 await sheet.locator(".rl-jscan").getByText(/receipts? found so far/).waitFor();
 assert.equal(await sheet.getByRole("img", { name: "Step 1 of 2" }).count(), 1, "two steps: your inboxes, all set");
-assert.ok(await sheet.locator(".rl-jpbar i").count(), "one bar across the top shows how far along");
+assert.equal(await sheet.locator(".rl-jsegs i").count(), 2, "a segment a step across the top");
+assert.equal(await sheet.locator(".rl-jsegs i.on").count(), 1, "lime up to this one");
 // The first read finishes here: "You're all set" shows the count it reached straight away (it used to go back to
 // "Reading your Gmail…" and stay there).
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor({ timeout: 8000 });
-await sheet.locator(".rl-jlist").getByText("Gmail, connected").waitFor();
+await sheet.locator(".rl-jlist .rl-jrow", { hasText: "jess.tester@gmail.com" }).getByText("Gmail", { exact: true }).waitFor();
 assert.ok(await sheet.getByRole("button", { name: "Add another Gmail inbox" }).isVisible(), "another inbox is one tap away");
 await sheet.locator(".rl-jscan").getByText("12 receipts found").waitFor();
 await polished("your inboxes"); await page.screenshot({ path: "/tmp/shots/signup-3b-inboxes.png" });
@@ -222,8 +223,8 @@ await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "You're all set, Jess." }).waitFor();
 assert.equal(await sheet.getByRole("img", { name: "Step 2 of 2" }).count(), 1);
 assert.equal(st.interestPuts, undefined, "not asked what they shop for: their receipts say");
-assert.match(await sheet.locator(".rl-jscan").innerText(), /12 receipts found/, "the count carries over to 'You're all set' at once");
-await sheet.getByText("1 inbox connected").waitFor();
+// What's connected, as big numbers: the receipts found carry over at once.
+assert.deepEqual(await sheet.locator(".rl-jstat:not([hidden])").evaluateAll(n => n.map(x => x.innerText.replace(/\s+/g, " ").trim())), ["12 receipts found", "1 inbox"]);
 assert.deepEqual(st.profilePosts, [{ name: "Jess Tester" }]);
 assert.equal(st.connects, 0, "no second visit to Google to connect Gmail");
 assert.equal(st.consentPosts, 0, "the agreement made before Google isn't asked for again");
@@ -286,7 +287,7 @@ await sheet.locator(".rl-jscan").waitFor();
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 // With an inbox connected along the way, what they shop for isn't asked after all.
 await sheet.getByRole("heading", { name: "You're all set, Sam." }).waitFor();
-await sheet.locator(".rl-jscan").getByText(/receipts? found/).waitFor();
+await sheet.locator(".rl-jstat:not([hidden])").getByText(/receipts? found/).waitFor();
 await sheet.getByRole("button", { name: "Go to Home" }).click();
 await homeShows(page, "S");
 console.log("ok - email sign-in: Gmail users are pointed to the one-step route; otherwise they connect once and come back to their inboxes");
@@ -302,9 +303,11 @@ await sheet.getByRole("button", { name: "Continue with Microsoft" }).click();
 await backFrom("login.microsoftonline.com", "#signin=" + LINK);
 assert.equal(st.starts[0].consentVersion, CONSENT.version);
 await sheet.getByRole("heading", { name: "What should we call you?" }).waitFor();
-await sheet.getByText("Reading your Outlook").or(sheet.getByText(/found so far/)).first().waitFor();
+await page.waitForFunction(() => true); await page.waitForTimeout(600);
+assert.ok(st.scanCalls >= 1, "the Outlook read starts behind the name step");
 await sheet.getByRole("button", { name: "Skip" }).click();
 await sheet.getByRole("heading", { name: "Your inboxes" }).waitFor();
+await sheet.getByText("Reading your Outlook").or(sheet.getByText(/found so far/)).or(sheet.getByText(/receipts? found/)).first().waitFor();
 // A second "Skip" in the same spot within 0.4s is a double tap (index.html's guard), so it doesn't skip two steps.
 await sheet.getByRole("button", { name: "Skip" }).click();
 assert.equal(await sheet.getByRole("heading", { name: "Your inboxes" }).count(), 1, "a double tap on Skip doesn't skip two steps");
@@ -331,7 +334,7 @@ assert.equal(await sheet.getByRole("img", { name: "Step 1 of 3" }).count(), 1, "
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
 assert.equal(await sheet.getByRole("img", { name: "Step 2 of 3" }).count(), 1);
-assert.match(await sheet.locator(".rl-jbody").innerText(), /can only read: it can't move money/, "says plainly it can't move money");
+assert.match(await sheet.locator(".rl-jbody").innerText(), /It can only read, never move money\./, "says plainly it can't move money");
 // The usual banks and cards, one tap each; any other through TrueLayer's list.
 const tiles = sheet.getByRole("group", { name: "Choose your bank or card" }).getByRole("button");
 assert.deepEqual(await tiles.evaluateAll(b => b.map(x => x.lastChild.textContent)), ["Amex", "Barclays", "Chase", "Halifax", "HSBC", "Lloyds", "Monzo", "Nationwide", "NatWest", "Revolut", "Santander", "Starling"]);
@@ -346,7 +349,7 @@ await sheet.getByRole("heading", { name: "Your cards and banks" }).waitFor();
 await sheet.getByText("Connected. Relay has read your payments and is matching them to your receipts.").waitFor();
 await sheet.locator(".rl-jlist").getByText("American Express").waitFor();
 assert.equal(await sheet.getByRole("img", { name: "Step 2 of 3" }).count(), 1, "back from the bank, the same step count (it used to start again)");
-assert.match(await sheet.locator(".rl-jlist").innerText(), /12 payments read, 3 matched to receipts/);
+assert.match(await sheet.locator(".rl-jlist").innerText(), /American Express\n3 matched to receipts/, "a bank with what Relay matched in it");
 assert.equal(await tiles.filter({ hasText: "Amex" }).count(), 0, "a connected one isn't offered again");
 assert.equal(await tiles.count(), 11, "the others still one tap away");
 await polished("cards and banks, one connected"); await page.screenshot({ path: "/tmp/shots/signup-banks-2.png" });
@@ -357,8 +360,7 @@ await page.goto(origin + "/index.html#bank=denied");
 await sheet.getByText(/Not connected\. You can try again/).waitFor();
 await sheet.getByRole("button", { name: "Continue", exact: true }).click();
 await sheet.getByRole("heading", { name: "You're all set, Connor." }).waitFor();
-await sheet.getByText("1 inbox connected").waitFor();
-await sheet.getByText("1 bank or card connected").waitFor();
+assert.deepEqual(await sheet.locator(".rl-jstat:not([hidden])").evaluateAll(n => n.map(x => x.innerText.replace(/\s+/g, " ").trim())).then(a => a.filter(x => !/found/.test(x))), ["1 inbox", "1 bank"], "what's connected, as big numbers");
 await polished("all set, with a bank"); await page.screenshot({ path: "/tmp/shots/signup-banks-done.png" });
 // Coming back from the bank having said no: the same step, saying so, nothing listed.
 // (Off the page first: clearing storage under the open app makes it sign out and reload, which can cut across the next goto.)

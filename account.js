@@ -688,6 +688,45 @@
     ".rl-jlist{background:var(--rl-card);border:1px solid var(--rl-line);border-radius:18px;padding:2px 16px;margin:0 0 14px}.rl-jrow{display:flex;gap:12px;align-items:center;min-height:52px;padding:8px 0}.rl-jrow+.rl-jrow{border-top:1px solid var(--rl-line)}" +
     ".rl-jrow>.rl-jic{width:36px;height:36px;border-radius:10px;background:var(--rl-bg);color:var(--rl-text);flex:none}.rl-jrow b{display:block;font-size:15px;color:var(--rl-text);word-break:break-word}.rl-jrow span.rl-jrs{display:block;font-size:13px;color:var(--rl-text2)}" +
     "@media(prefers-reduced-motion:reduce){.rl-jbody.rl-jin,.rl-jart *{animation:none!important}.rl-jpbar i{transition:none}}" +
+    // Getting started, Relay's navy throughout (Connor, 17 Nov 2026): segments for the steps, a picture made of real things,
+    // short words, and the buttons kept at the bottom.
+    ".rl-jsegs{display:flex;gap:6px;justify-content:center;align-items:center}.rl-jsegs i{display:block;width:26px;height:5px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;position:relative}" +
+    ".rl-jsegs i.on{background:#c7f567}.rl-jsegs i.now{background:rgba(255,255,255,.18)}.rl-jsegs i.now::after{content:\"\";position:absolute;inset:0;background:#c7f567;transform-origin:left;animation:rljseg .5s .1s cubic-bezier(.2,.8,.2,1) both}" +
+    "@keyframes rljseg{from{transform:scaleX(0)}to{transform:scaleX(1)}}" +
+    ".rl-jr .rl-jbody{display:flex;flex-direction:column;min-height:calc(100dvh - 76px - env(safe-area-inset-top))}" +
+    ".rl-jr h2.rl-jh{font-size:clamp(28px,8.4vw,34px);line-height:1.08;letter-spacing:-.02em;margin:0 0 8px}.rl-jr p.rl-jsub{font-size:16px;line-height:1.42;margin:0 0 18px}" +
+    ".rl-jfoot{position:sticky;bottom:0;z-index:3;margin:auto -18px 0;padding:18px 18px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(rgba(16,24,40,0),#101828 22px);display:flex;flex-direction:column;gap:8px}" +
+    ".rl-jr .rl-jbody>*{flex:none}.rl-jr .rl-textbtn{min-height:48px!important}.rl-jfoot .rl-btn{margin:0!important;flex:none}.rl-jfoot .rl-textbtn{margin:0!important;min-height:48px!important;flex:none}" +
+    ".rl-jstage{position:relative;height:216px;margin:2px 0 14px;display:flex;align-items:center;justify-content:center}" +
+    ".rl-jring{position:absolute;left:50%;top:50%;border-radius:50%;border:1px solid rgba(255,255,255,.07);transform:translate(-50%,-50%)}.rl-jring.r1{width:200px;height:200px}.rl-jring.r2{width:300px;height:300px;border-color:rgba(255,255,255,.04)}" +
+    ".rl-jmark{flex:none;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;color:#fff;font-weight:800;font-size:17px;overflow:hidden;background-size:cover}.rl-jmark.rl-has-logo{background-color:#fff!important}.rl-jmark img{width:100%;height:100%;object-fit:contain}" +
+    ".rl-jfan{position:relative;width:268px;height:186px}" +
+    ".rl-jrc{position:absolute;left:0;right:0;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:#fff;color:#101828;box-shadow:0 14px 30px rgba(0,0,0,.28);animation:rljcard .7s cubic-bezier(.2,.8,.2,1) both}" +
+    ".rl-jrc-t{flex:1;min-width:0;display:flex;flex-direction:column}.rl-jrc-t b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-jrc-t span{font-size:13px;color:#5b6475}.rl-jrc-p{font-size:15px}" +
+    ".rl-jfan1{top:110px;z-index:3;--r:-2deg;animation-delay:.22s}.rl-jfan2{top:56px;z-index:2;--r:4deg;transform:rotate(4deg) scale(.95);opacity:.9;animation-delay:.12s}.rl-jfan3{top:8px;z-index:1;--r:-5deg;transform:rotate(-5deg) scale(.9);opacity:.75;animation-delay:.02s}" +
+    "@keyframes rljcard{from{opacity:0;transform:translateY(26px) rotate(var(--r,0deg)) scale(.92)}}" +
+    ".rl-jrc.rl-jfan1{transform:rotate(-2deg)}" +
+    ".rl-jtick{position:absolute;right:-8px;top:-10px;width:30px;height:30px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}.rl-jtick .rl-jic{color:#101828;margin:0}" +
+    "@keyframes rljpop{from{transform:scale(0)}to{transform:scale(1)}}" +
+    ".rl-jbfan{width:250px;height:196px}.rl-jbc{position:absolute;left:0;width:236px;height:146px;border-radius:20px;padding:16px;box-sizing:border-box;color:#fff;box-shadow:0 16px 32px rgba(0,0,0,.32);display:flex;flex-direction:column;justify-content:space-between;animation:rljcard .7s cubic-bezier(.2,.8,.2,1) both}" +
+    ".rl-jbc b{font-size:16px;letter-spacing:.01em;text-shadow:0 1px 2px rgba(0,0,0,.2)}.rl-jbc .rl-jmark{width:38px;height:38px;border-radius:10px}" +
+    ".rl-jbc-chip{position:absolute;right:18px;top:20px;width:34px;height:26px;border-radius:6px;background:rgba(255,255,255,.35)}" +
+    ".rl-jbc.rl-jfan1{top:50px;left:10px;z-index:3;transform:rotate(-3deg);--r:-3deg;animation-delay:.22s}.rl-jbc.rl-jfan2{top:14px;left:40px;z-index:2;transform:rotate(8deg) scale(.92);--r:8deg;animation-delay:.12s}.rl-jbc.rl-jfan3{top:6px;left:-26px;z-index:1;transform:rotate(-13deg) scale(.88);--r:-13deg;animation-delay:.02s}" +
+    ".rl-jpill{position:absolute;right:-10px;bottom:-12px;padding:7px 12px;border-radius:99px;background:#c7f567;color:#101828;font-size:13px;font-weight:800;box-shadow:0 0 0 4px #101828;animation:rljpop .4s .7s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jface{width:116px;height:116px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:800;letter-spacing:-.02em;animation:rljpop .5s .1s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jorbit{position:relative;width:100%;height:216px}.rl-jbigtick{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;background:#c7f567;color:#101828;display:flex;align-items:center;justify-content:center;animation:rljpop .5s .05s cubic-bezier(.2,1.4,.4,1) both}.rl-jbigtick .rl-jic{color:#101828;margin:0}" +
+    ".rl-jorb{position:absolute;width:44px;height:44px;border-radius:50%;box-shadow:0 0 0 3px #101828;animation:rljpop .45s cubic-bezier(.2,1.4,.4,1) both}" +
+    ".rl-jconn{padding:4px 14px}.rl-jconn .rl-jrow{gap:12px}.rl-jconn .rl-jlogo{width:36px;height:36px;border-radius:10px}.rl-jconn .rl-jrow>div{flex:1;min-width:0}.rl-jconn .rl-jrow b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".rl-jok{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(199,245,103,.16);color:#c7f567;display:flex;align-items:center;justify-content:center}.rl-jok .rl-jic{color:#c7f567;margin:0}" +
+    ".rl-jsmall{font-size:13px!important;font-weight:700;color:var(--rl-text2);margin:18px 0 8px!important}" +
+    ".rl-jadds{display:flex;gap:10px}.rl-jadd{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-height:48px;border-radius:14px;border:1px dashed rgba(255,255,255,.28);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:15px;color:#fff;transition:transform .12s,background-color .12s}" +
+    ".rl-jadd:active{transform:scale(.97);background:rgba(255,255,255,.06)}.rl-jadd:focus-visible{outline:2px solid #fff;outline-offset:2px}.rl-jadd .rl-jic{color:#c7f567;margin:0}.rl-jadd:disabled{opacity:.5}" +
+    ".rl-jstats{display:flex;gap:10px;margin:4px 0 0}.rl-jstat{flex:1;padding:16px 14px;border-radius:18px;background:var(--rl-card);display:flex;flex-direction:column;gap:2px}.rl-jstat b{font-size:30px;font-weight:800;letter-spacing:-.02em;color:#c7f567;line-height:1.1}.rl-jstat span{font-size:13px;color:var(--rl-text2)}" +
+    ".rl-jr .rl-jscan{background:transparent;padding:0;margin:0 0 16px}.rl-jr .rl-jscan[hidden]{display:none}.rl-jr .rl-jscan-t{gap:10px}.rl-jr .rl-jscan b{font-size:15px}.rl-jr .rl-jscan span{font-size:13px}" +
+    ".rl-jdot{flex:none;width:10px;height:10px;border-radius:50%;background:#c7f567;box-shadow:0 0 0 0 rgba(199,245,103,.6);animation:rljdot 1.6s infinite}.rl-jscan.done .rl-jdot{animation:none}" +
+    "@keyframes rljdot{70%{box-shadow:0 0 0 10px rgba(199,245,103,0)}100%{box-shadow:0 0 0 0 rgba(199,245,103,0)}}" +
+    ".rl-jr .rl-jscan .rl-jbar{margin-top:10px}.rl-jr .rl-jscan.done .rl-jbar{display:none}.rl-jr .rl-jscan-t{align-items:center}" +
+    "@media(prefers-reduced-motion:reduce){.rl-jrc,.rl-jbc,.rl-jtick,.rl-jpill,.rl-jface,.rl-jbigtick,.rl-jorb,.rl-jsegs i.now::after,.rl-jdot{animation:none!important}}" +
     ".rl-jbody{padding:8px 2px 4px}.rl-jkick{font-size:12px;font-weight:800;letter-spacing:.1em;color:var(--rl-accent);margin:6px 0 6px}" +
     ".rl-sheet h2.rl-jh{font-family:var(--rl-sys);font-weight:800;font-size:30px;line-height:1.1;letter-spacing:-.02em;color:var(--rl-text);margin:6px 0 10px}" +
     ".rl-sheet p.rl-jsub{font-size:16px;color:var(--rl-text2);margin:0 0 20px}" +
@@ -1811,26 +1850,101 @@
     if (kind === "mail") { art.appendChild(el("span", { className: "rl-jchip", style: "left:14px;top:18px", text: "Order confirmed" })); art.appendChild(el("span", { className: "rl-jchip", style: "right:14px;bottom:18px", text: "Refund issued" })); }
     return art;
   }
+  // Getting started's pictures (Connor, 17 Nov 2026: flat coloured boxes looked made by AI). Each step shows real things:
+  // your receipts fanned out like cards, your banks as cards in their own colours, your shops round a tick at the end.
+  // Until there are any, the same shops as the welcome story stand in, as pictures.
+  var J_SAMPLE = [{ shop: "lululemon", name: "Align High-Rise Pant", price: "£69", c: "#C8102E" }, { shop: "Allbirds", name: "Canvas Cruiser", price: "£60", c: "#D47B1F" },
+    { shop: "Kitri", name: "Hilda Midi Dress", price: "£35", c: "#2E9E5B" }];
+  function jStage(kind, parts) {
+    var st = el("div", { className: "rl-jstage rl-jstage-" + kind }); st.setAttribute("aria-hidden", "true");
+    st.appendChild(el("i", { className: "rl-jring r1" })); st.appendChild(el("i", { className: "rl-jring r2" }));
+    (parts || []).forEach(function (p) { if (p) st.appendChild(p); });
+    return st;
+  }
+  function jMark(text, colour) { return el("span", { className: "rl-jmark", text: String(text || "?").trim().charAt(0).toUpperCase(), style: "background:" + (colour || "#4F72E0") }); }
+  // Receipts as little white cards, fanned. `list`: { shop, name, price, dom?, c? }.
+  function jReceiptFan(list) {
+    var fan = el("div", { className: "rl-jfan" });
+    list.slice(0, 3).reverse().forEach(function (r, k, all) {
+      var mark = jMark(r.shop, r.c || colourFor(r.shop));
+      if (r.dom) shopLogo(mark, r.dom, 40, function () {});
+      fan.appendChild(el("div", { className: "rl-jrc rl-jfan" + (all.length - k) }, [mark, el("span", { className: "rl-jrc-t" }, [el("b", { text: r.name || r.shop }), el("span", { text: r.shop })]),
+        r.price ? el("b", { className: "rl-jrc-p", text: r.price }) : null].filter(Boolean)));
+    });
+    var front = fan.lastChild; if (front) front.appendChild(el("span", { className: "rl-jtick" }, [jIc("check", 16)]));
+    return fan;
+  }
+  function colourFor(name) { var c = ["#4F72E0", "#E0446E", "#D47B1F", "#2E9E5B", "#B455C9", "#6662D9"], h = 0; String(name || "").split("").forEach(function (x) { h = (h * 31 + x.charCodeAt(0)) >>> 0; }); return c[h % c.length]; }
+  // What they've bought lately, for the pictures (from what's already loaded; nothing is fetched for a picture).
+  function jRecent(rows) {
+    var r = rows || (memo.receipts && memo.receipts.rows) || [];
+    var out = [];
+    try {
+      feedEntries([], r || [], function () {}).filter(function (e) { return !e.digital && e.shop; })
+        .sort(function (a, b) { return String(b.at || "").localeCompare(String(a.at || "")); }).forEach(function (e) {
+          if (out.length >= 6 || out.some(function (x) { return x.shop === e.shop; })) return;
+          var t = e.tiles && e.tiles[0];
+          out.push({ shop: e.shop, name: cleanName(e.title || (t && t.name) || "", e.shop), price: (t && t.price) || "", dom: e.dom || "" });
+        });
+    } catch (x) {}
+    return out;
+  }
+  // Once their receipts are in, the picture shows those instead (asked once; the app reuses what it just loaded).
+  function jWithReceipts(stage, make) {
+    api("/relay/my/receipts").then(function (r) {
+      var rows = r.ok && r.body && r.body.receipts, mine = rows && rows.length ? jRecent(rows) : [];
+      if (!mine.length || !stage.isConnected) return;
+      var old = stage.querySelector(".rl-jfan, .rl-jorbit"), fresh = make(mine);
+      if (old && fresh) old.parentNode.replaceChild(fresh, old);
+    }, function () {});
+    return stage;
+  }
+  // Banks as cards in their own colours, fanned, with "Read only" on the front one.
+  function jBankFan(banks) {
+    var seen = [], list = [];
+    (banks || []).forEach(function (b) { var n = b.bank || "Bank"; if (seen.indexOf(n) < 0) { seen.push(n); list.push(n); } });
+    var names = list.length ? list : ["American Express", "Monzo", "Barclays"];
+    var fan = el("div", { className: "rl-jfan rl-jbfan" });
+    names.slice(0, 3).reverse().forEach(function (n, k, all) {
+      var tile = BANK_TILES.filter(function (t) { return t[3].test(n); })[0];
+      var mark = jMark(n, "rgba(255,255,255,.22)");
+      if (tile) shopLogo(mark, tile[2], 34, function () {});
+      fan.appendChild(el("div", { className: "rl-jbc rl-jfan" + (all.length - k), style: "background:" + (tile ? tile[4] : "#4F72E0") }, [mark, el("i", { className: "rl-jbc-chip" }), el("b", { text: n })]));
+    });
+    fan.lastChild.appendChild(el("span", { className: "rl-jpill", text: "Read only" }));
+    return fan;
+  }
+  // The end: a big tick with the shops they buy from round it.
+  function jDoneStage(recent) { return jStage("done", [jOrbit(recent)]); }
+  function jOrbit(recent) {
+    var ring = el("div", { className: "rl-jorbit" });
+    ring.appendChild(el("span", { className: "rl-jbigtick" }, [jIc("check", 44)]));
+    (recent.length ? recent : J_SAMPLE).slice(0, 6).forEach(function (r, k, all) {
+      var m = jMark(r.shop, r.c || colourFor(r.shop)); m.classList.add("rl-jorb");
+      var a = (k / all.length) * Math.PI * 2 - Math.PI / 2;
+      m.style.left = "calc(50% + " + Math.round(Math.cos(a) * 92) + "px - 22px)"; m.style.top = "calc(50% + " + Math.round(Math.sin(a) * 78) + "px - 22px)"; m.style.animationDelay = (0.15 + k * 0.07).toFixed(2) + "s";
+      if (r.dom) shopLogo(m, r.dom, 44, function () {});
+      ring.appendChild(m);
+    });
+    return ring;
+  }
+  // The buttons at the foot of a step, kept in reach at the bottom of the screen.
+  function jFoot(body, nodes) { var f = el("div", { className: "rl-jfoot" }, nodes.filter(Boolean)); body.appendChild(f); return f; }
   function jFrame(sheet, o) {
     sheet.textContent = ""; sheet.classList.remove("rl-signin"); sheet.classList.add("rl-full", "rl-jr"); sheet.setAttribute("aria-label", "Getting started");
     try { sheet.scrollTop = 0; } catch (e) {}
     var top = el("div", { className: "rl-jtop" });
     top.appendChild(o.back ? el("button", { type: "button", className: "rl-abtn", ariaLabel: "Back", "data-back": "", onclick: o.back }, [jIc("back"), el("span", { text: "Back" })]) : el("span"));
-    var bar = null;
     if (o.of > 1) {
-      var step = el("span", { className: "rl-jstep", text: o.at + " of " + o.of }); step.setAttribute("role", "img"); step.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
-      top.appendChild(step);
-      // The bar grows (or shrinks, going back) from where the last step left it.
-      bar = el("i", { style: "width:" + Math.round((jBarWas || 0) * 100) + "%" });
+      // How far along: a short segment for each step, lime up to this one (the newest one fills as the step opens).
+      var segs = el("span", { className: "rl-jsegs" }); segs.setAttribute("role", "img"); segs.setAttribute("aria-label", "Step " + o.at + " of " + o.of);
+      for (var k = 1; k <= o.of; k++) segs.appendChild(el("i", { className: k < o.at ? "on" : k === o.at ? "on now" : "" }));
+      top.appendChild(segs);
     } else top.appendChild(el("span"));
     top.appendChild(o.noClose ? el("span") : el("button", { type: "button", className: "rl-abtn done", text: o.closeText || "Close", onclick: o.onClose || close }));
-    if (bar) {
-      var to = o.at / o.of; top.appendChild(el("div", { className: "rl-jpbar" }, [bar]));
-      jBarWas = to; requestAnimationFrame(function () { requestAnimationFrame(function () { bar.style.width = Math.round(to * 100) + "%"; }); });
-    }
     sheet.appendChild(top);
     var body = el("div", { className: "rl-jbody" + (o.of > 1 ? " rl-jin" + (o.goingBack ? " rl-jback" : "") : "") });
-    if (o.art) body.appendChild(jArt(o.art));
+    if (o.stage) body.appendChild(o.stage); else if (o.art) body.appendChild(jArt(o.art));
     if (o.kicker) body.appendChild(el("div", { className: "rl-jkick", text: o.kicker }));
     body.appendChild(el("h2", { className: "rl-jh", text: o.title }));
     if (o.sub) body.appendChild(el("p", { className: "rl-jsub", text: o.sub }));
@@ -2280,7 +2394,7 @@
     var card = el("div", { className: "rl-jscan", role: "status" });
     var line = el("b", { text: "Reading your " + box + "…" }), sub = el("span", { text: "Looking for receipts and order confirmations" });
     var bar = el("div", { className: "rl-jbar" }, [el("i")]);
-    card.appendChild(el("div", { className: "rl-jscan-t" }, [jIc("mail"), el("div", {}, [line, sub])]));
+    card.appendChild(el("div", { className: "rl-jscan-t" }, [el("span", { className: "rl-jdot" }), el("div", {}, [line, sub])]));
     card.appendChild(bar);
     journeyScan(sheet, st).on(function (job, done) {
       // (The first call comes before the card is on the page: it fills it in then. Once the card has gone, it stops.)
@@ -2293,6 +2407,8 @@
       else { line.textContent = found ? found + " receipt" + (found === 1 ? "" : "s") + " found so far" : "Reading your " + box + "…"; sub.textContent = m ? "Read back to " + new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) : "Looking for receipts and order confirmations"; }
       bar.firstChild.style.width = pct + "%";
       card.classList.toggle("done", Boolean(done));
+      // Finished with nothing new: nothing to say (Connor, 17 Nov 2026: "All read, Nothing yet" on every step).
+      card.hidden = Boolean(done && !found && !(job && job.state === "failed"));
     });
     return card;
   }
@@ -2305,10 +2421,14 @@
     var back = i > 0 ? function () { st.wentBack = true; runJourney(sheet, st, steps, i - 1); } : null;
     var leave = function () { if (st.scanner) st.scanner.stop(); jBarWas = 0; planDrop(); close(); };
     if (kind === "name") {
-      var body = jFrame(sheet, { goingBack: wentBack, art: "name", back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
+      var face = el("span", { className: "rl-jface" });
+      var body = jFrame(sheet, { goingBack: wentBack, stage: jStage("name", [face]), back: back, of: of, at: at, closeText: "Skip", onClose: function () { obSet(st.email, { nameSkipped: true }); next(); },
         title: "What should we call you?", sub: "Your first name is fine. Only you see it." });
-      if (st.connected) body.appendChild(scanCard(sheet, st));
+      if (st.connected) journeyScan(sheet, st);   // the first read starts straight away, behind this step
       var input = el("input", { type: "text", id: "rl-onboard-name", maxLength: 40, autocomplete: "name", placeholder: "Your name", value: st.name || st.suggested || "" });
+      // Their initials, as they type them.
+      var showFace = function () { var w = input.value.trim().split(/\s+/).filter(Boolean); face.textContent = w.length ? (w[0].charAt(0) + (w.length > 1 ? w[w.length - 1].charAt(0) : "")).toUpperCase() : "Hi"; };
+      input.addEventListener("input", showFace); showFace();
       input.setAttribute("aria-label", "Your name");
       var note = el("div", { className: "rl-msg" });
       var go = el("button", { type: "button", className: "rl-btn", text: "Continue" });
@@ -2323,39 +2443,44 @@
         }).catch(function () { go.disabled = false; say(note, "Couldn't reach Relay. Check your connection.", true); });
       };
       input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.click(); });
-      [el("label", { htmlFor: "rl-onboard-name", className: "rl-jlabel", text: "Your name" }), input, go, note].forEach(function (n) { body.appendChild(n); });
+      [el("label", { htmlFor: "rl-onboard-name", className: "rl-jlabel", text: "Your name" }), input, note].forEach(function (n) { body.appendChild(n); });
       if (st.suggested && !st.name) body.appendChild(el("p", { className: "rl-jnote", text: "Filled in from your " + (st.provider === "microsoft" ? "Microsoft" : "Google") + " account. Change it if you like." }));
+      jFoot(body, [go]);
       return;
     }
     if (kind === "mail" && st.connected) {
       // Connected: the inboxes so far, the first read counting, and a quick way to add every other address they shop with.
-      var bodyM = jFrame(sheet, { goingBack: wentBack, art: "mail", back: back, of: of, at: at, closeText: "Skip", onClose: next,
-        title: "Your inboxes", sub: "Relay reads each one for receipts by itself. Add every email address you shop with." });
+      var stageM = jWithReceipts(jStage("mail", [jReceiptFan(jRecent().length ? jRecent() : J_SAMPLE)]), jReceiptFan);
+      var bodyM = jFrame(sheet, { goingBack: wentBack, stage: stageM, back: back, of: of, at: at, closeText: "Skip", onClose: next,
+        title: "Your inboxes", sub: "Add every email address you shop with. Relay reads them for receipts by itself." });
       bodyM.appendChild(scanCard(sheet, st));
-      var listM = el("div", { className: "rl-jlist" });
+      var listM = el("div", { className: "rl-jlist rl-jconn" });
       st.inboxes.forEach(function (x) {
-        listM.appendChild(el("div", { className: "rl-jrow" }, [jIc("mail"), el("div", {}, [el("b", { text: x.email || mailNameOf(x.provider) }), el("span", { className: "rl-jrs", text: mailNameOf(x.provider) + ", connected" })])]));
+        var logo = el("span", { className: "rl-jmark rl-jlogo" }); shopLogo(logo, x.provider === "microsoft" ? "outlook.com" : "gmail.com", 36, function () { logo.appendChild(jIc("mail")); });
+        listM.appendChild(el("div", { className: "rl-jrow" }, [logo, el("div", {}, [el("b", { text: x.email || mailNameOf(x.provider) }), el("span", { className: "rl-jrs", text: mailNameOf(x.provider) })]), el("span", { className: "rl-jok" }, [jIc("check", 16)])]));
       });
       bodyM.appendChild(listM);
       var noteM = el("div", { className: "rl-msg" }); noteM.setAttribute("role", "status");
       if (st.mailNote) { say(noteM, st.mailNote.text, st.mailNote.bad); listM.parentNode.insertBefore(noteM, listM); }
       var cM = st.consent || {};
-      bodyM.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
       if (st.inboxes.length < st.maxInboxes) {
+        var adds = el("div", { className: "rl-jadds" });
         [["google", "Gmail", cM.gmailAvailable !== false], ["microsoft", "Outlook", Boolean(cM.outlookAvailable)]].forEach(function (k) {
           if (!k[2]) return;
-          var b = el("button", { type: "button", className: "rl-btn ghost", text: "Add another " + k[1] + " inbox" });
+          var b = el("button", { type: "button", className: "rl-jadd", ariaLabel: "Add another " + k[1] + " inbox" }, [jIc("plus", 18), el("span", { text: k[1] })]);
           b.onclick = function () { obSet(st.email, { back: "mail" }); addAnotherInbox(k[0], b, noteM); };
-          bodyM.appendChild(b);
+          adds.appendChild(b);
         });
+        if (adds.firstChild) { bodyM.appendChild(el("p", { className: "rl-jsmall", text: "Add another inbox" })); bodyM.appendChild(adds); }
       }
       if (!noteM.parentNode) bodyM.appendChild(noteM);
+      jFoot(bodyM, [el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next })]);
       return;
     }
     if (kind === "mail") {
       var c = st.consent || {}, first = mailKindOf(st.email) || (c.gmailAvailable ? "google" : "microsoft");
-      var body2 = jFrame(sheet, { goingBack: wentBack, art: "mail", back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { mailLater: true }); next(); },
-        title: "Bring in your receipts", sub: "Connect the email you shop with. Relay reads it once now, then keeps up with new receipts by itself." });
+      var body2 = jFrame(sheet, { goingBack: wentBack, stage: jStage("mail", [jReceiptFan(J_SAMPLE)]), back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { mailLater: true }); next(); },
+        title: "Bring in your receipts", sub: "Connect the email you shop with. Relay finds every receipt in it, then keeps up by itself." });
       var pts = el("div", { className: "rl-jcard" });
       [["eye", "Reads only order confirmations, receipts and return emails"], ["lock", "Read-only: never sends, deletes or changes anything"], ["trash", "Disconnect and delete everything at any time"]]
         .forEach(function (x) { pts.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
@@ -2386,35 +2511,42 @@
       gb.onclick = function () { connect(null, "Gmail", /^https:\/\/accounts\.google\.com\//, gb); };
       ob.onclick = function () { connect("microsoft", "Outlook", /^https:\/\/login\.microsoftonline\.com\//, ob); };
       var order = first === "microsoft" ? [ob, gb] : [gb, ob];
-      order.forEach(function (b, k) { if (k) b.className = "rl-btn ghost"; if ((b === gb && c.gmailAvailable !== false) || (b === ob && c.outlookAvailable)) body2.appendChild(b); });
       body2.appendChild(note2);
       if (c.outlookAvailable) body2.appendChild(el("p", { className: "rl-jnote", text: "Outlook works with Outlook.com, Hotmail and Live addresses." }));
+      jFoot(body2, order.map(function (b, k) { if (k) b.className = "rl-btn ghost"; return (b === gb && c.gmailAvailable !== false) || (b === ob && c.outlookAvailable) ? b : null; }));
+      body2.lastChild.previousSibling.style.marginBottom = "8px";
       if (st.mailNote) say(note2, st.mailNote.text, st.mailNote.bad);
       return;
     }
     if (kind === "bank") {
       // Cards and banks, through TrueLayer: each one is its bank's own sign-in, then back here with it listed.
-      var bodyB = jFrame(sheet, { goingBack: wentBack, art: "bank", back: back, of: of, at: at, closeText: st.banks.length ? "Skip" : "Later",
+      var bodyB = jFrame(sheet, { goingBack: wentBack, stage: jStage("bank", [jBankFan(st.banks)]), back: back, of: of, at: at, closeText: st.banks.length ? "Skip" : "Later",
         onClose: function () { if (!st.banks.length) obSet(st.email, { bankLater: true }); next(); },
-        title: "Your cards and banks", sub: "Connect the cards and accounts you pay with. Relay matches payments to receipts and finds purchases that never sent one. It can only read: it can't move money." });
-      if (st.connected) bodyB.appendChild(scanCard(sheet, st));
+        title: "Your cards and banks", sub: "Relay matches what you paid to your receipts, and finds purchases that never sent one. It can only read, never move money." });
       if (st.testBanks) bodyB.appendChild(el("p", { className: "rl-jnote", text: "Test banks only for now. Choose Mock Bank, then sign in with john and doe." }));
       var noteB = el("div", { className: "rl-msg" }); noteB.setAttribute("role", "status");
       var BN = { connected: ["Connected. Relay has read your payments and is matching them to your receipts.", false], denied: ["Not connected. You can try again, or add it later from your picture, then Bank and cards.", true],
         failed: ["That didn't connect. Please try again.", true], expired: ["That took too long, so it didn't connect. Start again and finish within 15 minutes.", true], not_configured: ["Bank connections aren't switched on yet.", true] };
       if (st.bankNote && BN[st.bankNote]) { say(noteB, BN[st.bankNote][0], BN[st.bankNote][1]); bodyB.appendChild(noteB); }
       if (st.banks.length) {
-        var listB = el("div", { className: "rl-jlist" });
-        st.banks.forEach(function (x) {
-          listB.appendChild(el("div", { className: "rl-jrow" }, [jIc("card"), el("div", {}, [el("b", { text: x.bank || "Bank" }),
-            el("span", { className: "rl-jrs", text: x.needsReconnect ? "Connect again to keep reading payments" : x.payments ? x.payments + (x.payments === 1 ? " payment read" : " payments read") + (x.matched ? ", " + x.matched + " matched to receipts" : "") : "Connected" })])]));
+        // One row a bank (two Santander accounts are one Santander), with what Relay found in it.
+        var listB = el("div", { className: "rl-jlist rl-jconn" }), byBank = {};
+        st.banks.forEach(function (x) { var n = x.bank || "Bank"; (byBank[n] = byBank[n] || []).push(x); });
+        Object.keys(byBank).forEach(function (n) {
+          var xs = byBank[n], pays = 0, matched = 0, again = xs.some(function (x) { return x.needsReconnect; });
+          xs.forEach(function (x) { pays += x.payments || 0; matched += x.matched || 0; });
+          var tile = BANK_TILES.filter(function (t) { return t[3].test(n); })[0];
+          var logo = jMark(n, tile ? tile[4] : "#4F72E0"); logo.classList.add("rl-jlogo"); if (tile) shopLogo(logo, tile[2], 36, function () {});
+          var what = again ? "Connect again to keep reading payments" : matched ? matched + " matched to receipts" : pays ? pays + (pays === 1 ? " payment read" : " payments read") : "Connected";
+          if (xs.length > 1 && !again) what = xs.length + " accounts, " + what.charAt(0).toLowerCase() + what.slice(1);
+          listB.appendChild(el("div", { className: "rl-jrow" }, [logo, el("div", {}, [el("b", { text: n }), el("span", { className: "rl-jrs", text: what })]), again ? null : el("span", { className: "rl-jok" }, [jIc("check", 16)])].filter(Boolean)));
         });
         bodyB.appendChild(listB);
       }
       // The UK's usual banks and cards as one tap each, straight to that bank's own sign-in (Connor, 17 Nov 2026), and
       // any other through TrueLayer's list. Ones already connected aren't offered again. Not with test banks.
       var grid = st.testBanks ? null : bankTiles(st.bankChoices, st.banks, function (id, name) { openBank(id, name); });
-      var goB = el("button", { type: "button", className: "rl-btn" + (st.banks.length || grid ? " ghost" : ""), text: grid ? "Another bank or card" : st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
+      var goB = el("button", { type: "button", className: grid ? "rl-textbtn" : "rl-btn" + (st.banks.length ? " ghost" : ""), text: grid ? "Another bank or card" : st.banks.length ? "Add another bank or card" : "Connect a bank or card" });
       var openBank = function (choice, label) {
         var btns = Array.prototype.slice.call(bodyB.querySelectorAll(".rl-jbank")).concat([goB]);
         if (goB.dataset.busy) return;
@@ -2428,46 +2560,45 @@
         }, function () { free(); say(noteB, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
       goB.onclick = function () { openBank(null); };
-      if (st.banks.length) bodyB.appendChild(el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next }));
-      if (grid) bodyB.appendChild(grid);
+      if (grid) { bodyB.appendChild(el("p", { className: "rl-jsmall", text: st.banks.length ? "Add another" : "Choose yours" })); bodyB.appendChild(grid); }
       bodyB.appendChild(goB); if (!noteB.parentNode) bodyB.appendChild(noteB);
+      if (st.banks.length) jFoot(bodyB, [el("button", { type: "button", className: "rl-btn", text: "Continue", onclick: next })]);
       return;
     }
     if (kind === "interests") {
       var chosen = [];
-      var body4 = jFrame(sheet, { goingBack: wentBack, art: "shop", back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
+      var body4 = jFrame(sheet, { goingBack: wentBack, back: back, of: of, at: at, closeText: "Later", onClose: function () { obSet(st.email, { interestsLater: true }); interestsLater(true); next(); },
         title: "What do you shop for?", sub: "Pick a few and Relay shows shops you'll like first." });
-      if (st.connected) body4.appendChild(scanCard(sheet, st));
       var note4 = el("div", { className: "rl-msg" }); note4.setAttribute("role", "status");
       var save4 = interestsSaveButton("Continue", function () { return chosen; }, note4, function () { next(); });
       save4.disabled = true;
       // What they picked before (seeing getting started again) starts picked.
       chosen = (st.interests || []).slice(); save4.disabled = !chosen.length;
       body4.appendChild(interestsPicker(chosen.slice(), function (list) { chosen = list; save4.disabled = !list.length; }));
-      body4.appendChild(save4); body4.appendChild(note4);
+      body4.appendChild(note4); jFoot(body4, [save4]);
       return;
     }
     // Done: a short welcome, the scan still counting, and where to go first.
     var p = profileNow() || {}, first2 = p.name ? String(p.name).split(/\s+/)[0] : "";
-    var body3 = jFrame(sheet, { goingBack: wentBack, art: "done", of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
-      kicker: "YOU'RE IN", title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
-      sub: st.connected ? "Relay is bringing in your receipts now. It carries on even if you close the app."
+    var stage3 = st.connected ? jWithReceipts(jDoneStage(jRecent()), jOrbit) : jDoneStage(jRecent());
+    var body3 = jFrame(sheet, { goingBack: wentBack, stage: stage3, of: of, at: at, closeText: "Close", onClose: function () { leave(); if (window.go) window.go("profile"); },
+      title: first2 ? "You're all set, " + first2 + "." : "You're all set.",
+      sub: st.connected ? "Your receipts keep coming in by themselves, even with Relay closed."
         : isReview() ? "Orders you place at shops that use Relay, with this email address, show up on Home." : "You can connect your email any time: tap your picture at the top of the screen, then Inboxes." });
-    if (st.connected) body3.appendChild(scanCard(sheet, st));
+    // What's connected, as three big numbers.
     if (st.inboxes.length || st.banks.length) {
-      var got = el("div", { className: "rl-jlist" });
-      if (st.inboxes.length) got.appendChild(el("div", { className: "rl-jrow" }, [jIc("mail"), el("div", {}, [el("b", { text: st.inboxes.length === 1 ? "1 inbox connected" : st.inboxes.length + " inboxes connected" }), el("span", { className: "rl-jrs", text: "Read for receipts, by itself" })])]));
-      if (st.banks.length) got.appendChild(el("div", { className: "rl-jrow" }, [jIc("card"), el("div", {}, [el("b", { text: st.banks.length === 1 ? "1 bank or card connected" : st.banks.length + " banks and cards connected" }), el("span", { className: "rl-jrs", text: "Payments matched to receipts" })])]));
-      body3.appendChild(got);
+      var nBanks = st.banks.reduce(function (a, x) { return a.indexOf(x.bank) < 0 ? a.concat([x.bank]) : a; }, []).length;
+      var stat = function (n, one, many) { return el("div", { className: "rl-jstat" }, [el("b", { text: String(n) }), el("span", { text: n === 1 ? one : many })]); };
+      var stats = el("div", { className: "rl-jstats" }, [stat(st.inboxes.length, "inbox", "inboxes"), st.banks.length ? stat(nBanks, "bank", "banks") : null].filter(Boolean));
+      if (st.connected) {
+        var found = stat(0, "receipt found", "receipts found"); found.hidden = true; stats.insertBefore(found, stats.firstChild);
+        journeyScan(sheet, st).on(function (job) { var n = (job && job.found) || 0; if (n) { found.hidden = false; found.firstChild.textContent = String(n); found.lastChild.textContent = n === 1 ? "receipt found" : "receipts found"; } });
+      }
+      body3.appendChild(stats);
     }
-    var tips = el("div", { className: "rl-jcard" });
-    (isReview() ? [["check", "Swap a size or colour before the shop sends your order"], ["eye", "Price drops on things you watch, sent to your phone"]]
-      : [["check", "Return deadlines from your receipts, counted down for you"], ["eye", "Price drops on things you watch, sent to your phone"]]).forEach(function (x) { tips.appendChild(el("div", { className: "rl-jpt" }, [jIc(x[0]), el("span", { text: x[1] })])); });
-    body3.appendChild(tips);
-    if (st.connected) {
-      body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "See my receipts", onclick: function () { leave(); if (window.go) { window.__relayAutoScan = true; window.go("receipts"); } } }));
-      body3.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
-    } else body3.appendChild(el("button", { type: "button", className: "rl-btn", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } }));
+    jFoot(body3, st.connected ? [el("button", { type: "button", className: "rl-btn", text: "See my receipts", onclick: function () { leave(); if (window.go) { window.__relayAutoScan = true; window.go("receipts"); } } }),
+      el("button", { type: "button", className: "rl-textbtn", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } })]
+      : [el("button", { type: "button", className: "rl-btn", text: "Go to Home", onclick: function () { leave(); if (window.go) window.go("profile"); } })]);
   }
   var providersAsked = null, providersKnown = null;
   function signInProviders() {
