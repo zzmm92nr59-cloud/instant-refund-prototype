@@ -8,7 +8,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION } from "../worker/gmail.js";
-import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf } from "../worker/bank.js";
+import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf, statementShop } from "../worker/bank.js";
 
 {
   assert.ok(namesShop("SAINSBURYS S/MKTS LONDON", "Sainsbury's", "sainsburys.co.uk"));
@@ -35,6 +35,16 @@ import { matchPayments, namesShop, BANK_SCOPES, shopName, isShopping, merchantOf
   // Seen on a real Amex statement (16 Nov 2026): TfL fares are not shopping; a hyphen on its own is not part of a name.
   assert.equal(isShopping({ description: "TFL TRAVEL CHARGE TFL.GOV.UK/CP" }), false, "TfL fares");
   assert.equal(shopName("1234 - GUN -"), "Gun", "no stray hyphens");
+  // Santander's lines (17 Nov 2026): how it was paid, the date and a currency tail aren't the shop.
+  assert.equal(shopName("CROWNBILL.COM (VIA APPLE PAY), ON 15-11-2026"), "Crownbill.com", "Apple Pay isn't Apple");
+  assert.equal(shopName("MADE-UP STORES (VIA APPLE PAY), ON 14-11-2026"), "Made-up", "\"Stores\" is dropped as before");
+  assert.equal(shopName("APPLE.COM/BILL (VIA APPLE PAY), ON 10-11-2026"), "Apple", "but Apple is still Apple");
+  assert.equal(shopName("CARD PAYMENT TO MADE-UP HOSTING ,5.00 USD, RATE 0.79/GBP ON 03-11-2026"), "Made-up Hosting");
+  assert.equal(statementShop("CARD PAYMENT TO MADE-UP CAFE ON 01-11-2026"), "MADE-UP CAFE");
+  assert.equal(isShopping({ description: "CARD PAYMENT TO NOVUNA PERSONAL FINANC ON 29-10-2026" }), false, "a loan");
+  assert.equal(isShopping({ description: "CARD PAYMENT TO EE DEVICE PAYMENT ON 08-11-2026" }), false, "a phone contract");
+  // An Apple Pay payment doesn't match an Apple receipt just for saying "Apple Pay".
+  assert.equal(namesShop(statementShop("MADE-UP STORES (VIA APPLE PAY), ON 14-11-2026"), "Apple", "apple.com"), false);
   // Amex puts the shop's own name in meta.provider_merchant_name; it's used before the statement text.
   assert.equal(merchantOf({ description: "1234 - MADE-UP CAFE LON", meta: { provider_merchant_name: "Made-up Cafe" } }), "Made-up Cafe");
   assert.equal(merchantOf({ merchant_name: "Coffee Corner", meta: { provider_merchant_name: "Other" } }), "Coffee Corner", "TrueLayer's own first");
@@ -160,6 +170,27 @@ assert.deepEqual(r.connections.map((c) => [c.bank, c.payments, c.matched, c.need
 assert.deepEqual((await (await call("/relay/my/bank/payments", { token: sam })).json()), { error: "not_found" }, "Sam (not on the team) can't");
 console.log("ok - payments read and matched to receipts; each shopper's own");
 
+// 3b. "Not mine" (a shared card): a payment, or every payment from that shop, isn't matched to receipts and says so;
+// "This is mine" undoes it. Only your own payments.
+const brindle = r0 => r0.payments.find((p) => p.shop === "Brindle and Co");
+let pr = await (await call("/relay/my/bank/payments", { token: jess })).json();
+const bid = brindle(pr).id;
+assert.equal((await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: bid, on: "yes" } })).status, 400);
+assert.equal((await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: "someone-elses", on: true } })).status, 404);
+assert.equal((await call("/relay/my/bank/not-mine", { method: "POST", token: sam, body: { id: bid, on: true } })).status, 404, "not someone else's payment");
+let nm = await (await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: bid, on: true, everyFromShop: true } })).json();
+assert.equal(nm.matched, 0, "matched again without it");
+pr = await (await call("/relay/my/bank/payments", { token: jess })).json();
+assert.deepEqual([brindle(pr).notMine, brindle(pr).receiptId], ["payment", null], "not yours, and not matched to your receipt");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_not_mine WHERE shopper_id = ? AND kind = 'shop' AND key = 'brindle and co'").get(J).n, 1, "and nothing from that shop");
+nm = await (await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: bid, on: false } })).json();
+assert.equal(nm.matched, 1, "mine after all: matched again");
+pr = await (await call("/relay/my/bank/payments", { token: jess })).json();
+assert.deepEqual([brindle(pr).notMine, brindle(pr).match], [null, "sure"]);
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM bank_not_mine WHERE shopper_id = ?").get(J).n, 0, "and the shop rule goes too");
+await call("/relay/my/bank/not-mine", { method: "POST", token: jess, body: { id: bid, on: true } });
+console.log("ok - Not mine: a payment or every payment from a shop, left out of matching; undone by This is mine");
+
 // 4. Reading again: not more than every 10 minutes; an expired token is renewed; a bank that ended the permission says so.
 calls = [];
 await call("/relay/my/bank/sync", { method: "POST", token: jess });
@@ -179,6 +210,7 @@ console.log("ok - reads at most every 10 minutes; renews its access; says when t
 // 5. In Download my data; disconnecting removes it; so does deleting the account.
 const ex = await (await call("/relay/my/export", { token: jess })).json();
 assert.equal(ex.banks.connections.length, 1); assert.ok(ex.banks.payments.length >= 2);
+assert.equal(ex.banks.notMine.length, 1, "Not mine is in the copy");
 assert.ok(!JSON.stringify(ex).includes("ref-"), "no tokens in the copy");
 const id = r.connections[0].id;
 assert.equal((await call("/relay/my/bank/disconnect", { method: "POST", token: jess, body: { id: "00000000-0000-4000-8000-00000000abcd" } })).status, 404);

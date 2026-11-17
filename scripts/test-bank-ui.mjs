@@ -29,7 +29,8 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/bank/connect") return j({ url: "https://auth.truelayer-sandbox.com/?response_type=code&state=" + "s".repeat(43) });
   if (p === "/relay/my/bank/payments") return j({ payments: st.links.length ? [
     { id: "a", account: "Current account", date: day(-4), amountPence: 4500, currency: "GBP", description: "BRINDLE AND CO LONDON", merchant: null, shop: "Brindle and Co", receiptId: ID1, match: "sure" },
-    { id: "b", account: "Credit card ending 4242", date: day(-2), amountPence: 320, currency: "GBP", description: "COFFEE CORNER", merchant: "Coffee Corner", shop: "Coffee Corner", receiptId: null, match: null }] : [] });
+    { id: "b", account: "Credit card ending 4242", date: day(-2), amountPence: 320, currency: "GBP", description: "COFFEE CORNER", merchant: "Coffee Corner", shop: "Coffee Corner", receiptId: null, match: null, notMine: st.notMine || null }] : [] });
+  if (p === "/relay/my/bank/not-mine") { const b = JSON.parse(route.request().postData()); st.notMines.push(b); st.notMine = b.on ? (b.everyFromShop ? "shop" : "payment") : null; return j({ ok: true, matched: 1 }); }
   if (p === "/relay/my/bank/disconnect") { st.disconnects.push(JSON.parse(route.request().postData())); st.links = []; return j({ ok: true }); }
   if (p === "/relay/my/consent") return j({ version: "v5", accepted: true, text: [] });
   if (p === "/relay/my/gmail") return j({ connected: true, provider: "google", email: EMAIL, lastScanAt: Date.now() - 600e3, maxInboxes: 5 });
@@ -111,6 +112,24 @@ assert.match(rows[1], /Coffee Corner\s+No receipt yet\s+£3\.20/);
 assert.match(await view.locator(".rl-arow", { hasText: "Mock Bank" }).innerText(), /Read just now, 1 receipt matched/);
 await polished("bank page connected", "#mePage");
 console.log("ok - back from the bank: connected, card payments with the receipt each matches");
+
+// Not mine (a shared card): tap a payment, say it isn't yours (or nothing from that shop is); it says so, and This is mine undoes it.
+st.notMines = st.notMines || [];
+await page.getByRole("button", { name: /^Coffee Corner, £3\.20/ }).click();
+await page.getByRole("button", { name: "Nothing from Coffee Corner is mine" }).waitFor();
+await page.getByRole("button", { name: "Not mine", exact: true }).click();
+await page.getByRole("button", { name: /^Coffee Corner, £3\.20, .*, not yours$/ }).waitFor();
+assert.deepEqual(st.notMines.at(-1), { id: "b", on: true, everyFromShop: false });
+await page.getByText("Got it: that one isn't yours.").waitFor();
+await page.getByRole("button", { name: /^Coffee Corner, £3\.20, .*, not yours$/ }).click();
+await page.getByRole("button", { name: "This is mine" }).click();
+await page.getByRole("button", { name: /^Coffee Corner, £3\.20, \d+ \w+$/ }).waitFor();
+assert.deepEqual(st.notMines.at(-1), { id: "b", on: false, everyFromShop: false });
+await page.getByRole("button", { name: /^Coffee Corner, £3\.20/ }).click();
+await page.getByRole("button", { name: "Nothing from Coffee Corner is mine" }).click();
+await page.getByText("Got it: nothing from Coffee Corner is yours.").waitFor();
+assert.deepEqual(st.notMines.at(-1), { id: "b", on: true, everyFromShop: true });
+console.log("ok - Not mine: one payment or a whole shop, said back plainly, undone by This is mine");
 
 // 3b. The receipt says which card paid for it.
 await page.evaluate(() => window.go("receipts"));
