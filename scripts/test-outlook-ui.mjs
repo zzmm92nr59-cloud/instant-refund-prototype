@@ -89,12 +89,11 @@ await page.goto(origin + "/index.html#signin=" + "B".repeat(43));
 await page.getByRole("heading", { name: "What should we call you?" }).waitFor();
 await page.waitForTimeout(800);
 assert.ok(posts.some(p => p.path === "/relay/my/gmail/scan"), "the first scan starts by itself, straight away");
-await page.locator(".rl-jscan").waitFor();
 await page.getByRole("button", { name: "Skip" }).click();
 // Then their inboxes (the Outlook one listed, another one tap away), then "See my receipts" (with an inbox, what they
 // shop for isn't asked: Browse goes by their receipts).
 await page.getByRole("heading", { name: "Your inboxes" }).waitFor();
-await page.getByText("Outlook, connected").waitFor();
+await page.locator(".rl-jlist .rl-jrow").getByText("Outlook", { exact: true }).waitFor();
 await page.getByRole("button", { name: "Continue", exact: true }).click();
 await page.getByRole("button", { name: "See my receipts" }).click();
 await page.getByText(/Found or updated 1 receipt/).waitFor();

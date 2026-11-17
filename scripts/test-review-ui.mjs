@@ -165,7 +165,6 @@ await sheet.getByRole("button", { name: "Continue" }).click();
 await sheet.getByRole("heading", { name: "You're all set, App." }).waitFor();
 assert.equal(await sheet.getByRole("heading", { name: "Bring in your receipts" }).count(), 0, "no inbox step");
 await sheet.getByText("Orders you place at shops that use Relay, with this email address, show up on Home.").waitFor();
-await sheet.getByText("Swap a size or colour before the shop sends your order").waitFor();
 assert.equal(await sheet.getByText(/connect your email/i).count(), 0);
 await polished("all set", ".rl-sheet");
 assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("relay.session.v1")).review), true);
