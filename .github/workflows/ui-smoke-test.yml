@@ -14,6 +14,10 @@ on:
       - next.html
       - account-next.js
       - sw.js
+      - relay-corners.js
+      - relay-gestures.js
+      - worker/item-kind-core.js
+      - scripts/test-app-speed-ui.mjs
       - scripts/test-layout-ui.mjs
       - scripts/test-tips-ui.mjs
       - scripts/sample-pictures.mjs
@@ -67,6 +71,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-speed-ui.mjs
       - name: Test Relay stays quiet (nothing asked for while a tab is left open or Relay is in the background; an open auction or conversation only while on screen)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-quiet-ui.mjs
+      - name: Test Relay is quick with a big account on a slowed-down phone (Home from the kept copy at once, tabs reuse what was loaded, no long tasks) and Home never blank or stuck (after Contact us, forwarding a receipt, sending an email to Relay, sheets, the background, offline)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-app-speed-ui.mjs
       - name: Test receipt groups (every receipt, header, filters, months, rows)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipts-cat-ui.mjs
       - name: Test returns from the wallet (order number and email to copy, the shop's page, then the QR code)

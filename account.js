@@ -52,10 +52,28 @@
   }
   (function () {
     var c = diskRead(); if (!c) return;
-    if (Array.isArray(c.receipts)) memo.receipts = { rows: c.receipts, sig: JSON.stringify(c.receipts), at: 0 };
+    if (Array.isArray(c.receipts)) memo.receipts = keptRows(c.receipts, 0);
     if (Array.isArray(c.purchases)) memo.walletPurchases = c.purchases;
     if (Array.isArray(c.needReceipt)) memo.needReceipt = c.needReceipt;
   })();
+  // The receipts the app has, with a signature to tell whether a new answer changed anything. The signature (the whole
+  // list as text) is only worked out when something asks for it, not on every load: with hundreds of receipts it's slow.
+  function keptRows(rows, at) {
+    var sig = null;
+    return { rows: rows, at: at, get sig() { if (sig === null) sig = JSON.stringify(rows); return sig; }, set sig(v) { sig = v; } };
+  }
+  // A new list of receipts from Relay: kept in memory and on the phone, but written to the phone only when it changed
+  // (writing hundreds of receipts each time a screen opens kept the phone busy).
+  function keepReceipts(rows, sig) {
+    sig = sig || JSON.stringify(rows);
+    var same = memo.receipts && memo.receipts.sig === sig;
+    memo.receipts = keptRows(same ? memo.receipts.rows : rows, Date.now()); memo.receipts.sig = sig;
+    if (!same) diskWrite("receipts", rows);
+    return !same;
+  }
+  // After a change (a receipt added, an email sent, an inbox read): the receipts on screen stay until Relay's new answer is
+  // in, and that answer is asked for next time instead of reusing this one. Nothing goes blank while it comes.
+  function staleReceipts() { if (memo.receipts) memo.receipts.at = 0; }
   // Asks the server only when the answer isn't already remembered (and recent enough).
   function cachedGet(kind, path) {
     if (memoFresh(memo[kind])) return Promise.resolve(memo[kind].r);
@@ -71,7 +89,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -150,18 +168,34 @@
   // On Receipts, pulling down also checks the inbox now, as "Check now" does.
   function checkInbox() { if (window.__relayCheckNow && document.querySelector("#receiptsPage")) window.__relayCheckNow(); }
   // Each caller gets its own copy, so one screen changing what it was given can't change another's.
-  function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j }; }
+  function copyAnswer(r) { var j = {}; try { j = r.text ? JSON.parse(r.text) : {}; } catch (e) { j = {}; } return { ok: r.ok, status: r.status, body: j, raw: r.text || "" }; }
   // Fetches a signed-in image and returns a local address for it (or null).
   function apiBlob(path) {
-    // Pictures and logos are fetched once per visit, not every time a list is redrawn.
-    if (!memo.blobs[path]) memo.blobs[path] = apiBlobFetch(path).then(function (u) { if (!u) delete memo.blobs[path]; return u; });
+    // Pictures and logos are fetched once per visit, not every time a list is redrawn. A shop's logo Relay said it hasn't
+    // got isn't asked for again until Relay is opened again; any other picture that isn't there (or didn't arrive) is tried
+    // again next time.
+    if (logoMissing(path)) return Promise.resolve(null);
+    if (!memo.blobs[path]) memo.blobs[path] = apiBlobFetch(path).then(function (u) {
+      if (u === false && logoMissing(path, true)) { memo.blobs[path] = Promise.resolve(null); return null; }
+      if (!u) delete memo.blobs[path];
+      return u;
+    });
     return memo.blobs[path];
   }
+  // false: Relay answered that there's no such picture; null: it didn't arrive.
   function apiBlobFetch(path) {
     var s = load(), headers = {};
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
-    return fetch(API + path, { headers: headers }).then(function (r) { return r.ok ? r.blob() : null; })
-      .then(function (b) { return b && /^image\//.test(b.type) ? URL.createObjectURL(b) : null; }).catch(function () { return null; });
+    return fetch(API + path, { headers: headers }).then(function (r) { return r.ok ? r.blob() : r.status === 404 ? false : null; })
+      .then(function (b) { return b === false ? false : b && /^image\//.test(b.type) ? URL.createObjectURL(b) : null; }).catch(function () { return null; });
+  }
+  // Shops Relay has no logo for, remembered until Relay is opened again (Relay itself tries those shops again only after a
+  // week), so going back and forth between screens doesn't ask about each of them every time.
+  var logoMisses = {};
+  function logoMissing(path, add) {
+    if (path.indexOf("/relay/my/logo/") !== 0) return false;
+    if (add) logoMisses[path] = 1;
+    return Boolean(logoMisses[path]);
   }
   function deadlineOf(x) {
     // A food order can still hold something that goes back on its own (a kettle in the weekly shop): its date counts too.
@@ -2405,7 +2439,7 @@
     var extra = Object.assign({}, signInExtra, b); signInExtra = {};
     if (extra.mailConnected || extra.outlookConnected) {
       rememberMailbox({ connected: true, provider: extra.mailConnected === "google" ? "google" : "microsoft" });
-      memo.consent = null; memo.gmail = null; memo.receipts = null;
+      memo.consent = null; memo.gmail = null; staleReceipts();
     }
     var connected = Boolean(extra.mailConnected || extra.outlookConnected);
     startJourney({ suggestedName: extra.suggestedName || "", justConnected: connected, viaProvider: connected });
@@ -2496,7 +2530,7 @@
         if (last && last.state === "failed") { done = true; tell(); return; }
         if (x.body.busy) { tell(); return setTimeout(step, x.body.retryAfterMs || 4000); }
         if (x.body.more) { tell(); return step(); }
-        done = true; memo.receipts = null; memo.gmail = null; tell();
+        done = true; staleReceipts(); memo.gmail = null; tell();
       }, function () { again(); });
     }
     st.scanner = { on: function (f) { listeners.push(f); f(last, done); }, stop: function () { stopped = true; } };
@@ -3607,7 +3641,7 @@
       api("/relay/my/receipts?all=1").then(function (x) {
         if (!x.ok || !box.isConnected) return;
         var rows = (x.body && x.body.receipts) || [];
-        memo.receipts = { rows: rows, sig: JSON.stringify(rows), at: Date.now() }; diskWrite("receipts", rows);
+        keepReceipts(rows);
         draw(rows);
       }, function () {});
     }
@@ -4059,7 +4093,7 @@
           if (!x.ok) { if (drawnSig === null || shopsChanged) drawList(); return; }
           if (!x.ok) { if (drawnSig === null) drawList(); return; }
           var rows = (x.body && x.body.receipts) || [], sig = JSON.stringify(rows);
-          memo.receipts = { rows: rows, sig: sig, at: Date.now() }; diskWrite("receipts", rows);
+          keepReceipts(rows, sig);
           if (sig === drawnSig && !shopsChanged) return;
           if (sig !== drawnSig) memoDrop("wrapped");
           allRows = rows; drawnSig = sig; drawList();
@@ -4315,7 +4349,7 @@
       add.disabled = true; add.textContent = "Adding…";
       api("/relay/my/gmail/add", { method: "POST", body: x.mailbox ? { messageId: x.id, mailbox: x.mailbox } : { messageId: x.id } }).then(function (a) {
         if (a.ok && a.body && a.body.ok) {
-          add.textContent = "Added"; add.classList.add("done"); memo.receipts = null;
+          add.textContent = "Added"; add.classList.add("done"); staleReceipts();
           note.textContent = a.body.kind === "receipt" ? "In your Receipts now." : "Added to the order it belongs to.";
           return;
         }
@@ -4351,7 +4385,7 @@
         if (r.status === 429) return say(msg, "That's a lot of receipts in one go. Try again in an hour.", true);
         if (!r.ok) return say(msg, "Couldn't add that. Check your connection and try again.", true);
         if (!r.body.ok) return say(msg, "That doesn't look like an order, delivery or return email. Copy the whole email and try again.", true);
-        memo.receipts = null; box.value = ""; box.hidden = true; draftSet("paste", ""); label();
+        staleReceipts(); box.value = ""; box.hidden = true; draftSet("paste", ""); label();
         out.appendChild(addedCard(r.body));
       }, function () { busy = false; label(); say(msg, "Couldn't reach Relay. Check your connection.", true); });
     }
@@ -5628,7 +5662,7 @@
           if (!r.ok) return say(msg, r.status === 503 ? "AI help isn't available right now. Try again later." : "Couldn't change that. Try again in a moment.", true);
           on = Boolean(r.body && r.body.on); draw();
           say(msg, on ? "On. Relay will ask the AI about receipts it isn't sure of, a few at a time." : "Off. What the AI read has been deleted.");
-          memo.receipts = null;
+          staleReceipts();
         }, function () { busy = false; sw.disabled = false; say(msg, "Couldn't reach Relay. Check your connection and try again.", true); });
       };
       // AI for picks: its own switch, under AI help (worker/item-kinds.js). Off deletes what the AI worked out.
@@ -6468,7 +6502,7 @@
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
-    memo.gmail = null; memo.receipts = null;
+    memo.gmail = null; staleReceipts();
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
     var wasAt = obGet(s.email).back;
@@ -8043,7 +8077,7 @@
     var frame = el("div", { className: "rl-story-frame" });
     var bars = el("div", { className: "rl-story-bars" });
     slides.forEach(function () { bars.appendChild(el("div", {}, [el("i")])); });
-    var closeBtn = el("button", { type: "button", className: "rl-story-x", ariaLabel: "Close" });
+    var closeBtn = el("button", { type: "button", className: "rl-story-x", ariaLabel: "Close" }); closeBtn.setAttribute("data-back", "");
     closeBtn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     var body = el("div", { className: "rl-story-body" });
     // The soundtrack starts with the tap that opened the story (phones only allow sound after a tap).
@@ -8735,10 +8769,12 @@
   function testingOn() {
     try { return /[?&]testing=1(&|$)/.test(location.search) || localStorage.getItem("relay-testing-tools") === "1"; } catch (e) { return false; }
   }
+  var SHORT_FMT = [];
   function shortDate(d) {
     var t = new Date(d); if (isNaN(t)) return "";
-    var o = { day: "numeric", month: "short" }; if (t.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
-    return t.toLocaleDateString("en-GB", o);
+    var y = t.getFullYear() !== new Date().getFullYear(), o = y ? { day: "numeric", month: "short", year: "numeric" } : { day: "numeric", month: "short" };
+    try { var f = SHORT_FMT[y ? 1 : 0] || (SHORT_FMT[y ? 1 : 0] = new Intl.DateTimeFormat("en-GB", o)); return f.format(t); }
+    catch (e) { return t.toLocaleDateString("en-GB", o); }
   }
   // One shop-confirmed item: picture, shop, what it is, price, where it's up to, and what you can do.
   function confirmedCard(o, it, redraw, deadline) {
@@ -9379,7 +9415,7 @@
     if (!fresh && auLive.rows && Date.now() - auLive.at < 60000) return Promise.resolve(auLive.rows);
     if (auLive.asking) return auLive.asking;
     auLive.asking = fetch(API + "/relay/auctions" + (auTest() ? "?test=1" : "")).then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (b) { auLive.asking = null; if (b && Array.isArray(b.auctions)) { auLive.rows = b.auctions; auLive.at = Date.now(); } return auLive.rows || []; },
+      .then(function (b) { auLive.asking = null; if (b) { auLive.rows = Array.isArray(b.auctions) ? b.auctions : []; auLive.at = Date.now(); } return auLive.rows || []; },
         function () { auLive.asking = null; return auLive.rows || []; });
     return auLive.asking;
   }
@@ -9779,7 +9815,7 @@
   }
   function markItems(x, idxs, status) {
     return api("/relay/my/receipts/" + x.id + "/items", { method: "POST", body: { items: idxs.map(function (i) { return { index: i, status: status }; }) } })
-      .then(function (r) { memo.receipts = null; return r.ok; }, function () { return false; });
+      .then(function (r) { staleReceipts(); return r.ok; }, function () { return false; });
   }
   // The items of an email order, each with whether it's being sent back. Orders with one (or no) named item stay whole.
   function emailItems(x) {
@@ -9797,7 +9833,7 @@
   function needReceiptNow() { return (memo.needReceipt || []).filter(function (p) { return p && p.id; }); }
   function forgetPayment(id) {
     memo.needReceipt = needReceiptNow().filter(function (p) { return p.id !== id; }); diskWrite("needReceipt", memo.needReceipt);
-    memo.receipts = null; memo.bankPays = null;
+    staleReceipts(); memo.bankPays = null;
   }
   // The photo, at most 1600 pixels on its longest side, as a JPEG small enough to send (at most about 1 MB). A HEIC photo
   // from an iPhone comes through the same way, as the phone opens it. null if it can't be opened.
@@ -9966,17 +10002,36 @@
     }, function () { return []; });
     return memo.bankPays.then(function (ps) { return ps.filter(function (p) { return p.receiptId === receiptId; })[0] || null; });
   }
+  // Home and Wallet's orders and receipts. An answer that is the same as the last one keeps the very same lists, so the
+  // screen knows nothing changed and isn't drawn again (and nothing is written to the phone again). After a change on
+  // Home or Wallet (memo.bothFresh) the next load asks Relay itself.
   function loadBoth() {
-    var p = memo.purchases || api(purchasesPath());
-    return Promise.all([p.then(function (r) { return r.ok ? (r.body && r.body.purchases) || [] : null; }, function () { return null; }),
-      api("/relay/my/receipts").then(function (r) {
+    var fresh = Boolean(memo.bothFresh); memo.bothFresh = false;
+    var p = (!fresh && memo.purchases) || api(purchasesPath(), fresh ? { fresh: true } : null);
+    return Promise.all([p.then(function (r) {
+        if (!r.ok) return null;
+        if (memo.walletPurchases && r.raw && r.raw === memo.rawPurchases) return memo.walletPurchases;
+        memo.rawPurchases = r.raw;
+        var list = (r.body && r.body.purchases) || [];
+        // The first answer since opening: the same as the copy kept on the phone keeps that copy.
+        if (memo.walletPurchases && JSON.stringify(list) === JSON.stringify(memo.walletPurchases)) return memo.walletPurchases;
+        return list;
+      }, function () { return null; }),
+      api("/relay/my/receipts", fresh ? { fresh: true } : null).then(function (r) {
+        if (!r.ok) return null;
+        if (memo.homeRaw && r.raw && r.raw === memo.homeRaw.raw) { if (memo.receipts && memo.receipts.rows === memo.homeRaw.rows) memo.receipts.at = Date.now(); return memo.homeRaw.rows; }
         // Shop payments with no receipt yet (Bank and cards), which come with the receipts: Home shows one small card.
-        if (r.ok) { memo.needReceipt = (r.body && r.body.needReceipt) || []; diskWrite("needReceipt", memo.needReceipt); }
-        return r.ok ? (r.body && r.body.receipts) || [] : null;
+        var need = (r.body && r.body.needReceipt) || [];
+        if (JSON.stringify(need) !== JSON.stringify(memo.needReceipt || [])) { memo.needReceipt = need; diskWrite("needReceipt", need); }
+        var rows = (r.body && r.body.receipts) || [];
+        // The same receipts as the copy already shown keep that copy (and are remembered with this answer's text).
+        if (memo.receipts && JSON.stringify(rows) === memo.receipts.sig) rows = memo.receipts.rows;
+        memo.homeRaw = { raw: r.raw, rows: rows };
+        return rows;
       }, function () { return null; })]).then(function (both) {
       // Remember what came back, so the next visit shows it straight away.
-      if (both[0]) { memo.walletPurchases = both[0]; diskWrite("purchases", both[0]); }
-      if (both[1]) { memo.receipts = { rows: both[1], sig: JSON.stringify(both[1]), at: Date.now() }; diskWrite("receipts", both[1]); }
+      if (both[0] && both[0] !== memo.walletPurchases) { memo.walletPurchases = both[0]; diskWrite("purchases", both[0]); }
+      if (both[1] && !(memo.receipts && memo.receipts.rows === both[1])) { keepReceipts(both[1]); both[1] = memo.receipts.rows; }
       return [both[0] || memo.walletPurchases || [], both[1] || (memo.receipts && memo.receipts.rows) || []];
     });
   }
@@ -9999,7 +10054,7 @@
       return;
     }
     var top = el("div"); host.appendChild(top);
-    var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountWallet(host, opts); };
+    var refresh = function () { memo.purchases = null; staleReceipts(); memo.bothFresh = true; mountWallet(host, opts); };
     mountInstore(top, refresh, "suggest");
     var head = el("div", { className: "sectionhead" }, [el("h2", { text: opts.title || "Still returnable" })]);
     var grid = el("div", { className: "rl-po-grid" }); skeleton(grid, 3);
@@ -10076,7 +10131,14 @@
   }
   function calmIcon(name, tint) { var i = accIc(name); if (tint && ACC_TINT[name]) { i.classList.add("rl-ai-tint"); i.style.setProperty("--ai", ACC_TINT[name]); } return i; }
   function leftWords(d) { return d === 0 ? "Last day" : d === 1 ? "1 day left" : d + " days left"; }
-  function dayWords(day) { return new Date(String(day).slice(0, 10) + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); }
+  // "18 Nov". Worked out once per day and kept: making the words for a date is slow on a phone, and Home names hundreds.
+  var DAY_WORDS = {}, dayFmt = null;
+  function dayWords(day) {
+    var k = String(day).slice(0, 10);
+    if (DAY_WORDS[k] !== undefined) return DAY_WORDS[k];
+    try { dayFmt = dayFmt || new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }); return (DAY_WORDS[k] = dayFmt.format(new Date(k + "T00:00:00Z"))); }
+    catch (e) { return (DAY_WORDS[k] = new Date(k + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })); }
+  }
   // ---- Draft 2: Home is a feed, one card for each order ----
   // What needs the shopper comes first (money owed for a swap, a return date inside a week), then orders still in play (on
   // the way, a return under way, still returnable), then the newest. A card is one tap and opens that order's page.
@@ -10347,14 +10409,48 @@
     }).catch(function () {});
   }
 
+  // Home again after a change made from one of its cards (a return started, an email sent): what's on screen stays and
+  // Relay's new answer is drawn when it comes (never a blank or greyed-out Home while it does).
+  function homeRefresh() {
+    memo.purchases = null; staleReceipts(); memo.bothFresh = true;
+    var h = document.getElementById("homePage"); if (h) mountHome(h);
+  }
+  // Home's cards worked out from the orders and receipts, kept while those lists (and the day) are the same: going back to
+  // Home reuses them instead of going through hundreds of receipts again.
+  var homeEntries = { p: null, r: null, key: "", out: null }, listIds = typeof WeakMap === "function" ? new WeakMap() : null, listN = 0;
+  function homeIds(list) { if (!list || typeof list !== "object" || !listIds) return String(list && list.length); if (!listIds.has(list)) listIds.set(list, ++listN); return listIds.get(list); }
+  function homeFeedEntries(purchases, receipts) {
+    var key = new Date().toISOString().slice(0, 10) + "|" + (testToolsOn() ? 1 : 0) + "|" + (isReview() ? 1 : 0);
+    if (homeEntries.out && homeEntries.p === purchases && homeEntries.r === receipts && homeEntries.key === key) return homeEntries.out.slice();
+    homeEntries = { p: purchases, r: receipts, key: key, out: feedEntries(purchases, receipts, homeRefresh) };
+    return homeEntries.out.slice();
+  }
+  // The page can always scroll once nothing that holds it still is showing (Wrapped's story, the welcome story): one of
+  // them closed some other way than its own button can't leave the page stuck.
+  function unlockPage() {
+    try {
+      if (document.body.style.overflow === "hidden" && !document.querySelector(".rl-story")) document.body.style.overflow = "";
+      if (document.body.classList.contains("rl-welcoming") && !document.querySelector(".rl-welcome")) document.body.classList.remove("rl-welcoming");
+    } catch (e) {}
+  }
+  // Back on screen (from the Mail app, the phone's lock screen, or the browser's back-forward cache): the screen is never
+  // left empty or stuck. Home with nothing in it is drawn again from what the app has; nothing is asked of Relay for it.
+  function backOnScreen() {
+    unlockPage();
+    var v = document.getElementById("view"); if (!v) return;
+    var h = document.getElementById("homePage");
+    if (h && load() && !h.querySelector(".h2-feed > *:not(.rl-skel)") && memo.receipts) { mountHome(h); return; }
+    if (!v.firstElementChild && typeof window.render === "function") { try { window.render(); } catch (e) {} }
+  }
   function mountHome(host) {
     if (!host) return;
+    unlockPage();
     var s = load();
     if (!s || !s.token) return mountWallet(host, { title: "Wallet", home: true });
     host.textContent = ""; host.classList.add("h2-home"); paintAvatars();
     // Asked only while Home is still the screen (never over another tab the shopper has moved to).
     setTimeout(function () { if (host.isConnected) interestsMaybeAsk(host); }, 700);
-    var refresh = function () { memo.purchases = null; memo.walletPurchases = null; memo.receipts = null; mountHome(host); };
+    var refresh = homeRefresh;
     var top = el("div"); host.appendChild(top);
     mountInstore(top, refresh, "suggest");
     var chips = el("div", { className: "h2-chips", role: "group", ariaLabel: "What to show" });
@@ -10369,7 +10465,8 @@
     // testing tools). It sat under the wallet before; it goes after the cards.
     // (Adding an in-shop purchase from its receipt is in Add a receipt; test orders are in Settings, Team: Connor, 17 Nov 2026.)
     for (var k = 0; k < 2; k++) feed.appendChild(el("div", { className: "rl-skel", style: "height:296px;border-radius:28px;margin:0" }));
-    var state = { both: null, mail: [], wins: [], connected: null, pick: memo.homeChip || "you" };
+    // An inbox this phone knows is connected counts as connected until Relay says otherwise (so its answer, the same, draws nothing).
+    var state = { both: null, mail: [], wins: [], connected: memo.gmail && memo.gmail.r && memo.gmail.r.body ? Boolean(memo.gmail.r.body.connected) : hasMailbox() ? true : null, pick: memo.homeChip || "you" };
     // Watching: real products only (a shop's website, or a shop on Relay that isn't one of Relay's test shops), newest first.
     var watches = function () { try { return (window.relayLocalWatches ? window.relayLocalWatches() : []).filter(function (w) { return w && w.sku && w.product && w.real; }).reverse(); } catch (e) { return []; } };
     // A brand-new account: one card that says what to do first.
@@ -10380,9 +10477,16 @@
         el("button", { className: "rl-po-primary", text: "Connect your email", style: "max-width:280px", onclick: function () { if (window.go) window.go("receipts"); } }),
         el("button", { className: "rl-po-secondary", text: "Add a missing receipt", style: "max-width:280px", onclick: function () { open(function (sheet) { addReceiptView(sheet, function () { close(); refresh(); }); }); } })]);
     };
-    var draw = function () {
+    // Drawn again only when something it shows has changed (the same answer arriving again draws nothing); force: always.
+    var drawnKey = null;
+    var draw = function (force) {
       if (!state.both || !document.body.contains(feed)) return;
-      var all = feedEntries(state.both[0], state.both[1], refresh), watched = watches();
+      var watched = watches();
+      var key = [homeIds(state.both[0]), homeIds(state.both[1]), homeIds(memo.needReceipt), state.connected, state.mail.length, state.wins.length, state.pick, homeLook(), homeFocus(),
+        watched.map(function (w) { return w.sku + ":" + w.nowMinor + ":" + (w.image ? 1 : 0) + ":" + (w.store || ""); }).join(",")].join("|");
+      if (!force && key === drawnKey && feed.firstChild && !feed.querySelector(".rl-skel")) return;
+      drawnKey = key;
+      var all = homeFeedEntries(state.both[0], state.both[1]);
       // Wallet and Today show the things you might send back or are waiting for: never app purchases or subscriptions, and
       // nothing older than a week that can't be returned (Connor, 15 Nov), unless it's on its way or a return is going.
       // They stay in Receipts.
@@ -10421,7 +10525,7 @@
       // Watched things without a photo yet: Browse's products give it (asked once, only when Watching is opened).
       if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
         memo.watchPicsAsked = true;
-        if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(); }, { once: true }); }
+        if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(true); }, { once: true }); }
       // Only real products from the shops, with their own photo and the shop's name (Connor, 18 Nov 2026: "It should be real
       // products with real photos from the stores we have and the ones I've clicked watch"). One a shop's website no longer
       // has is left off, with one line saying so once the shops' products are in.
@@ -10470,7 +10574,7 @@
     var winsCard = function () { var nWin = state.wins.length, st0 = state.wins[0].you && state.wins[0].you.state, a0 = state.wins[0].auction || {};
       return feedCard({ small: true, icon: "gavel", line: nWin > 1 ? nWin + " auctions to finish" : st0 === "add_address" ? "Add delivery details for your auction win" : st0 === "offered" ? "An auction is yours if you pay" : "Pay for your auction win",
         sub: nWin > 1 ? "" : (a0.title || ""), open: function () { openAuctions("mine"); } }); };
-    var receiptsChanged = function () { draw(); loadBoth().then(function (both) { state.both = both; draw(); }); };
+    var receiptsChanged = function () { draw(true); loadBoth().then(function (both) { state.both = both; draw(); }); };
     // Receipts first (the users-first Home): what needs you, most urgent first; then parcels on their way; then the
     // latest receipts. Only what is really there: when nothing needs you, one calm line says so.
     var drawReceipts = function (all, watched) {
@@ -10543,7 +10647,7 @@
       orders.sort(function (a, b) { return stage(a) - stage(b) || (a.strip && b.strip ? (a.when < b.when ? -1 : a.when > b.when ? 1 : 0) : 0) || (a.at < b.at ? 1 : a.at > b.at ? -1 : 0); });
       var known = ysRelayShops(), shops = (known || []).filter(function (sh) { return sh && sh.name && (!sh.test || testToolsOn()); });
       // Relay's shops become known once Browse's products are in (asked for by Browse, never by Home): drawn again then.
-      if (known === null && !memo.homeShopsWait) { memo.homeShopsWait = true; window.addEventListener("relay-catalogue", function () { memo.homeShopsWait = false; if (feed.isConnected && state.pick === "you" && homeFocus() === "orders") draw(); }, { once: true }); }
+      if (known === null && !memo.homeShopsWait) { memo.homeShopsWait = true; window.addEventListener("relay-catalogue", function () { memo.homeShopsWait = false; if (feed.isConnected && state.pick === "you" && homeFocus() === "orders") draw(true); }, { once: true }); }
       var logoFor = function (name) { var k = label(name), m = shops.filter(function (sh) { return label(sh.name) === k; })[0]; return m && m.domain && !/\.myshopify\.com$/.test(m.domain) ? m.domain : ""; };
       // A shop's round logo, or its first letter in Relay's soft blue and navy until there is one.
       var shopDot = function (name) { var d = ysLogo({ name: name, cat: "other", logo: logoFor(name) }, 64); d.classList.add("h2-shop-dot"); return d; };
@@ -10936,9 +11040,9 @@
   function start() {
     keyboardWatch(); if (load()) keepStorage(); bind(); mountWelcome(); completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank(); claimPending();
     // Back on screen (from Google or Microsoft's separate browser, or the phone's back from their page): finish or give the buttons back.
-    window.addEventListener("pageshow", function (e) { if (e.persisted) claimPending(); });
+    window.addEventListener("pageshow", function (e) { backOnScreen(); if (e.persisted) claimPending(); });
     window.addEventListener("focus", claimPending);
-    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") claimPending(); });
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") { backOnScreen(); claimPending(); } });
     window.addEventListener("hashchange", function () { completeGoogleNote(); completeLinkSignIn(); completeGmail(); completeBank(); });
     window.addEventListener("relay:session", function () { if (load()) unmountWelcome(); else mountWelcome(); });
   }
