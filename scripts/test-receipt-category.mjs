@@ -102,7 +102,10 @@ t("a supermarket basket stays Food & drink, however much kitchen roll is in it",
   assert.equal(c("Tesco", "tesco.com", ["F&F Denim Jacket", "F&F Slim Jeans"]).category, "fashion");
   assert.equal(itemKind("Super Absorbent Kitchen Towels"), "home");
   assert.equal(itemKind("Greek Yoghurt 950g"), "food");
-  assert.equal(itemKind("Highland Venison Grillsteaks"), null, "a name that doesn't say");
+  // Venison grillsteaks are food (Connor, 18 Nov 2026: a "Highland Game" line opened his Wrapped as a game); a name that
+  // really doesn't say still gives no guess.
+  assert.equal(itemKind("Highland Venison Grillsteaks"), "food");
+  assert.equal(itemKind("Highland Range No. 4"), null, "a name that doesn't say");
 });
 // Each item on a receipt is scored on its own, and the receipt's group is built from those scores.
 const priced = (shop, domain, rows, total) => ({ retailer: { name: shop, domain }, items: rows.map(([name, pricePence, qty]) => ({ name, pricePence, qty: qty || 1 })), totalPence: total });
@@ -120,7 +123,7 @@ t("each item on a supermarket receipt gets its own group, with how sure it is", 
   assert.equal(by("Classic Clean Toilet Tissue x9").category, "home");
   assert.equal(by("Fabric Conditioner 1.16L").category, "home", "fabric conditioner, not hair conditioner");
   assert.equal(by("Cat Food Pouches 12x100g").category, "home", "pet food goes with the pets, not the shopper's food");
-  assert.deepEqual(by("Highland Venison Grillsteaks"), { category: "food", points: 1, sure: false, ranked: [{ category: "food", points: 1 }] }, "a name that doesn't say: the supermarket's food");
+  assert.deepEqual(by("Highland Venison Grillsteaks"), { category: "food", points: 4, sure: true, ranked: [{ category: "food", points: 4 }] }, "venison grillsteaks say food themselves now");
   assert.equal(categorise(weekly).category, "food", "the receipt is still the week's groceries");
   assert.equal(itemCategories({ retailer: { name: "Tiny Shop" }, items: [{ name: "Thing" }, { name: "" }] }).every(x => x === null), true, "nothing points anywhere: no guess");
 });
