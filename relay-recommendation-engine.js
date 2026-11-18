@@ -167,7 +167,7 @@
   ["pyjamas","pyjamas",/pyjama|pajama|\bpjs?\b|nightie|nightdress|loungewear set/,null],
   ["boots","boots",/\bboots?\b/,null],
   ["shoes","shoes",/loafer|sandal|court shoe|\bheels?\b|ballet flat|\bmules?\b|slipper|espadrille/,null],
-  ["trainers","trainers",/trainer|sneaker|running shoe|air max|air force|jordan|\bdunks?\b|samba|gazelle|ultraboost|\bshoes?\b/,null],
+  ["trainers","trainers",/trainer|sneaker|running shoe|\bshoes?\b/,null],
   ["socks","socks",/socks?\b/,null],
   ["bag","bag",/\bbag\b|\btote\b|backpack|rucksack|holdall|\bpouch\b/,/\bbag\b|\btote\b|backpack|rucksack|holdall/],
   ["hat","hat",/beanie|\bcap\b|\bhat\b/,null],
@@ -189,12 +189,20 @@
  // What a bought item is: {mode:"none"} for a one-off, "similar" or "companion" with its kind, or null when Relay can't say.
  // Lines on a receipt that aren't things anyone would want more of: a supermarket's carrier bag, bin bags, packaging.
  const NOT_A_THING=/washing bag|laundry bag|carrier bag|bags? for life|plastic bag|paper bag|reusable (shopping )?bag|shopping bag|bin bag|bin liner|freezer bag|sandwich bag|food bag|gift bag|gift wrap|packaging|\bbag charge\b/;
+ // Trainer model and brand names only say "trainers" when nothing else in the name says what it is (Connor, 18 Nov 2026:
+ // a Jordan backpack is a bag, not trainers); a pick for trainers must still be trainers by the same test.
+ const TRAINER_MODELS=/\bair max\b|\bair force\b|\bjordan\b|\bdunks?\b|\bsamba\b|\bgazelle\b|ultraboost|\bnew balance \d{3,4}\b|\bstan smith\b|\bsuperstar\b|\bcortez\b|\bvomero\b|\bpegasus\b/;
+ // Food, drink and things for skin and hair: never clothes or shoes, whatever a word in them looks like (heel balm isn't
+ // heels, a Moscow Mule isn't mules, a chicken drumstick isn't a stick). Connor, 18 Nov 2026: "What shoes have I bought from
+ // Sainsbury's?"
+ const FOOD_OR_CARE=/\bbalm\b|\bcream\b|\blotion\b|\bgel\b|\bwash\b|shampoo|conditioner|plasters?|\bfile\b|\bgrips?\b|insoles?|\bpads?\b|moscow mule|\bmule (can|cocktail)|\bchicken\b|\bbeef\b|\bpork\b|\blamb\b|\bham\b|\bbacon\b|\bfish\b|\bsalmon\b|\bcheese\b|\bmilk\b|\bbread\b|\bbuns?\b|\bcake\b|biscuit|chocolate|\bcrisps?\b|\bsweets?\b|\bfruit\b|\bveg\b|\bsalad\b|\bpasta\b|\brice\b|\bsoup\b|\bsauce\b|\bpizza\b|\bsandwich|\bwrap\b|\bjuice\b|\bwater\b|\bcola\b|\bbeer\b|\bcider\b|\bgin\b|\bvodka\b|\bcoffee\b|\btea\b|\bcereal\b|\byoghurt|\byogurt|\beggs?\b|\bbutter\b|\bsausages?\b|\bpie\b|\bnoodles?\b|\bkg\b|\d+ ?(g|ml|l|cl)\b|\d+ ?x ?\d/;
  function kindOf(name){
   const s=normal(name);if(!s)return null;
   if(NOT_A_THING.test(s))return {mode:"none"};
   if(ONE_OFF.test(s))return {mode:"none"};
   if(/\btea ?bags?\b/.test(s)){const c=COMPANIONS.find(x=>x[0]==="tea");return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:null};}
-  const k=KINDS.find(x=>x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[3]||k[2]};
+  const k=FOOD_OR_CARE.test(s)?null:KINDS.find(x=>x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[0]==="trainers"?new RegExp(k[2].source+"|"+TRAINER_MODELS.source):(k[3]||k[2])};
+  if(!FOOD_OR_CARE.test(s)&&TRAINER_MODELS.test(s)){const t=KINDS.find(x=>x[0]==="trainers");return {mode:"similar",key:"trainers",noun:t[1],want:new RegExp(t[2].source+"|"+TRAINER_MODELS.source)};}
   const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
   return null;
  }
@@ -209,6 +217,7 @@
   return d.mode==="with"?{mode:"companion",key:"with:"+d.kind,noun:d.kind,want,better:null}:{mode:"similar",key:known?known[0]:d.kind,noun:d.kind,want,ai:true};}
  // A shop that sells one thing with a companion (Nespresso: coffee), when the item's own name doesn't say (Ispirazione Roma).
  function shopCompanion(shop){const s=normal(shop);const c=COMPANIONS.find(x=>x[2].test(s));return c?{mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null}:null;}
+  const SUPERMARKETS=/\b(sainsbury'?s?|tesco|asda|morrisons|aldi|lidl|waitrose|co-?op|iceland|ocado|m ?& ?s food|spar|budgens|farmfoods)\b/;
  const possessiveShop=n=>/s$/i.test(n)?n+"'":n+"'s";
  // groups: what Browse shows, each {key, product, store, min (pence), options[], left}. Returns up to `limit` picks, best first,
  // each {g, score, why[]}. At most two of a kind (three when there's only one kind to go on), one companion per thing bought,
@@ -233,7 +242,11 @@
    owned.add(normal(p.merchant)+"|"+normal(p.item));
    // A line under £2 (a carrier bag, a pack of hair ties) says nothing about what someone would buy again.
    if(Number(p.price)>0&&Number(p.price)<2&&!aiKindOf(p.item,options.aiKinds))continue;
-   const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||shopCompanion(p.merchant);if(!k||k.mode==="none")continue;
+   // A supermarket's receipt is mostly the weekly shop: its lines count only as clothes or homeware that last, by the word
+   // lists (or the AI), never by a shop-wide guess.
+   const superm=SUPERMARKETS.test(normal(p.merchant));
+   const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||(superm?null:shopCompanion(p.merchant));if(!k||k.mode==="none")continue;
+   if(superm&&k.mode==="companion")continue;
    if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
    const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
    // The AI's words for what to look for widen what the word lists know (yoga pants are leggings too).
