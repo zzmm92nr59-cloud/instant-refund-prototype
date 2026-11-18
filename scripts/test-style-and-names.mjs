@@ -63,7 +63,7 @@ const cards = [
 const w = buildWrapped(cards, 2026);
 assert.deepEqual(w.photos.map(p => p.id), ["a"], "only the checked photo of a thing; the takeaway's picture is left out");
 assert.equal(w.photos[0].item, "Align Pant");
-assert.deepEqual(w.firstBuy, { shop: "Kick Lane", item: "Court Classic Trainers", kind: "fashion", thing: "footwear", date: "2026-01-04", photoId: null });
+assert.deepEqual(w.firstBuy, { shop: "Kick Lane", item: "Court Classic Trainers", kind: "fashion", date: "2026-01-04", photoId: null });
 assert.equal(w.biggest.item, "Align Pant"); assert.equal(w.biggest.photoId, "a");
 assert.ok(!w.things.some(t => t.name === "Pizza"), "food isn't used for style");
 assert.equal(w.categories.find(c => c.category === "fashion").topShop.name, "Kick Lane");
