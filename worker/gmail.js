@@ -26,7 +26,8 @@ import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSumma
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads } from "./ai-reader.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
-import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
+import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
+import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
@@ -1666,6 +1667,21 @@ export async function styleThings(env, shopperId) {
   return things;
 }
 
+// The name of every thing the shopper bought, with its shop, newest receipts first, for the AI to say what each is (AI for
+// picks, item-kinds.js; only for shoppers who switched it on). Names and shops only: no prices, dates or order numbers.
+// Forwarded receipts' senders are people, so no shop is given for those.
+export async function boughtNames(env, shopperId) {
+  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const out = [];
+  for (const c of cards) {
+    if (c.kind === "return_instructions") continue;
+    const forwarded = PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""));
+    for (const i of (c.items || []).slice(0, 30)) if (i && typeof i.name === "string" && i.name.trim()) out.push({ name: i.name.trim().slice(0, 120), shop: forwarded ? "" : ((c.retailer && c.retailer.name) || "") });
+    if (out.length >= 2000) break;
+  }
+  return out;
+}
+
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
@@ -1699,7 +1715,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, aiTypes, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status, updated_at AS at FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
@@ -1712,6 +1728,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     readReturnTracks(env.RELAY_DB, shopperId),
     // What Claude said about shops whose names don't say what they sell (shop-kind-ai.js): nothing personal, one per shop.
     readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
+    // What the AI said each thing is, for shoppers who switched AI for picks on (item-kinds.js); {} for everyone else.
+    aiTypesFor(env, shopperId),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
@@ -1782,10 +1800,14 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
     // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
     const kinds = itemCategories(c, learned);
+    // And what each thing is (item-kind-core.js, with the AI's sure answers for shoppers who switched it on): `kind`, whether
+    // that is sure (`kindSure`, `kindAi` when the AI said so) and whether it is kept rather than used up (`lasting`).
+    const own = itemKinds(c, aiTypes);
     // A food order can still hold things that go back on their own (a kettle in the weekly shop): those items are marked.
     const keep = group.returnable === false && group.category === "food" ? returnableItems(c, kinds) : [];
     const items = (c.items || []).map((it, i) => (it && typeof it.name === "string" && it.name
-      ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure), ...(keep.includes(i) ? { returnable: true } : {}) } : it));
+      ? { ...it, category: kinds[i] ? kinds[i].category : group.category, categorySure: Boolean(kinds[i] && kinds[i].sure), ...(keep.includes(i) ? { returnable: true } : {}),
+        ...(own[i] ? { kind: own[i].kind, kindSure: own[i].confidence === "high" || own[i].confidence === "ai", ...(own[i].confidence === "ai" ? { kindAi: true } : {}), lasting: own[i].lasting && (own[i].confidence === "high" || own[i].confidence === "ai") } : {}) } : it));
     // A return date Relay can safely go by when the emails don't give one (only for what can go back).
     // When the emails give no return date or window at all: the shop's own published returns policy, if Relay has read it
     // (return-policies.js). It gives the least the shopper can count on for most items, and replaces UK law's 14 days.
@@ -2119,6 +2141,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ ok: true, ...(await disconnect(env, shopper.id, opts.fetchImpl, { withdraw: false })) }, 200, cors);
   }
   if (path === "/relay/my/wrapped" && m === "GET") {
+    // With AI for picks on, the names of things not read yet are read first (item-kinds.js), so Wrapped counts each thing as
+    // what it is. Off, or with no AI key: Relay's own rules only.
+    await learnItemKinds(env, shopper, { now: opts.now, fetchImpl: opts.fetchImpl }).catch(() => null);
     let cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
     // Shops whose names don't say what they sell are asked about once (only with the AI on, only the shop's name): when
     // any were learned, the receipts are sorted again with the answers.
