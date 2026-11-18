@@ -38,9 +38,6 @@ const P = {
   "nuneaton": [52.53, -1.46], "grantham": [52.91, -0.64], "newark": [53.08, -0.81], "newark north gate": [53.08, -0.80], "retford": [53.32, -0.95],
   "scarborough": [54.28, -0.40], "whitby": [54.49, -0.61], "leeds bradford airport": [53.87, -1.66], "east midlands airport": [52.83, -1.33],
   "newcastle airport": [55.04, -1.69], "liverpool john lennon airport": [53.33, -2.85],
-  "salisbury": [51.07, -1.81], "winchester": [51.07, -1.32], "windsor": [51.48, -0.61], "windsor and eton central": [51.48, -0.61],
-  "stratford-upon-avon": [52.19, -1.71], "stratford upon avon": [52.19, -1.71], "windermere": [54.38, -2.91], "ely": [52.39, 0.27],
-  "margate": [51.39, 1.38], "conwy": [53.28, -3.83],
   // Scotland.
   "edinburgh": [55.95, -3.19], "edinburgh waverley": [55.95, -3.19], "edinburgh haymarket": [55.95, -3.22], "edinburgh airport": [55.95, -3.37],
   "glasgow": [55.86, -4.25], "glasgow central": [55.86, -4.26], "glasgow queen street": [55.86, -4.25], "glasgow airport": [55.87, -4.43],

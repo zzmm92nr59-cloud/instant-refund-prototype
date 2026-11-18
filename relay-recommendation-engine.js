@@ -1,12 +1,10 @@
 /* Relay Discover: explainable, opt-in purchase-history ranking.
  * Client-side only. No API calls, customer profiles or claims of machine-learning inference. */
 (function(root,factory){
- // What a thing is comes from worker/item-kind-core.js, the same file the server uses (loaded before this one in the app).
- const core=root&&root.RelayItemKind?root.RelayItemKind:(typeof require==="function"&&typeof module==="object"?(()=>{try{return require("./worker/item-kind-core.js")}catch(e){return null}})():null);
- const api=factory(core);
+ const api=factory();
  if(typeof module==="object"&&module.exports)module.exports=api;
  else root.RelayRecommendationEngine=api;
-})(typeof globalThis!=="undefined"?globalThis:this,function(Core){
+})(typeof globalThis!=="undefined"?globalThis:this,function(){
  "use strict";
  // Lower case, with the shops' fancy hyphens (T‑shirt) and quotes made plain.
  const normal=s=>String(s??"").toLowerCase().replace(/[\u2010-\u2015\u2212]/g,"-").replace(/[\u2018\u2019]/g,"'").trim();
@@ -195,34 +193,16 @@
  // a Jordan backpack is a bag, not trainers); a pick for trainers must still be trainers by the same test.
  const TRAINER_MODELS=/\bair max\b|\bair force\b|\bjordan\b|\bdunks?\b|\bsamba\b|\bgazelle\b|ultraboost|\bnew balance \d{3,4}\b|\bstan smith\b|\bsuperstar\b|\bcortez\b|\bvomero\b|\bpegasus\b/;
  // Food, drink and things for skin and hair: never clothes or shoes, whatever a word in them looks like (heel balm isn't
- // heels, a Moscow Mule isn't mules, a chicken drumstick isn't a stick, a sharing bag of sweets isn't a bag). Connor, 18 Nov
- // 2026: "What shoes have I bought from Sainsbury's?" item-kind-core.js decides; this word list is only for a page that
- // hasn't loaded it.
- const FOOD_OR_CARE_WORDS=/\bbalm\b|\bcream\b|\blotion\b|\bgel\b|\bwash\b|shampoo|conditioner|plasters?|\bfile\b|\bgrips?\b|insoles?|\bpads?\b|moscow mule|\bmule (can|cocktail)|\bchicken\b|\bbeef\b|\bpork\b|\blamb\b|\bham\b|\bbacon\b|\bfish\b|\bsalmon\b|\bcheese\b|\bmilk\b|\bbread\b|\bbuns?\b|\bcake\b|biscuit|chocolate|\bcrisps?\b|\bsweets?\b|\bfruit\b|\bveg\b|\bsalad\b|\bpasta\b|\brice\b|\bsoup\b|\bsauce\b|\bpizza\b|\bsandwich|\bwrap\b|\bjuice\b|\bwater\b|\bcola\b|\bbeer\b|\bcider\b|\bgin\b|\bvodka\b|\bcoffee\b|\btea\b|\bcereal\b|\byoghurt|\byogurt|\beggs?\b|\bbutter\b|\bsausages?\b|\bpie\b|\bnoodles?\b|\bkg\b|\d+ ?(g|ml|l|cl)\b|\d+ ?x ?\d/;
- // What the core says a thing is: "used" (eaten, drunk, washed with), "pet", "beauty", "none" (travel, an app, a service, a
- // gift card: nothing to pick from), or null when it isn't sure (the word lists below then decide).
- function coreSays(name){
-  if(!Core)return FOOD_OR_CARE_WORDS.test(normal(name))?"used":null;
-  const c=Core.classify(name);if(c.confidence==="low")return null;
-  if(c.kind==="pets")return "pet";if(c.kind==="beauty_health")return "beauty";
-  if(c.kind==="food_drink"||c.kind==="household")return "used";
-  if(c.kind==="travel"||c.kind==="digital"||c.kind==="services"||c.kind==="gift_cards")return "none";
-  return "thing";
- }
+ // heels, a Moscow Mule isn't mules, a chicken drumstick isn't a stick). Connor, 18 Nov 2026: "What shoes have I bought from
+ // Sainsbury's?"
+ const FOOD_OR_CARE=/\bbalm\b|\bcream\b|\blotion\b|\bgel\b|\bwash\b|shampoo|conditioner|plasters?|\bfile\b|\bgrips?\b|insoles?|\bpads?\b|moscow mule|\bmule (can|cocktail)|\bchicken\b|\bbeef\b|\bpork\b|\blamb\b|\bham\b|\bbacon\b|\bfish\b|\bsalmon\b|\bcheese\b|\bmilk\b|\bbread\b|\bbuns?\b|\bcake\b|biscuit|chocolate|\bcrisps?\b|\bsweets?\b|\bfruit\b|\bveg\b|\bsalad\b|\bpasta\b|\brice\b|\bsoup\b|\bsauce\b|\bpizza\b|\bsandwich|\bwrap\b|\bjuice\b|\bwater\b|\bcola\b|\bbeer\b|\bcider\b|\bgin\b|\bvodka\b|\bcoffee\b|\btea\b|\bcereal\b|\byoghurt|\byogurt|\beggs?\b|\bbutter\b|\bsausages?\b|\bpie\b|\bnoodles?\b|\bkg\b|\d+ ?(g|ml|l|cl)\b|\d+ ?x ?\d/;
  function kindOf(name){
   const s=normal(name);if(!s)return null;
   if(NOT_A_THING.test(s))return {mode:"none"};
   if(ONE_OFF.test(s))return {mode:"none"};
   if(/\btea ?bags?\b/.test(s)){const c=COMPANIONS.find(x=>x[0]==="tea");return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:null};}
-  const says=coreSays(name);
-  if(says==="none")return {mode:"none"};
-  // Pets: more for the pet. Beauty: only skincare is picked from. Food and household: only a companion (coffee: a cup).
-  if(says==="pet"){const p=KINDS.find(x=>x[0]==="pet");return {mode:"similar",key:p[0],noun:p[1],want:p[2]};}
-  if(says==="beauty"){const b=KINDS.find(x=>x[0]==="skincare");return b[2].test(s)?{mode:"similar",key:b[0],noun:b[1],want:b[2]}:null;}
-  if(says==="used"){const c=COMPANIONS.find(x=>x[0]!=="bed"&&x[2].test(s));return c?{mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null}:null;}
-  // A thing: the word lists say which kind of thing (never "pet" or "skincare" for a jumper with a dog on it).
-  const k=KINDS.find(x=>x[0]!=="pet"&&x[0]!=="skincare"&&x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[0]==="trainers"?new RegExp(k[2].source+"|"+TRAINER_MODELS.source):(k[3]||k[2])};
-  if(TRAINER_MODELS.test(s)){const t=KINDS.find(x=>x[0]==="trainers");return {mode:"similar",key:"trainers",noun:t[1],want:new RegExp(t[2].source+"|"+TRAINER_MODELS.source)};}
+  const k=FOOD_OR_CARE.test(s)?null:KINDS.find(x=>x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[0]==="trainers"?new RegExp(k[2].source+"|"+TRAINER_MODELS.source):(k[3]||k[2])};
+  if(!FOOD_OR_CARE.test(s)&&TRAINER_MODELS.test(s)){const t=KINDS.find(x=>x[0]==="trainers");return {mode:"similar",key:"trainers",noun:t[1],want:new RegExp(t[2].source+"|"+TRAINER_MODELS.source)};}
   const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
   return null;
  }

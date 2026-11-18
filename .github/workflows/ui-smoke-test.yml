@@ -89,8 +89,6 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-gifts-ui.mjs
       - name: Test the better Wrapped (memorable opening, right kinds, plain words, travel train and UK map, moving things, reduced motion)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-better-ui.mjs
-      - name: Test Wrapped's journeys (each journey travelled on the map, Did you visit, never opening on sweets, reduced motion)
-        run: node --import ./scripts/record-app-requests.mjs scripts/test-wrapped-journeys-ui.mjs
       - name: Test the Relay health page (admins only, numbers, chart and table, plain words)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-health-ui.mjs
       - name: Test Fix this receipt (from the details or 'Is this right?', plain-English checks, changes only, undo)

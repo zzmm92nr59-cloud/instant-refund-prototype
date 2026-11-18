@@ -1,9 +1,7 @@
 // Browser test: the better Wrapped (Connor, 17 Nov 2026). Stubbed Relay server; the Wrapped is built by the real
 // worker/wrapped.js from made-up receipts, sorted the way the server sorts them. It opens on something memorable (not a
-// bottle of water), a TV bed is Home & garden, a one-off shop is never a "go-to", nothing is joined with dots, each journey gets
-// a train running along its route (Connor, 18 Nov 2026: the train running across the screen went) and they all go on a UK map,
-// and things bought tumble in and drop into a bag (and sit still with reduced motion). scripts/test-wrapped-journeys-ui.mjs
-// checks the journeys in detail.
+// bottle of water), a TV bed is Home & garden, a one-off shop is never a "go-to", nothing is joined with dots, journeys get a
+// train and a UK map, and things bought tumble in and drop into a bag (and sit still with reduced motion).
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 import { skipInterests } from "./relay-places.mjs";
@@ -99,15 +97,13 @@ const body = (page) => page.locator(".rl-story-body").innerText();
       }
       sawBag = true;
     }
-    if (/ON THE MOVE/.test(t)) assert.match(t, /Most travelled\s+London Euston to Manchester Piccadilly\s+3 journeys/);
-    if (/JOURNEY 1 OF/.test(t) && !sawTrain) {
-      // Shown afresh, then read twice: the train moves along the route.
-      await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight"); await page.waitForTimeout(600);
-      const a = await page.locator(".rl-story-body .tiny-train").evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y]; });
+    if (/ON THE MOVE/.test(t)) {
+      assert.match(t, /Most travelled\s+London Euston to Manchester Piccadilly\s+3 journeys/);
+      const a = await page.locator(".rl-story-body .train .loco").evaluate(n => new DOMMatrix(getComputedStyle(n).transform).m41);
       await page.waitForTimeout(700);
-      const b = await page.locator(".rl-story-body .tiny-train").evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y]; });
-      assert.ok(Math.hypot(b[0] - a[0], b[1] - a[1]) > 5, "the train moves along the journey");
-      await page.screenshot({ path: SHOTS + "/3-train.png" }); sawTrain = true;
+      const b = await page.locator(".rl-story-body .train .loco").evaluate(n => new DOMMatrix(getComputedStyle(n).transform).m41);
+      assert.ok(b > a, "the train moves across the screen");
+      await page.waitForTimeout(800); await page.screenshot({ path: SHOTS + "/3-train.png" }); sawTrain = true;
     }
     if (/Where you went/.test(t)) {
       assert.ok(await page.locator(".rl-story-body .map path.land").count() >= 5, "Great Britain, its islands and Northern Ireland");
@@ -158,15 +154,13 @@ const body = (page) => page.locator(".rl-story-body").innerText();
   await page.getByRole("button", { name: "Play your 2026 story" }).click(); await page.waitForTimeout(400);
   assert.equal(await page.locator(".rl-story-body .rl-wr-hero").evaluate(n => getComputedStyle(n).animationName), "none");
   assert.equal(await page.locator(".rl-story-body .rl-wr-hero").evaluate(n => getComputedStyle(n).opacity), "1");
-  let sawList = false;
   for (let k = 0; k < 30; k++) {
     await page.keyboard.press("ArrowRight"); await page.waitForTimeout(150);
-    if (await page.locator(".rl-story-body .jlist").count()) { assert.equal(await page.locator(".rl-story-body .jmap").count(), 0, "the journeys are a still list"); sawList = true; break; }
+    if (await page.locator(".rl-story-body .train").count()) { assert.equal(await page.locator(".rl-story-body .train .loco").evaluate(n => getComputedStyle(n).animationName), "none"); break; }
   }
-  assert.ok(sawList, "the journeys were shown as a list");
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - with reduced motion the photo, the bag and the journeys stand still");
+  console.log("ok - with reduced motion the photo, the bag and the train stand still");
 }
 
 // 3. Only everyday buys: it opens on the count. A year without journeys has no travel slides. A new shopper is told what's next.
@@ -178,7 +172,7 @@ const body = (page) => page.locator(".rl-story-body").innerText();
   assert.match(first, /^RELAY WRAPPED 2026\s+Your 2026, one receipt at a time\.\s+4\s+receipts from 2 shops\. Here's your year\.$/);
   const all = [first];
   for (let k = 0; k < 20; k++) { await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200); all.push(await body(page)); if (await page.getByRole("button", { name: "Watch again" }).count()) break; }
-  assert.ok(!all.some(t => /ON THE MOVE|Where you went|JOURNEY \d|Did you visit/.test(t)), "no journeys, no travel slides");
+  assert.ok(!all.some(t => /ON THE MOVE|Where you went/.test(t)), "no journeys, no travel slides");
   assert.ok(!all.some(t => /Home & garden/.test(t)), "a supermarket's kitchen roll makes no Home & garden chapter");
   await page.keyboard.press("Escape");
   wrapped = buildWrapped([], 2026, NOW);
