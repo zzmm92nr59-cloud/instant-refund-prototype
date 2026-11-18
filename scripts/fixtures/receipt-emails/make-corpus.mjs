@@ -8,9 +8,10 @@ import food from "./food.mjs";
 import grocery from "./grocery.mjs";
 import retail from "./retail.mjs";
 import digital from "./digital.mjs";
+import holdout from "./holdout.mjs";
 
 const dir = dirname(fileURLToPath(import.meta.url));
-const all = [...food(), ...grocery(), ...retail(), ...digital()];
+const all = [...food(), ...grocery(), ...retail(), ...digital(), ...holdout()];
 const ids = new Set();
 for (const f of all) { if (ids.has(f.id)) throw new Error("two fixtures called " + f.id); ids.add(f.id); }
 for (const name of readdirSync(dir)) if (name.endsWith(".json")) unlinkSync(join(dir, name));

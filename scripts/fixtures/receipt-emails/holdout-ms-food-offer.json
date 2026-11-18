@@ -1,0 +1,40 @@
+{
+ "id": "holdout-ms-food-offer",
+ "sender": "M&S",
+ "layout": "an offer line under an item",
+ "headers": {
+  "from": "M&S <noreply@marksandspencer.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your M&S order",
+  "date": "Mon, 09 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "M&S Food\nOrder number: 9988776655XYZ\n9 November 2026\n\n1 x Collection Luxury Smoked Salmon 200g £7.00\nSparks offer -£2.00\n2 x Percy Pig Fruit Gums 170g £2.50\n1 x Our Best Ever Chicken Pie £9.00\n\nSubtotal £18.50\nSparks offer -£2.00\nDelivery £4.50\nTotal £21.00",
+ "expected": {
+  "shop": "M&S",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Collection Luxury Smoked Salmon 200g",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Percy Pig Fruit Gums 170g",
+    "qty": 2,
+    "linePence": 250
+   },
+   {
+    "name": "Our Best Ever Chicken Pie",
+    "qty": 1,
+    "linePence": 900
+   }
+  ],
+  "subtotalPence": 1850,
+  "feesPence": 450,
+  "discountsPence": 200,
+  "tipsPence": 0,
+  "totalPence": 2100
+ }
+}

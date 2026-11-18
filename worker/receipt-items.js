@@ -59,7 +59,11 @@ function splitCell(raw) {
   else {
     // A price at the end of a name ("Prawn Crackers  £1.80", "Large Margherita ........ £11.99", "Wool jumper - Qty 1 - £59.00").
     m = new RegExp("^(.*?\\p{L}.*?)(?:\\s*(?:\\.{2,}|[-–:])\\s*|\\s+)([-−–])?" + MONEY + "$", "u").exec(c);
-    if (m && !/[(+]\s*$/.test(m[1])) { if (!m[2]) out.prices.push(pence(m[3], m[4], m[5])); else out.negative = true; c = m[1]; }
+    if (m && !/[(+]\s*$/.test(m[1])) {
+      // ("Sparks offer -£2.00": the dash against the pound sign is money off, even where a dash could also separate.)
+      const neg = Boolean(m[2]) || /[-−–]\s?£\s?[\d,.\s]+$/.test(c) && !/\s[-–]\s+£/.test(c);
+      if (!neg) out.prices.push(pence(m[3], m[4], m[5])); else out.negative = true; c = m[1];
+    }
   }
   // Quantity at the start: "1 x Name", "2x Name", "2 × Name"; a bare "1 Big Mac Meal" only on a line with its price.
   m = /^(\d{1,3})\s?[x×]\s+(\S.*)$/i.exec(c) || /^(\d{1,3})[x×](\p{L}.*)$/iu.exec(c);
@@ -96,6 +100,9 @@ function readLine(raw) {
     if ((m = QTY_CELL.exec(c))) { line.qty = Number(m[1] || m[2] || m[3]); continue; }
     if (FREE_CELL.test(c) && line.names.length) { line.free = true; continue; }
     if (NOT_CHARGED.test(c) && line.names.length) { line.notCharged = true; continue; }
+    if (/^(?:was|now|rrp|save|you save|saving|price was|originally)\b\s*:?\s*£/i.test(c)) { line.details = true; continue; }
+    const lt = new RegExp("^(?:item|line|product)\\s+total\\s*:?\\s*" + MONEY + "$", "i").exec(c);
+    if (lt) { line.lineTotal = pence(lt[1], lt[2], lt[3]); continue; }
     // A money line ("Guide price | £112.99", "Delivery fee £2.49", "Subtotal" over its amount) ends the list. A thing whose
     // name starts with such a word ("Bag for Life | 1 | £0.50") doesn't: it has more than an amount beside it.
     if (i === 0 && END.test(c) && cells.slice(1).every((x) => PRICE_CELL.test(x) || FREE_CELL.test(x) || /^[-−–]\s?£/.test(x))) {
@@ -181,6 +188,7 @@ export function readItems(text, opts = {}) {
       const u = pend.unit ?? pend.unitLabelled;
       if ((pend.qty || 1) * u === l.labelledTotal) { pend.lineFromLabel = l.labelledTotal; pend.unit = u; emit(); continue; }
     }
+    if (l.lineTotal != null && !hasName && pend && pend.name) { pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
     if (pend && pend.prices.length) emit();
     if (pend && pend.unitLabelled != null && !(l.labelledTotal != null)) { pend.prices.push(pend.unitLabelled); pend.unit = null; emit(); }
     if (l.endWord && !hasName && (items.length || last)) break;
@@ -206,6 +214,8 @@ export function readItems(text, opts = {}) {
       continue;
     }
     if (!hasName && priced && !pend && last && last.extraAt === n - 1 && opts.extraPrices && l.qty == null) { last.item.pricePence += l.prices[l.prices.length - 1]; continue; }
+    // "+ Extra cheese £0.80" under an item: an extra of it, with its own price (added only in the extra-price reading).
+    if (!hasName && priced && !pend && last && l.extras.length && l.plus && l.qty == null) { addExtras(last.item, l.extras); if (opts.extraPrices) last.item.pricePence += l.prices[l.prices.length - 1]; continue; }
     if (!hasName && priced) {
       if (pend && pend.name) { pend.prices.push(...l.prices); if (l.qty != null) pend.qty = l.qty; if (l.unit != null) pend.unit = l.unit; pend.extras.push(...l.extras); if (l.details) pend.detail = true; if (l.priceLabelled) pend.labelled = true; if (l.plus) pend.plus = true; continue; }
       continue;
@@ -311,7 +321,8 @@ export function checkItems(items, money, totalPence) {
   const m = money || {};
   const S = m.subtotal ?? null, T = totalPence ?? null;
   const targets = [];
-  if (S != null) targets.push(S, S + (m.discounts || 0), S - (m.discounts || 0));
+  // (Never the subtotal plus or minus the discounts: a discount read as an item would then look complete.)
+  if (S != null) targets.push(S);
   if (T != null) targets.push(T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0), T - (m.fees || 0) - (m.tips || 0), T);
   const expectedPence = S ?? (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
   const unpriced = list.some((i) => i.pricePence == null);
