@@ -7639,7 +7639,7 @@
   var ICON_PLANE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c.8 0 1.4.7 1.4 1.5v5.2l7.1 4.1v1.9l-7.1-2.2v4.3l2.1 1.6v1.6L12 19.6l-3.5.9v-1.6l2.1-1.6V13l-7.1 2.2v-1.9l7.1-4.1V4c0-.8.6-1.5 1.4-1.5Z"/></svg>';
   var milesText = function (n) { return n.toLocaleString("en-GB") + (n === 1 ? " mile" : " miles"); };
   var BOARD_MONTHS = "JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(" ");
-  var shortDay = function (d) { return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Number(d.slice(8, 10)) + " " + BOARD_MONTHS[Number(d.slice(5, 7)) - 1] : ""; };
+  var boardDay = function (d) { return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Number(d.slice(8, 10)) + " " + BOARD_MONTHS[Number(d.slice(5, 7)) - 1] : ""; };
   // "11 journeys, 2,340 miles by train" (only what's known is added up; "at least" when some trip couldn't be measured).
   function groundTotals(g) {
     var x = g && g.totals; if (!x || !x.journeys) return null;
@@ -7664,7 +7664,7 @@
   var BOARD_ROWS = 6, BOARD_MAX = 18, FLAP_ROW = 260, FLAP_HOLD = 1500;
   function boardPages(n) { return Math.max(1, Math.ceil(Math.min(n, BOARD_MAX) / BOARD_ROWS)); }
   function boardDur(n) { var rows = Math.min(n, BOARD_ROWS); return Math.max(6500, boardPages(n) * (rows * FLAP_ROW + 700 + FLAP_HOLD) + 1600); }
-  function rowText(r) { return { day: shortDay(r.date) || "", place: String(r.place || r.to || "").toUpperCase(), times: r.times > 1 ? r.times + " TIMES" : "" }; }
+  function rowText(r) { return { day: boardDay(r.date) || "", place: String(r.place || r.to || "").toUpperCase(), times: r.times > 1 ? r.times + " TIMES" : "" }; }
   function trainBoard(b, g, year, still) {
     b.classList.add("jx", "jbd");
     b.appendChild(el("div", { className: "k", text: "YOUR OTHER TRAIN JOURNEYS" }));
