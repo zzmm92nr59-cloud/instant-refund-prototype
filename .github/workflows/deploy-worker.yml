@@ -21,6 +21,8 @@ jobs:
           node --check worker/shopify-webhooks.js
           node --check worker/auth.js
           node --check worker/receipt-parser.js
+          node --check worker/receipt-items.js
+          node --check worker/receipt-reread.js
           node --check worker/gmail.js
           node --check worker/resale.js
           node --check worker/original.js
@@ -41,6 +43,8 @@ jobs:
           node scripts/test-security-mail.mjs
           node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs
+          node scripts/test-receipt-corpus.mjs
+          node scripts/test-receipt-reread.mjs
           node scripts/test-receipt-category.mjs
           node scripts/test-receipt-reader.mjs
           node scripts/test-wrapped.mjs

@@ -1,0 +1,35 @@
+{
+ "id": "zara-2",
+ "sender": "Zara",
+ "layout": "text, units",
+ "headers": {
+  "from": "ZARA <noreply@zara.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your ZARA order",
+  "date": "Thu, 05 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "ZARA\nORDER NO. 52419933790\n5 November 2026\n\nOVERSIZE HOODIE\n2 units\n£51.98\nLEATHER EFFECT BELT\n1 unit\n£15.99\n\nSubtotal £67.97\nStore delivery FREE\nTOTAL £67.97",
+ "expected": {
+  "shop": "Zara",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "OVERSIZE HOODIE",
+    "qty": 2,
+    "linePence": 5198
+   },
+   {
+    "name": "LEATHER EFFECT BELT",
+    "qty": 1,
+    "linePence": 1599
+   }
+  ],
+  "subtotalPence": 6797,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6797
+ }
+}

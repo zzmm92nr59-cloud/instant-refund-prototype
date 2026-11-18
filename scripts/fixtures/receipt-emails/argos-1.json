@@ -1,0 +1,40 @@
+{
+ "id": "argos-1",
+ "sender": "Argos",
+ "layout": "catalogue numbers, Qty | Price",
+ "headers": {
+  "from": "Argos <orders@argos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order - Argos",
+  "date": "Sat, 17 Oct 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Argos</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.argos.co.uk/?utm_source=email\"><img src=\"https://www.argos.co.uk/static/email/logo.png\" alt=\"Argos\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: AO12345678</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>17 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Product</td><td>Qty</td><td>Price</td></tr><tr><td>Russell Hobbs 26200 Brushed Steel Kettle<br />Cat. no. 123/4567</td><td>1</td><td>£35.00</td></tr><tr><td>Tower 4 Slice Toaster - Black<br />Cat. no. 123/4567</td><td>1</td><td>£30.00</td></tr><tr><td>Duracell Plus AA Batteries - Pack of 12<br />Cat. no. 123/4567</td><td>1</td><td>£9.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£74.00</td></tr><tr><td>Delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£77.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Argos. All rights reserved.<br /><a href=\"https://www.argos.co.uk/help\">Help</a> | <a href=\"https://www.argos.co.uk/privacy\">Privacy</a> | <a href=\"https://www.argos.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.argos.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Argos",
+  "date": "2026-10-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Russell Hobbs 26200 Brushed Steel Kettle",
+    "qty": 1,
+    "linePence": 3500
+   },
+   {
+    "name": "Tower 4 Slice Toaster - Black",
+    "qty": 1,
+    "linePence": 3000
+   },
+   {
+    "name": "Duracell Plus AA Batteries - Pack of 12",
+    "qty": 1,
+    "linePence": 900
+   }
+  ],
+  "subtotalPence": 7400,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7795
+ }
+}

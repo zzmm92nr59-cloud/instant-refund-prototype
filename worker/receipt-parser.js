@@ -12,6 +12,7 @@ const MAX_INPUT = 600_000;
 import { flightBooking, flightItemName } from "./flight-booking.js";
 import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
+import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -116,7 +117,8 @@ function collectParts(headers, body, out, depth = 0) {
     }
     return;
   }
-  const decoded = withoutInvisible(unwrapSafeLinks(decodeBody(headers, body)));
+  // (Line ends as sent, "\r\n", become "\n": a shop's name at the end of a line would otherwise carry the "\r".)
+  const decoded = withoutInvisible(unwrapSafeLinks(decodeBody(headers, body))).replace(/\r\n?/g, "\n");
   if (/text\/html/i.test(type)) out.html.push(decoded);
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
 }
@@ -171,7 +173,11 @@ function htmlToText(html) {
   return decodeEntities(html
     .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    // (An item's extras in their own <div> or <p> inside the name's cell are lines of their own, not part of its name. A block
+    // that opens straight after another closes starts the one new line the closing gave.)
+    .replace(/(<\/(?:p|div|tr|li|h[1-6]|table)>)(?:\s*<(?:p|div|li|h[1-6])\b[^>]*>)+/gi, "$1")
     .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
+    .replace(/<(p|div|li|h[1-6])\b[^>]*>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/t[dh]>/gi, " | ")
     .replace(/<[^>]+>/g, " "))
@@ -350,10 +356,16 @@ function fromText(text, refDate) {
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
   // includes delivery ("Total Including Delivery | £315.78") beats a plain one.
-  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
-  const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(text.slice(Math.max(0, m.index - 4), m.index)));
+  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay(?: in store)?|due|guide price))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
+  // Not the items' own total ("Products total", "Goods total", "Items total"), and, when there is a subtotal, a total after it
+  // (an email can print the total at the top too, or a "Total" for each line of its item list).
+  const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
+  const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(before(m)) && !/\b(?:items?|products?|goods|line|item\(s\))[ \t]*$/i.test(before(m)));
+  const subAt = (/\bsub-?\s?total\b/i.exec(text) || {}).index;
+  const afterSub = subAt == null ? [] : notSub.filter((m) => m.index > subAt);
+  const pool = afterSub.length ? afterSub : notSub;
   const totalMatch =
-    notSub.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || notSub[0] || totals[0] ||
+    pool.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || pool[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
     [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop();
@@ -525,7 +537,10 @@ function extractReturns(text, html, orderDate) {
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
-  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^.!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s) ||
+  const subjectHit = /(order|receipt|purchase|thank you for your|payment)\b.*(confirm|receipt|received|thank)|confirmation|your receipt|order #|order no|\bthanks?\b.*\b(order|purchase)\b|\byour\b[^!?]{0,40}\b(?:order|e-?receipt|receipt)\s*$/.test(s) ||
+    // "Your Friday evening trip with Uber", "Your Deliveroo order from Wagamama", "We're processing your order W123",
+    // "Your Etsy Purchase from …", "Your purchase with lululemon", "Receipt for your payment to …", "Your LNER tickets for …".
+    /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
@@ -652,17 +667,27 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   const personal = PERSONAL_MAIL.test(domain || "");
   const fwOpts = { subject, personal: (d) => PERSONAL_MAIL.test(d) };
   const fw = forwardedSender(text, fwOpts) || (otherText ? forwardedSender(otherText, fwOpts) : null);
+  // A shop's email the shopper forwarded from their own mailbox reads as if the shop had sent it: the original sender is
+  // weighed as the sender (a payment company's own name still counts for nothing), so it names the same shop as the original.
+  const asSent = Boolean(fw && personal);
+  const GENERIC = /^(orders?|noreply|no-reply|info|hello|customer.?service|team|support|shop|store|sales)\b/i;
+  const sentName = asSent ? (fw.name && !GENERIC.test(fw.name) ? fw.name : null) : sender?.name ? fromName : null;
+  const sentDomain = asSent ? fw.domain : domain;
+  subject = String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
   const ranked = rankShop({
     dataName: ld?.retailerName || null,
-    forwardedName: fw?.name || null, forwardedDomain: fw?.domain || null,
-    senderName: sender?.name ? fromName : null, senderDomain: domain, personal,
-    bodyNames: shopNamesInText(text, subject),
+    forwardedName: asSent ? null : fw?.name || null, forwardedDomain: asSent ? null : fw?.domain || null,
+    senderName: sentName, senderDomain: sentDomain, personal: asSent ? false : personal,
+    // (Not the forward's own header lines: its "Subject:" would count the subject twice.)
+    bodyNames: shopNamesInText(asSent ? text.replace(/^[ \t>*]*(?:from|subject|date|to|sent|cc)[ \t*]*:.*$/gim, "") : text, subject),
     // A payment platform's own receipt names the business that was paid ("Merchant: Example Lettings").
-    merchantName: domain && isVia(domain) ? ((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) || [])[1] || null) : null,
+    merchantName: sentDomain && isVia(sentDomain) ? ((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) || [])[1] || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
-    titleName: GAME_SHOP.test(domain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
+    titleName: GAME_SHOP.test(sentDomain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
   });
+  // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
+  if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
   if (ranked.via) out.via = ranked.via;
@@ -762,7 +787,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
-  if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
+  const gameShop = GAME_SHOP.test(sender?.domain || "");
+  if (!result.items.length && gameShop) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
   // Flights: each one (from, to, day, flight number, out or back), the booking reference, and what was paid. The flights
   // are what was bought, so they are the one item (a fare's lines, "Adult 1", "Hold bag", aren't things).
   if (isFlight) {
@@ -771,11 +797,40 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (result.totalPence == null && flight.paid) { result.totalPence = flight.paid.pence; result.currency = flight.paid.currency; }
     result.items = [{ name: flightItemName(flight.legs), qty: 1, pricePence: result.totalPence ?? null }];
   }
-  // A travel booking names the journey in its subject and nowhere as an item: the journey is what was bought.
-  if (!result.items.length) {
-    const j = JOURNEY.exec(subject || "");
-    if (j) result.items = [{ name: `${j[2].trim()} to ${j[3].trim()}${j[1] ? " (return)" : ""}`, qty: 1, pricePence: result.totalPence ?? null }];
+  // A travel booking names the journey in its subject: the journey is what was bought (its fare lines, "Anytime Day Return",
+  // "1 Adult", are not things).
+  const journey = !isFlight && !gameShop ? JOURNEY.exec(subject || "") : null;
+  if (journey) result.items = [{ name: `${journey[2].trim()} to ${journey[3].trim()}${journey[1] ? " (return)" : ""}`, qty: 1, pricePence: result.totalPence ?? null }];
+  // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
+  // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
+  const otherPart = text === fromHtml ? plain : fromHtml;
+  if (!isFlight && !journey && !gameShop) {
+    const cands = [];
+    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
+    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
+    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
+    cands.push({ items: result.items, money: moneyOf(text) });
+    if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
+    if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
+    // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
+    if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
+    const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money }));
+    const gap = (c) => (c.check.missingPence == null ? Infinity : Math.abs(c.check.missingPence));
+    const pick = settled.find((c) => c.items.length && c.check.complete) ||
+      settled.filter((c) => c.items.length).sort((a, b) => gap(a) - gap(b))[0] || settled[settled.length - 1 - (settled.length > 3 ? settled.length - 3 : 0)] || settled[0];
+    // When the older readings found the very same items, their copy is kept (the same fields as before for everything they
+    // already read right).
+    const same = (a, b) => a.length === b.length && a.every((x, k) => String(x.name).toLowerCase() === String(b[k].name).toLowerCase() && (x.qty || 1) === (b[k].qty || 1) && lineOf(x) === lineOf(b[k]));
+    const older = settled[cands.findIndex((c) => c.items === result.items)];
+    const chosen = older && older !== pick && older.check.complete && same(older.items, pick.items) ? older : pick;
+    // (For one of something the price is the line's either way, so a new reading doesn't say which.)
+    result.items = chosen.items.map(({ extras, ...i }) => { if (chosen !== older && (i.qty || 1) === 1 && i.lineTotal) delete i.lineTotal; return i; });
+    result.itemsCheck = pick.check;
+  } else {
+    result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
   }
+  const stated = statedItemCount(text) ?? (otherPart ? statedItemCount(otherPart) : null);
+  if (stated) result.itemCount = stated;
   if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }

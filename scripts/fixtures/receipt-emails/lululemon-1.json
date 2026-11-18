@@ -1,0 +1,40 @@
+{
+ "id": "lululemon-1",
+ "sender": "lululemon",
+ "layout": "product blocks",
+ "headers": {
+  "from": "lululemon <orders@e.lululemon.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Sat, 31 Oct 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>lululemon</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.lululemon.co.uk/?utm_source=email\"><img src=\"https://www.lululemon.co.uk/static/email/logo.png\" alt=\"lululemon\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: UK1234567890</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 31 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.lululemon.co.uk/products/align-high-rise-pant-25-.jpg\" alt=\"Align High-Rise Pant 25\"\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Align High-Rise Pant 25\"</p><p style=\"margin:2px 0\" class=\"muted\">Colour: Black</p><p style=\"margin:2px 0\" class=\"muted\">Size: 8</p><p style=\"margin:2px 0\" class=\"muted\">Quantity: 1</p><p style=\"margin:6px 0 0 0\">£98.00</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.lululemon.co.uk/products/define-jacket-nulu.jpg\" alt=\"Define Jacket Nulu\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Define Jacket Nulu</p><p style=\"margin:2px 0\" class=\"muted\">Colour: Black</p><p style=\"margin:2px 0\" class=\"muted\">Size: 8</p><p style=\"margin:2px 0\" class=\"muted\">Quantity: 1</p><p style=\"margin:6px 0 0 0\">£118.00</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.lululemon.co.uk/products/everywhere-belt-bag-1l.jpg\" alt=\"Everywhere Belt Bag 1L\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Everywhere Belt Bag 1L</p><p style=\"margin:2px 0\" class=\"muted\">Colour: Black</p><p style=\"margin:2px 0\" class=\"muted\">Size: 8</p><p style=\"margin:2px 0\" class=\"muted\">Quantity: 1</p><p style=\"margin:6px 0 0 0\">£38.00</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£254.00</td></tr><tr><td>Shipping</td><td>Free</td></tr><tr><td><strong>Total</strong></td><td><strong>£254.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 lululemon. All rights reserved.<br /><a href=\"https://www.lululemon.co.uk/help\">Help</a> | <a href=\"https://www.lululemon.co.uk/privacy\">Privacy</a> | <a href=\"https://www.lululemon.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.lululemon.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "lululemon",
+  "date": "2026-10-31",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Align High-Rise Pant 25\"",
+    "qty": 1,
+    "linePence": 9800
+   },
+   {
+    "name": "Define Jacket Nulu",
+    "qty": 1,
+    "linePence": 11800
+   },
+   {
+    "name": "Everywhere Belt Bag 1L",
+    "qty": 1,
+    "linePence": 3800
+   }
+  ],
+  "subtotalPence": 25400,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 25400
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "id": "hm-2",
+ "sender": "H&M",
+ "layout": "text",
+ "headers": {
+  "from": "H&M <info@email.hm.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your H&M order confirmation",
+  "date": "Tue, 03 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "H&M\nOrder number: 60012345690\nOrder date: 03/11/2026\n\nPuffer Jacket\nArt. no. 1011234002\nQuantity: 1\n£49.99\n\nOrder value £49.99\nDelivery Free\nTotal £49.99",
+ "expected": {
+  "shop": "H&M",
+  "date": "2026-11-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Puffer Jacket",
+    "qty": 1,
+    "linePence": 4999
+   }
+  ],
+  "subtotalPence": 4999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4999
+ }
+}

@@ -11,7 +11,7 @@ export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCas
 
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
 // Words senders add after the shop's name: "Swarovski Customer Service GB", "Tempur UK Consumer Support", "The Buyagift Team".
-const NAME_TAIL = /\s*(?:[-–|:,]\s*)?(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|online\s+(?:store|shop)|digital\s+edition|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
+const NAME_TAIL = /\s*(?:[-–|:,]\s*)?(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|transactions?|online\s+(?:store|shop)|digital\s+edition|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
 const COUNTRY_TAIL = /\s+(?:uk|gb|eu|ie|united kingdom)$/i;
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu;
 const GENERIC_NAME = /^(orders?|order confirmation|receipts?|your receipt|no-?reply|noreply|do not reply|donotreply|info|hello|hi|team|support|customer service|customer services|sales|shop|store|notifications?|alerts?|updates?|accounts?|billing|payments?|admin|mailer|newsletter)$/i;
@@ -215,7 +215,8 @@ export function cleanItem(item) {
   let name = item.name.replace(/\s+\|\s*$/, "").replace(/[ \t]+/g, " ").trim();
   let qty = item.qty;
   // "Chocolate Brown                1": the quantity column ran into the name.
-  const tail = item.name.match(/\s{2,}(\d{1,2})\s*$/) || name.match(/\s+[x×]\s?(\d{1,2})$/i);
+  // (Not when the item's own quantity was given apart from its name: "Screen Protector x2" over "Quantity: 2" is a 2-pack.)
+  const tail = item.keepName ? null : item.name.match(/\s{2,}(\d{1,2})\s*$/) || name.match(/\s+[x×]\s?(\d{1,2})$/i);
   if (tail) { name = name.slice(0, name.length - tail[0].trim().length).trim(); if (!qty || qty === 1) qty = Number(tail[1]) || qty; }
   name = name.replace(/\s*[-–:|]+$/, "").trim();
   if (letters(name).replace(/[0-9]/g, "").length < 2) return null;
@@ -225,7 +226,8 @@ export function cleanItem(item) {
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
   if (/@|https?:|www\./i.test(name)) return null;
-  return { ...item, name, qty: qty || 1 };
+  const { keepName, ...rest } = item;
+  return { ...rest, name, qty: qty || 1 };
 }
 export function cleanItems(items) {
   return (Array.isArray(items) ? items : []).map(cleanItem).filter(Boolean);

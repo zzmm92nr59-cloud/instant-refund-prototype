@@ -1,0 +1,40 @@
+{
+ "id": "dominos-2",
+ "sender": "Domino's",
+ "layout": "plain text",
+ "headers": {
+  "from": "Domino's Pizza <orders@dominos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Domino's order",
+  "date": "Mon, 09 Nov 2026 19:06:00 +0000"
+ },
+ "html": "",
+ "text": "Domino's Pizza\n\nOrder confirmation\nOrder number: 412-0087\nPlaced: 9 November 2026 at 19:05\n\n1 x Medium Vegi Supreme (Classic Crust) - £17.99\n1 x Potato Wedges - £5.49\n1 x Coca-Cola Zero Sugar 1.25L - £2.99\n\nSubtotal £26.47\nDelivery charge £1.99\nTotal to pay £28.46\n\nPaid online by card",
+ "expected": {
+  "shop": "Domino's",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Medium Vegi Supreme (Classic Crust)",
+    "qty": 1,
+    "linePence": 1799
+   },
+   {
+    "name": "Potato Wedges",
+    "qty": 1,
+    "linePence": 549
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 1.25L",
+    "qty": 1,
+    "linePence": 299
+   }
+  ],
+  "subtotalPence": 2647,
+  "feesPence": 199,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2846
+ }
+}

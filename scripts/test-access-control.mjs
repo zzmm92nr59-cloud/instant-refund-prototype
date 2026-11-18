@@ -106,7 +106,7 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
   const before = JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id));
   const tries = [["GET", "/original"], ["GET", "/image"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
     ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }],
-    ["GET", "/share"], ["POST", "/share", { note: "mine now" }], ["POST", "/return-sent", { trackingNumber: "KO123456789GB" }], ["GET", "/return-parcel"]];
+    ["GET", "/share"], ["POST", "/share", { note: "mine now" }], ["POST", "/return-sent", { trackingNumber: "KO123456789GB" }], ["GET", "/return-parcel"], ["POST", "/reread", {}]];
   for (const [method, end, body] of tries) {
     const res = await call("/relay/my/receipts/" + id + end, { method, auth: "Bearer " + bob, body });
     assert.ok(res.status === 404 || res.status === 403, method + " " + end + " by someone else → " + res.status);

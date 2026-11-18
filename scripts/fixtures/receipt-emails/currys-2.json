@@ -1,0 +1,30 @@
+{
+ "id": "currys-2",
+ "sender": "Currys",
+ "layout": "text",
+ "headers": {
+  "from": "Currys <orders@currys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Currys order confirmation",
+  "date": "Wed, 14 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Currys\nOrder number: 4400112299\n14 October 2026\n\n1 x APPLE iPad 10.9\" (2022) - 64 GB, Blue £329.00\n\nSubtotal £329.00\nDelivery FREE\nTotal £329.00",
+ "expected": {
+  "shop": "Currys",
+  "date": "2026-10-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "APPLE iPad 10.9\" (2022) - 64 GB, Blue",
+    "qty": 1,
+    "linePence": 32900
+   }
+  ],
+  "subtotalPence": 32900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 32900
+ }
+}

@@ -949,6 +949,9 @@
     ".rl-rr-chip{font-size:13px;font-weight:800;padding:3px 8px;border-radius:999px}.rl-rr-chip.green{background:var(--rl-accent-bg);color:var(--rl-accent)}.rl-rr-chip.amber{background:#ffefc9;color:#77520a}.rl-rr-chip.red{background:#fde0dd;color:#b3261e}" +
     // An opened receipt: when to return it and why, the shop's returns page, small buttons in a row, one question, its group.
     ".rl-ret{display:flex;flex-direction:column;gap:4px}.rl-ret+.rl-ret{margin-top:16px}" +
+    // "Relay may have missed some items on this receipt" (missedBox): one soft box, its two buttons side by side when they fit.
+    ".rl-miss{margin:0 0 14px;padding:14px 16px;border-radius:16px;background:var(--rl-accent-bg)}.rl-miss-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}" +
+    ".rl-miss-acts .rl-btn{flex:1 1 140px;width:auto;min-height:44px;margin:0}" +
     ".rl-ret-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.rl-ret-h{font-size:17px;font-weight:700;line-height:1.3;color:var(--rl-text)}" +
     ".rl-ret-why{display:block;font-size:14px;line-height:1.45;color:var(--rl-text2)}" +
     ".rl-ret-go span{color:inherit;font-size:inherit}.rl-order .rl-rr-chip{font-size:13px}.rl-po-ship .rl-jic{color:inherit}" +
@@ -3354,6 +3357,9 @@
     }
     var dv = x.delivery;
     if (!slim && dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) card.appendChild(shipLine(dv));
+    // The totals check (worker/receipt-items.js): when the items Relay read don't add up to what the email says they came to,
+    // the receipt says so plainly, never shows a short list as if it were all, and offers the email and "Read it again".
+    if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && x.itemsCheck.complete === false && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
@@ -3492,6 +3498,58 @@
     chk.appendChild(no); chk.appendChild(yes);
     card.appendChild(chk);
     return card;
+  }
+  // "Relay may have missed some items on this receipt": the email itself, and "Read it again" (worker/receipt-reread.js),
+  // which reads that one email once more, with Relay's rules and then, only if they still don't add up, the AI. What it
+  // finds is kept only when it adds up. A receipt pasted in has no email to read again: it can be fixed by hand.
+  function missedBox(x, refresh) {
+    var none = !(x.items || []).filter(function (i) { return i && i.name; }).length;
+    var box = el("div", { className: "rl-ret rl-miss" });
+    box.appendChild(el("b", { className: "rl-ret-h", text: none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
+    var short = x.itemsCheck.missingPence;
+    if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));
+    else if (none && x.itemCount) box.appendChild(el("span", { className: "rl-ret-why", text: "The email says " + (x.itemCount === 1 ? "1 item" : x.itemCount + " items") + "." }));
+    var note = el("div", { className: "rl-msg", role: "status" });
+    var row = el("div", { className: "rl-miss-acts" });
+    var fixBtn = function () { return el("button", { type: "button", className: "rl-btn ghost", text: "Fix it yourself", onclick: function () { fixSheet(x, function () { refresh("fix"); }); } }); };
+    if (mailRef(x)) {
+      var again = el("button", { type: "button", className: "rl-btn", text: "Read it again" });
+      again.onclick = function () {
+        if (again.disabled) return;
+        again.disabled = true; again.textContent = "Reading it again…"; say(note, "");
+        api("/relay/my/receipts/" + x.id + "/reread", { method: "POST", body: {} }).then(function (r) {
+          again.disabled = false; again.textContent = "Read it again";
+          var e = r.body && r.body.error;
+          if (!r.ok) return say(note, r.status === 429 ? "You've asked for a lot of receipts to be read again today. Try again tomorrow."
+            : e === "gmail_not_connected" ? "The inbox this receipt came from isn't connected any more."
+            : e === "email_not_found" ? "This email isn't in your inbox any more. You can fix the receipt yourself."
+            : e === "consent_required" ? "Relay needs your permission to read your emails first. Turn it on under Inboxes."
+            : "Couldn't read it again just now. Try again in a moment.", true);
+          if (r.body && r.body.complete) {
+            x.items = r.body.items || x.items; x.itemsCheck = r.body.itemsCheck;
+            var n = (x.items || []).length;
+            box.textContent = "";
+            box.appendChild(el("b", { className: "rl-ret-h", text: n === 1 ? "Relay has the item now." : "Relay has all " + n + " items now." }));
+            if (refresh) refresh("reread");
+            return;
+          }
+          say(note, r.body && r.body.reason === "busy" ? "Relay couldn't finish reading it just now. Try again in a moment."
+            : "Relay still can't read every item on this one. See the email for the full list, or fix it yourself.", true);
+          if (!row.querySelector(".rl-miss-fix")) { var f = fixBtn(); f.classList.add("rl-miss-fix"); row.appendChild(f); }
+        }, function () { again.disabled = false; again.textContent = "Read it again"; say(note, "Couldn't reach Relay. Check your connection.", true); });
+      };
+      row.appendChild(again);
+      // (On Home the receipts page hasn't set openOriginal up yet: the email opens in a sheet of its own.)
+      row.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "See the email", onclick: function () {
+        if (openOriginal) openOriginal(x.id); else open(function (sh) { originalView(sh, x.id, close); }); } }));
+    } else row.appendChild(fixBtn());
+    box.appendChild(row); box.appendChild(note);
+    return box;
+  }
+  // What a receipt with no item names is called: how many things the email says it has, or the order from the shop.
+  function noItemsTitle(x) {
+    var n = Number(x && x.itemCount);
+    return n > 1 ? n + " items" : n === 1 ? "1 item" : "Order from " + ((x && x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop");
   }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
   function shipWords(dv, short) {
@@ -8863,7 +8921,7 @@
   }
   function receiptTitle(x) {
     var items = (x.items || []).filter(function (i) { return i.name; });
-    if (!items.length) return "Order from " + ((x.retailer && x.retailer.name) || "this shop");
+    if (!items.length) return noItemsTitle(x);
     return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
   }
   // ---- Return tracking (worker/return-tracking.js) ----
@@ -9071,7 +9129,7 @@
     var count = one && (x.items || []).length > 1 ? x.items.length : 0;
     // What it is, with the price; under it the shop. Without an item name, the shop is the title and the order day goes under.
     var title = itemName || who;
-    var under = itemName ? who + (count ? ", 1 of " + count + " in this order" : "") : date ? "Ordered " + date : "";
+    var under = itemName ? who + (count ? ", 1 of " + count + " in this order" : "") : x.itemCount ? noItemsTitle(x) + (date ? ", ordered " + date : "") : date ? "Ordered " + date : "";
     var info = el("div", { className: "rl-po-info" }, [
       el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: title }), el("div", { className: "rl-po-price", text: price })]),
       el("div", { className: "rl-po-meta", text: under })]);
@@ -10154,11 +10212,11 @@
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p && !rt;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
         noReturn: x.returnable === false && !(x.returnableItems || []).length, digital: x.category === "digital",
-        title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who };
+        title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x) };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
-        : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
+        : [{ name: named.length ? named[0].name : noItemsTitle(x), price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
       // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.
       if (rt) {
         e.line = retLine(x); e.returning = rt.state !== "refunded"; e.swaps = e.returning; e.rank = e.returning ? 1 : 2; e.nudge = Boolean(rt.refundNotSeen);

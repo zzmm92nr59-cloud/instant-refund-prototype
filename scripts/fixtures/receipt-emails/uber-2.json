@@ -1,0 +1,30 @@
+{
+ "id": "uber-2",
+ "sender": "Uber",
+ "layout": "text, airport surcharge, promotion",
+ "headers": {
+  "from": "Uber Receipts <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Thursday morning trip with Uber",
+  "date": "Thu, 05 Nov 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Uber\nThanks for riding, Sam\n5 November 2026\nTotal £24.85\n\nTrip fare £22.10\nBooking fee £1.75\nAirport surcharge £6.00\nPromotion -£5.00\n\nPayments\nVisa ••••1234 £24.85",
+ "expected": {
+  "shop": "Uber",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Trip fare",
+    "qty": 1,
+    "linePence": 2210
+   }
+  ],
+  "subtotalPence": 2210,
+  "feesPence": 775,
+  "discountsPence": 500,
+  "tipsPence": 0,
+  "totalPence": 2485
+ }
+}

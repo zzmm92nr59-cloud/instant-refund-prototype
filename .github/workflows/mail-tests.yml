@@ -14,6 +14,7 @@ on:
       - 'scripts/test-wrapped-journeys.mjs'
       - 'scripts/test-flights.mjs'
       - 'scripts/fixtures/flight-emails.mjs'
+      - 'scripts/fixtures/receipt-emails/**'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
@@ -35,6 +36,7 @@ on:
       - 'scripts/test-wrapped-journeys.mjs'
       - 'scripts/test-flights.mjs'
       - 'scripts/fixtures/flight-emails.mjs'
+      - 'scripts/fixtures/receipt-emails/**'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
@@ -58,6 +60,8 @@ jobs:
       - name: Reading receipts (items, shop names, groups, forwarded emails)
         run: |
           node scripts/test-receipt-parser.mjs
+          node scripts/test-receipt-corpus.mjs
+          node scripts/test-receipt-reread.mjs
           node scripts/test-receipt-reader.mjs
           node scripts/test-receipt-category.mjs
           node scripts/test-wrapped.mjs

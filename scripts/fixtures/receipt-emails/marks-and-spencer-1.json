@@ -1,0 +1,40 @@
+{
+ "id": "marks-and-spencer-1",
+ "sender": "M&S",
+ "layout": "product blocks",
+ "headers": {
+  "from": "M&S <noreply@marksandspencer.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your M&S order",
+  "date": "Sun, 25 Oct 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>M&amp;S</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.marksandspencer.com/?utm_source=email\"><img src=\"https://www.marksandspencer.com/static/email/logo.png\" alt=\"M&amp;S\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 1234567890ABC</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>25 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.marksandspencer.com/products/pure-cotton-slim-fit-shirt.jpg\" alt=\"Pure Cotton Slim Fit Shirt\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Pure Cotton Slim Fit Shirt</p><p style=\"margin:2px 0\" class=\"muted\">Qty: 1</p><p style=\"margin:6px 0 0 0\">£25.00</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.marksandspencer.com/products/supersoft-fleece-throw.jpg\" alt=\"Supersoft Fleece Throw\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Supersoft Fleece Throw</p><p style=\"margin:2px 0\" class=\"muted\">Qty: 1</p><p style=\"margin:6px 0 0 0\">£35.00</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"130\" valign=\"top\"><img src=\"https://images.marksandspencer.com/products/percy-pig-fruit-gums-170g.jpg\" alt=\"Percy Pig Fruit Gums 170g\" width=\"120\" height=\"150\" /></td><td valign=\"top\"><p style=\"font-weight:bold;margin:0\">Percy Pig Fruit Gums 170g</p><p style=\"margin:2px 0\" class=\"muted\">Qty: 3</p><p style=\"margin:6px 0 0 0\">£3.75</p></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£63.75</td></tr><tr><td>Delivery</td><td>£4.50</td></tr><tr><td><strong>Total</strong></td><td><strong>£68.25</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 M&amp;S. All rights reserved.<br /><a href=\"https://www.marksandspencer.com/help\">Help</a> | <a href=\"https://www.marksandspencer.com/privacy\">Privacy</a> | <a href=\"https://www.marksandspencer.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.marksandspencer.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "M&S",
+  "date": "2026-10-25",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Pure Cotton Slim Fit Shirt",
+    "qty": 1,
+    "linePence": 2500
+   },
+   {
+    "name": "Supersoft Fleece Throw",
+    "qty": 1,
+    "linePence": 3500
+   },
+   {
+    "name": "Percy Pig Fruit Gums 170g",
+    "qty": 3,
+    "linePence": 375
+   }
+  ],
+  "subtotalPence": 6375,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6825
+ }
+}

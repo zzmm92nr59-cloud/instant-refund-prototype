@@ -1,0 +1,43 @@
+{
+ "id": "apple-store-1",
+ "sender": "Apple Store",
+ "layout": "online store order: product blocks with qty",
+ "headers": {
+  "from": "Apple Store <order_acknowledgment@orders.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "We're processing your order W1234567890",
+  "date": "Fri, 13 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Apple Store</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.apple.com/?utm_source=email\"><img src=\"https://www.apple.com/static/email/logo.png\" alt=\"Apple Store\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>Thanks for your order.</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order Number: W1234567890</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Ordered on: 13 Nov 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>iPhone 17 256GB Black</td><td>Qty 1</td><td>£899.00</td></tr><tr><td>iPhone 17 Clear Case with MagSafe</td><td>Qty 1</td><td>£49.00</td></tr><tr><td>AppleCare+ for iPhone 17</td><td>Qty 1</td><td>£129.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£1,077.00</td></tr><tr><td>Delivery</td><td>FREE</td></tr><tr><td><strong>Total</strong></td><td><strong>£1,077.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Apple Store. All rights reserved.<br /><a href=\"https://www.apple.com/help\">Help</a> | <a href=\"https://www.apple.com/privacy\">Privacy</a> | <a href=\"https://www.apple.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.apple.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Apple Store",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "iPhone 17 256GB Black",
+    "qty": 1,
+    "linePence": 89900
+   },
+   {
+    "name": "iPhone 17 Clear Case with MagSafe",
+    "qty": 1,
+    "linePence": 4900
+   },
+   {
+    "name": "AppleCare+ for iPhone 17",
+    "qty": 1,
+    "linePence": 12900
+   }
+  ],
+  "subtotalPence": 107700,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 107700,
+  "shopAlso": [
+   "Apple"
+  ]
+ }
+}

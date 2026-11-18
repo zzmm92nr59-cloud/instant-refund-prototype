@@ -1,0 +1,30 @@
+{
+ "id": "trainline-2",
+ "sender": "Trainline",
+ "layout": "return trip in the subject, text",
+ "headers": {
+  "from": "Trainline <auto-confirm@info.thetrainline.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation for return trip York to Edinburgh (5 December at 09:10)",
+  "date": "Mon, 09 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Trainline\nBooking reference: TL7XQ3AB\n9 November 2026\n\n2 Adults\nAdvance Single x 2\nTotal paid £45.10",
+ "expected": {
+  "shop": "Trainline",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "York to Edinburgh (return)",
+    "qty": 1,
+    "linePence": 4510
+   }
+  ],
+  "subtotalPence": 4510,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4510
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "id": "just-eat-3",
+ "sender": "Just Eat",
+ "layout": "plain text only, 2x prices after dots, indented + extras",
+ "headers": {
+  "from": "Just Eat <noreply@t.just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order with Napoli Express",
+  "date": "Tue, 17 Nov 2026 20:13:02 +0000"
+ },
+ "html": "",
+ "text": "Hi Sam,\n\nThanks for ordering from Napoli Express on Just Eat.\nOrder number: 1851009933\nOrder placed: 17/11/2026 20:12\n\nYOUR ORDER\n------------------------------\n1x Large Margherita ........ £11.99\n   + Stuffed crust\n2x Garlic Bread with Cheese ........ £9.00\n1x Chicken Wings (8) ........ £6.99\n   + BBQ sauce\n1x Coca-Cola 1.25L ........ £2.99\n------------------------------\nSubtotal: £30.97\nDelivery fee: Free\nService charge: £0.99\nSmall order fee: Free\nTotal: £31.96\n\nPayment: Apple Pay\n\nEnjoy your meal!\nThe Just Eat team",
+ "expected": {
+  "shop": "Just Eat",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Large Margherita",
+    "qty": 1,
+    "linePence": 1199,
+    "extras": [
+     "Stuffed crust"
+    ]
+   },
+   {
+    "name": "Garlic Bread with Cheese",
+    "qty": 2,
+    "linePence": 900
+   },
+   {
+    "name": "Chicken Wings (8)",
+    "qty": 1,
+    "linePence": 699,
+    "extras": [
+     "BBQ sauce"
+    ]
+   },
+   {
+    "name": "Coca-Cola 1.25L",
+    "qty": 1,
+    "linePence": 299
+   }
+  ],
+  "subtotalPence": 3097,
+  "feesPence": 99,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3196
+ }
+}

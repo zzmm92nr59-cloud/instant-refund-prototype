@@ -23,7 +23,8 @@ import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
 import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
-import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads } from "./ai-reader.js";
+import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
+import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
@@ -107,7 +108,10 @@ const OUTLOOK_FULL_REV = 1;
 // 13: flight bookings from airlines and travel sites (flight-booking.js: "Your booking is confirmed", "Ryanair Travel
 // Itinerary", "Your e-ticket receipt"), each flight read with its airports, day and flight number; check-in reminders and
 // boarding passes left out. The search also asks for "travel confirmation", "flight confirmation" and e-ticket subjects.
-const READER_FULL_REV = 13;
+// 14: every item on an order email (receipt-items.js): items whose extras sit between the name and the price (a takeaway's
+// "+ Egg Fried Rice") are no longer skipped, and each receipt carries a totals check (itemsCheck) saying whether its items
+// add up to what the email says; forwarded receipts read as the original; line ends as sent ("\r\n") no longer hide shops.
+const READER_FULL_REV = 14;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -126,7 +130,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 31;
+export const PARSER_VERSION = 32;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -241,6 +245,8 @@ async function ensureGmailTablesRun(db) {
     SHARED_EMAILS_SQL,
     // "AI help" (ai-reader.js): who switched it on, and what the AI read from emails the rules weren't sure about.
     AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
+    // "Read it again" (receipt-reread.js): counts only, for its limits.
+    REREADS_SQL,
     // Live parcel tracking (parcel-tracking.js): what the carrier said about a parcel, and how many new parcels this month.
     PARCEL_TRACKS_SQL, PARCEL_USES_SQL,
     // Return tracking (return-tracking.js): "I've sent it back" and the return's tracking number, as the shopper gave them.
@@ -280,6 +286,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_rereads WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
@@ -571,6 +578,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_rereads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM return_tracks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM captured_receipts WHERE shopper_id = ? AND ${pick}`).bind(...args)];
 }
@@ -622,6 +630,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_rereads WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM ai_reading WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
@@ -800,6 +809,9 @@ function classify(rawText, ref, lenient = false) {
       kind: "receipt", ...ref,
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, orderDateFrom: receipt.orderDateFrom || null, currency: receipt.currency,
       totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence, sentTo: receipt.sentTo || null,
+      // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
+      // email itself says the order has, when it says. The app says plainly when items may be missing.
+      itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
       // A flight booking's flights (airport codes, day, flight number, out or back): for the receipt and for Wrapped.
       ...(receipt.flights ? { flights: receipt.flights } : {}),
@@ -1249,6 +1261,10 @@ async function tellScanDone(env, shopperId, found, o) {
 export async function hiddenCopyOf(env, shopper, d, fetchImpl) {
   const got = await readReceiptEmail(env, shopper.id, d, fetchImpl);
   if (!got.raw) return got;
+  return hiddenCopyFromRaw(env, shopper, got.raw);
+}
+async function hiddenCopyFromRaw(env, shopper, raw) {
+  const got = { raw };
   const db = env.RELAY_DB;
   const prof = await db.prepare("SELECT name FROM shopper_profiles WHERE shopper_id = ?").bind(shopper.id).first().catch(() => null);
   const boxes = (await db.prepare("SELECT google_email AS e FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopper.id, shopper.id + "~%").all()).results || [];
@@ -1442,7 +1458,7 @@ export function mergeOrderEmails(orders) {
       // The currency goes with the amount: a total taken from another email of the order is in that email's currency.
       if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = o.currency || c.currency; }
       if (!c.orderDate && o.orderDate) c.orderDate = o.orderDate;
-      if (!c.items.length && (o.items || []).length) c.items = o.items.map(i => ({ ...i }));
+      if (!c.items.length && (o.items || []).length) { c.items = o.items.map(i => ({ ...i })); if (o.itemsCheck) c.itemsCheck = o.itemsCheck; }
       for (const it of c.items) {
         const twin = (o.items || []).find(x => x.name === it.name);
         if (!twin) continue;
@@ -2264,6 +2280,48 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       .bind(crypto.randomUUID(), shopper.id, shr[1], copy.domain || (d.retailer && d.retailer.domain) || null, Number(d.parserVersion) || 0, sealed.iv, sealed.data, now, until).run();
     return json({ ok: true, sent: { at: iso(now), until: iso(until) } }, 200, cors);
   }
+  // "Read it again" (receipt-reread.js): a receipt whose items don't add up is read once more from its inbox, on the shopper's
+  // tap. Rules first, with a wider pass; then, if they still don't add up and the AI is set up, Claude reads the order section
+  // with personal details hidden. Items are only kept when they add up. Their own receipts only (anyone else's answers 404).
+  const rr = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/reread$/.exec(path);
+  if (rr && m === "POST") {
+    const db = env.RELAY_DB, now = opts.now || Date.now();
+    await ensureGmailTables(db);
+    if (!(await hasConsent(db, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+    const rec = await db.prepare("SELECT id, details FROM captured_receipts WHERE id = ? AND shopper_id = ? AND status NOT IN ('dismissed','not_receipt')").bind(rr[1], shopper.id).first();
+    if (!rec) return json({ error: "not_found" }, 404, cors);
+    let d = {}; try { d = JSON.parse(rec.details) || {}; } catch { d = {}; }
+    if ((d.kind || "receipt") !== "receipt") return json({ error: "not_found" }, 404, cors);
+    if (!d.gmailId && !d.outlookId) return json({ error: "no_email" }, 409, cors);
+    const used = await rereadsUsed(db, shopper.id, now);
+    if (used.mine >= REREADS_PER_DAY) return json({ error: "too_many_requests" }, 429, cors);
+    const got = await readReceiptEmail(env, shopper.id, d, opts.fetchImpl);
+    if (!got.raw) return json({ error: got.error }, got.status, cors);
+    const log = (ai, outcome) => db.prepare("INSERT INTO receipt_rereads (shopper_id, receipt_id, ai, outcome, created_at) VALUES (?,?,?,?,?)").bind(shopper.id, rr[1], ai ? 1 : 0, outcome, now).run();
+    const save = async (patch) => { const next = { ...d, ...patch, rereadAt: now }; await db.prepare("UPDATE captured_receipts SET details = ? WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(next), rr[1], shopper.id).run(); return next; };
+    const reply = (next, via) => json({ ok: true, complete: Boolean(next.itemsCheck && next.itemsCheck.complete), via, items: next.items || [], itemsCheck: next.itemsCheck || null,
+      totalPence: next.totalPence == null ? null : next.totalPence, itemCount: next.itemCount || null }, 200, cors);
+    // 1. The rules, with every reading tried on both parts of the email.
+    const r = parseReceiptEmail(got.raw, { lenient: true, wide: true });
+    if (r.ok && r.itemsCheck && r.itemsCheck.complete) {
+      const next = await save({ items: r.items, itemsCheck: r.itemsCheck, ...(d.totalPence == null && r.totalPence != null ? { totalPence: r.totalPence, currency: r.currency } : {}), ...(r.itemCount ? { itemCount: r.itemCount } : {}), itemsFrom: "rules" });
+      await log(false, "rules");
+      return reply(next, "rules");
+    }
+    // 2. Claude, on the order section only, with personal details hidden.
+    if (aiAvailable(env) && used.mineAi < REREAD_AI_PER_DAY && used.allAi < REREAD_AI_ALL_DAY) {
+      const copy = await hiddenCopyFromRaw(env, shopper, got.raw);
+      const section = orderSection(copy.copy && copy.copy.text);
+      const total = d.totalPence ?? (r.ok ? r.totalPence : null);
+      const ans = section ? await askForItems(env, section, opts.fetchImpl) : { error: "unreadable" };
+      const kept = ans.reading ? acceptAiItems(ans.reading, section, total) : null;
+      await log(true, kept ? "ai" : ans.error || "didnt_add_up");
+      if (kept) return reply(await save({ items: kept.items, itemsCheck: kept.check, itemsFrom: "ai", ...(d.totalPence == null && total != null ? { totalPence: total, currency: d.currency || "GBP" } : {}) }), "ai");
+      return json({ ok: true, complete: false, via: null, reason: ans.error === "ai_busy" || ans.error === "ai_unreachable" ? "busy" : "not_sure", items: d.items || [], itemsCheck: d.itemsCheck || null }, 200, cors);
+    }
+    await log(false, "not_sure");
+    return json({ ok: true, complete: false, via: null, reason: "not_sure", items: d.items || [], itemsCheck: d.itemsCheck || null }, 200, cors);
+  }
   // A receipt the shopper pasted in (an order email from any inbox): read like a scanned one and kept in Receipts. Only the
   // details read from it are kept, never the email itself. The same email pasted twice is kept once.
   if (path === "/relay/my/receipts/add-pasted" && m === "POST") {
@@ -2302,6 +2360,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       env.RELAY_DB.prepare("DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
+      env.RELAY_DB.prepare("DELETE FROM receipt_rereads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
     // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
     const b = await request.json().catch(() => ({}));

@@ -1,0 +1,55 @@
+{
+ "id": "deliveroo-3",
+ "sender": "Deliveroo",
+ "layout": "grocery basket, plain text",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Deliveroo order receipt",
+  "date": "Fri, 13 Nov 2026 11:02:00 +0000"
+ },
+ "html": "",
+ "text": "Thanks for your order!\nCo-op - Headingley\nOrder #22918\nOrdered 13 November 2026\n\n2 x Co-op Semi Skimmed Milk 2 Pints £2.90\n1 x Warburtons Toastie White Bread 800g £1.75\n1 x Lurpak Spreadable Butter 500g £5.25\n4 x Heinz Baked Beans 415g £5.60\n1 x Co-op British Free Range Eggs 6 Pack £2.30\n1 x Walkers Ready Salted Crisps 6x25g £2.25\n\nSubtotal £20.05\nDelivery fee £3.49\nService fee £0.99\nBag fee £0.10\nTotal £24.63\n\nDeliveroo",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Co-op Semi Skimmed Milk 2 Pints",
+    "qty": 2,
+    "linePence": 290
+   },
+   {
+    "name": "Warburtons Toastie White Bread 800g",
+    "qty": 1,
+    "linePence": 175
+   },
+   {
+    "name": "Lurpak Spreadable Butter 500g",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Heinz Baked Beans 415g",
+    "qty": 4,
+    "linePence": 560
+   },
+   {
+    "name": "Co-op British Free Range Eggs 6 Pack",
+    "qty": 1,
+    "linePence": 230
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6x25g",
+    "qty": 1,
+    "linePence": 225
+   }
+  ],
+  "subtotalPence": 2005,
+  "feesPence": 458,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2463
+ }
+}

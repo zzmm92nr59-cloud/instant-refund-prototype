@@ -1,0 +1,35 @@
+{
+ "id": "shopify-3",
+ "sender": "Shopify store",
+ "layout": "Shopify order confirmation: name × qty, variant, price",
+ "headers": {
+  "from": "Kind Skin Co <store+12345678@t.shopifyemail.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order #1051 confirmed",
+  "date": "Mon, 28 Sep 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Kind Skin Co</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.kindskin.test/?utm_source=email\"><img src=\"https://www.kindskin.test/static/email/logo.png\" alt=\"Kind Skin Co\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>Kind Skin Co</h2></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #1051</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>Thank you for your purchase!</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Hi Sam, we're getting your order ready to be shipped.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Order summary</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><img src=\"https://images.kindskin.test/products/gentle-cleansing-balm.jpg\" alt=\"Gentle Cleansing Balm\" width=\"120\" height=\"150\" /></td><td><span>Gentle Cleansing Balm &times; 1</span><br /><span class=\"muted\">100ml</span></td><td align=\"right\"><strong>£28.00</strong></td></tr><tr><td><img src=\"https://images.kindskin.test/products/hydrating-face-mist.jpg\" alt=\"Hydrating Face Mist\" width=\"120\" height=\"150\" /></td><td><span>Hydrating Face Mist &times; 1</span><br /><span class=\"muted\">50ml</span></td><td align=\"right\"><strong>£16.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£44.00</td></tr><tr><td>Shipping</td><td align=\"right\">£3.50</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£47.50</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>If you have any questions, reply to this email or contact us at hello@kindskin.test</p></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">Kind Skin Co, Unit 4 Example Works, Leeds LS2 7AA</td></tr>\n</table></td></tr></table>\n<img src=\"https://click.kindskin.test/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Kind Skin Co\nOrder #1051\nThank you for your purchase!\n\nOrder summary\nGentle Cleansing Balm × 1\n100ml\n£28.00\nHydrating Face Mist × 1\n50ml\n£16.00\n\nSubtotal\n£44.00\nShipping\n£3.50\nTotal\n£47.50",
+ "expected": {
+  "shop": "Kind Skin Co",
+  "date": "2026-09-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Gentle Cleansing Balm",
+    "qty": 1,
+    "linePence": 2800
+   },
+   {
+    "name": "Hydrating Face Mist",
+    "qty": 1,
+    "linePence": 1600
+   }
+  ],
+  "subtotalPence": 4400,
+  "feesPence": 350,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4750
+ }
+}

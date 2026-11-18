@@ -1,0 +1,30 @@
+{
+ "id": "boots-2",
+ "sender": "Boots",
+ "layout": "text",
+ "headers": {
+  "from": "Boots <noreply@boots.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Boots order confirmation",
+  "date": "Tue, 20 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Boots\nOrder number: 9876543299\n20 October 2026\n\n2 x Soltan Protect & Moisturise Lotion SPF30 200ml £12.00\n\nSubtotal £12.00\nClick & Collect Free\nTotal £12.00",
+ "expected": {
+  "shop": "Boots",
+  "date": "2026-10-20",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Soltan Protect & Moisturise Lotion SPF30 200ml",
+    "qty": 2,
+    "linePence": 1200
+   }
+  ],
+  "subtotalPence": 1200,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1200
+ }
+}

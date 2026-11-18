@@ -1,0 +1,30 @@
+{
+ "id": "lululemon-2",
+ "sender": "lululemon",
+ "layout": "text with qty 2 and unit price",
+ "headers": {
+  "from": "lululemon <orders@e.lululemon.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your lululemon order confirmation",
+  "date": "Fri, 30 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "lululemon\nOrder number: UK1234567901\n30 October 2026\n\nSwiftly Tech Short-Sleeve Shirt 2.0\nSize: M\nQty: 2\n£68.00 each\n£136.00\n\nSubtotal £136.00\nShipping Free\nTotal £136.00",
+ "expected": {
+  "shop": "lululemon",
+  "date": "2026-10-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Swiftly Tech Short-Sleeve Shirt 2.0",
+    "qty": 2,
+    "linePence": 13600
+   }
+  ],
+  "subtotalPence": 13600,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 13600
+ }
+}

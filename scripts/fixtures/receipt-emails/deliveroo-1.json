@@ -1,0 +1,54 @@
+{
+ "id": "deliveroo-1",
+ "sender": "Deliveroo",
+ "layout": "html 1x cells; text with name, extras and price on separate lines",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Deliveroo order from Wagamama",
+  "date": "Sun, 15 Nov 2026 18:33:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Deliveroo</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.deliveroo.co.uk/?utm_source=email\"><img src=\"https://www.deliveroo.co.uk/static/email/logo.png\" alt=\"Deliveroo\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>Your order's in!</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Wagamama Leeds is getting it ready.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number #1047</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>15 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1x</td><td>Katsu Chicken Curry<br /><span class=\"muted\" style=\"font-size:13px\">Add extra sauce</span></td><td align=\"right\">£11.50</td></tr><tr><td>2x</td><td>Yasai Gyoza</td><td align=\"right\">£11.90</td></tr><tr><td>1x</td><td>Chicken Ramen<br /><span class=\"muted\" style=\"font-size:13px\">No egg</span></td><td align=\"right\">£13.95</td></tr><tr><td>1x</td><td>Edamame<br /><span class=\"muted\" style=\"font-size:13px\">Chilli salt</span></td><td align=\"right\">£4.95</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£42.30</td></tr><tr><td>Delivery fee</td><td align=\"right\">£2.99</td></tr><tr><td>Service fee</td><td align=\"right\">£1.49</td></tr><tr><td>Rider tip</td><td align=\"right\">£1.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£47.78</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Deliveroo. All rights reserved.<br /><a href=\"https://www.deliveroo.co.uk/help\">Help</a> | <a href=\"https://www.deliveroo.co.uk/privacy\">Privacy</a> | <a href=\"https://www.deliveroo.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.deliveroo.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Your order's in!\nWagamama Leeds is getting it ready.\nOrder number #1047\n15 November 2026\n\n1x Katsu Chicken Curry\n  Add extra sauce\n£11.50\n2x Yasai Gyoza\n£11.90\n1x Chicken Ramen\n  No egg\n£13.95\n1x Edamame\n  Chilli salt\n£4.95\n\nSubtotal\n£42.30\nDelivery fee\n£2.99\nService fee\n£1.49\nRider tip\n£1.00\nTotal\n£47.78\n\nDeliveroo",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Katsu Chicken Curry",
+    "qty": 1,
+    "linePence": 1150,
+    "extras": [
+     "Add extra sauce"
+    ]
+   },
+   {
+    "name": "Yasai Gyoza",
+    "qty": 2,
+    "linePence": 1190
+   },
+   {
+    "name": "Chicken Ramen",
+    "qty": 1,
+    "linePence": 1395,
+    "extras": [
+     "No egg"
+    ]
+   },
+   {
+    "name": "Edamame",
+    "qty": 1,
+    "linePence": 495,
+    "extras": [
+     "Chilli salt"
+    ]
+   }
+  ],
+  "subtotalPence": 4230,
+  "feesPence": 448,
+  "discountsPence": 0,
+  "tipsPence": 100,
+  "totalPence": 4778
+ }
+}

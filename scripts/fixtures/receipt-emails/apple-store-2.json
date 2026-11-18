@@ -1,0 +1,38 @@
+{
+ "id": "apple-store-2",
+ "sender": "Apple Store",
+ "layout": "in-store receipt by email",
+ "headers": {
+  "from": "Apple Store <noreply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Apple Leeds",
+  "date": "Thu, 12 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Apple Leeds\nTrinity Leeds\n12 Nov 2026\nReceipt number: R123-456789\n\nAirPods 4\nQty 1\n£129.00\nUSB-C to Lightning Cable (1 m)\nQty 2\n£38.00\n\nTotal £167.00\nIncludes VAT of £29.50\nVisa .... 1234",
+ "expected": {
+  "shop": "Apple Store",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "AirPods 4",
+    "qty": 1,
+    "linePence": 12900
+   },
+   {
+    "name": "USB-C to Lightning Cable (1 m)",
+    "qty": 2,
+    "linePence": 3800
+   }
+  ],
+  "subtotalPence": 16700,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 16700,
+  "shopAlso": [
+   "Apple"
+  ]
+ }
+}

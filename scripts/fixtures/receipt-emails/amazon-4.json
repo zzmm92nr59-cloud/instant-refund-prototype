@@ -1,0 +1,35 @@
+{
+ "id": "amazon-4",
+ "sender": "Amazon",
+ "layout": "Subscribe & Save",
+ "headers": {
+  "from": "\"Amazon Subscribe & Save\" <no-reply@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk Subscribe & Save order",
+  "date": "Sun, 15 Nov 2026 06:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Amazon.co.uk</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.amazon.co.uk/?utm_source=email\"><img src=\"https://www.amazon.co.uk/static/email/logo.png\" alt=\"Amazon.co.uk\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Your Subscribe &amp; Save order has been placed.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #205-9998887-7776665</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Placed on Sunday, 15 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table><tr><td><img src=\"https://images.amazon.co.uk/products/finish-ultimate-all-in-one-dishwasher-ta.jpg\" alt=\"Finish Ultimate All in One Dishwasher Tablets, 80 Tablets\" width=\"120\" height=\"150\" /></td><td><a href=\"https://www.amazon.co.uk/dp/B0EXAMPLE\">Finish Ultimate All in One Dishwasher Tablets, 80 Tablets</a><br /><span>Sold by</span>: <span>Amazon</span><br /><span>Quantity: 1</span><br /><span style=\"font-size:12px\">£</span><span style=\"font-size:18px\">22</span><span style=\"font-size:12px\">00</span></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table><tr><td><img src=\"https://images.amazon.co.uk/products/pampers-baby-wipes-fragrance-free-12-x-5.jpg\" alt=\"Pampers Baby Wipes Fragrance Free, 12 x 52\" width=\"120\" height=\"150\" /></td><td><a href=\"https://www.amazon.co.uk/dp/B0EXAMPLE\">Pampers Baby Wipes Fragrance Free, 12 x 52</a><br /><span>Sold by</span>: <span>Amazon</span><br /><span>Quantity: 2</span><br /><span style=\"font-size:12px\">£</span><span style=\"font-size:18px\">15</span><span style=\"font-size:12px\">00</span></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item(s) Subtotal:</td><td>£52.00</td></tr><tr><td>Subscribe & Save discount:</td><td>-£2.60</td></tr><tr><td><b>Order Total:</b></td><td><b>£49.40</b></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Amazon.co.uk. All rights reserved.<br /><a href=\"https://www.amazon.co.uk/help\">Help</a> | <a href=\"https://www.amazon.co.uk/privacy\">Privacy</a> | <a href=\"https://www.amazon.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.amazon.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Finish Ultimate All in One Dishwasher Tablets, 80 Tablets",
+    "qty": 1,
+    "linePence": 2200
+   },
+   {
+    "name": "Pampers Baby Wipes Fragrance Free, 12 x 52",
+    "qty": 2,
+    "linePence": 3000
+   }
+  ],
+  "subtotalPence": 5200,
+  "feesPence": 0,
+  "discountsPence": 260,
+  "tipsPence": 0,
+  "totalPence": 4940
+ }
+}

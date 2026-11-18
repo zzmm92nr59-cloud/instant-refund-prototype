@@ -1,0 +1,175 @@
+{
+ "id": "ocado-2",
+ "sender": "Ocado",
+ "layout": "text receipt: name, qty, price columns; missing items; a substitute",
+ "headers": {
+  "from": "Ocado <customerservices@ocado.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Ocado receipt",
+  "date": "Sun, 08 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "Ocado\nYour receipt for your delivery on 8 November 2026\nOrder number: 1004-2219-8890\n\nOcado British Semi Skimmed Milk 2.272L, 4 Pints  2  £3.30\nWarburtons Medium Sliced White Bread 800G  1  £1.60\nM&S Sourdough Bloomer 800G  1  £2.20\nOcado British Free Range Large Eggs 12 Pack  1  £3.89\nAnchor Spreadable Butter 500G  1  £4.50\nCathedral City Mature Cheddar 550G  1  £5.75\nOcado Bananas Loose  6  £1.08\nOcado Braeburn Apple Minimum 5 Pack  1  £1.59\nOcado Carrots 1Kg  1  £0.59\nOcado Broccoli 335G  2  £1.38\nOcado Brown Onions 3 Pack  1  £0.89\nOcado Cherry Tomatoes 330G  1  £0.99\nOcado Iceberg Lettuce Each  1  £0.65\nOcado British Chicken Breast Portions 650G  1  £4.99\nOcado 12 Pork Sausages 681G  1  £3.00\nOcado Beef Mince 5% Fat 500G  1  £4.25\nOcado Smoked Back Bacon 300G  1  £2.49\nHeinz Baked Beans In Tomato Sauce 4X415g  1  £4.50\nNapolina Chopped Tomatoes 400G  3  £2.55\nOcado Fusilli Pasta Twists 1Kg  1  £1.15\nTilda Basmati Rice 1Kg  1  £3.75\nKellogg's Corn Flakes Cereal 670G  1  £2.90\nQuaker Oat So Simple Original 12X27g  1  £3.25\nPG Tips 240 Pyramid Tea Bags 696G  1  £6.50\nNescafe Gold Blend Instant Coffee 200G  1  £7.00\nWalkers Ready Salted Crisps 6X25g  2  £4.50\nMcVitie's Chocolate Digestives 433G  1  £2.25\nCoca-Cola Zero Sugar 8X330ml  1  £5.25\nTropicana Smooth Orange Juice 1.4L  1  £3.95\nOcado Organic Baby Potatoes 750g  1  £1.50  (substitute)\n\nMissing items (you have not been charged)\nOcado Baby Potatoes 1Kg  1\n\nSubtotal  £92.19\nDelivery  £1.99\nTotal  £94.18",
+ "expected": {
+  "shop": "Ocado",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Ocado British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "M&S Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Ocado British Free Range Large Eggs 12 Pack",
+    "qty": 1,
+    "linePence": 389
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "Ocado Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "Ocado Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "Ocado Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "Ocado Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "Ocado Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "Ocado Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "Ocado Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Ocado British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "Ocado 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Ocado Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Ocado Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "Ocado Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   },
+   {
+    "name": "Ocado Organic Baby Potatoes 750g",
+    "qty": 1,
+    "linePence": 150
+   }
+  ],
+  "subtotalPence": 9219,
+  "feesPence": 199,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9418
+ }
+}

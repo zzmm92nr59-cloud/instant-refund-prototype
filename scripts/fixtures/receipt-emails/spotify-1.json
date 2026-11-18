@@ -1,0 +1,30 @@
+{
+ "id": "spotify-1",
+ "sender": "Spotify",
+ "layout": "receipt text",
+ "headers": {
+  "from": "Spotify <no-reply@spotify.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Spotify Premium receipt",
+  "date": "Tue, 03 Nov 2026 06:00:00 +0000"
+ },
+ "html": "",
+ "text": "Spotify\nReceipt\nOrder ID: 12345678901\nDate: 03/11/2026\n\nSpotify Premium Family  £20.99\n\nTotal £20.99\n(includes VAT of £3.50)\nPaid with Visa ending 1234",
+ "expected": {
+  "shop": "Spotify",
+  "date": "2026-11-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Spotify Premium Family",
+    "qty": 1,
+    "linePence": 2099
+   }
+  ],
+  "subtotalPence": 2099,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2099
+ }
+}

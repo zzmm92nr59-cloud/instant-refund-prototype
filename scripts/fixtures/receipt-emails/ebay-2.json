@@ -1,0 +1,35 @@
+{
+ "id": "ebay-2",
+ "sender": "eBay",
+ "layout": "text with two items",
+ "headers": {
+  "from": "eBay <ebay@ebay.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed",
+  "date": "Mon, 05 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "eBay\nOrder confirmed\nOrder number: 12-34567-89100\n5 Oct 2026\n\nApple iPhone 13 128GB Midnight - Refurbished\nQuantity: 1\nItem price: £329.99\nTempered Glass Screen Protector x2\nQuantity: 2\nItem price: £9.98\n\nSubtotal £339.97\nPostage Free\nOrder total £339.97",
+ "expected": {
+  "shop": "eBay",
+  "date": "2026-10-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Apple iPhone 13 128GB Midnight - Refurbished",
+    "qty": 1,
+    "linePence": 32999
+   },
+   {
+    "name": "Tempered Glass Screen Protector x2",
+    "qty": 2,
+    "linePence": 998
+   }
+  ],
+  "subtotalPence": 33997,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 33997
+ }
+}
