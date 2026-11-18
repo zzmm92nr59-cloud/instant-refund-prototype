@@ -825,6 +825,15 @@ export function trackingLink(carrier, number) {
 // Delivery updates: emails from a carrier ("Your parcel from Lululemon EMEA has been delivered") or from the shop
 // ("Your order is out for delivery"). They never make a purchase card; they add "where's my parcel" to one.
 const CARRIER_SENDERS = [["Royal Mail", /royalmail\.com|parcelforce\.com/i], ["Evri", /evri\.com|myhermes/i], ["DPD", /dpd\.co\.uk|dpdlocal/i], ["InPost", /inpost\.co\.uk/i], ["Yodel", /yodel\.co\.uk/i]];
+// Carriers' own addresses, for return parcels (parseReturnParcelEmail): the seven UK carriers shops send returns with.
+// Matched against the sender's domain only (the part after @), so a shop can't pass for a carrier by its display name.
+export const RETURN_CARRIER_SENDERS = [["Parcelforce", /(^|\.)parcelforce\.(com|co\.uk)$/i], ["Royal Mail", /(^|\.)royalmail\.(com|co\.uk)$/i], ["Evri", /(^|\.)(evri\.com|myhermes\.co\.uk)$/i],
+  ["DPD", /(^|\.)(dpd\.co\.uk|dpdlocal\.co\.uk)$/i], ["InPost", /(^|\.)inpost\.co\.uk$/i], ["Yodel", /(^|\.)yodel\.co\.uk$/i], ["Collect+", /(^|\.)collectplus\.co\.uk$/i]];
+export function returnCarrierOf(from) {
+  const s = String(from || ""), addr = ((s.match(/<([^<>\s]+@[^<>\s]+)>/) || [])[1] || (s.match(/([^\s<>"]+@[^\s<>"]+)/) || [])[1] || "").toLowerCase();
+  const domain = addr.split("@")[1] || "";
+  return domain ? (RETURN_CARRIER_SENDERS.find(([, re]) => re.test(domain)) || [])[0] || null : null;
+}
 export function parseDeliveryEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -938,6 +947,8 @@ export function parseReturnEmail(rawEmail) {
 
   return {
     ok: true, kind: "return_instructions", source: "shopper_email", refundEligible: false,
+    // The day the shop sent it: when the return was started, on the receipt's return timeline.
+    at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
     retailer: { name: sender?.name || null, domain: sender?.domain || null },
     returnId: idm ? idm[1] : null,
     orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : null,
@@ -960,6 +971,8 @@ export function parseReturnUpdateEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
   const subject = headers.subject || "";
+  // A carrier's "we've received your return" means the carrier has it, not the shop: parseReturnParcelEmail reads those.
+  if (returnCarrierOf(headers.from)) return { ok: false, reason: "not_a_return_update" };
   if (!/\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject) ||
       /\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
   const parts = { text: [], html: [] };
@@ -982,6 +995,52 @@ export function parseReturnUpdateEmail(rawEmail) {
     amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
     orderRef: ref ? ref[1] : null, returnId: rid ? rid[1] : null,
     retailer: { name: sender?.name || null, domain: sender?.domain || null },
+  };
+}
+
+// ---- Return parcels: carriers' and shops' emails about a parcel going back (return-tracking.js) -----------------
+// From a carrier (Royal Mail, Parcelforce, Evri, InPost, DPD, Collect+, Yodel, by the sender's own domain): a return label
+// or QR code made ("started"), the parcel dropped off or on its way back ("sent"), or delivered to the shop ("received").
+// From a shop: only when its subject says the return parcel is on its way ("sent"). It must be about a return: "returned to
+// sender" (a delivery that failed) is not one. Relay keeps what the email says and nothing else; which receipt it belongs
+// to is worked out later, against that shopper's own receipts only (attachReturnTracking).
+export function parseReturnParcelEmail(rawEmail) {
+  const no = { ok: false, reason: "not_a_return_parcel" };
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const subject = headers.subject || "", from = String(headers.from || "");
+  const carrierSender = returnCarrierOf(from);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const lead = text.slice(0, 5000), head = subject + "\n" + lead;
+  if (/\breturn(?:ed|ing)? to (?:the )?sender\b/i.test(head)) return no;
+  const aboutReturn = /\breturn(?:s|ed|ing)?\b/i.test(subject) ||
+    /\b(?:your|the|this) return\b|\breturns? (?:parcel|label|item|package|shipment)\b|\breturning (?:your|an?|the)\b|\bon (?:its|it's|the) way back\b|\bback to the (?:retailer|shop|store|seller)\b/i.test(lead);
+  if (!aboutReturn) return no;
+  if (!carrierSender && !/\breturn\b[^\n]{0,40}\b(?:on (?:its|it's|the) way|dropped off|in transit|been sent|been posted)\b|\bdropped off\b|\bon (?:its|it's|the) way back\b/i.test(subject)) return no;
+  let stage = null;
+  if (carrierSender && /\b(?:has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bdelivered to\b/i.test(head) && !/\bout for delivery\b|\bdue to be delivered\b/i.test(head)) stage = "received";
+  else if (/\bdropped off\b|\bdrop[- ]off (?:confirmed|confirmation|receipt)\b|\bhanded (?:it |your parcel |your return )?(?:in|over)\b|\b(?:we(?:'|’)?ve|we have) (?:got|received|collected) your (?:return|parcel)\b|\bcollected your (?:return|parcel)\b|\bon (?:its|it's|the) way back\b|\bon (?:its|it's) way to\b|\bin transit\b|\bhas been (?:posted|sent)\b|\baccepted at\b/i.test(head)) stage = "sent";
+  else if (carrierSender && /\breturn label\b|\byour label\b|\blabel (?:is )?ready\b|\bprint (?:your|the) label\b|\b(?:qr|barcode) code\b/i.test(head)) stage = "started";
+  if (!stage) return no;
+  const t = trackingIn(text);
+  const other = text.match(/\b(?:tracking|parcel|barcode|consignment)\s*(?:number|no\.?|#|id|code)\s*(?:is\s*)?[:#]?\s*([A-Z0-9]{8,30})\b/i) || text.match(/\b(JJD\d{12,20}|H[0-9A-Z]{15})\b/);
+  const trackingNumber = t ? t.trackingNumber : other && /\d/.test(other[1]) ? other[1].toUpperCase() : null;
+  const NAME = "([A-Z][\\w&'’ .-]{1,40}?)(?=\\s+(?:is|has|was|on|have|will|today|by|at|from|via|with|using|and)\\b|[.,:;!\\n]|$)";
+  const named = (head.match(new RegExp("\\breturn(?:ing)?(?: parcel| item| package)? (?:to|for) " + NAME, "m")) || head.match(new RegExp("\\bback to " + NAME, "m")) || head.match(new RegExp("\\bparcel (?:to|for) " + NAME, "m")) || [])[1];
+  const shop = named && !/^(?:the |us\b|our |sender|retailer)/i.test(named.trim()) ? named.trim() : null;
+  const refDate = headers.date ? new Date(headers.date) : null;
+  const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) ||
+    text.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
+  const sender = carrierSender ? null : retailerFromFrom(from);
+  return {
+    ok: true, kind: "return_update", stage, fromCarrier: Boolean(carrierSender),
+    at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
+    carrier: carrierSender || (t && t.carrier) || carrierIn(text) || null,
+    trackingNumber, shop, orderRef: ref ? ref[1] : null,
+    retailer: sender ? { name: sender.name || null, domain: sender.domain || null } : null,
   };
 }
 

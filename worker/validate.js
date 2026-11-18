@@ -177,6 +177,9 @@ const PATTERNS = [
     items: list(50, obj({ name: text(120), qty: int(1, 999), pricePence: int(0, 100000000) })), undo: bool } }],
   // "Send this email to Relay": an optional note from the shopper about what's wrong, or deleting what they sent.
   [new RegExp("^/relay/my/receipts/" + uuidish + "/share$"), { fields: { note: text(300), delete: bool } }],
+  // "I've sent it back" (return-tracking.js): the return's tracking number and carrier if the shopper has them, the day
+  // they sent it, or undo. The route checks the number's format, the carrier against its list and the date.
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/return-sent$"), { fields: { trackingNumber: str(60), carrier: str(20), sentOn: str(10), undo: bool } }],
   [new RegExp("^/relay/my/admin/shared-emails/" + uuidish + "$"), { fields: { delete: bool } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/ask$"), { fields: { kind: one("swap", "buy"), message: text(600), offeredListingId: str(64) } }],
   [new RegExp("^/relay/my/resale/listings/" + uuidish + "/withdraw$"), NOTHING],

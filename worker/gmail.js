@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -25,6 +25,7 @@ import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads } from "./ai-reader.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
+import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { categorise, itemCategories, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
 import { cleanItems, isVia } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
@@ -121,7 +122,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 29;
+export const PARSER_VERSION = 30;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -132,7 +133,7 @@ const SEARCH_TERMS =
   '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
   ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
-  ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped)';
+  ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk OR collectplus.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped OR "dropped off")';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
 const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;
@@ -238,6 +239,8 @@ async function ensureGmailTablesRun(db) {
     AI_SETTING_SQL, AI_READS_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL,
     // Live parcel tracking (parcel-tracking.js): what the carrier said about a parcel, and how many new parcels this month.
     PARCEL_TRACKS_SQL, PARCEL_USES_SQL,
+    // Return tracking (return-tracking.js): "I've sent it back" and the return's tracking number, as the shopper gave them.
+    RETURN_TRACKS_SQL,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -277,6 +280,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM return_tracks WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     db.prepare("DELETE FROM gmail_oauth_states WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -563,6 +567,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`DELETE FROM receipt_fixes WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM return_tracks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM captured_receipts WHERE shopper_id = ? AND ${pick}`).bind(...args)];
 }
 // Disconnects one of the other inboxes: Relay's access is cancelled at Google (Microsoft has no such call) and its key
@@ -617,6 +622,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM picks_ai WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM item_kinds WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM parcel_tracks WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM return_tracks WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_connections WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM mail_scan_jobs WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id LIKE ?").bind(shopperId + "~%")
@@ -756,13 +762,20 @@ function classify(rawText, ref, lenient = false) {
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
   // otherwise a return email that also mentions the order and an amount could be mistaken for the order itself.
   const upd = parseReturnUpdateEmail(rawText);
-  const ret = upd.ok ? { ok: false } : parseReturnEmail(rawText);
-  const del = upd.ok || ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
-  const receipt = upd.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
+  // A return parcel's own news (a carrier's drop-off or label email, a shop's "your return is on its way"): return-tracking.js.
+  const par = upd.ok ? { ok: false } : parseReturnParcelEmail(rawText);
+  const ret = upd.ok || par.ok ? { ok: false } : parseReturnEmail(rawText);
+  const del = upd.ok || par.ok || ret.ok ? { ok: false } : parseDeliveryEmail(rawText);
+  const receipt = upd.ok || par.ok || ret.ok || del.ok ? { ok: false } : parseReceiptEmail(rawText, { lenient });
   if (upd.ok) {
     details = {
       kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
       orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
+    };
+  } else if (par.ok) {
+    details = {
+      kind: "return_update", ...ref, stage: par.stage, at: par.at, fromCarrier: par.fromCarrier, carrier: par.carrier, trackingNumber: par.trackingNumber,
+      shopNamed: par.shop, orderRef: par.orderRef, retailer: par.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (del.ok) {
     details = {
@@ -771,7 +784,7 @@ function classify(rawText, ref, lenient = false) {
     };
   } else if (ret.ok) {
     details = {
-      kind: "return_instructions", ...ref,
+      kind: "return_instructions", ...ref, at: ret.at || null,
       retailer: ret.retailer, orderRef: ret.orderRef, orderDate: ret.orderDate, returnId: ret.returnId,
       deadline: ret.deadline, carrier: ret.carrier, steps: ret.steps, qrMentioned: ret.qrMentioned,
       estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl, trackingNumber: ret.trackingNumber || null,
@@ -834,7 +847,7 @@ function gmailMailbox(fetchImpl, token) {
 // Payments, tickets, rides and collections are included too ("Your payment to Rains", "Your Monday trip with Uber",
 // "Ready to collect"), and senders whose address says what they send (orders@, billing@, PayPal's service@).
 const SHOPPING_SUBJECT = /\b(orders?|ordered|receipts?|e-?receipts?|purchases?|purchased|bought|thanks? (you )?for (shopping|your)|returns?|returned|refunds?|refunded|qr code|delivered|delivery|deliveries|dispatched|despatched|dispatch|despatch|shipped|shipping|shipment|on (its|it's|the) way|invoice|booking|booked|reservation|itinerary|confirmation|confirmed|payments?|paid|tickets?|e-?tickets?|trip|rides?|collection|ready (to|for) collect(ion)?|subscriptions?|renewal|renewed|membership|your (items?|parcel|package|purchase|delivery|booking|tickets?|trip|ride|bill))\b/i;
-const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)(\+[^@\s]*)?@/i;
+const SHOPPING_SENDER = /(^|[.@])(royalmail\.com|parcelforce\.com|evri\.com|dpd\.co\.uk|inpost\.co\.uk|yodel\.co\.uk|collectplus\.co\.uk)$|^(orders?|order-?confirm(ation)?|order-?updates?|orderstatus|receipts?|returns?|shipping|ship-confirm|auto-confirm|confirm|confirmation|transactional|transactions?|billing|invoices?|payments?|purchases?|sales|bookings?|tickets?|delivery|dispatch|service|customerservice|customer-service)(\+[^@\s]*)?@/i;
 export function looksLikeShopping(subject, from) {
   return SHOPPING_SUBJECT.test(String(subject || "")) || SHOPPING_SENDER.test(String(from || "").trim());
 }
@@ -1686,15 +1699,17 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, shopKinds, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
-    env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
+    env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status, updated_at AS at FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, is_gift AS g, recipient AS who, updated_at AS at FROM receipt_gifts WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, updated_at AS at FROM receipt_fixes WHERE shopper_id = ?").bind(shopperId).all(),
     sharedByReceipt(env.RELAY_DB, shopperId, Date.now()),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, fields, created_at AS at FROM receipt_ai_reads WHERE shopper_id = ? AND fields IS NOT NULL").bind(shopperId).all(),
     readTrackedRows(env.RELAY_DB, shopperId),
+    // "I've sent it back", with the return's tracking number if the shopper gave it (return-tracking.js).
+    readReturnTracks(env.RELAY_DB, shopperId),
     // What Claude said about shops whose names don't say what they sell (shop-kind-ai.js): nothing personal, one per shop.
     readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
     ...lookups
@@ -1711,6 +1726,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     if (o) o.returnPlan = p;
   }
   attachReturnProgress(orders, deliveries, updates);
+  // Where each return has got to, step by step, and who said so (return-tracking.js).
+  attachReturnTracking(orders, { updates, deliveries, typed: typedReturns, tracked, marks: (marks && marks.results) || [], today: new Date(opts.now || Date.now()).toISOString().slice(0, 10) });
   attachItemReturns(orders, (marks && marks.results) || []);
   attachGifts(orders, (gifts && gifts.results) || []);
   // What the AI read fills only what the rules missed, and the shopper's own fixes still win (so they come after).
@@ -1780,6 +1797,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
       ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}), ...(policy ? { returnPolicy: policyForApp(policy) } : {}) };
   });
+}
+
+// For a future Plus instant refund (nothing pays out yet): whether the return on one of the shopper's own receipts is
+// confirmed on its way (returnInTransit) or at the shop (returnReceived), by a carrier or the shop, never only by the
+// shopper's own word. null when the receipt isn't theirs. See return-tracking.js returnFacts and docs/SECURITY.md.
+export async function returnFactsFor(env, shopperId, receiptId) {
+  if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
+  const c = (await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 })).find((r) => r.id === receiptId);
+  return c ? returnFacts(c) : null;
 }
 
 // One receipt as the help chat may see it (worker/support-chat.js), only when the shopper chooses to show it: what Relay
@@ -2119,6 +2145,28 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const mine = (await listReceipts(env, shopper.id, {})).find((r) => r.id === parcel[1]);
     if (!mine) return json({ error: "not_found" }, 404, cors);
     return json(await liveParcel(env, shopper.id, mine, opts), 200, cors);
+  }
+  // Return tracking (return-tracking.js). Their own receipts only: anyone else's answers 404.
+  // POST .../return-sent { trackingNumber?, carrier?, sentOn?, undo? }: "I've sent it back", with the return's tracking number.
+  // GET .../return-parcel: where the return parcel is, from the carrier (Ship24), asked only now, when the receipt is opened.
+  const rtn = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/(return-sent|return-parcel)$/.exec(path);
+  if (rtn && ((rtn[2] === "return-sent" && m === "POST") || (rtn[2] === "return-parcel" && m === "GET"))) {
+    await ensureGmailTables(env.RELAY_DB);
+    const now = opts.now || Date.now();
+    const find = async () => (await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000, now })).find((r) => r.id === rtn[1]);
+    const mine = await find();
+    if (!mine) return json({ error: "not_found" }, 404, cors);
+    if (rtn[2] === "return-sent") {
+      const b = await request.json().catch(() => null);
+      if (!b || typeof b !== "object" || Array.isArray(b)) return json({ error: "bad_request" }, 400, cors);
+      const r = await saveReturnSent(env, shopper.id, mine, b, now);
+      if (r.status !== 200) return json(r.body, r.status, cors);
+      const after = await find();
+      return json({ ...r.body, returnTracking: (after && after.returnTracking) || null, ...returnFacts(after) }, 200, cors);
+    }
+    const live = await liveReturnParcel(env, shopper.id, mine, { ...opts, now });
+    const after = live.asked ? await find() : mine;
+    return json({ available: live.available, ...(live.reason ? { reason: live.reason } : {}), returnTracking: (after && after.returnTracking) || null, ...returnFacts(after) }, 200, cors);
   }
   const orig = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/original$/.exec(path);
   if (orig && m === "GET") {
