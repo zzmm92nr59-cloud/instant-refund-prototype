@@ -1,0 +1,35 @@
+{
+ "id": "holdout2-ebay-two-sellers",
+ "sender": "eBay",
+ "layout": "two sellers, postage each",
+ "headers": {
+  "from": "eBay <ebay@ebay.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed",
+  "date": "Thu, 12 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "eBay\nOrder confirmed\n12 Nov 2026\n\nSeller: kitchen_finds_uk\nOrder number: 12-34567-90001\nVintage Pyrex Bowl Set\nQuantity: 1\nItem price: £24.00\nPostage: £3.20\n\nSeller: mugshot_vintage\nOrder number: 12-34567-90002\nRetro Enamel Mug\nQuantity: 2\nItem price: £13.00\nPostage: £2.85\n\nOrder total £43.05",
+ "expected": {
+  "shop": "eBay",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Vintage Pyrex Bowl Set",
+    "qty": 1,
+    "linePence": 2400
+   },
+   {
+    "name": "Retro Enamel Mug",
+    "qty": 2,
+    "linePence": 1300
+   }
+  ],
+  "subtotalPence": 3700,
+  "feesPence": 605,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4305
+ }
+}

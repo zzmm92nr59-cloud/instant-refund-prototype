@@ -44,6 +44,7 @@ const VARIANT = /^(?:colou?r|size|style|fit|length|width|waist|leg|flavou?r|scen
 const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|nd|rd|th)?[\s/.-]+(?:\d{1,2}|[a-z]{3,9})[\s/.,-]+\d{2,4}\b[^|]{0,20}$|^\d{4}-\d{2}-\d{2}$/i;
 const GREETING = /^(?:hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
 const FULL_DATE = /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i;
+const HARD_END = /^(?:sub-?\s?total|subtotal|(?:order |grand |basket |estimated |trolley |items? |products? |goods )?total\b|total of items|item\(s\) subtotal|guide price|order value|items$|products$|payment|payments|paid\b|amount (?:paid|due)|total paid|includes vat|including vat|incl\.? vat|vat\b|tax\b)/i;
 const sentence = (c) => c.length > 80 || (c.split(/\s+/).length > 8 && /[.!?]$/.test(c)) || GREETING.test(c);
 
 const letters = (c) => (String(c).match(/\p{L}/gu) || []).length;
@@ -65,6 +66,9 @@ function splitCell(raw) {
       if (!neg) out.prices.push(pence(m[3], m[4], m[5])); else out.negative = true; c = m[1];
     }
   }
+  // An option's own price after it, "Oat milk +£0.45" (not one in brackets, which the item's price already includes).
+  m = new RegExp("^(.*?\\p{L}.*?)\\s*\\+\\s?" + MONEY + "$", "u").exec(c);
+  if (m && !out.prices.length) { out.addPrice = pence(m[2], m[3], m[4]); c = m[1]; }
   // Quantity at the start: "1 x Name", "2x Name", "2 × Name"; a bare "1 Big Mac Meal" only on a line with its price.
   m = /^(\d{1,3})\s?[x×]\s+(\S.*)$/i.exec(c) || /^(\d{1,3})[x×](\p{L}.*)$/iu.exec(c);
   if (m) { out.qty = Number(m[1]); c = m[2]; out.head = true; }
@@ -90,6 +94,8 @@ function readLine(raw) {
     if (PRICE_LABEL.test(c) && next && PRICE_CELL.test(next)) { const m = PRICE_CELL.exec(next); line.unitLabelled = pence(m[2], m[3], m[4]); i++; continue; }
     if (TOTAL_LABEL.test(c) && next && PRICE_CELL.test(next)) { const m = PRICE_CELL.exec(next); line.labelledTotal = pence(m[2], m[3], m[4]); line.endWord = true; i++; continue; }
     if (NAME_LABEL.test(c) && next && letters(next) >= 3 && !PRICE_CELL.test(next) && !HEADING.test(next)) { line.names.push(cleanName(next)); line.namedByLabel = true; i++; continue; }
+    if (/^(?:£\s?\d[\d,]*\.\d{2}\s+){1,3}£\s?\d[\d,]*\.\d{2}$/.test(c)) { for (const p of c.match(/£\s?\d[\d,]*\.\d{2}/g)) line.prices.push(pence(p.replace(/[£\s]/g, "").split(".")[0], p.split(".")[1])); continue; }
+    if (FREE_CELL.test(c) && i > 0) { line.free = true; continue; }
     let m = PRICE_CELL.exec(c);
     if (m) { if (m[1]) line.negative = true; else { line.prices.push(pence(m[2], m[3], m[4])); if (LABEL_PRICE.test(c)) line.priceLabelled = true; } continue; }
     if ((m = UNIT_CELL.exec(c))) {
@@ -107,13 +113,14 @@ function readLine(raw) {
     // name starts with such a word ("Bag for Life | 1 | £0.50") doesn't: it has more than an amount beside it.
     if (i === 0 && END.test(c) && cells.slice(1).every((x) => PRICE_CELL.test(x) || FREE_CELL.test(x) || /^[-−–]\s?£/.test(x))) {
       const s = splitCell(c);
-      if (cells.length > 1 || s.prices.length || s.negative || END.test(s.text) && s.text.length <= 40) { line.endWord = true; continue; }
+      if (cells.length > 1 || s.prices.length || s.negative || END.test(s.text) && s.text.length <= 40) { line.endWord = true; line.endLabel = s.text || c; continue; }
     }
     if (i === 0 && SKIP_START.test(c)) line.skipStart = true;
     if (i === 0 && SKIP_END.test(c)) line.skipEnd = true;
     const s = splitCell(c);
     if (s.negative) line.negative = true;
     if (s.unit != null) line.unit = s.unit;
+    if (s.addPrice != null) line.addPrice = s.addPrice;
     if (s.qty != null && line.qty == null) line.qty = s.qty;
     if (s.head) line.head = true;
     line.prices.push(...s.prices);
@@ -121,7 +128,7 @@ function readLine(raw) {
     if (!t) continue;
     if (/\s-\s(?:not charged|unavailable|out of stock)$/i.test(t) || /^not charged$/i.test(t)) { line.notCharged = true; continue; }
     if (DETAIL.test(t)) { line.details = true; continue; }
-    if (VARIANT.test(t)) { line.variant.push(t); continue; }
+    if (VARIANT.test(t) || (/^[\p{L}\d][\p{L}\d .'’-]{0,20}\s\/\s[\p{L}\d][\p{L}\d .'’()-]{0,20}$/u.test(t) && !/\b(?:and|or|with)\b/i.test(t))) { line.variant.push(t); continue; }
     if (/^[+＋]$/.test(t)) { line.plus = true; continue; }
     if (/^[+＋]\s*/.test(t)) { line.plus = true; line.extras.push(t.replace(/^[+＋]\s*/, "")); continue; }
     if (letters(t) < 3) continue;           // a size column ("M", "UK 9"), a stray symbol
@@ -158,12 +165,12 @@ const finish = (b) => {
 // deal's "+ Stuffed Crust £3.00"). Without it such a price is passed over. Both readings are tried; the totals check picks.
 export function readItems(text, opts = {}) {
   const items = [];
-  let pend = null, last = null, skip = false, wantExtra = false, qtyBefore = null;
+  let pend = null, last = null, skip = false, wantExtra = false, qtyBefore = null, paused = false;
   const emit = () => {
     // A name on one line and a price on another is only an item when something says so: how many, a size or colour, its
     // code, a labelled price, or a "+" extra. ("Some Shop" over "£5.00" is a heading and a total, not a purchase.)
-    const sure = pend && (pend.head || pend.qty != null || pend.unit != null || pend.lineFromLabel != null || pend.variant.length || pend.detail || pend.labelled || pend.plus);
-    if (pend && sure && pend.prices.length + (pend.unit != null ? 1 : 0) + (pend.lineFromLabel != null ? 1 : 0) > 0 && !pend.dropped) {
+    const sure = pend && (!paused || pend.head || pend.qty != null) && (pend.head || pend.qty != null || pend.unit != null || pend.lineFromLabel != null || pend.variant.length || pend.detail || pend.labelled || pend.plus);
+    if (pend && sure && pend.prices.length + (pend.unit != null ? 1 : 0) + (pend.lineFromLabel != null ? 1 : 0) + (pend.free ? 1 : 0) > 0 && !pend.dropped) {
       const it = finish(pend);
       if (it) { items.push(it); last = { item: it, mode: "block" }; }
     }
@@ -189,17 +196,24 @@ export function readItems(text, opts = {}) {
       if ((pend.qty || 1) * u === l.labelledTotal) { pend.lineFromLabel = l.labelledTotal; pend.unit = u; emit(); continue; }
     }
     if (l.lineTotal != null && !hasName && pend && pend.name) { pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
-    if (pend && pend.prices.length) emit();
+    if (pend && (pend.prices.length || pend.free)) emit();
     if (pend && pend.unitLabelled != null && !(l.labelledTotal != null)) { pend.prices.push(pend.unitLabelled); pend.unit = null; emit(); }
-    if (l.endWord && !hasName && (items.length || last)) break;
+    // The list ends at its subtotal or total. A fee or a discount line only pauses it: some emails list an order per seller,
+    // each with its own postage. After one, only an item that says how many counts.
+    if (l.endWord && !hasName && (items.length || last)) {
+      if (HARD_END.test(String(l.endLabel || l.cells[0] || "")) || l.labelledTotal != null) break;
+      paused = true; pend = null; last = null; continue;
+    }
     if (l.endWord && hasName && /^(?:sub-?\s?total|total|order total|delivery|shipping|postage|service|vat)\b/i.test(l.names[0]) && items.length) break;
     if (l.skipStart) { pend = null; skip = true; last = null; continue; }
     if (l.skipEnd) { skip = false; pend = null; last = null; continue; }
     if (skip) continue;
     if (l.noise && !hasName && !l.prices.length) { pend = null; last = null; continue; }
+    // ("Apple Arcade" under a game's name is what it came with, not a new section.)
+    if (l.heading && !hasName && !l.prices.length && pend && pend.name && /^(?:apple arcade|apple music|apple tv\+?|apple one|icloud\+?)$/i.test(l.cells[0] || "")) { pend.detail = true; continue; }
     if (l.heading && !hasName && !l.prices.length) { pend = null; continue; }
     if (l.notCharged) { pend = null; continue; }
-    const priced = l.prices.length > 0 || (l.free && hasName);
+    const priced = l.prices.length > 0 || (l.free && (hasName || pend));
     if (hasName && priced) {
       // An extra with the item's price on its line, under a name that gave its quantity ("1 x | Salt and Pepper Chips" then
       // "+ Large | £4.20"; "Fig & Cassis Candle × 2" then "Large / 300g | £44.00").
@@ -208,16 +222,18 @@ export function readItems(text, opts = {}) {
         continue;
       }
       pend = null;
+      if (paused && l.qty == null && !l.head) continue;
       const b = newBlock(l, l.names[0]);
       b.prices = l.prices.slice(); if (l.free) b.free = true;
-      if (!l.negative) { const it = finish(b); if (it) { items.push(it); last = { item: it, mode: "row" }; } }
+      if (!l.negative) { const it = finish(b); if (it) { items.push(it); last = { item: it, mode: "row", at: n }; } }
       continue;
     }
     if (!hasName && priced && !pend && last && last.extraAt === n - 1 && opts.extraPrices && l.qty == null) { last.item.pricePence += l.prices[l.prices.length - 1]; continue; }
+    if (!hasName && priced && !pend && last && last.mode === "row" && last.at === n - 1 && opts.laterPrice && l.qty == null && l.prices.length === 1) { last.item.pricePence = l.prices[0]; continue; }
     // "+ Extra cheese £0.80" under an item: an extra of it, with its own price (added only in the extra-price reading).
     if (!hasName && priced && !pend && last && l.extras.length && l.plus && l.qty == null) { addExtras(last.item, l.extras); if (opts.extraPrices) last.item.pricePence += l.prices[l.prices.length - 1]; continue; }
     if (!hasName && priced) {
-      if (pend && pend.name) { pend.prices.push(...l.prices); if (l.qty != null) pend.qty = l.qty; if (l.unit != null) pend.unit = l.unit; pend.extras.push(...l.extras); if (l.details) pend.detail = true; if (l.priceLabelled) pend.labelled = true; if (l.plus) pend.plus = true; continue; }
+      if (pend && pend.name) { pend.prices.push(...l.prices); if (l.free) pend.free = true; pend.variant.push(...l.variant); if (l.qty != null) pend.qty = l.qty; if (l.unit != null) pend.unit = l.unit; pend.extras.push(...l.extras); if (l.details) pend.detail = true; if (l.priceLabelled) pend.labelled = true; if (l.plus) pend.plus = true; continue; }
       continue;
     }
     if (!hasName && l.unitLabelled != null) { if (pend && pend.name) pend.unitLabelled = l.unitLabelled; continue; }
@@ -247,12 +263,17 @@ export function readItems(text, opts = {}) {
     // A line set in from the item above (an empty first cell, spaces, a "+") is part of it: its extras, or a meal deal's
     // parts. Unless it starts an item of its own: a quantity, size or code follows it before any price (Amazon's rows start
     // with the photo's cell).
-    if ((l.lead || l.indent || l.plus || wantExtra) && !pend && last && qtyBefore == null && (last.mode === "row" || l.plus || wantExtra || !startsItem(n))) { addExtras(last.item, l.names); last.extraAt = n; wantExtra = false; continue; }
+    if ((l.lead || l.indent || l.plus || wantExtra) && !pend && last && qtyBefore == null && (last.mode === "row" || l.plus || wantExtra || !startsItem(n))) {
+      addExtras(last.item, l.names); last.extraAt = n; wantExtra = false;
+      if (l.addPrice != null && opts.extraPrices) last.item.pricePence += l.addPrice;
+      continue;
+    }
     wantExtra = false;
     // A name over two lines ("Define Jacket", then its fabric "Nulu"): one capitalised word straight under a name that gave
     // no quantity and has nothing else under it yet.
     if (pend && !pend.prices.length && !pend.head && pend.qty == null && !pend.extras.length && !pend.variant.length && pend.lines === 1 &&
         l.names.length === 1 && /^\p{Lu}[\p{Ll}]{2,15}$/u.test(l.names[0]) && !l.plus && !l.lead && !l.indent) { pend.name += " " + l.names[0]; pend.lines++; continue; }
+    if (pend && !pend.prices.length && pend.unit != null && !l.lead && !l.indent && !l.plus) { emit(); pend = newBlock(l, l.names[0]); last = null; continue; }
     if (pend && !pend.prices.length) { pend.extras.push(...l.names); pend.variant.push(...l.variant); if (l.qty != null) pend.qty = l.qty; if (l.details) pend.detail = true; if (l.plus) pend.plus = true; pend.lines++; continue; }
     pend = newBlock(l, l.names[0]);
     last = null;
@@ -277,7 +298,7 @@ function addExtras(item, extras) {
 }
 
 // ---- What the email says the items came to ---------------------------------------------------------------------------------
-const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|merchandise(?: total)?|guide price|item total)\b/i;
+const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|merchandise(?: total)?|guide price|item total)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
 const FEE_LABEL = /\b(?:delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;

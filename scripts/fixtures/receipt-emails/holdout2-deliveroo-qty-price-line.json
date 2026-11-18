@@ -1,0 +1,38 @@
+{
+ "id": "holdout2-deliveroo-qty-price-line",
+ "sender": "Deliveroo",
+ "layout": "name, then '1 × £8.95'",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Deliveroo order from Levant Kitchen",
+  "date": "Mon, 09 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Your order's in!\nLevant Kitchen\nOrder #3301\n9 November 2026\n\nChicken Shawarma Wrap\n1 × £8.95\nHummus & Pitta\n+ Extra pitta\n2 × £4.50\n\nSubtotal £17.95\nDelivery fee £2.49\nService fee £0.99\nTotal £21.43",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Shawarma Wrap",
+    "qty": 1,
+    "linePence": 895
+   },
+   {
+    "name": "Hummus & Pitta",
+    "qty": 2,
+    "linePence": 900,
+    "extras": [
+     "Extra pitta"
+    ]
+   }
+  ],
+  "subtotalPence": 1795,
+  "feesPence": 348,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2143
+ }
+}

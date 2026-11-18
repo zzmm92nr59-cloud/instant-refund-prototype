@@ -1,0 +1,35 @@
+{
+ "id": "holdout2-shopify-compare-at",
+ "sender": "Shopify store",
+ "layout": "compare-at price beside each price",
+ "headers": {
+  "from": "Fellside Goods <store+87654321@t.shopifyemail.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order #1203 confirmed",
+  "date": "Tue, 10 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Fellside Goods</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fellsidegoods.test/?utm_source=email\"><img src=\"https://www.fellsidegoods.test/static/email/logo.png\" alt=\"Fellside Goods\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #1203</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thank you for your purchase!</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Merino Crew Socks × 3<br />Grey / M</td><td><del>£45.00</del><br />£36.00</td></tr><tr><td>Waxed Cotton Cap × 1</td><td><del>£35.00</del><br />£28.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£64.00</td></tr><tr><td>Shipping</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£67.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Fellside Goods. All rights reserved.<br /><a href=\"https://www.fellsidegoods.test/help\">Help</a> | <a href=\"https://www.fellsidegoods.test/privacy\">Privacy</a> | <a href=\"https://www.fellsidegoods.test/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fellsidegoods.test/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Fellside Goods",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Merino Crew Socks",
+    "qty": 3,
+    "linePence": 3600
+   },
+   {
+    "name": "Waxed Cotton Cap",
+    "qty": 1,
+    "linePence": 2800
+   }
+  ],
+  "subtotalPence": 6400,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6795
+ }
+}

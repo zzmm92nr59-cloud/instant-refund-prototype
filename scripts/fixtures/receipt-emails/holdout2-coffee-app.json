@@ -1,0 +1,46 @@
+{
+ "id": "holdout2-coffee-app",
+ "sender": "Pret",
+ "layout": "option price written +£0.45",
+ "headers": {
+  "from": "Pret A Manger <receipts@pret.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Pret receipt",
+  "date": "Wed, 18 Nov 2026 08:10:00 +0000"
+ },
+ "html": "",
+ "text": "Pret A Manger\nKing's Cross\n18/11/2026 08:09\nReceipt 4471\n\n1x Flat White £3.45\n   Oat milk +£0.45\n1x Almond Croissant £3.25\n2x Americano £5.90\n\nTotal £13.05\nPaid by Apple Pay",
+ "expected": {
+  "shop": "Pret A Manger",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Flat White",
+    "qty": 1,
+    "linePence": 390,
+    "extras": [
+     "Oat milk"
+    ]
+   },
+   {
+    "name": "Almond Croissant",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "Americano",
+    "qty": 2,
+    "linePence": 590
+   }
+  ],
+  "subtotalPence": 1305,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1305,
+  "shopAlso": [
+   "Pret"
+  ]
+ }
+}
