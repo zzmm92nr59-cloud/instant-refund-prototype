@@ -44,9 +44,10 @@ const fetchImpl = async (url, init = {}) => {
     const body = JSON.parse(init.body); aiCalls.push(body);
     if (ai === "busy") return new Response("{}", { status: 529 });
     const asked = JSON.parse(body.messages[0].content);
-    const answer = asked.map((x) => /legging|pant/i.test(x.name) ? { id: x.id, mode: "again", kind: "leggings", look: ["leggings", "yoga pants"] }
+    const answer = asked.map((x) => /legging|pant/i.test(x.name) ? { id: x.id, type: "clothing", sure: true, mode: "again", kind: "leggings", look: ["leggings", "yoga pants"] }
       : /capsule|roma/i.test(x.name) ? { id: x.id, mode: "with", kind: "coffee", look: ["espresso cup"] }
-      : /tv/i.test(x.name) ? { id: x.id, mode: "once" } : { id: x.id, mode: "skip" });
+      : /tv/i.test(x.name) ? { id: x.id, type: "electronics", sure: true, mode: "once" } : /banana/i.test(x.name) ? { id: x.id, type: "food_drink", sure: true, mode: "skip" }
+      : /jumper/i.test(x.name) ? { id: x.id, type: "clothing", sure: true, mode: "again", kind: "jumpers", look: ["jumper"] } : { id: x.id, mode: "skip" });
     return Response.json({ content: [{ type: "text", text: JSON.stringify({ items: answer }) }] });
   }
   return new Response("{}", { status: 404 });
@@ -97,7 +98,8 @@ assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", tok
 r = await (await call("/relay/my/item-kinds", { token: jess })).json();
 assert.equal(aiCalls.length, 1);
 const sent = JSON.parse(aiCalls[0].messages[0].content);
-assert.deepEqual(sent.map((x) => x.shop).sort(), ["Nespresso", "Screen Barn", "Studio North", "Studio North"], "her shops only, and food only where it has a companion (coffee, not bananas)");
+// Every line's name is asked about now (18 Nov 2026), so each thing is counted as what it is, not only the ones picks follow.
+assert.deepEqual(sent.map((x) => x.shop).sort(), ["Corner Grocer", "Nespresso", "Screen Barn", "Studio North", "Studio North"], "her shops only");
 const words = JSON.stringify(aiCalls[0]);
 for (const never of ["#77", "9900", "8800", "jess.private", "12 High Street", "Jess Private", "Black / 8", "Sam's Secret"]) assert.ok(!words.includes(never), "never sent: " + never);
 assert.ok(sent.some((x) => x.name === "Align High-Rise Pant 25"));
@@ -106,6 +108,39 @@ assert.deepEqual(r.kinds, { "align high-rise pant 25": { mode: "again", kind: "l
 await call("/relay/my/item-kinds", { token: jess });
 assert.equal(aiCalls.length, 1, "each name is read once");
 assert.deepEqual(await (await call("/relay/my/item-kinds", { token: sam })).json(), { available: true, on: false, kinds: {} }, "Sam's are his: off, and nothing of Jess's");
+// The AI's type from the fixed list goes with her receipts (with whether it was sure), for Wrapped and the receipts list.
+{
+  const typed = sqlite.prepare("SELECT data FROM item_kinds WHERE shopper_id = ? AND name_key = ?").get(J, "55 inch qled tv");
+  assert.deepEqual(JSON.parse(typed.data), { mode: "once", type: "electronics", sure: true });
+  assert.deepEqual(cleanKinds('{"items":[{"id":"1","type":"spaceship","sure":true,"mode":"once"},{"id":"2","type":"other","sure":true,"mode":"skip"}]}', new Set(["1", "2"])).get("2"), { mode: "skip", type: "other", sure: false }, "\"other\" is never sure");
+  assert.deepEqual(cleanKinds('{"items":[{"id":"1","type":"spaceship","sure":true,"mode":"once"}]}', new Set(["1"])).get("1"), { mode: "once" }, "a type that isn't on the list is dropped");
+  // A name with nothing personal in it is kept once for everyone, with no shopper; one with something hidden never is.
+  const shared = sqlite.prepare("SELECT name_key FROM item_kind_cache ORDER BY name_key").all().map((r) => r.name_key);
+  assert.ok(shared.includes("55 inch qled tv") && shared.includes("bananas"));
+  assert.ok(!shared.some((k) => /gift note|jess|high street/.test(k)), "nothing personal in the shared copy");
+  assert.deepEqual(Object.keys(sqlite.prepare("SELECT * FROM item_kind_cache LIMIT 1").get()).sort(), ["created_at", "data", "name_key"], "no shopper, shop, price or date in it");
+  // Sam switches it on: the TV he also bought isn't asked about again; his own jumper (his name in it) is, and isn't shared.
+  receipt(S, "Screen Barn", "electronics", [{ name: "55 inch QLED TV", qty: 1, pricePence: 20000 }]);
+  await call("/relay/my/item-kinds", { method: "POST", token: sam, body: { on: true } });
+  aiCalls = [];
+  await call("/relay/my/item-kinds", { token: sam });
+  const samSent = aiCalls.flatMap((c) => JSON.parse(c.messages[0].content).map((x) => x.name));
+  assert.ok(!samSent.includes("55 inch QLED TV"), "already known: not sent again");
+  assert.ok(samSent.some((n) => /Secret Jumper/.test(n)) && !samSent.some((n) => /Sam/.test(n)), "his name hidden");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM item_kind_cache WHERE name_key LIKE '%secret jumper%'").get().n, 0);
+  assert.equal(JSON.parse(sqlite.prepare("SELECT data FROM item_kinds WHERE shopper_id = ? AND name_key = ?").get(S, "55 inch qled tv").data).type, "electronics", "his copy, from the shared one");
+  // Her receipts carry what each thing is: the AI's sure answer for a name the rules can't place, the rules' otherwise.
+  const list = await (await call("/relay/my/receipts", { token: jess })).json();
+  const items = (list.receipts || list.cards || list).flatMap ? (list.receipts || list.cards || list).flatMap((c) => c.items || []) : [];
+  const tv = items.find((i) => i.name === "55 inch QLED TV"), banana = items.find((i) => i.name === "Bananas");
+  assert.equal(tv.kind, "electronics"); assert.equal(tv.kindSure, true); assert.equal(tv.lasting, true);
+  assert.equal(banana.kind, "food_drink"); assert.equal(banana.lasting, false);
+  // Sam, with it off again, gets Relay's rules only: nothing the AI said is used for him.
+  await call("/relay/my/item-kinds", { method: "POST", token: sam, body: { on: false } });
+  const samList = await (await call("/relay/my/receipts", { token: sam })).json();
+  assert.ok(!(samList.receipts || samList.cards || []).flatMap((c) => c.items || []).some((i) => i.kindAi), "AI answers only while it's on");
+  aiCalls = [];
+}
 console.log("ok - only item names and shops' names are sent (never prices, order numbers, addresses or variants), personal bits hidden, each name once, each shopper's own");
 
 // 3. Limits: 40 names a request, 120 a day; a busy AI sends nothing back and is asked again later.

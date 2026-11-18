@@ -124,7 +124,8 @@ const listed = (c) => { const g = categorise(c), k = itemCategories(c); return {
   const w = buildWrapped(year, 2026, Date.UTC(2026, 11, 31));
   // The opening: not the water, the coffee, the train, the subscription or the kitchen roll; the trainers, and within a
   // month a thing with a photo is preferred.
-  assert.deepEqual(w.firstBuy, { shop: "Studio North", item: "Oversized Hoodie", kind: "fashion", date: "2026-01-20", photoId: "f2" });
+  // (`thing` is what it is, from item-kind-core.js, for its drawn icon.)
+  assert.deepEqual(w.firstBuy, { shop: "Studio North", item: "Oversized Hoodie", kind: "fashion", thing: "clothing", date: "2026-01-20", photoId: "f2" });
   const noPhoto = buildWrapped(year.filter((c) => c.id !== "f2"), 2026);
   assert.equal(noPhoto.firstBuy.item, "Kick Lane Court Classic Trainers", "the first memorable thing (the app takes the shop's name off its front)");
   assert.equal(noPhoto.firstBuy.photoId, null);
@@ -159,6 +160,32 @@ const listed = (c) => { const g = categorise(c), k = itemCategories(c); return {
   assert.deepEqual(journeysOf({ category: "travel", retailer: R("Uber", "uber.com"), items: [{ name: "Trip fare" }, { name: "Pick up to drop off" }] }), [], "only names with capitals both sides count as places");
   assert.equal(placeAt("London Road"), null, "a station named after a road isn't put in that city");
   assert.ok(placeAt("Manchester Oxford Road"), "a station that starts with its city's name is put in that city");
+  // Each journey in the order it was made, with where both ends are, for the story to travel along.
+  assert.deepEqual(t.trips.map((x) => x.from + " > " + x.to + " " + x.date), ["London Euston > Manchester Piccadilly 2026-01-06", "Manchester Piccadilly > London Euston 2026-05-02",
+    "Edinburgh > Glasgow Queen Street 2026-06-02", "Glasgow > Little Snoring Halt 2026-06-02"]);
+  assert.ok(t.trips[0].fromAt && t.trips[0].toAt && t.trips[0].return === true); assert.equal(t.trips[3].toAt, null, "an unknown place has no position");
+  assert.equal(t.moreTrips, 0);
+  // "Did you visit?": only places with well-known sights listed, asked about, at most two; never London.
+  assert.deepEqual(t.visits.map((v) => v.place), ["Manchester", "Glasgow"]);
+  assert.ok(t.visits[0].attractions.includes("Manchester Cathedral") && t.visits[0].attractions.length <= 3);
+  // Connor's year (18 Nov 2026): a sharing bag of Fruit Pastilles first, then more groceries. The story never opens on sweets:
+  // with nothing lasting bought, it opens on the count; with a jumper later in the year, on the jumper (drawn as clothing).
+  const sweets = [
+    listed({ id: "s1", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-04-19", totalPence: 125, items: [{ name: "Rowntree's 130g Fruit Pastilles Sweets Sharing Bag Lollies", pricePence: 125 }] }),
+    listed({ id: "s2", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-04-26", totalPence: 410, items: [{ name: "Haribo Starmix Sweets Sharing Bag 140g", pricePence: 135 }, { name: "Sainsbury's Bag For Life", pricePence: 25 }, { name: "Percy Pig 170g", pricePence: 250 }] }),
+    listed({ id: "s3", retailer: R("Tesco", "tesco.com"), orderDate: "2026-05-02", totalPence: 300, items: [{ name: "Kinder Bueno Twin Bar 43g", pricePence: 100 }, { name: "Pringles Original 165g Tube", pricePence: 200 }] }),
+    listed({ id: "s4", retailer: R("Boots", "boots.com"), orderDate: "2026-05-03", totalPence: 600, items: [{ name: "Scholl Cracked Heel Repair Balm 60ml", pricePence: 600 }] }),
+    listed({ id: "s5", retailer: R("M&S", "marksandspencer.com"), orderDate: "2026-05-04", totalPence: 400, items: [{ name: "Moscow Mule 250ml", pricePence: 200 }, { name: "Large Gift Bag", pricePence: 200 }] }),
+  ];
+  assert.equal(buildWrapped(sweets, 2026).firstBuy, null, "a sweets-and-groceries year opens on the count");
+  const withJumper = buildWrapped(sweets.concat(listed({ id: "j1", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Tu Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026);
+  assert.deepEqual([withJumper.firstBuy.item, withJumper.firstBuy.thing, withJumper.firstBuy.date], ["Tu Navy Cable Knit Jumper", "clothing", "2026-06-01"]);
+  assert.ok(!buildWrapped(sweets, 2026).chapters.some((c) => c.category === "fashion"), "no fashion chapter from sweets in a sharing bag");
+  // A name the rules aren't sure of never opens it, but the AI's sure answer (for shoppers with AI on) can.
+  const odd = [{ id: "o1", kind: "order", retailer: R("Blorp", "blorp.example"), orderDate: "2026-02-01", totalPence: 5000, category: "other", items: [{ name: "Xqzzy Mk2", pricePence: 5000 }] }];
+  assert.equal(buildWrapped(odd, 2026).firstBuy, null);
+  const oddAi = [{ ...odd[0], items: [{ name: "Xqzzy Mk2", pricePence: 5000, kind: "electronics", kindSure: true, kindAi: true, lasting: true }] }];
+  assert.equal(buildWrapped(oddAi, 2026).firstBuy.thing, "electronics");
   // Nothing personal or made up: an empty year still builds.
   const empty = buildWrapped([], 2026);
   assert.equal(empty.firstBuy, null); assert.equal(empty.travel, null);

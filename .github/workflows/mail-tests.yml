@@ -11,6 +11,8 @@ on:
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
+      - 'scripts/test-item-kinds-accuracy.mjs'
+      - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -27,6 +29,8 @@ on:
       - 'scripts/test-receipt-*.mjs'
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
+      - 'scripts/test-item-kinds-accuracy.mjs'
+      - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -52,6 +56,8 @@ jobs:
           node scripts/test-receipt-category.mjs
           node scripts/test-wrapped.mjs
           node scripts/test-wrapped-better.mjs
+      - name: What each receipt line is (Relay's rules alone, over 1,000 made-up UK receipt lines; at least 97% right, and food never read as clothes, shoes, bags, tech or homeware or the other way round)
+        run: node scripts/test-item-kinds-accuracy.mjs
       - name: Gmail
         run: |
           node scripts/test-gmail.mjs
