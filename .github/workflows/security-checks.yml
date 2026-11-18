@@ -42,6 +42,8 @@ jobs:
         run: node scripts/test-receipt-photo.mjs
       - name: Shop directory (seed list, TrueLayer's labels, shops learned from two shoppers' receipts, nothing about anyone kept)
         run: node scripts/test-shop-directory.mjs
+      - name: Picks follow what a thing is (a Jordan backpack is a bag, heel balm isn't heels, the weekly shop picks nothing)
+        run: node scripts/test-picks-kinds.mjs
       - name: Live parcel tracking (off until the key is set, tracking number only, 10 new parcels a month)
         run: node scripts/test-parcel-tracking.mjs
       - name: Return tracking (emails matched to the shopper's own receipt only, typed numbers, carrier guessed only when sure, refund not seen at 14 days, Ship24 shares the allowance, own receipts only)
