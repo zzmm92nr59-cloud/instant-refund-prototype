@@ -175,10 +175,14 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   assert.deepEqual((await overlaps(page)).hit, []);
   await page.waitForTimeout(500);
   await page.screenshot({ path: SHOTS + "/4-did-you-visit.png" });
+  // A tap goes on to the next trip. (Read where it is first: on a busy machine the slide may already have moved on by
+  // itself, so the tap is checked against where it really was.)
+  const jn = async () => Number((/JOURNEY (\d) OF 5/.exec(await body(page)) || [])[1] || 0);
+  const before = await jn();
   await page.mouse.click(330, 500); await page.waitForTimeout(250);
-  assert.match(await body(page), /JOURNEY 3 OF 5/);
-  await page.keyboard.press("ArrowRight"); await page.waitForTimeout(250);
-  await page.keyboard.press("ArrowRight"); await page.waitForTimeout(500);
+  assert.ok(await jn() > before && before >= 2, "a tap goes on to the next trip");
+  assert.ok(await toSlide(page, /JOURNEY 5 OF 5/, 4), "on to the last trip");
+  await page.waitForTimeout(500);
   // A place Relay can't position is named, never guessed; the start it knows (Manchester Picc) is on the map.
   const unknown = await body(page);
   assert.match(unknown, /JOURNEY 5 OF 5/); assert.match(unknown, /Little Snoring Halt isn't on the map\./);
