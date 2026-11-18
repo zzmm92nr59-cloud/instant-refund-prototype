@@ -1,9 +1,9 @@
 // Browser test: the better Wrapped (Connor, 17 Nov 2026). Stubbed Relay server; the Wrapped is built by the real
 // worker/wrapped.js from made-up receipts, sorted the way the server sorts them. It opens on something memorable (not a
-// bottle of water), a TV bed is Home & garden, a one-off shop is never a "go-to", nothing is joined with dots, each journey gets
-// a train running along its route (Connor, 18 Nov 2026: the train running across the screen went) and they all go on a UK map,
-// and things bought tumble in and drop into a bag (and sit still with reduced motion). scripts/test-wrapped-journeys-ui.mjs
-// checks the journeys in detail.
+// bottle of water), a TV bed is Home & garden, a one-off shop is never a "go-to", nothing is joined with dots, the year's
+// furthest journey is ridden from a train window and the others are on a departures board over a UK map of every route
+// (Connor, 18 Nov 2026: "not train on every journey"), and things bought tumble in and drop into a bag (and sit still with
+// reduced motion). scripts/test-wrapped-journeys-ui.mjs and test-wrapped-travel-ui.mjs check the journeys in detail.
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 import { skipInterests } from "./relay-places.mjs";
@@ -100,7 +100,7 @@ const body = (page) => page.locator(".rl-story-body").innerText();
       sawBag = true;
     }
     if (/ON THE MOVE/.test(t)) assert.match(t, /Most travelled\s+London Euston to Manchester Piccadilly\s+3 journeys/);
-    if (/JOURNEY 1 OF/.test(t) && !sawTrain) {
+    if (/YOUR LONGEST TRAIN JOURNEY/.test(t) && !sawTrain) {
       // Shown afresh, then read twice once on board (Connor, 18 Nov: the trip is seen from the train's window now): the
       // countryside goes by.
       await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight"); await page.waitForTimeout(3600);
@@ -111,19 +111,19 @@ const body = (page) => page.locator(".rl-story-body").innerText();
       assert.ok(Math.abs(b - a) > 5, "the countryside goes by on the journey");
       await page.screenshot({ path: SHOTS + "/3-train.png" }); sawTrain = true;
     }
-    if (/Where you went/.test(t)) {
-      assert.ok(await page.locator(".rl-story-body .map path.land").count() >= 5, "Great Britain, its islands and Northern Ireland");
-      assert.equal(await page.locator(".rl-story-body .map circle.dot").count(), wrapped.travel.places.length, "a dot for each place Relay can position");
-      const known = new Set(wrapped.travel.places.map(p => p.name.toLowerCase()));
-      const drawable = wrapped.travel.routes.filter(r => known.has(r.from.toLowerCase()) && known.has(r.to.toLowerCase())).length;
-      assert.equal(drawable, 2, "the fixture has two routes with both ends known: Euston to Manchester and Edinburgh to Glasgow Queen Street");
-      assert.equal(await page.locator(".rl-story-body .map path.arc").count(), drawable, "an arc for every route with both ends known; the journey to an unknown halt isn't drawn");
-      const delays = await page.locator(".rl-story-body .map path.arc").evaluateAll(ns => ns.map(n => parseFloat(getComputedStyle(n).animationDelay)));
-      assert.ok(delays.every((d, i) => i === 0 || d >= delays[i - 1] + 0.8), "the arcs are drawn one after another: " + delays);
-      await page.waitForTimeout(400 + delays.at(-1) * 1000 + 1000);
-      const arcs = await page.locator(".rl-story-body .map path.arc").evaluateAll(ns => ns.map(n => ({ len: n.getTotalLength(), off: parseFloat(getComputedStyle(n).strokeDashoffset) })));
-      for (const a of arcs) { assert.ok(a.len >= 20, "each arc is long enough to see beside its dots: " + a.len); assert.ok(Math.abs(a.off) < 0.01, "each arc is fully drawn"); }
-      assert.match(t, /Not on the map: Little Snoring Halt\./);
+    if (/YOUR OTHER TRAIN JOURNEYS/.test(t) && !sawMap) {
+      // The map behind the departures board (Connor, 18 Nov 2026: the other journeys are grouped): the whole of the UK, a
+      // line for every route with both ends known, each lit as its row settles, one after another.
+      await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight");
+      assert.ok(await page.locator(".rl-story-body .jbmap path.land").count() >= 5, "Great Britain, its islands and Northern Ireland");
+      const g = wrapped.travel.ground;
+      assert.equal(await page.locator(".rl-story-body .jbmap path.rt").count(), g.lines.length, "a line for every route with both ends known");
+      assert.equal(g.lines.length, 3, "the fixture's routes with both ends known: Euston to Manchester, back, and Edinburgh to Glasgow Queen Street");
+      const lit = [];
+      for (const ms of [150, 700, 1300, 2200]) { await page.waitForTimeout(ms - (lit.length ? [150, 700, 1300, 2200][lit.length - 1] : 0)); lit.push(await page.locator(".rl-story-body .jbmap .gl.on").count()); }
+      assert.ok(lit[0] < lit[lit.length - 1] && lit.every((v, k) => !k || v >= lit[k - 1]), "the routes light up one after another: " + lit);
+      const t2 = await page.locator(".rl-story-body").innerText();
+      assert.match(t2, /Not on the map: Little Snoring Halt\./);
       await page.screenshot({ path: SHOTS + "/4-map.png" }); sawMap = true;
     }
     if (/Some things you brought home/.test(t)) {

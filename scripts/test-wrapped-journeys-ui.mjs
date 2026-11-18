@@ -1,8 +1,9 @@
-// Browser test (Connor, 18 Nov 2026): Wrapped takes the shopper on every trip out. For each: the map flies to the starting
+// Browser test (Connor, 18 Nov 2026): Wrapped takes the shopper on the year's furthest trip out ("not train on every journey,
+// it's too long"; the others are on one departures board, see test-wrapped-travel-ui.mjs). The map flies to the starting
 // station (its name on a station board), the view moves into a train window with the countryside going by (lit for the
 // month), the train slows, the destination's board slides in, then "Did you visit…?" with sights from the server's list, or
 // "How was Brighouse?" where none are listed. The way back is never replayed; places Relay can't position are named, never
-// plotted; nothing written on a slide ever overlaps other words; reduced motion gets a still card per trip. Also: a
+// plotted; nothing written on a slide ever overlaps other words; reduced motion gets still cards. Also: a
 // sweets-and-groceries year never opens with sweets. Stubbed Relay server; the Wrapped is built by the real worker/wrapped.js
 // from made-up receipts, sorted the way the server sorts them. Screenshots at 390x844 @2x.
 import assert from "node:assert/strict";
@@ -33,7 +34,7 @@ const ticket = (date, name, shop = ["Trainline", "thetrainline.com"]) => listed(
 const trains = [
   ticket("2026-01-14", "London King's Cross to Brighouse"),
   ticket("2026-01-16", "Brighouse to London Kings Cross"),
-  ticket("2026-03-14", "London Kings Cross to York (Return)"),
+  ticket("2026-03-14", "Leeds to York (Return)"),
   ticket("2026-06-20", "York to Edinburgh Waverley", ["LNER", "lner.co.uk"]),
   ticket("2026-06-23", "Edinburgh to Glasgow Queen Street"),
   ticket("2026-09-02", "Manchester Picc to Little Snoring Halt"),
@@ -113,14 +114,16 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   console.log("ok - the first lasting thing opens it, with its own kind's icon");
 }
 
-// 2. Each trip out: zoom on the start, into the train, the countryside going by, arrival, the question; then the next.
+// 2. The year's furthest trip out (Connor, 18 Nov 2026: "not train on every journey, it's too long"): zoom on the start,
+// into the train, the countryside going by, arrival, the question. Then the other trips, all on one departures board.
 {
   wrapped = buildWrapped(trains, 2026, NOW);
   const t = wrapped.travel;
-  assert.deepEqual(t.trips.map(x => x.from + " > " + x.to), ["London King's Cross > Brighouse", "London Kings Cross > York", "York > Edinburgh Waverley", "Edinburgh > Glasgow Queen Street", "Manchester Picc > Little Snoring Halt"], "every trip out in order; the single back from Brighouse isn't one");
+  assert.deepEqual(t.trips.map(x => x.from + " > " + x.to), ["London King's Cross > Brighouse", "Leeds > York", "York > Edinburgh Waverley", "Edinburgh > Glasgow Queen Street", "Manchester Picc > Little Snoring Halt"], "every trip out in order; the single back from Brighouse isn't one");
   assert.ok(t.trips[0].toAt && Math.abs(t.trips[0].toAt.lat - 53.70) < 0.02, "Brighouse is on the map");
+  assert.equal(t.ground.featured.to, "Brighouse", "London to Brighouse is the furthest");
   const { ctx, page, errors } = await open({}, "on");
-  assert.ok(await toSlide(page, /JOURNEY 1 OF 5/), "the first trip has its own slide");
+  assert.ok(await toSlide(page, /YOUR LONGEST TRAIN JOURNEY/), "the furthest trip has its own slide");
   const started = Date.now(), at = (ms) => page.waitForTimeout(Math.max(0, ms - (Date.now() - started)));
   // a. The map: the camera zooms in on the start; the station's name goes up on a board.
   await at(250);
@@ -162,39 +165,59 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   await at(6900);
   assert.match(await body(page), /How was Brighouse\?/); assert.doesNotMatch(await body(page), /Did you visit/);
   assert.deepEqual((await overlaps(page)).hit, []);
-  // d. Then the next trip, by itself; a tap goes on sooner.
+  // d. Then the other trips, together on one departures board (none of them ridden); a tap goes on sooner.
   await at(7900);
-  assert.match(await body(page), /JOURNEY 2 OF 5/);
-  // Journey 2, to York in March: Did you visit…? with York's sights from the list, asked, never claimed.
-  await page.waitForTimeout(6500);
-  const v = await body(page);
-  assert.match(v, /Did you visit…\s+York Minster\s+The Shambles\s+The National Railway Museum\?/);
-  assert.doesNotMatch(v, /You visited|you saw|you went/i);
-  assert.equal(await page.locator(".rl-story-body .jsights .sic svg").count(), 3, "a drawn icon for each sight");
-  assert.equal(await page.locator(".rl-story-body .jtrain").evaluate(n => getComputedStyle(n).backgroundColor), "rgb(191, 224, 245)", "spring light in March");
-  assert.deepEqual((await overlaps(page)).hit, []);
-  await page.waitForTimeout(500);
-  await page.screenshot({ path: SHOTS + "/4-did-you-visit.png" });
-  // A tap goes on to the next trip. (Read where it is first: on a busy machine the slide may already have moved on by
-  // itself, so the tap is checked against where it really was.)
-  const jn = async () => Number((/JOURNEY (\d) OF 5/.exec(await body(page)) || [])[1] || 0);
-  const before = await jn();
+  assert.match(await body(page), /YOUR OTHER TRAIN JOURNEYS/);
+  assert.equal(await page.locator(".rl-story-body .jtrain").count(), 0, "no second ride");
+  await page.waitForTimeout(2600);
+  const rows = await page.locator(".rl-story-body .jbr.set").evaluateAll(ns => ns.map(n => [...n.children].map(c => c.textContent.trim()).filter(Boolean).join(" ")));
+  assert.deepEqual(rows, ["14 MAR YORK", "20 JUN EDINBURGH", "23 JUN GLASGOW", "2 SEP LITTLE SNORING"]);
+  // A place Relay can't position is named, never guessed onto the map.
+  assert.match(await body(page), /Not on the map: Little Snoring Halt\./);
+  assert.equal(await page.locator(".rl-story-body .jbmap .gl[data-place='little snoring halt']").count(), 0, "no line to a place Relay can't position");
+  await page.screenshot({ path: SHOTS + "/4-departures-board.png" });
   await page.mouse.click(330, 500); await page.waitForTimeout(250);
-  assert.ok(await jn() > before && before >= 2, "a tap goes on to the next trip");
-  assert.ok(await toSlide(page, /JOURNEY 5 OF 5/, 4), "on to the last trip");
-  await page.waitForTimeout(500);
-  // A place Relay can't position is named, never guessed; the start it knows (Manchester Picc) is on the map.
-  const unknown = await body(page);
-  assert.match(unknown, /JOURNEY 5 OF 5/); assert.match(unknown, /Little Snoring Halt isn't on the map\./);
-  assert.equal(await page.locator(".rl-story-body .jmap .pin").count(), 1); assert.equal(await page.locator(".rl-story-body .jmap .way").count(), 0, "no line to a place Relay can't position");
-  await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200);
-  assert.doesNotMatch(await body(page), /JOURNEY 6/);
+  assert.doesNotMatch(await body(page), /YOUR OTHER TRAIN JOURNEYS|YOUR LONGEST/, "a tap goes on");
+  // York's sights are asked about on Places you went (from the list, never claimed).
+  assert.ok(await toSlide(page, /PLACES YOU WENT/, 4));
+  await page.waitForTimeout(2200);
+  const v = await body(page);
+  assert.match(v, /York\s+York Minster, The Shambles or the National Railway Museum\?/);
+  assert.doesNotMatch(v.replace("PLACES YOU WENT", ""), /You visited|you saw|you went/i, "asked, never claimed (the slide's own title aside)");
+  assert.deepEqual((await overlaps(page)).hit, []);
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - each trip: zoom on the start, the train and the countryside, arrival board, the question; no way back replayed");
+  console.log("ok - the furthest trip: zoom on the start, the train and the countryside, arrival board, the question; the rest on one board");
+}
+// Spring light when the furthest trip is in March.
+{
+  wrapped = buildWrapped([ticket("2026-03-14", "London Kings Cross to York (Return)"), ticket("2026-04-02", "Leeds to Hull")], 2026, NOW);
+  const { ctx, page, errors } = await open();
+  assert.ok(await toSlide(page, /YOUR LONGEST TRAIN JOURNEY/));
+  await page.waitForTimeout(3600);
+  assert.equal(await page.locator(".rl-story-body .jtrain").evaluate(n => getComputedStyle(n).backgroundColor), "rgb(191, 224, 245)", "spring light in March");
+  await page.waitForTimeout(3600);
+  assert.match(await body(page), /Did you visit…\s+York Minster\s+The Shambles\s+The National Railway Museum\?/);
+  assert.equal(await page.locator(".rl-story-body .jsights .sic svg").count(), 3, "a drawn icon for each sight");
+  await page.screenshot({ path: SHOTS + "/5-did-you-visit.png" });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  console.log("ok - the ride is lit for its month, and asks about the place's sights");
+}
+// A trip Relay can only half place, when it's the only one: the start on the map, the end named.
+{
+  wrapped = buildWrapped([ticket("2026-09-02", "Manchester Picc to Little Snoring Halt")], 2026, NOW);
+  const { ctx, page, errors } = await open();
+  assert.ok(await toSlide(page, /YOUR TRAIN JOURNEY/));
+  await page.waitForTimeout(500);
+  assert.match(await body(page), /Little Snoring Halt isn't on the map\./);
+  assert.equal(await page.locator(".rl-story-body .jmap .pin").count(), 1); assert.equal(await page.locator(".rl-story-body .jmap .way").count(), 0, "no line to a place Relay can't position");
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  console.log("ok - a place Relay can't position is named, never plotted");
 }
 
-// 3. More than ten trips: each place once, with how many times.
+// 3. More than ten trips: each place once on the board, with how many times.
 {
   const many = [];
   const legs = [["Leeds", "York"], ["Leeds", "Harrogate"], ["Leeds", "York"], ["Leeds", "Sheffield"], ["Leeds", "Manchester Piccadilly"], ["Leeds", "York"], ["Leeds", "Bradford Interchange"],
@@ -204,21 +227,27 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   const t = wrapped.travel;
   assert.equal(t.trips.length, 10, "twelve trips, ten places");
   assert.deepEqual(t.trips.map(x => x.to + (x.times ? " x" + x.times : "")).slice(0, 3), ["York x3", "Harrogate", "Sheffield"]);
+  assert.equal(t.ground.featured.to, "Newcastle");
+  assert.equal(t.ground.others.length, 9, "ten places, the furthest featured");
   const { ctx, page, errors } = await open();
-  assert.ok(await toSlide(page, /JOURNEY 1 OF 10/));
-  await page.waitForTimeout(6800);
-  assert.match(await body(page), /3 times this year/);
+  assert.ok(await toSlide(page, /YOUR OTHER TRAIN JOURNEYS/));
+  await page.waitForTimeout(2500);
+  const first = await page.locator(".rl-story-body .jbr.set").first().evaluate(n => [...n.children].map(c => c.textContent.trim()).filter(Boolean).join(" "));
+  assert.equal(first, "3 JAN YORK 3 TIMES");
   assert.deepEqual((await overlaps(page)).hit, []);
+  // Nine rows: a second page of the board flips in.
+  await page.waitForTimeout(1600);
+  assert.equal(await page.locator(".rl-story-body .jbstage").getAttribute("data-page"), "1");
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - over ten trips, a place gone to three times is shown once: 3 times this year");
+  console.log("ok - over ten trips, a place gone to three times is on the board once: 3 TIMES");
 }
 
-// 4. Reduced motion: a still card for each trip (the route on the map, names, date) and its question.
+// 4. Reduced motion: a still card for the furthest trip (the route on the map, names, date) and its question; the board still.
 {
   wrapped = buildWrapped(trains, 2026, NOW);
   const { ctx, page, errors } = await open({ reducedMotion: "reduce" });
-  assert.ok(await toSlide(page, /JOURNEY 1 OF 5/));
+  assert.ok(await toSlide(page, /YOUR LONGEST TRAIN JOURNEY/));
   const t = await body(page);
   assert.match(t, /London King's Cross to Brighouse\s+14 January\s+How was Brighouse\?/);
   assert.equal(await page.locator(".rl-story-body .jtrain, .rl-story-body .jmap").count(), 0, "nothing moving");
@@ -226,23 +255,25 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   assert.equal(await page.locator(".rl-story-body .jstill .pin").count(), 2);
   assert.deepEqual((await overlaps(page)).hit, []);
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(200);
-  assert.match(await body(page), /JOURNEY 2 OF 5[\s\S]*Did you visit…\s+York Minster/);
-  await page.screenshot({ path: SHOTS + "/5-reduced-motion.png" });
+  assert.match(await body(page), /YOUR OTHER TRAIN JOURNEYS/);
+  assert.equal(await page.locator(".rl-story-body .jbr.set").count(), 4, "every row in place at once");
+  await page.screenshot({ path: SHOTS + "/6-reduced-motion.png" });
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - with reduced motion, a still card for each trip and its question");
+  console.log("ok - with reduced motion, a still card for the furthest trip and a still board");
 }
-// A flight isn't shown from a train window: its route stands still on the map, with the question.
+// A flight is seen from a plane's window, not a train's.
 {
   wrapped = buildWrapped([ticket("2026-07-04", "London Stansted to Edinburgh", ["Ryanair", "ryanair.com"])], 2026, NOW);
   assert.equal(wrapped.travel.trips[0].mode, "flight");
   const { ctx, page, errors } = await open();
-  assert.ok(await toSlide(page, /YOUR JOURNEY/));
-  assert.equal(await page.locator(".rl-story-body .jtrain").count(), 0); assert.equal(await page.locator(".rl-story-body .jstill .way.solid").count(), 1);
-  assert.match(await body(page), /London Stansted to Edinburgh\s+4 July[\s\S]*Did you visit…\s+Edinburgh Castle/);
+  assert.ok(await toSlide(page, /YOUR FLIGHT/));
+  assert.equal(await page.locator(".rl-story-body .jtrain").count(), 0); assert.equal(await page.locator(".rl-story-body .jplane").count(), 1);
+  await page.waitForTimeout(8200);
+  assert.match(await body(page), /Did you visit…\s+Edinburgh Castle/);
   assert.deepEqual(errors, []);
   await ctx.close();
-  console.log("ok - a flight is a still route on the map, not a train window");
+  console.log("ok - a flight is the window seat, not a train window");
 }
 // 5. The sights are only ever the server's list.
 {
@@ -253,4 +284,4 @@ const onStage = (page, sel) => page.evaluate((s) => { const st = document.queryS
   console.log("ok - sights come only from uk-attractions.js");
 }
 await browser.close(); server.close();
-console.log("PASS Wrapped journeys: no sweets opening, every trip out travelled (zoom, train, arrival, question), no way back, grouping, reduced motion");
+console.log("PASS Wrapped journeys: no sweets opening, the furthest trip ridden (zoom, train, arrival, question), the rest on a board, no way back, grouping, reduced motion");

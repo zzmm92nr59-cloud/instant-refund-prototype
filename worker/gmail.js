@@ -104,7 +104,10 @@ const OUTLOOK_FULL_REV = 1;
 // booking confirmation numbers, deposits into an account left out, and a payment platform's "Merchant:".
 // 12: notices about an order already placed left out (a delay, "important information regarding your order", a benefit
 // confirmed for it), and totals that aren't in pounds read in their own currency, never converted.
-const READER_FULL_REV = 12;
+// 13: flight bookings from airlines and travel sites (flight-booking.js: "Your booking is confirmed", "Ryanair Travel
+// Itinerary", "Your e-ticket receipt"), each flight read with its airports, day and flight number; check-in reminders and
+// boarding passes left out. The search also asks for "travel confirmation", "flight confirmation" and e-ticket subjects.
+const READER_FULL_REV = 13;
 const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
@@ -123,7 +126,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 30;
+export const PARSER_VERSION = 31;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -132,7 +135,7 @@ const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 
 // SHOPPING_SUBJECT): bookings, tickets, trips and invoices as well as orders and receipts.
 const SEARCH_TERMS =
   '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
-  ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
+  ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk OR collectplus.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped OR "dropped off")';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
@@ -798,6 +801,8 @@ function classify(rawText, ref, lenient = false) {
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, orderDateFrom: receipt.orderDateFrom || null, currency: receipt.currency,
       totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence, sentTo: receipt.sentTo || null,
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
+      // A flight booking's flights (airport codes, day, flight number, out or back): for the receipt and for Wrapped.
+      ...(receipt.flights ? { flights: receipt.flights } : {}),
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else {

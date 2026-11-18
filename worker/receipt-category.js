@@ -40,7 +40,7 @@ const SHOP_LIST = {
     "ryanair easyjet britishairways ba jet2 jet2holidays wizzair virginatlantic emirates qatarairways klm airfrance lufthansa tui loganair aerlingus " +
     "vueling iberia norwegian turkishairlines bookingcom booking airbnb expedia hotelscom hotels trivago premierinn travelodge hilton marriott ihg " +
     "holidayinn accor ibis novotel citizenm skyscanner kayak lastminute onthebeach loveholidays haystravel trailfinders sykescottages hoseasons " +
-    "centerparcs haven butlins omio holidayextras opodo edreams hostelworld agoda vrbo",
+    "centerparcs haven butlins omio holidayextras opodo edreams hostelworld agoda vrbo tripcom kiwicom etihad",
   digital: "itunes icloud applemusic appletv googleplay spotify netflix disney disneyplus primevideo audible kindle youtube youtubepremium " +
     "microsoft365 adobe dropbox openai chatgpt anthropic claude appcharge xsolla steam steampowered playstationstore xbox nintendoeshop epicgames " +
     "roblox ubisoft patreon substack onlyfans twitch discord discordnitro duolingo notion canva github cloudflare googleone googleworkspace " +
@@ -296,6 +296,8 @@ export function categorise(card, learned) {
   const store = [r.name, r.legalName, r.domain].filter(Boolean).join(" ");
   const noReturn = NO_RETURN.test(store);
   if (learned && CATEGORIES[learned]) return finish(learned, items, noReturn);
+  // A booking the reader found flights in (flight-booking.js) is travel, whoever it was booked with.
+  if (Array.isArray(card.flights) && card.flights.length) return finish("travel", items, noReturn);
   // Apple sells both phones and App Store credit: the items decide.
   if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store) && !isVia(r.domain)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items, noReturn);
   const score = categoryScores(card);
