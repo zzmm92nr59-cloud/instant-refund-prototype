@@ -8031,6 +8031,12 @@
       if ((t.unplotted || []).length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + t.unplotted.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
     } });
   }
+  // Home's Wrapped goes straight into this year's story (Connor, 18 Nov 2026: the Wrapped page is boring). The page with
+  // every year stays in Receipts. With no receipts this year yet, the page says what to do first.
+  function playThisYear() {
+    var y = new Date().getFullYear(), page = function () { if (window.go) window.go("wrapped"); };
+    cachedGet("wrapped" + y, "/relay/my/wrapped?year=" + y).then(function (r) { if (r && r.ok && r.body && r.body.receipts) { try { playStory(r.body); } catch (e) { page(); } } else page(); }, page);
+  }
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
     var root = el("div", { className: "rl-story", role: "dialog", ariaLabel: "Your " + w.year + " Wrapped" });
@@ -10399,7 +10405,7 @@
       });
       // The rest of Relay, a tap from Home and scrolled to sideways (Connor, 17 Nov 2026): these open their own pages.
       [["Swap & resell", function () { window.dcShow && window.dcShow("market"); }, "swap"], ["Auctions", function () { window.dcShow && window.dcShow("auctions"); }, "gavel"],
-        ["Shops on Relay", function () { window.dcShow && window.dcShow("shops"); }, "bag"], isReview() ? null : ["Wrapped", function () { window.go && window.go("wrapped"); }, "spark"]].forEach(function (c, i) {
+        ["Shops on Relay", function () { window.dcShow && window.dcShow("shops"); }, "bag"], isReview() ? null : ["Wrapped", playThisYear, "spark"]].forEach(function (c, i) {
         if (!c) return;
         var b = el("button", { type: "button", className: "h2-chip h2-chip-go" + (i === 0 ? " h2-chip-first" : ""), onclick: tapOnce(c[1]) });
         var ico = accIc(c[2], 18, "h2-chip-ic"); ico.style.color = ACC_TINT[c[2]] || "#D47B1F";
