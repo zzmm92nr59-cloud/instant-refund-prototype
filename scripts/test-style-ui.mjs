@@ -137,10 +137,11 @@ await panel.getByRole("heading", { name: "Picked for you" }).waitFor();
 assert.equal(await page.locator('#catalogResults [data-card-select="shopify:kick:1"] .dc-opts').innerText(), "White · UK 8, UK 9", "the colour is said once, then the sizes");
 await page.waitForTimeout(1300);   // the drawings finish drawing themselves in
 await page.screenshot({ path: "/tmp/shots/discover-for-you.png", fullPage: true });
-// Turning picks off leaves a "Picks for you" switch in the filters (the invitation was answered, so it doesn't come back).
+// Turning picks off leaves a way straight back where they were (Connor, 18 Nov 2026: "When I turn off For you shopping
+// the button disappears to turn it back on"), and the "Picks for you" switch in the filters.
 await panel.getByRole("button", { name: "Turn off" }).click();
 await page.locator(".dc-for").waitFor({ state: "detached" });
-assert.equal(await invite.count(), 0, "the invitation was answered");
+assert.equal(await invite.count(), 1, "Turn on picks for you stays, so they can come back");
 await openFilters(page);
 await page.locator(".dc-chips").getByRole("button", { name: "Picks for you" }).waitFor();
 // Sizes read in their natural order, and the ladder's two sizes are one product.

@@ -94,6 +94,9 @@ export async function learnItemKinds(env, shopper, o) {
   if (!(await isOnFor(env, db, shopper.id))) return null;
   const known = new Map((await db.prepare("SELECT name_key, data, created_at FROM item_kinds WHERE shopper_id = ?").bind(shopper.id).all()).results
     .map((r) => [r.name_key, r]));
+  // Asked from a screen being opened: answer with what's known now; asking Claude happens after the response (o.later).
+  // Connor, 18 Nov 2026: Wrapped stopped loading and the app slowed while every open waited for the AI.
+  if (o && o.askNow === false) return known;
   const today = [...known.values()].filter((r) => r.created_at > now - DAY).length;
   const room = Math.min(KINDS_PER_ASK, Math.max(0, KINDS_PER_DAY - today));
   if (room <= 0) return known;
@@ -160,7 +163,8 @@ export async function handleItemKindsRoute(path, method, request, env, cors, sho
     return json({ available: aiAvailable(env), on: b.on }, 200, cors);
   }
   if (method !== "GET") return json({ error: "not_found" }, 404, cors);
-  const known = await learnItemKinds(env, shopper, o);
+  const known = await learnItemKinds(env, shopper, { ...o, askNow: false });
+  if (known && o && o.later) o.later(learnItemKinds(env, shopper, o).catch(() => null));
   if (!known) return json({ available: aiAvailable(env), on: false, kinds: {} }, 200, cors);
   // What picks use: the mode, the kind and the words to look for (what each thing is goes with the receipts instead).
   const kinds = {};

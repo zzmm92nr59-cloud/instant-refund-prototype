@@ -323,12 +323,16 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
 // switched it on), from a shop rather than a forwarded email. Food, drink, toiletries, beauty, tickets, travel and apps never
 // open it. Within a month of that, one with a photo of it is preferred. Null when there is none: the story then opens with
 // the count. Nothing is made up: the shop, the thing and the date are the receipt's; `thing` is what it is, for its icon.
+const GROCER = /\b(sainsbury'?s?|tesco|asda|morrisons|aldi|lidl|waitrose|co-?op|iceland|ocado|m ?& ?s food|spar|budgens|farmfoods|deliveroo|just ?eat|uber ?eats|greggs|pret|costa|starbucks|nespresso)\b/i;
 const OPENS = new Set(["clothing", "footwear", "accessories", "electronics", "home", "toys_hobbies", "books_media", "sport_outdoor"]);
 function memorableFirst(list) {
   const found = [];
   const sorted = list.slice().sort((a, b) => whenOf(a).localeCompare(whenOf(b)) || (a.createdAt || 0) - (b.createdAt || 0));
   for (const c of sorted) {
     if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
+    // Nothing from a supermarket, a takeaway or a food shop opens the story, however its line reads (Connor, 18 Nov 2026:
+    // "Highland Game Venison Grillsteaks 300g" read as a game). Most of what they sell is eaten.
+    if (c.category === "food" || GROCER.test(shopName(c) + " " + String((c.retailer && c.retailer.domain) || ""))) continue;
     const kinds = thingsOf(c);
     for (let i = 0; i < (c.items || []).length; i++) {
       const n = itemName(c.items[i]), t = kinds[i];

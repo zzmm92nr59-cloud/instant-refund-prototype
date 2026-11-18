@@ -832,7 +832,7 @@ function dcPicks(groups){if(!personalise||typeof RelayRecommendationEngine==="un
  const watched=Object.entries(watch).map(([sku,w])=>({product:w&&w.name||""}));
  return RelayRecommendationEngine.picks(hist,groups,{sizes,taps:getTaps(),watched,notFor:getNotFor(),seen,aiKinds})}
 function dcForYou(groups){const signed=window.RelayAccount&&RelayAccount.signedIn&&RelayAccount.signedIn();if(!signed)return"";
- if(!personalise)return personaliseAsked?"":'<button type="button" class="dc-pickrow" onclick="togglePersonalise()"><span class="dc-pickrow-ic" aria-hidden="true">'+navIcon("discover")+'</span><span class="dc-pickrow-t"><b>Turn on picks for you</b><span>Chosen from your receipts. Only you see them.</span></span>'+ic("chev")+'</button>';
+ if(!personalise)return '<button type="button" class="dc-pickrow" onclick="togglePersonalise()"><span class="dc-pickrow-ic" aria-hidden="true">'+navIcon("discover")+'</span><span class="dc-pickrow-t"><b>Turn on picks for you</b><span>Chosen from your receipts. Only you see them.</span></span>'+ic("chev")+'</button>';
  const head='<div class="dc-forhead"><h2>Picked for you</h2><span>'+(hasLearned()?'<button class="link small" onclick="forgetTaste()">Forget my style</button>':'')+'<button class="link small" onclick="togglePersonalise()">Turn off</button></span></div>'
   +(lastNotFor?'<p class="dc-fewer" role="status">'+(lastNotFor.noun?'Fewer '+safe(lastNotFor.noun)+' from now on.':'Hidden from your picks.')+' <button class="link small" onclick="undoNotFor()">Undo</button></p>':'');
  if(!tasteLoaded&&!tasteOff)return '<div class="dc-for"><div class="skel" style="height:220px;border-radius:20px"></div></div>';

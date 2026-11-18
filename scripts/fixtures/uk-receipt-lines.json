@@ -62,7 +62,7 @@
     ["Sainsbury's Home Bath Towel Navy", "home"],
     ["Sainsbury's Home Scented Candle Fig", "home"],
     ["Sainsbury's Basil Plant", "home"],
-    ["Sainsbury's Highland Venison Grillsteaks", "food_drink"],
+    ["Sainsbury's Highland Venison Grillsteaks", "food_drink"], ["Highland Game Venison Grillsteaks 300g", "food_drink"], ["Sainsbury's Game Casserole Pack 400g", "food_drink"],
     ["Sainsbury's Gift Bag Large", "household"]
   ] },
   {"shop": "Tesco", "domain": "tesco.com", "lines": [

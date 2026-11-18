@@ -2143,11 +2143,13 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/wrapped" && m === "GET") {
     // With AI for picks on, the names of things not read yet are read first (item-kinds.js), so Wrapped counts each thing as
     // what it is. Off, or with no AI key: Relay's own rules only.
-    await learnItemKinds(env, shopper, { now: opts.now, fetchImpl: opts.fetchImpl }).catch(() => null);
-    let cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
-    // Shops whose names don't say what they sell are asked about once (only with the AI on, only the shop's name): when
-    // any were learned, the receipts are sorted again with the answers.
-    if (await learnShopKinds(env, cards, { fetchImpl: opts.fetchImpl, now: opts.now }).catch(() => 0)) cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    // Wrapped never waits for the AI (Connor, 18 Nov 2026: it stopped loading while it did): it's built from what's known
+    // now, and things and shops not read yet are read after the response, for next time.
+    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    if (opts.later) opts.later((async () => {
+      await learnItemKinds(env, shopper, { now: opts.now, fetchImpl: opts.fetchImpl }).catch(() => null);
+      await learnShopKinds(env, cards, { fetchImpl: opts.fetchImpl, now: opts.now }).catch(() => 0);
+    })());
     return json(buildWrapped(cards, url.searchParams.get("year"), opts.now, { industry: url.searchParams.get("industry") }), 200, cors);
   }
   // Everything the shopper bought that their style can be learned from: physical things only (no food, travel or apps),

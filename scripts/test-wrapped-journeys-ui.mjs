@@ -73,10 +73,10 @@ async function toSlide(page, re, max = 40) {
 }
 // With a jumper later that year, it opens on the jumper, drawn as clothing.
 {
-  wrapped = buildWrapped(sweets.concat(listed({ id: id(), retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Tu Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026, NOW);
+  wrapped = buildWrapped(sweets.concat(listed({ id: id(), retailer: R("Fernleigh Knitwear", "fernleighknit.example"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026, NOW);
   const { ctx, page, errors } = await open();
   await page.waitForTimeout(900);
-  assert.match(await body(page), /It started on 1 June with Tu Navy Cable Knit Jumper from Sainsbury's\./);
+  assert.match(await body(page), /It started on 1 June with Navy Cable Knit Jumper from Fernleigh Knitwear\./);
   assert.equal(await page.locator(".rl-story-body .rl-wr-hero svg path").getAttribute("d"), "M8.5 4 4 7l2 3.2 2-1.1V20h8V9.1l2 1.1L20 7l-4.5-3c-.9 1.4-2.1 2-3.5 2s-2.6-.6-3.5-2Z", "the clothing icon for a jumper");
   await page.screenshot({ path: SHOTS + "/1b-first-lasting-thing.png" });
   assert.deepEqual(errors, []);

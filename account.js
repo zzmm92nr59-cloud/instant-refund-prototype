@@ -9810,7 +9810,14 @@
       if (state.pick === "watch" && watched.some(function (w) { return !w.image; }) && window.relayNeedCatalog && !memo.watchPicsAsked) {
         memo.watchPicsAsked = true;
         if (!window.relayNeedCatalog()) window.addEventListener("relay-catalogue", function () { if (state.pick === "watch" && feed.isConnected) draw(); }, { once: true }); }
-      if (state.pick === "watch") watched.slice(0, 12).forEach(function (w) {
+      // Only real products from the shops, with their own photo and the shop's name (Connor, 18 Nov 2026: "It should be real
+      // products with real photos from the stores we have and the ones I've clicked watch"). One a shop's website no longer
+      // has is left off, with one line saying so once the shops' products are in.
+      var shownWatch = watched.filter(function (w) { return w.image && /^https:\/\//.test(w.image) && w.store; }), gone = watched.length - shownWatch.length;
+      if (state.pick === "watch" && gone && window.relayNeedCatalog && window.relayNeedCatalog()) feed.appendChild(feedCard({ small: true, icon: "bell",
+        line: gone === 1 ? "1 thing you watched isn't on its shop's website any more" : gone + " things you watched aren't on their shops' websites any more",
+        open: function () { if (window.go) window.go("radar"); } }));
+      if (state.pick === "watch") shownWatch.slice(0, 12).forEach(function (w) {
         var now = Number.isInteger(w.nowMinor) ? w.nowMinor : null, was = Number.isInteger(w.priceMinor) ? w.priceMinor : null, drop = now !== null && was !== null && now < was;
         feed.appendChild(feedCard({ shop: w.store || "Watching", cat: null, tiles: [{ name: w.product + (w.variation ? ", " + w.variation : ""), price: now !== null ? money(now, w.currency || "GBP") : "",
             draw: function (box) { var drawIt = function () { illustrate(box, { items: [{ name: w.product }], retailer: { name: w.store || "" }, category: "other" }, 96); };

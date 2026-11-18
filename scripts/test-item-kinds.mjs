@@ -57,7 +57,10 @@ const clock = Date.UTC(2026, 10, 15, 9);
 let now = clock;
 const call = (path, { method = "GET", body, token, ip = "1.1.1.1" } = {}) =>
   handleAuthRoute(new Request("https://w.test" + path, { method, headers: { "content-type": "application/json", "cf-connecting-ip": ip, ...(token ? { authorization: "Bearer " + token } : {}) },
-    body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now, fetchImpl });
+    body: body ? JSON.stringify(body) : undefined }), env, new URL("https://w.test" + path), {}, { now, fetchImpl, later: (p) => pending.push(p) })
+    // The Worker finishes what it does after a response (ctx.waitUntil) before the next request comes in.
+    .then(async (res) => { while (pending.length) await pending.shift(); return res; });
+const pending = [];
 async function signIn(email, ip) {
   emails = [];
   await call("/relay/auth/request", { method: "POST", body: { email }, ip });
@@ -95,8 +98,12 @@ console.log("ok - off until the AI key is set, and then only for shoppers who sw
 
 // 2. Jess switches it on: her item names are read once, with the shop's name and nothing else.
 assert.deepEqual(await (await call("/relay/my/item-kinds", { method: "POST", token: jess, body: { on: true } })).json(), { available: true, on: true });
+// The screen asking doesn't wait for the AI (Connor, 18 Nov 2026): it's read after the response, and the next open has it.
 r = await (await call("/relay/my/item-kinds", { token: jess })).json();
 assert.equal(aiCalls.length, 1);
+assert.deepEqual(r.kinds, {}, "the first open answers at once with what's known");
+r = await (await call("/relay/my/item-kinds", { token: jess })).json();
+assert.equal(aiCalls.length, 1, "opened again: nothing asked twice");
 const sent = JSON.parse(aiCalls[0].messages[0].content);
 // Every line's name is asked about now (18 Nov 2026), so each thing is counted as what it is, not only the ones picks follow.
 assert.deepEqual(sent.map((x) => x.shop).sort(), ["Corner Grocer", "Nespresso", "Screen Barn", "Studio North", "Studio North"], "her shops only");

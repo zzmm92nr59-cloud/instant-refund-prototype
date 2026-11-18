@@ -177,9 +177,13 @@ const listed = (c) => { const g = categorise(c), k = itemCategories(c); return {
     listed({ id: "s4", retailer: R("Boots", "boots.com"), orderDate: "2026-05-03", totalPence: 600, items: [{ name: "Scholl Cracked Heel Repair Balm 60ml", pricePence: 600 }] }),
     listed({ id: "s5", retailer: R("M&S", "marksandspencer.com"), orderDate: "2026-05-04", totalPence: 400, items: [{ name: "Moscow Mule 250ml", pricePence: 200 }, { name: "Large Gift Bag", pricePence: 200 }] }),
   ];
+  // Connor's next Wrapped (18 Nov 2026) opened on "Highland Game Venison Grillsteaks 300g" as a game: nothing from a
+  // supermarket opens the story, however its line reads.
+  sweets.unshift(listed({ id: "s0", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-01-11", totalPence: 450, items: [{ name: "Highland Game Venison Grillsteaks 300g", pricePence: 450 }] }));
   assert.equal(buildWrapped(sweets, 2026).firstBuy, null, "a sweets-and-groceries year opens on the count");
-  const withJumper = buildWrapped(sweets.concat(listed({ id: "j1", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Tu Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026);
-  assert.deepEqual([withJumper.firstBuy.item, withJumper.firstBuy.thing, withJumper.firstBuy.date], ["Tu Navy Cable Knit Jumper", "clothing", "2026-06-01"]);
+  assert.equal(buildWrapped(sweets.concat(listed({ id: "j0", retailer: R("Sainsbury's", "sainsburys.co.uk"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Tu Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026).firstBuy, null, "not even a jumper from a supermarket");
+  const withJumper = buildWrapped(sweets.concat(listed({ id: "j1", retailer: R("Fernleigh Knitwear", "fernleighknit.example"), orderDate: "2026-06-01", totalPence: 1800, items: [{ name: "Navy Cable Knit Jumper", pricePence: 1800 }] })), 2026);
+  assert.deepEqual([withJumper.firstBuy.item, withJumper.firstBuy.thing, withJumper.firstBuy.date], ["Navy Cable Knit Jumper", "clothing", "2026-06-01"]);
   assert.ok(!buildWrapped(sweets, 2026).chapters.some((c) => c.category === "fashion"), "no fashion chapter from sweets in a sharing bag");
   // A name the rules aren't sure of never opens it, but the AI's sure answer (for shoppers with AI on) can.
   const odd = [{ id: "o1", kind: "order", retailer: R("Blorp", "blorp.example"), orderDate: "2026-02-01", totalPence: 5000, category: "other", items: [{ name: "Xqzzy Mk2", pricePence: 5000 }] }];
