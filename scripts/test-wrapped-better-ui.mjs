@@ -101,12 +101,14 @@ const body = (page) => page.locator(".rl-story-body").innerText();
     }
     if (/ON THE MOVE/.test(t)) assert.match(t, /Most travelled\s+London Euston to Manchester Piccadilly\s+3 journeys/);
     if (/JOURNEY 1 OF/.test(t) && !sawTrain) {
-      // Shown afresh, then read twice: the train moves along the route.
-      await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight"); await page.waitForTimeout(600);
-      const a = await page.locator(".rl-story-body .tiny-train").evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y]; });
-      await page.waitForTimeout(700);
-      const b = await page.locator(".rl-story-body .tiny-train").evaluate(n => { const r = n.getBoundingClientRect(); return [r.x, r.y]; });
-      assert.ok(Math.hypot(b[0] - a[0], b[1] - a[1]) > 5, "the train moves along the journey");
+      // Shown afresh, then read twice once on board (Connor, 18 Nov: the trip is seen from the train's window now): the
+      // countryside goes by.
+      await page.keyboard.press("ArrowLeft"); await page.waitForTimeout(100); await page.keyboard.press("ArrowRight"); await page.waitForTimeout(3600);
+      const near = () => page.locator(".rl-story-body .jl").last().evaluate(n => new DOMMatrix(getComputedStyle(n).transform).m41);
+      const a = await near();
+      await page.waitForTimeout(300);
+      const b = await near();
+      assert.ok(Math.abs(b - a) > 5, "the countryside goes by on the journey");
       await page.screenshot({ path: SHOTS + "/3-train.png" }); sawTrain = true;
     }
     if (/Where you went/.test(t)) {
@@ -161,9 +163,10 @@ const body = (page) => page.locator(".rl-story-body").innerText();
   let sawList = false;
   for (let k = 0; k < 30; k++) {
     await page.keyboard.press("ArrowRight"); await page.waitForTimeout(150);
-    if (await page.locator(".rl-story-body .jlist").count()) { assert.equal(await page.locator(".rl-story-body .jmap").count(), 0, "the journeys are a still list"); sawList = true; break; }
+    // Each trip is a still card (its route on a map that doesn't move), not the moving map and train window.
+    if (await page.locator(".rl-story-body .jstill").count()) { assert.equal(await page.locator(".rl-story-body .jmap, .rl-story-body .jtrain").count(), 0, "the journeys don't move"); sawList = true; break; }
   }
-  assert.ok(sawList, "the journeys were shown as a list");
+  assert.ok(sawList, "the journeys were shown as still cards");
   assert.deepEqual(errors, []);
   await ctx.close();
   console.log("ok - with reduced motion the photo, the bag and the journeys stand still");

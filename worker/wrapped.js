@@ -2,7 +2,7 @@
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
 import { PERSONAL_MAIL, CATEGORIES, itemKind, itemKinds, categoryShares, isGrocer, lastingThing, knownShop } from "./receipt-category.js";
 import KindCore from "./item-kind-core.js";
-import { placeAt } from "./uk-places.js";
+import { placeAt, findPlace, samePlace, placeKey } from "./uk-places.js";
 import { attractionsFor, placeTitle } from "./uk-attractions.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
@@ -384,16 +384,13 @@ function travelOf(list) {
   const known = [], unknown = [];
   for (const p of places.values()) { const at = placeAt(p.name); if (at) known.push({ name: p.name, lat: at.lat, lon: at.lon, visits: p.visits }); else unknown.push(p.name); }
   const by = (m) => trips.filter(t => t.mode === m).reduce((n, t) => n + (t.return ? 2 : 1), 0);
-  // The journeys one at a time, in the order they were made, for the story to take the shopper on each (the first six; the
-  // rest are counted). Each end has its place on the map when Relay knows where it is.
-  const at = (name) => { const p = placeAt(name); return p ? { lat: p.lat, lon: p.lon } : null; };
   const inOrder = trips.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
-  const TRIPS_SHOWN = 6;
+  const outward = outwardTrips(inOrder);
   // "Did you visit?": the places the journeys went to that have well-known sights listed (uk-attractions.js), most visited
   // first, at most two. Only ever asked, never said: a ticket there doesn't mean the shopper saw any of it.
   const dest = new Map();
-  inOrder.forEach((t, i) => {
-    const a = attractionsFor(t.to);
+  outward.forEach((t, i) => {
+    const a = sightsFor(t.to);
     if (!a) return;
     const e = dest.get(a.place) || { place: placeTitle(a.place), attractions: a.attractions, times: 0, first: i, date: t.date };
     e.times++; dest.set(a.place, e);
@@ -406,9 +403,48 @@ function travelOf(list) {
     routes: ranked.slice(0, 12).map(r => ({ from: r.from, to: r.to, times: r.times, mode: r.mode })),
     topRoute: ranked[0] && ranked[0].times >= 2 ? { from: ranked[0].from, to: ranked[0].to, times: ranked[0].times } : null,
     places: known.sort((a, b) => b.visits - a.visits).slice(0, 30), unplotted: unknown.slice(0, 10),
-    trips: inOrder.slice(0, TRIPS_SHOWN).map(t => ({ from: t.from, to: t.to, date: t.date, mode: t.mode, return: t.return, fromAt: at(t.from), toAt: at(t.to) })),
-    moreTrips: Math.max(0, inOrder.length - TRIPS_SHOWN), visits,
+    // Every trip out, in date order, for the story to take the shopper on (the way back isn't replayed). With more than ten,
+    // each place is gone to once, with how many times.
+    trips: storyTrips(outward), moreTrips: 0, waysBack: inOrder.length - outward.length, visits,
   };
+}
+const DAY = 864e5;
+const dayOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + "T12:00:00Z") : null);
+// The town a place is in, for the question and for counting places gone to more than once.
+const townName = (name) => { const p = findPlace(name); return p ? p.town : name; };
+function sightsFor(name) { return attractionsFor(townName(name)) || attractionsFor(name); }
+// The trips out: a return ticket is one trip (its way back isn't a trip of its own), and so is a single straight back from
+// where the last trip went (within 60 days), or one back to where the shopper's trips usually start (their home station,
+// when one place starts at least two trips and more than any other).
+export function outwardTrips(inOrder) {
+  const starts = new Map();
+  for (const t of inOrder) { const k = placeKey(townName(t.from)); starts.set(k, (starts.get(k) || 0) + 1); }
+  const top = [...starts.entries()].sort((a, b) => b[1] - a[1]);
+  const home = top[0] && top[0][1] >= 2 && (!top[1] || top[0][1] > top[1][1]) ? top[0][0] : null;
+  const open = [], out = [];
+  for (const t of inOrder) {
+    const when = dayOf(t.date);
+    const back = open.findIndex(o => samePlace(o.to, t.from) && samePlace(o.from, t.to) && (when === null || o.when === null || when - o.when <= 60 * DAY));
+    if (back >= 0) { open.splice(back, 1); continue; }
+    if (home && placeKey(townName(t.to)) === home) continue;
+    out.push(t);
+    if (!t.return) open.push({ from: t.from, to: t.to, when });
+  }
+  return out;
+}
+// What the story needs for each trip: both ends' positions (or none, for a place Relay doesn't know: it's named, never
+// guessed), the place to ask about, and its well-known sights (only those listed in uk-attractions.js).
+function storyTrips(outward) {
+  const at = (name) => { const p = findPlace(name); return p ? { lat: p.lat, lon: p.lon } : null; };
+  const one = (t, times) => {
+    const s = sightsFor(t.to), p = findPlace(t.to);
+    return { from: t.from, to: t.to, date: t.date, mode: t.mode, return: t.return, fromAt: at(t.from), toAt: at(t.to),
+      place: p ? p.town : t.to, sights: s ? s.attractions : [], ...(times > 1 ? { times } : {}) };
+  };
+  if (outward.length <= 10) return outward.map(t => one(t, 1));
+  const seen = new Map();
+  for (const t of outward) { const k = placeKey(townName(t.to)); const e = seen.get(k) || { t, times: 0 }; e.times++; seen.set(k, e); }
+  return [...seen.values()].map(e => one(e.t, e.times));
 }
 
 // One playful number for each kind of shopping, worked out from that kind's receipts only (null when the receipts can't back it).

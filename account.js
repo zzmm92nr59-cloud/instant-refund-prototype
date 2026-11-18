@@ -528,11 +528,25 @@
     ".rl-story-slide .map{margin:12px auto 0;width:min(100%,250px)}.rl-story-slide .map svg{display:block;width:100%;height:auto;max-height:52vh}" +
     ".rl-story-slide .map .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.6;stroke-width:1.2;stroke-linejoin:round}" +
     ".rl-story-slide .map .arc{fill:none;stroke:currentColor;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rlarc .9s cubic-bezier(.4,0,.2,1) forwards}@keyframes rlarc{to{stroke-dashoffset:0}}" +
-    ".rl-story-slide .jmap{margin:10px auto 0;width:min(100%,330px);aspect-ratio:1;border-radius:22px;overflow:hidden;background:rgba(255,255,255,.04)}.rl-story-slide .jmap svg{display:block;width:100%;height:100%}" +
-    ".rl-story-slide .jmap .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.45;stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}" +
-    ".rl-story-slide .jmap .route-ghost{fill:none;stroke:currentColor;stroke-opacity:.25;stroke-linecap:round;stroke-dasharray:.018 .022}.rl-story-slide .jmap .route{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}" +
-    ".rl-story-slide .jmap .stop{fill:var(--accent);stroke:currentColor}.rl-story-slide .jmap .stn{fill:currentColor;font-weight:800;opacity:0;paint-order:stroke;stroke:#0f2a4a;stroke-linejoin:round}" +
-    ".rl-story-slide .tiny-train .tr-body{fill:var(--accent);stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}.rl-story-slide .tiny-train .tr-line{fill:none;stroke:#0f2a4a;stroke-width:1.6;stroke-linecap:round}.rl-story-slide .tiny-train .tr-wheel{fill:#0f2a4a;stroke:currentColor;stroke-width:1.4}" +
+    // Journeys: each trip's stage (map, then the train window), and the question under it.
+    ".rl-story-slide.jx{align-self:stretch;display:flex;flex-direction:column;justify-content:center;min-height:0}.rl-story-slide.jx>.jstage{flex:0 1 500px;min-height:220px;margin:12px -14px 0;position:relative;border-radius:22px;overflow:hidden;background:#0b223f;animation:none;opacity:1;contain:layout paint}" +
+    ".rl-story-slide.jx>.jq{flex:none;animation:none;opacity:1;margin-top:10px}.rl-story-slide .jstage>.jmap,.rl-story-slide .jstage>.jtrain{position:absolute;inset:0}.rl-story-slide .jmap svg{display:block;width:100%;height:100%}" +
+    ".rl-story-slide .jmap .land,.rl-story-slide .jstill .land{fill:#C9D8FF;fill-opacity:.16;stroke:#C9D8FF;stroke-opacity:.55;stroke-width:1.2;stroke-linejoin:round;vector-effect:non-scaling-stroke}" +
+    ".rl-story-slide .jmap .way,.rl-story-slide .jstill .way{fill:none;stroke:#C9D8FF;stroke-opacity:.6;stroke-linecap:round}.rl-story-slide .jstill .way.solid{stroke:var(--accent);stroke-opacity:1}" +
+    ".rl-story-slide .jmap .pin,.rl-story-slide .jstill .pin{fill:var(--accent);stroke:#fff}.rl-story-slide .jmap .pin,.rl-story-slide .jmap .ring{opacity:0}.rl-story-slide .jmap .ring{fill:none;stroke:var(--accent);transform-box:fill-box;transform-origin:center;animation:jxring 1.4s ease-out infinite}" +
+    "@keyframes jxring{from{transform:scale(1);stroke-opacity:1}to{transform:scale(3.2);stroke-opacity:0}}" +
+    ".rl-story-slide .jboard{position:absolute;left:24px;right:24px;margin:0 auto;width:fit-content;max-width:calc(100% - 48px);box-sizing:border-box;background:#101828;color:#fff;border:2px solid #fff;box-shadow:0 0 0 3px #101828;border-radius:8px;padding:8px 16px;text-align:center}" +
+    ".rl-story-slide .jboard b{display:block;font-size:20px;line-height:1.15;font-weight:800;overflow-wrap:anywhere}.rl-story-slide .jboard.from{bottom:22px;opacity:0}" +
+    ".rl-story-slide .jtrain{opacity:0;overflow:hidden;transform-origin:50% 45%}.rl-story-slide .jtrain>*{position:absolute}.rl-story-slide .jsun{right:16%;width:52px;height:52px;border-radius:50%}" +
+    ".rl-story-slide .jl{left:0;will-change:transform}.rl-story-slide .jl svg{display:block}.rl-story-slide .jplat{inset:0;will-change:transform}.rl-story-slide .jplat svg{position:absolute;left:0;top:0}.rl-story-slide .jframe{inset:0;width:100%;height:100%}" +
+    ".rl-story-slide .jdep{top:10px;left:12px;right:12px;background:#05070d;color:#ffb020;border-radius:8px;padding:6px 10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.35;letter-spacing:.3px}" +
+    ".rl-story-slide .jdep span{display:block;text-transform:uppercase;font-weight:700;opacity:.85}.rl-story-slide .jdep b{display:block;font-size:14px;font-weight:800;overflow-wrap:anywhere}" +
+    ".rl-story-slide .jqin{opacity:0;transform:translateY(10px);transition:opacity .45s,transform .45s}.rl-story-slide .jq.on .jqin{opacity:1;transform:none}" +
+    ".rl-story-slide .jq h2.ch{font-size:28px;margin:4px 0 0}.rl-story-slide .jq .jhow{margin:4px 0}.rl-story-slide .jq .jcap{margin:0 0 6px}.rl-story-slide .jtimes{display:inline-block;margin:0 0 6px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.12);font-size:14px;font-weight:800}" +
+    ".rl-story-slide .jsights{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}.rl-story-slide .jsights li{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:16px;background:rgba(255,255,255,.08);opacity:0;transform:translateY(8px);transition:opacity .4s,transform .4s}" +
+    ".rl-story-slide .jq.on .jsights li{opacity:1;transform:none}.rl-story-slide .jsights .sic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--accent);color:#172554}.rl-story-slide .jsights svg{width:24px;height:24px}.rl-story-slide .jsights b{font-size:17px;line-height:1.25}" +
+    ".rl-story-slide .jstill{margin:12px -14px 0;border-radius:22px;overflow:hidden;background:#0b223f;aspect-ratio:4/3;max-height:40vh}.rl-story-slide .jstill svg{display:block;width:100%;height:100%}.rl-story-slide.still .jroute{margin:14px 0 0}" +
+    "@media(prefers-reduced-motion:reduce){.rl-story-slide .jqin,.rl-story-slide .jsights li{transition:none;opacity:1;transform:none}}" +
     ".rl-story-slide .jwhen{font-size:20px;font-weight:800;margin-top:14px}" +
     ".rl-story-slide .jlist{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}.rl-story-slide .jlist li{display:grid;gap:2px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.08)}.rl-story-slide .jlist b{font-size:17px}.rl-story-slide .jlist small{font-size:14px;opacity:.8}" +
     ".rl-story-slide .sights{list-style:none;margin:18px 0 6px;padding:0;display:grid;gap:12px}.rl-story-slide .sights li{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.08);opacity:0;animation:rlsight .5s ease-out forwards}" +
@@ -6891,45 +6905,81 @@
     if (f.kind === "outings") return f.count + (f.count === 1 ? " day out" : " days out") + " booked.";
     return null;
   }
-  // The UK's coast, drawn simply (latitude, longitude pairs traced from well-known headlands, ports and estuaries), so the
-  // map is recognisable and the journeys' places sit where they really are. Great Britain, then the islands, then Northern
-  // Ireland. Positions of places come from the server (worker/uk-places.js) and use the same projection.
+  // The UK's coast (latitude, longitude pairs traced from about 450 well-known headlands, ports, estuaries and islands),
+  // drawn as smooth curves through them, so the map reads as the UK and the journeys' places sit where they really are:
+  // Great Britain, the Isle of Wight, Anglesey, Arran, Islay, Jura, Mull, Skye, the Outer Hebrides, Orkney, Shetland,
+  // then Northern Ireland. No map was downloaded (none could be from where Relay is built). Positions of places come from
+  // the server (worker/uk-places.js) and use the same projection.
   var UK_COAST = [
-    [51.13,1.31,51.38,1.45,51.36,1.03,51.44,0.76,51.49,0.45,51.53,0.71,51.6,0.95,51.79,1.15,51.94,1.29,52.09,1.57,52.48,1.76,52.61,1.73,52.93,1.3,52.96,0.85,52.94,0.49,
-     52.78,0.38,52.97,0.02,53.14,0.34,53.34,0.26,53.58,0.11,53.73,0.03,54.12,-0.08,54.28,-0.4,54.49,-0.61,54.62,-1.07,54.69,-1.21,54.91,-1.37,55.02,-1.42,55.33,-1.58,
-     55.61,-1.71,55.77,-2.0,55.9,-2.13,56.0,-2.52,56.06,-2.72,55.98,-3.17,56.02,-3.55,56.11,-3.16,56.19,-2.82,56.28,-2.58,56.34,-2.79,56.46,-2.87,56.56,-2.58,56.71,-2.47,
-     56.96,-2.21,57.15,-2.08,57.51,-1.78,57.69,-2.0,57.67,-2.52,57.72,-3.28,57.59,-3.87,57.48,-4.22,57.68,-4.03,57.86,-3.78,57.88,-4.03,58.12,-3.65,58.44,-3.09,58.64,-3.03,
-     58.67,-3.38,58.6,-3.52,58.53,-4.42,58.62,-5.0,58.46,-5.05,58.15,-5.24,57.9,-5.16,57.73,-5.7,57.43,-5.81,57.28,-5.71,57.0,-5.83,56.73,-6.23,56.41,-5.47,56.0,-5.6,
-     55.31,-5.8,55.42,-5.6,55.7,-5.45,55.96,-4.82,55.79,-4.87,55.46,-4.63,55.24,-4.86,55.1,-5.0,55.01,-5.16,54.84,-5.12,54.64,-4.86,54.8,-4.75,54.68,-4.39,54.8,-4.05,
-     54.87,-3.6,54.98,-3.26,54.87,-3.39,54.71,-3.5,54.55,-3.59,54.51,-3.64,54.1,-3.23,54.07,-2.86,53.92,-3.01,53.82,-3.06,53.65,-3.01,53.55,-3.07,53.39,-3.18,53.34,-3.41,
-     53.33,-3.83,53.23,-4.13,53.41,-4.34,53.31,-4.63,53.23,-4.52,53.14,-4.27,52.94,-4.52,52.8,-4.71,52.89,-4.41,52.92,-4.13,52.72,-4.05,52.41,-4.09,52.1,-4.66,52.0,-4.98,
-     51.9,-5.31,51.71,-5.04,51.6,-4.93,51.67,-4.7,51.7,-4.4,51.68,-4.25,51.56,-4.33,51.57,-3.98,51.62,-3.93,51.48,-3.7,51.39,-3.27,51.46,-3.16,51.55,-2.97,51.64,-2.67,
-     51.6,-2.62,51.5,-2.7,51.35,-2.98,51.24,-3.0,51.21,-3.47,51.23,-3.83,51.21,-4.12,51.02,-4.52,50.83,-4.55,50.54,-4.94,50.42,-5.08,50.21,-5.48,50.07,-5.71,49.96,-5.2,
-     50.15,-5.07,50.33,-4.64,50.36,-4.14,50.22,-3.64,50.46,-3.53,50.62,-3.41,50.72,-2.94,50.61,-2.45,50.58,-2.06,50.72,-1.88,50.75,-1.54,50.85,-1.4,50.79,-1.1,50.72,-0.79,
-     50.81,-0.37,50.82,-0.14,50.73,0.24,50.85,0.57,50.91,0.98,51.08,1.17],
-    [50.77,-1.3,50.72,-1.07,50.59,-1.29,50.66,-1.58,50.7,-1.5],
-    [58.52,-6.26,58.2,-6.37,57.75,-6.8,57.88,-7.1,58.25,-7.05],
-    [57.65,-7.25,57.1,-7.35,57.05,-7.45,57.6,-7.55],
-    [57.7,-6.35,57.52,-6.15,57.27,-5.75,57.08,-5.95,57.2,-6.2,57.4,-6.75,57.55,-6.65],
-    [56.6,-6.2,56.55,-5.75,56.32,-5.7,56.3,-6.35],
-    [55.9,-6.1,55.65,-6.1,55.65,-6.5,55.85,-6.45],
-    [59.1,-3.35,59.05,-2.8,58.85,-2.9,58.8,-3.3],
-    [54.6,-5.93,54.66,-5.67,54.5,-5.43,54.37,-5.55,54.26,-5.61,54.21,-5.89,54.06,-6.0,54.1,-6.27,54.18,-6.34,54.08,-6.61,54.26,-6.9,54.4,-7.04,54.12,-7.3,54.3,-7.88,
-     54.48,-8.09,54.62,-7.85,54.83,-7.47,55.0,-7.32,55.17,-6.96,55.18,-6.72,55.24,-6.51,55.2,-6.24,55.22,-6.15,55.08,-6.06,54.86,-5.81,54.82,-5.7,54.71,-5.81]
+    [51.12,1.32,51.14,1.37,51.22,1.41,51.27,1.38,51.33,1.42,51.375,1.445,51.39,1.38,51.38,1.2,51.375,1.12,51.365,1.03,51.33,0.9,51.39,0.94,51.445,0.76,
+     51.45,0.7,51.47,0.5,51.45,0.37,51.46,0.22,51.49,0.12,51.5,0.16,51.47,0.3,51.46,0.36,51.52,0.58,51.53,0.71,51.53,0.8,51.6,0.95,51.63,0.9,51.68,0.95,
+     51.73,0.93,51.78,0.92,51.8,1.02,51.79,1.15,51.85,1.28,51.87,1.29,51.94,1.29,51.96,1.35,52.08,1.57,52.15,1.6,52.32,1.68,52.48,1.76,52.6,1.74,52.72,1.69,
+     52.82,1.53,52.93,1.3,52.945,1.21,52.97,0.98,52.97,0.85,52.94,0.49,52.87,0.44,52.78,0.38,52.8,0.2,52.87,0.05,52.95,0.02,53.1,0.33,53.14,0.35,53.34,0.27,
+     53.47,0.15,53.56,-0.02,53.58,-0.07,53.62,-0.19,53.7,-0.44,53.7,-0.7,53.74,-0.33,53.72,-0.23,53.63,0.05,53.58,0.11,53.73,0.03,53.91,-0.16,54.08,-0.19,
+     54.12,-0.08,54.21,-0.28,54.28,-0.39,54.43,-0.53,54.49,-0.61,54.56,-0.79,54.59,-0.97,54.62,-1.06,54.64,-1.15,54.69,-1.18,54.84,-1.33,54.91,-1.36,
+     55.02,-1.42,55.13,-1.49,55.18,-1.51,55.33,-1.57,55.39,-1.61,55.47,-1.59,55.61,-1.71,55.68,-1.8,55.77,-1.99,55.92,-2.14,56,-2.52,56.06,-2.72,
+     56.04,-2.83,55.95,-3.06,55.98,-3.17,55.99,-3.4,56.03,-3.7,56.07,-3.73,56.03,-3.43,56.06,-3.23,56.11,-3.15,56.19,-3,56.19,-2.82,56.28,-2.58,56.34,-2.79,
+     56.44,-2.82,56.37,-3.1,56.36,-3.25,56.42,-3.1,56.46,-2.97,56.47,-2.87,56.5,-2.71,56.56,-2.58,56.71,-2.46,56.79,-2.33,56.96,-2.2,57.15,-2.07,
+     57.32,-1.99,57.5,-1.78,57.61,-1.82,57.69,-2,57.67,-2.52,57.69,-2.82,57.68,-2.96,57.72,-3.28,57.7,-3.49,57.66,-3.61,57.59,-3.87,57.49,-4.22,57.58,-4.13,
+     57.68,-4.03,57.69,-4.17,57.86,-3.77,57.81,-4.05,57.88,-4.03,57.97,-3.97,58.01,-3.85,58.12,-3.65,58.3,-3.29,58.44,-3.09,58.64,-3.02,58.64,-3.07,
+     58.67,-3.37,58.6,-3.52,58.58,-4.02,58.52,-4.42,58.53,-4.68,58.6,-4.77,58.625,-5,58.53,-5.06,58.46,-5.05,58.35,-5.15,58.27,-5.18,58.26,-5.37,
+     58.15,-5.25,58.1,-5.42,57.9,-5.16,57.92,-5.62,57.83,-5.6,57.86,-5.81,57.72,-5.7,57.6,-5.7,57.43,-5.82,57.28,-5.72,57.21,-5.62,57.13,-5.6,57,-5.83,
+     56.91,-5.85,56.73,-6.23,56.69,-5.85,56.54,-5.78,56.48,-5.5,56.41,-5.47,56.17,-5.55,56.09,-5.56,55.85,-5.65,55.65,-5.66,55.42,-5.74,55.29,-5.8,
+     55.31,-5.64,55.42,-5.6,55.59,-5.47,55.86,-5.41,55.88,-5.32,55.86,-4.98,55.95,-4.92,55.98,-4.88,55.96,-4.82,55.95,-4.76,55.935,-4.69,55.875,-4.89,
+     55.8,-4.87,55.64,-4.82,55.61,-4.7,55.54,-4.67,55.46,-4.64,55.4,-4.76,55.32,-4.83,55.24,-4.86,55.1,-5,54.97,-5.03,54.91,-5.02,55,-5.16,54.84,-5.12,
+     54.635,-4.86,54.76,-4.58,54.68,-4.39,54.7,-4.37,54.85,-4.42,54.82,-4.06,54.87,-3.6,54.98,-3.26,54.99,-3.07,54.95,-3.22,54.87,-3.39,54.71,-3.5,
+     54.64,-3.57,54.55,-3.6,54.51,-3.64,54.39,-3.49,54.35,-3.41,54.21,-3.27,54.1,-3.26,54.18,-3.08,54.19,-2.91,54.2,-2.83,54.07,-2.87,54.03,-2.92,
+     53.93,-3.01,53.82,-3.06,53.74,-2.97,53.65,-3.02,53.55,-3.09,53.49,-3.04,53.4,-3,53.35,-2.8,53.29,-2.9,53.44,-3.05,53.39,-3.18,53.37,-3.19,53.22,-3.05,
+     53.25,-3.13,53.35,-3.32,53.34,-3.41,53.32,-3.49,53.3,-3.73,53.34,-3.87,53.29,-3.84,53.27,-3.93,53.23,-4.13,53.14,-4.28,53.08,-4.34,52.99,-4.42,
+     52.94,-4.52,52.79,-4.77,52.82,-4.5,52.88,-4.41,52.91,-4.23,52.92,-4.13,52.86,-4.11,52.72,-4.06,52.58,-4.09,52.54,-4.04,52.48,-4.05,52.41,-4.09,
+     52.24,-4.26,52.21,-4.36,52.11,-4.68,52.03,-4.91,52.01,-4.98,52.03,-5.07,51.9,-5.31,51.87,-5.3,51.85,-5.12,51.78,-5.11,51.73,-5.25,51.69,-5.15,
+     51.68,-5.08,51.65,-5.06,51.6,-4.93,51.64,-4.8,51.67,-4.7,51.71,-4.69,51.73,-4.65,51.74,-4.55,51.77,-4.46,51.76,-4.37,51.68,-4.25,51.67,-4.16,
+     51.66,-4.08,51.65,-4.25,51.565,-4.33,51.54,-4.21,51.57,-3.98,51.61,-3.93,51.57,-3.8,51.48,-3.7,51.4,-3.56,51.39,-3.27,51.41,-3.17,51.46,-3.16,
+     51.55,-2.97,51.6,-2.67,51.61,-2.64,51.72,-2.48,51.56,-2.67,51.5,-2.7,51.49,-2.77,51.44,-2.86,51.35,-2.99,51.33,-3.02,51.24,-3,51.21,-3.03,51.21,-3.13,
+     51.18,-3.33,51.21,-3.47,51.25,-3.79,51.23,-3.83,51.21,-4.03,51.21,-4.12,51.19,-4.21,51.14,-4.25,51.07,-4.2,51.04,-4.24,51.02,-4.53,50.83,-4.55,
+     50.69,-4.7,50.665,-4.76,50.59,-4.83,50.55,-4.94,50.55,-5.03,50.42,-5.09,50.35,-5.16,50.31,-5.22,50.26,-5.29,50.24,-5.4,50.21,-5.48,50.2,-5.57,
+     50.13,-5.71,50.07,-5.72,50.04,-5.68,50.06,-5.56,50.1,-5.55,50.12,-5.53,50.12,-5.47,50.08,-5.32,49.96,-5.2,50.02,-5.1,50.13,-5.05,50.14,-5.02,
+     50.22,-4.8,50.27,-4.78,50.33,-4.75,50.33,-4.63,50.35,-4.45,50.31,-4.22,50.36,-4.14,50.31,-4.08,50.24,-3.87,50.21,-3.72,50.22,-3.64,50.34,-3.56,
+     50.4,-3.48,50.46,-3.52,50.54,-3.49,50.58,-3.46,50.62,-3.43,50.61,-3.4,50.62,-3.32,50.68,-3.24,50.69,-3.1,50.72,-2.93,50.7,-2.76,50.66,-2.6,
+     50.515,-2.46,50.61,-2.45,50.62,-2.25,50.575,-2.06,50.6,-1.95,50.65,-1.93,50.68,-1.95,50.715,-1.87,50.71,-1.75,50.735,-1.7,50.71,-1.55,50.75,-1.53,
+     50.79,-1.4,50.82,-1.31,50.9,-1.4,50.85,-1.31,50.8,-1.2,50.78,-1.13,50.78,-1.09,50.78,-0.98,50.725,-0.79,50.78,-0.67,50.8,-0.54,50.81,-0.37,50.83,-0.25,
+     50.82,-0.14,50.78,0.06,50.76,0.12,50.735,0.24,50.77,0.3,50.81,0.35,50.835,0.47,50.855,0.58,50.875,0.65,50.93,0.77,50.93,0.8,50.91,0.98,51,1,51.07,1.08,
+     51.08,1.18],
+    [50.66,-1.59,50.71,-1.5,50.765,-1.3,50.73,-1.16,50.69,-1.07,50.65,-1.15,50.59,-1.21,50.575,-1.3,50.67,-1.52],
+    [53.22,-4.16,53.27,-4.09,53.31,-4.04,53.41,-4.34,53.42,-4.45,53.4,-4.57,53.31,-4.68,53.3,-4.7,53.23,-4.52,53.19,-4.46,53.14,-4.41,53.15,-4.33],
+    [55.71,-5.29,55.58,-5.15,55.44,-5.11,55.5,-5.34,55.64,-5.39],
+    [55.9,-6.12,55.63,-6.19,55.59,-6.33,55.68,-6.51,55.88,-6.33,55.9,-6.33],
+    [56.13,-5.73,55.83,-5.95,55.82,-6,56,-5.95],
+    [56.62,-6.07,56.58,-6.28,56.48,-6.2,56.33,-6.37,56.32,-5.98,56.35,-5.86,56.47,-5.71,56.46,-5.65,56.52,-5.94],
+    [57.69,-6.35,57.41,-6.19,57.27,-5.73,57.06,-5.89,57.02,-6.02,57.15,-6.1,57.19,-6.29,57.42,-6.79,57.52,-6.71,57.6,-6.63,57.59,-6.36],
+    [58.515,-6.26,58.26,-6.14,58.2,-6.38,58.04,-6.36,57.74,-6.96,57.77,-7.03,57.9,-7.07,58.19,-7.08,58.24,-7.03,58.29,-6.8,58.45,-6.55],
+    [57.7,-7.15,57.62,-7.1,57.45,-7.3,57.1,-7.24,57.05,-7.3,57.2,-7.45,57.45,-7.45,57.65,-7.55],
+    [59.13,-3.32,59,-2.9,58.93,-2.72,58.88,-2.95,58.78,-3.25,58.9,-3.38,58.96,-3.3],
+    [60.6,-1.3,60.47,-1.05,60.15,-1.13,59.85,-1.27,60.1,-1.33,60.22,-1.6,60.45,-1.55],
+    [54.62,-5.9,54.67,-5.67,54.64,-5.53,54.5,-5.43,54.38,-5.55,54.23,-5.66,54.21,-5.89,54.06,-6,54.1,-6.25,54.17,-6.34,54.08,-6.61,54.29,-6.85,54.41,-6.98,
+     54.18,-7.23,54.3,-7.88,54.48,-8.09,54.55,-7.83,54.7,-7.6,54.83,-7.47,55.04,-7.25,55.19,-6.96,55.17,-6.79,55.19,-6.72,55.21,-6.65,55.24,-6.51,
+     55.205,-6.24,55.225,-6.15,55.2,-6.06,55.08,-6.06,55.05,-5.97,54.97,-5.95,54.86,-5.81,54.8,-5.69,54.75,-5.71,54.71,-5.8]
   ];
   var UK_LAT0 = 59.4, UK_LON0 = -8.3, UK_K = Math.cos(54.5 * Math.PI / 180), UK_S = 30;
   // Longitude and latitude to the map's x and y (a flat projection squeezed east to west, fine for a country this size).
-  function ukXY(lat, lon) { return [Math.round((lon - UK_LON0) * UK_K * UK_S * 10) / 10, Math.round((UK_LAT0 - lat) * UK_S * 10) / 10]; }
-  function ukMapSvg(travel) {
-    // Each coast is drawn through the middles of its edges, curving round its points, so it reads smooth rather than spiky.
-    var r1 = function (v) { return Math.round(v * 10) / 10; };
-    var paths = UK_COAST.map(function (a) {
-      var pts = []; for (var i = 0; i < a.length; i += 2) pts.push(ukXY(a[i], a[i + 1]));
-      var mid = function (k) { var p = pts[k % pts.length], q = pts[(k + 1) % pts.length]; return r1((p[0] + q[0]) / 2) + " " + r1((p[1] + q[1]) / 2); };
-      var d = "M" + mid(0);
-      for (var k = 1; k <= pts.length; k++) { var c = pts[k % pts.length]; d += "Q" + c[0] + " " + c[1] + " " + mid(k); }
+  function ukXY(lat, lon) { return [Math.round((lon - UK_LON0) * UK_K * UK_S * 100) / 100, Math.round((UK_LAT0 - lat) * UK_S * 100) / 100]; }
+  // The coast as paths, worked out the first time a map is drawn and kept (each coast a closed Catmull-Rom curve).
+  var UK_LAND = null;
+  function ukLand() {
+    if (UK_LAND) return UK_LAND;
+    var r2 = function (v) { return Math.round(v * 100) / 100; };
+    UK_LAND = UK_COAST.map(function (a) {
+      var p = []; for (var i = 0; i < a.length; i += 2) p.push(ukXY(a[i], a[i + 1]));
+      var n = p.length, at = function (k) { return p[(k + n) % n]; }, d = "M" + p[0][0] + " " + p[0][1];
+      for (var k = 0; k < n; k++) {
+        var p0 = at(k - 1), p1 = at(k), p2 = at(k + 1), p3 = at(k + 2);
+        d += "C" + r2(p1[0] + (p2[0] - p0[0]) / 6) + " " + r2(p1[1] + (p2[1] - p0[1]) / 6) + " " + r2(p2[0] - (p3[0] - p1[0]) / 6) + " " + r2(p2[1] - (p3[1] - p1[1]) / 6) + " " + p2[0] + " " + p2[1];
+      }
       return '<path class="land" d="' + d + 'Z"/>';
     }).join("");
+    return UK_LAND;
+  }
+  function ukMapSvg(travel) {
     var at = {}; (travel.places || []).forEach(function (p) { at[p.name.toLowerCase()] = ukXY(p.lat, p.lon); });
     var arcs = "", n = 0;
     (travel.routes || []).forEach(function (r) {
@@ -6942,7 +6992,7 @@
       n++;
     });
     var dots = (travel.places || []).map(function (p, i) { var q = ukXY(p.lat, p.lon); return '<circle class="dot" style="animation-delay:' + (0.3 + i * 0.08).toFixed(2) + 's" cx="' + q[0] + '" cy="' + q[1] + '" r="' + (p.visits > 2 ? 6 : 4.5) + '"/>'; }).join("");
-    return '<svg viewBox="-6 -4 ' + Math.ceil(10.3 * UK_K * UK_S + 12) + " " + Math.ceil(9.6 * UK_S + 8) + '" role="img" aria-label="Map of the UK with your journeys">' + paths + arcs + dots + "</svg>";
+    return '<svg viewBox="-6 -4 ' + Math.ceil(10.3 * UK_K * UK_S + 12) + " " + Math.ceil(9.6 * UK_S + 8) + '" role="img" aria-label="Map of the UK with your journeys">' + ukLand() + arcs + dots + "</svg>";
   }
 
   // Small drawn icons for each kind of thing (no emoji), for things with no photo of their own.
@@ -7055,10 +7105,10 @@
         if (c.category === "fashion" && style && style.styles.length) row("Your style", style.styles.slice(0, 2).map(function (x) { return x.name; }).join(" & "));
         if (lines.childNodes.length) b.appendChild(lines);
       } });
-      if (c.category === "travel") travelSlides(S, w.travel);
+      if (c.category === "travel") travelSlides(S, w.travel, w.year);
     });
     // A year with journeys but no travel chapter of its own still gets them.
-    if (!chapters.some(function (c) { return c.category === "travel"; })) travelSlides(S, w.travel);
+    if (!chapters.some(function (c) { return c.category === "travel"; })) travelSlides(S, w.travel, w.year);
     // 5. The rest of the year's highlights.
     if (top && w.topShops.length > 1) S.push({ bg: "#172554", fg: "#fff", accent: "#93c5fd", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Your top shops" }));
@@ -7205,8 +7255,16 @@
         g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
         s.connect(f); f.connect(g); g.connect(out); s.start(t); s.stop(t + 0.6);
       },
-      beat: function (b, t, level) {
+      // On a journey: the soft clack of wheels over rail joints (two quick knocks, twice a bar) and a low rumble, over the
+      // pads only.
+      beat: function (b, t, level, train) {
         var inBar = b % 4, part = level === 3 ? B : A, c = Math.floor(b / 4) % 4, drums = level >= 1 && level <= 3;
+        if (train) {
+          if (inBar === 0) pad(t, part.chords[c], SPB * 4, 0.016);
+          hiss(t, 0.05, SPB * 0.9, "lowpass", 160);
+          if (inBar % 2 === 0) [0, 0.14].forEach(function (d) { hiss(t + d, 0.16, 0.05, "bandpass", 900, 2.5); var o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine"; o.frequency.setValueAtTime(110, t + d); o.frequency.exponentialRampToValueAtTime(60, t + d + 0.08); env(g, t + d, 0.003, 0.18, 0.09); o.connect(g); g.connect(out); o.start(t + d); o.stop(t + d + 0.15); });
+          return;
+        }
         if (inBar === 0) pad(t, part.chords[c], SPB * 4, level === 4 ? 0.022 : 0.03);
         if (drums && (level >= 2 || inBar % 2 === 0)) kick(t);
         if (level >= 2 && level <= 3 && inBar % 2 === 1) hiss(t, 0.42, 0.16, "bandpass", 1700, 0.9);
@@ -7224,12 +7282,12 @@
     try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (e) {}
     var comp = ctx.createDynamicsCompressor(), master = ctx.createGain();
     master.gain.value = 0.0001; comp.connect(master); master.connect(ctx.destination);
-    var song = storySong(ctx, comp), level = 0, beat = 0, next = ctx.currentTime + 0.1, held = false, hidden = false, stopped = false;
+    var song = storySong(ctx, comp), level = 0, beat = 0, next = ctx.currentTime + 0.1, held = false, hidden = false, stopped = false, train = false;
     function fade(v, s) { var t = ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t); master.gain.exponentialRampToValueAtTime(Math.max(v, 0.0001), t + s); }
     var timer = setInterval(function () {
       if (stopped || ctx.state !== "running") return;
       if (next < ctx.currentTime) next = ctx.currentTime + 0.05;
-      while (next < ctx.currentTime + 0.25) { song.beat(beat, next, level); beat++; next += song.spb; }
+      while (next < ctx.currentTime + 0.25) { song.beat(beat, next, level, train); beat++; next += song.spb; }
     }, 50);
     function sync() { if (stopped) return; if (held || hidden) ctx.suspend().catch(function () {}); else ctx.resume().catch(function () {}); }
     function vis() { hidden = document.hidden; sync(); }
@@ -7238,6 +7296,7 @@
     return {
       context: ctx,
       level: function (l, swoosh) { if (swoosh && ctx.state === "running") song.swoosh(ctx.currentTime + 0.02); level = l; },
+      train: function (on) { train = Boolean(on); },
       hold: function (on) { held = Boolean(on); sync(); },
       stop: function () {
         if (stopped) return; stopped = true; clearInterval(timer); document.removeEventListener("visibilitychange", vis);
@@ -7248,112 +7307,291 @@
   }
   var SOUND_ON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.3a4 4 0 0 1 0 5.4M18.2 6.8a7.5 7.5 0 0 1 0 10.4"/></svg>';
   var SOUND_OFF = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>';
-  // Travel (Connor, 18 Nov 2026: "take the user on each journey"). The count first; then each journey in the order it was
-  // made, one short slide each: the map moves to the route, a small drawn train runs along it from one station to the other,
-  // the stations' names appear at each end and the date underneath; then the next journey. Places Relay can't position are
-  // named in words, never guessed onto the map. Then all of them on one map, and "Did you visit?" for places with well-known
-  // sights (asked, never said). With reduced motion: one still list of the journeys instead.
-  var JOURNEY_MS = 2600;
-  var TINY_TRAIN = '<path d="M-17 -6h22a6 6 0 0 1 6 6v3h-28Z" class="tr-body"/><path d="M-13 -3h5M-4 -3h5" class="tr-line"/><path d="M-19 3h34" class="tr-line"/>' +
-    '<circle cx="-12" cy="5.5" r="2.4" class="tr-wheel"/><circle cx="-3" cy="5.5" r="2.4" class="tr-wheel"/><circle cx="7" cy="5.5" r="2.4" class="tr-wheel"/>';
+  // Travel (Connor, 18 Nov 2026: "an interactive journey with animations"). The count first; then every trip out, in date
+  // order (the way back isn't replayed; with more than ten trips each place is gone to once, "3 times this year"). Each
+  // trip is one slide of about eight seconds, tap to go on: the map flies to the starting station and its name goes up on a
+  // station board; the view moves into a train window (the frame and a seat edge in Relay's navy, the trip's date and
+  // route on a departure board) with the countryside sliding past, lit for the month (frost in winter, green in summer);
+  // the train slows, the destination's board slides in; then "Did you visit…?" with its well-known sights (only those
+  // listed on the server, uk-attractions.js), or "How was Brighouse?" where none are listed. Never said that they went.
+  // Places Relay can't position are named in words, never guessed onto the map. Everything is drawn here (SVG and CSS
+  // transforms, nothing downloaded) and only when its slide is shown. With reduced motion: a still card for each trip.
+  var JX = { map: 1500, board: 700, ride: 2100, slow: 1700, read: 1300, readSights: 1900 };
+  function tripDur(tr) { return JX.map + JX.board + JX.ride + JX.slow + ((tr.sights || []).length ? JX.readSights : JX.read); }
   function calmMotion() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
-  // The UK's outline as paths (the same drawing as the overview map).
-  function ukLand() {
-    var r1 = function (v) { return Math.round(v * 10) / 10; };
-    return UK_COAST.map(function (a) {
-      var pts = []; for (var i = 0; i < a.length; i += 2) pts.push(ukXY(a[i], a[i + 1]));
-      var mid = function (k) { var p = pts[k % pts.length], q = pts[(k + 1) % pts.length]; return r1((p[0] + q[0]) / 2) + " " + r1((p[1] + q[1]) / 2); };
-      var d = "M" + mid(0);
-      for (var k = 1; k <= pts.length; k++) { var c = pts[k % pts.length]; d += "Q" + c[0] + " " + c[1] + " " + mid(k); }
-      return '<path class="land" d="' + d + 'Z"/>';
-    }).join("");
-  }
   var UK_W = Math.ceil(10.3 * UK_K * UK_S + 12), UK_H = Math.ceil(9.6 * UK_S + 8);
-  // The whole UK as a square view (the journey map is square so the move from one route to the next never jumps).
-  function wholeBox() { return [UK_W / 2 - 6 - UK_H / 2, -4, UK_H, UK_H]; }
-  // A journey as a gentle curve: its two ends and the bend.
-  function routeOf(tr) {
-    if (!tr || !tr.fromAt || !tr.toAt) return null;
-    var a = ukXY(tr.fromAt.lat, tr.fromAt.lon), b = ukXY(tr.toAt.lat, tr.toAt.lon);
-    var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.max(4, Math.min(30, len * 0.25));
-    return { a: a, b: b, c: [(a[0] + b[0]) / 2 - dy / len * bow, (a[1] + b[1]) / 2 + dx / len * bow], len: len };
-  }
-  function boxOf(r) {
-    if (!r) return wholeBox();
-    var xs = [r.a[0], r.b[0], r.c[0]], ys = [r.a[1], r.b[1], r.c[1]];
-    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-    var size = Math.max(70, (x1 - x0) * 1.7, (y1 - y0) * 1.7 + 30);
-    return [(x0 + x1) / 2 - size / 2, (y0 + y1) / 2 - size / 2 - 4, size, size];
-  }
-  function bez(r, t) { var u = 1 - t; return [u * u * r.a[0] + 2 * u * t * r.c[0] + t * t * r.b[0], u * u * r.a[1] + 2 * u * t * r.c[1] + t * t * r.b[1]]; }
-  function bezAngle(r, t) { var u = 1 - t, dx = 2 * u * (r.c[0] - r.a[0]) + 2 * t * (r.b[0] - r.c[0]), dy = 2 * u * (r.c[1] - r.a[1]) + 2 * t * (r.b[1] - r.c[1]); return Math.atan2(dy, dx) * 180 / Math.PI; }
   var ease = function (x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
   var clamp01 = function (x) { return Math.max(0, Math.min(1, x)); };
   function svgEl(tag, attrs) { var n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (var k in attrs) n.setAttribute(k, attrs[k]); return n; }
-  // One journey on the map. `from` is the view the map starts at (the last journey's, or the whole UK).
-  function journeyMap(tr, from) {
-    var r = routeOf(tr), to = boxOf(r), box = from || wholeBox();
-    var wrap = el("div", { className: "jmap" });
-    var svg = svgEl("svg", { viewBox: box.join(" "), role: "img", "aria-label": "Map of the journey from " + tr.from + " to " + tr.to });
-    svg.innerHTML = ukLand();
-    wrap.appendChild(svg);
-    if (!r) {
-      // An end Relay can't position: the place it can, if any, as a dot on the whole map.
-      [[tr.fromAt, tr.from], [tr.toAt, tr.to]].forEach(function (p) { if (!p[0]) return; var q = ukXY(p[0].lat, p[0].lon); svg.appendChild(svgEl("circle", { class: "stop", cx: q[0], cy: q[1], r: 4 })); });
-      return { node: wrap, box: wholeBox(), run: function () {} };
-    }
-    var d = "M" + r.a[0] + " " + r.a[1] + "Q" + r.c[0] + " " + r.c[1] + " " + r.b[0] + " " + r.b[1];
-    var ghost = svgEl("path", { class: "route-ghost", d: d, pathLength: "1" }), path = svgEl("path", { class: "route", d: d, pathLength: "1" });
-    var dotA = svgEl("circle", { class: "stop", cx: r.a[0], cy: r.a[1] }), dotB = svgEl("circle", { class: "stop end", cx: r.b[0], cy: r.b[1] });
-    var labA = svgEl("text", { class: "stn from", "text-anchor": "middle" }), labB = svgEl("text", { class: "stn to", "text-anchor": "middle" });
-    labA.textContent = tr.from; labB.textContent = tr.to;
-    var train = svgEl("g", { class: "tiny-train" }); train.innerHTML = TINY_TRAIN;
-    [ghost, path, dotA, dotB, labA, labB, train].forEach(function (n) { svg.appendChild(n); });
-    // Sizes are kept the same on screen whatever the zoom: a unit is (view width ÷ map width) pixels.
-    function place(bx, t) {
-      var px = (wrap.getBoundingClientRect().width || 300), u = bx[2] / px;
-      svg.setAttribute("viewBox", bx.map(function (v) { return Math.round(v * 100) / 100; }).join(" "));
-      [dotA, dotB].forEach(function (n) { n.setAttribute("r", (5 * u).toFixed(2)); n.style.strokeWidth = (2 * u).toFixed(2); });
-      ghost.style.strokeWidth = path.style.strokeWidth = (3.5 * u).toFixed(2);
-      var fs = 14 * u, above = r.a[1] <= r.b[1];
-      [[labA, r.a, above ? -1 : 1], [labB, r.b, above ? 1 : -1]].forEach(function (x) {
-        x[0].setAttribute("font-size", fs.toFixed(2)); x[0].style.strokeWidth = (4 * u).toFixed(2);
-        // Keep the name inside the map's edges.
-        var half = Math.min(x[0].textContent.length * fs * 0.3, bx[2] / 2 - 4 * u), cx = Math.max(bx[0] + half + 4 * u, Math.min(bx[0] + bx[2] - half - 4 * u, x[1][0]));
-        x[0].setAttribute("x", cx.toFixed(2)); x[0].setAttribute("y", (x[1][1] + x[2] * 14 * u + (x[2] > 0 ? fs * 0.7 : 0)).toFixed(2));
-      });
-      // The train stays upright (it's drawn from the side), faces the way it's going, and leans a little up or down hill.
-      var p = bez(r, t), ang = bezAngle(r, t), flip = Math.abs(ang) > 90, lean = Math.max(-25, Math.min(25, flip ? (ang > 0 ? 180 - ang : -180 - ang) : ang));
-      train.setAttribute("transform", "translate(" + p[0].toFixed(2) + " " + (p[1] - 4 * u).toFixed(2) + ") scale(" + ((flip ? -1 : 1) * u).toFixed(3) + " " + u.toFixed(3) + ") rotate(" + lean.toFixed(1) + ")");
-      path.style.strokeDashoffset = (1 - t).toFixed(4);
-    }
-    function run(calm) {
-      if (calm) { place(to, 1); labA.style.opacity = labB.style.opacity = "1"; return; }
-      var t0 = null;
-      function frame(now) {
-        if (!svg.isConnected) return;
-        if (t0 === null) t0 = now;
-        var e = now - t0, m = ease(clamp01(e / 900)), tt = ease(clamp01((e - 500) / 1700));
-        place(box.map(function (v, k) { return v + (to[k] - v) * m; }), tt);
-        labA.style.opacity = String(clamp01(e / 300));
-        labB.style.opacity = String(clamp01((e - 2050) / 250));
-        wrap.setAttribute("data-t", tt.toFixed(2));
-        if (e < 2400) requestAnimationFrame(frame);
+  // A view of the map: its middle (map units) and its width.
+  function wholeView() { return { cx: UK_W / 2 - 6, cy: UK_H / 2 - 4, w: UK_W, h: UK_H }; }
+  function viewAt(p) { if (!p) return wholeView(); var q = ukXY(p.lat, p.lon); return { cx: q[0], cy: q[1], w: 44 }; }
+  // The view as a viewBox the shape of the map on screen (whole UK: all of it fits).
+  function viewBox(v, pw, ph) { var w = v.h ? Math.max(v.w, v.h * pw / ph) : v.w, h = w * ph / pw; return [v.cx - w / 2, v.cy - h / 2, w, h]; }
+  // From one view to another the way a camera would: out a little when the places are far apart, then in.
+  function flyView(a, b, pw, ph, e) {
+    var A = viewBox(a, pw, ph), B = viewBox(b, pw, ph), d = Math.hypot(b.cx - a.cx, b.cy - a.cy);
+    var l0 = Math.log(A[2]), l1 = Math.log(B[2]), mid = (l0 + l1) / 2, bump = Math.max(0, Math.log(Math.max(A[2], B[2], d * 1.4)) - Math.max(l0, l1)) + Math.max(0, Math.log(d * 1.4 + 1) - mid) * 0.2;
+    var w = Math.exp(l0 + (l1 - l0) * e + bump * Math.sin(Math.PI * e)), cx = A[0] + A[2] / 2 + (B[0] + B[2] / 2 - A[0] - A[2] / 2) * e, cy = A[1] + A[3] / 2 + (B[1] + B[3] / 2 - A[1] - A[3] / 2) * e;
+    return [cx - w / 2, cy - w * ph / pw / 2, w, w * ph / pw];
+  }
+  var seasonOf = function (date) { var m = Number(String(date || "").slice(5, 7)) || 6; return m === 12 || m <= 2 ? "winter" : m <= 5 ? "spring" : m <= 8 ? "summer" : "autumn"; };
+  // The countryside's colours for the time of year: pale and frosty in winter, fresh in spring, deep green in summer,
+  // gold and brown in autumn. The sun sits lower in winter.
+  var SEASON = {
+    winter: { sky: "#cfdbe4", sun: "#fbf6ea", sunY: 0.34, far: "#9fb1ba", far2: "#b7c5cc", mid: "#a9b8a5", fields: ["#b8c7b4", "#e8eeee", "#a3b59d", "#d2dcd3"], hedge: "#5c6a5b", tree: "#6e645d", bare: true, near: "#93a491", tuft: "#eef3f4", frost: true },
+    spring: { sky: "#bfe0f5", sun: "#fff6c8", sunY: 0.24, far: "#8db4a3", far2: "#a8c9bc", mid: "#86c06a", fields: ["#9fd47f", "#b8e08a", "#7fbf62", "#e9dc6a"], hedge: "#3f7d3a", tree: "#4f9a46", blossom: "#f6c9d6", near: "#5ea24f", tuft: "#7cbd62" },
+    summer: { sky: "#9fd3f5", sun: "#fff1a8", sunY: 0.16, far: "#76a68f", far2: "#96bda9", mid: "#62ad4e", fields: ["#6fbf5a", "#8fcc55", "#e9cf4f", "#4f9a40"], hedge: "#2f6b2c", tree: "#3a8435", near: "#4d963f", tuft: "#67b14f" },
+    autumn: { sky: "#e4ddcc", sun: "#ffd9a0", sunY: 0.3, far: "#a3a58f", far2: "#bcbca8", mid: "#a9a957", fields: ["#c9b56a", "#b7a04f", "#9caf5a", "#d8c486"], hedge: "#6b5a2b", tree: "#c97b35", tree2: "#b5652b", near: "#8d8f45", tuft: "#b59a4a" }
+  };
+  // A little seeded randomness, so each season's countryside is the same every time and costs nothing to keep.
+  function seeded(n) { return function () { n = (n + 0x6D2B79F5) | 0; var t = Math.imul(n ^ (n >>> 15), 1 | n); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+  var r1 = function (v) { return Math.round(v * 10) / 10; };
+  // Each layer is two copies of a tile that repeats seamlessly (hills and ground are sums of waves that fit the tile), so it
+  // can slide by one tile for ever. Made once per season, the first time it's needed.
+  var SCENERY = {};
+  function scenery(season) {
+    if (SCENERY[season]) return SCENERY[season];
+    var c = SEASON[season], rnd = seeded(season.length * 7919 + 17), TAU = Math.PI * 2;
+    var wave = function (W, parts) { return function (x) { var y = 0; parts.forEach(function (p) { y += p[0] * Math.sin(TAU * x * p[1] / W + p[2]); }); return y; }; };
+    var ridge = function (W, f, base, step) { var d = "M0 " + r1(base + f(0)); for (var x = step; x <= 2 * W; x += step) d += "L" + x + " " + r1(base + f(x)); return d; };
+    // Far hills: two soft ridges.
+    var FW = 2400, FH = 120, f1 = wave(FW, [[16, 1, 0.4], [9, 3, 2.1], [4, 7, 4.2]]), f2 = wave(FW, [[12, 2, 1.3], [7, 5, 0.2]]);
+    var far = '<path fill="' + c.far2 + '" d="' + ridge(FW, f2, 46, 40) + "V" + FH + "H0Z" + '"/><path fill="' + c.far + '" d="' + ridge(FW, f1, 70, 40) + "V" + FH + "H0Z" + '"/>';
+    // Distant woods along the nearer ridge.
+    for (var dw = 0; dw < 2 * FW; dw += 100) { var dx = dw + (dw * 7) % 50; if ((dw / 100) % 3 === 1) continue; far += '<circle cx="' + dx + '" cy="' + r1(70 + f1(dx) + 2) + '" r="' + (5 + (dw % 4)) + '" fill="' + c.hedge + '" fill-opacity=".55"/>'; }
+    // Fields, hedgerows, trees, sheep and a village church.
+    var MW = 2400, MH = 160, g = wave(MW, [[12, 2, 0.9], [7, 5, 2.6], [3, 11, 1.1]]), gy = function (x) { return 48 + g(x); };
+    var mid = '<path fill="' + c.mid + '" d="' + ridge(MW, g, 48, 30) + "V" + MH + "H0Z" + '"/>';
+    var tile = function (o) {
+      var s = "", x = 0, k = 0, rr = seeded(season.length * 31 + 5);
+      while (x < MW) {
+        var w = 170 + Math.floor(rr() * 200), x1 = Math.min(MW, x + w), top0 = gy(x) + 5, top1 = gy(x1) + 5, lean = 26;
+        s += '<path fill="' + c.fields[k % c.fields.length] + '" d="M' + r1(o + x) + " " + r1(top0) + "L" + r1(o + x1) + " " + r1(top1) + "L" + r1(o + x1 - lean) + " " + MH + "L" + r1(o + x - lean) + " " + MH + 'Z"/>';
+        // Furrows in some fields.
+        if (k % 3 === 1) for (var f = 1; f < 4; f++) { var fy = top0 + (MH - top0) * f / 4; s += '<path stroke="' + c.hedge + '" stroke-opacity=".18" stroke-width="2" d="M' + r1(o + x + 8) + " " + r1(fy) + "L" + r1(o + x1 - 12) + " " + r1(fy + (top1 - top0) * f / 4) + '"/>'; }
+        s += '<path stroke="' + c.hedge + '" stroke-width="6" stroke-linecap="round" d="M' + r1(o + x1) + " " + r1(top1) + "L" + r1(o + x1 - lean) + " " + MH + '"/>';
+        x = x1; k++;
       }
-      requestAnimationFrame(frame);
+      // The hedgerow along the top of the fields.
+      var h = "M" + o + " " + r1(gy(0) + 5); for (var hx = 30; hx <= MW; hx += 30) h += "L" + (o + hx) + " " + r1(gy(hx) + 4 + (hx % 60 ? 1.5 : -1.5));
+      s += '<path fill="none" stroke="' + c.hedge + '" stroke-width="7" stroke-linejoin="round" d="' + h + '"/>';
+      // Trees along the hedges.
+      for (var t = 0; t < 22; t++) {
+        var tx = 40 + t * 106 + rr() * 50; if ((tx > 1380 && tx < 1620) || (tx > 260 && tx < 360)) continue;
+        var ty = gy(tx) + 4, tr = 11 + rr() * 11, col = c.tree2 && t % 3 === 0 ? c.tree2 : c.tree;
+        s += '<rect x="' + r1(o + tx - 2) + '" y="' + r1(ty - tr * 1.2) + '" width="4" height="' + r1(tr * 1.2) + '" fill="#5b4632"/>';
+        if (c.bare) s += '<path fill="none" stroke="' + col + '" stroke-width="2" stroke-linecap="round" d="M' + r1(o + tx) + " " + r1(ty - tr) + "l-" + r1(tr * 0.7) + " -" + r1(tr) + "M" + r1(o + tx) + " " + r1(ty - tr) + "l" + r1(tr * 0.6) + " -" + r1(tr * 1.1) + "M" + r1(o + tx) + " " + r1(ty - tr) + "v-" + r1(tr * 1.3) + '"/>';
+        else s += '<circle cx="' + r1(o + tx) + '" cy="' + r1(ty - tr * 1.6) + '" r="' + r1(tr) + '" fill="' + col + '"/>' + (c.blossom && t % 4 === 1 ? '<circle cx="' + r1(o + tx - tr * 0.3) + '" cy="' + r1(ty - tr * 1.8) + '" r="' + r1(tr * 0.45) + '" fill="' + c.blossom + '"/>' : "");
+      }
+      // A farmhouse with its barn.
+      var fx = 300, fy = gy(fx) + 7;
+      s += '<path fill="#efe6d4" d="M' + (o + fx - 22) + " " + r1(fy) + "v-15h26v15Z" + '"/><path fill="#9b4a35" d="M' + (o + fx - 25) + " " + r1(fy - 15) + "l16 -10 16 10Z" + '"/>' +
+        '<path fill="#7a3b2c" d="M' + (o + fx + 8) + " " + r1(fy) + "v-11h22v11Z" + '"/><path fill="#5e2d22" d="M' + (o + fx + 6) + " " + r1(fy - 11) + "l13 -7 13 7Z" + '"/><rect x="' + (o + fx - 15) + '" y="' + r1(fy - 11) + '" width="5" height="5" fill="#5d6470"/>';
+      // A village church: nave, tower and spire, in stone.
+      var cx = 1500, cy = gy(cx) + 6;
+      s += '<path fill="#d9d3c4" d="M' + (o + cx - 30) + " " + r1(cy) + "v-16h36v16Z" + '"/><path fill="#8a8f99" d="M' + (o + cx - 32) + " " + r1(cy - 16) + "l20 -9h20l-2 9Z" + '"/>' +
+        '<path fill="#cfc8b7" d="M' + (o + cx + 6) + " " + r1(cy) + "v-30h14v30Z" + '"/><path fill="#8a8f99" d="M' + (o + cx + 5) + " " + r1(cy - 30) + "l8 -22 8 22Z" + '"/>' +
+        '<rect x="' + (o + cx - 22) + '" y="' + r1(cy - 11) + '" width="4" height="6" rx="2" fill="#5d6470"/><rect x="' + (o + cx - 12) + '" y="' + r1(cy - 11) + '" width="4" height="6" rx="2" fill="#5d6470"/>';
+      // A few sheep in one field.
+      for (var q = 0; q < 5; q++) {
+        var sx = 640 + q * 22 + rr() * 14, sy = gy(sx) + 30 + rr() * 50;
+        s += '<ellipse cx="' + r1(o + sx) + '" cy="' + r1(sy) + '" rx="7" ry="4.8" fill="#f7f5ee"/><circle cx="' + r1(o + sx + (q % 2 ? 7 : -7)) + '" cy="' + r1(sy - 1.5) + '" r="2.6" fill="#2b2b2b"/>' +
+          '<path stroke="#2b2b2b" stroke-width="1.4" d="M' + r1(o + sx - 3) + " " + r1(sy + 4) + "v3M" + r1(o + sx + 3) + " " + r1(sy + 4) + 'v3"/>';
+      }
+      return s;
+    };
+    mid += tile(0) + tile(MW);
+    // Near: the verge, bushes and telegraph poles with their wires, passing fast.
+    var NW = 1200, NH = 400, NG = 296, poles = [150, 750], wires = "", nearT = "";
+    var ntile = function (o) {
+      var s = '<path fill="' + c.near + '" d="M' + o + " " + NG + "Q" + (o + 300) + " " + (NG - 10) + " " + (o + 600) + " " + NG + "T" + (o + 1200) + " " + NG + "V" + NH + "H" + o + 'Z"/>';
+      for (var b = 0; b < 5; b++) { var bx = o + 90 + b * 240 + (b * 53) % 70; s += '<ellipse cx="' + bx + '" cy="' + (NG + 2) + '" rx="' + (26 + (b * 17) % 22) + '" ry="16" fill="' + c.hedge + '"/>'; }
+      for (var u = 0; u < 22; u++) { var ux = o + 20 + u * 54; s += '<path stroke="' + c.tuft + '" stroke-width="3" stroke-linecap="round" d="M' + ux + " " + (NG + 22) + "l-4 -12M" + (ux + 6) + " " + (NG + 22) + "l2 -14M" + (ux + 12) + " " + (NG + 22) + 'l5 -11"/>'; }
+      poles.forEach(function (px) {
+        s += '<rect x="' + (o + px - 4) + '" y="40" width="8" height="' + (NG - 34) + '" fill="#5b4632"/><rect x="' + (o + px - 30) + '" y="58" width="60" height="6" fill="#5b4632"/>' +
+          '<circle cx="' + (o + px - 24) + '" cy="56" r="3.5" fill="#e8e3d6"/><circle cx="' + (o + px + 24) + '" cy="56" r="3.5" fill="#e8e3d6"/>';
+      });
+      return s;
+    };
+    for (var wv = 0; wv < 4; wv++) { var a0 = 150 + wv * 600, a1 = a0 + 600; wires += "M" + (a0 - 24) + " 56Q" + (a0 + 300) + " 92 " + (a1 - 24) + " 56M" + (a0 + 24) + " 56Q" + (a0 + 300) + " 96 " + (a1 + 24) + " 56"; }
+    nearT = ntile(0) + ntile(NW) + '<path fill="none" stroke="#3b3b3b" stroke-width="1.6" d="' + wires + '"/>';
+    SCENERY[season] = { far: far, mid: mid, near: nearT, FW: FW, FH: FH, MW: MW, MH: MH, NW: NW, NH: NH };
+    return SCENERY[season];
+  }
+  // A station board: white words on navy, a white edge (the name as the ticket gives it).
+  function stationBoard(name, cls) { return el("div", { className: "jboard " + (cls || "") }, [el("b", { text: name })]); }
+  // Did you visit…? (its sights, from the server's list, each with a drawn icon), or "How was Brighouse?" when none are
+  // listed. Asked, never said.
+  function tripQuestion(tr, year) {
+    var box = el("div", { className: "jqin" });
+    if (tr.times > 1) box.appendChild(el("p", { className: "jtimes", text: tr.times + " times " + (year === new Date().getFullYear() ? "this year" : "in " + year) }));
+    var sights = (tr.sights || []).slice(0, 3);
+    if (sights.length) {
+      box.appendChild(el("h2", { className: "ch", text: "Did you visit…" }));
+      var ul = el("ul", { className: "jsights" });
+      sights.forEach(function (a, k) {
+        var li = el("li", { style: "transition-delay:" + (0.15 + k * 0.22).toFixed(2) + "s" }), ic = el("span", { className: "sic" }); ic.innerHTML = sightIcon(a);
+        li.appendChild(ic); li.appendChild(el("b", { text: cap1(a) + (k === sights.length - 1 ? "?" : "") })); ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    } else box.appendChild(el("p", { className: "lead jhow", text: "How was " + (tr.place || tr.to) + "?" }));
+    return box;
+  }
+  function unknownLine(tr) {
+    var u = [tr.fromAt ? null : tr.from, tr.toAt ? null : tr.to].filter(Boolean);
+    return u.length ? u.join(" and ") + (u.length === 1 ? " isn't" : " aren't") + " on the map." : null;
+  }
+  var tripWhen = function (tr) { return tr.date ? longDate(tr.date) : ""; };
+  // One trip, moving. `prev` is where the camera was at the end of the last trip (or the whole UK).
+  function tripScene(b, tr, prev, label, year, ctl) {
+    b.classList.add("jx");
+    b.appendChild(el("div", { className: "k", text: label }));
+    var stage = el("div", { className: "jstage", role: "img", ariaLabel: "A train journey from " + tr.from + " to " + tr.to + (tr.date ? " on " + tripWhen(tr) : "") });
+    var q = el("div", { className: "jq" });
+    var note = unknownLine(tr); if (note) q.appendChild(el("p", { className: "fine jcap", text: note }));
+    q.appendChild(tripQuestion(tr, year));
+    b.appendChild(stage); b.appendChild(q);
+    var SW = stage.clientWidth || 358, SH = stage.clientHeight || 420;
+    // 1. The map.
+    var map = el("div", { className: "jmap" }), svg = svgEl("svg", { "aria-hidden": "true", preserveAspectRatio: "xMidYMid slice" });
+    svg.innerHTML = ukLand(); map.appendChild(svg); stage.appendChild(map);
+    var start = tr.fromAt ? ukXY(tr.fromAt.lat, tr.fromAt.lon) : null, end = tr.toAt ? ukXY(tr.toAt.lat, tr.toAt.lon) : null;
+    var way = start && end ? svgEl("path", { class: "way", d: "M" + start[0] + " " + start[1] + "L" + end[0] + " " + end[1] }) : null;
+    var ring = start ? svgEl("circle", { class: "ring", cx: start[0], cy: start[1], r: 1 }) : null, pin = start ? svgEl("circle", { class: "pin", cx: start[0], cy: start[1], r: 1 }) : null;
+    [way, ring, pin].forEach(function (n) { if (n) svg.appendChild(n); });
+    var fromBoard = stationBoard(tr.from, "from"); stage.appendChild(fromBoard);
+    var target = viewAt(tr.fromAt);
+    // 2. The train window: sky, sun, three layers of countryside, the platform that arrives, then the frame.
+    var train = el("div", { className: "jtrain" }), sc = scenery(seasonOf(tr.date)), c = SEASON[seasonOf(tr.date)];
+    train.style.background = c.sky;
+    train.appendChild(el("i", { className: "jsun", style: "background:" + c.sun + ";top:" + Math.round(c.sunY * 100) + "%" }));
+    var layer = function (svgInner, vw, vh, hPx, topPx) {
+      var h = Math.round(hPx), w = Math.round(h * vw * 2 / vh), n = el("div", { className: "jl", style: "height:" + h + "px;width:" + w + "px;top:" + Math.round(topPx) + "px" });
+      n.innerHTML = '<svg viewBox="0 0 ' + vw * 2 + " " + vh + '" width="' + w + '" height="' + h + '" aria-hidden="true">' + svgInner + "</svg>";
+      train.insertBefore(n, dep); return { node: n, px: w / 2 };
+    };
+    // The departure board above the window: the date, and where from and to. The window is under it, wider than tall.
+    var dep = el("div", { className: "jdep" }, [el("span", { text: tripWhen(tr) || "Your journey" }), el("b", { text: tr.from + " to " + tr.to })]);
+    train.appendChild(dep); stage.appendChild(train);
+    var top = dep.offsetTop + dep.offsetHeight + 10, wx = Math.round(SW * 0.06), ww = SW - 2 * wx, rad = 24, bottom = Math.round(Math.min(SH * 0.84, top + ww * 0.95)), winH = bottom - top;
+    var L = [layer(sc.far, sc.FW, sc.FH, 0.34 * winH, top + 0.3 * winH), layer(sc.mid, sc.MW, sc.MH, 0.42 * winH, top + 0.5 * winH), layer(sc.near, sc.NW, sc.NH, 1.05 * winH, top + 0.9 * winH - 0.74 * 1.05 * winH)];
+    var plat = el("div", { className: "jplat" }), toBoard = stationBoard(tr.to, "to");
+    var frame = svgEl("svg", { class: "jframe", viewBox: "0 0 " + SW + " " + SH, "aria-hidden": "true" });
+    train.insertBefore(plat, dep); train.insertBefore(frame, dep);
+    var seatY = Math.round(top + 0.35 * winH), tableY = Math.round(bottom + Math.max(8, (SH - bottom) * 0.3));
+    var hole = "M" + (wx + rad) + " " + top + "H" + (wx + ww - rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + ww) + " " + (top + rad) + "V" + (bottom - rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + ww - rad) + " " + bottom +
+      "H" + (wx + rad) + "A" + rad + " " + rad + " 0 0 1 " + wx + " " + (bottom - rad) + "V" + (top + rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + rad) + " " + top + "Z";
+    frame.innerHTML = (c.frost ? '<g fill="#f4f8fb" fill-opacity=".55"><circle cx="' + (wx + 8) + '" cy="' + (top + 8) + '" r="34"/><circle cx="' + (wx + 40) + '" cy="' + (top + 4) + '" r="18"/><circle cx="' + (wx + ww - 6) + '" cy="' + (bottom - 6) + '" r="30"/><circle cx="' + (wx + ww - 40) + '" cy="' + (bottom - 2) + '" r="16"/></g>' : "") +
+      '<path fill="#fff" fill-opacity=".07" d="M' + (wx + ww * 0.55) + " " + top + "h" + Math.round(ww * 0.12) + "L" + (wx + ww * 0.3) + " " + bottom + "h-" + Math.round(ww * 0.12) + 'Z"/>' +
+      '<path fill="#101828" fill-rule="evenodd" d="M0 0H' + SW + "V" + SH + "H0Z" + hole + '"/>' +
+      '<path fill="none" stroke="#344054" stroke-width="3" d="' + hole + '"/>' +
+      // The edge of the seat in front, and the table under the window.
+      '<path fill="#1d2939" d="M0 ' + (seatY + 16) + "Q0 " + seatY + " " + Math.round(SW * 0.05) + " " + seatY + "H" + Math.round(SW * 0.1) + "Q" + Math.round(SW * 0.15) + " " + seatY + " " + Math.round(SW * 0.15) + " " + (seatY + 18) + "V" + SH + 'H0Z"/>' +
+      '<rect x="0" y="' + tableY + '" width="' + SW + '" height="' + (SH - tableY) + '" fill="#1d2939"/><rect x="0" y="' + tableY + '" width="' + SW + '" height="3" fill="#475467"/>';
+    // The platform and the destination's board, waiting off to the right.
+    var pTop = Math.round(top + 0.78 * winH);
+    plat.innerHTML = '<svg width="' + SW * 2 + '" height="' + SH + '" aria-hidden="true"><rect x="0" y="' + pTop + '" width="' + SW * 2 + '" height="' + (SH - pTop) + '" fill="#c3c8cf"/><rect x="0" y="' + pTop + '" width="' + SW * 2 + '" height="7" fill="#f2c94c"/>' +
+      '<rect x="' + Math.round(SW * 0.22) + '" y="' + (top + 30) + '" width="7" height="' + (pTop - top - 30) + '" fill="#101828"/><rect x="' + Math.round(SW * 0.78 - 7) + '" y="' + (top + 30) + '" width="7" height="' + (pTop - top - 30) + '" fill="#101828"/>' +
+      '<rect x="' + Math.round(SW * 1.4) + '" y="' + (top + 10) + '" width="6" height="' + (pTop - top - 10) + '" fill="#475467"/><rect x="' + Math.round(SW * 1.4 - 10) + '" y="' + (top + 6) + '" width="26" height="10" rx="4" fill="#475467"/></svg>';
+    toBoard.style.top = (top + 16) + "px"; plat.appendChild(toBoard);
+    // How far the platform slides, and the near layer's speed to match it as the train slows (quadratic ease out).
+    var D = SW * 1.15, v0 = 2 * D / JX.slow, nearMs = L[2].px / v0;
+    var speeds = [nearMs * 9, nearMs * 3.2, nearMs];
+    var anims = L.map(function (l, k) {
+      if (!l.node.animate) return null;
+      var a = l.node.animate([{ transform: "translate3d(0,0,0)" }, { transform: "translate3d(-50%,0,0)" }], { duration: speeds[k], iterations: Infinity });
+      a.currentTime = (k * 997 + (tr.date ? Number(tr.date.slice(8, 10)) * 131 : 0)) % speeds[k]; a.playbackRate = 0; return a;
+    });
+    var rateNow = -1, hold = false;
+    // How fast the countryside goes by (0 stopped, 1 full speed); stopped while the story is held.
+    function rate(r) { if (hold) r = 0; if (Math.abs(r - rateNow) < 0.002) return; rateNow = r; anims.forEach(function (a) { if (a) a.playbackRate = r; }); }
+    function setView(vb) {
+      svg.setAttribute("viewBox", vb.map(function (v) { return Math.round(v * 100) / 100; }).join(" "));
+      var u = vb[2] / SW;
+      if (pin) { pin.setAttribute("r", (7 * u).toFixed(3)); pin.style.strokeWidth = (2.5 * u).toFixed(3); ring.setAttribute("r", (7 * u).toFixed(3)); ring.style.strokeWidth = (2 * u).toFixed(3); }
+      if (way) { way.style.strokeWidth = (2.5 * u).toFixed(3); way.style.strokeDasharray = (3 * u).toFixed(3) + " " + (7 * u).toFixed(3); }
     }
-    return { node: wrap, box: to, run: run };
+    var t = 0, last = null, tBoard = JX.map, tRide = tBoard + JX.board, tSlow = tRide + JX.ride, tStop = tSlow + JX.slow, sound = false, endView = viewBox(target, SW, SH);
+    stage.setAttribute("data-phase", "map");
+    function phase(p) { if (stage.getAttribute("data-phase") !== p) stage.setAttribute("data-phase", p); }
+    function snd(on) { if (on !== sound) { sound = on; if (ctl && ctl.train) ctl.train(on); } }
+    function step(now) {
+      if (!stage.isConnected) { snd(false); return; }
+      var held = Boolean(stage.closest(".paused"));
+      if (held !== hold) { hold = held; rateNow = -1; }
+      if (last !== null && !held) t += Math.min(64, now - last);
+      last = now;
+      if (t < tBoard) {
+        phase("map");
+        var e = ease(clamp01(t / JX.map));
+        setView(flyView(prev, target, SW, SH, e));
+        if (pin) { var pe = clamp01((t - 250) / 350); pin.style.opacity = ring.style.opacity = String(pe); }
+        var fb = ease(clamp01((t - 500) / 450)); fromBoard.style.opacity = String(fb); fromBoard.style.transform = "translateY(" + Math.round((1 - fb) * 24) + "px)";
+      } else if (t < tRide) {
+        phase("board");
+        var bt = (t - tBoard) / JX.board, be = ease(clamp01(bt));
+        var vb = endView, z = 1 - 0.6 * be; setView([vb[0] + vb[2] * (1 - z) / 2, vb[1] + vb[3] * (1 - z) / 2, vb[2] * z, vb[3] * z]);
+        map.style.opacity = String(1 - clamp01((bt - 0.25) / 0.6));
+        fromBoard.style.opacity = String(1 - clamp01(bt / 0.35));
+        var te = ease(clamp01((bt - 0.4) / 0.6)); train.style.opacity = String(te); train.style.transform = "scale(" + (1.18 - 0.18 * te).toFixed(4) + ")";
+        rate(0.25 * clamp01((bt - 0.5) / 0.5));
+        if (bt > 0.5) snd(true);
+      } else if (t < tSlow) {
+        phase("ride");
+        map.style.opacity = "0"; fromBoard.style.opacity = "0"; train.style.opacity = "1"; train.style.transform = "none";
+        rate(Math.min(1, 0.25 + 0.75 * ease(clamp01((t - tRide) / 900))));
+      } else if (t < tStop) {
+        phase("slow");
+        train.style.opacity = "1"; train.style.transform = "none"; map.style.opacity = "0"; fromBoard.style.opacity = "0";
+        var s = clamp01((t - tSlow) / JX.slow);
+        rate(Math.max(0, 1 - s));
+        plat.style.transform = "translate3d(" + (D * (1 - (2 * s - s * s))).toFixed(1) + "px,0,0)";
+        if (s > 0.7) snd(false);
+      } else {
+        phase("arrived"); rate(0); snd(false); train.style.opacity = "1"; train.style.transform = "none"; map.style.opacity = "0";
+        plat.style.transform = "none"; q.classList.add("on");
+        return;
+      }
+      requestAnimationFrame(step);
+    }
+    plat.style.transform = "translate3d(" + D.toFixed(1) + "px,0,0)";
+    setView(viewBox(prev, SW, SH));
+    requestAnimationFrame(step);
+    return viewAt(tr.toAt);
+  }
+  // One trip, still (reduced motion): the route on the map, the two names, the date, and the question.
+  function tripStill(b, tr, label, year) {
+    b.classList.add("jx", "still");
+    b.appendChild(el("div", { className: "k", text: label }));
+    var box = el("div", { className: "jstill" }), svg = svgEl("svg", { role: "img", "aria-label": "Map of the journey from " + tr.from + " to " + tr.to, preserveAspectRatio: "xMidYMid meet" });
+    svg.innerHTML = ukLand(); box.appendChild(svg); b.appendChild(box);
+    var a = tr.fromAt ? ukXY(tr.fromAt.lat, tr.fromAt.lon) : null, z = tr.toAt ? ukXY(tr.toAt.lat, tr.toAt.lon) : null, pts = [a, z].filter(Boolean);
+    var vb;
+    if (pts.length) {
+      var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys), s = Math.max(50, (x1 - x0) * 1.5, (y1 - y0) * 1.5 * 4 / 3);
+      vb = [(x0 + x1) / 2 - s / 2, (y0 + y1) / 2 - s * 3 / 8, s, s * 3 / 4];
+    } else { var wv = wholeView(); vb = [wv.cx - wv.w / 2, wv.cy - wv.h / 2, wv.w, wv.h]; }
+    svg.setAttribute("viewBox", vb.map(function (v) { return Math.round(v * 10) / 10; }).join(" "));
+    var u = vb[2] / 330;
+    if (a && z) svg.appendChild(svgEl("path", { class: "way solid", d: "M" + a[0] + " " + a[1] + "L" + z[0] + " " + z[1], style: "stroke-width:" + (3 * u).toFixed(2) }));
+    pts.forEach(function (p) { svg.appendChild(svgEl("circle", { class: "pin", cx: p[0], cy: p[1], r: (6 * u).toFixed(2), style: "stroke-width:" + (2 * u).toFixed(2) })); });
+    b.appendChild(el("p", { className: "lead jroute", text: tr.from + " to " + tr.to }));
+    if (tr.date) b.appendChild(el("p", { className: "jwhen", text: tripWhen(tr) }));
+    var note = unknownLine(tr); if (note) b.appendChild(el("p", { className: "fine", text: note }));
+    var q = el("div", { className: "jq on" }); q.appendChild(tripQuestion(tr, year)); b.appendChild(q);
   }
   // Small drawn icons for the sights (no emoji, no photos from the web).
   var SIGHT_ICON = [
     [/castle|tower of|keep\b/i, '<path d="M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12M10 21v-4a2 2 0 0 1 4 0v4M3 21h18"/>'],
-    [/cathedral|minster|abbey|chapel|church/i, '<path d="M12 2v4M10 4h4M8 21V10l4-4 4 4v11M4 21v-7l4-3M20 21v-7l-4-3M3 21h18M11 21v-3h2v3"/>'],
-    [/bridge|viaduct|pier\b/i, '<path d="M2 18h20M4 18V11M20 18V11M2 11h20M7 18a5 5 0 0 1 10 0"/>'],
-    [/ship|^hms |^ss |rrs |mary rose|discovery|victory/i, '<path d="M3 15h18l-3 5H6ZM12 15V4l6 9M12 6 7 13"/>'],
-    [/loch|lake|bay\b|dock|deep\b|aquarium|minack/i, '<path d="M2 15c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M12 4v7M8 8l4-4 4 4"/>'],
-    [/park|garden|walk|backs|course|hoe|seat|orme|nevis|cliffs|battlefield|stonehenge|steps|shambles|lanes|rows|mile|beach|zoo/i, '<path d="M3 20l6-9 4 5 3-4 5 8ZM16 6.5a2.5 2.5 0 1 0 0-.01"/>'],
-    [/stadium|racecourse|bullring|world|centre|dreamland|pleasure|angel|spinnaker|monument|tower/i, '<path d="M12 2v20M8 22h8M9 6h6l-1 6h-4ZM10 12l-2 10M14 12l2 10"/>'],
-    [/museum|gallery|library|camera|house|hall|theatre|birthplace|cottage|pavilion|room|contemporary|story|crescent|baths|v&a/i, '<path d="M3 9 12 4l9 5M5 9v9M9 9v9M15 9v9M19 9v9M3 20h18M3 18h18"/>']
+    [/cathedral|minster|abbey|chapel|church|priory|spire|stump/i, '<path d="M12 2v4M10 4h4M8 21V10l4-4 4 4v11M4 21v-7l4-3M20 21v-7l-4-3M3 21h18M11 21v-3h2v3"/>'],
+    [/bridge|viaduct|pier\b|wheel/i, '<path d="M2 18h20M4 18V11M20 18V11M2 11h20M7 18a5 5 0 0 1 10 0"/>'],
+    [/ship|^hms |^ss |rrs |mary rose|discovery|victory|dockyard/i, '<path d="M3 15h18l-3 5H6ZM12 15V4l6 9M12 6 7 13"/>'],
+    [/loch|lake|bay\b|dock|deep\b|aquarium|minack|harbour|beach/i, '<path d="M2 15c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M12 4v7M8 8l4-4 4 4"/>'],
+    [/park|garden|walk|backs|course|hoe|seat|orme|nevis|cliffs|battlefield|stonehenge|steps|shambles|lanes|rows|mile|zoo|hills|head\b|cave|cavern|kelpies|walls|pantiles|abraham|project/i, '<path d="M3 20l6-9 4 5 3-4 5 8ZM16 6.5a2.5 2.5 0 1 0 0-.01"/>'],
+    [/stadium|racecourse|bullring|world|centre|dreamland|pleasure|angel|spinnaker|monument|tower|memorial|lift/i, '<path d="M12 2v20M8 22h8M9 6h6l-1 6h-4ZM10 12l-2 10M14 12l2 10"/>'],
+    [/museum|gallery|library|camera|house|hall|theatre|birthplace|cottage|pavilion|room|contemporary|story|crescent|baths|v&a|palace|mansion|mill|piece|opera|hepworth|tate|eureka/i, '<path d="M3 9 12 4l9 5M5 9v9M9 9v9M15 9v9M19 9v9M3 20h18M3 18h18"/>']
   ];
   function sightIcon(name) {
     var hit = SIGHT_ICON.filter(function (x) { return x[0].test(name); })[0];
@@ -7361,7 +7599,7 @@
       (hit ? hit[1] : '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/>') + "</svg>";
   }
   var cap1 = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
-  function travelSlides(S, t) {
+  function travelSlides(S, t, year) {
     if (!t || !t.journeys || S._travel) return;
     S._travel = true;
     var modes = [[t.trains, "by train"], [t.flights, "by air"], [t.coaches, "by coach"]].filter(function (m) { return m[0]; });
@@ -7378,31 +7616,17 @@
       }
     } });
     var trips = (t.trips || []).filter(function (x) { return x && x.from && x.to; });
-    var more = t.moreTrips || 0;
-    if (trips.length && calmMotion()) {
-      // Reduced motion: every journey, still, in order.
-      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
-        b.appendChild(el("p", { className: "lead", text: trips.length === 1 ? "Your journey" : "Your journeys" }));
-        var ol = el("ol", { className: "jlist" });
-        trips.forEach(function (tr) { ol.appendChild(el("li", {}, [el("b", { text: tr.from + " to " + tr.to }), el("small", { text: longDate(tr.date) + (tr.return ? ", and back" : "") })])); });
-        b.appendChild(ol);
-        if (more) b.appendChild(el("p", { className: "fine", text: "And " + journeysWord(more) + " more." }));
+    var calm = calmMotion();
+    trips.forEach(function (tr, i) {
+      var label = trips.length > 1 ? "JOURNEY " + (i + 1) + " OF " + trips.length : "YOUR JOURNEY";
+      // A flight isn't shown from a train window: it gets the still card (its route on the map) and the question.
+      var still = calm || tr.mode === "flight";
+      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: still ? 6500 : tripDur(tr), journey: true, build: function (b, again, close, ctl) {
+        if (still) return tripStill(b, tr, label, year);
+        // The camera starts where the last trip ended (or on the whole UK), so it moves on from one to the next.
+        tripScene(b, tr, i > 0 ? viewAt(trips[i - 1].toAt) : wholeView(), label, year, ctl);
       } });
-    } else {
-      trips.forEach(function (tr, i) {
-        S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: JOURNEY_MS + 600, journey: true, build: function (b) {
-          b.appendChild(el("div", { className: "k", text: trips.length > 1 ? "JOURNEY " + (i + 1) + " OF " + (trips.length + more) : "YOUR JOURNEY" }));
-          // The map starts where the last journey left it (or on the whole UK), so it moves on from one to the next.
-          var m = journeyMap(tr, i > 0 ? boxOf(routeOf(trips[i - 1])) : null);
-          b.appendChild(m.node);
-          b.appendChild(el("p", { className: "jwhen", text: longDate(tr.date) + (tr.return ? ", there and back" : "") }));
-          var unknown = [tr.fromAt ? null : tr.from, tr.toAt ? null : tr.to].filter(Boolean);
-          if (unknown.length) b.appendChild(el("p", { className: "fine", text: tr.from + " to " + tr.to + ". " + unknown.join(" and ") + (unknown.length === 1 ? " isn't" : " aren't") + " on the map." }));
-          if (i === trips.length - 1 && more) b.appendChild(el("p", { className: "fine", text: "And " + journeysWord(more) + " more." }));
-          m.run(false);
-        } });
-      });
-    }
+    });
     if ((t.places || []).length) S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Where you went" }));
       var m = el("div", { className: "map" }); m.innerHTML = ukMapSvg(t); b.appendChild(m);
@@ -7410,21 +7634,6 @@
       b.appendChild(el("p", { className: "fine", text: (t.places.length > 4 ? "Including " : "") + names.join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
       if ((t.unplotted || []).length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + t.unplotted.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
     } });
-    // Did you visit? Asked, never said: a ticket somewhere doesn't mean they saw any of it.
-    (t.visits || []).forEach(function (v) {
-      if (!v || !v.place || !(v.attractions || []).length) return;
-      S.push({ bg: "#172554", fg: "#fff", accent: "#C9D8FF", build: function (b) {
-        b.appendChild(el("div", { className: "k", text: "AROUND " + String(v.place).toUpperCase() }));
-        b.appendChild(el("h2", { className: "ch", text: "Did you visit…" }));
-        var ul = el("ul", { className: "sights" });
-        v.attractions.slice(0, 3).forEach(function (a, k) {
-          var li = el("li", { style: "animation-delay:" + (0.25 + k * 0.3).toFixed(2) + "s" }); var ic = el("span", { className: "sic" }); ic.innerHTML = sightIcon(a);
-          li.appendChild(ic); li.appendChild(el("b", { text: cap1(a) + (k === Math.min(3, v.attractions.length) - 1 ? "?" : "") })); ul.appendChild(li);
-        });
-        b.appendChild(ul);
-        b.appendChild(el("p", { className: "fine", text: "Your receipts show a ticket to " + v.place + (v.date ? " in " + new Date(v.date + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long" }) : "") + "." }));
-      } });
-    });
   }
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
@@ -7456,7 +7665,8 @@
       frame.style.background = sl.bg; frame.style.color = sl.fg; frame.style.setProperty("--accent", sl.accent);
       Array.prototype.forEach.call(bars.children, function (b, k) { b.className = k < i ? "done" : k === i ? "now" : ""; b.firstChild.style.animationDuration = (slides[k].dur || DUR) + "ms"; });
       body.textContent = ""; var inner = el("div", { className: "rl-story-slide" }); body.appendChild(inner);
-      sl.build(inner, function () { show(0); }, close);
+      if (music) music.train(false);
+      sl.build(inner, function () { show(0); }, close, { train: function (on) { if (music) music.train(on); } });
       if (!sl.summary) timer = setTimeout(function () { if (!paused) show(i + 1); }, sl.dur || DUR);
     }
     function key(e) { if (e.key === "Escape") close(); else if (e.key === "ArrowRight") show(i + 1); else if (e.key === "ArrowLeft") show(i - 1); }
