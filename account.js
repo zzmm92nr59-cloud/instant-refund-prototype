@@ -528,6 +528,16 @@
     ".rl-story-slide .map{margin:12px auto 0;width:min(100%,250px)}.rl-story-slide .map svg{display:block;width:100%;height:auto;max-height:52vh}" +
     ".rl-story-slide .map .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.6;stroke-width:1.2;stroke-linejoin:round}" +
     ".rl-story-slide .map .arc{fill:none;stroke:currentColor;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1;animation:rlarc .9s cubic-bezier(.4,0,.2,1) forwards}@keyframes rlarc{to{stroke-dashoffset:0}}" +
+    ".rl-story-slide .jmap{margin:10px auto 0;width:min(100%,330px);aspect-ratio:1;border-radius:22px;overflow:hidden;background:rgba(255,255,255,.04)}.rl-story-slide .jmap svg{display:block;width:100%;height:100%}" +
+    ".rl-story-slide .jmap .land{fill:currentColor;fill-opacity:.12;stroke:currentColor;stroke-opacity:.45;stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}" +
+    ".rl-story-slide .jmap .route-ghost{fill:none;stroke:currentColor;stroke-opacity:.25;stroke-linecap:round;stroke-dasharray:.018 .022}.rl-story-slide .jmap .route{fill:none;stroke:var(--accent);stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}" +
+    ".rl-story-slide .jmap .stop{fill:var(--accent);stroke:currentColor}.rl-story-slide .jmap .stn{fill:currentColor;font-weight:800;opacity:0;paint-order:stroke;stroke:#0f2a4a;stroke-linejoin:round}" +
+    ".rl-story-slide .tiny-train .tr-body{fill:var(--accent);stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}.rl-story-slide .tiny-train .tr-line{fill:none;stroke:#0f2a4a;stroke-width:1.6;stroke-linecap:round}.rl-story-slide .tiny-train .tr-wheel{fill:#0f2a4a;stroke:currentColor;stroke-width:1.4}" +
+    ".rl-story-slide .jwhen{font-size:20px;font-weight:800;margin-top:14px}" +
+    ".rl-story-slide .jlist{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}.rl-story-slide .jlist li{display:grid;gap:2px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.08)}.rl-story-slide .jlist b{font-size:17px}.rl-story-slide .jlist small{font-size:14px;opacity:.8}" +
+    ".rl-story-slide .sights{list-style:none;margin:18px 0 6px;padding:0;display:grid;gap:12px}.rl-story-slide .sights li{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.08);opacity:0;animation:rlsight .5s ease-out forwards}" +
+    ".rl-story-slide .sights .sic{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accent);color:#172554}.rl-story-slide .sights svg{width:26px;height:26px}.rl-story-slide .sights b{font-size:19px;line-height:1.25}" +
+    "@keyframes rlsight{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.rl-story-slide .sights li{animation:none;opacity:1}}" +
     ".rl-story-slide .map .dot{fill:var(--accent);stroke:currentColor;stroke-width:2;transform-box:fill-box;transform-origin:center;opacity:0;animation:rldot .5s cubic-bezier(.2,.9,.3,1.4) forwards}@keyframes rldot{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}" +
     "@media(prefers-reduced-motion:reduce){.rl-story-slide .rl-wr-hero,.rl-story-slide .ph.tumble figure{animation:none;opacity:1;transform:rotate(var(--r))}.rl-story-slide .bag .it{animation:none;opacity:1;transform:translateY(calc(30px + var(--k) * 12px)) rotate(var(--r))}" +
     ".rl-story-slide .belt>div{animation:none;flex-wrap:wrap;width:auto}.rl-story-slide .belt span.dup{display:none}.rl-story-slide .train *{animation:none!important}.rl-story-slide .train .loco{transform:translateX(calc(50cqw - 125px))}.rl-story-slide .train .puff{opacity:.5}" +
@@ -5583,7 +5593,7 @@
       psw.setAttribute("role", "switch"); psw.setAttribute("aria-label", "AI for picks");
       var pmsg = el("p", { className: "rl-msg" }); pmsg.setAttribute("role", "status");
       pk.appendChild(el("div", { className: "rl-aih-top" }, [el("b", { text: "AI for picks" }), psw]));
-      pk.appendChild(el("p", { text: "Claude reads the names of the things you bought, and the shop, to make Browse's picks fit. Nothing else is sent: not your emails, address, order numbers or prices." }));
+      pk.appendChild(el("p", { text: "Claude reads the names of the things you bought, and the shop, to work out what each one is, so Browse's picks and your Wrapped fit. Nothing else is sent: not your emails, address, order numbers or prices." }));
       pk.appendChild(pmsg); box.appendChild(pk);
       var pon = false, pbusy = false;
       var pdraw = function () { psw.setAttribute("aria-checked", pon ? "true" : "false"); };
@@ -6945,7 +6955,14 @@
     travel: '<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 14h.01M15 14h.01M8 21l2-4M16 21l-2-4"/>',
     digital: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="m10 8.5 5 2.5-5 2.5ZM8 21h8"/>',
     experiences: '<path d="M3.5 7h17v3a2 2 0 0 0 0 4v3h-17v-3a2 2 0 0 0 0-4ZM14.5 7v10"/>',
-    other: '<path d="M6 8h12l-1 12.5H7ZM9 8V6.5a3 3 0 0 1 6 0V8"/>'
+    other: '<path d="M6 8h12l-1 12.5H7ZM9 8V6.5a3 3 0 0 1 6 0V8"/>',
+    // What a thing is (worker/item-kind-core.js), so a sharing bag of sweets is never drawn as a T-shirt.
+    clothing: '<path d="M8.5 4 4 7l2 3.2 2-1.1V20h8V9.1l2 1.1L20 7l-4.5-3c-.9 1.4-2.1 2-3.5 2s-2.6-.6-3.5-2Z"/>',
+    footwear: '<path d="M3 17.5V11l3.5-1 2 2.5 3.5-.5 4 2.5 4 .8a2 2 0 0 1 1.5 2V17.5ZM3 17.5h18.5M6.5 10V7.5M9.5 12.5l1-1.5M12.5 12.3l1-1.4"/>',
+    accessories: '<path d="M5 9h14l-1.2 11H6.2ZM8.5 9V7a3.5 3.5 0 0 1 7 0v2M5.5 13h13"/>',
+    toys_hobbies: '<rect x="3.5" y="12" width="7.5" height="7.5" rx="1"/><rect x="13" y="12" width="7.5" height="7.5" rx="1"/><rect x="8.2" y="4" width="7.5" height="7.5" rx="1"/><path d="M6 12v-1.5M8.5 12v-1.5M15.5 12v-1.5M18 12v-1.5"/>',
+    books_media: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15.5H5.5A1.5 1.5 0 0 0 4 21ZM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15.5h5.5A1.5 1.5 0 0 1 20 21ZM11 19.5h2"/>',
+    sport_outdoor: '<circle cx="12" cy="12" r="8.5"/><path d="m12 7.5 4 3-1.5 4.5h-5L8 10.5ZM12 3.5v4M20.2 9.8l-4.2.7M17.2 19l-2.7-4M6.8 19l2.7-4M3.8 9.8l4.2.7"/>'
   };
   function kindIcon(kind) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (KIND_ICON[kind] || KIND_ICON.other) + "</svg>"; }
   // A photo from the shopper's own receipt (only one Relay checked is of the thing), else the thing's drawn icon.
@@ -6954,15 +6971,6 @@
     if (id) apiBlob("/relay/my/receipts/" + id + "/image").then(function (u) { if (u && box.isConnected) { box.textContent = ""; box.appendChild(el("img", { src: u, alt: alt || "" })); } });
     return box;
   }
-  // A plain-line steam train on its rails, puffing across the screen (drawn here, in the slide's own colours).
-  var TRAIN_SVG = '<svg class="loco" viewBox="0 0 250 80" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<circle class="puff p1" cx="214" cy="12" r="6"/><circle class="puff p2" cx="214" cy="12" r="5"/><circle class="puff p3" cx="214" cy="12" r="4"/>' +
-    '<rect x="4" y="26" width="62" height="34" rx="6"/><path d="M14 36h14M40 36h14"/><rect x="76" y="26" width="62" height="34" rx="6"/><path d="M86 36h14M112 36h14"/>' +
-    '<path d="M66 50h10M138 50h10"/><path d="M148 60V30h30v-8h14v8h8l18-6v8l14 10v18Z"/><path d="M156 38h14v10h-14z"/><path d="M210 30v-12"/>' +
-    '<circle class="wh" cx="20" cy="66" r="7"/><circle class="wh" cx="50" cy="66" r="7"/><circle class="wh" cx="92" cy="66" r="7"/><circle class="wh" cx="122" cy="66" r="7"/>' +
-    '<circle class="wh" cx="166" cy="64" r="9"/><circle class="wh" cx="196" cy="64" r="9"/><circle class="wh" cx="226" cy="66" r="6"/></svg>' +
-    '<svg class="rails" viewBox="0 0 400 12" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M0 3h400"/><g class="sl">' +
-    (function () { var g = ""; for (var x = 0; x < 424; x += 24) g += '<path d="M' + x + ' 3v8"/>'; return g; })() + "</g></svg>";
   function journeysWord(n) { return n + (n === 1 ? " journey" : " journeys"); }
   function storySlides(w) {
     var S = [], top = w.topShops[0], gbp = function (p) { return money(p, "GBP"); };
@@ -6980,7 +6988,7 @@
       var shopIn = fb && fb.shop && what.toLowerCase().indexOf(String(fb.shop).toLowerCase()) >= 0;
       var many = w.receipts + (w.receipts === 1 ? " receipt" : " receipts"), shopsN = w.shops + (w.shops === 1 ? " shop" : " shops");
       if (what && fb.date) {
-        b.appendChild(ownPhoto(el("div", { className: "rl-wr-hero" }), fb.photoId, what, fb.kind));
+        b.appendChild(ownPhoto(el("div", { className: "rl-wr-hero" }), fb.photoId, what, fb.thing || fb.kind));
         b.appendChild(el("p", { text: "It started on " + longDate(fb.date) + " with " + what + (fb.shop && !shopIn ? " from " + fb.shop : "") + "." }));
         b.appendChild(el("p", { text: many + " and " + shopsN + " later, here's your year." }));
       } else {
@@ -7067,7 +7075,7 @@
       var seen = {}, names = (w.things || []).filter(function (t) { var k = String(t.name).toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; }).slice(0, 10);
       if (names.length >= 4) {
         var belt = el("div", { className: "belt" }), track = el("div");
-        [false, true].forEach(function (dup) { names.forEach(function (t) { var sp = el("span", { className: dup ? "dup" : "" }); sp.innerHTML = kindIcon(t.kind || "other"); sp.appendChild(document.createTextNode(cleanName(t.name, t.shop) || t.name)); if (dup) sp.setAttribute("aria-hidden", "true"); track.appendChild(sp); }); });
+        [false, true].forEach(function (dup) { names.forEach(function (t) { var sp = el("span", { className: dup ? "dup" : "" }); sp.innerHTML = kindIcon(t.thing || t.kind || "other"); sp.appendChild(document.createTextNode(cleanName(t.name, t.shop) || t.name)); if (dup) sp.setAttribute("aria-hidden", "true"); track.appendChild(sp); }); });
         belt.appendChild(track); b.appendChild(belt);
       }
     } });
@@ -7240,8 +7248,119 @@
   }
   var SOUND_ON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="M15.5 9.3a4 4 0 0 1 0 5.4M18.2 6.8a7.5 7.5 0 0 1 0 10.4"/></svg>';
   var SOUND_OFF = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>';
-  // Travel: the journeys the receipts name. A train runs across the first slide; the second puts the places on a map of the
-  // UK with each route drawn between them. Places Relay can't position are named in words, never guessed onto the map.
+  // Travel (Connor, 18 Nov 2026: "take the user on each journey"). The count first; then each journey in the order it was
+  // made, one short slide each: the map moves to the route, a small drawn train runs along it from one station to the other,
+  // the stations' names appear at each end and the date underneath; then the next journey. Places Relay can't position are
+  // named in words, never guessed onto the map. Then all of them on one map, and "Did you visit?" for places with well-known
+  // sights (asked, never said). With reduced motion: one still list of the journeys instead.
+  var JOURNEY_MS = 2600;
+  var TINY_TRAIN = '<path d="M-17 -6h22a6 6 0 0 1 6 6v3h-28Z" class="tr-body"/><path d="M-13 -3h5M-4 -3h5" class="tr-line"/><path d="M-19 3h34" class="tr-line"/>' +
+    '<circle cx="-12" cy="5.5" r="2.4" class="tr-wheel"/><circle cx="-3" cy="5.5" r="2.4" class="tr-wheel"/><circle cx="7" cy="5.5" r="2.4" class="tr-wheel"/>';
+  function calmMotion() { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } }
+  // The UK's outline as paths (the same drawing as the overview map).
+  function ukLand() {
+    var r1 = function (v) { return Math.round(v * 10) / 10; };
+    return UK_COAST.map(function (a) {
+      var pts = []; for (var i = 0; i < a.length; i += 2) pts.push(ukXY(a[i], a[i + 1]));
+      var mid = function (k) { var p = pts[k % pts.length], q = pts[(k + 1) % pts.length]; return r1((p[0] + q[0]) / 2) + " " + r1((p[1] + q[1]) / 2); };
+      var d = "M" + mid(0);
+      for (var k = 1; k <= pts.length; k++) { var c = pts[k % pts.length]; d += "Q" + c[0] + " " + c[1] + " " + mid(k); }
+      return '<path class="land" d="' + d + 'Z"/>';
+    }).join("");
+  }
+  var UK_W = Math.ceil(10.3 * UK_K * UK_S + 12), UK_H = Math.ceil(9.6 * UK_S + 8);
+  // The whole UK as a square view (the journey map is square so the move from one route to the next never jumps).
+  function wholeBox() { return [UK_W / 2 - 6 - UK_H / 2, -4, UK_H, UK_H]; }
+  // A journey as a gentle curve: its two ends and the bend.
+  function routeOf(tr) {
+    if (!tr || !tr.fromAt || !tr.toAt) return null;
+    var a = ukXY(tr.fromAt.lat, tr.fromAt.lon), b = ukXY(tr.toAt.lat, tr.toAt.lon);
+    var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.max(4, Math.min(30, len * 0.25));
+    return { a: a, b: b, c: [(a[0] + b[0]) / 2 - dy / len * bow, (a[1] + b[1]) / 2 + dx / len * bow], len: len };
+  }
+  function boxOf(r) {
+    if (!r) return wholeBox();
+    var xs = [r.a[0], r.b[0], r.c[0]], ys = [r.a[1], r.b[1], r.c[1]];
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var size = Math.max(70, (x1 - x0) * 1.7, (y1 - y0) * 1.7 + 30);
+    return [(x0 + x1) / 2 - size / 2, (y0 + y1) / 2 - size / 2 - 4, size, size];
+  }
+  function bez(r, t) { var u = 1 - t; return [u * u * r.a[0] + 2 * u * t * r.c[0] + t * t * r.b[0], u * u * r.a[1] + 2 * u * t * r.c[1] + t * t * r.b[1]]; }
+  function bezAngle(r, t) { var u = 1 - t, dx = 2 * u * (r.c[0] - r.a[0]) + 2 * t * (r.b[0] - r.c[0]), dy = 2 * u * (r.c[1] - r.a[1]) + 2 * t * (r.b[1] - r.c[1]); return Math.atan2(dy, dx) * 180 / Math.PI; }
+  var ease = function (x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+  var clamp01 = function (x) { return Math.max(0, Math.min(1, x)); };
+  function svgEl(tag, attrs) { var n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (var k in attrs) n.setAttribute(k, attrs[k]); return n; }
+  // One journey on the map. `from` is the view the map starts at (the last journey's, or the whole UK).
+  function journeyMap(tr, from) {
+    var r = routeOf(tr), to = boxOf(r), box = from || wholeBox();
+    var wrap = el("div", { className: "jmap" });
+    var svg = svgEl("svg", { viewBox: box.join(" "), role: "img", "aria-label": "Map of the journey from " + tr.from + " to " + tr.to });
+    svg.innerHTML = ukLand();
+    wrap.appendChild(svg);
+    if (!r) {
+      // An end Relay can't position: the place it can, if any, as a dot on the whole map.
+      [[tr.fromAt, tr.from], [tr.toAt, tr.to]].forEach(function (p) { if (!p[0]) return; var q = ukXY(p[0].lat, p[0].lon); svg.appendChild(svgEl("circle", { class: "stop", cx: q[0], cy: q[1], r: 4 })); });
+      return { node: wrap, box: wholeBox(), run: function () {} };
+    }
+    var d = "M" + r.a[0] + " " + r.a[1] + "Q" + r.c[0] + " " + r.c[1] + " " + r.b[0] + " " + r.b[1];
+    var ghost = svgEl("path", { class: "route-ghost", d: d, pathLength: "1" }), path = svgEl("path", { class: "route", d: d, pathLength: "1" });
+    var dotA = svgEl("circle", { class: "stop", cx: r.a[0], cy: r.a[1] }), dotB = svgEl("circle", { class: "stop end", cx: r.b[0], cy: r.b[1] });
+    var labA = svgEl("text", { class: "stn from", "text-anchor": "middle" }), labB = svgEl("text", { class: "stn to", "text-anchor": "middle" });
+    labA.textContent = tr.from; labB.textContent = tr.to;
+    var train = svgEl("g", { class: "tiny-train" }); train.innerHTML = TINY_TRAIN;
+    [ghost, path, dotA, dotB, labA, labB, train].forEach(function (n) { svg.appendChild(n); });
+    // Sizes are kept the same on screen whatever the zoom: a unit is (view width ÷ map width) pixels.
+    function place(bx, t) {
+      var px = (wrap.getBoundingClientRect().width || 300), u = bx[2] / px;
+      svg.setAttribute("viewBox", bx.map(function (v) { return Math.round(v * 100) / 100; }).join(" "));
+      [dotA, dotB].forEach(function (n) { n.setAttribute("r", (5 * u).toFixed(2)); n.style.strokeWidth = (2 * u).toFixed(2); });
+      ghost.style.strokeWidth = path.style.strokeWidth = (3.5 * u).toFixed(2);
+      var fs = 14 * u, above = r.a[1] <= r.b[1];
+      [[labA, r.a, above ? -1 : 1], [labB, r.b, above ? 1 : -1]].forEach(function (x) {
+        x[0].setAttribute("font-size", fs.toFixed(2)); x[0].style.strokeWidth = (4 * u).toFixed(2);
+        // Keep the name inside the map's edges.
+        var half = Math.min(x[0].textContent.length * fs * 0.3, bx[2] / 2 - 4 * u), cx = Math.max(bx[0] + half + 4 * u, Math.min(bx[0] + bx[2] - half - 4 * u, x[1][0]));
+        x[0].setAttribute("x", cx.toFixed(2)); x[0].setAttribute("y", (x[1][1] + x[2] * 14 * u + (x[2] > 0 ? fs * 0.7 : 0)).toFixed(2));
+      });
+      // The train stays upright (it's drawn from the side), faces the way it's going, and leans a little up or down hill.
+      var p = bez(r, t), ang = bezAngle(r, t), flip = Math.abs(ang) > 90, lean = Math.max(-25, Math.min(25, flip ? (ang > 0 ? 180 - ang : -180 - ang) : ang));
+      train.setAttribute("transform", "translate(" + p[0].toFixed(2) + " " + (p[1] - 4 * u).toFixed(2) + ") scale(" + ((flip ? -1 : 1) * u).toFixed(3) + " " + u.toFixed(3) + ") rotate(" + lean.toFixed(1) + ")");
+      path.style.strokeDashoffset = (1 - t).toFixed(4);
+    }
+    function run(calm) {
+      if (calm) { place(to, 1); labA.style.opacity = labB.style.opacity = "1"; return; }
+      var t0 = null;
+      function frame(now) {
+        if (!svg.isConnected) return;
+        if (t0 === null) t0 = now;
+        var e = now - t0, m = ease(clamp01(e / 900)), tt = ease(clamp01((e - 500) / 1700));
+        place(box.map(function (v, k) { return v + (to[k] - v) * m; }), tt);
+        labA.style.opacity = String(clamp01(e / 300));
+        labB.style.opacity = String(clamp01((e - 2050) / 250));
+        wrap.setAttribute("data-t", tt.toFixed(2));
+        if (e < 2400) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+    return { node: wrap, box: to, run: run };
+  }
+  // Small drawn icons for the sights (no emoji, no photos from the web).
+  var SIGHT_ICON = [
+    [/castle|tower of|keep\b/i, '<path d="M4 21V9h3V6h2v3h2V6h2v3h2V6h2v3h3v12M10 21v-4a2 2 0 0 1 4 0v4M3 21h18"/>'],
+    [/cathedral|minster|abbey|chapel|church/i, '<path d="M12 2v4M10 4h4M8 21V10l4-4 4 4v11M4 21v-7l4-3M20 21v-7l-4-3M3 21h18M11 21v-3h2v3"/>'],
+    [/bridge|viaduct|pier\b/i, '<path d="M2 18h20M4 18V11M20 18V11M2 11h20M7 18a5 5 0 0 1 10 0"/>'],
+    [/ship|^hms |^ss |rrs |mary rose|discovery|victory/i, '<path d="M3 15h18l-3 5H6ZM12 15V4l6 9M12 6 7 13"/>'],
+    [/loch|lake|bay\b|dock|deep\b|aquarium|minack/i, '<path d="M2 15c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M12 4v7M8 8l4-4 4 4"/>'],
+    [/park|garden|walk|backs|course|hoe|seat|orme|nevis|cliffs|battlefield|stonehenge|steps|shambles|lanes|rows|mile|beach|zoo/i, '<path d="M3 20l6-9 4 5 3-4 5 8ZM16 6.5a2.5 2.5 0 1 0 0-.01"/>'],
+    [/stadium|racecourse|bullring|world|centre|dreamland|pleasure|angel|spinnaker|monument|tower/i, '<path d="M12 2v20M8 22h8M9 6h6l-1 6h-4ZM10 12l-2 10M14 12l2 10"/>'],
+    [/museum|gallery|library|camera|house|hall|theatre|birthplace|cottage|pavilion|room|contemporary|story|crescent|baths|v&a/i, '<path d="M3 9 12 4l9 5M5 9v9M9 9v9M15 9v9M19 9v9M3 20h18M3 18h18"/>']
+  ];
+  function sightIcon(name) {
+    var hit = SIGHT_ICON.filter(function (x) { return x[0].test(name); })[0];
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (hit ? hit[1] : '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/>') + "</svg>";
+  }
+  var cap1 = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
   function travelSlides(S, t) {
     if (!t || !t.journeys || S._travel) return;
     S._travel = true;
@@ -7252,22 +7371,60 @@
       b.appendChild(el("p", { className: "lead", text: (t.journeys === 1 ? "journey" : "journeys") + " on your receipts." }));
       if (modes.length && !(modes.length === 1 && modes[0][0] === t.journeys && modes[0][1] === "by train")) b.appendChild(el("p", { text: modes.map(function (m) { return m[0] + " " + m[1]; }).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
       else if (t.trains === t.journeys) b.appendChild(el("p", { text: t.journeys === 1 ? "By train." : "All of them by train." }));
-      if (t.trains) { var tr = el("div", { className: "train", ariaHidden: "true" }); tr.innerHTML = TRAIN_SVG; b.appendChild(tr); }
-      else b.appendChild(scene("travel"));
       if (t.topRoute) {
         var f = el("div", { className: "facts" });
         f.appendChild(el("div", {}, [el("span", { text: "Most travelled" }), el("b", {}, [document.createTextNode(t.topRoute.from + " to " + t.topRoute.to), el("small", { text: journeysWord(t.topRoute.times) })])]));
         b.appendChild(f);
       }
     } });
-    if (!(t.places || []).length) return;
-    S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+    var trips = (t.trips || []).filter(function (x) { return x && x.from && x.to; });
+    var more = t.moreTrips || 0;
+    if (trips.length && calmMotion()) {
+      // Reduced motion: every journey, still, in order.
+      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+        b.appendChild(el("p", { className: "lead", text: trips.length === 1 ? "Your journey" : "Your journeys" }));
+        var ol = el("ol", { className: "jlist" });
+        trips.forEach(function (tr) { ol.appendChild(el("li", {}, [el("b", { text: tr.from + " to " + tr.to }), el("small", { text: longDate(tr.date) + (tr.return ? ", and back" : "") })])); });
+        b.appendChild(ol);
+        if (more) b.appendChild(el("p", { className: "fine", text: "And " + journeysWord(more) + " more." }));
+      } });
+    } else {
+      trips.forEach(function (tr, i) {
+        S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: JOURNEY_MS + 600, journey: true, build: function (b) {
+          b.appendChild(el("div", { className: "k", text: trips.length > 1 ? "JOURNEY " + (i + 1) + " OF " + (trips.length + more) : "YOUR JOURNEY" }));
+          // The map starts where the last journey left it (or on the whole UK), so it moves on from one to the next.
+          var m = journeyMap(tr, i > 0 ? boxOf(routeOf(trips[i - 1])) : null);
+          b.appendChild(m.node);
+          b.appendChild(el("p", { className: "jwhen", text: longDate(tr.date) + (tr.return ? ", there and back" : "") }));
+          var unknown = [tr.fromAt ? null : tr.from, tr.toAt ? null : tr.to].filter(Boolean);
+          if (unknown.length) b.appendChild(el("p", { className: "fine", text: tr.from + " to " + tr.to + ". " + unknown.join(" and ") + (unknown.length === 1 ? " isn't" : " aren't") + " on the map." }));
+          if (i === trips.length - 1 && more) b.appendChild(el("p", { className: "fine", text: "And " + journeysWord(more) + " more." }));
+          m.run(false);
+        } });
+      });
+    }
+    if ((t.places || []).length) S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Where you went" }));
       var m = el("div", { className: "map" }); m.innerHTML = ukMapSvg(t); b.appendChild(m);
       var names = t.places.slice(0, 4).map(function (p) { return p.name; });
       b.appendChild(el("p", { className: "fine", text: (t.places.length > 4 ? "Including " : "") + names.join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
       if ((t.unplotted || []).length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + t.unplotted.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
     } });
+    // Did you visit? Asked, never said: a ticket somewhere doesn't mean they saw any of it.
+    (t.visits || []).forEach(function (v) {
+      if (!v || !v.place || !(v.attractions || []).length) return;
+      S.push({ bg: "#172554", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+        b.appendChild(el("div", { className: "k", text: "AROUND " + String(v.place).toUpperCase() }));
+        b.appendChild(el("h2", { className: "ch", text: "Did you visit…" }));
+        var ul = el("ul", { className: "sights" });
+        v.attractions.slice(0, 3).forEach(function (a, k) {
+          var li = el("li", { style: "animation-delay:" + (0.25 + k * 0.3).toFixed(2) + "s" }); var ic = el("span", { className: "sic" }); ic.innerHTML = sightIcon(a);
+          li.appendChild(ic); li.appendChild(el("b", { text: cap1(a) + (k === Math.min(3, v.attractions.length) - 1 ? "?" : "") })); ul.appendChild(li);
+        });
+        b.appendChild(ul);
+        b.appendChild(el("p", { className: "fine", text: "Your receipts show a ticket to " + v.place + (v.date ? " in " + new Date(v.date + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long" }) : "") + "." }));
+      } });
+    });
   }
   function playStory(w) {
     var slides = storySlides(w), i = 0, timer = null, paused = false, DUR = 6500;
@@ -7297,10 +7454,10 @@
       if (music) music.level(levelOf(i), i !== was);
       var sl = slides[i];
       frame.style.background = sl.bg; frame.style.color = sl.fg; frame.style.setProperty("--accent", sl.accent);
-      Array.prototype.forEach.call(bars.children, function (b, k) { b.className = k < i ? "done" : k === i ? "now" : ""; b.firstChild.style.animationDuration = DUR + "ms"; });
+      Array.prototype.forEach.call(bars.children, function (b, k) { b.className = k < i ? "done" : k === i ? "now" : ""; b.firstChild.style.animationDuration = (slides[k].dur || DUR) + "ms"; });
       body.textContent = ""; var inner = el("div", { className: "rl-story-slide" }); body.appendChild(inner);
       sl.build(inner, function () { show(0); }, close);
-      if (!sl.summary) timer = setTimeout(function () { if (!paused) show(i + 1); }, DUR);
+      if (!sl.summary) timer = setTimeout(function () { if (!paused) show(i + 1); }, sl.dur || DUR);
     }
     function key(e) { if (e.key === "Escape") close(); else if (e.key === "ArrowRight") show(i + 1); else if (e.key === "ArrowLeft") show(i - 1); }
     document.addEventListener("keydown", key);
@@ -8508,7 +8665,7 @@
     open(function (sheet) {
       sheet.setAttribute("aria-label", "Smarter picks with AI");
       sheet.appendChild(el("h2", { text: "Smarter picks with AI" }));
-      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Claude, an AI made by Anthropic, reads the names of the things on your receipts, like \u201cAlign High-Rise Pant\u201d, to work out what each one is. Your picks then follow what you really buy." }));
+      sheet.appendChild(el("p", { className: "rl-dl-intro", text: "Claude, an AI made by Anthropic, reads the names of the things on your receipts, like \u201cAlign High-Rise Pant\u201d, to work out what each one is. Your picks and your Wrapped then follow what you really buy." }));
       sheet.appendChild(el("p", { className: "rl-dl-intro", text: "It gets the item names and the shop, nothing else: not your emails, address, order numbers or prices. Anthropic doesn't train its AI on them." }));
       sheet.appendChild(el("p", { className: "rl-dl-intro", text: "You can switch it off any time: tap your picture, then Inboxes. Switching it off deletes what the AI worked out." }));
       var note = el("div", { className: "rl-msg", role: "status" });

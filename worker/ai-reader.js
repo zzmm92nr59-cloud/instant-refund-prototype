@@ -25,6 +25,9 @@ export const AI_READS_SQL = `CREATE TABLE IF NOT EXISTS receipt_ai_reads (
 export const PICKS_AI_SQL = `CREATE TABLE IF NOT EXISTS picks_ai (shopper_id TEXT PRIMARY KEY, on_since INTEGER NOT NULL)`;
 export const ITEM_KINDS_SQL = `CREATE TABLE IF NOT EXISTS item_kinds (shopper_id TEXT NOT NULL, name_key TEXT NOT NULL, data TEXT NOT NULL,
   created_at INTEGER NOT NULL, PRIMARY KEY (shopper_id, name_key))`;
+// What the AI said an item name is, kept once for everyone (no shopper, no date bought, no shop, no price): only names that
+// had nothing personal in them. See worker/item-kinds.js.
+export const ITEM_KIND_CACHE_SQL = `CREATE TABLE IF NOT EXISTS item_kind_cache (name_key TEXT PRIMARY KEY, data TEXT NOT NULL, created_at INTEGER NOT NULL)`;
 export const PARTS = ["shop", "total", "date", "number", "items"];
 export const FILLED = 1, AGREED = 2, DIFFER = 3, RULES_ONLY = 4;
 
