@@ -3,7 +3,9 @@
 import { PERSONAL_MAIL, CATEGORIES, itemKind, itemKinds, categoryShares, isGrocer, lastingThing, knownShop } from "./receipt-category.js";
 import KindCore from "./item-kind-core.js";
 import { placeAt, findPlace, samePlace, placeKey } from "./uk-places.js";
-import { attractionsFor, placeTitle } from "./uk-attractions.js";
+import { attractionsFor, placeTitle, ATTRACTION_PLACES } from "./uk-attractions.js";
+import { worldAttractionsFor } from "./world-attractions.js";
+import { airportByCode, distanceKm } from "./airports.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -351,12 +353,41 @@ function memorableFirst(list) {
 // Travel: the journeys the receipts name ("London Euston to Manchester Piccadilly", read from a booking's items or its
 // subject by the receipt reader), only as written. How each was made comes from the shop (a rail company or Trainline is a
 // train, an airline a flight, a coach company a coach); otherwise it's just a journey. Places Relay knows the position of
-// come with it, for the map; any other place is listed by name only.
+// come with it, for the map; any other place is listed by name only. A flight booking the reader read flight by flight
+// (flight-booking.js) gives its flights instead: airports by their codes (airports.js), each flight's own day, and the way
+// back known from the booking itself.
 const RAIL = new Set("trainline lner avanti avantiwestcoast gwr southeastern southernrailway thameslink northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar nationalrail heathrowexpress gatwickexpress stanstedexpress".split(" "));
 const AIR = new Set("ryanair easyjet britishairways ba jet2 wizzair virginatlantic emirates qatarairways klm airfrance lufthansa loganair aerlingus vueling iberia norwegian turkishairlines".split(" "));
 const COACH = new Set("megabus nationalexpress flixbus".split(" "));
 const JOURNEY = /^\s*(?:from\s+)?(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s+(?:to|→|->)\s+(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s*(\(([Rr]eturn|[Ss]ingle|[Oo]pen [Rr]eturn)\))?\s*$/u;
+const airportAt = (a) => (a ? { lat: a.lat, lon: a.lon } : null);
+// A booking's flights as trips: the flights out, one after another (a change of plane on the way is one trip, "via"), and
+// whether the booking has flights back. Each flight counts as a flight; the way back is never a trip of its own.
+function flightTrips(c) {
+  const legs = c.flights.filter((g) => g && airportByCode(g.from) && airportByCode(g.to));
+  if (!legs.length) return [];
+  const out = legs.filter((g) => g.leg !== "back"), back = legs.filter((g) => g.leg === "back");
+  const ways = out.length ? out : back;
+  const trips = [];
+  for (const g of ways) {
+    const last = trips[trips.length - 1], prev = last && last.legs[last.legs.length - 1];
+    // A connection: on from where the last flight landed, the same day or the next.
+    if (prev && prev.to === g.from && (!prev.date || !g.date || dayOf(g.date) - dayOf(prev.date) <= DAY)) { last.legs.push(g); continue; }
+    trips.push({ legs: [g] });
+  }
+  return trips.map((t, k) => {
+    const a = airportByCode(t.legs[0].from), z = airportByCode(t.legs[t.legs.length - 1].to);
+    const km = t.legs.reduce((n, g) => n + distanceKm(airportByCode(g.from), airportByCode(g.to)), 0);
+    const withBack = out.length > 0 && back.length > 0 && k === 0;
+    const backKm = withBack ? back.reduce((n, g) => n + distanceKm(airportByCode(g.from), airportByCode(g.to)), 0) : 0;
+    return { from: a.name, to: z.name, fromCode: a.code, toCode: z.code, fromAt: airportAt(a), toAt: airportAt(z), city: z.city, country: z.country,
+      mode: "flight", date: t.legs[0].date || whenOf(c), return: withBack, flights: t.legs.length + (withBack ? back.length : 0),
+      flight: t.legs[0].flight || null, ...(t.legs.length > 1 ? { via: t.legs.slice(0, -1).map((g) => airportByCode(g.to).name) } : {}),
+      km: Math.round(km), backKm: Math.round(backKm), ref: c.orderRef || null };
+  });
+}
 export function journeysOf(c) {
+  if (Array.isArray(c.flights) && c.flights.length) return flightTrips(c);
   const out = [];
   const shop = knownShop(c), key = shop && shop.key;
   const words = (c.items || []).map(it => (it && it.name) || "").join(" ");
@@ -370,55 +401,85 @@ export function journeysOf(c) {
   }
   return out;
 }
+const MILE = 1.609344;
+const DAY = 864e5;
+const dayOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + "T12:00:00Z") : null);
+// Where a trip's ends are: an airport's own position, or the place Relay knows by that name (never guessed).
+const endAt = (t, end) => (t[end + "At"] !== undefined ? t[end + "At"] : ((p) => (p ? { lat: p.lat, lon: p.lon } : null))(findPlace(t[end])));
+// How far a trip goes, as the crow flies (km), or null when an end isn't known.
+function tripKm(t) {
+  if (typeof t.km === "number") return t.km;
+  const a = endAt(t, "from"), b = endAt(t, "to");
+  return a && b ? Math.round(distanceKm(a, b)) : null;
+}
 function travelOf(list) {
-  const trips = list.filter(c => c.category === "travel").flatMap(journeysOf);
+  const seenFlights = new Set();
+  const trips = list.filter(c => c.category === "travel" || (Array.isArray(c.flights) && c.flights.length)).flatMap(journeysOf).filter((t) => {
+    // The same flights booked once but emailed twice (a confirmation and an updated itinerary under another reference).
+    if (t.mode !== "flight" || !t.fromCode) return true;
+    const k = t.fromCode + t.toCode + t.date + (t.flight || "");
+    if (seenFlights.has(k)) return false;
+    seenFlights.add(k); return true;
+  });
   if (!trips.length) return null;
   const routes = new Map(), places = new Map();
   for (const t of trips) {
     const ends = [t.from, t.to], k = ends.map(x => x.toLowerCase()).sort().join("|");
     const r = routes.get(k) || { from: t.from, to: t.to, times: 0, mode: t.mode };
     r.times += t.return ? 2 : 1; routes.set(k, r);
-    for (const p of ends) { const e = places.get(p.toLowerCase()) || { name: p, visits: 0 }; e.visits++; places.set(p.toLowerCase(), e); }
+    for (const p of ends) { const e = places.get(p.toLowerCase()) || { name: p, visits: 0, t, end: p === t.from ? "from" : "to" }; e.visits++; places.set(p.toLowerCase(), e); }
   }
   const ranked = [...routes.values()].sort((a, b) => b.times - a.times);
   const known = [], unknown = [];
-  for (const p of places.values()) { const at = placeAt(p.name); if (at) known.push({ name: p.name, lat: at.lat, lon: at.lon, visits: p.visits }); else unknown.push(p.name); }
-  const by = (m) => trips.filter(t => t.mode === m).reduce((n, t) => n + (t.return ? 2 : 1), 0);
+  for (const p of places.values()) { const at = endAt(p.t, p.end); if (at) known.push({ name: p.name, lat: at.lat, lon: at.lon, visits: p.visits }); else unknown.push(p.name); }
+  // How many journeys of a kind: a return ticket is two; a flight booking counts each flight.
+  const legsOf = (t) => (t.mode === "flight" && t.flights ? t.flights : t.return ? 2 : 1);
+  const by = (m) => trips.filter(t => t.mode === m).reduce((n, t) => n + legsOf(t), 0);
   const inOrder = trips.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
   const outward = outwardTrips(inOrder);
   // "Did you visit?": the places the journeys went to that have well-known sights listed (uk-attractions.js), most visited
   // first, at most two. Only ever asked, never said: a ticket there doesn't mean the shopper saw any of it.
   const dest = new Map();
   outward.forEach((t, i) => {
-    const a = sightsFor(t.to);
+    const a = sightsFor(t.city || t.to);
     if (!a) return;
     const e = dest.get(a.place) || { place: placeTitle(a.place), attractions: a.attractions, times: 0, first: i, date: t.date };
     e.times++; dest.set(a.place, e);
   });
   const visits = [...dest.values()].sort((a, b) => b.times - a.times || a.first - b.first).slice(0, 2).map(v => ({ place: v.place, attractions: v.attractions, date: v.date }));
+  // On the ground and in the air (Connor, 18 Nov 2026: "not train on every journey, it's too long"): the year's furthest
+  // trip out of each gets the whole story; every other one is grouped on one slide, with the year's totals.
+  const ground = outward.filter((t) => t.mode !== "flight"), air = outward.filter((t) => t.mode === "flight");
+  const totals = (ts) => {
+    let km = 0, unknownLegs = 0;
+    for (const t of ts) { const d = tripKm(t), n = legsOf(t); if (d == null) unknownLegs += n; else km += t.mode === "flight" ? d + (t.backKm || 0) : d * (t.return ? 2 : 1); }
+    return { journeys: ts.reduce((n, t) => n + legsOf(t), 0), miles: Math.round(km / MILE), atLeast: unknownLegs > 0 };
+  };
+  const groundAll = trips.filter((t) => t.mode !== "flight"), airAll = trips.filter((t) => t.mode === "flight");
   return {
     // A return ticket is two journeys: there and back.
-    journeys: trips.reduce((n, t) => n + (t.return ? 2 : 1), 0), bookings: trips.length,
+    journeys: trips.reduce((n, t) => n + legsOf(t), 0), bookings: trips.length,
     trains: by("train"), flights: by("flight"), coaches: by("coach"),
     routes: ranked.slice(0, 12).map(r => ({ from: r.from, to: r.to, times: r.times, mode: r.mode })),
     topRoute: ranked[0] && ranked[0].times >= 2 ? { from: ranked[0].from, to: ranked[0].to, times: ranked[0].times } : null,
     places: known.sort((a, b) => b.visits - a.visits).slice(0, 30), unplotted: unknown.slice(0, 10),
-    // Every trip out, in date order, for the story to take the shopper on (the way back isn't replayed). With more than ten,
-    // each place is gone to once, with how many times.
+    // Every trip out, in date order (the way back isn't replayed). With more than ten, each place once, with how many times.
     trips: storyTrips(outward), moreTrips: 0, waysBack: inOrder.length - outward.length, visits,
+    ground: ground.length ? { ...featuredAndRest(ground), totals: totals(groundAll), modes: [...new Set(groundAll.map((t) => t.mode))] } : null,
+    air: air.length ? { ...featuredAndRest(air), totals: totals(airAll) } : null,
+    destinations: destinationsOf(outward),
   };
 }
-const DAY = 864e5;
-const dayOf = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Date.parse(d + "T12:00:00Z") : null);
 // The town a place is in, for the question and for counting places gone to more than once.
 const townName = (name) => { const p = findPlace(name); return p ? p.town : name; };
-function sightsFor(name) { return attractionsFor(townName(name)) || attractionsFor(name); }
+function sightsFor(name) { return attractionsFor(townName(name)) || attractionsFor(name) || worldAttractionsFor(name); }
 // The trips out: a return ticket is one trip (its way back isn't a trip of its own), and so is a single straight back from
 // where the last trip went (within 60 days), or one back to where the shopper's trips usually start (their home station,
 // when one place starts at least two trips and more than any other).
 export function outwardTrips(inOrder) {
   const starts = new Map();
-  for (const t of inOrder) { const k = placeKey(townName(t.from)); starts.set(k, (starts.get(k) || 0) + 1); }
+  const where = (t, end) => placeKey(end === "from" ? townName(t.from) : t.city && t.mode === "flight" ? t.city : townName(t.to));
+  for (const t of inOrder) { const k = t.mode === "flight" && t.fromCode ? placeKey((airportByCode(t.fromCode) || {}).city || t.from) : where(t, "from"); starts.set(k, (starts.get(k) || 0) + 1); }
   const top = [...starts.entries()].sort((a, b) => b[1] - a[1]);
   const home = top[0] && top[0][1] >= 2 && (!top[1] || top[0][1] > top[1][1]) ? top[0][0] : null;
   const open = [], out = [];
@@ -426,25 +487,80 @@ export function outwardTrips(inOrder) {
     const when = dayOf(t.date);
     const back = open.findIndex(o => samePlace(o.to, t.from) && samePlace(o.from, t.to) && (when === null || o.when === null || when - o.when <= 60 * DAY));
     if (back >= 0) { open.splice(back, 1); continue; }
-    if (home && placeKey(townName(t.to)) === home) continue;
+    if (home && where(t, "to") === home) continue;
     out.push(t);
     if (!t.return) open.push({ from: t.from, to: t.to, when });
   }
   return out;
 }
 // What the story needs for each trip: both ends' positions (or none, for a place Relay doesn't know: it's named, never
-// guessed), the place to ask about, and its well-known sights (only those listed in uk-attractions.js).
+// guessed), the place to ask about, and its well-known sights (only those listed in uk-attractions.js and world-attractions.js).
+function storyTrip(t, times) {
+  const city = t.mode === "flight" ? t.city : null, s = sightsFor(city || t.to), p = city ? null : findPlace(t.to), km = tripKm(t);
+  return { from: t.from, to: t.to, date: t.date, mode: t.mode, return: t.return, fromAt: endAt(t, "from"), toAt: endAt(t, "to"),
+    place: city || (p ? p.town : t.to), sights: s ? s.attractions : [], ...(times > 1 ? { times } : {}),
+    ...(km != null ? { miles: Math.round(km / MILE) } : {}),
+    ...(t.fromCode ? { fromCode: t.fromCode, toCode: t.toCode, flight: t.flight || null, ...(t.via ? { via: t.via } : {}) } : {}) };
+}
 function storyTrips(outward) {
-  const at = (name) => { const p = findPlace(name); return p ? { lat: p.lat, lon: p.lon } : null; };
-  const one = (t, times) => {
-    const s = sightsFor(t.to), p = findPlace(t.to);
-    return { from: t.from, to: t.to, date: t.date, mode: t.mode, return: t.return, fromAt: at(t.from), toAt: at(t.to),
-      place: p ? p.town : t.to, sights: s ? s.attractions : [], ...(times > 1 ? { times } : {}) };
-  };
-  if (outward.length <= 10) return outward.map(t => one(t, 1));
+  if (outward.length <= 10) return outward.map(t => storyTrip(t, 1));
   const seen = new Map();
-  for (const t of outward) { const k = placeKey(townName(t.to)); const e = seen.get(k) || { t, times: 0 }; e.times++; seen.set(k, e); }
-  return [...seen.values()].map(e => one(e.t, e.times));
+  for (const t of outward) { const k = placeKey(t.city || townName(t.to)); const e = seen.get(k) || { t, times: 0 }; e.times++; seen.set(k, e); }
+  return [...seen.values()].map(e => storyTrip(e.t, e.times));
+}
+// The furthest trip out (as the crow flies, between places Relay knows; the first of the year if none can be measured) gets
+// the whole story. The others are grouped by where they went, oldest first, each with how many times this year.
+export function featuredAndRest(outward) {
+  let best = null, bestKm = -1;
+  outward.forEach((t, i) => { const d = tripKm(t); if (d != null && d > bestKm) { best = i; bestKm = d; } });
+  if (best === null) best = 0;
+  const keyOf = (t) => placeKey(t.city || townName(t.to)) + "|" + t.mode;
+  // How many times this year each place was gone to (the featured trip counts too).
+  const count = new Map();
+  for (const t of outward) count.set(keyOf(t), (count.get(keyOf(t)) || 0) + 1);
+  const featured = storyTrip(outward[best], count.get(keyOf(outward[best])));
+  const groups = new Map();
+  outward.forEach((t, i) => {
+    if (i === best) return;
+    const k = keyOf(t);
+    const g = groups.get(k);
+    if (g) return;
+    const s = storyTrip(t, 1);
+    groups.set(k, { from: s.from, to: s.to, place: s.place, date: s.date, mode: s.mode, fromAt: s.fromAt, toAt: s.toAt, times: count.get(k),
+      ...(s.miles != null ? { miles: s.miles } : {}), ...(s.fromCode ? { fromCode: s.fromCode, toCode: s.toCode, flight: s.flight } : {}) });
+  });
+  // Every route gone out on, once, for the map behind the grouped slide (only routes with both ends known).
+  const lines = new Map();
+  outward.forEach((t) => {
+    const a = endAt(t, "from"), b = endAt(t, "to");
+    if (!a || !b) return;
+    const k = [a.lat, a.lon, b.lat, b.lon].join(",");
+    if (!lines.has(k)) lines.set(k, { fromAt: a, toAt: b, place: storyTrip(t, 1).place });
+  });
+  return { featured, others: [...groups.values()], lines: [...lines.values()].slice(0, 40) };
+}
+// "Places you went": every place the year's trips out went to (by train and by air), most visited first, each with two or
+// three of its well-known sights to ask about. A town with none listed borrows the nearest listed place within 15 km, and
+// says so ("Near Brighouse, in Halifax"). Never a claim that the shopper saw them.
+const NEAR_KM = 15;
+let LISTED_AT = null;
+function listedNear(at) {
+  if (!LISTED_AT) LISTED_AT = ATTRACTION_PLACES.map((k) => ({ k, p: findPlace(placeTitle(k)) })).filter((x) => x.p);
+  let best = null, bestKm = Infinity;
+  for (const x of LISTED_AT) { const d = distanceKm(at, x.p); if (d < bestKm) { best = x; bestKm = d; } }
+  return best && bestKm <= NEAR_KM ? { place: placeTitle(best.k), attractions: attractionsFor(best.k).attractions } : null;
+}
+function destinationsOf(outward) {
+  const seen = new Map();
+  outward.forEach((t, i) => {
+    const s = storyTrip(t, 1), k = placeKey(s.place);
+    const e = seen.get(k);
+    if (e) { e.times++; if ((t.mode === "flight" ? "flight" : "ground") !== e.mode) e.mode = "both"; return; }
+    let sights = s.sights, near = null;
+    if (!sights.length && s.toAt && t.mode !== "flight") { const n = listedNear(s.toAt); if (n && placeKey(n.place) !== k) { near = n.place; sights = n.attractions; } }
+    seen.set(k, { place: s.place, mode: t.mode === "flight" ? "flight" : "ground", times: 1, first: i, date: s.date, sights: sights.slice(0, 3), ...(near ? { near } : {}) });
+  });
+  return [...seen.values()].sort((a, b) => b.times - a.times || a.first - b.first).map(({ first, ...d }) => d);
 }
 
 // One playful number for each kind of shopping, worked out from that kind's receipts only (null when the receipts can't back it).

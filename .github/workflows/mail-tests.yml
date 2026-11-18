@@ -12,6 +12,8 @@ on:
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-wrapped-journeys.mjs'
+      - 'scripts/test-flights.mjs'
+      - 'scripts/fixtures/flight-emails.mjs'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
@@ -31,6 +33,8 @@ on:
       - 'scripts/test-wrapped.mjs'
       - 'scripts/test-wrapped-better.mjs'
       - 'scripts/test-wrapped-journeys.mjs'
+      - 'scripts/test-flights.mjs'
+      - 'scripts/fixtures/flight-emails.mjs'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/test-delete-account.mjs'
@@ -59,6 +63,7 @@ jobs:
           node scripts/test-wrapped.mjs
           node scripts/test-wrapped-better.mjs
           node scripts/test-wrapped-journeys.mjs
+          node scripts/test-flights.mjs
       - name: What each receipt line is (Relay's rules alone, over 1,000 made-up UK receipt lines; at least 97% right, and food never read as clothes, shoes, bags, tech or homeware or the other way round)
         run: node scripts/test-item-kinds-accuracy.mjs
       - name: Gmail

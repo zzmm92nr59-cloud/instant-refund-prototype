@@ -9,6 +9,7 @@
 //    so the app can ask the shopper to confirm low-confidence captures.
 
 const MAX_INPUT = 600_000;
+import { flightBooking, flightItemName } from "./flight-booking.js";
 import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 
@@ -154,7 +155,7 @@ function walkShownParts(headers, body, out, depth) {
 // The characters shops' HTML most often writes as named entities ("Levi&rsquo;s", "25&quot;", "&lt;orders@shop.com&gt;").
 const ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", pound: "£", euro: "€", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
   ndash: "–", mdash: "—", hellip: "…", middot: "·", bull: "•", times: "×", copy: "©", reg: "®", trade: "™", deg: "°", frac12: "½", eacute: "é",
-  egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "" };
+  egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "", rarr: "→", larr: "←" };
 function decodeEntities(text) {
   // One pass, so "&amp;lt;" becomes "&lt;" (what the shop wrote), not "<".
   return text.replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{1,7});/gi, (m, e) => {
@@ -714,8 +715,15 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
 
   const sig = receiptSignals(subject, text);
+  // A flight booked with an airline or a travel site (flight-booking.js): its confirmation is the receipt even when it
+  // doesn't say "order" ("Your booking is confirmed", "Ryanair Travel Itinerary", "Total paid GBP 245.98"). A check-in
+  // reminder, a boarding pass or a delay notice about it is not a purchase.
+  const flightArgs = { subject, senderDomain: sender?.domain || null, fromName, refDate: headers.date ? new Date(headers.date) : null };
+  const flight = flightBooking({ ...flightArgs, text: plain || fromHtml }) || (plain && fromHtml ? flightBooking({ ...flightArgs, text: fromHtml }) : null);
+  if (flight && flight.kind === "notice" && !opts.lenient) return { ok: false, reason: "travel_notice", source: "shopper_email" };
+  const isFlight = Boolean(flight && flight.kind === "booking");
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
-  if (!(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
+  if (!isFlight && !(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
   }
 
@@ -755,12 +763,20 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
   if (!result.items.length && GAME_SHOP.test(sender?.domain || "")) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
+  // Flights: each one (from, to, day, flight number, out or back), the booking reference, and what was paid. The flights
+  // are what was bought, so they are the one item (a fare's lines, "Adult 1", "Hold bag", aren't things).
+  if (isFlight) {
+    result.flights = flight.legs;
+    if (!result.orderRef && flight.ref) result.orderRef = flight.ref;
+    if (result.totalPence == null && flight.paid) { result.totalPence = flight.paid.pence; result.currency = flight.paid.currency; }
+    result.items = [{ name: flightItemName(flight.legs), qty: 1, pricePence: result.totalPence ?? null }];
+  }
   // A travel booking names the journey in its subject and nowhere as an item: the journey is what was bought.
   if (!result.items.length) {
     const j = JOURNEY.exec(subject || "");
     if (j) result.items = [{ name: `${j[2].trim()} to ${j[3].trim()}${j[1] ? " (return)" : ""}`, qty: 1, pricePence: result.totalPence ?? null }];
   }
-  if (!opts.lenient && looksPromotional(subject, headers, Boolean(result.orderRef))) {
+  if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }
   // A notice about an order placed earlier, with no total of its own, is not a purchase. (One that does give the order's

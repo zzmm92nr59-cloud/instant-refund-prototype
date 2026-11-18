@@ -548,6 +548,36 @@
     ".rl-story-slide .jstill{margin:12px -14px 0;border-radius:22px;overflow:hidden;background:#0b223f;aspect-ratio:4/3;max-height:40vh}.rl-story-slide .jstill svg{display:block;width:100%;height:100%}.rl-story-slide.still .jroute{margin:14px 0 0}" +
     "@media(prefers-reduced-motion:reduce){.rl-story-slide .jqin,.rl-story-slide .jsights li{transition:none;opacity:1;transform:none}}" +
     ".rl-story-slide .jwhen{font-size:20px;font-weight:800;margin-top:14px}" +
+    // Travel, grouped: the departures board with its map, the boarding passes, the window seat, Places you went.
+    ".rl-story-slide .jbstage{display:flex;flex-direction:column;background:#0b223f}.rl-story-slide .jbmap{flex:1 1 auto;min-height:110px;position:relative}.rl-story-slide .jbmap svg{position:absolute;inset:0;width:100%;height:100%;display:block}" +
+    ".rl-story-slide .jbmap .land{fill:#C9D8FF;fill-opacity:.12;stroke:#C9D8FF;stroke-opacity:.45;stroke-width:1;stroke-linejoin:round;vector-effect:non-scaling-stroke}" +
+    ".rl-story-slide .jbmap .rt{fill:none;stroke:#C9D8FF;stroke-opacity:.3;stroke-width:1.5;stroke-linecap:round;vector-effect:non-scaling-stroke}.rl-story-slide .jbmap .gl{opacity:0;transition:opacity .5s}.rl-story-slide .jbmap .gl.on{opacity:1}" +
+    ".rl-story-slide .jbmap .halo{fill:none;stroke:#ffb020;stroke-opacity:.3;stroke-width:9;stroke-linecap:round;vector-effect:non-scaling-stroke}.rl-story-slide .jbmap .core{fill:none;stroke:#ffd27a;stroke-width:2.4;stroke-linecap:round;vector-effect:non-scaling-stroke}.rl-story-slide .jbmap .end{fill:#ffd27a}" +
+    ".rl-story-slide .jbb{flex:none;background:#05070d;color:#ffb020;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:10px 12px 12px;border-top:2px solid #1d2939}" +
+    ".rl-story-slide .jbh{display:flex;justify-content:space-between;font-size:13px;letter-spacing:1.5px;margin-bottom:6px;color:#ffd27a}.rl-story-slide .jbh b{font-weight:800}" +
+    ".rl-story-slide .jbr{display:flex;align-items:center;gap:8px;min-height:30px}.rl-story-slide .jbr[hidden]{display:none}.rl-story-slide .jbr .d,.rl-story-slide .jbr .p{display:flex;gap:1px}" +
+    ".rl-story-slide .jbr i{font-style:normal;display:inline-block;width:10px;height:22px;line-height:22px;text-align:center;font-size:14px;font-weight:700;background:#111827;border-radius:2px;color:#ffb020}" +
+    ".rl-story-slide .jbr i.f{animation:jbflip .09s linear}@keyframes jbflip{from{transform:scaleY(.15)}to{transform:none}}.rl-story-slide .jbr.set .p i{color:#ffd27a}" +
+    ".rl-story-slide .jbr .t{margin-left:auto;font-size:13px;font-weight:700;color:#ffd27a;white-space:nowrap}.rl-story-slide .jtot{margin:12px 0 0}" +
+    ".rl-story-slide .jpasses{display:grid;gap:10px;margin-top:14px}.rl-story-slide .jpass{background:#fff;color:#101828;border-radius:16px;padding:10px 14px;box-shadow:0 6px 18px rgba(0,0,0,.28);will-change:transform}" +
+    ".rl-story-slide .jpass .top{display:flex;align-items:center;justify-content:space-between;gap:8px}.rl-story-slide .jpass .e{min-width:0}.rl-story-slide .jpass .e b{display:block;font-size:24px;font-weight:800;letter-spacing:.5px;line-height:1.1}" +
+    ".rl-story-slide .jpass .e small{display:block;font-size:13px;color:#475467;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rl-story-slide .jpass .e.z{text-align:right}.rl-story-slide .jpass .e.z small{margin-left:auto}" +
+    ".rl-story-slide .jpass .pl{flex:none;color:#2B59C3;width:26px;height:26px;transform:rotate(90deg)}.rl-story-slide .jpass .pl svg{width:26px;height:26px;display:block}" +
+    ".rl-story-slide .jpass .bot{display:flex;justify-content:space-between;gap:8px;margin-top:6px;padding-top:6px;border-top:2px dashed #d0d5dd;font-size:13px;font-weight:700;color:#344054}.rl-story-slide .jpass .bot .n:empty{display:none}" +
+    ".rl-story-slide .jpass.big{margin-top:16px;padding:18px}.rl-story-slide .jpass.big .e b{font-size:34px}.rl-story-slide .jpass.big .bot{font-size:15px}" +
+    ".rl-story-slide .jfly .jplane{position:absolute;inset:0;opacity:0;overflow:hidden;transform-origin:50% 45%}.rl-story-slide .jplane>*{position:absolute}.rl-story-slide .jwin{overflow:hidden}.rl-story-slide .jwin>*{position:absolute}" +
+    ".rl-story-slide .jwin .band{left:0;right:0}.rl-story-slide .jwin .jsun{right:18%;width:46px;height:46px;border-radius:50%}.rl-story-slide .jground{left:-35%;right:-35%;top:28%;height:120%;transform-origin:50% 0;will-change:transform,opacity}" +
+    ".rl-story-slide .jground svg{display:block}.rl-story-slide .jwin .jl{left:0;will-change:transform,opacity}.rl-story-slide .jwing{left:0;top:0;width:100%;height:100%;transform-origin:0 100%;overflow:visible}" +
+    ".rl-story-slide .jarr{left:22px;right:22px;background:#05070d;color:#ffb020;border-radius:10px;padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;box-shadow:0 8px 24px rgba(0,0,0,.35)}" +
+    ".rl-story-slide .jarr span{display:block;font-size:13px;letter-spacing:2px;color:#ffd27a;font-weight:800}.rl-story-slide .jarr div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:4px}" +
+    ".rl-story-slide .jarr b{font-size:20px;font-weight:800;overflow-wrap:anywhere}.rl-story-slide .jarr em{font-style:normal;font-size:14px;font-weight:800;color:#7ee2a8}.rl-story-slide .jarr small{display:block;font-size:13px;margin-top:2px;opacity:.85}" +
+    ".rl-story-slide .jboard.air{background:#ffd23f;color:#101828;border-color:#101828;box-shadow:0 0 0 3px #ffd23f}" +
+    ".rl-story-slide.jpl h2.ch{font-size:28px;margin:6px 0 0}.rl-story-slide .jplaces{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}" +
+    ".rl-story-slide .jplaces li{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.08);opacity:0;animation:rlsight .5s ease-out forwards}" +
+    ".rl-story-slide .jplaces .sic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--accent);color:#172554}.rl-story-slide .jplaces .sic svg{width:24px;height:24px}.rl-story-slide .jplaces .w{min-width:0}" +
+    ".rl-story-slide .jplaces .h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.rl-story-slide .jplaces .h b{font-size:18px}.rl-story-slide .jplaces .h small{font-size:13px;font-weight:800;padding:2px 10px;border-radius:999px;background:rgba(255,255,255,.12)}" +
+    ".rl-story-slide .jplaces p{margin:2px 0 0;font-size:15px;line-height:1.35}" +
+    "@media(prefers-reduced-motion:reduce){.rl-story-slide .jplaces li{animation:none;opacity:1}.rl-story-slide .jbr i.f{animation:none}.rl-story-slide .jbmap .gl{transition:none}}" +
     ".rl-story-slide .jlist{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:10px}.rl-story-slide .jlist li{display:grid;gap:2px;padding:12px 16px;border-radius:16px;background:rgba(255,255,255,.08)}.rl-story-slide .jlist b{font-size:17px}.rl-story-slide .jlist small{font-size:14px;opacity:.8}" +
     ".rl-story-slide .sights{list-style:none;margin:18px 0 6px;padding:0;display:grid;gap:12px}.rl-story-slide .sights li{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:18px;background:rgba(255,255,255,.08);opacity:0;animation:rlsight .5s ease-out forwards}" +
     ".rl-story-slide .sights .sic{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:var(--accent);color:#172554}.rl-story-slide .sights svg{width:26px;height:26px}.rl-story-slide .sights b{font-size:19px;line-height:1.25}" +
@@ -7520,7 +7550,7 @@
       if (!stage.isConnected) { snd(false); return; }
       var held = Boolean(stage.closest(".paused"));
       if (held !== hold) { hold = held; rateNow = -1; }
-      if (last !== null && !held) t += Math.min(64, now - last);
+      if (last !== null && !held) t += Math.min(200, now - last);
       last = now;
       if (t < tBoard) {
         phase("map");
@@ -7599,9 +7629,365 @@
       (hit ? hit[1] : '<path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12Z"/><circle cx="12" cy="9" r="2.5"/>') + "</svg>";
   }
   var cap1 = function (s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
+  // Travel, shorter (Connor, 18 Nov 2026: "not train on every journey, it's too long"). The count first; then only the
+  // year's furthest train journey gets the whole ride (zoom to the start, the window, the arrival board, "Did you visit…?");
+  // every other one is on one departures board that flips through them while their routes light up on a map behind it. The
+  // same for flights: the furthest one from the window seat (the wing, fields falling away, clouds, the arrivals board),
+  // the others as a pile of boarding passes dealt out. Then "Places you went": every place the year's trips went to, each
+  // with two or three well-known sights to ask about (the server's lists only). With reduced motion: still cards.
+  var ICON_TRAIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 14h.01M15 14h.01M8 21l2-4M16 21l-2-4"/></svg>';
+  var ICON_PLANE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5c.8 0 1.4.7 1.4 1.5v5.2l7.1 4.1v1.9l-7.1-2.2v4.3l2.1 1.6v1.6L12 19.6l-3.5.9v-1.6l2.1-1.6V13l-7.1 2.2v-1.9l7.1-4.1V4c0-.8.6-1.5 1.4-1.5Z"/></svg>';
+  var milesText = function (n) { return n.toLocaleString("en-GB") + (n === 1 ? " mile" : " miles"); };
+  var BOARD_MONTHS = "JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(" ");
+  var shortDay = function (d) { return d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? Number(d.slice(8, 10)) + " " + BOARD_MONTHS[Number(d.slice(5, 7)) - 1] : ""; };
+  // "11 journeys, 2,340 miles by train" (only what's known is added up; "at least" when some trip couldn't be measured).
+  function groundTotals(g) {
+    var x = g && g.totals; if (!x || !x.journeys) return null;
+    var by = (g.modes || []).length === 1 && g.modes[0] === "train" ? "by train" : (g.modes || []).every(function (m) { return m === "train" || m === "coach"; }) ? "by train and coach" : "on your trips";
+    return journeysWord(x.journeys) + (x.miles ? ", " + (x.atLeast ? "at least " : "") + milesText(x.miles) + " " + by : " " + by) + ".";
+  }
+  function airTotals(a) {
+    var x = a && a.totals; if (!x || !x.journeys) return null;
+    return x.journeys + (x.journeys === 1 ? " flight" : " flights") + (x.miles ? ", " + (x.atLeast ? "at least " : "") + milesText(x.miles) + " in the air" : "") + ".";
+  }
+  // A Wrapped kept from before this version has only `trips`: the same story is made from them (first trip featured).
+  function travelGroups(t) {
+    if (t.ground || t.air) return { ground: t.ground, air: t.air };
+    var trips = (t.trips || []).filter(function (x) { return x && x.from && x.to; }), mk = function (list) {
+      return list.length ? { featured: list[0], others: list.slice(1).map(function (x) { return { from: x.from, to: x.to, place: x.place || x.to, date: x.date, mode: x.mode, fromAt: x.fromAt, toAt: x.toAt, times: x.times || 1 }; }), lines: [], totals: null, modes: [] } : null;
+    };
+    return { ground: mk(trips.filter(function (x) { return x.mode !== "flight"; })), air: mk(trips.filter(function (x) { return x.mode === "flight"; })) };
+  }
+
+  // ---- The departures board: every other train journey, a row at a time, split-flap letters settling. ----
+  var FLAP = "ABCDEFGHIJKLMNOPRSTUVWY0123456789";
+  var BOARD_ROWS = 6, BOARD_MAX = 18, FLAP_ROW = 260, FLAP_HOLD = 1500;
+  function boardPages(n) { return Math.max(1, Math.ceil(Math.min(n, BOARD_MAX) / BOARD_ROWS)); }
+  function boardDur(n) { var rows = Math.min(n, BOARD_ROWS); return Math.max(6500, boardPages(n) * (rows * FLAP_ROW + 700 + FLAP_HOLD) + 1600); }
+  function rowText(r) { return { day: shortDay(r.date) || "", place: String(r.place || r.to || "").toUpperCase(), times: r.times > 1 ? r.times + " TIMES" : "" }; }
+  function trainBoard(b, g, year, still) {
+    b.classList.add("jx", "jbd");
+    b.appendChild(el("div", { className: "k", text: "YOUR OTHER TRAIN JOURNEYS" }));
+    var rows = (g.others || []).slice(0, BOARD_MAX), stage = el("div", { className: "jstage jbstage", role: "img", ariaLabel: "A departures board of your other train journeys: " + rows.map(function (r) { return (r.date ? longDate(r.date) + ", " : "") + (r.place || r.to); }).join("; ") });
+    // The map behind: the UK, every route of the year faint, each lighting up as its row settles.
+    var map = el("div", { className: "jbmap" }), svg = svgEl("svg", { "aria-hidden": "true", preserveAspectRatio: "xMidYMid meet" });
+    svg.innerHTML = ukLand(); map.appendChild(svg); stage.appendChild(map);
+    var pts = [], glow = {};
+    (g.lines || []).forEach(function (l) {
+      var a = ukXY(l.fromAt.lat, l.fromAt.lon), z = ukXY(l.toAt.lat, l.toAt.lon); pts.push(a, z);
+      var mx = (a[0] + z[0]) / 2, my = (a[1] + z[1]) / 2, dx = z[0] - a[0], dy = z[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1, bow = Math.min(18, len * 0.2);
+      var d = "M" + a[0] + " " + a[1] + "Q" + r1(mx - dy / len * bow) + " " + r1(my + dx / len * bow) + " " + z[0] + " " + z[1];
+      svg.appendChild(svgEl("path", { class: "rt", d: d }));
+      var gl = svgEl("g", { class: "gl", "data-place": String(l.place || "").toLowerCase() });
+      gl.appendChild(svgEl("path", { class: "halo", d: d })); gl.appendChild(svgEl("path", { class: "core", d: d }));
+      gl.appendChild(svgEl("circle", { class: "end", cx: z[0], cy: z[1], r: 3.2 }));
+      svg.appendChild(gl); (glow[String(l.place || "").toLowerCase()] = glow[String(l.place || "").toLowerCase()] || []).push(gl);
+    });
+    // Framed on the routes (all of the UK when there are none).
+    var vb;
+    if (pts.length) {
+      var xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys), s = Math.max(90, (x1 - x0) * 1.35, (y1 - y0) * 1.35 * 1.4);
+      vb = [(x0 + x1) / 2 - s / 2, (y0 + y1) / 2 - s * 0.7 / 2 - s * 0.08, s, s * 0.7];
+    } else { var wv = wholeView(); vb = [wv.cx - wv.w / 2, wv.cy - wv.h / 2, wv.w, wv.h]; }
+    svg.setAttribute("viewBox", vb.map(function (v) { return Math.round(v * 10) / 10; }).join(" "));
+    Array.prototype.forEach.call(svg.querySelectorAll(".end"), function (c) { c.setAttribute("r", (4 * vb[2] / 340).toFixed(2)); });
+    // The board: DEPARTURES, then a row a trip (its day, where to, how many times this year).
+    var board = el("div", { className: "jbb" });
+    board.appendChild(el("div", { className: "jbh" }, [el("b", { text: "DEPARTURES" }), el("span", { text: String(year) })]));
+    var slots = [];
+    for (var k = 0; k < Math.min(rows.length, BOARD_ROWS); k++) {
+      var row = el("div", { className: "jbr" }), day = el("span", { className: "d" }), place = el("span", { className: "p" }), times = el("span", { className: "t" });
+      for (var c = 0; c < 6; c++) day.appendChild(el("i", { text: " " }));
+      for (var c2 = 0; c2 < 14; c2++) place.appendChild(el("i", { text: " " }));
+      row.appendChild(day); row.appendChild(place); row.appendChild(times); board.appendChild(row); slots.push({ row: row, day: day, place: place, times: times });
+    }
+    stage.appendChild(board);
+    b.appendChild(stage);
+    var tot = groundTotals(g);
+    if (tot) b.appendChild(el("p", { className: "lead jtot", text: tot }));
+    var shown = still ? BOARD_ROWS : BOARD_MAX;
+    if ((g.others || []).length > shown) b.appendChild(el("p", { className: "fine", text: "And " + ((g.others || []).length - shown) + " more places." }));
+    var unknown = (g.others || []).filter(function (r) { return !r.toAt; }).map(function (r) { return r.to; });
+    if (unknown.length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + unknown.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
+    // Writes a row. A long name is cut to fit the board's 14 letters only where a word ends.
+    function fit(s, n) { if (s.length <= n) return s; if (s.charAt(n) === " ") return s.slice(0, n); var cut = s.slice(0, n); return cut.lastIndexOf(" ") > 5 ? cut.slice(0, cut.lastIndexOf(" ")) : cut; }
+    function settle(slot, r, now) {
+      var tx = rowText(r), want = [fit(tx.day, 6), fit(tx.place, 14)];
+      [slot.day, slot.place].forEach(function (box, w) { Array.prototype.forEach.call(box.children, function (cell, ci) { cell.textContent = want[w].charAt(ci) || " "; cell.className = ""; }); });
+      slot.times.textContent = tx.times; slot.row.setAttribute("data-place", String(r.place || "").toLowerCase()); slot.row.classList.add("set");
+      (glow[String(r.place || "").toLowerCase()] || []).forEach(function (n) { n.classList.add("on"); });
+    }
+    if (still) { slots.forEach(function (s, k) { if (rows[k]) settle(s, rows[k]); }); return; }
+    // The flaps: each letter turns over a few times, then stops on its own letter; the rows go one after another.
+    var pages = boardPages(rows.length), t0 = null, last = null, t = 0;
+    var perPage = Math.min(rows.length, BOARD_ROWS) * FLAP_ROW + 700 + FLAP_HOLD, rnd = seeded(rows.length * 131 + 7);
+    function step(now) {
+      if (!stage.isConnected) return;
+      var held = Boolean(stage.closest(".paused"));
+      if (last !== null && !held) t += Math.min(200, now - last);
+      last = now;
+      var p = Math.min(pages - 1, Math.floor(t / perPage)), pt = t - p * perPage;
+      if (stage.getAttribute("data-page") !== String(p)) {
+        stage.setAttribute("data-page", String(p));
+        slots.forEach(function (s) { s.row.classList.remove("set"); s.times.textContent = ""; s.row.hidden = !rows[p * BOARD_ROWS + slots.indexOf(s)]; });
+      }
+      slots.forEach(function (s, k) {
+        var r = rows[p * BOARD_ROWS + k]; if (!r) return;
+        var start = k * FLAP_ROW, end = start + 520;
+        if (pt < start || s.row.classList.contains("set")) return;
+        if (pt >= end) { settle(s, r); return; }
+        // Turning: random letters, a quarter turn each (transform only).
+        var cells = s.day.children.length + s.place.children.length, i0 = 0;
+        [s.day, s.place].forEach(function (box) {
+          Array.prototype.forEach.call(box.children, function (cell, ci) {
+            var stopAt = start + 200 + (i0 + ci) * 320 / cells;
+            if (pt < stopAt && (now | 0) % 2 === 0) { cell.textContent = FLAP.charAt(Math.floor(rnd() * FLAP.length)); cell.className = "f"; }
+          });
+          i0 += box.children.length;
+        });
+      });
+      stage.setAttribute("data-flipping", slots.some(function (s, k) { return rows[p * BOARD_ROWS + k] && !s.row.classList.contains("set") && pt >= k * FLAP_ROW; }) ? "1" : "0");
+      if (p < pages - 1 || pt < perPage) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---- Boarding passes: every other flight, dealt from a pile into a neat column. ----
+  var PASS_MAX = 5;
+  function passCard(f) {
+    var card = el("div", { className: "jpass" });
+    var end = function (code, name, cls) { return el("div", { className: "e " + cls }, [el("b", { text: code || "" }), el("small", { text: name || "" })]); };
+    var mid = el("div", { className: "pl" }); mid.innerHTML = ICON_PLANE;
+    card.appendChild(el("div", { className: "top" }, [end(f.fromCode, f.from, "a"), mid, end(f.toCode, f.place || f.to, "z")]));
+    card.appendChild(el("div", { className: "bot" }, [el("span", { text: f.date ? longDate(f.date) : "" }), el("span", { text: f.flight || "" }), el("span", { className: "n", text: f.times > 1 ? f.times + " times" : "" })]));
+    return card;
+  }
+  function passStack(b, a, still) {
+    b.classList.add("jx", "jps");
+    b.appendChild(el("div", { className: "k", text: "YOUR OTHER FLIGHTS" }));
+    var list = (a.others || []).slice(0, PASS_MAX), box = el("div", { className: "jpasses", role: "list" });
+    list.forEach(function (f) { var c = passCard(f); c.setAttribute("role", "listitem"); box.appendChild(c); });
+    b.appendChild(box);
+    var tot = airTotals(a);
+    if (tot) b.appendChild(el("p", { className: "lead jtot", text: tot }));
+    if ((a.others || []).length > PASS_MAX) b.appendChild(el("p", { className: "fine", text: "And " + ((a.others || []).length - PASS_MAX) + " more." }));
+    if (still) return;
+    // Start as a pile in the middle, each a little turned, then dealt out one after another (transform and opacity only).
+    var cards = Array.prototype.slice.call(box.children), mid = box.offsetHeight / 2;
+    cards.forEach(function (c, k) {
+      var dy = mid - (c.offsetTop + c.offsetHeight / 2) + k * 3, rot = ((k * 37) % 11) - 5;
+      c.style.transform = "translate3d(0," + Math.round(dy) + "px,0) rotate(" + rot + "deg) scale(.96)"; c.style.opacity = k ? "0" : "1";
+    });
+    box.offsetHeight;
+    requestAnimationFrame(function () {
+      cards.forEach(function (c, k) {
+        c.style.transition = "transform .6s cubic-bezier(.2,.8,.2,1) " + (0.5 + k * 0.38).toFixed(2) + "s, opacity .25s " + (k ? 0.3 + k * 0.38 : 0).toFixed(2) + "s";
+        c.style.transform = "none"; c.style.opacity = "1";
+      });
+    });
+  }
+
+  // ---- The furthest flight, from the window seat. ----
+  var FX = { map: 1500, board: 700, climb: 2300, cruise: 900, arrive: 1300, read: 1300, readSights: 1900 };
+  function flightDur(f, hasMap) { return (hasMap ? FX.map : 0) + FX.board + FX.climb + FX.cruise + FX.arrive + ((f.sights || []).length ? FX.readSights : FX.read); }
+  // The sky by the time of year: a low winter sun at sunset, golden in autumn, bright daylight in spring and summer.
+  var SKY = {
+    winter: { sky: "#f2a36f", band: "#f8cd94", sun: "#fff1c9", sunY: 0.6, cloud: "#fbe3d2", shade: "#e9b99f" },
+    autumn: { sky: "#f1bd83", band: "#f8dcab", sun: "#fff4d8", sunY: 0.36, cloud: "#fff0e0", shade: "#eccaa7" },
+    spring: { sky: "#9fd1f3", band: "#cfe9fa", sun: "#fffbe6", sunY: 0.16, cloud: "#ffffff", shade: "#dbe6ef" },
+    summer: { sky: "#86c6f1", band: "#c3e3f8", sun: "#fffbe6", sunY: 0.12, cloud: "#ffffff", shade: "#d7e3ee" }
+  };
+  var skyOf = function (date) { var m = Number(String(date || "").slice(5, 7)) || 6; return m === 12 || m <= 2 ? "winter" : m >= 10 ? "autumn" : m <= 5 ? "spring" : "summer"; };
+  var CLOUDS = {};
+  function cloudTile(kind, sky) {
+    var key = kind + sky; if (CLOUDS[key]) return CLOUDS[key];
+    var c = SKY[sky], W = 1200, H = kind === "deck" ? 220 : 160, rnd = seeded(kind.length * 977 + sky.length), s = "";
+    var puff = function (x, y, r) { return '<circle cx="' + r1(x) + '" cy="' + r1(y) + '" r="' + r1(r) + '"/>'; };
+    for (var o = 0; o < 2; o++) {
+      if (kind === "deck") {
+        // A deck of cloud below the plane: a rolling top edge and solid underneath.
+        var d = "M" + o * W + " " + H;
+        for (var x = 0; x <= W; x += 40) d += "L" + (o * W + x) + " " + r1(60 + 14 * Math.sin(x / W * Math.PI * 6) + 8 * Math.sin(x / W * Math.PI * 14 + 1));
+        s += '<path fill="' + c.shade + '" d="' + d + "V" + H + 'Z"/>';
+        s += '<g fill="' + c.cloud + '">';
+        for (var k = 0; k < 18; k++) { var px = o * W + k * W / 18 + 20; s += puff(px, 66 + 14 * Math.sin(k / 18 * Math.PI * 6), 26 + (k % 3) * 8); }
+        s += '<rect x="' + o * W + '" y="78" width="' + W + '" height="' + (H - 78) + '"/></g>';
+      } else {
+        // Separate clouds passing above and level with the plane.
+        s += '<g fill="' + c.cloud + '" fill-opacity=".92">';
+        for (var q = 0; q < 4; q++) {
+          var cx = o * W + 120 + q * 290 + (q % 2) * 40, cy = 50 + (q % 3) * 28, rr = 20 + (q % 2) * 10;
+          s += puff(cx, cy, rr) + puff(cx + rr, cy - rr * 0.5, rr * 1.2) + puff(cx + rr * 2.2, cy, rr * 0.95) + '<rect x="' + r1(cx) + '" y="' + r1(cy) + '" width="' + r1(rr * 2.2) + '" height="' + r1(rr) + '"/>';
+        }
+        s += "</g>";
+      }
+    }
+    CLOUDS[key] = { svg: s, W: W, H: H };
+    return CLOUDS[key];
+  }
+  var FIELDS = {};
+  function fieldsTile(season) {
+    if (FIELDS[season]) return FIELDS[season];
+    var c = SEASON[season], rnd = seeded(season.length * 53 + 11), s = "", W = 600, H = 600;
+    for (var y = 0; y < H; y += 60) for (var x = 0; x < W; x += 75) {
+      var dx = Math.floor(rnd() * 20) - 10;
+      s += '<rect x="' + (x + dx) + '" y="' + y + '" width="' + (75 + Math.floor(rnd() * 12)) + '" height="' + (60 + Math.floor(rnd() * 10)) + '" fill="' + c.fields[Math.floor(rnd() * c.fields.length)] + '"/>';
+    }
+    for (var h = 0; h <= W; h += 75) s += '<path stroke="' + c.hedge + '" stroke-width="3" d="M' + h + " 0V" + H + '"/>';
+    for (var v = 0; v <= H; v += 60) s += '<path stroke="' + c.hedge + '" stroke-width="3" d="M0 ' + v + "H" + W + '"/>';
+    s += '<path fill="none" stroke="#8fa3b5" stroke-width="7" d="M-10 420C120 380 220 470 330 400S520 300 610 340"/>';
+    FIELDS[season] = s;
+    return s;
+  }
+  var inUK = function (p) { return p && p.lat > 49.8 && p.lat < 61 && p.lon > -8.8 && p.lon < 2; };
+  function flightScene(b, f, label, year, ctl) {
+    b.classList.add("jx");
+    b.appendChild(el("div", { className: "k", text: label }));
+    var stage = el("div", { className: "jstage jfly", role: "img", ariaLabel: "A flight from " + f.from + " to " + (f.place || f.to) + (f.date ? " on " + tripWhen(f) : "") });
+    var q = el("div", { className: "jq" });
+    q.appendChild(tripQuestion(f, year));
+    b.appendChild(stage); b.appendChild(q);
+    var SW = stage.clientWidth || 358, SH = stage.clientHeight || 420, hasMap = inUK(f.fromAt);
+    // 1. The map: zoom in on the airport, its name on a yellow airport sign.
+    var map = null, svg = null, pin = null, ring = null, sign = null, target = null;
+    if (hasMap) {
+      map = el("div", { className: "jmap" }); svg = svgEl("svg", { "aria-hidden": "true", preserveAspectRatio: "xMidYMid slice" });
+      svg.innerHTML = ukLand(); map.appendChild(svg); stage.appendChild(map);
+      var st = ukXY(f.fromAt.lat, f.fromAt.lon);
+      ring = svgEl("circle", { class: "ring", cx: st[0], cy: st[1], r: 1 }); pin = svgEl("circle", { class: "pin", cx: st[0], cy: st[1], r: 1 });
+      svg.appendChild(ring); svg.appendChild(pin);
+      sign = el("div", { className: "jboard from air" }, [el("b", { text: f.from })]); stage.appendChild(sign);
+      target = viewAt(f.fromAt);
+    }
+    // 2. The window seat: sky and sun, the fields below, cloud, the wing; the cabin wall and the window round it.
+    var sky = SKY[skyOf(f.date)], plane = el("div", { className: "jplane" });
+    plane.style.background = sky.sky;
+    var info = el("div", { className: "jdep" }, [el("span", { text: [tripWhen(f), f.flight].filter(Boolean).join("   ") || "Your flight" }), el("b", { text: f.from + " to " + (f.place || f.to) })]);
+    plane.appendChild(info); stage.appendChild(plane);
+    var top = info.offsetTop + info.offsetHeight + 12, ww = Math.round(Math.min(SW * 0.66, (SH - top) * 0.62)), wx = Math.round((SW - ww) / 2), bottom = Math.round(Math.min(SH - 16, top + ww * 1.42)), wh = bottom - top, rad = Math.round(ww * 0.42);
+    var view = el("div", { className: "jwin", style: "left:" + wx + "px;top:" + top + "px;width:" + ww + "px;height:" + wh + "px" });
+    view.appendChild(el("i", { className: "band", style: "background:" + sky.band + ";top:" + Math.round(wh * 0.42) + "px;height:" + Math.round(wh * 0.2) + "px" }));
+    view.appendChild(el("i", { className: "jsun", style: "background:" + sky.sun + ";top:" + Math.round(sky.sunY * wh) + "px" }));
+    var ground = el("div", { className: "jground" }); ground.innerHTML = '<svg viewBox="0 0 600 600" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">' + fieldsTile(seasonOf(f.date)) + "</svg>";
+    view.appendChild(ground);
+    var layer = function (kind, hPx, topPx) {
+      var t = cloudTile(kind, skyOf(f.date)), h = Math.round(hPx), w = Math.round(h * t.W * 2 / t.H), n = el("div", { className: "jl jc-" + kind, style: "height:" + h + "px;width:" + w + "px;top:" + Math.round(topPx) + "px" });
+      n.innerHTML = '<svg viewBox="0 0 ' + t.W * 2 + " " + t.H + '" width="' + w + '" height="' + h + '" aria-hidden="true">' + t.svg + "</svg>";
+      view.appendChild(n); return n;
+    };
+    var deck = layer("deck", wh * 0.55, wh * 0.5), high = layer("puffs", wh * 0.32, wh * 0.06), near = layer("puffs", wh * 0.6, wh * 0.3);
+    var wing = svgEl("svg", { class: "jwing", viewBox: "0 0 100 100", preserveAspectRatio: "none", "aria-hidden": "true" });
+    wing.innerHTML = '<path fill="#d3d9e1" d="M-8 92 L88 58 L96 60 L30 108 Z"/><path fill="none" stroke="#a6b0bd" stroke-width="1.4" d="M-8 92 L88 58"/><path fill="#101828" d="M88 58 L95 44 L98 46 L96 60 Z"/><circle cx="93" cy="58" r="1.2" fill="#f04438"/>';
+    view.appendChild(wing);
+    plane.insertBefore(view, info);
+    var frame = svgEl("svg", { class: "jframe", viewBox: "0 0 " + SW + " " + SH, "aria-hidden": "true" });
+    var hole = "M" + (wx + rad) + " " + top + "H" + (wx + ww - rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + ww) + " " + (top + rad) + "V" + (bottom - rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + ww - rad) + " " + bottom +
+      "H" + (wx + rad) + "A" + rad + " " + rad + " 0 0 1 " + wx + " " + (bottom - rad) + "V" + (top + rad) + "A" + rad + " " + rad + " 0 0 1 " + (wx + rad) + " " + top + "Z";
+    var shadeH = Math.round(wh * 0.12);
+    frame.innerHTML = '<path fill="#e8ebf0" fill-rule="evenodd" d="M0 0H' + SW + "V" + SH + "H0Z" + hole + '"/>' +
+      '<path fill="none" stroke="#c4cad3" stroke-width="12" d="' + hole + '"/><path fill="none" stroke="#98a2b3" stroke-width="2" d="' + hole + '"/>' +
+      '<clipPath id="jxhole"><path d="' + hole + '"/></clipPath><g clip-path="url(#jxhole)"><rect x="' + wx + '" y="' + top + '" width="' + ww + '" height="' + shadeH + '" fill="#d6dbe2"/><rect x="' + wx + '" y="' + (top + shadeH - 3) + '" width="' + ww + '" height="3" fill="#b6bec9"/>' +
+      '<rect x="' + Math.round(wx + ww / 2 - 14) + '" y="' + (top + shadeH - 9) + '" width="28" height="6" rx="3" fill="#98a2b3"/></g>';
+    plane.insertBefore(frame, info);
+    // 3. The arrivals board, waiting below the window.
+    var arr = el("div", { className: "jarr" }, [el("span", { text: "ARRIVALS" }), el("div", {}, [el("b", { text: String(f.place || f.to).toUpperCase() }), el("em", { text: "LANDED" })]), f.flight ? el("small", { text: f.flight }) : el("small", { text: f.from.toUpperCase() })]);
+    arr.style.top = Math.round(top + wh * 0.3) + "px"; plane.appendChild(arr);
+    // The clouds drift by at their own speeds for as long as the slide is open.
+    var drift = [[deck, 26000], [high, 15000], [near, 5200]].map(function (x, k) {
+      if (!x[0].animate) return null;
+      var a2 = x[0].animate([{ transform: "translate3d(0,0,0)" }, { transform: "translate3d(-50%,0,0)" }], { duration: x[1], iterations: Infinity }); a2.currentTime = k * 1777; return a2;
+    });
+    var tMap = hasMap ? FX.map : 0, tBoard = tMap + FX.board, tClimb = tBoard + FX.climb, tCruise = tClimb + FX.cruise, tArr = tCruise + FX.arrive;
+    var t = 0, last = null, endView = hasMap ? viewBox(target, SW, SH) : null;
+    function phase(p) { if (stage.getAttribute("data-phase") !== p) stage.setAttribute("data-phase", p); }
+    function setView(vb) {
+      svg.setAttribute("viewBox", vb.map(function (v) { return Math.round(v * 100) / 100; }).join(" "));
+      var u = vb[2] / SW; pin.setAttribute("r", (7 * u).toFixed(3)); pin.style.strokeWidth = (2.5 * u).toFixed(3); ring.setAttribute("r", (7 * u).toFixed(3)); ring.style.strokeWidth = (2 * u).toFixed(3);
+    }
+    function climb(e) {
+      // Fields fall away and shrink; the cloud deck rises into view below; a cloud rushes past the window; the wing levels.
+      ground.style.transform = "translate3d(0," + Math.round(e * wh * 0.55) + "px,0) scale(" + (1.5 - 0.9 * e).toFixed(3) + ")"; ground.style.opacity = String(1 - clamp01((e - 0.55) / 0.4));
+      deck.style.transform = "translate3d(0," + Math.round((1 - e) * wh * 0.6) + "px,0)"; deck.style.opacity = String(clamp01((e - 0.35) / 0.4));
+      var p = clamp01((e - 0.25) / 0.5); near.style.opacity = String(Math.sin(Math.PI * p) * 0.95); near.style.transform = "translate3d(0," + Math.round((0.5 - p) * wh * 0.7) + "px,0)";
+      high.style.opacity = String(clamp01((e - 0.6) / 0.4));
+      wing.style.transform = "rotate(" + (6 * (1 - e)).toFixed(2) + "deg)";
+    }
+    function step(now) {
+      if (!stage.isConnected) { drift.forEach(function (a2) { if (a2) a2.cancel(); }); return; }
+      var held = Boolean(stage.closest(".paused"));
+      drift.forEach(function (a2) { if (a2) a2.playbackRate = held ? 0 : 1; });
+      if (last !== null && !held) t += Math.min(200, now - last);
+      last = now;
+      if (t < tMap) {
+        phase("map");
+        setView(flyView(wholeView(), target, SW, SH, ease(clamp01(t / FX.map))));
+        var pe = clamp01((t - 250) / 350); pin.style.opacity = ring.style.opacity = String(pe);
+        var fb = ease(clamp01((t - 500) / 450)); sign.style.opacity = String(fb); sign.style.transform = "translateY(" + Math.round((1 - fb) * 24) + "px)";
+        plane.style.opacity = "0"; climb(0);
+      } else if (t < tBoard) {
+        phase("board");
+        var bt = (t - tMap) / FX.board;
+        if (map) { var vb = endView, z = 1 - 0.6 * ease(clamp01(bt)); setView([vb[0] + vb[2] * (1 - z) / 2, vb[1] + vb[3] * (1 - z) / 2, vb[2] * z, vb[3] * z]); map.style.opacity = String(1 - clamp01((bt - 0.25) / 0.6)); sign.style.opacity = String(1 - clamp01(bt / 0.35)); }
+        var te = ease(clamp01((bt - (map ? 0.4 : 0)) / (map ? 0.6 : 1))); plane.style.opacity = String(te); plane.style.transform = "scale(" + (1.12 - 0.12 * te).toFixed(4) + ")";
+        climb(0);
+      } else if (t < tClimb) {
+        phase("climb"); if (map) map.style.opacity = "0"; plane.style.opacity = "1"; plane.style.transform = "none";
+        climb(ease(clamp01((t - tBoard) / FX.climb)));
+      } else if (t < tCruise) {
+        phase("cruise"); climb(1); plane.style.opacity = "1"; plane.style.transform = "none";
+      } else if (t < tArr) {
+        phase("arrive"); climb(1);
+        var ae = ease(clamp01((t - tCruise) / (FX.arrive * 0.7))); arr.style.opacity = String(ae); arr.style.transform = "translate3d(0," + Math.round((1 - ae) * 60) + "px,0)";
+      } else {
+        phase("arrived"); climb(1); arr.style.opacity = "1"; arr.style.transform = "none"; q.classList.add("on");
+        return;
+      }
+      requestAnimationFrame(step);
+    }
+    if (hasMap) setView(viewBox(wholeView(), SW, SH));
+    climb(0); arr.style.opacity = "0";
+    stage.setAttribute("data-phase", hasMap ? "map" : "board");
+    requestAnimationFrame(step);
+  }
+  // The furthest flight, still: a big boarding pass and the question.
+  function flightStill(b, f, label, year) {
+    b.classList.add("jx", "still");
+    b.appendChild(el("div", { className: "k", text: label }));
+    var card = passCard(f); card.classList.add("big"); b.appendChild(card);
+    var q = el("div", { className: "jq on" }); q.appendChild(tripQuestion(f, year)); b.appendChild(q);
+  }
+
+  // ---- Places you went: every place, its sights asked about (or the nearest listed place's, said as such). ----
+  var PLACES_MAX = 5;
+  function orList(a) { return a.length > 1 ? a.slice(0, -1).join(", ") + " or " + a[a.length - 1] : a[0]; }
+  function placesSlide(b, list, year) {
+    b.classList.add("jpl");
+    b.appendChild(el("div", { className: "k", text: "PLACES YOU WENT" }));
+    b.appendChild(el("h2", { className: "ch", text: "Did you visit…" }));
+    var ul = el("ul", { className: "jplaces" });
+    list.slice(0, PLACES_MAX).forEach(function (d, k) {
+      var li = el("li", { style: "animation-delay:" + (0.25 + k * 0.3).toFixed(2) + "s" }), ic = el("span", { className: "sic" });
+      ic.innerHTML = d.mode === "flight" ? ICON_PLANE : ICON_TRAIN;
+      var head = el("div", { className: "h" }, [el("b", { text: d.place })]);
+      if (d.times > 1) head.appendChild(el("small", { text: d.times + " times" }));
+      var sights = (d.sights || []).map(function (x, k) { return k ? x : cap1(x); }), line;
+      if (sights.length && d.near) line = "Nearby in " + d.near + ": " + orList(sights) + "?";
+      else if (sights.length) line = orList(sights) + "?";
+      else line = "How was it?";
+      li.appendChild(ic); li.appendChild(el("div", { className: "w" }, [head, el("p", { text: line })])); ul.appendChild(li);
+    });
+    b.appendChild(ul);
+    // The rest by name, so every place is there.
+    var rest = list.slice(PLACES_MAX).map(function (d) { return d.place; });
+    if (rest.length) b.appendChild(el("p", { className: "fine jalso", text: "Also " + (rest.length > 8 ? rest.slice(0, 8).join(", ") + " and " + (rest.length - 8) + " more" : rest.join(", ").replace(/, ([^,]*)$/, " and $1")) + "." }));
+  }
+
   function travelSlides(S, t, year) {
     if (!t || !t.journeys || S._travel) return;
     S._travel = true;
+    var grp = travelGroups(t), g = grp.ground, a = grp.air, calm = calmMotion();
+    var gBoard = Boolean(g && (g.others || []).length), aStack = Boolean(a && (a.others || []).length);
     var modes = [[t.trains, "by train"], [t.flights, "by air"], [t.coaches, "by coach"]].filter(function (m) { return m[0]; });
     S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("div", { className: "k", text: "ON THE MOVE" }));
@@ -7609,29 +7995,39 @@
       b.appendChild(el("p", { className: "lead", text: (t.journeys === 1 ? "journey" : "journeys") + " on your receipts." }));
       if (modes.length && !(modes.length === 1 && modes[0][0] === t.journeys && modes[0][1] === "by train")) b.appendChild(el("p", { text: modes.map(function (m) { return m[0] + " " + m[1]; }).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
       else if (t.trains === t.journeys) b.appendChild(el("p", { text: t.journeys === 1 ? "By train." : "All of them by train." }));
-      if (t.topRoute) {
-        var f = el("div", { className: "facts" });
-        f.appendChild(el("div", {}, [el("span", { text: "Most travelled" }), el("b", {}, [document.createTextNode(t.topRoute.from + " to " + t.topRoute.to), el("small", { text: journeysWord(t.topRoute.times) })])]));
-        b.appendChild(f);
-      }
+      var f = el("div", { className: "facts" });
+      if (t.topRoute) f.appendChild(el("div", {}, [el("span", { text: "Most travelled" }), el("b", {}, [document.createTextNode(t.topRoute.from + " to " + t.topRoute.to), el("small", { text: journeysWord(t.topRoute.times) })])]));
+      // The miles, here only for a kind of travel that has no grouped slide of its own (that slide says them).
+      var gm = g && !gBoard && g.totals && g.totals.miles ? groundTotals(g) : null, am = a && !aStack && a.totals && a.totals.miles ? airTotals(a) : null;
+      if (gm) f.appendChild(el("div", {}, [el("span", { text: "On the rails" }), el("b", { text: gm.replace(/\.$/, "") })]));
+      if (am) f.appendChild(el("div", {}, [el("span", { text: "In the air" }), el("b", { text: am.replace(/\.$/, "") })]));
+      if (f.children.length) b.appendChild(f);
     } });
-    var trips = (t.trips || []).filter(function (x) { return x && x.from && x.to; });
-    var calm = calmMotion();
-    trips.forEach(function (tr, i) {
-      var label = trips.length > 1 ? "JOURNEY " + (i + 1) + " OF " + trips.length : "YOUR JOURNEY";
-      // A flight isn't shown from a train window: it gets the still card (its route on the map) and the question.
-      var still = calm || tr.mode === "flight";
-      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: still ? 6500 : tripDur(tr), journey: true, build: function (b, again, close, ctl) {
-        if (still) return tripStill(b, tr, label, year);
-        // The camera starts where the last trip ended (or on the whole UK), so it moves on from one to the next.
-        tripScene(b, tr, i > 0 ? viewAt(trips[i - 1].toAt) : wholeView(), label, year, ctl);
+    if (g && g.featured) {
+      var tr = g.featured, train = tr.mode === "train", label = (gBoard ? "YOUR LONGEST " : "YOUR ") + (train ? "TRAIN JOURNEY" : "JOURNEY");
+      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: calm ? 6500 : tripDur(tr), journey: true, build: function (b, again, close, ctl) {
+        if (calm) return tripStill(b, tr, label, year);
+        tripScene(b, tr, wholeView(), label, year, ctl);
       } });
-    });
-    if ((t.places || []).length) S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
+    }
+    if (gBoard) S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", dur: calm ? 6500 : boardDur(g.others.length), build: function (b) { trainBoard(b, g, year, calm); } });
+    if (a && a.featured) {
+      var fl = a.featured, flabel = aStack ? "YOUR LONGEST FLIGHT" : "YOUR FLIGHT";
+      S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: calm ? 6500 : flightDur(fl, inUK(fl.fromAt)), journey: true, build: function (b) {
+        if (calm) return flightStill(b, fl, flabel, year);
+        flightScene(b, fl, flabel, year);
+      } });
+    }
+    if (aStack) S.push({ bg: "#101828", fg: "#fff", accent: "#C9D8FF", dur: calm ? 6500 : 4200 + Math.min(PASS_MAX, a.others.length) * 400, build: function (b) { passStack(b, a, calm); } });
+    if ((t.destinations || []).length) S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", dur: 6500 + Math.min(PLACES_MAX, t.destinations.length) * 500, build: function (b) { placesSlide(b, t.destinations, year); } });
+    // The year's map, when no departures board has drawn the routes already.
+    // (A UK map: places abroad are on the flights' slides, not here.)
+    var ukPlaces = (t.places || []).filter(inUK), ukTravel = { places: ukPlaces, routes: t.routes };
+    if (!gBoard && ukPlaces.length) S.push({ bg: "#0f2a4a", fg: "#fff", accent: "#C9D8FF", build: function (b) {
       b.appendChild(el("p", { className: "lead", text: "Where you went" }));
-      var m = el("div", { className: "map" }); m.innerHTML = ukMapSvg(t); b.appendChild(m);
-      var names = t.places.slice(0, 4).map(function (p) { return p.name; });
-      b.appendChild(el("p", { className: "fine", text: (t.places.length > 4 ? "Including " : "") + names.join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
+      var m = el("div", { className: "map" }); m.innerHTML = ukMapSvg(ukTravel); b.appendChild(m);
+      var names = ukPlaces.slice(0, 4).map(function (p) { return p.name; });
+      b.appendChild(el("p", { className: "fine", text: (ukPlaces.length > 4 ? "Including " : "") + names.join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
       if ((t.unplotted || []).length) b.appendChild(el("p", { className: "fine", text: "Not on the map: " + t.unplotted.slice(0, 3).join(", ").replace(/, ([^,]*)$/, " and $1") + "." }));
     } });
   }

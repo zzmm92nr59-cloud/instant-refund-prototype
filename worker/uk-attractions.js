@@ -60,7 +60,7 @@ const A = {
   // Added 18 Nov 2026 for the journeys, the same way: long-standing, widely known, in or right by the town itself.
   bradford: ["the National Science and Media Museum"],
   saltaire: ["Salts Mill", "Roberts Park"],
-  halifax: ["The Piece Hall", "Eureka! The National Children's Museum"],
+  halifax: ["The Piece Hall", "Shibden Hall", "Eureka! The National Children's Museum"],
   wakefield: ["The Hepworth Wakefield", "Wakefield Cathedral"],
   skipton: ["Skipton Castle"],
   knaresborough: ["Knaresborough Castle", "Mother Shipton's Cave"],
