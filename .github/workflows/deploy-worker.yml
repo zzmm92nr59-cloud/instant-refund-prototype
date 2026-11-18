@@ -60,6 +60,8 @@ jobs:
           node scripts/test-receipt-photo.mjs
           node scripts/test-shop-directory.mjs
           node scripts/test-parcel-tracking.mjs
+          node --check worker/return-tracking.js
+          node scripts/test-return-tracking.mjs
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs

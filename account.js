@@ -901,6 +901,20 @@
     ".rl-ret-go{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;min-height:44px;font-size:15px;font-weight:700;color:var(--rl-accent);text-decoration:none;transition:opacity .12s}.rl-ret-go:active{opacity:.55}.rl-ret-go .rl-jic{margin:0}" +
     ".rl-ret-steps{display:flex;flex-direction:column;gap:4px;margin:4px 0}.rl-ret-steps>span{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--rl-text2)}.rl-ret-steps>span.done{color:var(--rl-accent);font-weight:600}.rl-ret-steps .rl-jic{margin:0;flex:none}" +
     ".rl-rc-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}" +
+    // Return tracking on a receipt's page: the four steps, each with its day and who said so (worker/return-tracking.js).
+    ".rl-rt{display:flex;flex-direction:column;gap:10px;margin:0 0 16px;padding:16px;border-radius:18px;background:var(--rl-card)}" +
+    ".rl-rt-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}" +
+    ".rl-rt-step{position:relative;display:flex;gap:12px;padding:0 0 14px}.rl-rt-step:last-child{padding-bottom:0}" +
+    ".rl-rt-step:not(:last-child)::before{content:'';position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--rl-line)}.rl-rt-step.done:not(:last-child)::before{background:var(--rl-accent)}" +
+    ".rl-rt-dot{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--rl-fill);color:var(--rl-text2)}.rl-rt-step.done .rl-rt-dot{background:var(--rl-accent);color:#fff}" +
+    ".rl-rt-dot .rl-jic{margin:0;color:inherit}.rl-rt-note:empty{display:none}.rl-rt-t{display:flex;flex-direction:column;gap:2px;min-width:0;padding-top:3px}.rl-rt-t b{font-size:16px;line-height:1.3;color:var(--rl-text2);font-weight:600}" +
+    ".rl-rt-step.done .rl-rt-t b{color:var(--rl-text);font-weight:700}.rl-rt-t span{font-size:14px;line-height:1.4;color:var(--rl-text2)}" +
+    ".rl-rt-tn{font-size:14px;line-height:1.4;color:var(--rl-text2);overflow-wrap:anywhere}.rl-rt-tn b{color:var(--rl-text);font-weight:700;letter-spacing:.02em}" +
+    ".rl-rt-nudge{display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:14px;background:#FFF4DB;color:#5C3D00}.rl-rt-nudge b{font-size:16px}.rl-rt-nudge p{margin:0;font-size:14px;line-height:1.45}" +
+    ".rl-rt-note{margin:0;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-rt .rl-po-primary,.rl-rt .rl-po-secondary{flex:none;width:100%;min-height:48px;font-size:15px}" +
+    ".rl-rt-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px;margin:0 0 12px}" +
+    ".rl-rt-pick button{min-height:44px;padding:8px 12px;border-radius:12px;border:1.5px solid var(--rl-line);background:var(--rl-card);color:var(--rl-text);font:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:transform .12s}" +
+    ".rl-rt-pick button:active{transform:scale(.97)}.rl-rt-pick button[aria-pressed=true]{border-color:#101828;background:#101828;color:#fff}" +
     ".rl-pill{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:999px;background:rgba(120,120,128,.16);color:var(--rl-text);font-size:15px;font-weight:700;text-align:center;text-decoration:none;transition:transform .12s,opacity .12s}" +
     ".rl-pill:active{transform:scale(.96)}.rl-pill:disabled{opacity:.5;cursor:default}.rl-pill:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-pill.rl-pill-on{background:var(--lime,#C9D8FF);color:var(--navy,#101828)}" +
     ".rl-rc-ask{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--rl-line)}.rl-rc-ask>span{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.35;color:var(--rl-text)}.rl-rc-ask .rl-pill{padding:0 20px}" +
@@ -3345,16 +3359,19 @@
     } else if (leftText && !opts.inRow) card.appendChild(el("span", { className: "rl-rr-chip " + leftTone, text: leftText, style: "display:inline-block;margin-top:2px" }));
     var rp = x.returnPlan || (x.kind === "return_instructions" ? x : null);
     var prog = x.returnProgress || null;
-    if (!rp && prog) rp = {};
+    if (!rp && prog && !retOf(x)) rp = {};
+    // Shown on its own (not inside a receipt's page, which draws it above): the return's timeline here.
+    if (retOf(x) && !opts.returnShown) card.appendChild(returnBox(x, function () { refresh("return"); }));
     if (rp) {
       var pb = el("div", { className: "rl-ret" });
-      pb.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
+      pb.appendChild(el("b", { className: "rl-ret-h", text: retOf(x) ? "Sending it back" : "Your return" }));
       var pl = function (t, st) { pb.appendChild(el("span", { className: "rl-ret-why", text: t, style: st || "" })); };
       if (rp.deadline) {
         var past = rp.deadline < new Date().toISOString().slice(0, 10);
         pl((past ? "Deadline passed: " : "Return by ") + day(rp.deadline), past ? "" : "color:var(--rl-text);font-weight:600");
       }
-      if (prog) {
+      // With return tracking, the receipt's page shows the steps above this card (returnBox), so they aren't repeated here.
+      if (prog && !retOf(x)) {
         // Where the return has got to, step by step. Each step comes from an email; Relay can't confirm the refund itself.
         var shortDay = function (d) { return d ? " · " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; };
         var pc = prog.parcel, arrived = Boolean(prog.receivedAt || prog.refundedAt || (pc && pc.status === "delivered"));
@@ -8080,6 +8097,191 @@
     if (!items.length) return "Order from " + ((x.retailer && x.retailer.name) || "this shop");
     return headlineItem(x).name + (items.length > 1 ? " + " + (items.length - 1) + " more" : "");
   }
+  // ---- Return tracking (worker/return-tracking.js) ----
+  // Where a return has got to: Return started, Sent back, Received by the shop, Refund issued. Each step has the day and who
+  // said so (a carrier, the shop's email, or "you said"); Relay shows only what it was told.
+  var RET_CARRIERS = ["Royal Mail", "Parcelforce", "Evri", "InPost", "DPD", "Collect+", "Yodel", "DHL", "UPS", "FedEx"];
+  // Only formats that belong to one carrier (as the server's guessCarrier): otherwise the shopper is asked.
+  function retGuessCarrier(tn) {
+    var t = String(tn || "").toUpperCase().replace(/[\s-]+/g, "");
+    return /^[A-Z]{2}\d{9}GB$/.test(t) ? "Royal Mail" : /^JJD\d{12,20}$/.test(t) ? "Yodel" : /^H[0-9A-Z]{15}$/.test(t) && /\d/.test(t.slice(1)) ? "Evri" : null;
+  }
+  function retOf(x) { var t = x && x.returnTracking; return t && t.state && t.steps ? t : null; }
+  function retShop(x) { return (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop"; }
+  // A return under way: started or sent, or at the shop waiting for the refund.
+  function retOpen(x) { var t = retOf(x); return Boolean(t && t.state !== "refunded"); }
+  // One line for a card: where the return has got to.
+  function retLine(x) {
+    var t = retOf(x), who = retShop(x);
+    if (!t) return "";
+    if (t.state === "refunded") { var s = t.steps[3]; return "Refunded" + (s.amountPence != null ? " " + money(s.amountPence, s.currency || "GBP") : ""); }
+    if (t.refundNotSeen) return "Refund not seen yet";
+    if (t.state === "received") return who + " has it, waiting for the refund";
+    if (t.problem) return "Problem with the return parcel";
+    if (t.state === "sent") return "Sent back, on its way to " + who;
+    return "Return started";
+  }
+  function retFrom(f, who) {
+    if (!f) return "";
+    if (f.by === "you") return "You said";
+    if (f.by === "shop") return "From " + possessive(f.name || who) + " email";
+    return "From " + (f.name || "the carrier");
+  }
+  function retStepName(s, who) {
+    if (s.step === "started") return "Return started";
+    if (s.step === "sent") return "Sent back";
+    if (s.step === "received") return "Received by " + who;
+    return s.amountPence != null ? "Refund of " + money(s.amountPence, s.currency || "GBP") + " issued" : "Refund issued";
+  }
+  // Could this receipt be sent back (so "I've sent it back" makes sense)? Not apps or food, not long ago.
+  function retCanSend(x) {
+    if (!x || !x.id || x.kind !== "receipt" || x.category === "digital") return false;
+    if (x.returnable === false && !(x.returnableItems || []).length) return false;
+    return !x.orderDate || Date.now() - Date.parse(String(x.orderDate).slice(0, 10) + "T00:00:00Z") <= 120 * 864e5;
+  }
+  // The return on a receipt's page: its timeline, the tracking number, "Refund not seen yet" when it's due, and "I've sent
+  // it back". On opening, the carrier is asked where the return parcel is (only with a tracking number, only before the shop
+  // has it). changed() runs after the shopper saves something, so the lists behind are drawn again.
+  function returnBox(x, changed) {
+    var box = el("div", { className: "rl-rt" }), who = retShop(x), live = el("p", { className: "rl-rt-note", role: "status" });
+    function draw() {
+      box.textContent = "";
+      var t = retOf(x);
+      if (!t && !retCanSend(x)) { box.style.display = "none"; return; }
+      box.style.display = "";
+      if (t) {
+        box.appendChild(el("b", { className: "rl-ret-h", text: "Your return" }));
+        var list = el("ol", { className: "rl-rt-steps" });
+        t.steps.forEach(function (s) {
+          var when = s.at ? dayWords(s.at) : "", from = retFrom(s.from, who);
+          var sub = s.done && (from || when) ? [from, when].filter(Boolean).join(", ") : "";
+          var name = retStepName(s, who) + (s.step === "sent" && t.state === "sent" && !t.problem ? ", on its way to " + who : "");
+          list.appendChild(el("li", { className: "rl-rt-step" + (s.done ? " done" : "") }, [el("span", { className: "rl-rt-dot" }, [jIc(s.done ? "check" : "dot", 16)]),
+            el("span", { className: "rl-rt-t" }, [el("b", { text: name })].concat(sub ? [el("span", { text: sub })] : []))]));
+        });
+        box.appendChild(list);
+        if (t.problem) box.appendChild(el("p", { className: "rl-rt-note", text: (t.problem.name || "The carrier") + " says there's a problem with the parcel. Check with " + (t.problem.name || "the carrier") + " using the tracking number." }));
+        if (t.refundNotSeen) {
+          var ref = x.orderRef ? String(x.orderRef).replace(/^#/, "") : null;
+          var nudge = el("div", { className: "rl-rt-nudge", role: "note" }, [el("b", { text: "Refund not seen yet" }),
+            el("p", { text: who + " had your return on " + dayWords(t.refundNotSeen.since) + ", and Relay hasn't seen a refund email since. Contact " + who + (ref ? " with your order number, " + ref + "," : "") + " and ask when they'll refund you." })]);
+          var portal = x.returns && /^https:\/\//.test(x.returns.portalUrl || "") ? x.returns.portalUrl : null;
+          if (portal) nudge.appendChild(el("a", { className: "rl-ret-go", href: portal, target: "_blank", rel: "noopener noreferrer", style: "color:inherit" }, [el("span", { text: "Go to " + possessive(who) + " returns page" }), jIc("ext", 18)]));
+          box.appendChild(nudge);
+        }
+        if (t.trackingNumber) {
+          box.appendChild(el("p", { className: "rl-rt-tn" }, [el("span", { text: "Tracking number " }), el("b", { text: t.trackingNumber })].concat(t.carrier ? [el("span", { text: " with " + t.carrier })] : [])));
+          if (t.trackUrl && /^https:\/\//.test(t.trackUrl)) box.appendChild(el("a", { className: "rl-ret-go", href: t.trackUrl, target: "_blank", rel: "noopener noreferrer" }, [el("span", { text: "Track it on " + possessive(t.carrier) + " website" }), jIc("ext", 18)]));
+        }
+        box.appendChild(live);
+      }
+      if (retCanSend(x) && (!t || ((t.state === "started" || t.state === "sent") && !t.returnInTransit) || (t.typed && !t.returnReceived && t.state !== "refunded"))) {
+        var typed = t && t.typed;
+        var b = el("button", { type: "button", className: typed ? "rl-po-secondary" : "rl-po-primary" }, [el("span", { text: typed ? "Change what you told Relay" : "I've sent it back" })]);
+        b.onclick = tapOnce(function () { sentSheet(x, function (body) { if (body && body.returnTracking !== undefined) x.returnTracking = body.returnTracking; draw(); if (changed) changed(); }); });
+        box.appendChild(b);
+      }
+    }
+    draw();
+    // Where the return parcel is, from the carrier, now that its page is open (never on a timer).
+    var t0 = retOf(x);
+    if (t0 && t0.liveTracking && t0.trackingNumber && !memo.returnsLiveOff) {
+      api("/relay/my/receipts/" + x.id + "/return-parcel").then(function (r) {
+        if (!r.ok || !r.body) return;
+        var carrier = t0.carrier || "the carrier";
+        if (r.body.returnTracking) { x.returnTracking = r.body.returnTracking; draw(); }
+        if (r.body.available === false) { memo.returnsLiveOff = true; live.textContent = "Relay can't follow the parcel with " + carrier + " just now, so this shows what the emails and you said."; }
+        else if (r.body.reason === "limit") live.textContent = "Relay can't check with " + carrier + " again this month. You can still track it on " + possessive(carrier) + " website.";
+        else if (r.body.reason === "carrier_unavailable") live.textContent = carrier + " didn't answer just now. Open this again later to see where it is.";
+      }, function () {});
+    }
+    return box;
+  }
+  // "I've sent it back": the tracking number if there is one (pasted or typed), who's carrying it when the number doesn't
+  // say, and the day. done(body) gets the server's answer.
+  function sentSheet(x, done) {
+    var who = retShop(x), t = retOf(x), typed = (t && t.typed) || null;
+    var card = el("div", { className: "rl-sheet rl-fix", role: "dialog", ariaModal: "true", ariaLabel: "I've sent it back" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    var today = new Date().toISOString().slice(0, 10), yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    card.appendChild(el("h2", { text: typed ? "Your return" : "I've sent it back" }));
+    card.appendChild(el("p", { className: "rl-fix-lead", text: "Add the tracking number from your drop-off receipt or the carrier's email if you have one, and Relay follows the parcel back to " + who + "." }));
+    var tn = el("input", { type: "text", id: "rl-rt-tn", value: (typed && typed.trackingNumber) || "", maxLength: 60, autocomplete: "off", enterKeyHint: "done", placeholder: "For example KO123456789GB" });
+    tn.setAttribute("autocapitalize", "characters"); tn.setAttribute("spellcheck", "false");
+    card.appendChild(el("label", { className: "rl-fix-f" }, [el("span", { text: "Tracking number (optional)" }), tn]));
+    // Who's carrying it: asked only when there's a number whose format doesn't say.
+    var carrier = (typed && typed.carrier) || null, chosen = Boolean(carrier);
+    var carrierBox = el("div"), pick = el("div", { className: "rl-rt-pick", role: "group", ariaLabel: "Who's carrying it" });
+    carrierBox.appendChild(el("span", { className: "rl-fix-h", text: "Who's carrying it?", style: "display:block;margin:0 0 8px" }));
+    carrierBox.appendChild(pick);
+    RET_CARRIERS.concat(["Not sure"]).forEach(function (c) {
+      var b = el("button", { type: "button", text: c });
+      b.onclick = function () { carrier = c === "Not sure" ? null : c; chosen = true; mark(); };
+      pick.appendChild(b);
+    });
+    function mark() { Array.prototype.forEach.call(pick.children, function (b) { b.setAttribute("aria-pressed", String(chosen && (b.textContent === carrier || (!carrier && b.textContent === "Not sure")))); }); }
+    function showCarrier() {
+      var v = tn.value.trim(), g = retGuessCarrier(v);
+      if (g && !chosen) carrier = g;
+      carrierBox.style.display = v && (!g || chosen) ? "" : "none";
+      mark();
+    }
+    tn.addEventListener("input", function () { if (!chosen) carrier = null; showCarrier(); });
+    card.appendChild(carrierBox);
+    // The day it went: today, yesterday or another day.
+    var sentOn = (typed && typed.sentOn) || today;
+    var dayPick = el("div", { className: "rl-rt-pick", role: "group", ariaLabel: "When you sent it", style: "grid-template-columns:repeat(auto-fill,minmax(96px,1fr))" });
+    var other = el("input", { type: "date", max: today, min: /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? x.orderDate : "2020-01-01", value: sentOn });
+    var otherF = el("label", { className: "rl-fix-f" }, [el("span", { text: "The day you sent it" }), other]);
+    [["Today", today], ["Yesterday", yesterday], ["Another day", null]].forEach(function (d) {
+      var b = el("button", { type: "button", text: d[0] });
+      b.onclick = function () { sentOn = d[1] || other.value || yesterday; markDay(d[1] === null); };
+      dayPick.appendChild(b);
+    });
+    var otherOn = sentOn !== today && sentOn !== yesterday;
+    function markDay(showOther) {
+      otherOn = showOther; otherF.style.display = otherOn ? "" : "none";
+      Array.prototype.forEach.call(dayPick.children, function (b, i) { b.setAttribute("aria-pressed", String(otherOn ? i === 2 : (i === 0 ? sentOn === today : i === 1 ? sentOn === yesterday : false))); });
+      if (otherOn) other.value = sentOn;
+    }
+    other.addEventListener("change", function () { if (other.value) sentOn = other.value; });
+    card.appendChild(el("span", { className: "rl-fix-h", text: "When did you send it?", style: "display:block;margin:0 0 8px" }));
+    card.appendChild(dayPick); card.appendChild(otherF);
+    var note = el("p", { className: "rl-msg" }); note.setAttribute("role", "status");
+    var save = el("button", { type: "button", className: "rl-btn", text: "Save" });
+    card.appendChild(note); card.appendChild(save);
+    var undo = typed ? el("button", { type: "button", className: "rl-btn ghost", text: "I haven't sent it back" }) : null;
+    if (undo) card.appendChild(undo);
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    var busy = false;
+    var words = { bad_tracking_number: "That doesn't look like a tracking number. Check it, or leave it empty.", bad_carrier: "Pick who's carrying it, or Not sure.",
+      bad_date: "Pick the day you sent it: today or earlier, and after you ordered.", too_many_requests: "That's been changed a lot today. Please try again tomorrow." };
+    function send(body) {
+      if (busy) return;
+      busy = true; save.disabled = true; if (undo) undo.disabled = true; say(note, "");
+      api("/relay/my/receipts/" + x.id + "/return-sent", { method: "POST", body: body }).then(function (r) {
+        busy = false; save.disabled = false; if (undo) undo.disabled = false;
+        if (!r.ok) return say(note, r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : words[r.body && r.body.error] || "Couldn't save that. Please try again.", true);
+        shut(); done(r.body || {});
+      }, function () { busy = false; save.disabled = false; if (undo) undo.disabled = false; say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    save.onclick = function () {
+      var v = tn.value.toUpperCase().replace(/[\s-]+/g, "");
+      if (v && !/^[A-Z0-9]{8,40}$/.test(v)) return say(note, words.bad_tracking_number, true);
+      if (otherOn && other.value) sentOn = other.value;
+      if (!sentOn || sentOn > today) return say(note, words.bad_date, true);
+      var body = { sentOn: sentOn };
+      if (v) { body.trackingNumber = v; if (carrier) body.carrier = carrier; }
+      send(body);
+    };
+    if (undo) undo.onclick = function () { send({ undo: true }); };
+    showCarrier(); markDay(otherOn);
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+  }
   // A purchase found in an email receipt: the shop handles the return, so Relay links to it and shows the deadline and parcel.
   // The card says what it is, where it's from, the price and the time left to send it back; tapping it opens its page
   // (a sheet) with what you can do: start the return, say you're sending it back, see the receipt.
@@ -8105,7 +8307,9 @@
       el("div", { className: "rl-po-head" }, [el("h3", { className: "rl-po-brand", text: title }), el("div", { className: "rl-po-price", text: price })]),
       el("div", { className: "rl-po-meta", text: under })]);
     var dv = x.delivery, showShip = Boolean(dv && dv.status && (dv.status === "delivered" || freshDelivery(x)));
-    if (showShip) info.appendChild(shipLine(dv));
+    // A return under way says where it has got to instead of the parcel that came.
+    if (retOf(x)) info.appendChild(el("div", { className: "rl-po-ship" + (retOf(x).state === "refunded" ? " done" : "") }, [jIc(retOf(x).state === "refunded" ? "check" : "ret", 17), el("span", { text: retLine(x) })]));
+    else if (showShip) info.appendChild(shipLine(dv));
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var dl = statedDeadline(x);
     if (opts.deadline !== false && dl) card.appendChild(dueBar(dl, deadlineLead(x, dl, "Return by "), dueFrom(x)));
@@ -8132,10 +8336,11 @@
         if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
           acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
             open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
-        else if (opts.actions !== false && portal)
+        else if (opts.actions !== false && portal && !(retOf(x) && retOf(x).state !== "started"))
           acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sh) { returnGuide(sh, x, who, portal); }); } }));
         // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
-        if (opts.markable && x.id) {
+        // (Not once Relay is following the return: its page then says where the return has got to, below.)
+        if (opts.markable && x.id && !(retOf(x) && retOf(x).state !== "started")) {
           var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
           if (!idxs.length) idxs = [0];
           var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
@@ -8149,7 +8354,9 @@
           acts.appendChild(mark);
         }
         if (acts.childNodes.length) sheet.appendChild(acts);
-        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true, { noPortal: Boolean(portal && opts.actions !== false) }));
+        // Where the return has got to, and "I've sent it back" (return tracking).
+        sheet.appendChild(returnBox(x, function () { if (opts.changed) opts.changed(); }));
+        sheet.appendChild(receiptCard(x, function (kind) { if (opts.changed) opts.changed(); if (kind === "dismiss") setTimeout(close, 900); }, true, { noPortal: Boolean(portal && opts.actions !== false), returnShown: true }));
         // The order's details, one to a line.
         var facts = el("div", { className: "rl-dt-facts" });
         var fact = function (k, v) { if (v) facts.appendChild(el("div", { className: "rl-dt-fact" }, [el("span", { text: k }), el("b", { text: v })])); };
@@ -9174,8 +9381,8 @@
       // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
       var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
       if (keep.length) named = keep.concat(named.filter(function (i) { return keep.indexOf(i) < 0; }));
-      var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress;
-      var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p;
+      var dl = deadlineOf(x), stated = statedDeadline(x), dv = x.delivery, p = x.returnProgress, rt = retOf(x);
+      var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p && !rt;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
         noReturn: x.returnable === false && !(x.returnableItems || []).length, digital: x.category === "digital",
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who };
@@ -9183,7 +9390,12 @@
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
         : [{ name: named.length ? named[0].name : who, price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
-      if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
+      // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.
+      if (rt) {
+        e.line = retLine(x); e.returning = rt.state !== "refunded"; e.swaps = e.returning; e.rank = e.returning ? 1 : 2; e.nudge = Boolean(rt.refundNotSeen);
+        e.tag = rt.refundNotSeen ? "Refund not seen yet" : rt.state === "refunded" ? "Refunded" : rt.state === "received" ? "At the shop" : rt.state === "sent" ? "Sent back" : "Return started";
+      }
+      else if (p) { e.line = p.refundedAt ? "Refunded" + (p.refundPence != null ? " " + money(p.refundPence, p.currency || "GBP") : "")
           : p.receivedAt || (p.parcel && p.parcel.status === "delivered") ? "Back at the shop, waiting for the refund" : "Sent back, on its way to the shop";
         e.swaps = !p.refundedAt; e.rank = p.refundedAt ? 2 : 1; }
       else if (canGoBack && stated && daysLeft(stated) <= 7) { e.line = "Return by " + dayWords(stated); soon(e, stated); }
@@ -9409,7 +9621,8 @@
       // purchase is always there to see (Connor, 15 Nov); apps and subscriptions never do.
       var weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
       if (homeLook() !== "cards") all = all.filter(function (e) { return e.onWay || e.swaps || (!e.digital && (!e.noReturn || String(e.at || "").slice(0, 10) >= weekAgo)); });
-      var sets = { you: all, back: all.filter(function (e) { return e.toReturn; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
+      // "To return": what can still go back, and returns on their way (with where each has got to).
+      var sets = { you: all, back: all.filter(function (e) { return e.toReturn || e.returning; }), way: all.filter(function (e) { return e.onWay; }), swaps: all.filter(function (e) { return e.swaps; }), watch: watched };
       // "To return" runs soonest date first; the others keep the feed's order.
       sets.back.sort(function (a, b) { return a.when === b.when ? 0 : !a.when ? 1 : !b.when ? -1 : a.when < b.when ? -1 : 1; });
       if (!sets[state.pick] || (state.pick !== "you" && state.pick !== "watch" && !sets[state.pick].length)) state.pick = "you";
@@ -9494,6 +9707,12 @@
         else if (e.rank === 0 && e.strip && e.when) {
           used[e.key] = 1; var d = daysLeft(e.when);
           needs.push({ u: d === null ? 7 : d, card: feedCard({ small: true, line: cleanName(e.title, e.shop) || e.shop, sub: "Return to " + e.shop + " by " + dayWords(e.when), strip: e.strip, stripKind: e.stripKind, open: e.open }) });
+        }
+        // Returns Relay is following: a refund not seen 14 days after the shop had it comes near the top; the others,
+        // with where each has got to, after the return dates.
+        else if (e.returning) {
+          used[e.key] = 1;
+          needs.push({ u: e.nudge ? 1.5 : 7.5, card: feedCard({ small: true, line: e.line, sub: [e.shop, cleanName(e.title, e.shop)].filter(Boolean).join(", "), open: e.open }) });
         }
       });
       if (state.wins.length) needs.push({ u: 0.5, card: winsCard() });

@@ -123,6 +123,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-delivery-ui.mjs
+      - name: Test return tracking in the app (Needs you and To return show returns in progress, the receipt's timeline with who said so, Refund not seen yet, I've sent it back once per tap, the carrier asked only on opening)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-return-tracking-ui.mjs
       - name: Test auctions in the app (a tile while live, one-tap cards, delivery details first, one bid per tap, a win to pay for first with the shop's own link)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-auctions-ui.mjs
       - name: Test the layout everyone has (the Ask tab, pictures in their tiles, the three looks, interests, and the old next.html address)

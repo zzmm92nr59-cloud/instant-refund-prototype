@@ -8,6 +8,7 @@
 //    order number or what they bought.
 //  * Only for a parcel on one of the shopper's own receipts, not yet delivered, ordered in the last 30 days, and only when
 //    they open that purchase's page. Nothing runs on a timer.
+//  * Return parcels (return-tracking.js) go through trackNumber below too, under these same rules and allowance.
 //  * Ship24's free plan covers 10 new parcels a month for all of Relay, so each new tracking number counts once
 //    (PARCEL_TRACKS_PER_MONTH, 10 unless set) and each shopper starts at most 3 a month. A parcel already being tracked
 //    is looked up again at most every 2 hours (10 minutes while the carrier has no news yet), and never after it's delivered.
@@ -85,15 +86,26 @@ async function ask(env, fetchImpl, url, init) {
 
 // The parcel on one of the shopper's receipts. `order` comes from their own receipts list, so it is theirs.
 export async function liveParcel(env, shopperId, order, o = {}) {
-  const now = o.now || Date.now(), fetchImpl = o.fetchImpl || fetch, db = env.RELAY_DB;
-  const today = new Date(now).toISOString().slice(0, 10);
+  const now = o.now || Date.now();
   if (!trackingAvailable(env)) return { available: false, delivery: null };
   const dv = order && order.delivery, tn = dv && String(dv.trackingNumber || "").toUpperCase();
   const recent = order && day(order.orderDate) && now - Date.parse(day(order.orderDate)) <= 30 * DAY;
   if (!dv || !TRACKING_NUMBER.test(tn) || dv.status === "delivered" || !recent) return { available: true, delivery: null, reason: "not_tracked" };
+  const r = await trackNumber(env, shopperId, tn, dv.carrier, { ...o, now });
+  if (!r.row) return { available: true, delivery: null, reason: r.reason };
+  return { available: true, delivery: r.row.status ? { ...dv, status: r.row.status, at: r.row.at || null, live: true } : null };
+}
+
+// One tracking number, for one shopper: what the carrier says, under the same rules and the same monthly allowance for
+// every kind of parcel (a delivery, or a return on its way back to the shop: return-tracking.js). The caller has checked
+// that the parcel is on one of the shopper's own receipts and still worth asking about.
+// Answers { row } (row.status is null while the carrier has no news), or { row: null, reason } ("limit", "carrier_unavailable").
+export async function trackNumber(env, shopperId, number, carrier, o = {}) {
+  const now = o.now || Date.now(), fetchImpl = o.fetchImpl || fetch, db = env.RELAY_DB;
+  const today = new Date(now).toISOString().slice(0, 10), tn = String(number || "").toUpperCase();
   await db.batch([db.prepare(PARCEL_TRACKS_SQL), db.prepare(PARCEL_USES_SQL)]);
   const mine = await db.prepare("SELECT status, at, checked_at, created_at FROM parcel_tracks WHERE shopper_id = ? AND tracking_number = ?").bind(shopperId, tn).first();
-  const answer = (row) => ({ available: true, delivery: row && row.status ? { ...dv, status: row.status, at: row.at || null, live: true } : null });
+  const answer = (row) => ({ row: row || { status: null, at: null } });
   if (mine && (FINAL.has(mine.status) || now - mine.checked_at < (mine.status ? AGAIN_AFTER : NO_NEWS_AGAIN))) return answer(mine);
 
   // Tracked before (by anyone): look up the results again, which doesn't count as a new parcel.
@@ -103,17 +115,17 @@ export async function liveParcel(env, shopperId, order, o = {}) {
   else {
     const month = today.slice(0, 7), cap = Math.max(0, Number(env.PARCEL_TRACKS_PER_MONTH) || 10);
     const theirs = await db.prepare("SELECT COUNT(*) AS n FROM parcel_tracks WHERE shopper_id = ? AND created_at > ?").bind(shopperId, now - 30 * DAY).first();
-    if (theirs && theirs.n >= PER_SHOPPER) return { available: true, delivery: null, reason: "limit" };
+    if (theirs && theirs.n >= PER_SHOPPER) return { row: null, reason: "limit" };
     // Counted before asking, and only while under the month's allowance (one statement, so two at once can't both slip in).
     const took = await db.prepare(`INSERT INTO parcel_track_uses (month, n) VALUES (?, 1) ON CONFLICT(month) DO UPDATE SET n = n + 1 WHERE n < ?`)
       .bind(month, cap).run();
-    if (!cap || !took.meta || !took.meta.changes) return { available: true, delivery: null, reason: "limit" };
-    const courier = courierCode(dv.carrier);
+    if (!cap || !took.meta || !took.meta.changes) return { row: null, reason: "limit" };
+    const courier = courierCode(carrier);
     res = await ask(env, fetchImpl, `${API}/trackers/track`, { method: "POST", body: JSON.stringify({ trackingNumber: tn, destinationCountryCode: "GB", ...(courier ? { courierCode: [courier] } : {}) }) });
   }
   if (!res.ok) {
     if (mine) return answer(mine);
-    return { available: true, delivery: null, reason: "carrier_unavailable" };
+    return { row: null, reason: "carrier_unavailable" };
   }
   const got = readShip24(res.body, today);
   await db.prepare(`INSERT INTO parcel_tracks (shopper_id, tracking_number, status, at, checked_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
