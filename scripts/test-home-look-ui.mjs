@@ -7,6 +7,7 @@
 // own page, with the countdown, Start return (when the shop has a returns page) and "I'm sending this back". From Home,
 // All receipts, the bell (Price alerts, with how many things are watched) and, through Receipts and Browse, Returns &
 // swaps and Wrapped each open their page. Every screen passes the polish rules in light and dark.
+import { buildWrapped } from "../worker/wrapped.js";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 import { skipInterests, homeCard, openHomeCard, closeSheet, openReceiptKind, goTab, bigCards } from "./relay-places.mjs";
@@ -53,7 +54,10 @@ await ctx.route("https://**/*", async route => {
   if (p === "/relay/my/purchases") return j({ purchases: [] });
   if (p === "/relay/my/profile") return j({ email: EMAIL, name: "Jess Tester", photo: null });
   if (p === "/relay/my/alerts/status") return j({ devices: 0, stores: [], watches: [{ sku: "shopify:fernway.example:101", product: "Linen Notebook", variant: "A5", lastSeenMinor: 1800 }, { sku: "shopify:fernway.example:102", product: "Desk Lamp", variant: "", lastSeenMinor: 4500 }] });
-  if (p === "/relay/my/wrapped") return j({ year: new Date().getFullYear(), receipts: 4, spentPence: 29800, years: [{ year: new Date().getFullYear(), receipts: 4 }], industries: [], coverage: {} });
+  // A real Wrapped, built by the server's own code from two made-up receipts, so the story can play.
+  if (p === "/relay/my/wrapped") return j(buildWrapped([
+    { id: "w1", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderDate: new Date().getFullYear() + "-03-02", totalPence: 8500, category: "fashion", items: [{ name: "Court Classic Trainers", pricePence: 8500, qty: 1 }] },
+    { id: "w2", retailer: { name: "Larkspur Home", domain: "larkspur.example" }, orderDate: new Date().getFullYear() + "-05-02", totalPence: 6000, category: "home", items: [{ name: "Brass Table Lamp", pricePence: 6000, qty: 1 }] }], new Date().getFullYear()));
   return j({});
 });
 const page = await ctx.newPage(); const errors = []; page.on("pageerror", e => errors.push(String(e)));
@@ -225,6 +229,12 @@ for (const look of ["today", "wallet"]) {
     await page.locator("#view .h2-chip", { hasText: "Watching" }).click();
     await page.getByText("Nothing watched yet.", { exact: false }).waitFor();
     await page.locator("#view .h2-chip", { hasText: "For you" }).click(); await page.locator(".hl-sq").first().waitFor();
+    // Wrapped on Home plays this year's story straight away, not a page first (Connor, 18 Nov 2026).
+    await page.waitForTimeout(450);
+    await page.locator("#view .h2-chip", { hasText: "Wrapped" }).click();
+    await page.locator(".rl-story[role=dialog]").waitFor();
+    assert.notEqual(await page.evaluate(() => window.page), "wrapped", "no page in between");
+    await page.locator(".rl-story-x").click(); await page.locator(".rl-story").waitFor({ state: "detached" });
   }
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Match Masters" }).count(), 0, look + ": an app that can't be returned isn't on Home");
   assert.equal(await page.locator("#homePage .h2-feed", { hasText: "Vertuo Pods" }).count(), 1, look + ": something bought this week is on Home, even if it can't go back");
