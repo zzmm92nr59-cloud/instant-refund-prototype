@@ -45,6 +45,7 @@ jobs:
           node scripts/test-receipt-reader.mjs
           node scripts/test-wrapped.mjs
           node scripts/test-wrapped-better.mjs
+          node scripts/test-wrapped-journeys.mjs
           node scripts/test-gmail.mjs
           node scripts/test-return-policies.mjs
           node scripts/test-gifts.mjs
