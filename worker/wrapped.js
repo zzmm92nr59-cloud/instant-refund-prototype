@@ -1,7 +1,9 @@
 // Builds a shopper's "Wrapped" from the receipts Relay has captured for them. Nothing here is invented:
 // a receipt with no readable total is counted but never added to spending, and the answer says how many were left out.
-import { PERSONAL_MAIL, CATEGORIES, itemKind, categoryShares, isGrocer, lastingThing, knownShop } from "./receipt-category.js";
+import { PERSONAL_MAIL, CATEGORIES, itemKind, itemKinds, categoryShares, isGrocer, lastingThing, knownShop } from "./receipt-category.js";
+import KindCore from "./item-kind-core.js";
 import { placeAt } from "./uk-places.js";
+import { attractionsFor, placeTitle } from "./uk-attractions.js";
 // A name for someone whose year was mostly one kind of shopping. Plain and kind, never a judgement.
 const KIND_LABEL = { digital: "The Digital Native", food: "The Foodie", fashion: "The Style Seeker", electronics: "The Gadget Lover",
   home: "The Nester", beauty: "The Self-Care Pro", travel: "The Wanderer" };
@@ -14,6 +16,18 @@ const THINGS = new Set(["fashion", "electronics", "home", "beauty", "other"]);
 // Lines some shops print among the items that aren't things bought: savings, credits, charges and labels.
 const NOT_A_THING = /^(you('ve| have)?\s+saved?|you\s+save|saved?|savings?|was|now|rrp|credit|credits|discount|voucher|promo(tion)?( code)?|offer|multi-?buy|delivery|service( fee| charge)?|bag charge|carrier bag|tip|total|sub-?total|vat|balance|deposit|nectar|clubcard|points?|apple\s?pay|google\s?pay|paypal|visa|mastercard|amex|card payment|gift card balance)\b|:\s*$/i;
 const itemName = (it) => { const n = it && typeof it.name === "string" ? it.name.trim() : ""; return n.length > 1 && n.length <= 80 && !NOT_A_THING.test(n) ? n : null; };
+// What each thing on a receipt is (item-kind-core.js): what the receipts list already worked out for it (with the AI's answer
+// for shoppers who switched AI on), else read here from its name and the shop.
+function thingsOf(c) {
+  const items = Array.isArray(c && c.items) ? c.items : [];
+  let worked = null;
+  return items.map((it, i) => {
+    if (it && typeof it.kind === "string" && KindCore.KIND_LIST[it.kind])
+      return { kind: it.kind, group: KindCore.KIND_LIST[it.kind].group, confidence: it.kindSure ? (it.kindAi ? "ai" : "high") : "medium", lasting: it.lasting === true };
+    if (!worked) worked = itemKinds(c);
+    return worked[i];
+  });
+}
 
 function whenOf(card) {
   if (card.orderDate && /^\d{4}-\d{2}-\d{2}$/.test(card.orderDate)) return card.orderDate;
@@ -50,7 +64,8 @@ function partsOf(c) {
 // counts as what it is.
 function asGroceries(c) {
   if (!c || !isGrocer(c)) return c;
-  const items = Array.isArray(c.items) ? c.items.map(it => (!it || typeof it.category !== "string" || it.category === "food" || lastingThing(it.name, it.category) ? it : { ...it, category: "food", kindOwn: it.category })) : c.items;
+  const kinds = thingsOf(c);
+  const items = Array.isArray(c.items) ? c.items.map((it, i) => (!it || typeof it.category !== "string" || it.category === "food" || (kinds[i] ? KindCore.isLasting(kinds[i]) : lastingThing(it.name)) ? it : { ...it, category: "food", kindOwn: it.category })) : c.items;
   const lasting = (items || []).some(it => it && it.category && it.category !== "food");
   return { ...c, items, ...(!lasting && c.category !== "food" ? { category: "food", categoryLabel: CATEGORIES.food } : {}) };
 }
@@ -169,7 +184,12 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // someone else says nothing about your own style, so gifts are left out.
   for (const c of mine) {
     if (forwarded(c) || c.gift) continue;
-    for (const it of (c.items || [])) { const n = itemName(it); if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, kind: kindOfItem(it, c), variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null }); }
+    const kinds = thingsOf(c);
+    (c.items || []).forEach((it, i) => {
+      const n = itemName(it), t = kinds[i];
+      // Its drawn icon comes from what it is ("thing"), only when that is sure.
+      if (n && THINGS.has(kindOfItem(it, c)) && things.length < 300) things.push({ name: n, kind: kindOfItem(it, c), thing: t && (t.confidence === "high" || t.confidence === "ai") ? t.kind : null, variant: typeof it.variant === "string" ? it.variant.slice(0, 80) : null, shop: shopName(c), pricePence: Number.isInteger(it.pricePence) ? it.pricePence : null });
+    });
   }
   // ---- The Spotify-style parts, each counted straight from the receipts. ----
   // Your year's list (like "Your Top Songs"): every named thing, ranked by how many separate orders it was in, then spend.
@@ -297,23 +317,27 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   };
 }
 
-// The story opens on the first thing worth remembering, not the first bottle of water: the year's first thing (clothes,
-// tech, something for the home, a beauty buy, tickets) with a name, from a shop rather than a forwarded email, and never
-// a supermarket's groceries. Within a month of that, one with a photo of it is preferred. Null when there is none (the
-// story then opens with the count instead). Nothing is made up: the shop, the thing and the date are the receipt's.
-const KEEPSAKE = new Set(["fashion", "electronics", "home", "beauty", "experiences"]);
+// The story opens on the first thing worth remembering, not the first bottle of water or bag of sweets (Connor, 18 Nov
+// 2026): the year's first thing that is kept rather than used up (clothes, shoes, a bag, tech, something for the home, a
+// toy, a book, sports kit), by item-kind-core.js and sure of it (the thing's own name says so, or the AI did for shoppers who
+// switched it on), from a shop rather than a forwarded email. Food, drink, toiletries, beauty, tickets, travel and apps never
+// open it. Within a month of that, one with a photo of it is preferred. Null when there is none: the story then opens with
+// the count. Nothing is made up: the shop, the thing and the date are the receipt's; `thing` is what it is, for its icon.
+const GROCER = /\b(sainsbury'?s?|tesco|asda|morrisons|aldi|lidl|waitrose|co-?op|iceland|ocado|m ?& ?s food|spar|budgens|farmfoods|deliveroo|just ?eat|uber ?eats|greggs|pret|costa|starbucks|nespresso)\b/i;
+const OPENS = new Set(["clothing", "footwear", "accessories", "electronics", "home", "toys_hobbies", "books_media", "sport_outdoor"]);
 function memorableFirst(list) {
   const found = [];
   const sorted = list.slice().sort((a, b) => whenOf(a).localeCompare(whenOf(b)) || (a.createdAt || 0) - (b.createdAt || 0));
   for (const c of sorted) {
     if (PERSONAL_MAIL.test(String((c.retailer && c.retailer.domain) || ""))) continue;
-    const grocer = isGrocer(c);
-    for (const it of (c.items || [])) {
-      const n = itemName(it), k = kindOfItem(it, c);
-      if (!n || !KEEPSAKE.has(k) || !/[a-z]{3}/i.test(n)) continue;
-      // From a supermarket only something that lasts; from anywhere, never what gets used up (kitchen roll, refills).
-      if (grocer ? !lastingThing(n, k) : (k === "home" || k === "electronics") && !lastingThing(n, k)) continue;
-      found.push({ c, n, k }); break;
+    // Nothing from a supermarket, a takeaway or a food shop opens the story, however its line reads (Connor, 18 Nov 2026:
+    // "Highland Game Venison Grillsteaks 300g" read as a game). Most of what they sell is eaten.
+    if (c.category === "food" || GROCER.test(shopName(c) + " " + String((c.retailer && c.retailer.domain) || ""))) continue;
+    const kinds = thingsOf(c);
+    for (let i = 0; i < (c.items || []).length; i++) {
+      const n = itemName(c.items[i]), t = kinds[i];
+      if (!n || !t || !OPENS.has(t.kind) || !KindCore.isLasting(t) || !/[a-z]{3}/i.test(n)) continue;
+      found.push({ c, n, k: t.group, thing: t.kind }); break;
     }
     if (found.length >= 40) break;
   }
@@ -321,7 +345,7 @@ function memorableFirst(list) {
   const limit = Date.parse(whenOf(found[0].c)) + 31 * 864e5;
   const hasPhoto = (f) => Boolean(f.c.hasImage && f.c.id && THINGS.has(f.c.category || "other") && itemName((f.c.items || [])[0]) === f.n);
   const pick = found.find(f => Date.parse(whenOf(f.c)) <= limit && hasPhoto(f)) || found[0];
-  return { shop: shopName(pick.c), item: pick.n, kind: pick.k, date: whenOf(pick.c), photoId: hasPhoto(pick) ? pick.c.id : null };
+  return { shop: shopName(pick.c), item: pick.n, kind: pick.k, thing: pick.thing, date: whenOf(pick.c), photoId: hasPhoto(pick) ? pick.c.id : null };
 }
 
 // Travel: the journeys the receipts name ("London Euston to Manchester Piccadilly", read from a booking's items or its
@@ -331,7 +355,7 @@ function memorableFirst(list) {
 const RAIL = new Set("trainline lner avanti avantiwestcoast gwr southeastern southernrailway thameslink northernrailway transpennine tpexpress crosscountry scotrail c2c greateranglia chilternrailways lumo grandcentral hulltrains eurostar nationalrail heathrowexpress gatwickexpress stanstedexpress".split(" "));
 const AIR = new Set("ryanair easyjet britishairways ba jet2 wizzair virginatlantic emirates qatarairways klm airfrance lufthansa loganair aerlingus vueling iberia norwegian turkishairlines".split(" "));
 const COACH = new Set("megabus nationalexpress flixbus".split(" "));
-const JOURNEY = /^\s*(?:from\s+)?(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s+(?:to|→|->)\s+(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s*(\((return|single|open return)\))?\s*$/u;
+const JOURNEY = /^\s*(?:from\s+)?(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s+(?:to|→|->)\s+(\p{Lu}[\p{L}0-9 .'’&-]{1,48}?)\s*(\(([Rr]eturn|[Ss]ingle|[Oo]pen [Rr]eturn)\))?\s*$/u;
 export function journeysOf(c) {
   const out = [];
   const shop = knownShop(c), key = shop && shop.key;
@@ -360,6 +384,21 @@ function travelOf(list) {
   const known = [], unknown = [];
   for (const p of places.values()) { const at = placeAt(p.name); if (at) known.push({ name: p.name, lat: at.lat, lon: at.lon, visits: p.visits }); else unknown.push(p.name); }
   const by = (m) => trips.filter(t => t.mode === m).reduce((n, t) => n + (t.return ? 2 : 1), 0);
+  // The journeys one at a time, in the order they were made, for the story to take the shopper on each (the first six; the
+  // rest are counted). Each end has its place on the map when Relay knows where it is.
+  const at = (name) => { const p = placeAt(name); return p ? { lat: p.lat, lon: p.lon } : null; };
+  const inOrder = trips.slice().sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+  const TRIPS_SHOWN = 6;
+  // "Did you visit?": the places the journeys went to that have well-known sights listed (uk-attractions.js), most visited
+  // first, at most two. Only ever asked, never said: a ticket there doesn't mean the shopper saw any of it.
+  const dest = new Map();
+  inOrder.forEach((t, i) => {
+    const a = attractionsFor(t.to);
+    if (!a) return;
+    const e = dest.get(a.place) || { place: placeTitle(a.place), attractions: a.attractions, times: 0, first: i, date: t.date };
+    e.times++; dest.set(a.place, e);
+  });
+  const visits = [...dest.values()].sort((a, b) => b.times - a.times || a.first - b.first).slice(0, 2).map(v => ({ place: v.place, attractions: v.attractions, date: v.date }));
   return {
     // A return ticket is two journeys: there and back.
     journeys: trips.reduce((n, t) => n + (t.return ? 2 : 1), 0), bookings: trips.length,
@@ -367,6 +406,8 @@ function travelOf(list) {
     routes: ranked.slice(0, 12).map(r => ({ from: r.from, to: r.to, times: r.times, mode: r.mode })),
     topRoute: ranked[0] && ranked[0].times >= 2 ? { from: ranked[0].from, to: ranked[0].to, times: ranked[0].times } : null,
     places: known.sort((a, b) => b.visits - a.visits).slice(0, 30), unplotted: unknown.slice(0, 10),
+    trips: inOrder.slice(0, TRIPS_SHOWN).map(t => ({ from: t.from, to: t.to, date: t.date, mode: t.mode, return: t.return, fromAt: at(t.from), toAt: at(t.to) })),
+    moreTrips: Math.max(0, inOrder.length - TRIPS_SHOWN), visits,
   };
 }
 
