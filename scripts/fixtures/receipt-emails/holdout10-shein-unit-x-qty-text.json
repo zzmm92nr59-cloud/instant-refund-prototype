@@ -1,0 +1,38 @@
+{
+ "id": "holdout10-shein-unit-x-qty-text",
+ "sender": "SHEIN",
+ "layout": "text: name, 'Size: L', '£14.99 x 2' (unit times how many, no line price)",
+ "headers": {
+  "from": "SHEIN <noreply@shein.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your SHEIN order GSUK99887ABC",
+  "date": "Thu, 5 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "SHEIN\nThanks for shopping with SHEIN!\nOrder Number: GSUK99887ABC\nOrder Date: 05/11/2026\n\nSHEIN Teddy Fleece Hoodie\nSize: L\n£14.99 x 2\nSHEIN Fluffy Slipper Socks 5 Pairs\n£5.99 x 1\n\nRetail Price: £35.97\nShipping Fee: £3.99\nCoupon Saving: -£2.00\nOrder Total: £37.96",
+ "expected": {
+  "shop": "SHEIN",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "SHEIN Teddy Fleece Hoodie",
+    "qty": 2,
+    "linePence": 2998,
+    "extras": [
+     "L"
+    ]
+   },
+   {
+    "name": "SHEIN Fluffy Slipper Socks 5 Pairs",
+    "qty": 1,
+    "linePence": 599
+   }
+  ],
+  "subtotalPence": 3597,
+  "feesPence": 399,
+  "discountsPence": 200,
+  "tipsPence": 0,
+  "totalPence": 3796
+ }
+}

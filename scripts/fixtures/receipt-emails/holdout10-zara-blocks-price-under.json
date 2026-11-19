@@ -1,0 +1,41 @@
+{
+ "id": "holdout10-zara-blocks-price-under",
+ "sender": "Zara",
+ "layout": "blocks: NAME, price, 'XS | BLACK', '1 UNIT'",
+ "headers": {
+  "from": "ZARA <noreply@zara.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your order",
+  "date": "Fri, 6 Nov 2026 18:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Zara</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.zara.com/?utm_source=email\"><img src=\"https://www.zara.com/static/email/logo.png\" alt=\"Zara\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>THANK YOU FOR YOUR ORDER</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>ORDER NO. 52099001122</p><p>06/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p><b>RIBBED KNIT MIDI DRESS</b></p><p>£35.99</p><p>XS | BLACK</p><p>1 UNIT</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p><b>FAUX LEATHER BIKER JACKET</b></p><p>£59.99</p><p>S | BLACK</p><p>1 UNIT</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£95.98</td></tr><tr><td>Standard delivery</td><td align=\"right\">£3.99</td></tr><tr><td>Student discount</td><td align=\"right\">-£9.60</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£90.37</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Zara. All rights reserved.<br /><a href=\"https://www.zara.com/help\">Help</a> | <a href=\"https://www.zara.com/privacy\">Privacy</a> | <a href=\"https://www.zara.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.zara.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Zara",
+  "date": "2026-11-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "RIBBED KNIT MIDI DRESS",
+    "qty": 1,
+    "linePence": 3599,
+    "extras": [
+     "XS"
+    ]
+   },
+   {
+    "name": "FAUX LEATHER BIKER JACKET",
+    "qty": 1,
+    "linePence": 5999,
+    "extras": [
+     "S"
+    ]
+   }
+  ],
+  "subtotalPence": 9598,
+  "feesPence": 399,
+  "discountsPence": 960,
+  "tipsPence": 0,
+  "totalPence": 9037
+ }
+}

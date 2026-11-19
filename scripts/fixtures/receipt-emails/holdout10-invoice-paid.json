@@ -1,0 +1,35 @@
+{
+ "id": "holdout10-invoice-paid",
+ "sender": "Brightwave Window Cleaning",
+ "layout": "subject 'Your invoice from …', paid, no 'order' anywhere",
+ "headers": {
+  "from": "Brightwave Window Cleaning <accounts@brightwavecleaning.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Brightwave Window Cleaning",
+  "date": "Wed, 4 Nov 2026 17:00:00 +0000"
+ },
+ "html": "",
+ "text": "Brightwave Window Cleaning\nHi Sam,\nHere is your invoice for this month's clean. Thank you for your payment.\nInvoice number: BW-2291\nInvoice date: 4 November 2026\n\nWindow cleaning (front and back)  £25.00\nConservatory roof clean  £35.00\n\nTotal £60.00\nAmount paid £60.00\nBalance due £0.00\n\nBrightwave Window Cleaning",
+ "expected": {
+  "shop": "Brightwave Window Cleaning",
+  "date": "2026-11-04",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Window cleaning (front and back)",
+    "qty": 1,
+    "linePence": 2500
+   },
+   {
+    "name": "Conservatory roof clean",
+    "qty": 1,
+    "linePence": 3500
+   }
+  ],
+  "subtotalPence": 6000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6000
+ }
+}

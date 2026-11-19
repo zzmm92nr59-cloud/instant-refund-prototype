@@ -1,0 +1,40 @@
+{
+ "id": "holdout10-waitrose-qty-price-line-text",
+ "sender": "Waitrose",
+ "layout": "text: name, then 'Quantity: 2  £1.50', an age-restricted note line",
+ "headers": {
+  "from": "Waitrose & Partners <customerservice@waitrose.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Waitrose order is confirmed",
+  "date": "Wed, 11 Nov 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Waitrose & Partners\nYour order has been confirmed\nOrder number: 1022999810\nOrder date: 11 November 2026\n\nWaitrose Essential Spaghetti 500g\nQuantity: 2  £1.50\nWaitrose Duchy Organic Free Range Eggs 6\nQuantity: 1  £3.40\nWaitrose Prosecco 75cl\nQuantity: 1  £9.00\nThis item is age restricted\n\nSubtotal £13.90\nDelivery charge Free\nCarrier bags Free\nOffer: Prosecco 25% off -£2.25\nTotal £11.65",
+ "expected": {
+  "shop": "Waitrose",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Waitrose Essential Spaghetti 500g",
+    "qty": 2,
+    "linePence": 150
+   },
+   {
+    "name": "Waitrose Duchy Organic Free Range Eggs 6",
+    "qty": 1,
+    "linePence": 340
+   },
+   {
+    "name": "Waitrose Prosecco 75cl",
+    "qty": 1,
+    "linePence": 900
+   }
+  ],
+  "subtotalPence": 1390,
+  "feesPence": 0,
+  "discountsPence": 225,
+  "tipsPence": 0,
+  "totalPence": 1165
+ }
+}

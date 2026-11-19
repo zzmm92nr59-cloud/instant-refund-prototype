@@ -1,0 +1,38 @@
+{
+ "id": "holdout10-dr-plus-text",
+ "sender": "Deliveroo",
+ "layout": "text: 'Delivery fee £0.00 (Deliveroo Plus)', small order fee, priced option",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order from Bao House",
+  "date": "Wed, 18 Nov 2026 12:00:00 +0000"
+ },
+ "html": "",
+ "text": "Deliveroo\nOrder from Bao House\nOrder number: 7712-0040\n18 November 2026\n\n1x Katsu Chicken Bao (2)  £8.50\n2x Kimchi Fried Rice  £15.00\n  Add fried egg +£1.00\n\nSubtotal  £23.50\nDelivery fee  £0.00 (Deliveroo Plus)\nService fee  £1.15\nSmall order fee  £2.00\nTotal  £26.65",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Katsu Chicken Bao (2)",
+    "qty": 1,
+    "linePence": 850
+   },
+   {
+    "name": "Kimchi Fried Rice",
+    "qty": 2,
+    "linePence": 1500,
+    "extras": [
+     "Add fried egg +£1.00"
+    ]
+   }
+  ],
+  "subtotalPence": 2350,
+  "feesPence": 315,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2665
+ }
+}

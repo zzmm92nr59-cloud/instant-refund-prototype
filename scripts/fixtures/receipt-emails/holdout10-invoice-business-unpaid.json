@@ -1,0 +1,18 @@
+{
+ "id": "holdout10-invoice-business-unpaid",
+ "sender": "Northgate Supplies",
+ "layout": "a business's invoice still to pay: never a purchase",
+ "headers": {
+  "from": "Northgate Supplies Ltd <invoices@northgatesupplies.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Invoice from Northgate Supplies Ltd",
+  "date": "Wed, 18 Nov 2026 15:00:00 +0000"
+ },
+ "html": "",
+ "text": "Northgate Supplies Ltd\nInvoice number: NS-77120\nInvoice date: 18 November 2026\nDue date: 18 December 2026\nCopier paper A4 (10 reams)  £45.00\nToner cartridge  £89.00\nSubtotal £134.00\nVAT £26.80\nTotal £160.80\nAmount due £160.80\nPayment terms: 30 days. Please pay by bank transfer quoting NS-77120.",
+ "expected": {
+  "notPurchase": {
+   "kind": "unpaid invoice"
+  }
+ }
+}

@@ -12,10 +12,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails } from "../worker/gmail.js";
+import { mergeOrderEmails, attachCancellations } from "../worker/gmail.js";
 import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
@@ -179,8 +179,32 @@ const bulkyAt = Date.now(), bulkyRead = parseReceiptEmail(bulky), bulkyMs = Date
 const bulkyOk = bulkyRead.ok && bulkyRead.totalPence === 3500 && bulkyRead.items.length === 1 && bulkyRead.itemsCheck.complete === true && bulkyMs < 2000;
 console.log(`  A 600 KB email that is mostly one attribute: ${bulkyOk ? "read" : "NOT read"} in ${bulkyMs} ms`);
 
+// Round 8: on an order the shop cancelled part of, the item its email names as cancelled is marked on the receipt; nothing
+// is marked when the email names no item, whatever the amount (it is never guessed from the money). Made-up emails.
+const cancelMail = (subject, lines) => `From: Example Shop <orders@exampleshop.co.uk>\r\nSubject: ${subject}\r\nDate: Fri, 13 Nov 2026 09:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n` + lines.join("\n");
+const cancelOrder = () => ({ orderRef: "ES-77001", retailer: { name: "Example Shop", domain: "exampleshop.co.uk" }, totalPence: 9000, currency: "GBP",
+  items: [{ name: "Linen Shirt White", qty: 1, pricePence: 3500 }, { name: "Canvas Belt Tan", qty: 1, pricePence: 1500 }, { name: "Chino Trousers Navy", qty: 1, pricePence: 4000 }] });
+const cancelCases = [
+  ["a 'Cancelled items' list", cancelMail("Part of your order ES-77001 has been cancelled", ["Some items in your order have been cancelled", "Order number: ES-77001", "", "Cancelled items", "Canvas Belt Tan", "Quantity 1", "Price £15.00", "", "Amount to be refunded: £15.00"]), ["Canvas Belt Tan"]],
+  ["a sentence", cancelMail("An item in your order ES-77001 has been cancelled", ["Order number: ES-77001", "Sorry, we've had to cancel the Linen Shirt White from your order as it is out of stock. You'll get £35.00 back."]), ["Linen Shirt White"]],
+  ["only an amount (£40.00 is the trousers' price)", cancelMail("Part of your order ES-77001 has been cancelled", ["Order number: ES-77001", "Part of your order has been cancelled. £40.00 will be refunded to your card."]), []],
+  ["a name that is no item's", cancelMail("Part of your order ES-77001 has been cancelled", ["Order number: ES-77001", "", "Cancelled items", "Wool Scarf Grey", "Price £20.00"]), []],
+];
+const cancelWrong = [];
+for (const [label, raw, want] of cancelCases) {
+  const c = parseCancellationEmail(raw);
+  if (!c.ok || !c.partial) { cancelWrong.push(label + ": not read as part of the order cancelled"); continue; }
+  const o = cancelOrder();
+  attachCancellations([o], [c]);
+  const got = o.items.filter((i) => i.cancelled === true).map((i) => i.name);
+  if (!o.cancelled || !o.cancelled.partial) cancelWrong.push(label + ": the order not marked part cancelled");
+  if (got.join(", ") !== want.join(", ")) cancelWrong.push(`${label}: marked ${got.join(", ") || "nothing"} for ${want.join(", ") || "nothing"}`);
+}
+console.log(`  Part-cancelled orders: ${cancelWrong.length ? cancelWrong.join("; ") : "the item the email names is marked cancelled; nothing when it names none or only an amount"}`);
+
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
+need(cancelWrong.length === 0, "a part-cancelled order marks the item its email names as cancelled, and only that");
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
 need(a.total === a.n && b.total === b.n, "totals right on every email");
 need(silent.length === 0, "the totals check flags every email whose items are incomplete");
