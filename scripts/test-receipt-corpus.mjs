@@ -399,12 +399,15 @@ const joinWrong = [];
   // Round 14: a reference only the bill or the counter gives ("Order Number:" over "042", "Bill ID: 71200455") is the order's
   // number, as sent and as forwarded.
   const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
-  for (const id of ["holdout15-platform-till-list", "holdout15-burger-app-short-number", "holdout15-bill-id"]) for (const app of [null, "gmail", "outlook", "apple"]) {
+  for (const id of ["holdout15-platform-till-list", "holdout15-burger-app-short-number", "holdout15-bill-id", "holdout15-order-number-underscores"]) for (const app of [null, "gmail", "outlook", "apple"]) {
     const f = fx(id), r = parseReceiptEmail(rawEmail(app ? forwarded(f, app) : f));
     if (!r.ok || r.orderRef !== f.expected.orderRef) joinWrong.push(`${id}${app ? " (" + app + ")" : ""}: order number ${r.ok ? r.orderRef : r.reason} for ${f.expected.orderRef}`);
   }
+  // The inbox scan never asks for the shopper's own sent mail (a receipt forwarded to someone else is a copy). Round 14.
+  if (!/const windowQuery = [^\n]*-in:sent /.test(readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8"))) joinWrong.push("the Gmail search asks for sent mail");
   // A table booked but not paid for: read with its number and price, never a purchase in the inbox.
-  const { TABLE_BOOKING } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  const { TABLE_BOOKING, PERSONAL_REPLY } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  { const r = parseReceiptEmail(rawEmail(PERSONAL_REPLY)); if (r.ok || r.reason !== "reply") joinWrong.push("a person's reply about an order read as " + (r.ok ? "a purchase" : r.reason)); }
   for (const app of [null, "gmail", "outlook", "apple"]) {
     const raw = rawEmail(app ? forwarded(TABLE_BOOKING, app) : TABLE_BOOKING);
     const r = parseReceiptEmail(raw), k = classifyEmail(raw).details.kind;

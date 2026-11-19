@@ -69,6 +69,13 @@ export default function holdout15() {
       from: "Grocer & Co at Points <noreply@emails.grocerpoints.example>", subject: "Sam, there’s still time to pre-order your Grocer & Co Christmas Food to order", date: "Thu, 19 Nov 2026 07:00:00 +0000",
       html: mail("Grocer & Co", "grocerco.example", ["Make hosting hassle free this Christmas", "Order number: 4410293", "Turkey Crown | £30.00", "Total | £30.00"]) }, "advert");
   }
+  // ---- An online doctor's order whose number has underscores, "AB_4410321_1": the whole of it, so a forward joins it -----
+  {
+    const o = order([{ name: "Antihistamine Tablets", qty: 1, unit: 1299 }]);
+    add("holdout15-order-number-underscores", "Clinic Direct", "subject 'Your Clinic Direct order no: CD_4410321_1'; 'Your order number: CD_4410321_1'; item and price in a row", {
+      from: "Clinic Direct <noreply@clinicdirect.example>", subject: "Your Clinic Direct order no: CD_4410321_1", date: "Wed, 18 Nov 2026 14:05:00 +0000",
+      html: mail("Clinic Direct", "clinicdirect.example", ["Your order number: CD_4410321_1", "Item | Price", "Antihistamine Tablets | £12.99", "TOTAL | £12.99", "Check below for more information about your order"]) }, o, "Clinic Direct", "2026-11-18", { orderRef: "CD_4410321_1" });
+  }
   return out;
 }
 
@@ -78,3 +85,9 @@ export const TABLE_BOOKING = fixture("holdout15-table-booking-not-paid", "Tablef
       from: "\"Tablefinder | Lantern House Bookings\" <no-reply@tablefinder.example>", subject: "Your booking confirmation for Lantern House", date: "Tue, 17 Nov 2026 18:00:00 +0000",
       html: mail("Tablefinder", "tablefinder.example", ["Booking confirmed", "Thanks for using Tablefinder!", "Lantern House", "Table for 2 on Friday, 27 November 2026 at 19:30", "Confirmation #: 4410098812",
         "Modify", "Cancel", "Experience summary", "2 x Bottomless Dim Sum Brunch | £79.90", "Total | £79.90"]) }, { tableBooking: true });
+
+// ---- A relative writing back about the order from their own mailbox: "Re: Thanks for your order!", no reply headers -------
+// (Kept out of the corpus, whose forwards go to Relay's own address, where a reply sent on is read as the shopper meant.)
+export const PERSONAL_REPLY = fixture("holdout15-personal-reply", "a person", "'Re: Thanks for your order!' from a personal address, quoting the order with its total", {
+    from: "Alex Taylor <alex.taylor.example@hotmail.co.uk>", to: "sam.taylor.example@gmail.com", subject: "Re: Thanks for your order!", date: "Thu, 19 Nov 2026 14:01:00 +0000",
+    text: "Done it\n\nFrom: Sam Taylor <sam.taylor@example.co.uk>\nSent: 19 November 2026 13:56\nSubject: Fwd: Thanks for your order!\n\nThanks for your order! Order number: VX-77120\nDriving Experience Voucher £89.00\nTotal £89.00" }, { notPurchase: { kind: "reply" } });

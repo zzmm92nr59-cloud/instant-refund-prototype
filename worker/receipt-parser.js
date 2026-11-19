@@ -566,7 +566,7 @@ function fromText(text, refDate, ctx = {}) {
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
     // capitals ("QWERTZ"). Round 11.)
-    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
+    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
@@ -926,10 +926,10 @@ export function looksPromotional(subject, headers, hasOrderRef) {
   // … Food to order", "Shop 25% off today to WIN your order": never a purchase, whatever order-like words or numbers it has.
   // Round 14.)
   if (STRONG_PROMO_SUBJECT.test(sub)) return true;
+  if (ORDERISH_SUBJECT.test(sub)) return false;
   // (Nor a promotion sent from a shop's newsletter address, "news@", "newsletter@", "offers@". Round 14.)
   const fromAddr = ((String((headers && headers.from) || "").match(/<([^>]+)>/) || [])[1] || String((headers && headers.from) || "")).trim();
   if (/^(?:news|newsletters?|marketing|promo(?:tions?)?|offers|deals|specialoffers)@/i.test(fromAddr) && (PROMO_SUBJECT.test(sub) || MONEY_OFF_SUBJECT.test(sub))) return true;
-  if (ORDERISH_SUBJECT.test(sub)) return false;
   if (PROMO_CREDIT_SUBJECT.test(sub)) return true;
   if (hasOrderRef) return false;
   if (PROMO_SUBJECT.test(sub) || MONEY_OFF_SUBJECT.test(sub)) return true;
@@ -1674,6 +1674,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (A shop's reply to the shopper's own message, "RE: Order #1806 confirmed", "RE: Thank you for your order: …": support
   // writing back, quoting the order. The order's own email is the purchase, never this. Round 11.)
   if (!opts.lenient && /^\s*re\s*:/i.test(String(subject || "")) && (headers["in-reply-to"] || headers.references)) return { ok: false, reason: "reply", source: "shopper_email" };
+  // (A person writing back from their own mailbox to another person's, "Re: Thanks for your order!" between two personal
+  // addresses, quoting the order: a conversation about a purchase, never the purchase, even with no reply headers. Sent on
+  // to Relay's own address it is still read, as the shopper meant. Round 14.)
+  const toDomain = ((String(headers.to || "").match(/@([^>\s,;]+)/) || [])[1] || "").toLowerCase();
+  if (!opts.lenient && /^\s*re\s*:/i.test(String(subject || "")) && PERSONAL_MAIL.test(sender?.domain || "") && PERSONAL_MAIL.test(toDomain)) return { ok: false, reason: "reply", source: "shopper_email" };
   // (Someone else's purchase they forwarded to the shopper: forwarded from a personal address by a person whose name is not
   // the shopper's, and it was first sent to that person ("To: their address" in what they forwarded). Their booking, not the
   // shopper's. Round 11.)

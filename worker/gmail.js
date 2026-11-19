@@ -178,7 +178,9 @@ const SEARCH_TERMS =
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk OR collectplus.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped OR "dropped off")';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
-const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;
+// (Never the shopper's own sent mail: a receipt they forwarded or replied about to someone else is a copy of one already in
+// their inbox, and it made a second card of the same order. Round 14.)
+const windowQuery = (after, before) => "after:" + after + " before:" + before + " -in:sent " + SEARCH_TERMS;
 const encoder = new TextEncoder();
 
 async function sha256Hex(text) {
