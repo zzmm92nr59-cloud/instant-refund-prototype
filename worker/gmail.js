@@ -886,7 +886,7 @@ function classify(rawText, ref, lenient = false) {
       details = { kind: "order_update", ...ref, stage: "adjusted", at: adj.at, orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
         previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
-      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency,
+      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
@@ -1708,7 +1708,27 @@ export function attachDeliveries(orders, deliveries) {
 // (no return date) and is not money spent (wrapped.js spentOf, account.js); for part of one, the amount the shop says came
 // back is taken off, when it says.
 export function attachCancellations(orders, cancels) {
+  // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
+  // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
+  const byItems = new Map();
+  for (const u of cancels) {
+    if (u.orderRef || !u.byItems || !Array.isArray(u.cancelledItems) || !u.cancelledItems.length) continue;
+    const keys = u.cancelledItems.map(c => cancelKey(c && c.name)).filter(k => k.length >= 6);
+    if (keys.length !== u.cancelledItems.length) continue;
+    const fits = orders.filter(o => o.retailer && sameShop(u, o) && u.retailer && (u.retailer.domain || u.retailer.name) && Array.isArray(o.items) && o.items.length &&
+      (!u.at || !o.orderDate || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 60 * 864e5)) &&
+      keys.every(k => o.items.some(it => cancelKey(it && it.name) === k)));
+    if (fits.length === 1) byItems.set(fits[0], [...(byItems.get(fits[0]) || []), u]);
+  }
   for (const o of orders) {
+    const listed = byItems.get(o);
+    if (listed) {
+      const keys = new Set(listed.flatMap(u => u.cancelledItems.map(c => cancelKey(c.name))));
+      const at = listed.map(u => u.at).filter(Boolean).sort()[0] || null;
+      if (o.items.every(it => keys.has(cancelKey(it && it.name)))) { o.cancelled = { at, partial: false, amountPence: null, currency: null }; delete o.returnBy; }
+      else { o.cancelled = { at, partial: true, amountPence: null, currency: null }; o.items = o.items.map(it => keys.has(cancelKey(it && it.name)) ? { ...it, cancelled: true } : it); }
+      if (!o.orderRef) continue;
+    }
     if (!o.orderRef) continue;
     const mine = cancels.filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
     if (!mine.length) continue;

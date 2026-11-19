@@ -242,6 +242,9 @@ function plainAsWritten(t) {
 // Pay-later companies, and what their emails about an instalment (not the purchase itself) say.
 const PAY_LATER_SENDER = /(^|\.)(klarna\.(?:com|co\.uk)|clearpay\.co\.uk|afterpay\.com|laybuy\.com|payzilch\.com|zilch\.com)$/i;
 const INSTALMENT = /\b(?:your next (?:automatic )?payment|next payment of|payment plan|instal?ments?|remaining (?:balance|amount)|scheduled payment|final\b[^\n]{0,40}\bpayment|payment (?:failed|didn(?:'|’)t go through)|pay(?:ment)? overdue)\b/i;
+// A plain-text part that writes a link round several lines, "[Coffee Table" … "Qty:1](https://…)" (the whole product block
+// is the link): the lines are read as written, without the brackets and the address. Round 11.
+const linksOverLines = (t) => String(t).replace(/\[([^\[\]]{1,600}?\n[^\[\]]{0,600}?)\]\((?:https?:|mailto:)[^)\s]{0,2000}\)/g, "$1");
 // The full-width pound sign some shops print ("Grand Total:￡123.20", Homary) is the pound sign (coverage round).
 const fullWidthPounds = (t) => String(t).replace(/\uffe1/g, "£");
 function decodeEntities(text) {
@@ -520,10 +523,15 @@ function fromText(text, refDate) {
   // Others write the currency after the amount ("5 GBP", "12.99 GBP"): read as "£5.00", "£12.99" (never "£0.00 GBP" twice).
   text = text.replace(/(?<![£\d.,])(?<!£ )(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[ \t]?GBP\b/g, (m, n, p) => "£" + n + "." + (p || "00"));
   const ref =
-    text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
-    // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.)
-    text.match(/\border\s*(?:number|no\.?)\s*:?[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
+    // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
+    // capitals ("QWERTZ"). Round 11.)
+    [...text.matchAll(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
+    // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
+    // number is: |" over it too. Round 11.)
+    text.match(/\border\s*(?:number|no\.?)\s*(?:is\s*)?:?[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
+    // ("Order:" alone on its line, the number on the next: Homary. Round 11.)
+    text.match(/^[\s|]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
     // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
     text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     // A shop that sends an invoice instead of an order confirmation ("Invoice number: INV-2290"): its number is the order's
@@ -1015,7 +1023,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   collectParts(headers, body, parts);
   if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
   const html = parts.html.join("\n").slice(0, MAX_INPUT);
-  const plain = tillPounds(unquoted(fullWidthPounds(plainAsWritten(parts.text.join("\n").trim()))));
+  const plain = tillPounds(unquoted(fullWidthPounds(linksOverLines(plainAsWritten(parts.text.join("\n").trim())))));
   const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(html)))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
@@ -1600,6 +1608,20 @@ function cancelledNames(text) {
   }
   return out.slice(0, 20);
 }
+// The things an order email shows in its product blocks with no heading over them: a name, maybe its colour or size, then
+// how many ("X1", "Qty: 1"). The name is the longest name-like line of the two above how many. Round 11.
+function namedInOrderBlock(text) {
+  const lines = String(text || "").split("\n").map((l) => l.replace(/[|]/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const out = [];
+  for (let k = 1; k < lines.length && out.length < 20; k++) {
+    const q = /^(?:[x×]\s?(\d{1,3})|(?:qty|quantity)\s*:?\s*(\d{1,3}))$/i.exec(lines[k]);
+    if (!q) continue;
+    const cands = lines.slice(Math.max(0, k - 2), k).filter((n) => (n.match(/\p{L}/gu) || []).length >= 6 && n.length <= 140 && !/£|€|\$|:\s*$|[.!?]$/.test(n) && n.split(" ").length >= 2);
+    const name = cands.sort((a, b) => b.length - a.length)[0];
+    if (name) out.push({ name, qty: Number(q[1] || q[2]) });
+  }
+  return out;
+}
 export function parseCancellationEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_cancellation" };
   const u = updateParts(rawEmail);
@@ -1608,7 +1630,17 @@ export function parseCancellationEmail(rawEmail) {
   const said = /\bcancell?(?:ed|ation)\b/i.test(u.subject) || NOT_A_PURCHASE_TOP.test(top);
   // A price adjustment or a subscription ("Your membership has been cancelled") is not a cancelled order.
   if (!said || PRICE_ADJUSTMENT.test(u.subject + " " + top) || /\b(?:subscription|membership|plan|direct debit|account|booking|reservation|appointment|trial)\b/i.test(u.subject)) return no;
-  if (!/\border\b/i.test(u.subject + " " + top) || !u.orderRef) return no;
+  if (!/\border\b/i.test(u.subject + " " + top)) return no;
+  // (No order number, but the whole order is said to be cancelled and the email shows what was in it, "1000mm Coffee
+  // Table", "Black", "X1" (Homary): kept with those names, so it joins only the one order of that shop with those very
+  // items (gmail.js attachCancellations). Round 11.)
+  if (!u.orderRef) {
+    if (!/\b(?:your|the|this) order (?:was|has been|is) cancell?ed\b/i.test(u.subject + " " + top)) return no;
+    const items = namedInOrderBlock(u.text);
+    if (!items.length) return no;
+    return { ok: true, kind: "order_update", stage: "cancelled", partial: false, at: u.at, orderRef: null, byItems: true, cancelledItems: items,
+      amountPence: null, currency: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+  }
   const partial = /\b(?:part of|some of|one of|an item|some items|items? (?:in|from|of) your order (?:has|have) been|(?:has|have) been cancell?ed from your order)\b/i.test(u.subject + " " + top) &&
     !/(?<!\b(?:part|some|one|items?) (?:of|in|from) )\b(?:your|the|this) (?:whole |entire )?order (?:has been|was|is) cancell?ed\b/i.test(u.subject + " " + top);
   const amt = (top.match(/\brefund(?:ed)?\b[^£€\n]{0,40}([£€])\s*([0-9][0-9,]*\.[0-9]{2})/i) || top.match(/([£€])\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\b(?:refund|back to your|returned to your)/i));
