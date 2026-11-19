@@ -94,6 +94,7 @@ jobs:
           node scripts/test-gmail.mjs
           node scripts/test-gmail-auto.mjs
           node scripts/test-gmail-busy.mjs
+          node scripts/test-gmail-big-email.mjs
           node scripts/test-delete-account.mjs
       - name: More than one inbox (Gmail and Outlook together)
         run: node scripts/test-more-inboxes.mjs
