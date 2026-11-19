@@ -58,7 +58,7 @@ export default function holdout2() {
   }
   {
     // Three App Store purchases, one of them free.
-    const o = order([{ name: "Monument Valley 3", qty: 1, unit: 0 }, { name: "Procreate Pocket", qty: 1, unit: 599 }, { name: "Candy Crush Saga", qty: 1, unit: 399 }]);
+    const o = order([{ name: "Monument Valley 3", qty: 1, unit: 0 }, { name: "Procreate Pocket", qty: 1, unit: 599 }, { name: "Gold Bars", qty: 1, unit: 399 }]);
     add("holdout2-apple-free", "Apple App Store", "three purchases, one free", { from: "Apple <no_reply@email.apple.com>", subject: "Your receipt from Apple.", date: "Wed, 11 Nov 2026 10:00:00 +0000",
       html: page({ brand: "Apple", domain: "apple.com", rows: [`<p>Receipt</p>`, `<p>ORDER ID</p><p>MX99ZZ11AA</p>`, `<p>11 Nov 2026</p>`, `<p>App Store</p>`,
         table([["Monument Valley 3<br />Apple Arcade<br />Report a Problem", "Free"], ["Procreate Pocket<br />iPhone<br />Report a Problem", "£5.99"], ["Candy Crush Saga<br />Gold Bars<br />In-App Purchase<br />Report a Problem", "£3.99"]]),

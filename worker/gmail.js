@@ -155,7 +155,7 @@ const GONE = Symbol("gone");
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 42;
+export const PARSER_VERSION = 43;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -168,7 +168,9 @@ const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 
 // SHOPPING_SUBJECT): bookings, tickets, trips and invoices as well as orders and receipts.
 const SEARCH_TERMS =
   '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
-  ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
+  ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket"' +
+  // (An entry, a membership or a draw "Entry Confirmation", a bar's "Your payment #39814759": round 11. The reader decides.)
+  ' OR confirmation OR "your payment" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk OR collectplus.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped OR "dropped off")';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
@@ -907,6 +909,7 @@ function classify(rawText, ref, lenient = false) {
   if (upd.ok) {
     details = {
       kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
+      ...(upd.paidPence != null ? { paidPence: upd.paidPence, paidOn: upd.paidOn || null } : {}),
       orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (par.ok) {
@@ -937,6 +940,7 @@ function classify(rawText, ref, lenient = false) {
       // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
       // order's confirmation (mergeOrderEmails). Round 10.
       ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
+      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
@@ -957,10 +961,11 @@ function classify(rawText, ref, lenient = false) {
     if (adj.ok) {
       // A takeaway app's changed total for an order it already charged (money back for part of it): never a purchase, joined
       // to that order by attachAdjustments. Round 10.
-      details = { kind: "order_update", ...ref, stage: "adjusted", at: adj.at, orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
+      details = { kind: "order_update", ...ref, stage: adj.stage || "adjusted", at: adj.at, ...(adj.paymentRef ? { paymentRef: adj.paymentRef } : {}), orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
+        ...(adj.orderRefs ? { orderRefs: adj.orderRefs } : {}), ...(adj.creditPence ? { creditPence: adj.creditPence } : {}), ...(adj.bySupport ? { bySupport: true } : {}),
         previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
-      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency,
+      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
@@ -1619,36 +1624,117 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 // A receipt the shopper forwarded from their own mailbox (gmail.com...) has the shop's order number but not the shop's
 // address, so it joins the shop's own emails for that order when the order number matches and the amounts agree.
 const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
+// The shop an order email is from, for joining one order's emails: its address without the part a shop sends a kind of
+// email from ("order.detalecph.com" is detalecph.com). Round 11.
+const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m)\./i;
+function joinStore(o) {
+  const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
+  return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
+}
 export function mergeOrderEmails(orders) {
+  // (One email confirming two orders: a card for each, the second named by its own number, total and items. Its id says
+  // which email it came from. Round 12.)
+  orders = orders.flatMap((o) => !Array.isArray(o.moreOrders) || !o.moreOrders.length ? [o] : [{ ...o, moreOrders: undefined },
+    ...o.moreOrders.map((m, k) => ({ ...o, moreOrders: undefined, id: o.id + "-" + (k + 2), fromEmail: o.id, orderRef: m.orderRef, totalPence: m.totalPence, currency: m.currency || o.currency, items: m.items, itemsCheck: m.itemsCheck, itemCount: undefined }))]);
   const out = [], groups = new Map();
   const shopFor = new Map(); // order number -> the shop it belongs to, when exactly one shop used it
   for (const o of orders) {
     if (!o.orderRef || isForwarded(o)) continue;
     const ref = String(o.orderRef).toUpperCase(), e = shopFor.get(ref) || { keys: new Set(), totals: new Set() };
-    e.keys.add(storeKey(o)); if (o.totalPence != null) e.totals.add(o.totalPence); shopFor.set(ref, e);
+    e.keys.add(joinStore(o)); if (o.totalPence != null) e.totals.add(o.totalPence); shopFor.set(ref, e);
+  }
+  // (A parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1", joins that order. Round 11.)
+  const refsOf = new Map();
+  for (const o of orders) if (o.orderRef) { const k = joinStore(o); if (!refsOf.has(k)) refsOf.set(k, new Set()); refsOf.get(k).add(String(o.orderRef).toUpperCase()); }
+  const baseRef = (o, ref) => { const m = /^(.{5,})-\d{1,2}$/.exec(ref); return m && (refsOf.get(joinStore(o)) || new Set()).has(m[1]) ? m[1] : ref; };
+  // (A payment service's receipt for an order, PayPal's "Receipt for your payment to Cama-Gruppen AB", "Order ID 2416172",
+  // joins the shop's own email for that order, "Order Number: WGR2416172", when the numbers are the same but for the
+  // letters the shop puts first, the money is the same and the days are close: one purchase, never two. Round 11.)
+  const paidVia = new Map();
+  for (const p of orders) {
+    if (!(p.retailer && p.retailer.via) || !p.orderRef || isForwarded(p)) continue;
+    const r = refCore(p.orderRef);
+    if (!/^\d{5,}$/.test(r) && !/\d/.test(r)) continue;
+    const fits = orders.filter((o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && (refCore(o.orderRef) === r || new RegExp("^[A-Z]{1,4}[-#]?" + r.replace(/[^A-Z0-9]/g, "") + "$").test(refCore(o.orderRef))) &&
+      (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1) &&
+      (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
+    if (fits.length === 1) paidVia.set(p, fits[0]);
   }
   const keyOf = (o) => {
+    if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
     if (!o.orderRef) return null;
-    const ref = String(o.orderRef).toUpperCase();
+    const ref = baseRef(o, String(o.orderRef).toUpperCase());
     if (isForwarded(o)) {
       const e = shopFor.get(ref);
       if (e && e.keys.size === 1 && (o.totalPence == null || !e.totals.size || e.totals.has(o.totalPence))) return [...e.keys][0] + "|" + ref;
     }
-    return storeKey(o) + "|" + ref;
+    return joinStore(o) + "|" + ref;
   };
+  // (A shop's invoice email that is only its PDF, no items and no total of its own (Nespresso, Tempur), sent within a few days
+  // of the shop's own itemised order email: it is that order's, not a second purchase. Joined only when exactly one such
+  // order email of the shop fits. Round 11.)
+  const bare = (o) => o.detailsInAttachment && !(o.items || []).length && o.totalPence == null && o.kind !== "order_update";
+  const folded = new Map();
   for (const o of orders) {
+    if (!bare(o) || !o.orderDate) continue;
+    const fits = orders.filter((p) => p !== o && !bare(p) && (p.items || []).length && p.orderDate && joinStore(p) === joinStore(o) &&
+      (!p.orderRef || !o.orderRef || sameOrderRef(p.orderRef, o.orderRef)) &&
+      // (Within three days either way, or an invoice sent later, up to 60 days after the order, when no other order of the
+      // shop came in between.)
+      (Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5 || (p.orderDate <= o.orderDate && Date.parse(o.orderDate) - Date.parse(p.orderDate) <= 60 * 864e5)));
+    const near = fits.filter((p) => Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5);
+    if (near.length === 1) folded.set(o, near[0]); else if (!near.length && fits.length === 1) folded.set(o, fits[0]);
+  }
+  for (const o of orders) {
+    if (folded.has(o)) {
+      const p = folded.get(o);
+      if (!p.orderRef && o.orderRef) p.orderRef = o.orderRef;
+      if (!p.detailsInAttachment) Object.defineProperty(p, "invoiceAttached", { value: o.detailsInAttachment, enumerable: false, configurable: true });
+      continue;
+    }
     const k = keyOf(o);
     if (!k) { out.push(o); continue; }
     if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }
     groups.get(k).push(o);
   }
   // (An email whose items add up to the order's money, its confirmation, leads over a shipment email that lists one parcel.)
-  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
+  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0) +
+    // (The shop's own email leads over a payment service's receipt for the same order: its names are whole. Round 11.)
+    (o.retailer && o.retailer.via ? 0 : 3);
   return out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
-    const [lead, ...rest] = g.slice().sort((a, b) => score(b) - score(a) || a.createdAt - b.createdAt);
+    // (A changed order's email, "We got your changes", never leads: the order's own confirmation keeps its day and number.)
+    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
+    // The order as it now is: the latest change's whole list and estimated total ("We got your changes", sent after each
+    // change) replace what the confirmation listed, so taken-off items are gone and added ones are there. Round 12.
+    const changes = g.filter(o => o.orderUpdate === "amended" && (o.items || []).length).sort((a, b) => String(a.amendedAt || "").localeCompare(String(b.amendedAt || "")) || a.createdAt - b.createdAt);
+    const latest = changes[changes.length - 1];
+    if (latest) {
+      c.items = latest.items.map(i => ({ ...i }));
+      if (latest.itemsCheck) c.itemsCheck = latest.itemsCheck;
+      if (latest.totalPence != null) { c.totalPence = latest.totalPence; c.currency = latest.currency || c.currency; }
+      if (latest.itemCount) c.itemCount = latest.itemCount; else delete c.itemCount;
+      c.amended = { at: latest.amendedAt || null, changes: changes.length };
+    }
+    // What the shop swapped on the day ("Truffle Burrata" substituted with "Italian Burrata 150g £3.20"): the item that came
+    // and what it cost, saying what it replaced. Round 12.
+    const lowName = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    for (const o of g) for (const sub of o.substitutions || []) {
+      const it = c.items.find(i => !i.substitutedFor && lowName(i.name) === lowName(sub.from));
+      if (!it || !sub.to || !sub.to.name) continue;
+      it.substitutedFor = it.name; it.name = sub.to.name;
+      if (Number.isInteger(sub.to.pricePence)) { it.pricePence = sub.to.pricePence; it.qty = sub.to.qty || it.qty || 1; it.lineTotal = (it.qty || 1) > 1; }
+      delete it.variant;
+      if (c.itemsCheck && Number.isInteger(c.itemsCheck.itemsPence)) {
+        const sum = c.items.reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
+        // (The estimate moves with it, so the fees worked out against the paid total below stay what they were. Substitutions
+        // come only on the delivery-day email, whose paid total then becomes the order's.)
+        if (!Number.isNaN(sum) && c.totalPence != null && c.orderUpdate !== "paid") c.totalPence += sum - c.itemsCheck.itemsPence;
+        if (!Number.isNaN(sum)) c.itemsCheck = { ...c.itemsCheck, itemsPence: sum, substituted: true, ...(Number.isInteger(c.itemsCheck.expectedPence) ? { missingPence: c.itemsCheck.expectedPence - sum } : {}) };
+      }
+    }
     for (const o of rest) {
       // The currency goes with the amount: a total taken from another email of the order is in that email's currency.
       if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = o.currency || c.currency; }
@@ -1663,7 +1749,8 @@ export function mergeOrderEmails(orders) {
       // A split shipment (round 3): each parcel's email lists only what is in it. Unless the card's items are already all the
       // order's (they add up), the items from the order's other emails that aren't on the card yet are added, once each, so
       // nothing bought is dropped and nothing is shown twice. The card says the items are complete only when they then add up.
-      if (!(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
+      // (Not for a changed order: its latest list is the whole order, and what the earlier lists had more was taken off.)
+      if (!latest && !(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
         const named = new Set(c.items.map(i => String(i.name || "").toLowerCase().trim()));
         const more = (o.items || []).filter(i => i && i.name && !named.has(String(i.name).toLowerCase().trim()));
         if (more.length) {
@@ -1781,7 +1868,10 @@ const paidInPounds = (o) => !o || !o.currency || o.currency === "GBP";
 const refCore = (r) => String(r || "").toUpperCase().replace(/\s+/g, "").replace(/^#/, "").replace(/^(?:ORD(?:ER)?|NO)[-#.:]?(?=\d{4,}$)/, "");
 export function sameOrderRef(a, b) { return Boolean(a && b) && refCore(a) !== "" && refCore(a) === refCore(b); }
 // An update names this order's shop: by its address or name when it says, any shop when it doesn't say (a carrier's).
-const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o);
+// (Or the same shop's name, from the company that sends its parcel news, "lululemon" <noreply@lululemon-intl.narvar.com>, for
+// an order with the same number. Round 12.)
+const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o) ||
+  (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name));
 export function attachDeliveries(orders, deliveries) {
   for (const o of orders) {
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
@@ -1824,8 +1914,50 @@ export function attachDeliveries(orders, deliveries) {
 // `cancelled` says so on the card: { at, partial, amountPence, currency }. A whole order cancelled has nothing to send back
 // (no return date) and is not money spent (wrapped.js spentOf, account.js); for part of one, the amount the shop says came
 // back is taken off, when it says.
+// Payments towards a purchase paid in parts (a holiday's deposit, then instalments), from a payment service's "You've
+// authorised £38.00 GBP to We Love Holidays Lim...": each joins the latest purchase from that shop made on or before its day
+// (within a year), when exactly one is. The card says what was paid and when; never a purchase of its own. Round 12.
+function attachPayments(orders, pays) {
+  const squash = (x) => String(x || "").toLowerCase().replace(/\b(?:ltd|limited|lim|plc|inc|llc|uk|the)\b|[^a-z0-9]+/g, "");
+  for (const p of pays) {
+    const m = squash(p.retailer && p.retailer.name);
+    if (m.length < 5 || !Number.isInteger(p.amountPence) || !p.at) continue;
+    const fits = orders.filter(o => o.kind !== "order_update" && o.orderDate && o.orderDate <= p.at && Date.parse(p.at) - Date.parse(o.orderDate) <= 366 * 864e5 &&
+      (() => { const s = squash(o.retailer && o.retailer.name); return s.length >= 5 && (m.includes(s) || s.includes(m)); })());
+    if (!fits.length) continue;
+    const last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
+    if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+    const list = last.payments || (last.payments = []);
+    if (!list.some(x => x.at === p.at && x.amountPence === p.amountPence)) list.push({ at: p.at, amountPence: p.amountPence, currency: p.currency || "GBP" });
+    list.sort((a, b) => a.at.localeCompare(b.at));
+    last.paidSoFarPence = list.reduce((n, x) => n + x.amountPence, 0);
+  }
+}
 export function attachCancellations(orders, cancels) {
+  // (Payments towards a purchase come with the order's other news: they are not cancellations.)
+  attachPayments(orders, cancels.filter(u => u.stage === "payment"));
+  cancels = cancels.filter(u => u.stage !== "payment");
+  // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
+  // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
+  const byItems = new Map();
+  for (const u of cancels) {
+    if (u.orderRef || !u.byItems || !Array.isArray(u.cancelledItems) || !u.cancelledItems.length) continue;
+    const keys = u.cancelledItems.map(c => cancelKey(c && c.name)).filter(k => k.length >= 6);
+    if (keys.length !== u.cancelledItems.length) continue;
+    const fits = orders.filter(o => o.retailer && sameShop(u, o) && u.retailer && (u.retailer.domain || u.retailer.name) && Array.isArray(o.items) && o.items.length &&
+      (!u.at || !o.orderDate || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 60 * 864e5)) &&
+      keys.every(k => o.items.some(it => cancelKey(it && it.name) === k)));
+    if (fits.length === 1) byItems.set(fits[0], [...(byItems.get(fits[0]) || []), u]);
+  }
   for (const o of orders) {
+    const listed = byItems.get(o);
+    if (listed) {
+      const keys = new Set(listed.flatMap(u => u.cancelledItems.map(c => cancelKey(c.name))));
+      const at = listed.map(u => u.at).filter(Boolean).sort()[0] || null;
+      if (o.items.every(it => keys.has(cancelKey(it && it.name)))) { o.cancelled = { at, partial: false, amountPence: null, currency: null }; delete o.returnBy; }
+      else { o.cancelled = { at, partial: true, amountPence: null, currency: null }; o.items = o.items.map(it => keys.has(cancelKey(it && it.name)) ? { ...it, cancelled: true } : it); }
+      if (!o.orderRef) continue;
+    }
     if (!o.orderRef) continue;
     const mine = cancels.filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
     if (!mine.length) continue;
@@ -1864,6 +1996,19 @@ export function attachAdjustments(orders, adjusts) {
   const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   for (const a of adjusts) {
     if (!Number.isInteger(a.amountPence)) continue;
+    // (Money back a shop's support team wrote about an order it names, "order #966874418": that order of that shop, when
+    // exactly one of the numbers it names is one of the shop's orders. A card refund and account credit are said apart. Round 12.)
+    if (a.bySupport) {
+      const refs = (a.orderRefs || [a.orderRef]).filter(Boolean).map((r) => String(r).toUpperCase());
+      const base = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]+\.(?:(?:co|org|ac)\.uk|[a-z]{2,6}))$/, "$1");
+      const sameShop = (o) => (base(o.retailer && o.retailer.domain) && base(o.retailer && o.retailer.domain) === base(a.retailer && a.retailer.domain)) || low(o.retailer && o.retailer.name).startsWith(low(a.retailer && a.retailer.name).split(" ")[0] || "-");
+      const hit = refs.map((r) => orders.filter((o) => o.kind !== "order_update" && o.orderRef && String(o.orderRef).toUpperCase() === r && sameShop(o))).find((l) => l.length);
+      if (!hit || hit.length !== 1) continue;
+      const o = hit[0], was = o.adjusted || {};
+      o.adjusted = { at: a.at || was.at || null, refundPence: (was.refundPence || 0) + a.amountPence, newTotalPence: was.newTotalPence ?? null, currency: a.currency || o.currency || "GBP",
+        ...((was.creditPence || 0) + (a.creditPence || 0) ? { creditPence: (was.creditPence || 0) + (a.creditPence || 0) } : {}) };
+      continue;
+    }
     const fits = orders.filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
       (!a.merchant || low(o.merchant) === low(a.merchant)) && (a.previousTotalPence == null || o.totalPence === a.previousTotalPence) &&
       (!a.at || !o.orderDate || (o.orderDate <= a.at && Date.parse(a.at) - Date.parse(o.orderDate) <= 7 * 864e5)));
@@ -1893,6 +2038,22 @@ export function estimateReturnBy(o, today) {
 
 // Where a return has got to: the return parcel (carrier emails about its tracking number) and the shop's own
 // "we've received your return" / "your refund has been processed" emails, matched by order number.
+// A payment service's refund that names no order but says what was first paid, to whom and on which day ("You originally
+// paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026"): the one order of that shop for that money on that day, or
+// the next (a shop's email can be dated the day after). Never a guess between two. Round 12.
+function refundFits(u, o, orders) {
+  if (u.stage !== "refunded" || !Number.isInteger(u.paidPence) || !/^\d{4}-\d{2}-\d{2}$/.test(u.paidOn || "")) return false;
+  const words = (x) => String(x || "").toLowerCase().replace(/\b(?:payments?|uk|ltd|limited|plc|inc|online|the|gb|europe|services?)\b|[^a-z0-9 ]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  const fit = (x) => {
+    if (x.kind === "order_update" || x.totalPence !== u.paidPence || !x.orderDate) return false;
+    const days = (Date.parse(x.orderDate) - Date.parse(u.paidOn)) / 864e5;
+    if (days < -1 || days > 1) return false;
+    const a = words(u.retailer && u.retailer.name), b = words(x.retailer && x.retailer.name);
+    return a.length > 0 && b.length > 0 && (a[0] === b[0] || a.join(" ").startsWith(b.join(" ")) || b.join(" ").startsWith(a.join(" ")));
+  };
+  if (!fit(o)) return false;
+  return orders.filter(fit).length === 1;
+}
 export function attachReturnProgress(orders, deliveries, updates) {
   for (const o of orders) {
     const plan = o.returnPlan || null;
@@ -1903,7 +2064,8 @@ export function attachReturnProgress(orders, deliveries, updates) {
       if (d.trackingNumber !== t) continue;
       if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
     }
-    const mine = ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [];
+    const mine = (ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
+      .concat(updates.filter(u => !u.orderRef && refundFits(u, o, orders)));
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;

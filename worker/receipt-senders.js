@@ -84,6 +84,62 @@ export function groceryDayOf(text) {
   return { paidPence: pence(MONEY.exec(paid[1])), orderRef: ref ? ref[1] : null };
 }
 
+// What the shop swapped on the day ("Substitutions (1)", then "Truffle Burrata 125g | at a quantity of 1 | £2.55 |",
+// "Substituted with", "Italian Burrata 150g | at a quantity of 1 | £3.20 |"): each item ordered and what came instead, so
+// the order's card can show what was actually delivered and paid for (gmail.js mergeOrderEmails). Round 12.
+const SUB_ITEM = /^(\p{L}[^|£]{2,150}?)\s*\|\s*(?:(?:at a )?(?:qty|quantity)(?: of)?\s*:?\s*)?(\d{1,3})\s*\|\s*(£\s?[\d,]+\.\d{2})\s*\|?$/iu;
+export function grocerySubstitutions(text) {
+  const list = rows(String(text || "").slice(0, 30000));
+  const out = [];
+  for (let k = 0; k + 1 < list.length && out.length < 60; k++) {
+    if (!/^(?:substituted|replaced|swapped) (?:with|by|for)\s*:?$/i.test(list[k])) continue;
+    const a = SUB_ITEM.exec(list[k - 1] || ""), b = SUB_ITEM.exec(list[k + 1] || "");
+    if (!a || !b) continue;
+    out.push({ from: a[1].trim(), to: { name: b[1].trim(), qty: Number(b[2]), pricePence: pence(MONEY.exec(b[3])) } });
+  }
+  return out;
+}
+
+// A changed order ("We got your changes", "You've amended your order", "Your order has been updated"): the shop's whole new
+// list and estimated total for the order it names. The latest one is the order (gmail.js mergeOrderEmails), never a second
+// purchase. Round 12.
+export function orderAmended(subject, text) {
+  const t = String(subject || "") + "\n" + String(text || "").slice(0, 3000).replace(/\s+/g, " ");
+  return /\bwe(?:'|’)?ve? got your changes\b|\byou(?:'|’)?ve (?:amended|changed|edited) your order\b|\byour order (?:has been|was) (?:amended|updated|changed)\b|\bchanges to your order (?:have been|are) (?:saved|confirmed)\b|^\s*(?:order amended|amended order)\b/i.test(t);
+}
+
+// Money back a shop's support team wrote out in a reply about an order ("I have processed a partial refund of £11.46 back to
+// your original payment card", "we refunded you £4.99 on 31/08/25", "We've added a £3.99 credit to your account"): what
+// came back and which order numbers the email names (the one the sentence names first, then the subject's). Only said
+// as done; a refusal ("we're unable to refund") says nothing. Round 12.
+const AMT = "£\\s?(\\d{1,3}(?:,\\d{3})+|\\d+)\\.(\\d{2})";
+export function supportRefund(subject, text) {
+  const t = String(text || "").slice(0, 8000).replace(/\*\*/g, "").replace(/\s+/g, " ");
+  const one = (res) => { for (const re of res) { const m = new RegExp(re, "i").exec(t); if (m) return Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]); } return null; };
+  const refundPence = one([
+    "\\b(?:processed|issued|sent|given you|arranged|approved) (?:you )?an? (?:partial |full |further )?refund of " + AMT,
+    "\\bwe(?:'|’)?(?:ve| have)? refunded (?:you |your (?:card|account|original payment method) )?(?:with )?" + AMT,
+    "\\ban? (?:partial |full )?refund of " + AMT + " (?:has been|was|is being) (?:processed|issued|sent|made)\\b"]);
+  const creditPence = one(["\\b(?:we(?:'|’)?(?:ve| have) )?added an? " + AMT + " credit to your\\b", "\\b" + AMT + " (?:of )?(?:account )?credit (?:has been|was) added\\b"]);
+  if (refundPence == null && creditPence == null) return null;
+  const refs = [];
+  for (const src of [t, String(subject || "")]) for (const m of src.matchAll(/\border\s*(?:number|no\.?|id)?\s*[:#]?\s*#?\s*(\d{6,14})\b/gi)) if (!refs.includes(m[1])) refs.push(m[1]);
+  return { refundPence, creditPence, refs };
+}
+
+// A payment service's "You've authorised £38.00 GBP to We Love Holidays Lim..." (money taken for a booking paid in parts:
+// a deposit, then instalments): one payment towards a purchase made with the shop, never a purchase of its own. What was
+// paid, to whom, on which day and the payment's own order number. Round 12.
+export function paymentAuthorised(subject, text) {
+  const t = String(text || "").slice(0, 6000);
+  const m = /\byou(?:'|’)?ve authori[sz]ed (£\s?[\d,]+\.\d{2})(?: GBP)? to ([^\n|]{2,60}?)(?:\.{3}|…)?\s*(?:\n|\||$)/i.exec(t);
+  if (!m) return null;
+  const list = rows(t);
+  const after = (re) => { const i = list.findIndex((x) => re.test(x)); return i >= 0 ? (list[i].replace(re, "").trim() || list[i + 1] || "") : ""; };
+  const ref = /^[A-Z0-9-]{6,30}$/i.exec(after(/^order id\s*:?/i));
+  return { amountPence: pence(MONEY.exec(m[1])), merchant: m[2].replace(/(?:\.{2,}|…)$/, "").trim(), orderRef: ref ? ref[0] : null, on: after(/^transaction date\s*:?/i) || null };
+}
+
 // ---- A game's web shop (Appcharge, Xsolla) --------------------------------------------------------------------------------
 // "Items" then each thing in the pack with how many ("Mixy Meow | 1", "Checkerboard | 10", "Coins | 4,500"), then the
 // subtotal: one purchase of the whole pack, named by what is in it ("Mixy Meow, 10 Checkerboard", "2,200 Coins").
@@ -95,9 +151,13 @@ export function gameBundle(text) {
   for (let k = i + 1; k < list.length && k < i + 40; k++) {
     const r = list[k];
     if (/^(?:sub-?\s?total|total|tax|vat)\b/i.test(r)) break;
-    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
-    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && /^(\d{1,3}(?:,\d{3})*|\d{1,7})$/.test(list[k + 1] || "")) { m = [null, r, list[k + 1]]; k++; }
-    if (!m) return parts.length ? parts : null;
+    // (How many, as "6,000" or "x 15". Round 12.)
+    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
+    const next = /^(?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
+    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1]]; k++; }
+    // (Whatever follows the list ends it: the pack is what was read so far. A list of objects was once returned here, and
+    // read as an item named "[object Object]". Round 12.)
+    if (!m) break;
     parts.push({ name: m[1].trim(), amount: m[2] });
   }
   if (!parts.length) return null;

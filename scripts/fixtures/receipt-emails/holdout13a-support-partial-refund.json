@@ -1,0 +1,25 @@
+{
+ "id": "holdout13a-support-partial-refund",
+ "sender": "Just Eat",
+ "layout": "a support reply ('Re: Conversation with …') saying it processed a partial refund for an order it names",
+ "headers": {
+  "from": "Just Eat UK <info@just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "[Just Eat UK] Re: Conversation with sam.taylor@example.co.uk",
+  "date": "Mon, 12 Oct 2026 10:34:00 +0000"
+ },
+ "html": "",
+ "text": "##- Please type your reply above this line -##\n\nPriya, 12 Oct 2026, 11:34 BST\n\nHi Sam,\n\nI have personally taken ownership of your ticket regarding order #771200341 from Napoli Corner.\n\nI have overridden the automated decline and processed a partial refund of £6.25 back to your original payment card. Please allow 5-7 business days for this to reflect in your account.\n\nKind regards,\nThis email is a service from Just Eat UK.",
+ "expected": {
+  "notPurchase": {
+   "kind": "adjusted",
+   "refundPence": 625,
+   "merchant": null
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

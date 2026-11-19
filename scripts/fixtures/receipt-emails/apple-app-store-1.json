@@ -16,12 +16,12 @@
   "currency": "GBP",
   "items": [
    {
-    "name": "Royal Match",
+    "name": "5,000 Coins",
     "qty": 1,
     "linePence": 159
    },
    {
-    "name": "Duolingo",
+    "name": "Super Duolingo (Monthly)",
     "qty": 1,
     "linePence": 1299
    }

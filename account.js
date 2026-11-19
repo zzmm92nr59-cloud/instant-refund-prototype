@@ -3498,6 +3498,16 @@
     // Money back on this order later (Uber Eats "We adjusted the total", worker/gmail.js attachAdjustments).
     if (x.adjusted && Number.isInteger(x.adjusted.refundPence) && x.adjusted.refundPence > 0)
       card.appendChild(el("p", { className: "rl-po-now", text: money(x.adjusted.refundPence, x.adjusted.currency || x.currency) + " refunded" + (Number.isInteger(x.adjusted.newTotalPence) ? ". It now comes to " + money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) + "." : ".") }));
+    // Account credit given back instead of money (Just Eat "£3.99 credit"), said apart from money refunded.
+    if (x.adjusted && Number.isInteger(x.adjusted.creditPence) && x.adjusted.creditPence > 0)
+      card.appendChild(el("p", { className: "rl-po-now", text: money(x.adjusted.creditPence, x.adjusted.currency || x.currency) + " given back as account credit." }));
+    // A booking paid in parts (a deposit, then instalments): what's been paid so far, from the payment emails.
+    if (Number.isInteger(x.paidSoFarPence) && x.paidSoFarPence > 0 && Array.isArray(x.payments) && x.payments.length)
+      card.appendChild(el("p", { className: "rl-po-now", text: "Paid so far: " + money(x.paidSoFarPence, x.currency) + (x.payments.length > 1 ? " in " + x.payments.length + " payments." : ".") }));
+    // Swapped by the shop (a supermarket's substitutions), said once per item, whichever way the items are shown.
+    (x.items || []).forEach(function (i) { if (i && i.name && typeof i.substitutedFor === "string" && i.substitutedFor) card.appendChild(el("p", { className: "rl-po-now", text: i.name + " was sent instead of " + i.substitutedFor + "." })); });
+    // The shop's email says it can't be refunded (a non-refundable hotel rate): said plainly, no return window.
+    if (x.returns && x.returns.nonRefundable === true) card.appendChild(el("p", { className: "rl-po-now", text: "Non-refundable, as the booking email says." }));
     if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && (x.itemsCheck.complete === false || x.itemsCheck.namesOk === false) && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
@@ -3603,7 +3613,7 @@
     // One row of small buttons: the receipt itself (with the QR code or label it mentions), the parcel, a reminder.
     var acts = el("div", { className: "rl-rc-acts" });
     var pill = function (text, onclick, extra) { var b = el("button", { type: "button", className: "rl-pill", text: text, onclick: onclick }); if (extra) extra(b); acts.appendChild(b); return b; };
-    if (x.id && mailRef(x) && openOriginal) pill(rt.qrMentioned ? "Receipt and QR code" : rt.labelMentioned ? "Receipt and label" : "View receipt", function () { openOriginal(x.id); });
+    if ((x.id || x.viewId) && mailRef(x) && openOriginal) pill(rt.qrMentioned ? "Receipt and QR code" : rt.labelMentioned ? "Receipt and label" : "View receipt", function () { openOriginal(x.viewId || x.id); });
     if (dv && dv.trackUrl && /^https:\/\//.test(dv.trackUrl) && freshDelivery(x))
       acts.appendChild(el("a", { className: "rl-pill", href: dv.trackUrl, target: "_blank", rel: "noopener noreferrer", text: "Track parcel" }));
     // Your own photo of it (Connor, 15 Nov: an in-store receipt has no picture, and a shop's picture can be the wrong colour).
@@ -9489,6 +9499,10 @@
   }
   function emailCard(x, opts) {
     opts = opts || {};
+    // A second order inside one email (Amazon puts two in one confirmation; worker/gmail.js listReceipts, id "<email>-2")
+    // has no stored receipt of its own: it shows what was bought and its email, but nothing that would change the email's
+    // first order (fix, remind, return, share, photo).
+    if (x.fromEmail && x.id && x.id !== x.fromEmail) x = Object.assign({}, x, { id: null, viewId: x.fromEmail });
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
     var card = el("div", { className: "rl-po rl-tap" });
     var img = el("div", { className: "rl-po-img" });

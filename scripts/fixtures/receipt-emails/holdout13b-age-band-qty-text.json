@@ -1,0 +1,30 @@
+{
+ "id": "holdout13b-age-band-qty-text",
+ "sender": "Strike Lanes",
+ "layout": "plain text 'Junior - aged 6+ 3 £25.50'",
+ "headers": {
+  "from": "Strike Lanes <bookings@strikelanes.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation",
+  "date": "Sun, 15 Nov 2026 15:00:00 +0000"
+ },
+ "html": "",
+ "text": "Strike Lanes\nBooking reference: SL-449JQ\nSunday, 15 November 2026\n16:00 - 17:00\nJunior - aged 6+ 3 £25.50\nTotal Price: £25.50",
+ "expected": {
+  "shop": "Strike Lanes",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Junior - aged 6+",
+    "qty": 3,
+    "linePence": 2550
+   }
+  ],
+  "subtotalPence": 2550,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2550
+ }
+}

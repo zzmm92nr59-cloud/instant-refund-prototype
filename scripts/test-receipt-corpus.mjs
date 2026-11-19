@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations, attachAdjustments } from "../worker/gmail.js";
-import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
+import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail } from "../worker/gmail.js";
+import { rawEmail, forwarded, SHOPPER } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
 const only = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
@@ -239,7 +239,124 @@ const joinWrong = [];
   if (!(meal.adjusted && meal.adjusted.refundPence === 625 && meal.adjusted.newTotalPence === 1511)) joinWrong.push("adjustment not joined to its order: " + JSON.stringify(meal.adjusted));
   if (other.adjusted) joinWrong.push("adjustment joined to another restaurant's order");
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders"}`);
+// Round 11 (Connor's real inbox, four blind checks): emails of one order that must end as one card, or none.
+{
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const card = (id, n) => ({ id: "c" + n, createdAt: n, kind: "receipt", status: "pending", ...parseReceiptEmail(rawEmail(fx(id))) });
+  const cancel = (id) => ({ kind: "order_update", stage: "cancelled", ...parseCancellationEmail(rawEmail(fx(id))) });
+  // A takeaway order and its cancellation, by the number under "Your order number is:".
+  const je = mergeOrderEmails([card("holdout12-je-order-number-under-label", 1)]);
+  attachCancellations(je, [cancel("holdout12-je-cancelled")]);
+  if (!(je[0].cancelled && je[0].cancelled.partial === false)) joinWrong.push("takeaway cancellation not joined by its number");
+  // A cancellation with no number that shows the item joins the one order of that shop with that item, and no other.
+  const tableOrder = card("holdout12-furniture-order-label", 2);
+  const other = { ...card("holdout12-furniture-order-label", 3), orderRef: "LWH-OTHER-1", items: [{ name: "Velvet Accent Chair", qty: 1, pricePence: 19999 }] };
+  const furn = mergeOrderEmails([tableOrder, other]);
+  const c = cancel("holdout12-furniture-cancelled-no-number");
+  if (!c.ok || c.orderRef !== null || !c.byItems) joinWrong.push("item-named cancellation not read: " + JSON.stringify(c.reason || c.orderRef));
+  attachCancellations(furn, [c]);
+  if (!(furn[0].cancelled && !furn[0].cancelled.partial) || furn[1].cancelled) joinWrong.push("item-named cancellation joined the wrong order");
+  const twice = mergeOrderEmails([card("holdout12-furniture-order-label", 4), { ...card("holdout12-furniture-order-label", 5), orderRef: "LWH-OTHER-2" }]);
+  attachCancellations(twice, [c]);
+  if (twice.some((o) => o.cancelled)) joinWrong.push("item-named cancellation guessed between two orders with the same item");
+  // A payment service's receipt for the shop's order (same number but the shop's letters, same money, same day): one card,
+  // led by the shop's own email.
+  const shop = card("holdout12-rugs-comma-pence", 6);
+  const paypal = { id: "p1", createdAt: 7, kind: "receipt", retailer: { name: "Rugsmith AB", domain: null, via: "paypal.co.uk" }, orderRef: "5502714", orderDate: shop.orderDate, totalPence: shop.totalPence, currency: "GBP",
+    items: [{ name: "Linen cushion cover 4...", qty: 2, pricePence: 1350 }], itemsCheck: { complete: false } };
+  const one = mergeOrderEmails([shop, paypal]);
+  if (one.length !== 1 || one[0].retailer.name !== "Rugsmith") joinWrong.push(`a PayPal receipt and the shop's order made ${one.length} cards`);
+  if (mergeOrderEmails([shop, { ...paypal, totalPence: shop.totalPence + 500 }]).length !== 2) joinWrong.push("a PayPal receipt for other money joined the order");
+  // A PDF-only invoice of the shop days after its itemised order email is that order's; a parcel "-1" of an order joins it.
+  const coffee = card("holdout12-coffee-sections", 8);
+  const inv = { id: "i1", createdAt: 9, kind: "receipt", retailer: { name: "Brewhaus", domain: "brewhaus.example" }, orderRef: "88120044", orderDate: coffee.orderDate, totalPence: null, items: [], detailsInAttachment: "pdf" };
+  const c1 = mergeOrderEmails([coffee, inv]);
+  if (c1.length !== 1 || c1[0].orderRef !== "88120044") joinWrong.push(`a PDF-only invoice made ${c1.length} cards`);
+  const paints = card("holdout12-paints-no-pence", 10);
+  const parcel = { id: "s1", createdAt: 11, kind: "receipt", retailer: { name: "Nordvik Paints", domain: "nordvik-paints.example" }, orderRef: paints.orderRef + "-1", orderDate: paints.orderDate, totalPence: null, items: [] };
+  if (mergeOrderEmails([paints, parcel]).length !== 1) joinWrong.push("a parcel numbered '-1' of an order made a card of its own");
+  // A shop's reply quoting the order, and a booking someone else forwarded to the shopper, are never purchases.
+  const reply = ["From: Bedcraft <hello@bedcraft.example>", "To: Sam Taylor <sam.taylor@example.co.uk>", "Subject: RE: Order #1806 confirmed", "Date: Mon, 6 Jul 2026 10:30:55 +0000", "In-Reply-To: <abc@mail.example>",
+    "Content-Type: text/plain; charset=utf-8", "", "Hi Sam, thanks for your message. Your delivery is booked.", "", "Order #1806 confirmed", "Ottoman Bed Frame | £899.00", "Total | £899.00"].join("\r\n");
+  if (parseReceiptEmail(reply).ok) joinWrong.push("a shop's reply read as a purchase");
+  const fwd = ["From: Alex Morgan <alex.morgan@outlook.com>", "To: Sam Taylor <sam.taylor@example.co.uk>", "Subject: Fw: Flight Booking Confirmed: London - Faro", "Date: Thu, 5 Feb 2026 18:13:21 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "________________________________", "From: SkyTrips <flights@skytrips.example>", "Sent: 4 February 2026 20:00", "To: alex.morgan@outlook.com <alex.morgan@outlook.com>", "Subject: Flight Booking Confirmed: London - Faro", "",
+    "Dear ALEX MORGAN,", "Your booking is confirmed. Booking number 5531877201", "Total | £412.30"].join("\r\n");
+  if (parseReceiptEmail(fwd).ok) joinWrong.push("someone else's forwarded booking read as the shopper's purchase");
+  const mine = fwd.replace("From: Alex Morgan <alex.morgan@outlook.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace(/alex\.morgan@outlook\.com/g, "sam.taylor@outlook.com").replace("ALEX MORGAN", "SAM TAYLOR");
+  if (!parseReceiptEmail(mine).ok) joinWrong.push("the shopper's own forwarded booking not read");
+}
+// Round 12 (Connor's real inbox): a changed order's emails ("We got your changes", each with the whole new list) make one card
+// with the latest list and no taken-off item; the delivery-day email's substitution shows what came instead, at its price.
+{
+  const card = (id, n) => ({ id: "g" + n, createdAt: n, kind: "receipt", status: "pending", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, id + ".json"), "utf8")))) });
+  // (In any order the emails were read: the change sent last is the order as it now is.)
+  for (const order of [[1, 2, 3, 4], [4, 3, 2, 1], [3, 1, 4, 2]]) {
+    const ids = ["holdout13a-grocer-confirmation", "holdout13a-grocer-change-1", "holdout13a-grocer-change-2", "holdout13a-grocer-day-of-substitution"];
+    const cards = mergeOrderEmails(order.map((k, n) => card(ids[k - 1], n + 1)));
+    if (cards.length !== 1) { joinWrong.push(`a changed order made ${cards.length} cards`); continue; }
+    const o = cards[0], names = (o.items || []).map((i) => i.name);
+    if (o.orderDate !== "2026-10-07") joinWrong.push(`changed order dated ${o.orderDate} for its confirmation's 2026-10-07`);
+    if (names.length !== 5 || names.some((n) => /Bacon/.test(n)) || !names.some((n) => /Chopped Tomatoes/.test(n))) joinWrong.push("changed order's items not the latest list: " + names.join(", "));
+    const sub = (o.items || []).find((i) => /Italian Mozzarella/.test(i.name));
+    if (!sub || sub.pricePence !== 185 || !/Buffalo Mozzarella/.test(sub.substitutedFor || "") || names.some((n) => /Buffalo/.test(n))) joinWrong.push("substitution not shown: " + JSON.stringify(sub || null));
+    if (o.totalPence !== 920) joinWrong.push(`changed order's total ${o.totalPence} for the paid 920`);
+  }
+}
+// Round 12: money back joins the order it is for. A support reply's refund and account credit by the order number it names
+// (the first number that is one of the shop's orders); a payment service's refund naming no order by what was first paid, to
+// whom and when, and only when one order fits; a refund naming the shop's invoice by that number.
+{
+  const mail = (from, subject, date, body) => `From: ${from}\r\nTo: ${SHOPPER.email}\r\nSubject: ${subject}\r\nDate: ${date}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`;
+  const je = (n, ref, total) => ({ id: "je" + n, createdAt: n, kind: "receipt", retailer: { name: "Just Eat", domain: "just-eat.co.uk" }, orderRef: ref, orderDate: "2025-08-31", totalPence: total, currency: "GBP", items: [] });
+  const orders = [je(1, "664851790", 2397), je(2, "771200999", 1500)];
+  const reply = (body) => classifyEmail(mail("Just Eat UK <info@just-eat.co.uk>", "[Just Eat UK] Re: Just Eat Order 664851790", "Sun, 07 Sep 2025 10:50:00 +0000", body)).details;
+  const a1 = reply("Thank you for reaching out about your recent order 552658111.\n\nI can see that we refunded you £4**.99** on 31/08/25.");
+  const a2 = reply("We are sorry items were missing from your recent order 664851790.\n\nWe've added a £3.99 credit to your Just Eat account, which covers the value of the affected items.");
+  const no = reply("We're sorry, but we are unable to offer a refund of £5.00 for order 664851790.");
+  if (no.kind === "order_update") joinWrong.push("a refused refund read as money back");
+  attachAdjustments(orders, [a1, a2].filter((x) => x.kind === "order_update"));
+  const adj = orders[0].adjusted;
+  if (!(adj && adj.refundPence === 499 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
+  const ride = (n, total, day) => ({ id: "u" + n, createdAt: n, kind: "receipt", retailer: { name: "Uber", domain: "uber.com" }, orderRef: null, orderDate: day, totalPence: total, currency: "GBP", items: [] });
+  const pp = classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've got a refund from UBER PAYMENTS UK LIMITED", "Wed, 18 Mar 2026 09:00:00 +0000",
+    "You've got a refund from UBER PAYMENTS UK LIMITED\nYour refund of £3.06 GBP from UBER PAYMENTS UK LIMITED\nRefund complete! Available now in your balance.\nYou originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026. View receipt\nRefund total\n£3.06 GBP")).details;
+  const rides = [ride(1, 499, "2026-03-05"), ride(2, 499, "2026-03-09"), ride(3, 720, "2026-03-05")];
+  attachReturnProgress(rides, [], [pp]);
+  if (!(rides[0].returnProgress && rides[0].returnProgress.refundPence === 306) || rides[1].returnProgress || rides[2].returnProgress) joinWrong.push("payment service's refund not joined by what was first paid: " + JSON.stringify(pp.paidPence) + " " + JSON.stringify(rides.map((r) => r.returnProgress && r.returnProgress.refundPence)));
+  const twice = [ride(4, 499, "2026-03-05"), ride(5, 499, "2026-03-05")];
+  attachReturnProgress(twice, [], [pp]);
+  if (twice.some((r) => r.returnProgress)) joinWrong.push("payment service's refund guessed between two rides for the same money");
+  // A holiday paid in parts: each "You've authorised £… to <the shop's company>" payment joins the booking, none is a purchase.
+  const trip = mergeOrderEmails([{ id: "h1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-holiday-booking-no-price.json"), "utf8")))) }]);
+  const auth = (amt, day, date) => classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've authorised a payment to Sunward Breaks Lim...", date,
+    `Hello, ${SHOPPER.name}\nYou've authorised ${amt} GBP to Sunward Breaks Lim...\nMerchant\nSunward Breaks Lim...\nTransaction date\n${day}\nOrder ID\n2610GBPAB12CD\n`)).details;
+  const pays = [auth("£40.00", "14 Oct 2026", "Tue, 14 Oct 2026 20:43:00 +0000"), auth("£150.25", "8 Nov 2026", "Sun, 08 Nov 2026 05:10:00 +0000")];
+  if (pays.some((p) => p.kind !== "order_update" || p.stage !== "payment")) joinWrong.push("a payment authorisation read as " + pays.map((p) => p.kind + ":" + p.stage).join());
+  attachCancellations(trip, pays);
+  if (trip.length !== 1 || trip[0].totalPence != null || trip[0].paidSoFarPence !== 19025 || (trip[0].payments || []).length !== 2 || trip[0].cancelled) joinWrong.push("a booking's payments not joined: " + JSON.stringify(trip.map((o) => [o.orderRef, o.totalPence, o.paidSoFarPence])));
+  // A payment service's receipt with no item lines: the total paid with its postage, and "£52.48 GBP" is never an item.
+  const ppr = parseReceiptEmail(mail("PayPal <service@paypal.co.uk>", "Receipt for your payment to Trailhaus Ltd", "Sun, 21 Dec 2026 10:00:00 +0000",
+    ["You paid £52.48 GBP to Trailhaus Ltd", "Merchant", "Trailhaus Ltd", "Order ID", "556120044", "Subtotal", "£47.49", "Postage and packing", "£4.99", "Total", "£52.48 GBP", "Paid with", "Visa Debit", "£52.48 GBP"].join("\n")));
+  if (!ppr.ok || ppr.totalPence !== 5248 || (ppr.items || []).length) joinWrong.push("payment receipt with postage read as " + JSON.stringify([ppr.totalPence, (ppr.items || []).map((i) => i.name)]));
+  // A shop's "delivered" email sent by the company that sends its parcel news ("Fellwear" <noreply@fellwear-intl.parcelnews.test>)
+  // joins the shop's own order with that number.
+  const shipped = { id: "s1", createdAt: 1, kind: "receipt", retailer: { name: "Fellwear", domain: "e.fellwear.test" }, orderRef: "FW55027025", orderDate: "2026-10-30", totalPence: 6900, items: [], shipment: { trackingNumber: "JK000000001GB", carrier: "Royal Mail", status: "shipped" } };
+  const dl = classifyEmail(mail("Fellwear <noreply@fellwear-intl.parcelnews.test>", "Your Fellwear order has been delivered", "Sat, 31 Oct 2026 11:07:00 +0000",
+    "ORDER ID: FW55027025\nSHOP WOMEN | SHOP MEN\nYour Fellwear order has been delivered.\nTime to get active! We hope you enjoy your purchase.")).details;
+  attachDeliveries([shipped], [dl]);
+  if (!(shipped.delivery && shipped.delivery.status === "delivered")) joinWrong.push("a delivered email from the shop's parcel-news company not joined: " + JSON.stringify([dl.kind, dl.orderRef, shipped.delivery && shipped.delivery.status]));
+  // One email confirming two orders: a card for each, each with its own number, total and items.
+  const two = mergeOrderEmails([{ id: "t1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-two-orders-one-email.json"), "utf8")))) }]);
+  if (two.length !== 2 || two[1].orderRef !== "301-5510022-4410002" || two[1].totalPence !== 3100 || (two[1].items || []).map((i) => i.name).join() !== "Eau de Parfum 50ml" || two[0].totalPence !== 2249)
+    joinWrong.push("an email with two orders made " + JSON.stringify(two.map((o) => [o.orderRef, o.totalPence, (o.items || []).length])));
+  const inv = parseReturnUpdateEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-paypal-refund-invoice.json"), "utf8"))));
+  const wine = [{ id: "w1", createdAt: 1, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22001544-P001", orderDate: "2026-06-13", totalPence: 3000, items: [] },
+    { id: "w2", createdAt: 2, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22170130-P001", orderDate: "2026-07-14", totalPence: 3000, items: [] }];
+  attachReturnProgress(wine, [], [{ kind: "return_update", ...inv }]);
+  if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };

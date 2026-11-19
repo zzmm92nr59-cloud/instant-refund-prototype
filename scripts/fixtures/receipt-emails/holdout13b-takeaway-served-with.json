@@ -1,0 +1,35 @@
+{
+ "id": "holdout13b-takeaway-served-with",
+ "sender": "Pitta Point",
+ "layout": "'1 x', 'Regular (incl. VAT)', 'Served with:', '1', 'x', 'Halloumi Wrap', price, 'Inc. £0.00 VAT'",
+ "headers": {
+  "from": "Pitta Point <no-reply@orders.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Pitta Point: Order #7QPLMN accepted",
+  "date": "Fri, 6 Nov 2026 12:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Pitta Point</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.orders.example/?utm_source=email\"><img src=\"https://www.orders.example/static/email/logo.png\" alt=\"Pitta Point\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your order 7QPLMN has been accepted by Pitta Point and is being prepared.</td></tr>\n<tr><td>Order ID: 7QPLMN</td></tr>\n<tr><td>1 x</td></tr>\n<tr><td>Regular (incl. VAT)</td></tr>\n<tr><td>Served with:</td></tr>\n<tr><td>1</td></tr>\n<tr><td>x</td></tr>\n<tr><td>Halloumi Wrap</td></tr>\n<tr><td>1</td></tr>\n<tr><td>x</td></tr>\n<tr><td>Chips</td></tr>\n<tr><td>&pound;10.95</td></tr>\n<tr><td>Inc. &pound;0.00 VAT</td></tr>\n<tr><td>1 x</td></tr>\n<tr><td>Cola (can) (incl. VAT)</td></tr>\n<tr><td>&pound;1.80</td></tr>\n<tr><td>Inc. &pound;0.00 VAT</td></tr>\n<tr><td>Subtotal</td><td>&pound;12.75</td></tr>\n<tr><td>Total</td><td>&pound;12.75</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Pitta Point. All rights reserved.<br /><a href=\"https://www.orders.example/help\">Help</a> | <a href=\"https://www.orders.example/privacy\">Privacy</a> | <a href=\"https://www.orders.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.orders.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Pitta Point",
+  "date": "2026-11-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Regular (with Halloumi Wrap and Chips)",
+    "qty": 1,
+    "linePence": 1095
+   },
+   {
+    "name": "Cola (can)",
+    "qty": 1,
+    "linePence": 180
+   }
+  ],
+  "subtotalPence": 1275,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1275
+ }
+}
