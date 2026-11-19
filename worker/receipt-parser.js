@@ -1146,34 +1146,42 @@ const VAT_NOTE = /^[\s|]*inc(?:l|luding)?\.?\s*£\s?[\d,]+(?:\.\d{2})?\s*vat[\s|
 function servedWith(lines) {
   const out = [];
   for (let i = 0; i < lines.length; i++) {
-    if (!/^[\s|]*(?:served with|comes with|with)\s*:\s*$/i.test(lines[i])) { out.push(lines[i]); continue; }
+    if (!/^[\s|]*(?:served with|comes with|with)\s*:[\s|]*$/i.test(lines[i])) { out.push(lines[i]); continue; }
     const sides = [];
     let j = i + 1;
     for (; j < lines.length; j++) {
-      const l = lines[j].trim();
-      if (!l || /^\|+$/.test(l)) continue;
+      const l = lines[j].replace(/^[\s|]+|[\s|]+$/g, "");
+      if (!l) continue;
       const one = /^(\d{1,2})\s*[x×]\s+(\p{L}.{1,60})$/u.exec(l);
       if (one) { sides.push((one[1] === "1" ? "" : one[1] + " x ") + one[2].trim()); continue; }
-      const n = /^\d{1,2}$/.test(l), x = /^[x×]$/i.test((lines[j + 1] || "").trim()), name = (lines[j + 2] || "").trim();
-      if (n && x && /^\p{L}.{1,60}$/u.test(name) && !/£/.test(name)) { sides.push((l === "1" ? "" : l + " x ") + name); j += 2; continue; }
+      // (Blank lines between the rows say nothing.)
+      const next = []; for (let k = j + 1; k < lines.length && next.length < 2; k++) { const v = lines[k].replace(/^[\s|]+|[\s|]+$/g, ""); if (v) next.push([k, v]); }
+      const n = /^\d{1,2}$/.test(l), x = next[0] && /^[x×]$/i.test(next[0][1]), name = next[1] ? next[1][1] : "";
+      if (n && x && /^\p{L}.{1,60}$/u.test(name) && !/£/.test(name)) { sides.push((l === "1" ? "" : l + " x ") + name); j = next[1][0]; continue; }
       break;
     }
     if (!sides.length) { out.push(lines[i]); continue; }
-    out.push("Served with: " + sides.join(", "));
+    // (A meal named only by its size, "Large", is named with what it came with: "Large (with Latin Fajita Veg and Rice)".)
+    let k = out.length - 1;
+    while (k >= 0 && !out[k].replace(/^[\s|]+|[\s|]+$/g, "")) k--;
+    const sized = k >= 0 && /^[\s|]*(small|medium|regular|large|extra large|mini|half|full)(\s*\((?:incl?\.?|including)\s*vat\))?([\s|]*)$/i.exec(out[k]);
+    const listed = sides.length > 1 ? sides.slice(0, -1).join(", ") + " and " + sides[sides.length - 1] : sides[0];
+    if (sized) out[k] = `${sized[1]} (with ${listed})${sized[3] || ""}`;
+    else out.push("Served with: " + sides.join(", ") + (/\|\s*$/.test(lines[i]) ? " |" : ""));
     i = j - 1;
   }
   return out;
 }
 // Under an "Item | Price" heading, a row the email's HTML split in two, its name over "| £6.66 |": one row again. Round 12.
 function rowsUnderHeading(lines) {
-  const h = lines.findIndex((l) => /^\s*\|?\s*(?:items?|descriptions?|products?)\s*\|\s*(?:price|amount|total|cost)\s*\|?\s*$/i.test(l));
+  const h = lines.findIndex((l) => /^[\s|]*(?:items?|descriptions?|products?)\s*\|\s*(?:price|amount|total|cost)[\s|]*$/i.test(l));
   if (h < 0) return lines;
   const out = lines.slice(0, h + 1);
   for (let i = h + 1; i < lines.length; i++) {
-    const name = lines[i].trim();
+    const name = lines[i].replace(/^[\s|]+|[\s|]+$/g, "");
     let j = i + 1;
     while (j < lines.length && !lines[j].trim()) j++;
-    if (/^\p{L}[^£|]{1,80}$/u.test(name) && /^\|\s*£\s?[\d,]+\.\d{2}\s*\|?\s*$/.test((lines[j] || "").trim())) { out.push(name + " " + lines[j].trim()); i = j; continue; }
+    if (/^\p{L}[^£|]{1,80}$/u.test(name) && /^\|\s*£\s?[\d,]+\.\d{2}[\s|]*$/.test((lines[j] || "").trim())) { out.push(name + " | " + lines[j].replace(/^[\s|]+|[\s|]+$/g, "")); i = j; continue; }
     out.push(lines[i]);
   }
   return out;
@@ -1525,8 +1533,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.items = [{ name: bought[1].trim(), qty: 1, pricePence: result.totalPence }];
       const siteDomain = site ? site[1].toLowerCase() : null;
       if (siteDomain && siteDomain !== String(result.retailer.domain || "").toLowerCase()) {
-        const base = domainBase(siteDomain);
-        const named = (bought[1].match(/[\p{L}\d]+/gu) || []).find((w) => w.toLowerCase() === base.replace(/-/g, ""));
+        const bases = [domainBase(siteDomain), siteDomain.split(".")[0]].map((b) => b.replace(/-/g, ""));
+        const named = (bought[1].match(/[\p{L}\d]+/gu) || []).find((w) => bases.includes(w.toLowerCase()));
+        const base = named || bases[1];
         result.retailer = { ...result.retailer, name: named || base.charAt(0).toUpperCase() + base.slice(1), domain: siteDomain };
       }
       const rn = /\breceipt\s*(?:number|no\.?|#)?\s*:?\s*(\d{6,14})\b/i.exec(flatT);

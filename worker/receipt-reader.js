@@ -359,7 +359,7 @@ export function gameTitle(text) {
     // (The web shop's own heading, "Appcharge Reciept" (sic), is not the game: a misspelt receipt, or the shop's name. Round 12.)
     if (/\breci?ei?pt\b|\b(?:appcharge|xsolla)\b/i.test(c)) continue;
     // (A forward's own header lines, "From: Puzzle Pals <receipts@…>", are not the game's title. Round 10.)
-    if (/^(?:from|to|sent|subject|date|cc)\s*:|@/i.test(c)) continue;
+    if (/^(?:from|to|sent|subject|date|cc)\s*:|@|forwarded message|original message/i.test(c)) continue;
     let name = c.replace(/\s*[-–]\s*[A-Z0-9][A-Z0-9 &.]{1,30}$/, "").trim() || c;
     if (name === name.toUpperCase()) name = name.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
     return name;
