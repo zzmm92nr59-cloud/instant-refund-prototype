@@ -540,7 +540,7 @@ function fromText(text, refDate, ctx = {}) {
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
     // capitals ("QWERTZ"). Round 11.)
-    [...text.matchAll(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
+    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
@@ -750,10 +750,14 @@ function extractReturns(text, html, orderDate) {
   // A QR code for a return. Not one to download the shop's app, a ticket's or an eSIM's code, or the letters "qr" inside
   // a tracking link's picture address (round 12: a hotel booking, a train ticket, a phone plan and a gift receipt were all
   // flagged "QR code" for that).
-  const NOT_RETURN_QR = /download|\bapp\b|app store|google play|e-?sim|activat|install|ticket|boarding|barcode|check[- ]?in|entry|admission|wallet|sign[- ]?in|log[- ]?in/i;
+  const NOT_RETURN_QR = /\{[^}]*\bqr\b[^}]*\}|phone(?:'s)? camera|download|\bapp\b|app store|google play|e-?sim|activat|install|ticket|boarding|barcode|check[- ]?in|entry|admission|wallet|sign[- ]?in|log[- ]?in/i;
   const qrLines = String(flat).split(/(?<=[.!?])\s+|\n/).filter((l) => /\bqr\b/i.test(l));
   const qrImg = [...String(html || "").matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]).filter((t) => /\balt=["'][^"']*\bqr\b|\bsrc=["'][^"']*(?:\bqr[-_]?code|[\/_-]qr[\/_.-])/i.test(t));
-  out.qrMentioned = qrLines.some((l) => !NOT_RETURN_QR.test(l)) || qrImg.some((t) => !NOT_RETURN_QR.test(t));
+  // (The sentence before counts too: "Your eSIM is ready to be installed and activated. To complete the process simply scan
+  // the QR code below.")
+  const allLines = String(flat).split(/(?<=[.!?])\s+|\n/);
+  const qrCtx = allLines.map((l, k) => (/\bqr\b/i.test(l) ? [allLines[k - 1] || "", l].join(" ") : null)).filter(Boolean);
+  out.qrMentioned = (qrLines.length && qrCtx.some((l) => !NOT_RETURN_QR.test(l))) || qrImg.some((t) => !NOT_RETURN_QR.test(t));
   out.labelMentioned = /(prepaid|printable|return)\s+label|drop[- ]?off|drop (?:it )?off|collect\+|evri|royal mail|inpost|dpd|ups access point/i.test(flat);
   // A booking that says it can't be refunded ("This booking is non-refundable"): no window or return steps are kept from
   // it, so Relay never offers a return the shop has ruled out. Round 12.
@@ -1154,8 +1158,38 @@ function rowsUnderHeading(lines) {
   }
   return out;
 }
+// A gift's own message ("Personal message: Happy birthday !", "Hope you enjoy"), up to its price, and an "Item 1" heading
+// over a labelled name: never things bought. Round 12.
+function withoutGiftNotes(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^[\s|]*item\s+\d{1,2}[\s|]*$/i.test(lines[i])) continue;
+    if (/^[\s|]*(?:personal |gift )?message\s*:/i.test(lines[i])) {
+      let j = i + 1;
+      while (j < lines.length && j <= i + 4 && !/£|:\s/.test(lines[j])) j++;
+      i = j - 1;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out;
+}
+function soleItemOverPrice(text, m, total) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const basket = m && m.subtotal != null ? m.subtotal : total;
+  if (basket == null) return null;
+  const hits = [];
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const pm = /^£\s?([\d,]+\.\d{2})$/.exec(rows[i + 1]);
+    if (!pm || money(pm[1]) !== basket) continue;
+    const name = rows[i];
+    if (!/^\p{Lu}[\p{L}\d '’&+.,()-]{4,80}$/u.test(name) || /[:!?]$|\b(?:total|subtotal|basket|paid|payment|delivery|voucher|discount|vat|tax)\b/i.test(name)) continue;
+    hits.push({ name, qty: 1, pricePence: basket });
+  }
+  return hits.length === 1 ? hits[0] : null;
+}
 function withoutRecommendations(t) {
-  const lines = rowsUnderHeading(servedWith(String(t || "").split("\n").filter((l) => !FROM_PRICE.test(l) && !VAT_NOTE.test(l))));
+  const lines = withoutGiftNotes(rowsUnderHeading(servedWith(String(t || "").split("\n").filter((l) => !FROM_PRICE.test(l) && !VAT_NOTE.test(l)))));
   if (!lines.some((l) => RECOMMEND_HEAD.test(l))) return lines.join("\n");
   const out = [];
   for (let i = 0, skip = false; i < lines.length; i++) {
@@ -1372,6 +1406,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
     if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     // Prices printed above their names (round 3): tried after every other reading, so it is taken only when nothing else adds up.
+    // (One name straight over one price that is the whole basket, "WineBank Welcome Red Selection" over "£134.88" with
+    // "Basket Total: £134.88": that one thing, before a price printed above the next words is tried. Round 12.)
+    for (const t of [textR, otherR]) if (t) { const one = soleItemOverPrice(t, moneyOf(t), result.totalPence); if (one) cands.push({ items: [one], money: moneyOf(t) }); }
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
     // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
@@ -1443,6 +1480,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       it.pricePence = result.totalPence;
       result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
     }
+  }
+  // A credit set out like an item under the one thing bought ("Unused time on Claude Pro after 26 Oct 2026", "Qty 1",
+  // "-£11.10"): kept as that item's detail, so the card says why less was paid. Round 12.
+  if (result.items.length === 1) {
+    const cr = /^[\s|]*(\p{L}[^\n|£]{8,80}?)[\s|]*\n(?:[\s|]*\n)*[\s|]*qty\s*:?\s*1[\s|]*\n(?:[\s|]*\n)*[\s|]*[-−–]\s?£\s?([\d,]+\.\d{2})[\s|]*$/imu.exec(fromHtml || text);
+    if (cr && !/\b(?:discount|voucher|promo)/i.test(cr[1])) { const it = result.items[0]; const note = `${cr[1].trim()} −£${cr[2]}`; it.variant = it.variant ? `${it.variant}, ${note}` : note; }
   }
   // A stay booked through a booking site: the room is the item, and the hotel it is at ("Your booking is confirmed at
   // citizenM Paris Charles de Gaulle Airport") is its detail, so the card says where. Round 12.

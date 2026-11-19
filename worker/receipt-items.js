@@ -166,7 +166,9 @@ function splitCell(raw) {
   else if (out.prices.length && (m = /^(\d{1,2})\s+(\p{Lu}.*)$/u.exec(c)) && !/^(?:adults?|child(?:ren)?|items?|for|pack|people|nights?|days?|months?)\b/i.test(m[2])) { out.qty = Number(m[1]); c = m[2]; }
   // Quantity at the end: "Name x2", "Name × 1", "Name (x1)", "Name Qty: 2", "Name  2" (a column).
   m = /^(.*?\S)\s*\(\s?[x×]\s?(\d{1,3})\)$/i.exec(c) || /^(.*?\S)\s+[x×]\s?(\d{1,3})$/i.exec(c) || /^(.*?\S)\s*[-–|]?\s*(?:qty|quantity)\s*:?\s*(\d{1,3})\s*[-–]?$/i.exec(c) ||
-    /^(.*?\S)\s{2,}(\d{1,3})$/.exec(c);
+    /^(.*?\S)\s{2,}(\d{1,3})$/.exec(c) ||
+    // ("Adult - aged 16+ 2": a number after an age band's "+" is how many. Round 12.)
+    /^(.*?\d{1,2}\+)\s(\d{1,2})$/.exec(c);
   if (m && out.qty == null) { out.untailed = cleanName(c); out.qty = Number(m[2]); c = m[1]; out.head = true; out.tail = true; }
   // ("Sea Mist 5L, x 1": the size before how many, set apart by a comma, is the item's size. Round 11.)
   if (out.tail && (m = /^(.*\p{L}.*?)\s+(\d+(?:[.,]\d+)?\s?(?:ml|cl|l|ltr|g|kg|oz))\s*,$/iu.exec(c))) { out.measure = m[2]; c = m[1]; out.untailed = null; }
@@ -519,7 +521,8 @@ export function readItems(text, opts = {}) {
     if (l.cellStart) { foldPend(); pend = newBlock(l, l.names[0]); pend.cell = true; last = null; continue; }
     // A name over two lines ("Define Jacket", then its fabric "Nulu"): one capitalised word straight under a name that gave
     // no quantity and has nothing else under it yet.
-    if (pend && !pend.cell && !pend.prices.length && !pend.head && pend.qty == null && !pend.extras.length && !pend.variant.length && pend.lines === 1 &&
+    // (Not under a labelled name, "Name: Afternoon Tea for Two" then "Standard": the label gave the whole name. Round 12.)
+    if (pend && !pend.cell && !pend.labelled && !pend.prices.length && !pend.head && pend.qty == null && !pend.extras.length && !pend.variant.length && pend.lines === 1 &&
         l.names.length === 1 && /^\p{Lu}[\p{Ll}]{2,15}$/u.test(l.names[0]) && !l.plus && !l.lead && !l.indent) { pend.name += " " + l.names[0]; pend.lines++; continue; }
     if (pend && !pend.prices.length && pend.unit != null && !l.lead && !l.indent && !l.plus) { emit(); pend = newBlock(l, l.names[0]); last = null; continue; }
     if (pend && !pend.prices.length) { pend.extras.push(...l.names); pend.variant.push(...l.variant); if (l.qty != null) pend.qty = l.qty; if (l.details) pend.detail = true; if (l.plus) pend.plus = true; pend.lines++; continue; }
