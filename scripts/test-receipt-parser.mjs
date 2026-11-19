@@ -806,3 +806,11 @@ t("Amazon order where the seller sits under its own heading: one item, not two",
   assert.deepEqual(amazonItems(`<a>Made-Up Garden Hose 15m</a><span>Sold by:</span><span>Hose Co Ltd</span><span>Quantity: 1</span><sup>£</sup><span>19</span><sup>99</sup>`), [{ name: "Made-Up Garden Hose 15m", qty: 1, pricePence: 1999 }]);
   assert.deepEqual(amazonItems("<p>Your Amazon.co.uk order has been dispatched</p>"), [], "nothing found, nothing made up");
 });
+t("An invoice number is the order number when the email gives no other (round 7)", () => {
+  const mk = (body) => "From: Bramble Home <orders@bramblehome.example>\r\nTo: sam@example.com\r\nSubject: Thanks for your Bramble Home order\r\nDate: Wed, 11 Nov 2026 10:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n" + body;
+  const lines = "\nRattan Lamp Shade - Qty 1 - £32.00\nCotton Throw - Qty 1 - £28.00\nTotal: £60.00";
+  assert.equal(parseReceiptEmail(mk("Thanks for your order.\nInvoice number: INV-2290" + lines)).orderRef, "INV-2290");
+  assert.equal(parseReceiptEmail(mk("Thanks for your order.\nInvoice No. 77120" + lines)).orderRef, "77120");
+  assert.equal(parseReceiptEmail(mk("Order number: BH-5512\nInvoice number: INV-2290" + lines)).orderRef, "BH-5512", "the order's own number comes first");
+  assert.equal(parseReceiptEmail(mk("Thanks for your order.\nYour invoice is attached." + lines)).orderRef, null, "no number, none made up");
+});

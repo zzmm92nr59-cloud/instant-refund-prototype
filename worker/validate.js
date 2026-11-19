@@ -82,7 +82,7 @@ const ROUTES = new Map(Object.entries({
   "/relay/my/gmail/find": { fields: { query: str(500) } },
   "/relay/my/gmail/add": { fields: { messageId: str(600), mailbox: int(1, 5) } },
   "/relay/my/gmail/disconnect": { fields: { mailbox: int(1, 5) } },
-  "/relay/my/receipts/add-pasted": { limit: 1000 * KB, fields: { email: str(250000) } },
+  "/relay/my/receipts/add-pasted": { limit: 1000 * KB, fields: { email: str(250000), html: str(600000) } },
   // The help chat: the conversation so far, as the app holds it (worker/support-chat.js checks it further).
   // "Email me one now" on the Relay health page: nothing to send (it goes to the admin asking).
   "/relay/my/admin/health/email": { fields: {} },
