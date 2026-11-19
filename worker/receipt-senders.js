@@ -36,7 +36,7 @@ export function uberEmail(domain, subject, text) {
     return { kind: "adjusted", merchant: adj ? tidyName(adj[1]) : null, refundPence: labelled(list, /refund/), previousPence: labelled(list, /previous total/), newPence: labelled(list, /new total/) };
   }
   if ((/\bthanks for riding\b|\bwe hope you enjoyed your (?:ride|trip)\b|\byour [^\n]{0,30}\btrip with uber\b/i.test(top + "\n" + (subject || "")) && /\btrip fare\b|\bfare\b/i.test(t)) ||
-      (/^[\s|]*trip fare\b/im.test(t) && !/\bhere(?:'|’)s your receipt for\b|\buber eats\b/i.test(top))) {
+      (/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*trip fare\b/im.test(t) && !/\bhere(?:'|’)s your receipt for\b|\buber eats\b/i.test(top))) {
     const pet = /\buber pet\b|\bpet fee\b/i.test(t);
     return { kind: "ride", item: pet ? "Uber Pet ride" : "Uber ride" };
   }

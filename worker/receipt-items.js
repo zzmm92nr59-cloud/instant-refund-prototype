@@ -769,7 +769,7 @@ export function settleItems(items, money, totalPence) {
 // How many items the email says the order has ("Your order of 3 items", "(5 items)"), when it says.
 export function statedItemCount(text) {
   const t = String(text || "").slice(0, 20000);
-  const m = t.match(/\b(?:order|basket|bag|parcel|purchase|delivery)\s+(?:of|contains|with|has)\s+(\d{1,3})\s+items?\b/i) || t.match(/\((\d{1,3})\s+items?\)/i) || t.match(/^[\s|]*(\d{1,3})\s+items?[\s|]*$/im);
+  const m = t.match(/\b(?:order|basket|bag|parcel|purchase|delivery)\s+(?:of|contains|with|has)\s+(\d{1,3})\s+items?\b/i) || t.match(/\((\d{1,3})\s+items?\)/i) || t.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(\d{1,3})\s+items?[\s|]*$/im);
   const n = m ? Number(m[1]) : null;
   return n && n > 0 && n < 500 ? n : null;
 }

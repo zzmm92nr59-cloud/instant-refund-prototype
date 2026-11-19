@@ -134,6 +134,34 @@ async function graphGet(fetchImpl, url, headers) {
 }
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
+// Gmail saying it is too busy for this mailbox just now (it allows only so many requests a second per mailbox): the read is
+// left for a later round, without counting as a try (an email is never left out because Gmail was busy).
+const BUSY = Symbol("busy");
+// ---- Gmail being busy (20 Nov 2026) ----
+// Year rounds sometimes answered 502 "gmail_unavailable": Gmail refuses a mailbox's requests for a moment when they come
+// too fast ("429 Too Many Requests", or "403 rateLimitExceeded" / "userRateLimitExceeded"), and a refused listing ended the
+// round, while a refused email counted as one of its three tries. Now a refused request is asked once more after the wait
+// Gmail asks for (at most 2 seconds); if Gmail still refuses, the round stops there and says when to ask again
+// (retryAfterMs): with nothing read yet, a 503 the app waits on; otherwise what was read is kept and the round says there is more.
+const GMAIL_BUSY_REASON = /rateLimitExceeded|userRateLimitExceeded|RESOURCE_EXHAUSTED|concurrent|backendError/i;
+async function gmailBusy(r) {
+  if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) return true;
+  if (r.status !== 403) return false;
+  const t = await r.clone().text().catch(() => "");
+  return GMAIL_BUSY_REASON.test(t);
+}
+function waitFor(r) {
+  const secs = Number(r.headers && typeof r.headers.get === "function" ? r.headers.get("retry-after") : NaN);
+  return Number.isFinite(secs) && secs >= 0 ? Math.min(2000, secs * 1000) : 500;
+}
+// One request to Gmail, asked once more if Gmail is busy: { res, busy, retryMs }.
+async function gmailGet(fetchImpl, url, headers) {
+  let r = await fetchImpl(url, { headers });
+  if (!(await gmailBusy(r))) return { res: r };
+  await sleep(waitFor(r));
+  r = await fetchImpl(url, { headers });
+  return (await gmailBusy(r)) ? { res: r, busy: true, retryMs: Math.max(2000, waitFor(r)) } : { res: r };
+}
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 // 35 (round 4): emails as they arrive: 8bit windows-1252 parts, forwards attached whole, attachments never read as text,
 // hidden and Outlook-only copies left out, replies quoted with "> ", recommendations, clipped emails, receipts only in a PDF.
@@ -615,7 +643,7 @@ const refused = async (res) => {
   return { ended: res.status === 400 && ACCESS_ENDED.has(String((body && body.error) || "")) };
 };
 async function accessToken(env, refreshToken, fetchImpl) {
-  const res = await fetchImpl("https://oauth2.googleapis.com/token", {
+  const ask = () => fetchImpl("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -623,6 +651,9 @@ async function accessToken(env, refreshToken, fetchImpl) {
       refresh_token: refreshToken, grant_type: "refresh_token"
     })
   });
+  let res = await ask();
+  // (Google busy for a moment: asked once more, see "Gmail being busy".)
+  if (res.status === 429 || res.status >= 500) { await sleep(waitFor(res)); res = await ask(); }
   if (!res.ok) return refused(res);
   const body = await res.json().catch(() => null);
   return body && body.access_token ? { access: body.access_token } : { ended: false };
@@ -1074,9 +1105,12 @@ function gmailMailbox(fetchImpl, token) {
       let pageToken = "", incomplete = false;
       for (let page = 0; page < MAX_PAGES; page++) {
         if (page > 0 && !canPage()) { incomplete = true; break; }
-        const list = await fetchImpl(
+        const got = await gmailGet(fetchImpl,
           "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=" + PAGE_SIZE + "&q=" + encodeURIComponent(windowQuery(afterD, before)) +
-          (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), { headers: auth });
+          (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : ""), auth);
+        const list = got.res;
+        // (Gmail busy part-way through a window's pages: the window is read again from its first page next round.)
+        if (got.busy) return page === 0 ? { failed: true, busy: true, retryMs: got.retryMs } : { entries, incomplete: true, busy: true, retryMs: got.retryMs };
         if (!list.ok) { if (page === 0) return { failed: true }; break; }
         const data = await list.json().catch(() => ({}));
         for (const m of data.messages || []) if (m && typeof m.id === "string" && GMAIL_ID.test(m.id)) entries.push({ id: m.id, key: m.id });
@@ -1088,7 +1122,9 @@ function gmailMailbox(fetchImpl, token) {
     },
     // The email as text; GONE if it no longer exists; null if Gmail couldn't give it just now (tried again later).
     async read(id) {
-      const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
+      const got = await gmailGet(fetchImpl, `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, auth);
+      if (got.busy) { this.busyMs = got.retryMs; return BUSY; }
+      const r = got.res;
       if (r.status === 404) return GONE;
       return r.ok ? gmailEmailText(r) : null;
     },
@@ -1183,7 +1219,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   if (!access.token) { const n = noAccess(access); return { status: n.status, body: { error: n.error } }; }
   const token = access.token;
   const box = row.provider === "microsoft" ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token);
-  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
+  let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0, busyMs = 0;
   // How long this round may keep starting to read more emails, and how much email text it may go through (see "One round's
   // work is bounded" above).
   const startedAt = Date.now(), deadlineMs = o.deadlineMs || ROUND_MS;
@@ -1198,7 +1234,10 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     try { suspects = (t && t.suspects && JSON.parse(t.suspects)) || {}; } catch { suspects = {}; }
     let inflight = [];
     try { inflight = (t && t.inflight && JSON.parse(t.inflight)) || []; } catch { inflight = []; }
-    for (const ref of Array.isArray(inflight) ? inflight : []) if (typeof ref === "string") suspects[ref] = (suspects[ref] || 0) + 1;
+    // (An email that was being read on its own when the round was ended counts twice: it was that email. So an email that
+    // ends rounds is left out after two ended rounds, the first with others, the second on its own.)
+    const list = (Array.isArray(inflight) ? inflight : []).filter((ref) => typeof ref === "string");
+    for (const ref of list) suspects[ref] = (suspects[ref] || 0) + (list.length === 1 ? 2 : 1);
     // (Kept short: an email that has since gone from the mailbox is forgotten after a while.)
     const keys = Object.keys(suspects);
     for (const k of keys.slice(0, Math.max(0, keys.length - MAX_SUSPECTS))) delete suspects[k];
@@ -1225,7 +1264,11 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     const afterD = ymd(fromYmd(before) - span * DAY_MS);
     incomplete = false;
     const listed = await box.list(afterD, before, () => calls + 4 <= budget);
-    if (listed.failed) { if (windows === 0) return { status: 502, body: { error: "gmail_unavailable" } }; incomplete = true; break; }
+    if (listed.busy) busyMs = Math.max(busyMs, listed.retryMs || 2000);
+    if (listed.failed) {
+      if (windows === 0) return listed.busy ? { status: 503, body: { error: "gmail_unavailable", retryAfterMs: busyMs } } : { status: 502, body: { error: "gmail_unavailable" } };
+      incomplete = true; break;
+    }
     // A busy month has more emails than one listing takes: the oldest of them used to be skipped. The same stretch is
     // listed again in half the days until it fits (a single day is read as far as it goes).
     if (listed.overflow && span > 1) { span = Math.max(1, Math.floor(span / 2)); continue; }
@@ -1259,6 +1302,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       fetched++;
       const rawText = rawById.get(id);
       if (rawText === GONE) return;   // deleted or moved since it was listed
+      if (rawText === BUSY) { fetched--; incomplete = true; return; }   // Gmail was busy: read next round, not a try
       // One email the reader trips over must not stop the round (and with it the whole year, every time it is tried): it is
       // remembered as not read, the same way as an email the mailbox couldn't give, and the rest are read.
       let cls = null;
@@ -1350,7 +1394,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     }
     let g = 0;
     for (; g < groups.length; g++) {
-      if (held >= ROUND_TEXT_CHARS || (g > 0 || windows > 0) && Date.now() - startedAt > deadlineMs) break;
+      if (held >= ROUND_TEXT_CHARS || (g > 0 || windows > 0) && Date.now() - startedAt > deadlineMs || box.busyMs) break;
       const group = groups[g], over = new Set();
       if (track) {
         for (const i of group) if ((track.suspects[refs[i]] || 0) >= MAX_READ_TRIES) over.add(i);
@@ -1386,6 +1430,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     if (span < WINDOW_DAYS && listed.entries.length < 150) span = Math.min(WINDOW_DAYS, span * 2);
     if (fetched >= maxFetch) break;
   }
+  if (box.busyMs) busyMs = Math.max(busyMs, box.busyMs);
   const more = incomplete || outOfBudget || before > limitDay;
   if (yr) {
     if (!more) await env.RELAY_DB.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev, cursor) VALUES (?,?,?,?,NULL) ON CONFLICT(shopper_id, year) DO UPDATE SET done_at = excluded.done_at, rev = excluded.rev, cursor = NULL").bind(boxId, yr, now, READER_FULL_REV).run();
@@ -1400,7 +1445,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     await ensureHealthColumns(env.RELAY_DB);
     await env.RELAY_DB.prepare("UPDATE gmail_connections SET mail_ok_at = ? WHERE shopper_id = ?").bind(now, boxId).run();
   }
-  return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before } };
+  return { status: 200, calls, body: { ok: true, added, updated, alreadyCaptured: skipped, notReceipts: ignored, more, cursor: more ? before : null, scannedBack: before, ...(busyMs && more ? { retryAfterMs: busyMs } : {}) } };
 }
 
 // A past year (for Wrapped) is read in every connected inbox, one after the other, the first inbox first. The cursor says

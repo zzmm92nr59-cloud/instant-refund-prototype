@@ -8,7 +8,7 @@
 //      reader, is read again round after round inside a second process with a Worker's memory (128 MB): every round stays
 //      well inside a Worker's processing time, and the long-line emails are read (not left out).
 //   2. A round that is ended part-way (as Cloudflare ends one) keeps what it had read; the email it was in the middle of is
-//      read on its own next time, and an email that ends every round it is in is left out after three, so the year finishes.
+//      read on its own next time, and an email that ends every round it is in is left out after two, so the year finishes.
 //   3. The year round and the background catch-up never read the same mailbox at once: the catch-up leaves it alone while
 //      the app is reading a year, the app is told plainly (with CORS headers) to try again in a moment while the catch-up
 //      has it, and a catch-up round that was ended part-way doesn't stop the next one moving on.
@@ -32,6 +32,60 @@ if (part === "main") {
   assert.equal(run.error, undefined, "the year is read within four minutes (a long line used to take many minutes on its own): " + (run.error && run.error.message));
   assert.equal(run.status, 0, "the year is read with a Worker's memory (128 MB), every round inside the time allowed (exit " + run.status + ", signal " + run.signal + ")");
   console.log(`ok - part 1 in ${Date.now() - started} ms`);
+  // Every way into the reader, on an email of 2 MB of blank table rows and on lines of 40,000 characters, in a second
+  // process so one that takes minutes can't hold the test up (several did: patterns that start a match at each line and
+  // run over all the blank lines after it).
+  const sh = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "shapes"], { encoding: "utf8", timeout: 240000 });
+  process.stdout.write(sh.stdout || "");
+  process.stderr.write((sh.stderr || "").split("\n").filter(l => !/ExperimentalWarning|trace-warnings/.test(l)).slice(0, 30).join("\n"));
+  assert.equal(sh.error, undefined, "the reader gets through blank rows and long lines in seconds, not minutes (stopped after 4 minutes; last one started: " + ((sh.stdout || "").trim().split("\n").pop()) + ")");
+  assert.equal(sh.status, 0, "every way into the reader is quick on blank rows and long lines");
+}
+
+if (part === "shapes") {
+  const P = await import("../worker/receipt-parser.js"), I = await import("../worker/receipt-items.js"), C = await import("../worker/scan-codes.js");
+  const R = await import("../worker/receipt-reader.js"), F = await import("../worker/flight-booking.js"), O = await import("../worker/original.js");
+  const head = (ct) => `From: Example Jewellers <orders@examplejewellers.test>\r\nSubject: Your order confirmation #EJ-1\r\nDate: Mon, 1 Dec 2025 10:00:00 +0000\r\nContent-Type: ${ct}\r\n\r\n`;
+  const fill = (unit, n) => unit.repeat(Math.ceil(n / unit.length));
+  const H = (body) => { const html = "<p>Order number: EJ-1</p><table><tr><td>Silver ring</td><td>Qty 1</td><td>&pound;100.00</td></tr>" + body + "</table><p>Total &pound;100.00</p>"; return { raw: head("text/html; charset=utf-8") + html, html, text: html.replace(/<[^>]+>/g, "\n") }; };
+  const T = (body) => { const text = "Order number: EJ-1\nSilver ring Qty 1 £100.00\n" + body + "\nTotal £100.00\n"; return { raw: head("text/plain; charset=utf-8") + text, html: "<pre>" + text + "</pre>", text }; };
+  const L = 40000;
+  const shapes = {
+    "2 MB of blank rows": () => H(fill("<tr><td>&nbsp;</td></tr>\n", 2e6)), "2 MB of empty rows": () => H(fill("<tr><td></td></tr>", 2e6)),
+    "2 MB of blank cells": () => H(fill("<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>\r\n", 2e6)), "2 MB of line breaks": () => H(fill("<br>&nbsp;\n", 2e6)),
+    "2 MB of blank lines": () => T(fill("\n", 2e6)), "2 MB of spaces on lines": () => T(fill("   \n", 2e6)), "2 MB of column edges": () => T(fill("| | |\n", 2e6)),
+    "a line of 40,000 spaces": () => T(fill(" ", L)), "a line of 40,000 tabs": () => T(fill("\t", L)), "a line of 40,000 non-breaking spaces": () => T(fill("\u00a0", L)),
+    "a line of 40,000 letters": () => T(fill("x", L)), "a line of 40,000 words": () => T(fill("x ", L)), "a line of 40,000 prices": () => T(fill("£1.00 ", L)),
+    "a line of 40,000 column edges": () => T(fill("| ", L)), "a cell of 40,000 spaces": () => H("<tr><td>" + fill(" ", L) + "</td></tr>"),
+  };
+  const ref = new Date(Date.UTC(2025, 11, 1));
+  const card = { kind: "receipt", retailer: { name: "Example Jewellers", domain: "examplejewellers.test" }, items: [{ name: "Silver ring", qty: 1, pricePence: 10000 }], totalPence: 10000, orderRef: "EJ-1" };
+  const ways = ({ raw, html, text }) => [
+    ["classifyEmail", () => G.classifyEmail(raw, { gmailId: "x" })], ["parseReceiptEmail (lenient)", () => P.parseReceiptEmail(raw, { lenient: true })],
+    ["parseDeliveryEmail", () => P.parseDeliveryEmail(raw)], ["parseReturnEmail", () => P.parseReturnEmail(raw)], ["parseReturnUpdateEmail", () => P.parseReturnUpdateEmail(raw)],
+    ["parseReturnParcelEmail", () => P.parseReturnParcelEmail(raw)], ["parseDispatchEmail", () => P.parseDispatchEmail(raw)], ["parseCancellationEmail", () => P.parseCancellationEmail(raw)],
+    ["parseOrderAdjustmentEmail", () => P.parseOrderAdjustmentEmail(raw)], ["emailForReading", () => P.emailForReading(raw)], ["emailForCodes", () => P.emailForCodes(raw)], ["orderNewsOf", () => P.orderNewsOf(raw)],
+    ["mimeParts", () => P.mimeParts(raw)], ["extractProductImageUrls", () => P.extractProductImageUrls(raw, card)], ["photoShowsItem", () => P.photoShowsItem(raw, card)],
+    ["findCodes", () => C.findCodes(raw, card)], ["codeEmailDetails", () => C.codeEmailDetails(raw)], ["htmlAsText", () => P.htmlAsText(html)], ["amazonOrders", () => P.amazonOrders(html, text)],
+    ["appleItems", () => P.appleItems(text)], ["readItems", () => I.readItems(text)], ["moneyOf", () => I.moneyOf(text)], ["statedItemCount", () => I.statedItemCount(text)],
+    ["shopNamesInText", () => R.shopNamesInText(text, "Your order")], ["forwardedSender", () => R.forwardedSender(text)], ["itemsFromCells", () => R.itemsFromCells(text)], ["gameItems", () => R.gameItems(text)],
+    ["flightBooking", () => F.flightBooking({ subject: "Your booking is confirmed", text, senderDomain: "airline.test", fromName: "Airline", refDate: ref })],
+    ["cleanHtml", () => O.cleanHtml(html)], ["a pasted receipt", () => G.classifyEmail(G.pastedWithHtml(text.slice(0, 200000), html), { pasted: true })],
+  ];
+  // (A computer running tests can be several times slower than Cloudflare's; the slowest here took 0.9 s on a fast one.)
+  const LIMIT = 3000;
+  const slow = [];
+  for (const [name, make] of Object.entries(shapes)) {
+    const sh = make();
+    for (const [way, f] of ways(sh)) {
+      console.log("started: " + way + " on " + name);
+      const t0 = performance.now(); try { f(); } catch { /* an email that can't be read is fine; one that takes minutes isn't */ } const ms = performance.now() - t0;
+      if (ms > LIMIT) slow.push(`${way} on ${name}: ${Math.round(ms)} ms`);
+    }
+  }
+  assert.deepEqual(slow, [], "every way into the reader takes under " + LIMIT + " ms on blank rows and long lines");
+  console.log("ok - " + Object.keys(shapes).length + " shapes of blank rows and long lines, through " + ways(shapes["2 MB of blank rows"]()).length + " ways into the reader, each under " + LIMIT + " ms");
+  process.exit(0);
 }
 
 // ---- What every part shares: a database, a made-up Google, a signed-in shopper with Gmail connected ----
@@ -60,6 +114,8 @@ async function world(mail) {
     }
     if (url === "https://gmail.googleapis.com/gmail/v1/users/me/profile") return Response.json({ emailAddress: "sam.example@gmail.test" });
     if (url.startsWith("https://gmail.googleapis.com/gmail/v1/users/me/messages?")) {
+      // Gmail refusing for a moment, as it does when a mailbox's requests come too fast.
+      if (w.listBusy > 0) { w.listBusy--; return Response.json({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Too many requests" } }, { status: 429, headers: { "retry-after": "0" } }); }
       const q = /after:(\S+) before:(\S+)/.exec(decodeURIComponent(url));
       return Response.json({ messages: mail.filter(m => m.day >= q[1] && m.day < q[2]).map(m => ({ id: m.id })) });
     }
@@ -69,6 +125,7 @@ async function world(mail) {
       w.reads[m.id] = (w.reads[m.id] || 0) + 1;
       // The round reading this email is ended here, the way Cloudflare ends one: it never carries on, nothing after runs.
       if (w.hang && w.hang(m)) { w.ended = true; return new Promise(() => {}); }
+      if (w.readBusy && w.readBusy(m)) return Response.json({ error: { code: 403, errors: [{ reason: "userRateLimitExceeded" }], message: "User-rate limit exceeded" } }, { status: 403 });
       // (Gmail's answer, made when it is asked for, so the made-up mailbox itself takes no memory.)
       return new Response('{"id":"' + m.id + '","raw":"' + Buffer.from(m.raw()).toString("base64url") + '"}', { headers: { "content-type": "application/json" } });
     }
@@ -176,7 +233,7 @@ if (part === "year") {
   const kept = w.onNewReader();
   assert.ok(kept >= 24, `what the ended round had read before it was ended is kept (${kept} of the 25 emails before the one it was ended on; it used to keep none)`);
   // The app tries again (it asks one round at a time, so the ended round's hold on the mailbox doesn't make it wait),
-  // and each time the poison email is read on its own, until it has ended three rounds; then it is left out.
+  // and the poison email is read on its own; once it has ended a round on its own too (two in all), it is left out.
   let cursor = "", more = true, ends = 1, rounds = 0;
   while (more && rounds < 40) {
     w.ended = false;
@@ -188,15 +245,15 @@ if (part === "year") {
     const j = await res.json(); more = j.more; cursor = j.cursor;
   }
   assert.equal(more, false, "the year finishes even with an email that ends every round it is in");
-  assert.equal(ends, 3, "the poison email ended three rounds, no more");
-  assert.equal(w.reads[poison.id], 3, "and was asked for three times");
+  assert.equal(ends, 2, "the poison email ended two rounds (one with others, one on its own), no more");
+  assert.equal(w.reads[poison.id], 2, "and was asked for twice");
   for (const m of mail) if (m.id !== poison.id) assert.ok(w.reads[m.id] <= 2, "every other email is read at most twice (" + m.id + ": " + w.reads[m.id] + ")");
   assert.equal(w.onNewReader(), mail.length, "every email is done");
   const pr = w.rowOf(poison);
   assert.equal(pr.d.orderRef, "OLD-" + poison.id, "the poison email keeps what the older reader found (nothing is lost)");
   const others = mail.filter(m => m.id !== poison.id).map(m => w.rowOf(m).d);
   assert.ok(others.every(d => !d.unread && d.orderRef !== "OLD-" + d.gmailId), "every other email is read by the new reader");
-  console.log(`ok - an ended round kept ${kept} emails it had read; the email that ended rounds was left out after 3, the year finished`);
+  console.log(`ok - an ended round kept ${kept} emails it had read; the email that ended rounds was left out after 2, the year finished`);
 }
 
 // ---- 3. The year round and the background catch-up take turns ----
@@ -243,5 +300,65 @@ if (part === "year") {
   const y = db.prepare("SELECT rev FROM gmail_history_years WHERE shopper_id = ? AND year = 2023").get(w.shopperId);
   assert.equal(y.rev, G.READER_FULL_REV, "the year is marked as read by the new reader");
   console.log(`ok - the catch-up waits for the app, the app is told to wait for the catch-up, and an ended catch-up round kept ${kept} emails and carried on (${runs} more runs)`);
+}
+// ---- 4. Gmail busy for a moment: the round waits once, then stops and says when to ask again; nothing is left out ----
+{
+  const mail = mailbox(30, 2021, () => "small", 25);
+  const w = await world(mail);
+  // At the start of a round, Gmail refuses twice in a row (the round asks once more): the app is told to wait, with CORS.
+  w.listBusy = 2;
+  let res = await w.post("/relay/my/gmail/scan", { year: 2021 });
+  assert.equal(res.status, 503, "a round Gmail is too busy for answers 503");
+  assert.equal(res.headers.get("access-control-allow-origin"), "*");
+  let j = await res.json();
+  assert.equal(j.error, "gmail_unavailable");
+  assert.ok(j.retryAfterMs >= 1000, "and says when to ask again");
+  // Refused once only: asked once more and read as usual.
+  w.listBusy = 1;
+  res = await w.post("/relay/my/gmail/scan", { year: 2021, small: true });
+  assert.equal(res.status, 200, "Gmail refusing once is waited out within the round");
+  // Some emails refused for a while: they wait for a later round, without counting as a try.
+  let refusing = true;
+  w.readBusy = (m) => refusing && (m === mail[8] || m === mail[9]);
+  let cursor = "", more = true, rounds = 0, hinted = 0;
+  while (more && rounds < 30) {
+    res = await w.post("/relay/my/gmail/scan", { year: 2021, ...(cursor ? { cursor } : {}) });
+    assert.equal(res.status, 200);
+    j = await res.json(); more = j.more; cursor = j.cursor; rounds++;
+    if (j.retryAfterMs) { hinted++; if (hinted >= 3) refusing = false; }
+  }
+  assert.equal(more, false);
+  assert.ok(hinted >= 3, "a round stopped by Gmail being busy says when to ask again");
+  for (const m of mail) {
+    const r = w.rowOf(m);
+    assert.equal(r.d.parserVersion, G.PARSER_VERSION);
+    assert.ok(!r.d.unread && r.d.orderRef !== "OLD-" + m.id, "every email is read once Gmail answers, none left out because Gmail was busy (" + m.id + ")");
+  }
+  console.log(`ok - Gmail busy: a 503 with when to ask again, one refusal waited out, refused emails read later (${hinted} rounds told to wait), none left out`);
+}
+
+// ---- 5. The background catch-up's pace: hundreds of emails a minute, each run inside its time ----
+{
+  const mail = mailbox(400, 2020, i => (i % 3 === 1 ? "mid" : "small"));
+  const w = await world(mail);
+  w.addOther(2600);
+  const db = w.sqlite;
+  db.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev, cursor) VALUES (?, 2020, ?, 1, NULL)").run(w.shopperId, w.clock - 86400000);
+  db.prepare("UPDATE gmail_connections SET last_scan_at = ?, full_rev = ? WHERE shopper_id = ?").run(w.clock - 3600000, G.FULL_REV, w.shopperId);
+  db.prepare("UPDATE mail_scan_jobs SET state = 'done' WHERE shopper_id = ?").run(w.shopperId);
+  const runs = [];
+  let t = w.clock;
+  while (runs.length < 30) {
+    const before = w.onNewReader(), c0 = process.cpuUsage();
+    const c = await G.catchUpFullReads(w.env, t, w.fetchImpl); t += 60000;
+    const cpu = process.cpuUsage(c0);
+    if (!c.checked) break;
+    runs.push({ read: w.onNewReader() - before, cpuMs: Math.round((cpu.user + cpu.system) / 1000) });
+  }
+  assert.equal(w.onNewReader(), mail.length, "the catch-up reads the whole year");
+  const full = runs.slice(0, -1);
+  assert.ok(full.every(r => r.read >= 60), "each minute's run reads at least 60 emails (" + runs.map(r => r.read).join(", ") + ")");
+  assert.ok(runs.every(r => r.cpuMs < 15000), "each run stays well inside a scheduled run's processing time (" + runs.map(r => r.cpuMs).join(", ") + " ms)");
+  console.log(`ok - catch-up: ${mail.length} emails in ${runs.length} one-minute runs (${runs.map(r => r.read).join(", ")}), at most ${Math.max(...runs.map(r => r.cpuMs))} ms of processing a run: about ${Math.round(mail.length / runs.length * 60)} emails an hour`);
 }
 console.log("PASS year rounds: bounded in time and memory, an ended round keeps its work, no email can stall a year, the app and the catch-up take turns");
