@@ -304,7 +304,7 @@
   const EATERY_NAME = /\b(deliveroo|just eat|justeat|uber eats|ubereats|bolt food|wolt|dominos|pizza hut|papa johns|mcdonalds|kfc|burger king|nandos|wagamama|five guys|greggs|pret|leon|itsu|wasabi|yo sushi|subway|costa|starbucks|caffe nero|wetherspoons?|pub|restaurant|cafe|takeaway|pizzeria|grill|diner|bistro|tavern|chippy|kebab|curry house|noodle bar|sushi bar|trattoria|osteria|taverna|cantina|ristorante|brasserie|steakhouse|canteen|poke bar)\b/;
   // DIY and trade shops (nothing there is food), pet shops (their chicken is for the dog), gyms (a membership is to go there)
   // and shops that sell only downloads.
-  const DIY_NAME = /\b(b and q|bandq|wickes|screwfix|toolstation|homebase|plumb centre|plumbcentre|travis perkins|jewson|selco|city plumbing|toolstop|machine mart)\b/;
+  const DIY_NAME = /\b(b and q|bandq|wickes|screwfix|toolstation|homebase|plumb centre|plumbcentre|travis perkins|jewson|selco|city plumbing|toolstop|machine mart|buildbase|builder depot|plumbase|plumbworld|victorian plumbing|topps tiles|tile giant|tile mountain|dulux decorator|brewers decorator|crown decorating|leyland sdm|edmundson electrical|toolden|axminster tools)\b/;
   const PET_SHOP_NAME = /\b(pets at home|zooplus|jollyes|pet ?planet|viovet|medivet|pets corner|purely pets|pet supermarket|pet shop|petshop|pet store|pet supplies)\b/;
   const GYM_NAME = /\b(gym|gyms|fitness|leisure|health club|puregym|david lloyd|nuffield health|virgin active|everyone active)\b/;
   const DIGITAL_SHOP_NAME = /\b(kobo|audible|steam|google play|app store|playstation store|xbox store|nintendo eshop|itch io)\b/;
