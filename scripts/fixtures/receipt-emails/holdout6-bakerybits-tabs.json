@@ -1,0 +1,40 @@
+{
+ "id": "holdout6-bakerybits-tabs",
+ "sender": "Bread Kit Co",
+ "layout": "text: tab-separated Qty, Item, Price",
+ "headers": {
+  "from": "Bread Kit Co <orders@breadkitco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation BK-77310",
+  "date": "Sun, 15 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Bread Kit Co\nOrder number: BK-77310\nOrder date: 15/11/2026\n\nQty\tItem\tPrice\n1\tSourdough Starter Kit\t£14.50\n2\tBanneton Proving Basket 25cm\t£24.00\n1\tBread Lame with 5 Blades\t£6.50\n\nSubtotal\t£45.00\nShipping\t£4.50\nTotal\t£49.50",
+ "expected": {
+  "shop": "Bread Kit Co",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sourdough Starter Kit",
+    "qty": 1,
+    "linePence": 1450
+   },
+   {
+    "name": "Banneton Proving Basket 25cm",
+    "qty": 2,
+    "linePence": 2400
+   },
+   {
+    "name": "Bread Lame with 5 Blades",
+    "qty": 1,
+    "linePence": 650
+   }
+  ],
+  "subtotalPence": 4500,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4950
+ }
+}

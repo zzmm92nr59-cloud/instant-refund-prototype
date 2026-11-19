@@ -184,9 +184,10 @@ function htmlToText(html) {
     // (Its name is in the alt text only when it isn't written anywhere else.)
     // (An item's extras in their own <div> or <p> inside the name's cell are lines of their own, not part of its name. A block
     // that opens straight after another closes starts the one new line the closing gave.)
-    .replace(/(<\/(?:p|div|tr|li|h[1-6]|table)>)(?:\s*<(?:p|div|li|h[1-6])\b[^>]*>)+/gi, "$1")
-    .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
-    .replace(/<(p|div|li|h[1-6])\b[^>]*>/gi, "\n")
+    // (A definition list's terms and descriptions, <dt> and <dd>, are lines of their own too.)
+    .replace(/(<\/(?:p|div|tr|li|h[1-6]|table|dt|dd|dl)>)(?:\s*<(?:p|div|li|h[1-6]|dt|dd|dl)\b[^>]*>)+/gi, "$1")
+    .replace(/<\/(p|div|tr|li|h[1-6]|table|dt|dd|dl)>/gi, "\n")
+    .replace(/<(p|div|li|h[1-6]|dt|dd|dl)\b[^>]*>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/t[dh]>/gi, " | ")
     .replace(/<[^>]+>/g, " "))
@@ -572,7 +573,8 @@ function receiptSignals(subject, text) {
     /\b(?:reservation|booking|order|purchase)\b[^!?]{0,30}\bconfirmed\b|\byour\b[^!?]{0,40}\border\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border\b[^!?]{0,30}\b(?:has been|was|is) placed\b|(?:^|[!.:]\s+)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) ||
     // "Order acknowledgement 30044112", "Your … subscription has renewed", "Receipt for your Notely Pro renewal", a
     // bilingual "Archeb / Order CR-1102" (round 3).
-    /\border acknowledge?ment\b|\bsubscription\b[^!?]{0,30}\b(?:has )?renew(?:ed|al)\b|\breceipt for your\b|(?:^|\/\s*)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) || SHIPMENT_SUBJECT.test(s) ||
+    // "Your Iceland delivery receipt 7711204" (round 3).
+    /\b(?:delivery |order |e-?)?receipt\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border acknowledge?ment\b|\bsubscription\b[^!?]{0,30}\b(?:has )?renew(?:ed|al)\b|\breceipt for your\b|(?:^|\/\s*)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) || SHIPMENT_SUBJECT.test(s) ||
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
@@ -762,6 +764,8 @@ export function emailForReading(rawEmail) {
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
 function tillPounds(t) {
+  // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
+  if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
   if (!t || /£/.test(t) || !/(?:^|[\s|])GBP(?:$|[\s|/])/m.test(t)) return t;
   return t.replace(/(\d{1,5}\.\d{2}) ?GBP\b/g, "£$1").replace(/(\S[ \t]{2,})(-?)(\d{1,5}\.\d{2})(?:[ \t]+[A-Z])?[ \t]*$/gm, "$1$2£$3");
 }
