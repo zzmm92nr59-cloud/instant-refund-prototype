@@ -409,6 +409,10 @@ const joinWrong = [];
   // A total's own amount is never the price of the line under it ("Order Total" / "£310.00" / "The Gift Box").
   { const r = parseReceiptEmail(`From: Jeweller <no-reply@jeweller.example>\nSubject: Thank You For Your Order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number\n00412233\nOrder Total\n£310.00\nThe Signature Gift Box\nEvery purchase arrives wrapped in our gift box.`);
     if (r.ok && r.items.some((i) => /gift box/i.test(i.name))) joinWrong.push("the gift box under a total read as the thing bought"); }
+  // A model that is all figures over its labelled style code ("608" / "Style #:" / "WX608RG1" / its colour): the model is
+  // the name, the colour a detail, and the name check takes it as a name.
+  { const r = parseReceiptEmail(`From: Stridewell <orders@stridewell.example>\nSubject: Your Stridewell order NK0441191\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number: NK0441191\n608\nStyle #:\nWX608RG1\nUK Size: UK 5.5\nTeam Away Grey with White\nQUANTITY: 1\nPRICE: £60.00\nOrder Subtotal: £60.00\nOrder Total: £60.00`);
+    if (!r.ok || !r.items.length || r.items[0].name !== "608" || !/grey/i.test(r.items[0].variant || "") || r.itemsCheck.namesOk !== true) joinWrong.push("a model number over its style code read as " + JSON.stringify(r.ok ? r.items : r.reason)); }
   // The inbox scan never asks for the shopper's own sent mail (a receipt forwarded to someone else is a copy). Round 14.
   if (!/const windowQuery = [^\n]*-in:sent /.test(readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8"))) joinWrong.push("the Gmail search asks for sent mail");
   // A table booked but not paid for: read with its number and price, never a purchase in the inbox.

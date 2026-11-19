@@ -78,10 +78,10 @@ export default function holdout15() {
   }
   // ---- A trainer named by its model number over its style code, its colour and size under it ------------------------------
   {
-    const o = order([{ name: "574", qty: 1, unit: 7500 }], { fees: [["Shipping", 450]] });
-    add("holdout15-model-over-style-code", "Stridewell", "'574' over 'Style #:' over 'ML574EV2', 'UK Size: UK 9', the colour, 'QUANTITY: 1', 'PRICE: £75.00'", {
+    const o = order([{ name: "Arc 574", qty: 1, unit: 7500 }], { fees: [["Shipping", 450]] });
+    add("holdout15-model-over-style-code", "Stridewell", "'Arc 574' over 'Style #:' over 'ML574EV2', 'UK Size: UK 9', the colour, 'QUANTITY: 1', 'PRICE: £75.00'", {
       from: "Stridewell <orders@stridewell.example>", subject: "Your Stridewell order NK0441190", date: "Tue, 17 Nov 2026 11:00:00 +0000",
-      html: mail("Stridewell", "stridewell.example", ["Thanks for your order", "Order Number: NK0441190", "574", "Style #:", "ML574EV2", "UK Size: UK 9", "Navy with Grey", "QUANTITY: 1", "PRICE: £75.00",
+      html: mail("Stridewell", "stridewell.example", ["Thanks for your order", "Order Number: NK0441190", "Arc 574", "Style #:", "ML574EV2", "UK Size: UK 9", "Navy with Grey", "QUANTITY: 1", "PRICE: £75.00",
         "Order Subtotal: £75.00", "Shipping: £4.50", "Order Total: £79.50"]) }, o, "Stridewell", "2026-11-17");
   }
   return out;
