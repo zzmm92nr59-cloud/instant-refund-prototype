@@ -187,7 +187,7 @@ assert.equal(st.pastes.length, before, "nothing sent");
 console.log("ok - Paste reads the copied email in one tap (once on a double tap), shows what was added, and explains what it can't add");
 
 // 6. When the phone won't share what was copied, a box to paste into appears, and pasting into it adds the receipt.
-await page.evaluate(() => { navigator.clipboard.readText = () => Promise.reject(new Error("NotAllowedError")); });
+await page.evaluate(() => { navigator.clipboard.readText = navigator.clipboard.read = () => Promise.reject(new Error("NotAllowedError")); });
 await page.waitForTimeout(450); // (two taps on one button within 400ms count as one)
 await view.getByRole("button", { name: "Paste", exact: true }).click();
 const box = page.getByRole("textbox", { name: "The order email" });
@@ -212,7 +212,7 @@ console.log("ok - without clipboard access a box appears, focused; pasting into 
 // 7. Forwarding from another inbox: the address Relay reads, one tap to copy.
 await view.getByRole("button", { name: "Copy " + EMAIL }).click();
 await view.getByRole("button", { name: "Copied" }).waitFor();
-assert.equal(await page.evaluate(() => { delete navigator.clipboard.readText; return navigator.clipboard.readText(); }), EMAIL, "the address is what was copied");
+assert.equal(await page.evaluate(() => { delete navigator.clipboard.readText; delete navigator.clipboard.read; return navigator.clipboard.readText(); }), EMAIL, "the address is what was copied");
 // The way to it: Receipts.
 await done.getByRole("button", { name: "See it in Receipts" }).click();
 await page.getByRole("heading", { name: "Receipts", exact: true }).waitFor();
