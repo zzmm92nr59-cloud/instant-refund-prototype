@@ -840,7 +840,7 @@ const APPLE_NOISE = /report a problem|write a review|in-app purchase|^(iphone|ip
 const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
 // A money line read as an item ("Invoice total", "Order total", "Amount due"): never something bought (round 4).
 const MONEY_LABEL = /^(?:(?:invoice|order|grand|basket|bag|payment|final|overall)\s+total|total\s+(?:paid|due|amount|to pay|charged)|amount\s+(?:due|paid|payable|charged)|balance\s+(?:due|paid))\s*:?$/i;
-const PRICE_WORDS = /^(?:(?:promotions?|offers?|discounts?|vouchers?|coupons?|savings?)\s+applied|you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
+const PRICE_WORDS = /^(?:(?:gbp|usd|eur|aud|cad|chf|sek|nok|dkk)|(?:promotions?|offers?|discounts?|vouchers?|coupons?|savings?)\s+applied|you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
 // Amazon's order emails put each thing bought in its own little boxes, so the usual line reading finds nothing. Two layouts:
 //  * things to be delivered: the item's name (Amazon cuts long ones short with "..."), "Sold by …", maybe "Colour: …" and
 //    "Size: …", "Condition: New", "Quantity: 2", then the price split into "£", "4" and "99" (pounds big, pence small);

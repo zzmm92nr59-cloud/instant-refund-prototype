@@ -335,6 +335,10 @@ const joinWrong = [];
   if (pays.some((p) => p.kind !== "order_update" || p.stage !== "payment")) joinWrong.push("a payment authorisation read as " + pays.map((p) => p.kind + ":" + p.stage).join());
   attachCancellations(trip, pays);
   if (trip.length !== 1 || trip[0].totalPence != null || trip[0].paidSoFarPence !== 19025 || (trip[0].payments || []).length !== 2 || trip[0].cancelled) joinWrong.push("a booking's payments not joined: " + JSON.stringify(trip.map((o) => [o.orderRef, o.totalPence, o.paidSoFarPence])));
+  // A payment service's receipt with no item lines: the total paid with its postage, and "£52.48 GBP" is never an item.
+  const ppr = parseReceiptEmail(mail("PayPal <service@paypal.co.uk>", "Receipt for your payment to Trailhaus Ltd", "Sun, 21 Dec 2026 10:00:00 +0000",
+    ["You paid £52.48 GBP to Trailhaus Ltd", "Merchant", "Trailhaus Ltd", "Order ID", "556120044", "Subtotal", "£47.49", "Postage and packing", "£4.99", "Total", "£52.48 GBP", "Paid with", "Visa Debit", "£52.48 GBP"].join("\n")));
+  if (!ppr.ok || ppr.totalPence !== 5248 || (ppr.items || []).length) joinWrong.push("payment receipt with postage read as " + JSON.stringify([ppr.totalPence, (ppr.items || []).map((i) => i.name)]));
   // One email confirming two orders: a card for each, each with its own number, total and items.
   const two = mergeOrderEmails([{ id: "t1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-two-orders-one-email.json"), "utf8")))) }]);
   if (two.length !== 2 || two[1].orderRef !== "301-5510022-4410002" || two[1].totalPence !== 3100 || (two[1].items || []).map((i) => i.name).join() !== "Eau de Parfum 50ml" || two[0].totalPence !== 2249)
