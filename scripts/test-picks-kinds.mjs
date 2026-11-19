@@ -37,4 +37,29 @@ assert.equal(out.length, 0, "nothing from a weekly shop: " + JSON.stringify(out.
 out = E.picks([{ item: "Tu Black Strappy Heels", merchant: "Sainsbury's", price: 22, verified: true }], stock);
 assert.deepEqual(out.map(x => x.g.key), ["hl"]);
 assert.equal(out[0].why[0], "Like the shoes you bought at Sainsbury's");
+
+// Round 5 (Connor, 19 Nov 2026): the kind comes from what the thing is, never a word or a colour it shares.
+// A supermarket's lines are only shoes when they really are footwear.
+for (const n of ["Boots Meal Deal", "Sainsbury's Home Shoe Rack 3 Tier", "Wellington Boot Cake Topper", "Tesco Boot Socks 2pk", "JS Shoe Polish Black"])
+  assert.notEqual(["shoes", "trainers", "boots"].includes(E.kindOf(n, "Sainsbury's") && E.kindOf(n, "Sainsbury's").key), true, n + " is not footwear");
+assert.equal(E.kindOf("Tesco Boot Socks 2pk", "Tesco").key, "socks");
+assert.equal(E.kindOf("Next Slipper Socks Grey").key, "socks");
+assert.equal(E.kindOf("TU MENS BLACK TRAINERS", "Sainsbury's").key, "trainers");
+assert.equal(E.kindOf("F&F KIDS WELLIES", "Tesco") === null || E.kindOf("F&F KIDS WELLIES", "Tesco").key !== "bag", true);
+// What the thing is, for ranking Browse: a Jordan backpack is a bag, not footwear; a bag is never "like" black trainers.
+assert.equal(E.category("Jordan Mini Air Patrol Backpack"), "bags");
+assert.equal(E.category("Boots Meal Deal"), "other");
+assert.equal(E.category("Nike Air Max 90 Black"), "footwear");
+const black = [
+  { key: "bag", product: "Black Leather Tote Bag", store: "Hide & Stitch", min: 6000, options: ["Black"] },
+  { key: "sh", product: "Black Shoe Rack 3 Tier", store: "Marlow Home", min: 2500, options: ["Black"] },
+  { key: "tr", product: "Black Running Trainers", store: "JD Sports", min: 9000, options: ["Black"] }];
+out = E.picks([{ item: "Nike Air Max 90", merchant: "JD Sports", detail: "Black", price: 120, verified: true }], black);
+assert.deepEqual(out.map(x => x.g.key), ["tr"], "black trainers pick black trainers, never a black bag or a shoe rack");
+// The weekly shop with supermarket clothing in it: only the things that are what they say.
+out = E.picks([
+  { item: "TESCO SPRING WTR 6X500ML", merchant: "Tesco", price: 3, verified: true },
+  { item: "M&S PERCY PIG & PALS 170G", merchant: "Marks & Spencer", price: 2.5, verified: true },
+  { item: "SAINSBURYS HOME SHOE RACK", merchant: "Sainsbury's", price: 15, verified: true }], black);
+assert.equal(out.length, 0, "water, sweets and a shoe rack pick nothing: " + JSON.stringify(out.map(x => x.why)));
 console.log("ok - picks follow what a thing is: a Jordan backpack is a bag, heel balm isn't heels, the weekly shop picks nothing");

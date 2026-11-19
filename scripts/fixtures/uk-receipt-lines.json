@@ -1,5 +1,5 @@
 {
- "about": "Made-up but realistic UK receipt item lines, each with what it really is (worker/item-kind-core.js KIND_LIST). No real orders or people. Toiletries count as household; hair dryers, straighteners and electric toothbrushes as electronics; candles, plants and paint as home; pet food and pet things as pets; stationery and greetings cards as other; event tickets and delivery charges as services. scripts/test-item-kinds-accuracy.mjs reads it. Groups marked setTwo were written after the rules were first tuned and scored before the rules saw them: 209 of 229 right (91.3%), with 3 of 182 never-wrong lines wrong. The rules were then improved on them too, so the whole file is now tuning data; that first 91.3% is the honest estimate for lines Relay hasn't seen.",
+ "about": "Made-up but realistic UK receipt item lines, each with what it really is (worker/item-kind-core.js KIND_LIST). No real orders or people. Toiletries count as household; hair dryers, straighteners and electric toothbrushes as electronics; candles, plants and paint as home; pet food and pet things as pets; stationery and greetings cards as other; event tickets and delivery charges as services. scripts/test-item-kinds-accuracy.mjs reads it. Groups marked setTwo were written after the rules were first tuned and scored before the rules saw them: 209 of 229 right (91.3%), with 3 of 182 never-wrong lines wrong. The rules were then improved on them too, so the whole file is now tuning data; that first 91.3% is the honest estimate for lines Relay hasn't seen. Groups marked setThree (round 5, 19 Nov 2026) are 330 lines in harder styles (till-roll short forms like \"JS BTRNT SQSH\", colour and size codes, model numbers, DIY, pets, baby, vapes, gift cards, fees), scored before the rules saw them: 264 of 330 right (80.0%), with 14 never-wrong lines wrong. The rules were then improved on them, so they are tuning data too. Groups marked setFour (68 lines, one already in the file) were written after the round 5 fixes as a check and scored before the rules saw them: 65 of 68 right (95.6%), none of the never-wrong lines wrong; the three misses were then fixed too.",
  "groups": [
   {"shop": "Sainsbury's", "domain": "sainsburys.co.uk", "lines": [
     ["Rowntree's 130g Fruit Pastilles Sweets Sharing Bag Lollies", "food_drink"],
@@ -1210,6 +1210,525 @@
     ["Nivea Men Shaving Foam 200ml", "household"],
     ["Boots Sandwich Meal Deal", "food_drink"],
     ["Smartwater 600ml", "food_drink"]
+  ] },
+  {"shop": "Tesco", "domain": "tesco.com", "setThree": true, "lines": [
+    ["TESCO FNST SMKD SALMN 200G", "food_drink"],
+    ["TESCO SEMI SKMD MLK 4PT", "food_drink"],
+    ["TESCO WHL MLK 2PT", "food_drink"],
+    ["TESCO BRIT CHKN BRST FLLT", "food_drink"],
+    ["TESCO CHOC CHIP COOKIES", "food_drink"],
+    ["TESCO GRN SEEDLESS GRAPES", "food_drink"],
+    ["TESCO MATURE CHDR 400G", "food_drink"],
+    ["TESCO BTRNT SQUASH", "food_drink"],
+    ["TESCO SWT POTATO LSE", "food_drink"],
+    ["TESCO PEPPERS 3PK", "food_drink"],
+    ["TESCO FNST CHOC BROWNIES", "food_drink"],
+    ["TESCO ORGNC BANANAS", "food_drink"],
+    ["TESCO GRK STYLE YOG", "food_drink"],
+    ["TESCO BAG FOR LIFE", "household"],
+    ["TESCO KTCHN ROLL 2PK", "household"],
+    ["TESCO TOILET TISSUE 9RL", "household"],
+    ["TESCO NON BIO CAPS 30", "household"],
+    ["TESCO SPRING WTR 6X500ML", "food_drink"],
+    ["TESCO PARACETAMOL 500MG 16", "beauty_health"],
+    ["F&F MENS CREW SOCKS 5PK", "clothing"],
+    ["F&F GIRLS LEGGINGS 2PK", "clothing"],
+    ["F&F KIDS WELLIES", "footwear"],
+    ["TESCO SEASONAL CHUNKY KNIT THROW", "home"],
+    ["TESCO 1.7L KETTLE BLACK", "home"],
+    ["TESCO CLUBCARD PLUS", "digital"],
+    ["TESCO MOBILE TOP UP", "digital"],
+    ["TESCO MULLED WINE 75CL", "food_drink"],
+    ["TESCO HOT X BUNS 4PK", "food_drink"],
+    ["TESCO LRG FR EGGS 12", "food_drink"],
+    ["TESCO PORK SSGS 8PK", "food_drink"]
+  ] },
+  {"shop": "Sainsbury's", "domain": "sainsburys.co.uk", "setThree": true, "lines": [
+    ["JS BTRNT SQSH", "food_drink"],
+    ["JS SWEET POT", "food_drink"],
+    ["JS SPAG BOL SAUCE", "food_drink"],
+    ["JS SMKD BACK BACON", "food_drink"],
+    ["JS FR RANGE EGGS 6", "food_drink"],
+    ["JS TTD GARLIC FOCACCIA", "food_drink"],
+    ["JS ICEBERG LETT", "food_drink"],
+    ["JS CRSPS MULTIPK", "food_drink"],
+    ["JS SKMD MILK 1PT", "food_drink"],
+    ["JS BLUEBRRS 150G", "food_drink"],
+    ["JS MINCE PIES 6PK", "food_drink"],
+    ["JS SALTED BUTTER", "food_drink"],
+    ["JS HOUSE DISH TABS", "household"],
+    ["JS CTTN BUDS 200", "household"],
+    ["JS IBUPROFEN 200MG", "beauty_health"],
+    ["TU WOMENS PYJAMA SET NAVY", "clothing"],
+    ["TU BOYS SCHOOL TROUSERS 2PK", "clothing"],
+    ["TU KIDS SLIPPERS SIZE 11", "footwear"],
+    ["TU MENS BLACK TRAINERS", "footwear"],
+    ["SAINSBURYS HOME DOUBLE DUVET 10.5T", "home"],
+    ["SAINSBURYS HOME MUG WHITE", "home"],
+    ["NECTAR POINTS", "other"],
+    ["JS FROZEN PEAS 1KG", "food_drink"],
+    ["JS PEPPERMINT TEA 20S", "food_drink"],
+    ["JS COLLEGE ROAD HOT SAUCE", "food_drink"]
+  ] },
+  {"shop": "Marks & Spencer", "domain": "marksandspencer.com", "setThree": true, "lines": [
+    ["M&S PERCY PIG", "food_drink"],
+    ["M&S PERCY PIG & PALS 170G", "food_drink"],
+    ["M&S COLIN CATERPILLAR CAKE", "food_drink"],
+    ["M&S OUR BEST EVER LASAGNE", "food_drink"],
+    ["M&S GASTROPUB STEAK PIE", "food_drink"],
+    ["M&S FOOD TO ORDER PLATTER", "food_drink"],
+    ["M&S COLLECTION PROSECCO", "food_drink"],
+    ["M&S DINE IN FOR 2", "food_drink"],
+    ["M&S CHICKEN TIKKA SANDWICH", "food_drink"],
+    ["M&S BLACK RIBBED POLO NECK M", "clothing"],
+    ["M&S CASHMERE CREW JUMPER OATMEAL", "clothing"],
+    ["M&S HEATGEN THERMAL VEST", "clothing"],
+    ["M&S LEATHER CHELSEA BOOTS 7", "footwear"],
+    ["M&S FLOWERS PEONY BOUQUET", "home"],
+    ["M&S CUCUMBER SLICES", "food_drink"]
+  ] },
+  {"shop": "Asda", "domain": "asda.com", "setThree": true, "lines": [
+    ["GEO BOYS JEANS 7-8", "clothing"],
+    ["GEORGE MENS CHINO SHORTS STONE", "clothing"],
+    ["GEORGE WOMENS ANKLE BOOTS BLK", "footwear"],
+    ["GEORGE HOME TEA TOWELS 3PK", "home"],
+    ["ASDA JUST ESSENTIALS BEANS", "food_drink"],
+    ["ASDA XS STEAK", "food_drink"],
+    ["ASDA SMR PRCE NOODLES", "food_drink"],
+    ["ASDA CHC BTTNS", "food_drink"],
+    ["ASDA FRZN CHIPS 1.5KG", "food_drink"],
+    ["ASDA DIET COLA 2L", "food_drink"],
+    ["ASDA BABY WIPES 4X64", "household"],
+    ["ASDA KIDS VITAMINS GUMMIES", "beauty_health"],
+    ["ASDA TECH USB-C CABLE 1M", "electronics"],
+    ["ASDA RESCUE CHOC ORANGE", "food_drink"],
+    ["ASDA SWEDE EACH", "food_drink"]
+  ] },
+  {"shop": "Lidl", "domain": "lidl.co.uk", "setThree": true, "lines": [
+    ["DELUXE BELGIAN CHOC TRUFFLES", "food_drink"],
+    ["MILBONA SKYR NATURAL", "food_drink"],
+    ["CRUSTI CROC SALTED", "food_drink"],
+    ["SILVERCREST SANDWICH TOASTER", "home"],
+    ["PARKSIDE CORDLESS SCREWDRIVER", "home"],
+    ["LIVERGY MENS THERMAL SOCKS", "clothing"],
+    ["ESMARA LADIES LEGGINGS", "clothing"],
+    ["LUPILU NAPPIES SIZE 4", "household"],
+    ["CIEN MICELLAR WATER", "beauty_health"],
+    ["W5 WASHING UP LIQUID", "household"],
+    ["FREEWAY COLA 2L", "food_drink"],
+    ["MCENNEDY PEANUT BUTTER", "food_drink"],
+    ["CRIVIT YOGA MAT", "sport_outdoor"],
+    ["CARRIER BAG", "household"],
+    ["STRAWBERRIES 400G", "food_drink"]
+  ] },
+  {"shop": "Aldi", "domain": "aldi.co.uk", "setThree": true, "lines": [
+    ["SPECIALBUY AMBIANO AIR FRYER 4L", "home"],
+    ["SPECIALBUY FERREX DRILL DRIVER", "home"],
+    ["SPECIALBUY CROFTON LUNCH BOX", "home"],
+    ["MAMIA BABY WIPES", "household"],
+    ["LACURA MOISTURISER", "beauty_health"],
+    ["HARVEST MORN GRANOLA", "food_drink"],
+    ["SNACKRITE PAPRIKA CRISPS", "food_drink"],
+    ["DAIRYFINE MILK CHOC", "food_drink"],
+    ["SPECIALBUY CRANE HIKING SOCKS", "clothing"],
+    ["SPECIALBUY KIDS WELLIES", "footwear"]
+  ] },
+  {"shop": "Boots", "domain": "boots.com", "setThree": true, "lines": [
+    ["BTS PARACET CAPLETS 16", "beauty_health"],
+    ["NUROFEN EXPRESS 200MG 16", "beauty_health"],
+    ["BOOTS HAYFEVER RELIEF 30", "beauty_health"],
+    ["CALPOL 6+ SUSPENSION 80ML", "beauty_health"],
+    ["BOOTS SHAPERS CRISPS", "food_drink"],
+    ["NICORETTE QUICKMIST 1MG", "beauty_health"],
+    ["NICORETTE INVISI PATCH 25MG", "beauty_health"],
+    ["BOOTS ADVANCED WHITENING TOOTHPASTE", "household"],
+    ["ORAL-B PRO 3 3500 ELECTRIC TOOTHBRUSH", "electronics"],
+    ["BOOTS FOLIC ACID 400UG 90", "beauty_health"],
+    ["NO7 FUTURE RENEW SERUM 30ML", "beauty_health"],
+    ["BOOTS PHOTO PRINTS 6X4", "services"],
+    ["BOOTS EYE TEST", "services"],
+    ["BOOTS FLU JAB", "services"],
+    ["BOOTS BABY NAPPY CREAM", "beauty_health"],
+    ["DRS CONTACT LENSES DAILIES 30", "beauty_health"],
+    ["REMINGTON HAIR DRYER D3010", "electronics"]
+  ] },
+  {"shop": "Superdrug", "domain": "superdrug.com", "setThree": true, "lines": [
+    ["SD VIT E NIGHT CRM", "beauty_health"],
+    ["SOLUTIONS SALICYLIC CLEANSER", "beauty_health"],
+    ["REVOLUTION CONCEALER C8", "beauty_health"],
+    ["MUA LIP LINER", "beauty_health"],
+    ["NAIL POLISH REMOVER 250ML", "beauty_health"],
+    ["STUDIO LONDON HAIR STRAIGHTENERS", "electronics"],
+    ["SUPERDRUG KIDS PLASTERS", "beauty_health"]
+  ] },
+  {"shop": "Next", "domain": "next.co.uk", "setThree": true, "lines": [
+    ["Navy Crew Neck Jumper - M - Navy", "clothing"],
+    ["SLIM FIT STRETCH CHINO STONE 32R", "clothing"],
+    ["Wellies Blk 13 (Younger)", "footwear"],
+    ["Ribbed Midi Dress | Black | 12R", "clothing"],
+    ["Leather Chelsea Boots Tan UK8", "footwear"],
+    ["2pk Cotton Rich Pillowcases Grey", "home"],
+    ["Bronx Velvet Corner Sofa", "home"],
+    ["Signature Merino Scarf Charcoal", "accessories"],
+    ["Collection Luxe 100ml EDT", "beauty_health"],
+    ["Boys Sports Trainers White/Black 2", "footwear"]
+  ] },
+  {"shop": "River Island", "domain": "riverisland.com", "setThree": true, "lines": [
+    ["Black faux leather biker jacket 10", "clothing"],
+    ["Pink ribbed bodycon mini dress 8", "clothing"],
+    ["White chunky trainers 5", "footwear"],
+    ["Brown croc cross body bag", "accessories"],
+    ["Blue wash high waisted mom jeans 12 R", "clothing"]
+  ] },
+  {"shop": "ASOS", "domain": "asos.com", "setThree": true, "lines": [
+    ["ASOS DESIGN slim jeans in black - W32 L32", "clothing"],
+    ["Monki cropped cardigan in lilac - XS", "clothing"],
+    ["Dr Martens 1461 3-eye shoes in black - UK 7", "footwear"],
+    ["ASOS DESIGN mini hoop earrings in gold tone", "accessories"],
+    ["Bershka faux fur jacket in chocolate - S", "clothing"],
+    ["ASOS DESIGN leather belt in tan - M", "accessories"],
+    ["Weekday oversized t-shirt in sage - L", "clothing"],
+    ["Vans Old Skool trainers in black and white - UK 9", "footwear"]
+  ] },
+  {"shop": "H&M", "domain": "hm.com", "setThree": true, "lines": [
+    ["Relaxed Fit Sweatshirt - Black - M", "clothing"],
+    ["2-pack Rib Tank Tops White/Black XS", "clothing"],
+    ["Cotton Twill Cap - Beige", "accessories"],
+    ["Linen-blend Cushion Cover 50x50", "home"],
+    ["Chunky Loafers - Black - 38", "footwear"]
+  ] },
+  {"shop": "Schuh", "domain": "schuh.co.uk", "setThree": true, "lines": [
+    ["Nike Air Max 1 White/Black UK 9", "footwear"],
+    ["Dr. Martens 1460 Black Smooth 6", "footwear"],
+    ["Birkenstock Arizona EVA Black 41", "footwear"],
+    ["schuh Ankle Socks 3pk", "clothing"],
+    ["Converse Chuck 70 Hi Parchment 7", "footwear"]
+  ] },
+  {"shop": "Currys", "domain": "currys.co.uk", "setThree": true, "lines": [
+    ["SONY WH-1000XM5 Wireless Bluetooth Noise-Cancelling Headphones - Black", "electronics"],
+    ["LG OLED55C44LA 55\" Smart 4K TV", "electronics"],
+    ["LOGIK L60DIW20 60 cm Dishwasher", "electronics"],
+    ["NINJA AF400UK Dual Zone Air Fryer", "home"],
+    ["DYSON V8 Cordless Vacuum Cleaner", "home"],
+    ["SANDISK 128 GB microSDXC Card", "electronics"],
+    ["SAMSUNG Galaxy S25 128 GB Navy", "electronics"],
+    ["Knowhow Set-up Service", "services"],
+    ["Recycling of old appliance", "services"]
+  ] },
+  {"shop": "Argos", "domain": "argos.co.uk", "setThree": true, "lines": [
+    ["Habitat 3 Drawer Chest - White", "home"],
+    ["Tower T17021 Vortx 5L Air Fryer", "home"],
+    ["Apple AirPods 4", "electronics"],
+    ["Nintendo Switch 2 Console", "electronics"],
+    ["Mario Kart World (Nintendo Switch 2)", "books_media"],
+    ["Argos Home Fan Heater 2kW", "home"],
+    ["LEGO Technic 42151 Bugatti Bolide", "toys_hobbies"],
+    ["Opti Folding Treadmill", "sport_outdoor"],
+    ["Fire TV Stick 4K", "electronics"]
+  ] },
+  {"shop": "Amazon.co.uk", "domain": "amazon.co.uk", "setThree": true, "lines": [
+    ["UGREEN USB C Hub 6 in 1 Multiport Adapter", "electronics"],
+    ["Amazon Basics Microfibre Cleaning Cloths, Pack of 24", "household"],
+    ["Echo Show 8 (3rd generation) | Charcoal", "electronics"],
+    ["Kindle Unlimited Membership", "digital"],
+    ["Ninja Foodi MAX 15-in-1 SmartLid Multi-Cooker 7.5L", "home"],
+    ["COSRX Advanced Snail 96 Mucin Power Essence 100ml", "beauty_health"],
+    ["Fire-Resistant Document Bag 15x11 inches", "accessories"],
+    ["Yankee Candle Large Jar Vanilla Cupcake", "home"],
+    ["Lavazza Qualita Oro Coffee Beans 1kg", "food_drink"],
+    ["Mario Kart 8 Deluxe (Nintendo Switch)", "books_media"]
+  ] },
+  {"shop": "B&Q", "domain": "diy.com", "setThree": true, "lines": [
+    ["GoodHome Durable Matt Emulsion Paint 2.5L", "home"],
+    ["Diall 18V Cordless Combi Drill", "home"],
+    ["Erbauer EXT 600W Jigsaw", "home"],
+    ["Verve 50L Multi Purpose Compost", "home"],
+    ["Ronseal Fence Life Plus 5L", "home"],
+    ["Polycell Smoothover 1.5kg", "home"],
+    ["Rawlplug Red Wall Plugs x 96", "home"],
+    ["Bostik White Silicone 310ml", "home"],
+    ["Hozelock 30m Hose Reel", "home"],
+    ["Mac Allister 1800W Electric Lawnmower", "home"],
+    ["Colours Brilliant White Gloss 750ml", "home"],
+    ["Duck Tape Silver 50mm x 25m", "home"]
+  ] },
+  {"shop": "Screwfix", "domain": "screwfix.com", "setThree": true, "lines": [
+    ["Forgefix Spectre Woodscrews 5x50mm 200pk", "home"],
+    ["Titan TTB290DRL 18V Drill Driver", "home"],
+    ["No Nonsense Expanding Foam 750ml", "home"],
+    ["Site Rigger Boots Brown Size 10", "footwear"],
+    ["Scruffs Trade Work Trousers 34R", "clothing"],
+    ["LAP 10W LED Floodlight", "home"],
+    ["Hi-Vis Vest Yellow XL", "clothing"],
+    ["Fischer Cavity Fixings 6mm 50pk", "home"]
+  ] },
+  {"shop": "Toolstation", "domain": "toolstation.com", "setThree": true, "lines": [
+    ["Copper Tube 15mm x 3m", "home"],
+    ["Solder Ring Elbow 15mm", "home"],
+    ["Plumbers Mait 750g", "home"],
+    ["Masonry Drill Bit Set 5pc", "home"],
+    ["Builders Bucket 14L Black", "home"],
+    ["Dust Masks FFP2 10pk", "home"]
+  ] },
+  {"shop": "Homebase", "domain": "homebase.co.uk", "setThree": true, "lines": [
+    ["Homebase Kitchen Bin 50L Stainless", "home"],
+    ["Crown Breatheasy Emulsion Hessian 2.5L", "home"],
+    ["Wilko Paint Tray Set", "home"],
+    ["Dulux Weathershield Smooth Masonry Paint 5L", "home"],
+    ["Westland Multi Purpose Compost 60L", "home"]
+  ] },
+  {"shop": "Pets at Home", "domain": "petsathome.com", "setThree": true, "lines": [
+    ["Wainwrights Adult Dog Food Turkey 15kg", "pets"],
+    ["Webbox Dental Sticks Large 28 pk", "pets"],
+    ["Pets at Home Cat Litter 30L", "pets"],
+    ["Kong Classic Dog Toy Medium", "pets"],
+    ["Pets at Home Fleece Dog Coat Navy M", "pets"],
+    ["Frontline Plus Spot On Large Dog 3 Pipettes", "pets"],
+    ["Hamster Wheel 20cm", "pets"],
+    ["VIP Grooming Session", "services"],
+    ["Puppy Training Pads 30pk", "pets"],
+    ["Cat Scratching Post 60cm", "pets"]
+  ] },
+  {"shop": "Zooplus", "domain": "zooplus.co.uk", "setThree": true, "lines": [
+    ["Rocco Classic Pack 24 x 800g Beef", "pets"],
+    ["Feringa Adult Chicken 6.5kg", "pets"],
+    ["Catit Senses 2.0 Scratcher", "pets"],
+    ["Lukullus Wet Dog Food 6 x 400g", "pets"],
+    ["Purizon Grain Free Kitten Dry", "pets"]
+  ] },
+  {"shop": "Mamas & Papas", "domain": "mamasandpapas.com", "setThree": true, "lines": [
+    ["Strada Pushchair Sky Blue", "other"],
+    ["Welcome to the World Sleepsuit 3pk 0-3m", "clothing"],
+    ["Muslin Squares 3pk White", "home"],
+    ["Cot Bed Mattress Spring 140x70", "home"],
+    ["Baby Bath Seat Grey", "home"],
+    ["Changing Bag Black Quilted", "accessories"]
+  ] },
+  {"shop": "Boots", "domain": "boots.com", "setThree": true, "lines": [
+    ["Pampers Baby-Dry Nappies Size 4 x 41", "household"],
+    ["Aptamil 1 First Infant Milk 800g", "food_drink"],
+    ["Tommee Tippee Anti-Colic Bottles 3pk", "home"],
+    ["MAM Original Soothers 0-6m 2pk", "other"],
+    ["Infacol Colic Relief 50ml", "beauty_health"],
+    ["Ella's Kitchen Strawberry & Apple Pouch 90g", "food_drink"]
+  ] },
+  {"shop": "Space NK", "domain": "spacenk.com", "setThree": true, "lines": [
+    ["Augustinus Bader The Rich Cream 50ml", "beauty_health"],
+    ["Byredo Gypsy Water EDP 50ml", "beauty_health"],
+    ["Dr. Jart+ Cicapair Tiger Grass Colour Correcting Treatment", "beauty_health"],
+    ["Ouai Hair Oil 45ml", "beauty_health"],
+    ["Hourglass Ambient Lighting Powder", "beauty_health"]
+  ] },
+  {"shop": "Lookfantastic", "domain": "lookfantastic.com", "setThree": true, "lines": [
+    ["Lookfantastic Beauty Box Subscription", "digital"],
+    ["ghd Platinum+ Styler", "electronics"],
+    ["Medik8 Crystal Retinal 6 30ml", "beauty_health"]
+  ] },
+  {"shop": "WHSmith", "domain": "whsmith.co.uk", "setThree": true, "lines": [
+    ["WHSmith A4 Ruled Refill Pad 160 Pages", "other"],
+    ["Bic Cristal Pens Blue 10pk", "other"],
+    ["Sharpie Fine Permanent Markers Black 4pk", "other"],
+    ["Moleskine Classic Notebook Large Ruled Black", "other"],
+    ["Casio FX-83GTCW Scientific Calculator", "electronics"],
+    ["Pukka Pad Project Book A4", "other"],
+    ["CGP GCSE Maths Revision Guide", "books_media"],
+    ["Meal Deal", "food_drink"],
+    ["Radio Times Christmas Double Issue", "books_media"]
+  ] },
+  {"shop": "Ryman", "domain": "ryman.co.uk", "setThree": true, "lines": [
+    ["Ryman Lever Arch File A4 Black", "other"],
+    ["Stabilo Boss Highlighters 4pk", "other"],
+    ["Post-it Notes 76x76 12pk", "other"],
+    ["Rexel Stapler Half Strip", "other"],
+    ["Printing Service A4 Colour", "services"]
+  ] },
+  {"shop": "Majestic", "domain": "majestic.co.uk", "setThree": true, "lines": [
+    ["Definition Malbec 2022 75cl", "food_drink"],
+    ["Rioja Reserva Vina Eguia 6x75cl", "food_drink"],
+    ["Picpoul de Pinet Ormarine", "food_drink"],
+    ["Sancerre Les Baronnes 2023", "food_drink"],
+    ["Champagne Delivery Gift Box", "food_drink"]
+  ] },
+  {"shop": "Tesco", "domain": "tesco.com", "setThree": true, "lines": [
+    ["BUDWEISER 12X300ML", "food_drink"],
+    ["GORDONS PINK GIN 70CL", "food_drink"],
+    ["TESCO FNST CHABLIS", "food_drink"],
+    ["HOBGOBLIN RUBY 500ML", "food_drink"],
+    ["CORONA EXTRA 4X330ML", "food_drink"],
+    ["JACK DANIELS 1L", "food_drink"],
+    ["GUINNESS DRAUGHT 10X440ML", "food_drink"]
+  ] },
+  {"shop": "Vape Superstore", "domain": "vapesuperstore.co.uk", "setThree": true, "lines": [
+    ["Elf Bar 600 Blue Razz Lemonade 20mg", "other"],
+    ["Lost Mary BM600 Grape", "other"],
+    ["Vaporesso XROS 4 Pod Kit Black", "other"],
+    ["Elux Legend 3500 Pods 2pk", "other"],
+    ["Bar Juice 5000 Nic Salt 10ml Strawberry Ice", "other"],
+    ["Replacement Coils 0.8ohm 5pk", "other"]
+  ] },
+  {"shop": "Sainsbury's", "domain": "sainsburys.co.uk", "setThree": true, "lines": [
+    ["SKE ELF BAR 600 WATERMELON", "other"],
+    ["NICORETTE FRESHMINT GUM 2MG", "beauty_health"],
+    ["ZYN COOL MINT NICOTINE POUCHES", "other"]
+  ] },
+  {"shop": "Love2shop", "domain": "love2shop.co.uk", "setThree": true, "lines": [
+    ["Love2shop eGift £25", "gift_cards"]
+  ] },
+  {"shop": "Amazon.co.uk", "domain": "amazon.co.uk", "setThree": true, "lines": [
+    ["Amazon.co.uk eGift Card - Birthday Cake", "gift_cards"],
+    ["Apple Gift Card £25 - App Store, iTunes", "gift_cards"],
+    ["PlayStation Store Gift Card £20 | PSN Account UK", "gift_cards"]
+  ] },
+  {"shop": "One4all", "domain": "one4all.com", "setThree": true, "lines": [
+    ["One4all Gift Card £100", "gift_cards"],
+    ["Card Activation Fee", "services"]
+  ] },
+  {"shop": "Deliveroo", "domain": "deliveroo.co.uk", "setThree": true, "lines": [
+    ["Rider tip", "services"]
+  ] },
+  {"shop": "Evri", "domain": "evri.com", "setThree": true, "lines": [
+    ["Parcel to Locker Small", "services"],
+    ["Signature on Delivery", "services"],
+    ["Compensation Cover £100", "services"]
+  ] },
+  {"shop": "Timpson", "domain": "timpson.co.uk", "setThree": true, "lines": [
+    ["Key Cutting x2", "services"],
+    ["Watch Battery Replacement", "services"],
+    ["Shoe Heel Repair", "services"],
+    ["Passport Photos", "services"]
+  ] },
+  {"shop": "TV Beds North West", "domain": "tvbedsnorthwest.co.uk", "setThree": true, "lines": [
+    ["TVBED KING GREY PLUSH", "home"],
+    ["OTTOMANBED DBL CHARCOAL", "home"],
+    ["SOFABED 3STR CHENILLE", "home"],
+    ["HEADBRD WINGBACK 5FT", "home"],
+    ["MATTRESS POCKET 1000 KING", "home"],
+    ["DIVANBASE 2DRW DOUBLE", "home"],
+    ["Bedside Cabinet 2 Drawer Oak", "home"],
+    ["Fitted Sheet King Grey", "home"]
+  ] },
+  {"shop": "Wayfair", "domain": "wayfair.co.uk", "setThree": true, "lines": [
+    ["Brayden Studio Corner Sofa Bed", "home"],
+    ["Zipcode Design Upholstered Bed Frame", "home"],
+    ["Ebern Designs Desk Chair", "home"],
+    ["17 Stories 3 Tier Bookshelf", "home"]
+  ] },
+  {"shop": "Sports Direct", "domain": "sportsdirect.com", "setThree": true, "lines": [
+    ["Slazenger Golf Balls 12 Pack", "sport_outdoor"],
+    ["Karrimor Duma 5 Mens Running Shoes Black", "footwear"],
+    ["Lonsdale 2 Stripe T Shirt Mens", "clothing"],
+    ["Everlast Bottle 750ml", "home"],
+    ["Sondico Shin Pads Junior", "sport_outdoor"]
+  ] },
+  {"shop": "Ticketmaster", "domain": "ticketmaster.co.uk", "setThree": true, "lines": [
+    ["Standing - General Admission", "services"],
+    ["Fee", "services"],
+    ["Order Processing Fee", "services"]
+  ] },
+  {"shop": "Morrisons", "domain": "morrisons.com", "setFour": true, "lines": [
+    ["M BEST CHKN KIEV 2PK", "food_drink"],
+    ["MORR SAVERS BKD BNS", "food_drink"],
+    ["M GRTD MOZZ 250G", "food_drink"],
+    ["NUTMEG GIRLS SCHOOL SKIRT 2PK", "clothing"],
+    ["NUTMEG KIDS SLIDERS", "footwear"],
+    ["M KTCHN FOIL 10M", "household"],
+    ["MORRISONS MARKET ST LOAF", "food_drink"],
+    ["M FAIRTRADE BANANAS", "food_drink"]
+  ] },
+  {"shop": "Waitrose", "domain": "waitrose.com", "setFour": true, "lines": [
+    ["WR ESS SMKD SALMON TRIM", "food_drink"],
+    ["WTRS NO1 BEEF WELLINGTON", "food_drink"],
+    ["WR DUCHY ORG CARROTS", "food_drink"],
+    ["WR LAVENDER HAND WASH", "household"],
+    ["WR CORNISH PASTY", "food_drink"],
+    ["Waitrose Cellar Rioja Crianza", "food_drink"]
+  ] },
+  {"shop": "Co-op", "domain": "coop.co.uk", "setFour": true, "lines": [
+    ["CO OP IRRESISTIBLE STEAK PIE", "food_drink"],
+    ["CO-OP CARRIER BAG", "household"],
+    ["COOP 2L SEMI", "food_drink"],
+    ["CO OP CHAPSTICK", "beauty_health"]
+  ] },
+  {"shop": "Superdrug", "domain": "superdrug.com", "setFour": true, "lines": [
+    ["SD OPTIMUM HYALURONIC SERUM", "beauty_health"],
+    ["COLLECTION LASTING PERFECTION CONCEALER", "beauty_health"],
+    ["SD SUNCARE SPF50 200ML", "beauty_health"],
+    ["SD ANTIBAC HAND GEL 50ML", "household"]
+  ] },
+  {"shop": "Boots", "domain": "boots.com", "setFour": true, "lines": [
+    ["Boots Pharmaceuticals Loratadine 10mg 30 Tablets", "beauty_health"],
+    ["Braun Series 7 Electric Shaver", "electronics"],
+    ["Boots Shapers Meal Deal Wrap", "food_drink"],
+    ["Soap & Glory The Righteous Butter 300ml", "beauty_health"]
+  ] },
+  {"shop": "JD Sports", "domain": "jdsports.co.uk", "setFour": true, "lines": [
+    ["Nike Tech Fleece Joggers Black/Black L", "clothing"],
+    ["adidas Originals Handball Spezial Navy UK 8", "footwear"],
+    ["The North Face 1996 Retro Nuptse Gilet", "clothing"],
+    ["Nike Heritage Crossbody Bag Black", "accessories"],
+    ["Jordan Jumpman Cap", "accessories"]
+  ] },
+  {"shop": "Office", "domain": "office.co.uk", "setFour": true, "lines": [
+    ["Office Leading Lady Ballet Flats Black Leather 5", "footwear"],
+    ["Shoe Care Kit", "household"],
+    ["Ugg Tasman Chestnut 6", "footwear"]
+  ] },
+  {"shop": "Currys", "domain": "currys.co.uk", "setFour": true, "lines": [
+    ["ACER Aspire 3 A315 15.6\" Laptop - Intel Core i5, 512 GB SSD", "electronics"],
+    ["SONY PS5 Slim Console Digital Edition", "electronics"],
+    ["SWITCH Joy-Con Pair Neon", "electronics"],
+    ["BEKO CDFY24 24\" Fridge Freezer", "electronics"]
+  ] },
+  {"shop": "Screwfix", "domain": "screwfix.com", "setFour": true, "lines": [
+    ["Dewalt DCD796N 18V XR Combi Drill Body Only", "home"],
+    ["Flomasta Basin Mixer Tap", "home"],
+    ["Easyfix Floor Plates 150pk", "home"],
+    ["Everbuild 703 Decorators Caulk 380ml White", "home"]
+  ] },
+  {"shop": "IKEA", "domain": "ikea.com", "setFour": true, "lines": [
+    ["POÄNG Armchair, birch veneer/Knisa light beige", "home"],
+    ["HEMNES 8-drawer dresser, white stain", "home"],
+    ["Meatballs 1kg frozen", "food_drink"],
+    ["FRAKTA Shopping bag, large, blue", "household"]
+  ] },
+  {"shop": "Pets at Home", "domain": "petsathome.com", "setFour": true, "lines": [
+    ["Harringtons Grain Free Salmon 2kg", "pets"],
+    ["AvoDerm Natural Lamb Biscuits", "pets"],
+    ["Rosewood Chewy Rope Ball", "pets"]
+  ] },
+  {"shop": "Smyths Toys", "domain": "smythstoys.com", "setFour": true, "lines": [
+    ["Barbie Dreamhouse 2025", "toys_hobbies"],
+    ["Hot Wheels Monster Trucks 5 Pack", "toys_hobbies"],
+    ["Pokémon TCG Scarlet & Violet Booster", "toys_hobbies"]
+  ] },
+  {"shop": "Holland & Barrett", "domain": "hollandandbarrett.com", "setFour": true, "lines": [
+    ["Holland & Barrett Magnesium Citrate 120 Capsules", "beauty_health"],
+    ["Meridian Smooth Peanut Butter 1kg", "food_drink"],
+    ["Nakd Cocoa Delight Bar 35g", "food_drink"]
+  ] },
+  {"shop": "Vape Club", "domain": "vapeclub.co.uk", "setFour": true, "lines": [
+    ["Elf Bar 2000 Pod Kit Cherry", "other"],
+    ["Hayati Pro Max 4000 Blue Razz", "other"]
+  ] },
+  {"shop": "Deliveroo", "domain": "deliveroo.co.uk", "setFour": true, "lines": [
+    ["Chicken Wrap & Wedges", "food_drink"],
+    ["Kids Box Meal", "food_drink"]
+  ] },
+  {"shop": "Very", "domain": "very.co.uk", "setFour": true, "lines": [
+    ["Shark NZ690UK Anti Hair Wrap Upright Vacuum", "home"],
+    ["Everyday Ribbed Jersey Midi Dress Black 14", "clothing"],
+    ["Very Home Mirror 60x90cm", "home"]
+  ] },
+  {"shop": "John Lewis", "domain": "johnlewis.com", "setFour": true, "lines": [
+    ["John Lewis Classic Cotton Bath Towel, Navy", "home"],
+    ["Sage the Bambino Plus Coffee Machine", "home"]
+  ] },
+  {"shop": "Trainline", "domain": "thetrainline.com", "setFour": true, "lines": [
+    ["Off-Peak Day Return (Adult)", "travel"]
+  ] },
+  {"shop": "Gift Card Mall", "domain": "giftcardmall.example", "setFour": true, "lines": [
+    ["Costa Coffee Gift Card £15", "gift_cards"],
+    ["Nando's eGift £25", "gift_cards"]
   ] }
  ]
 }

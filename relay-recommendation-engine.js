@@ -40,8 +40,26 @@
   if(bed&&/bed|mattress|duvet|sheet|divan|headboard|frame/i.test(all))return{kind:"bed",value:bed[1].replace(/^./,c=>c.toUpperCase())};
   return null;
  }
+ // The broad kind of a thing, for ranking Browse. What the thing is comes from item-kind-core.js when it is sure (a Jordan
+ // backpack is a bag, Boots' meal deal isn't footwear, a black bag is never "like" black trainers); the word lists below only
+ // split clothes into tops, bottoms and so on, or decide for a name the core can't place.
+ const CORE_CATEGORY={footwear:"footwear",accessories:null,home:"home",electronics:"tech"};
  function category(name){
   const s=normal(name);
+  const c=Core?Core.classify(name):null;
+  if(c&&c.confidence!=="low"){
+   if(c.kind==="footwear")return "footwear";
+   if(c.kind==="accessories")return /bag|tote|holdall|backpack|crossbody|rucksack|satchel|clutch|purse/.test(s)?"bags":"other";
+   if(c.kind==="clothing"){
+    if(/coat|jacket|trench|parka|puffer|rain shell|gilet|blazer/.test(s))return "outerwear";
+    if(/shirt|tee|top|overshirt|jumper|sweater|hoodie|sweatshirt|cardigan|blouse|polo/.test(s))return "tops";
+    if(/jean|trouser|legging|pant|chino|jogger|shorts/.test(s))return "bottoms";
+    if(/dress|skirt/.test(s))return "dresses";
+    return "other";
+   }
+   if(CORE_CATEGORY[c.kind])return CORE_CATEGORY[c.kind];
+   return "other";
+  }
   if(/trainer|sneaker|shoe|boot|jordan/.test(s))return "footwear";
   if(/coat|jacket|trench|parka|puffer|rain shell/.test(s))return "outerwear";
   if(/shirt|tee|top|overshirt|jumper|sweater|hoodie|sweatshirt/.test(s))return "tops";
@@ -201,27 +219,41 @@
  const FOOD_OR_CARE_WORDS=/\bbalm\b|\bcream\b|\blotion\b|\bgel\b|\bwash\b|shampoo|conditioner|plasters?|\bfile\b|\bgrips?\b|insoles?|\bpads?\b|moscow mule|\bmule (can|cocktail)|\bchicken\b|\bbeef\b|\bpork\b|\blamb\b|\bham\b|\bbacon\b|\bfish\b|\bsalmon\b|\bcheese\b|\bmilk\b|\bbread\b|\bbuns?\b|\bcake\b|biscuit|chocolate|\bcrisps?\b|\bsweets?\b|\bfruit\b|\bveg\b|\bsalad\b|\bpasta\b|\brice\b|\bsoup\b|\bsauce\b|\bpizza\b|\bsandwich|\bwrap\b|\bjuice\b|\bwater\b|\bcola\b|\bbeer\b|\bcider\b|\bgin\b|\bvodka\b|\bcoffee\b|\btea\b|\bcereal\b|\byoghurt|\byogurt|\beggs?\b|\bbutter\b|\bsausages?\b|\bpie\b|\bnoodles?\b|\bkg\b|\d+ ?(g|ml|l|cl)\b|\d+ ?x ?\d/;
  // What the core says a thing is: "used" (eaten, drunk, washed with), "pet", "beauty", "none" (travel, an app, a service, a
  // gift card: nothing to pick from), or null when it isn't sure (the word lists below then decide).
- function coreSays(name){
+ function coreSays(name,shop){
   if(!Core)return FOOD_OR_CARE_WORDS.test(normal(name))?"used":null;
-  const c=Core.classify(name);if(c.confidence==="low")return null;
+  const c=Core.classify(name,shop?{shop}:undefined);if(c.confidence==="low")return null;
   if(c.kind==="pets")return "pet";if(c.kind==="beauty_health")return "beauty";
   if(c.kind==="food_drink"||c.kind==="household")return "used";
   if(c.kind==="travel"||c.kind==="digital"||c.kind==="services"||c.kind==="gift_cards")return "none";
   return "thing";
  }
- function kindOf(name){
+ // What each kind in KINDS is in item-kind-core.js's words: a pick named "boots" or "trainers" must be footwear, a bag must be
+ // a bag, by what the thing is and never by a word or a colour it shares (Connor, 18 Nov 2026).
+ const KIND_IS={underwear:"clothing",swimwear:"clothing",footballshirt:"clothing",tshirt:"clothing",leggings:"clothing",joggers:"clothing",
+  shorts:"clothing",jeans:"clothing",sportsbra:"clothing",hoodie:"clothing",jacket:"clothing",jumper:"clothing",shirt:"clothing",top:"clothing",
+  jumpsuit:"clothing",dress:"clothing",skirt:"clothing",trousers:"clothing",pyjamas:"clothing",socks:"clothing",boots:"footwear",shoes:"footwear",
+  trainers:"footwear",bag:"accessories",hat:"accessories",scarf:"accessories",gloves:"accessories",tie:"accessories",mug:"home",blanket:"home",
+  cushion:"home",candle:"home"};
+ // The core's own kind for a name when it is sure of it, else null.
+ function coreKind(name,shop){if(!Core)return null;const c=Core.classify(name,shop?{shop}:undefined);return c.confidence==="high"||c.confidence==="ai"?c.kind:null;}
+ const fitsCore=(key,ck)=>!ck||!KIND_IS[key]||KIND_IS[key]===ck||(ck==="sport_outdoor"&&(KIND_IS[key]==="clothing"||KIND_IS[key]==="footwear"));
+ function kindOf(name,shop){
   const s=normal(name);if(!s)return null;
   if(NOT_A_THING.test(s))return {mode:"none"};
   if(ONE_OFF.test(s))return {mode:"none"};
   if(/\btea ?bags?\b/.test(s)){const c=COMPANIONS.find(x=>x[0]==="tea");return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:null};}
-  const says=coreSays(name);
+  const says=coreSays(name,shop);
   if(says==="none")return {mode:"none"};
   // Pets: more for the pet. Beauty: only skincare is picked from. Food and household: only a companion (coffee: a cup).
   if(says==="pet"){const p=KINDS.find(x=>x[0]==="pet");return {mode:"similar",key:p[0],noun:p[1],want:p[2]};}
   if(says==="beauty"){const b=KINDS.find(x=>x[0]==="skincare");return b[2].test(s)?{mode:"similar",key:b[0],noun:b[1],want:b[2]}:null;}
   if(says==="used"){const c=COMPANIONS.find(x=>x[0]!=="bed"&&x[2].test(s));return c?{mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null}:null;}
   // A thing: the word lists say which kind of thing (never "pet" or "skincare" for a jumper with a dog on it).
-  const k=KINDS.find(x=>x[0]!=="pet"&&x[0]!=="skincare"&&x[2].test(s));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[0]==="trainers"?new RegExp(k[2].source+"|"+TRAINER_MODELS.source):(k[3]||k[2])};
+  const ck=coreKind(name,shop);
+  const k=KINDS.find(x=>x[0]!=="pet"&&x[0]!=="skincare"&&x[2].test(s)&&fitsCore(x[0],ck));if(k)return {mode:"similar",key:k[0],noun:k[1],want:k[0]==="trainers"?new RegExp(k[2].source+"|"+TRAINER_MODELS.source):(k[3]||k[2])};
+  // A name the word lists can't place but the core is sure is clothes, shoes or a bag, with no kind in the lists: nothing
+  // is guessed.
+  if(ck&&ck!=="footwear"&&TRAINER_MODELS.test(s))return null;
   if(TRAINER_MODELS.test(s)){const t=KINDS.find(x=>x[0]==="trainers");return {mode:"similar",key:"trainers",noun:t[1],want:new RegExp(t[2].source+"|"+TRAINER_MODELS.source)};}
   const c=COMPANIONS.find(x=>x[2].test(s));if(c)return {mode:"companion",key:c[0],noun:c[1],want:c[3],better:c[4]&&c[4].test(s)?c[4]:null};
   return null;
@@ -265,7 +297,7 @@
    // A supermarket's receipt is mostly the weekly shop: its lines count only as clothes or homeware that last, by the word
    // lists (or the AI), never by a shop-wide guess.
    const superm=SUPERMARKETS.test(normal(p.merchant));
-   const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item)||(superm?null:shopCompanion(p.merchant));if(!k||k.mode==="none")continue;
+   const k=aiKindOf(p.item,options.aiKinds)||kindOf(p.item,p.merchant)||(superm?null:shopCompanion(p.merchant));if(!k||k.mode==="none")continue;
    if(superm&&k.mode==="companion")continue;
    if(!src.has(k.key))src.set(k.key,{...k,n:0,colours:new Set(),shops:new Map(),prices:[]});
    const x=src.get(k.key);x.n++;if(k.better)x.better=k.better;
@@ -289,7 +321,10 @@
    const lead=k.looked?"Like the "+k.noun+" you've been looking at":k.mode==="similar"?(many?"Like the "+k.noun+" you buy":"Like the "+k.noun+" you bought at "+shop):"Goes with your "+k.noun+(many?"":" from "+shop);
    // A product picked as more of a kind must be that kind itself, as far as the word lists can tell: Boxer Shorts aren't
    // shorts, a Knit Jacket isn't a jumper, a Cap Sleeve T-Shirt isn't a cap.
-   const sameKind=g=>{if(k.mode!=="similar"||k.ai||!KINDS.some(x=>x[0]===k.key))return true;const o=kindOf(g.product);return !o||(o.mode==="similar"&&o.key===k.key)};
+   const sameKind=g=>{if(k.mode!=="similar"||k.ai||!KINDS.some(x=>x[0]===k.key))return true;const o=kindOf(g.product,g.store);
+    // And the core must not say it is another kind of thing (a black bag is never "like" black trainers).
+    const ck=coreKind(g.product,g.store);if(ck&&KIND_IS[k.key]&&!fitsCore(k.key,ck))return false;
+    return !o||(o.mode==="similar"&&o.key===k.key)};
    const list=stock.filter(g=>k.want.test(normal(g.product))&&sameKind(g)).map((g,i)=>{
     let s=3;const why=[lead],text=normal(g.product+" "+(g.options||[]).join(" "));
     const col=[...k.colours].find(c=>new RegExp("\\b"+c+"\\b").test(text));

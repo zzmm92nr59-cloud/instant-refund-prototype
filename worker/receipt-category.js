@@ -12,6 +12,7 @@
 import KindCore from "./item-kind-core.js";
 import { cleanShopName, isVia, looksLikePerson, nameFromDomain, domainBase as readerBase, GAME_SHOP } from "./receipt-reader.js";
 import { shopKind, spellOut } from "./shop-kind.js";
+import { SEED as SEED_LIST } from "./shop-seed.js";
 export const CATEGORIES = {
   fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden",
   beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other",
@@ -322,11 +323,33 @@ export function categorise(card, learned) {
 // What kind of shop a receipt is from, for reading its lines (item-kind-core.js): "eatery" (a café, restaurant, pub or
 // takeaway), "grocer" (a supermarket or food delivery), the group of a shop Relay knows or whose name says what it sells,
 // or null.
+// Relay's list of real UK shops (shop-seed.js), by the shop's whole name or web address: what each mostly sells, for
+// reading its lines. A department store or marketplace gives no hint (its items decide); a pet shop says so, so its
+// chicken is the dog's (DIY and trade shops are told by name in item-kind-core.js: a garden centre's café is still food).
+const SEED_HINT = { clothing: "fashion", shoes: "fashion", sport: "fashion", jewellery: "fashion", electronics: "electronics", home: "home",
+  diy: "home", beauty: "beauty", pets: "pets", supermarket: "grocer" };
+const SEED_KIND = new Map();
+for (const [kind, list] of Object.entries(SEED_LIST)) for (const entry of list) for (const n of entry.split("|")) {
+  const k = String(n).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+  if (k.length >= 3 && !SEED_KIND.has(k)) SEED_KIND.set(k, kind);
+}
+function seedKindOf(card) {
+  const r = card.retailer || {};
+  const sq = (x) => String(x || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]/g, "");
+  for (const n of [shopDisplayName(r), r.name]) { const k = sq(n); if (k && SEED_KIND.has(k)) return SEED_KIND.get(k); }
+  const d = isVia(r.domain) ? "" : domainBase(r.domain);
+  return d && SEED_KIND.has(d) ? SEED_KIND.get(d) : null;
+}
 export function shopHintFor(card) {
   card = card || {};
   const { shop, nameGroup } = shopClues(card), r = card.retailer || {};
-  if ((shop && EATERY.has(shop.key)) || EATERY_NAME.test([spaced(shopDisplayName(r)), spaced(r.name)].filter(Boolean).join(" "))) return "eatery";
+  if (shop && EATERY.has(shop.key)) return "eatery";
   if (shop && GROCER.has(shop.key)) return "grocer";
+  // A shop that sells a bit of everything (Argos, Very, John Lewis, M&S): what each item is called decides.
+  if (shop && MIXED.has(shop.key)) return null;
+  const seed = seedKindOf(card);
+  if (seed) return SEED_HINT[seed] || null;
+  if (EATERY_NAME.test([spaced(shopDisplayName(r)), spaced(r.name)].filter(Boolean).join(" "))) return "eatery";
   return (shop && shop.cat) || nameGroup || null;
 }
 // A supermarket or food delivery receipt (Sainsbury's, Tesco, Ocado…): its food, cleaning things and toiletries are the

@@ -355,13 +355,22 @@
     ["parcel", /\b(royal mail|parcels?|postage|stamps|evri|dpd|inpost)\b/i]
   ];
   var KIND_ILL = { food: "bowl", fashion: "tshirt", electronics: "plug", home: "sofa", beauty: "jar", travel: "suitcase", digital: "app", experiences: "ticket", other: "shop" };
+  // A drawing only fits a thing of its own kind (worker/item-kind-core.js): Boots' meal deal or a supermarket's "boot" cake is
+  // never drawn as a shoe, and the shop's name is only read for a drawing of the receipt's own kind.
+  function illFits(key, group) { var g = ILL_KIND[key]; return !g || !group || group === "other" && g !== "fashion" && g !== "electronics" || g === group || (g === "pets" && group === "home"); }
+  function itemGroup(it, shop) {
+    var K = window.RelayItemKind;
+    if (it.kind && it.kindSure && K && K.KIND_LIST[it.kind]) return K.KIND_LIST[it.kind].group;
+    if (!K) return null;
+    try { var c = K.classify(it.name, { shop: shop }); return c.confidence === "high" || c.confidence === "ai" ? c.group : null; } catch (e) { return null; }
+  }
   function illKey(x) {
-    var items = (x.items || []).map(function (i) { return i && i.name; }).filter(Boolean).join(" · ");
+    var shopName = (x.retailer && x.retailer.name) || "";
+    var its = (x.items || []).filter(function (i) { return i && i.name; }).map(function (i) { return { name: i.name, group: itemGroup(i, shopName) }; });
+    for (var i = 0; i < ILL_RULES.length; i++) for (var j = 0; j < its.length; j++) if (ILL_RULES[i][1].test(its[j].name) && illFits(ILL_RULES[i][0], its[j].group)) return ILL_RULES[i][0];
     var shop = [x.retailer && x.retailer.name, x.retailer && x.retailer.legalName].filter(Boolean).join(" · ");
-    for (var t = 0, texts = [items, shop]; t < texts.length; t++) {
-      if (!texts[t]) continue;
-      for (var i = 0; i < ILL_RULES.length; i++) if (ILL_RULES[i][1].test(texts[t])) return ILL_RULES[i][0];
-    }
+    var group = x.category && x.category !== "other" ? x.category : null;
+    if (shop) for (var r = 0; r < ILL_RULES.length; r++) if (ILL_RULES[r][1].test(shop) && illFits(ILL_RULES[r][0], group)) return ILL_RULES[r][0];
     return KIND_ILL[x.category] || "shop";
   }
   // Draws the picture into a picture box (in the colours of the receipt's group).
