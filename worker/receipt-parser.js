@@ -13,6 +13,7 @@ import { flightBooking, flightItemName } from "./flight-booking.js";
 import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems, looksLikePerson } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
+import { namesCheck } from "./item-names.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -1064,7 +1065,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
     const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money }));
     const gap = (c) => (c.check.missingPence == null ? Infinity : Math.abs(c.check.missingPence));
-    const pick = settled.find((c) => c.items.length && c.check.complete) ||
+    // (Of the readings that add up, one whose names all look like things bought comes first: a note or a size read as the
+    // name still adds up. Round 9.)
+    const shopName = (result.retailer && result.retailer.name) || "";
+    const pick = settled.find((c) => c.items.length && c.check.complete && namesCheck(c.items, { shop: shopName }).namesOk) ||
+      settled.find((c) => c.items.length && c.check.complete) ||
       settled.filter((c) => c.items.length).sort((a, b) => gap(a) - gap(b))[0] || settled[settled.length - 1 - (settled.length > 3 ? settled.length - 3 : 0)] || settled[0];
     // When the older readings found the very same items, their copy is kept (the same fields as before for everything they
     // already read right).
@@ -1099,6 +1104,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (CLIPPED.test(text) || (otherPart && CLIPPED.test(otherPart))) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, clipped: true };
   if (saysAttached && !result.items.length) { result.detailsInAttachment = attachedDoc.kind; result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, inAttachment: attachedDoc.kind }; }
   for (const i of result.items) delete i.unitPence;
+  // The name check (item-names.js, round 9): money that adds up says nothing about the names. A name that looks like a note,
+  // a label, a size or a code makes namesOk false (with suspectNames), and the app says some names may not be right.
+  if (result.items.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, ...namesCheck(result.items, { shop: (result.retailer && result.retailer.name) || "" }) };
   if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }

@@ -51,7 +51,9 @@ for (const f of fixtures) {
     res.items = itemsRight(r.items || [], w.items);
     res.total = r.totalPence === w.totalPence && r.currency === w.currency ? null : `total ${r.totalPence} ${r.currency} for ${w.totalPence} ${w.currency}`;
     res.check = r.itemsCheck || null;
-    res.flagged = Boolean(r.itemsCheck && r.itemsCheck.complete === false);
+    // (Round 9: the name check, itemsCheck.namesOk, flags too. A right list must pass both.)
+    res.flagged = Boolean(r.itemsCheck && (r.itemsCheck.complete === false || r.itemsCheck.namesOk === false));
+    res.namesFlagged = Boolean(r.itemsCheck && r.itemsCheck.namesOk === false);
     res.shop = [w.shop, ...(w.shopAlso || [])].some((x) => norm(r.retailer && r.retailer.name) === norm(x)) ? null : `shop "${r.retailer && r.retailer.name}" for "${w.shop}"`;
     res.shopName = r.retailer && r.retailer.name;
     res.date = r.orderDate === w.date ? null : `date ${r.orderDate} for ${w.date}`;
@@ -92,6 +94,9 @@ console.log(`  As sent:   items right ${a.items}/${a.n} (${pct(a.items, a.n)}), 
 console.log(`  Forwarded: items right ${b.items}/${b.n} (${pct(b.items, b.n)}), totals right ${b.total}/${b.n} (${pct(b.total, b.n)}), shop ${b.shop}/${b.n}, date ${b.date}/${b.n}`);
 console.log(`  Forwards that read differently from the original: ${sameAsSent.length}`);
 console.log(`  Totals check: ${silent.length} silent misses, ${falseAlarm.length} false alarms`);
+const namesFalse = rows.filter((r) => r.ok && !r.items && r.namesFlagged);
+console.log(`  Name check: ${namesFalse.length} right item lists flagged (of ${rows.filter((r) => r.ok && !r.items).length})`);
+for (const r of namesFalse) console.log("    " + r.id, JSON.stringify(r.check && r.check.suspectNames));
 
 // A refund, a cancellation or a price adjustment is never read as a new purchase, as sent or forwarded. A refund's amount and
 // order number are read (parseReturnUpdateEmail), so it can attach to the order it belongs to (return-tracking.js).
@@ -209,6 +214,7 @@ need(a.items === a.n && b.items === b.n, "items exactly right on every email, as
 need(a.total === a.n && b.total === b.n, "totals right on every email");
 need(silent.length === 0, "the totals check flags every email whose items are incomplete");
 need(falseAlarm.length === 0, "the totals check never flags an email whose items are all there");
+need(namesFalse.length === 0, "the name check never flags an email whose items are all right (round 9)");
 need(sameAsSent.length === 0, "a forwarded email reads the same as the original (" + sameAsSent.map((r) => r.id).join(", ") + ")");
 need(rows.filter((r) => r.count).length === 0, "the number of items an email states is read");
 need(rows.filter((r) => r.ok && r.attachment).length === 0, "a receipt only in its attachment says so, and no other receipt does");

@@ -135,7 +135,9 @@ const GONE = Symbol("gone");
 // 37 (round 7): an invoice number ("Invoice number: INV-2290") is the order number when the email gives no other.
 // 38 (round 8): takeaway, supermarket, Amazon and fashion layouts: a table cell over several lines, notes under an item, toppings
 // at £0.00, sizes under a row, guide prices, "Ordered on" dates, cells copied with tabs, fares without a journey flagged.
-export const PARSER_VERSION = 38;
+// 39 (round 9): the name check (item-names.js): itemsCheck.namesOk and suspectNames, so a note, a label, a size or a code
+// read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
+export const PARSER_VERSION = 39;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
