@@ -165,6 +165,8 @@ function splitCell(raw) {
   m = /^(.*?\S)\s*\(\s?[x×]\s?(\d{1,3})\)$/i.exec(c) || /^(.*?\S)\s+[x×]\s?(\d{1,3})$/i.exec(c) || /^(.*?\S)\s*[-–|]?\s*(?:qty|quantity)\s*:?\s*(\d{1,3})\s*[-–]?$/i.exec(c) ||
     /^(.*?\S)\s{2,}(\d{1,3})$/.exec(c);
   if (m && out.qty == null) { out.untailed = cleanName(c); out.qty = Number(m[2]); c = m[1]; out.head = true; out.tail = true; }
+  // ("Sea Mist 5L, x 1": the size before how many, set apart by a comma, is the item's size. Round 11.)
+  if (out.tail && (m = /^(.*\p{L}.*?)\s+(\d+(?:[.,]\d+)?\s?(?:ml|cl|l|ltr|g|kg|oz))\s*,$/iu.exec(c))) { out.measure = m[2]; c = m[1]; out.untailed = null; }
   out.text = cleanName(c);
   return out;
 }
@@ -353,7 +355,10 @@ export function readItems(text, opts = {}) {
   // "Carling Lager 18 x 440ml" over "Age restricted product | 1 | £15.00 |", can be told from an extra of the row above.)
   const afterRow = [];
   let raw = [];
-  for (let k = 0, rowEnded = false, all = prepText(text).replace(/\r\n?/g, "\n").split("\n"); k < all.length && raw.length < 6000; k++) {
+  for (let k = 0, rowEnded = false, all = prepText(text).replace(/\r\n?/g, "\n")
+      // (Two items run into one line of a text part, "Sea Mist 5L, x 1<tab>£89.50 Fern Hollow 2L, x 1<tab>£32.00": each on its own.
+      // Round 11.)
+      .replace(/(\t£\s?\d[\d,]*\.\d{2}) (?=\p{Lu}[^£\t\n]{2,80}\t£)/gu, "$1\n").split("\n"); k < all.length && raw.length < 6000; k++) {
     // (Text copied from a page a browser showed sets its cells apart with tabs: read as cells, as an email's table is. Only a
     // row that ends with its price is a row that ended.)
     // (A "|" inside such a cell is part of what it says, "… 140 MB/s | A1 | Class 10", unless it sets facts apart.)
