@@ -114,5 +114,21 @@ assert.match(txt, /Relay couldn't read the items on this receipt/); assert.match
 assert.deepEqual(errors, [], "no page errors");
 await ctx.close();
 console.log("ok - a pasted receipt offers Fix it yourself only; a receipt with no items says how many the email says");
+// 4. Round 4: a receipt whose items are only in the email's attachment (a PDF) says so, offers the email and fixing it by
+// hand, and never "Read it again" (the email has no items in it to read); nothing is made up for it.
+const PDF = base("55555555-5555-4555-8555-555555555555", "Harbour Hardware", { orderDate: day(-5), totalPence: 8640, items: [], detailsInAttachment: "pdf",
+  itemsCheck: { complete: false, itemsPence: 0, expectedPence: 8640, missingPence: 8640, inAttachment: "pdf" } });
+st = { receipts: [TAKEAWAY, PDF], log: [], reread: (id, j) => j({ error: "x" }, 500) };
+({ ctx, page, errors } = await shopper());
+await openFromHome(page, "Harbour Hardware");
+txt = await sheetText(page);
+assert.match(txt, /The items on this receipt are in its attachment/, txt); assert.match(txt, /sent the receipt as a PDF/);
+assert.equal(await page.locator(".rl-miss .rl-btn", { hasText: "Read it again" }).count(), 0, "no Read it again for items only in an attachment");
+assert.equal(await page.locator(".rl-miss .rl-btn", { hasText: "See the email" }).count(), 1);
+assert.equal(await page.locator(".rl-miss .rl-btn", { hasText: "Fix it yourself" }).count(), 1);
+for (const b of await page.locator(".rl-miss .rl-btn").all()) { const hgt = await b.evaluate((e) => e.getBoundingClientRect().height); assert.ok(hgt >= 44, "button at least 44px: " + hgt); }
+assert.deepEqual(errors, [], "no page errors");
+await ctx.close();
+console.log("ok - a receipt only in its PDF says the items are in the attachment, with See the email and Fix it yourself");
 await browser.close(); server.close();
 console.log("PASS receipt items: '+ N more', item counts, 'may have missed some items' with Read it again and See the email");

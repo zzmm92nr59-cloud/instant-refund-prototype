@@ -171,16 +171,18 @@ export function shopNamesInText(text, subject) {
 // A forward that arrives as HTML has &lt; &gt; round the address. In a forward of a forward, the person who passed it on
 // (a personal mailbox) is skipped, so the shop at the bottom of the chain is the one found.
 const FW_MARK = /forwarded message|begin forwarded message|original message|^[ \t>]*_{8,}[ \t]*$/im;
-const FW_FROM = /(?:^|\n)[ \t>*]*from[ \t*]*:[ \t*]*"?([^"<>[\]\n@]{0,60}?)"?[ \t]*(?:<[ \t]*(?:mailto:)?|\[mailto:|\()?[ \t]*([^\s<>[\]()"'@]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+))/gi;
+// (Outlook writes its forward header in the shopper's own language: "De : … Envoyé : …", "Von: … Gesendet: …", "Van: …
+// Verzonden: …", "Da: … Inviato: …", "De: … Enviado: …". Round 4, 19 Nov 2026.)
+const FW_FROM = /(?:^|\n)[ \t>*]*(?:from|de|von|van|da|fra|från|od)[ \t*]*:[ \t*]*"?([^"<>[\]\n@]{0,60}?)"?[ \t]*(?:<[ \t]*(?:mailto:)?|\[mailto:|\()?[ \t]*([^\s<>[\]()"'@]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+))/gi;
 export function forwardedSender(text, opts = {}) {
   const t = String(text || "").slice(0, 200000).replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;|&#0*34;/gi, '"');
-  const forwardedSubject = /^\s*(?:fwd?|fw)\s*:/i.test(String(opts.subject || ""));
+  const forwardedSubject = /^\s*(?:fwd?|fw|tr|wg|doorst|rv|enc)\s*:/i.test(String(opts.subject || ""));
   const personal = typeof opts.personal === "function" ? opts.personal : () => false;
   for (const m of t.matchAll(FW_FROM)) {
     const at = m.index + (m[0].startsWith("\n") ? 1 : 0);
     // It is a header block when a forward line sits just above it, or a Sent:/Date: line follows within a few lines.
     const above = FW_MARK.test(t.slice(Math.max(0, at - 300), at));
-    const below = /^[ \t>*]*(?:sent|date)[ \t*]*:/im.test(t.slice(at, at + 400).split("\n").slice(1, 5).join("\n"));
+    const below = /^[ \t>*]*(?:sent|date|envoy[ée]|gesendet|datum|verzonden|enviado|fecha|inviato|data|skickat|sendt|wysłano)[ \t*]*:/im.test(t.slice(at, at + 400).split("\n").slice(1, 5).join("\n"));
     if (!above && !below && !forwardedSubject) continue;
     const domain = m[3].toLowerCase().replace(/\.+$/, "");
     if (personal(domain)) continue;

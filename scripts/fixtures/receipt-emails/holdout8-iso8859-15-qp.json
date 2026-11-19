@@ -1,0 +1,36 @@
+{
+ "id": "holdout8-iso8859-15-qp",
+ "sender": "Potting Shed Supplies",
+ "layout": "text/plain iso-8859-15 quoted-printable",
+ "headers": {
+  "from": "Potting Shed Supplies <orders@pottingshedsupplies.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order PS-40213",
+  "date": "Fri, 13 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Potting Shed Supplies\nThanks for your order, Sam.\nOrder number: PS-40213\nOrder date: 13 November 2026\n\nGardening Gloves Large | Qty 2 | £17.98\nPruning Shears Bypass | Qty 1 | £24.50\n\nSubtotal £42.48\nDelivery £4.50\nTotal £46.98",
+ "expected": {
+  "shop": "Potting Shed Supplies",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Gardening Gloves Large",
+    "qty": 2,
+    "linePence": 1798
+   },
+   {
+    "name": "Pruning Shears Bypass",
+    "qty": 1,
+    "linePence": 2450
+   }
+  ],
+  "subtotalPence": 4248,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4698
+ },
+ "rawB64": "RnJvbTogUG90dGluZyBTaGVkIFN1cHBsaWVzIDxvcmRlcnNAcG90dGluZ3NoZWRzdXBwbGllcy5jby51az4NClRvOiBzYW0udGF5bG9yQGV4YW1wbGUuY28udWsNClN1YmplY3Q6IFlvdXIgb3JkZXIgUFMtNDAyMTMNCkRhdGU6IEZyaSwgMTMgTm92IDIwMjYgMTA6MDA6MDAgKzAwMDANCk1lc3NhZ2UtSUQ6IDxoOC0xQGNvcnB1cy5yZWxheS50ZXN0Pg0KTUlNRS1WZXJzaW9uOiAxLjANCkNvbnRlbnQtVHlwZTogdGV4dC9wbGFpbjsgY2hhcnNldD1JU08tODg1OS0xNQ0KQ29udGVudC1UcmFuc2Zlci1FbmNvZGluZzogcXVvdGVkLXByaW50YWJsZQ0KDQpQb3R0aW5nIFNoZWQgU3VwcGxpZXMNClRoYW5rcyBmb3IgeW91ciBvcmRlciwgU2FtLg0KT3JkZXIgbnVtYmVyOiBQUy00MDIxMw0KT3JkZXIgZGF0ZTogMTMgTm92ZW1iZXIgMjAyNg0KDQpHYXJkZW5pbmcgR2xvdmVzIExhcmdlIHwgUXR5IDIgfCA9QTMxNy45OA0KUHJ1bmluZyBTaGVhcnMgQnlwYXNzIHwgUXR5IDEgfCA9QTMyNC41MA0KDQpTdWJ0b3RhbCA9QTM0Mi40OA0KRGVsaXZlcnkgPUEzNC41MA0KVG90YWwgPUEzNDYuOTgNCg=="
+}

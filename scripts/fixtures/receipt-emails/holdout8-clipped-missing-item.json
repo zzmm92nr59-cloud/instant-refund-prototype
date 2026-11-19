@@ -1,0 +1,36 @@
+{
+ "id": "holdout8-clipped-missing-item",
+ "sender": "Leaf Lane",
+ "layout": "clipped after 2 of 3 items, total at the top",
+ "headers": {
+  "from": "Leaf Lane <orders@leaflane.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Leaf Lane order LL-2290",
+  "date": "Fri, 6 Nov 2026 11:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Leaf Lane</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.leaflane.co.uk/?utm_source=email\"><img src=\"https://www.leaflane.co.uk/static/email/logo.png\" alt=\"Leaf Lane\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: LL-2290</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 6 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order total: £50.00</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Advent Calendar Tea</td><td>1</td><td>£30.00</td></tr><tr><td>Gift Tin Large</td><td>1</td><td>£12.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><div>[Message clipped]&nbsp; <a href=\"https://mail.google.com/mail/u/0?view=lg&amp;permmsgid=msg-f:9\">View entire message</a></div></td></tr>\n\n</table></td></tr></table>\n<img src=\"https://click.leaflane.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Leaf Lane",
+  "date": "2026-11-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Advent Calendar Tea",
+    "qty": 1,
+    "linePence": 3000
+   },
+   {
+    "name": "Gift Tin Large",
+    "qty": 1,
+    "linePence": 1200
+   }
+  ],
+  "subtotalPence": 4200,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5000,
+  "partial": true
+ }
+}

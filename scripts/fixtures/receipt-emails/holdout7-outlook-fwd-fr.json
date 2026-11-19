@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-outlook-fwd-fr",
+ "sender": "Maison Perle",
+ "layout": "Outlook forward header in fr",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@outlook.com>",
+  "to": "receipts@example.com",
+  "subject": "TR: Your Maison Perle order MP-2201",
+  "date": "Mon, 26 Oct 2026 22:00:00 +0000"
+ },
+ "html": "<html><body><div><br></div><hr style=\"display:inline-block;width:98%\" tabindex=\"-1\"><div id=\"divRplyFwdMsg\" dir=\"ltr\"><font face=\"Calibri, sans-serif\" style=\"font-size:11pt\" color=\"#000000\"><b>De :</b> Maison Perle &lt;orders@maisonperle.co.uk&gt;<br><b>Envoyé :</b> lundi 26 octobre 2026 11:04<br><b>À :</b> Sam Taylor &lt;sam.taylor@example.co.uk&gt;<br><b>Objet :</b> Your Maison Perle order MP-2201</font><div>&nbsp;</div></div>\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.maisonperle.co.uk/?utm_source=email\"><img src=\"https://www.maisonperle.co.uk/static/email/logo.png\" alt=\"Maison Perle\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order, Sam.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: MP-2201</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 26 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Pearl Drop Earrings</td><td>1</td><td>£65.00</td></tr><tr><td>Jewellery Pouch</td><td>1</td><td>£5.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£70.00</td></tr><tr><td>Delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£73.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Maison Perle. All rights reserved.<br /><a href=\"https://www.maisonperle.co.uk/help\">Help</a> | <a href=\"https://www.maisonperle.co.uk/privacy\">Privacy</a> | <a href=\"https://www.maisonperle.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.maisonperle.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "\n\n________________________________\nDe : Maison Perle <orders@maisonperle.co.uk>\nEnvoyé : lundi 26 octobre 2026 11:04\nÀ : Sam Taylor <sam.taylor@example.co.uk>\nObjet : Your Maison Perle order MP-2201\n\nMaison Perle\nThanks for your order, Sam.\nOrder number: MP-2201\nOrder date: 26 October 2026\n\nPearl Drop Earrings | Qty 1 | £65.00\nJewellery Pouch | Qty 1 | £5.00\n\nSubtotal £70.00\nDelivery £3.95\nTotal £73.95",
+ "expected": {
+  "shop": "Maison Perle",
+  "date": "2026-10-26",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Pearl Drop Earrings",
+    "qty": 1,
+    "linePence": 6500
+   },
+   {
+    "name": "Jewellery Pouch",
+    "qty": 1,
+    "linePence": 500
+   }
+  ],
+  "subtotalPence": 7000,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7395
+ }
+}

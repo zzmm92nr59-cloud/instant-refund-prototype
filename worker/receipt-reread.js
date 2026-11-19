@@ -91,6 +91,13 @@ export async function askForItems(env, section, fetchImpl) {
 
 // The AI's items are kept only when they add up: against the email's own money lines as the rules read them, and the total
 // Relay already has. Its own subtotal or total never stands in for the email's.
+// Every item the AI names is written in the email: each word of its name is in the order section it was given. An item it
+// made up to fill the total ("Your order £86.40" on an email whose items are only in its PDF) is never kept. Round 4.
+const words = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").match(/[\p{L}\p{N}]{2,}/gu) || [];
+export function namedInEmail(reading, sectionText) {
+  const inEmail = new Set(words(sectionText));
+  return Boolean(reading && reading.items.length) && reading.items.every((i) => { const w = words(i.name); return w.length > 0 && w.every((x) => inEmail.has(x)); });
+}
 export function acceptAiItems(reading, sectionText, totalPence) {
   if (!reading || !reading.items.length) return null;
   const money = moneyOf(sectionText);

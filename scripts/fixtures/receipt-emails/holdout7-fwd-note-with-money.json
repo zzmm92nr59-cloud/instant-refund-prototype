@@ -1,0 +1,30 @@
+{
+ "id": "holdout7-fwd-note-with-money",
+ "sender": "Tailor & Thread",
+ "layout": "shopper's note with prices above a Gmail forward",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@gmail.com>",
+  "to": "receipts@example.com",
+  "subject": "Fwd: Your Tailor & Thread order TT-88001",
+  "date": "Wed, 28 Oct 2026 18:00:00 +0000"
+ },
+ "html": "<div dir=\"ltr\">Hi, this is the coat I want to return. They charged me £145 but it was £40 cheaper in the sale the next day, so I'd like the £40 back if I can't return it.<br><br>Thanks,<br>Sam<br><br><div class=\"gmail_quote\"><div dir=\"ltr\" class=\"gmail_attr\">---------- Forwarded message ---------<br>From: Tailor & Thread &lt;orders@tailorandthread.co.uk><br>Date: Wed, 28 Oct 2026 at 10:02<br>Subject: Your Tailor & Thread order TT-88001<br>To: &lt;sam.taylor@example.co.uk></div><br>\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tailorandthread.co.uk/?utm_source=email\"><img src=\"https://www.tailorandthread.co.uk/static/email/logo.png\" alt=\"Tailor &amp; Thread\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order, Sam.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: TT-88001</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 28 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Wool Blend Overcoat Camel</td><td>1</td><td>£145.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£145.00</td></tr><tr><td>Delivery</td><td>FREE</td></tr><tr><td><strong>Total</strong></td><td><strong>£145.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Tailor &amp; Thread. All rights reserved.<br /><a href=\"https://www.tailorandthread.co.uk/help\">Help</a> | <a href=\"https://www.tailorandthread.co.uk/privacy\">Privacy</a> | <a href=\"https://www.tailorandthread.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tailorandthread.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</div></div>",
+ "text": "Hi, this is the coat I want to return. They charged me £145 but it was £40 cheaper in the sale the next day, so I'd like the £40 back if I can't return it.\n\nThanks,\nSam\n\n---------- Forwarded message ---------\nFrom: Tailor & Thread <orders@tailorandthread.co.uk>\nDate: Wed, 28 Oct 2026 at 10:02\nSubject: Your Tailor & Thread order TT-88001\nTo: <sam.taylor@example.co.uk>\n\n\nTailor & Thread\nThanks for your order, Sam.\nOrder number: TT-88001\nOrder date: 28 October 2026\n\nWool Blend Overcoat Camel | Qty 1 | £145.00\n\nSubtotal £145.00\nDelivery FREE\nTotal £145.00",
+ "expected": {
+  "shop": "Tailor & Thread",
+  "date": "2026-10-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Wool Blend Overcoat Camel",
+    "qty": 1,
+    "linePence": 14500
+   }
+  ],
+  "subtotalPence": 14500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 14500
+ }
+}

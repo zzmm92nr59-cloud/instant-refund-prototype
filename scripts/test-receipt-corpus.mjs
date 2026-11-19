@@ -56,6 +56,9 @@ for (const f of fixtures) {
     res.shopName = r.retailer && r.retailer.name;
     res.date = r.orderDate === w.date ? null : `date ${r.orderDate} for ${w.date}`;
     res.count = w.itemCount != null && r.itemCount !== w.itemCount ? `item count ${r.itemCount} for ${w.itemCount}` : null;
+    // A receipt that is only in its attachment (a PDF, a photo) says so, and nothing is read from the attachment; no other
+    // email says its details are in an attachment (round 4).
+    res.attachment = (r.detailsInAttachment || null) === (w.attachmentOnly || null) ? null : `details in attachment: ${r.detailsInAttachment || "not said"} for ${w.attachmentOnly || "none"}`;
     rows.push(res);
   }
 }
@@ -77,10 +80,10 @@ if (report || silent.length || falseAlarm.length || a.items < a.n || a.total < a
   for (const r of rows) { const e = bySender.get(r.sender) || []; e.push(r); bySender.set(r.sender, e); }
   console.log("\nPer shop (originals and forwards together): items right / totals right / shop right / date right");
   for (const [s, list] of [...bySender].sort()) { const x = sum(list); console.log(`  ${s.padEnd(18)} ${String(x.items).padStart(3)}/${x.n} items  ${String(x.total).padStart(3)}/${x.n} totals  ${String(x.shop).padStart(3)}/${x.n} shop  ${String(x.date).padStart(3)}/${x.n} date`); }
-  const misses = rows.filter((r) => r.items || r.total || r.shop || r.date || r.count);
+  const misses = rows.filter((r) => r.items || r.total || r.shop || r.date || r.count || r.attachment);
   if (misses.length) {
     console.log("\nMisses:");
-    for (const r of misses) console.log(`  ${r.id.padEnd(34)} ${[r.items, r.total, r.shop, r.date, r.count].filter(Boolean).join("; ")}${r.items ? (r.flagged ? "  [flagged]" : "  [NOT FLAGGED]") : ""}`);
+    for (const r of misses) console.log(`  ${r.id.padEnd(34)} ${[r.items, r.total, r.shop, r.date, r.count, r.attachment].filter(Boolean).join("; ")}${r.items ? (r.flagged ? "  [flagged]" : "  [NOT FLAGGED]") : ""}`);
   }
   if (falseAlarm.length) { console.log("\nFlagged although the items are right:"); for (const r of falseAlarm) console.log("  " + r.id, JSON.stringify(r.check)); }
 }
@@ -167,6 +170,15 @@ else {
 }
 console.log(`  Split shipments: ${splitWrong.length ? splitWrong.join("; ") : "one card per order, every item once, complete only when it is"}`);
 
+// Round 4: an email whose HTML is mostly one enormous attribute (a 300 KB tracking address and style) is still read, and
+// quickly: the order after it is not pushed out of what is read. (Made-up email.)
+const longAttr = "x".repeat(300000);
+const bulky = `From: Example Shop <orders@exampleshop.co.uk>\r\nSubject: Your Example Shop order ES-30001\r\nDate: Mon, 16 Nov 2026 10:00:00 +0000\r\nContent-Type: text/html; charset=utf-8\r\n\r\n` +
+  `<html><body><a href="https://t.example.com/?u=${longAttr}">View in browser</a><p>Order number: ES-30001</p><table style="${"color:#222;".repeat(30000)}"><tr><td>Linen Shirt White</td><td>Qty 1</td><td>£35.00</td></tr></table><p>Subtotal £35.00</p><p>Total £35.00</p></body></html>`;
+const bulkyAt = Date.now(), bulkyRead = parseReceiptEmail(bulky), bulkyMs = Date.now() - bulkyAt;
+const bulkyOk = bulkyRead.ok && bulkyRead.totalPence === 3500 && bulkyRead.items.length === 1 && bulkyRead.itemsCheck.complete === true && bulkyMs < 2000;
+console.log(`  A 600 KB email that is mostly one attribute: ${bulkyOk ? "read" : "NOT read"} in ${bulkyMs} ms`);
+
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
@@ -175,7 +187,9 @@ need(silent.length === 0, "the totals check flags every email whose items are in
 need(falseAlarm.length === 0, "the totals check never flags an email whose items are all there");
 need(sameAsSent.length === 0, "a forwarded email reads the same as the original (" + sameAsSent.map((r) => r.id).join(", ") + ")");
 need(rows.filter((r) => r.count).length === 0, "the number of items an email states is read");
+need(rows.filter((r) => r.ok && r.attachment).length === 0, "a receipt only in its attachment says so, and no other receipt does");
 need(splitWrong.length === 0, "a split shipment's emails make one card with every item once");
+need(bulkyOk, "an email that is mostly one enormous attribute is still read, quickly");
 need(countCaught, "the item count an email states flags a miss the money can't see");
 need(a.shop === a.n && b.shop === b.n, "the shop is named right on every email, as sent and forwarded");
 need(a.date === a.n && b.date === b.n, "the order's date is read right on every email, as sent and forwarded");

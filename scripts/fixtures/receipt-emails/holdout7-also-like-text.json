@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-also-like-text",
+ "sender": "Pace Lab",
+ "layout": "'You might also like' with prices after the total (text)",
+ "headers": {
+  "from": "Pace Lab <orders@pacelab.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order PL-20031 confirmed",
+  "date": "Sat, 17 Oct 2026 07:30:00 +0000"
+ },
+ "html": "",
+ "text": "Pace Lab\nThanks for your order, Sam.\nOrder number: PL-20031\nOrder date: 17 October 2026\n\nRunning Belt Black | Qty 1 | £18.00\nEnergy Gel Box of 12 | Qty 1 | £15.00\n\nSubtotal £33.00\nDelivery £2.99\nTotal £35.99\n\nYou might also like\nHydration Vest 5L | £55.00\nCompression Calf Sleeves | £25.00\nReflective Running Cap | £18.00\nBlister Plasters x10 | £6.50",
+ "expected": {
+  "shop": "Pace Lab",
+  "date": "2026-10-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Running Belt Black",
+    "qty": 1,
+    "linePence": 1800
+   },
+   {
+    "name": "Energy Gel Box of 12",
+    "qty": 1,
+    "linePence": 1500
+   }
+  ],
+  "subtotalPence": 3300,
+  "feesPence": 299,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3599
+ }
+}

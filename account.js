@@ -3538,15 +3538,25 @@
   // finds is kept only when it adds up. A receipt pasted in has no email to read again: it can be fixed by hand.
   function missedBox(x, refresh) {
     var none = !(x.items || []).filter(function (i) { return i && i.name; }).length;
+    // (Round 4: the items are only in the email's attachment, a PDF or a photo, which Relay doesn't read; or Gmail cut the
+    // email short, so what came after the cut isn't in it.)
+    var inFile = none && (x.detailsInAttachment || x.itemsCheck.inAttachment);
     var box = el("div", { className: "rl-ret rl-miss" });
-    box.appendChild(el("b", { className: "rl-ret-h", text: none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
+    box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
     var short = x.itemsCheck.missingPence;
-    if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));
+    if (inFile) box.appendChild(el("span", { className: "rl-ret-why", text: (inFile === "image" ? "The shop sent the receipt as a picture" : "The shop sent the receipt as a PDF") + ". Open the email to see what you bought, or add the items yourself." }));
+    else if (x.itemsCheck.clipped) box.appendChild(el("span", { className: "rl-ret-why", text: "Gmail cut this email short, so some of it may not have reached Relay." }));
+    else if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));
     else if (none && x.itemCount) box.appendChild(el("span", { className: "rl-ret-why", text: "The email says " + (x.itemCount === 1 ? "1 item" : x.itemCount + " items") + "." }));
     var note = el("div", { className: "rl-msg", role: "status" });
     var row = el("div", { className: "rl-miss-acts" });
     var fixBtn = function () { return el("button", { type: "button", className: "rl-btn ghost", text: "Fix it yourself", onclick: function () { fixSheet(x, function () { refresh("fix"); }); } }); };
-    if (mailRef(x)) {
+    if (mailRef(x) && inFile) {
+      // (Reading the email again can't find items that aren't in it.)
+      row.appendChild(el("button", { type: "button", className: "rl-btn", text: "See the email", onclick: function () {
+        if (openOriginal) openOriginal(x.id); else open(function (sh) { originalView(sh, x.id, close); }); } }));
+      row.appendChild(fixBtn());
+    } else if (mailRef(x)) {
       var again = el("button", { type: "button", className: "rl-btn", text: "Read it again" });
       again.onclick = function () {
         if (again.disabled) return;
