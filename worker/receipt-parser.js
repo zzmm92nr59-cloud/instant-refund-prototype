@@ -693,7 +693,10 @@ function receiptSignals(subject, text) {
     // bilingual "Archeb / Order CR-1102" (round 3).
     // "Your Iceland delivery receipt 7711204" (round 3).
     /\b(?:delivery |order |e-?)?receipt\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border acknowledge?ment\b|\bsubscription\b[^!?]{0,30}\b(?:has )?renew(?:ed|al)\b|\breceipt for your\b|(?:^|\/\s*)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) || SHIPMENT_SUBJECT.test(s) ||
-    /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s) ||
+    // "Your tickets: The Winter's Tale, booking RT-55101", "Invoice INV-2290 for window cleaning" (round 6): a booking or an
+    // invoice named by its number. (The body must still show a total, below.)
+    /\btickets?\b[^!?]{0,60}\bbooking\s+(?:ref(?:erence)?\s*|no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?invoice\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{3,24}\b(?![^!?]*\b(?:overdue|reminder|due|unpaid|outstanding)\b)/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
   return { subjectHit, bodyHit };
@@ -1164,7 +1167,8 @@ export function parseDeliveryEmail(rawEmail) {
     carrier: fromCarrier || (t && t.carrier) || carrierIn(text) || null,
     trackingNumber: t ? t.trackingNumber : null,
     merchant: merchant ? merchant.trim() : null,
-    retailer: fromCarrier ? null : { name: sender?.name || null, domain: sender?.domain || null },
+    // A shop's own email the shopper forwarded from their own inbox names the shop, not the shopper's mailbox (round 6).
+    retailer: fromCarrier ? null : PERSONAL_MAIL.test(sender?.domain || "") ? shopOfUpdate(headers, text, html, parts) : { name: sender?.name || null, domain: sender?.domain || null },
     orderRef: ref ? ref[1] : null,
   };
 }
@@ -1352,6 +1356,67 @@ export function parseReturnParcelEmail(rawEmail) {
   };
 }
 
+
+// ---- A shop's own news about an order already placed (round 6, 19 Nov 2026) ------------------------------------------------
+// Both are read only when the email is not a receipt (classify in gmail.js tries the receipt first), and only with an order
+// number, so they can only ever join the order they name: they never make a purchase card of their own.
+// The shop of a shop's email, also when the shopper forwarded it from their own inbox (as for refunds, above).
+function shopOfUpdate(headers, text, html, parts) {
+  const sender = retailerFromFrom(headers.from);
+  const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
+  const shop = shopOf({ ld: null, sender, fromName, subject: headers.subject || "", text, html, otherText: html && parts.text.length ? htmlToText(html) : "" });
+  if (shop.domain && PERSONAL_MAIL.test(shop.domain)) shop.domain = null;
+  if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
+  return { name: shop.name || null, domain: shop.domain || null };
+}
+function updateParts(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n");
+  const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  const subject = String(headers.subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
+  const refDate = headers.date ? new Date(headers.date) : null;
+  const at = refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null;
+  // The order number, from the subject first ("Your order KO-1001 has been dispatched"), then the body ("Order number: …").
+  const ref = subject.match(/\border\s*(?:number|no\.?)?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+    text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
+  return { headers, parts, html, text, subject, at, orderRef: ref ? ref[1] : null };
+}
+// "Your order KO-1001 has been dispatched": a shop's dispatch email with no items in it. It used to be dropped, and with it the
+// parcel's tracking number, so the carrier's later "delivered" email had nothing to join (round 6). Kept as a parcel update.
+const DISPATCH_SUBJECT = /\b(?:dispatched|despatched|shipped|has shipped|on (?:its|it's|the) way|been sent|been posted)\b/i;
+const NOT_DISPATCH = /\b(?:return(?:s|ed|ing)?|refund(?:ed|s)?|cancell?(?:ed|ation)|delay(?:ed)?|problem|unable|failed|couldn(?:'|’)?t)\b/i;
+export function parseDispatchEmail(rawEmail) {
+  const no = { ok: false, reason: "not_a_dispatch_email" };
+  const u = updateParts(rawEmail);
+  if (!DISPATCH_SUBJECT.test(u.subject) || NOT_DISPATCH.test(u.subject) || !/\border\b/i.test(u.subject + "\n" + u.text.slice(0, 1500))) return no;
+  if (CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || ""))) || returnCarrierOf(u.headers.from)) return no;
+  if (!u.orderRef) return no;
+  const t = trackingIn(u.text);
+  return { ok: true, kind: "delivery_update", status: "shipped", at: u.at, carrier: (t && t.carrier) || carrierIn(u.text) || null,
+    trackingNumber: t ? t.trackingNumber : null, merchant: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts), orderRef: u.orderRef };
+}
+// "Your order LF-6006 has been cancelled", "Part of your order has been cancelled": the shop cancelled all or part of an order.
+// Nothing was bought (or that part wasn't), so it is not a purchase and not money spent; the order's card says so. The amount
+// is what the email says came back, when it says.
+export function parseCancellationEmail(rawEmail) {
+  const no = { ok: false, reason: "not_a_cancellation" };
+  const u = updateParts(rawEmail);
+  if (returnCarrierOf(u.headers.from) || CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || "")))) return no;
+  const top = u.text.slice(0, 1500).replace(/\s+/g, " ");
+  const said = /\bcancell?(?:ed|ation)\b/i.test(u.subject) || NOT_A_PURCHASE_TOP.test(top);
+  // A price adjustment or a subscription ("Your membership has been cancelled") is not a cancelled order.
+  if (!said || PRICE_ADJUSTMENT.test(u.subject + " " + top) || /\b(?:subscription|membership|plan|direct debit|account|booking|reservation|appointment|trial)\b/i.test(u.subject)) return no;
+  if (!/\border\b/i.test(u.subject + " " + top) || !u.orderRef) return no;
+  const partial = /\b(?:part of|some of|one of|an item|some items|items? (?:in|from|of) your order (?:has|have) been|(?:has|have) been cancell?ed from your order)\b/i.test(u.subject + " " + top) &&
+    !/(?<!\b(?:part|some|one|items?) (?:of|in|from) )\b(?:your|the|this) (?:whole |entire )?order (?:has been|was|is) cancell?ed\b/i.test(u.subject + " " + top);
+  const amt = (top.match(/\brefund(?:ed)?\b[^£€\n]{0,40}([£€])\s*([0-9][0-9,]*\.[0-9]{2})/i) || top.match(/([£€])\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\b(?:refund|back to your|returned to your)/i));
+  return { ok: true, kind: "order_update", stage: "cancelled", partial, at: u.at, orderRef: u.orderRef,
+    amountPence: amt ? money(amt[2]) : null, currency: amt ? (amt[1] === "€" ? "EUR" : "GBP") : null,
+    retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+}
 
 // ---- Product photos ---------------------------------------------------------------
 // Picks up to two likely product-photo URLs from an order email's HTML. Only https links to

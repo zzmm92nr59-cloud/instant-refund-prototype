@@ -448,8 +448,8 @@ await sequence("return dates: stated window, no window, food, download, ticket, 
   // as the shop's deadline: statedDeadline in account.js).
   expect(!lark.returnBy || lark.returnBy.estimate === true || lark.returnBy.basis === "uk_law", "no stated window: only a marked estimate (saw " + JSON.stringify(lark.returnBy || null) + ")");
   expect(!(lark.returns && (lark.returns.deadline || lark.returns.windowDays)), "nothing invented as the shop's own window (saw " + JSON.stringify(lark.returns || null) + ")");
-  for (const [ref, what] of [["PN-8812", "food"], ["SP-77120", "a download"], ["RT-55101", "tickets"], ["INV-2290", "a service"]]) {
-    const c = by(ref);
+  for (const [ref, what, domain] of [["PN-8812", "food"], ["SP-77120", "a download"], ["RT-55101", "tickets"], ["INV-2290", "a service", "sparklewindows.example"]]) {
+    const c = domain ? cards.find((x) => x.retailer && x.retailer.domain === domain) || {} : by(ref);
     expect(c.id, what + " is read (" + ref + ")");
     expect(!c.returnBy && !(c.returns && c.returns.deadline), what + " has no return date (saw " + JSON.stringify(c.returnBy || (c.returns && c.returns.deadline) || null) + ", category " + c.category + ")");
   }

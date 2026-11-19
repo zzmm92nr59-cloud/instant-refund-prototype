@@ -75,6 +75,16 @@ function asGroceries(c) {
 export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   year = Number(year) || new Date(now).getUTCFullYear();
   if (!opts.groceries) { cards = (cards || []).map(asGroceries); opts = { ...opts, groceries: true }; }
+  // An order the shop cancelled was never bought: it isn't counted at all. Part of one cancelled: the money the shop says came
+  // back for it is taken off (round 6). Without an amount, the order is counted as it was (nothing is guessed).
+  if (!opts.cancelsDone) {
+    cards = (cards || []).filter(c => !(c && c.cancelled && !c.cancelled.partial)).map(c => {
+      const x = c && c.cancelled;
+      return x && x.partial && Number.isInteger(x.amountPence) && Number.isInteger(c.totalPence) && (x.currency || "GBP") === (c.currency || "GBP") && x.amountPence <= c.totalPence
+        ? { ...c, totalPence: c.totalPence - x.amountPence } : c;
+    });
+    opts = { ...opts, cancelsDone: true };
+  }
   const industry = opts && INDUSTRIES.includes(opts.industry) ? opts.industry : null;
   // One order can arrive as several emails (confirmation, dispatch). It counts once.
   const seen = new Set();
@@ -106,6 +116,10 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   const on = industry ? " on " + CATEGORIES[industry].toLowerCase() : "";
   const gbp = mine.filter(c => c.totalPence != null && (!c.currency || c.currency === "GBP"));
   const otherCurrency = mine.filter(c => c.totalPence != null && c.currency && c.currency !== "GBP").length;
+  // Money in other currencies is never added to pounds: each currency's own total, listed separately (round 6).
+  const abroad = new Map();
+  for (const c of mine) if (c.totalPence != null && c.currency && c.currency !== "GBP") { const e = abroad.get(c.currency) || { currency: c.currency, receipts: 0, spentPence: 0 }; e.receipts++; e.spentPence += c.totalPence; abroad.set(c.currency, e); }
+  const otherCurrencies = [...abroad.values()].sort((a, b) => b.receipts - a.receipts || a.currency.localeCompare(b.currency));
   const noTotal = mine.filter(c => c.totalPence == null).length;
   const spentPence = gbp.reduce((s, c) => s + c.totalPence, 0);
   const shops = new Map();
@@ -284,7 +298,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
   // A kind gets its own chapter when some receipt was mostly that kind, or its things turned up in at least three
   // receipts (one pack of batteries in a supermarket shop isn't a year in electronics).
   const chapters = industry || opts.noChapters ? undefined : industries.filter(k => k.category !== "other" && k.receipts > 0 && (mainly.get(k.category) || k.receipts >= 3)).map(k => {
-    const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true, groceries: true });
+    const w = buildWrapped(cards, year, now, { industry: k.category, noChapters: true, groceries: true, cancelsDone: true });
     const weeks = Math.max(1, Math.ceil((Math.min(now, Date.UTC(year + 1, 0, 1)) - Date.UTC(year, 0, 1)) / (7 * 864e5)));
     const named = (w.topItems || []).filter(x => x.name);
     const fact = chapterFact(k.category, w, weeks);
@@ -307,7 +321,7 @@ export function buildWrapped(cards, year, now = Date.now(), opts = {}) {
     year, years, industry, industryLabel: industry ? CATEGORIES[industry] : null, industries, chapters,
     receipts: mine.length, shops: shops.size, items: itemCount, spentPence, currency: "GBP",
     topItem, refundedPence, refundsMatched: refunded.length, topShopShare, activeMonths, firstDate,
-    coverage: { withTotal: gbp.length, noTotal, otherCurrency },
+    coverage: { withTotal: gbp.length, noTotal, otherCurrency }, otherCurrencies,
     topShops, categories, byMonth,
     busiestMonth: busiest && busiest.receipts ? busiest.month : null,
     biggest: biggest ? { shop: shopName(biggest), totalPence: biggest.totalPence, date: whenOf(biggest), item: (biggest.items || []).length === 1 ? itemName(biggest.items[0]) : null,
