@@ -1,0 +1,40 @@
+{
+ "id": "holdout14b-restaurant-bill-net-total",
+ "sender": "noodlehaus",
+ "layout": "subject 'noodlehaus receipt'; 'restaurant', its branch, 'table', '#88' as loose lines; 'name | x1 | £13.95' rows; net total, v.a.t, bill total",
+ "headers": {
+  "from": "noodlehaus <noreply@noodlehaus.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "noodlehaus receipt",
+  "date": "Tue, 10 Nov 2026 13:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>noodlehaus</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.noodlehaus.example/?utm_source=email\"><img src=\"https://www.noodlehaus.example/static/email/logo.png\" alt=\"noodlehaus\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>your receipt</h1><p>thanks for visiting noodlehaus riverside and paying online</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>restaurant</h2><p>riverside</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>table</h2><p>#88</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>items</h2></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>jasmine tea</td></tr>\n<tr><td>x1</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>katsu curry</td></tr>\n<tr><td>x1</td></tr>\n<tr><td>&pound;13.95</td></tr>\n<tr><td>miso soup</td></tr>\n<tr><td>x1</td></tr>\n<tr><td>&pound;4.50</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>total items</td></tr>\n<tr><td>x3</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>net total</td></tr>\n<tr><td>&pound;15.38</td></tr>\n<tr><td>v.a.t</td></tr>\n<tr><td>&pound;3.07</td></tr>\n<tr><td>bill total</td></tr>\n<tr><td>&pound;18.45</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 noodlehaus. All rights reserved.<br /><a href=\"https://www.noodlehaus.example/help\">Help</a> | <a href=\"https://www.noodlehaus.example/privacy\">Privacy</a> | <a href=\"https://www.noodlehaus.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.noodlehaus.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "noodlehaus",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "jasmine tea",
+    "qty": 1,
+    "linePence": 0
+   },
+   {
+    "name": "katsu curry",
+    "qty": 1,
+    "linePence": 1395
+   },
+   {
+    "name": "miso soup",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 1845,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1845
+ }
+}

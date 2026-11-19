@@ -31,7 +31,7 @@ import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, live
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
 import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
-import { cleanItems, isVia } from "./receipt-reader.js";
+import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
@@ -155,7 +155,7 @@ const GONE = Symbol("gone");
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 43;
+export const PARSER_VERSION = 44;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -169,6 +169,9 @@ const LOOKBACK_DAYS = 500, WINDOW_DAYS = 30, MAX_WINDOWS_PER_CALL = 6, DAY_MS = 
 const SEARCH_TERMS =
   '(category:purchases OR category:reservations OR subject:(order OR "order confirmation" OR "order confirmed" OR "your order" OR receipt OR "thank you for your order" OR "thanks for your order" OR purchase OR "thanks for shopping" OR return OR refund OR "QR code"' +
   ' OR booking OR reservation OR itinerary OR tickets OR "e-ticket"' +
+  // (Amazon's "Ordered: 'Wireless Earbuds…'" and "Ordered: 3 items": Gmail matches whole words, so "order" never finds
+  // "Ordered", and these were missed whenever Gmail didn't file them under Purchases. Round 13.)
+  ' OR ordered' +
   // (An entry, a membership or a draw "Entry Confirmation", a bar's "Your payment #39814759": round 11. The reader decides.)
   ' OR confirmation OR "your payment" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
@@ -996,10 +999,13 @@ function classify(rawText, ref, lenient = false) {
       // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
       // order's confirmation (mergeOrderEmails). Round 10.
       ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
-      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}),
+      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}), ...(receipt.discounts ? { discounts: receipt.discounts } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
+      // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
+      // purchase, and what a gift card paid of an Amazon order. Round 13.)
+      ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
       ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
@@ -1023,6 +1029,7 @@ function classify(rawText, ref, lenient = false) {
     } else if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
+        ...(can.subscription ? { subscription: true, subscriptionName: can.subscriptionName, endsOn: can.endsOn, refund: can.refund } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
       details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
@@ -1776,6 +1783,18 @@ export function mergeOrderEmails(orders) {
       (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
     if (fits.length === 1) paidVia.set(p, fits[0]);
   }
+  // (A payment service's receipt with no order number, PayPal's "Receipt for your payment to Appcharge", "You paid $5.39 USD",
+  // sent within minutes of the shop's own receipt for the same money, "Your MATCH MASTERS-CANDIVORE receipt #672-235-462",
+  // Total $5.39, from the shop the payment names (appcharge.com for "Appcharge"): the same purchase, one card. Only when
+  // exactly one receipt fits each way. Round 13.)
+  const near = (a, b) => a.sentAt && b.sentAt && Math.abs(Date.parse(a.sentAt) - Date.parse(b.sentAt)) <= 10 * 60000;
+  const paidFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && o.retailer.domain && p.retailer.name &&
+    nameFitsDomain(p.retailer.name, o.retailer.domain) && o.totalPence != null && o.totalPence === p.totalPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o, p);
+  const unref = orders.filter((p) => p.retailer && p.retailer.via && !p.orderRef && p.totalPence != null && p.sentAt && !isForwarded(p));
+  for (const p of unref) {
+    const fits = orders.filter((o) => paidFits(p, o));
+    if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
+  }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
     if (!o.orderRef) return null;
@@ -2049,10 +2068,28 @@ function attachPayments(orders, pays) {
     last.paidSoFarPence = list.reduce((n, x) => n + x.amountPence, 0);
   }
 }
+// A subscription that won't renew ("Your Microsoft Word: … subscription will be cancelled … on 13 Aug 2019. No refunds will
+// be issued"): it says so on the subscription's latest payment before it, from the same shop, named by the same words
+// (two or more words of four letters, "Microsoft", "Word", "docs"), within a year. That payment is not cancelled: it
+// stays bought, and its card says when the subscription ends and whether money comes back. Never when no payment fits.
+// Round 13.
+const subWords = (s) => new Set(String(s || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !/^(?:with|from|subscription|monthly|yearly|annual|plan|trial|edit|your)$/.test(w)));
+function attachSubscriptionEnds(orders, ends) {
+  for (const u of ends) {
+    const want = subWords(u.subscriptionName);
+    if (want.size < 2) continue;
+    const fits = orders.filter((o) => o.retailer && sameShop(u, o) && Array.isArray(o.items) && o.items.length && o.orderDate && (!u.at || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 370 * 864e5)) &&
+      o.items.some((it) => [...subWords(it && it.name)].filter((w) => want.has(w)).length >= 2));
+    if (!fits.length) continue;
+    const latest = fits.sort((a, b) => String(b.orderDate).localeCompare(String(a.orderDate)))[0];
+    latest.subscriptionEnds = { on: u.endsOn || null, at: u.at || null, refund: u.refund === false ? false : null };
+  }
+}
 export function attachCancellations(orders, cancels) {
   // (Payments towards a purchase come with the order's other news: they are not cancellations.)
   attachPayments(orders, cancels.filter(u => u.stage === "payment"));
-  cancels = cancels.filter(u => u.stage !== "payment");
+  attachSubscriptionEnds(orders, cancels.filter(u => u.subscription));
+  cancels = cancels.filter(u => u.stage !== "payment" && !u.subscription);
   // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
   // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
   const byItems = new Map();

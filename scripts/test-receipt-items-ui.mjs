@@ -184,5 +184,30 @@ for (const word of ["Fix it yourself", "I'm sending this back", "Remind me"]) as
 assert.deepEqual(errors, [], "no page errors");
 await ctx.close();
 console.log("ok - non-refundable, credit back, paid so far, a swapped item, and a second order inside one email (shown, nothing that changes the first)");
+
+// 7. Round 13: a hotel with free cancellation, an app's cancel window, a subscription that ends, a gift card, discounts, pesos.
+const HOTEL2 = base("dddddddd-dddd-4ddd-8ddd-dddddddddddd", "Stayfinder", { totalPence: 23140, orderDate: day(-1), returnable: false, items: [{ name: "Double Room", variant: "Quayside Hotel", qty: 1, pricePence: 23140 }],
+  itemsCheck: { complete: true, itemsPence: 23140, expectedPence: 23140, missingPence: 0 }, returns: { freeCancellationUntil: "2025-06-06" } });
+const APP = base("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Apple", { totalPence: 159, orderDate: day(-2), returnable: false, items: [{ name: "Stack of Coins", variant: "Puzzle Pals", qty: 1, pricePence: 159 }],
+  itemsCheck: { complete: true, itemsPence: 159, expectedPence: 159, missingPence: 0 }, returns: { cancelWithin: true, windowDays: 14 } });
+const SUB = base("ffffffff-ffff-4fff-8fff-ffffffffffff", "Google Play", { totalPence: 599, orderDate: day(-3), items: [{ name: "Docs Pro (Monthly)", qty: 1, pricePence: 599 }],
+  itemsCheck: { complete: true, itemsPence: 599, expectedPence: 599, missingPence: 0 }, subscriptionEnds: { on: "2019-08-13", refund: false } });
+const GIFT = base("12121212-1212-4121-8121-121212121212", "Riverside Market", { totalPence: 0, orderDate: day(-4), giftCardPence: 810, items: [{ name: "Notebook", qty: 1, pricePence: 810 }],
+  itemsCheck: { complete: true, itemsPence: 810, expectedPence: 810, missingPence: 0 } });
+const PUB = base("13131313-1313-4131-8131-131313131313", "Crown & Anchor", { totalPence: 1785, orderDate: day(-5), items: [{ name: "Lager (Pint)", qty: 2, pricePence: 1100 }, { name: "Burger", qty: 1, pricePence: 1349 }],
+  itemsCheck: { complete: true, itemsPence: 2449, expectedPence: 2449, missingPence: 0 }, discounts: [["discount", "Promotion Applied", 664]] });
+const PESO = base("14141414-1414-4141-8141-141414141414", "Puzzle Pals", { totalPence: 15000, currency: "MXN", orderDate: day(-6), items: [{ name: "Coins bundle", qty: 1, pricePence: 15000 }],
+  itemsCheck: { complete: true, itemsPence: 15000, expectedPence: 15000, missingPence: 0 } });
+st = { receipts: [HOTEL2, APP, SUB, GIFT, PUB, PESO], log: [], reread: (id, j) => j({ error: "x" }, 500) };
+({ ctx, page, errors } = await shopper());
+txt = await sheetOf("Stayfinder"); assert.match(txt, /Free cancellation until 6 June 2025, as the booking email says\./); assert.ok(!/Usually can't be returned/.test(txt), txt);
+txt = await sheetOf("Apple"); assert.match(txt, /You can cancel within 14 days of the invoice, as the email says\./); assert.ok(!/Usually can't be returned/.test(txt), txt);
+assert.match(await sheetOf("Google Play"), /This subscription ends on 13 August 2019, with no refund\./);
+assert.match(await sheetOf("Riverside Market"), /£8\.10 was paid with a gift card\./);
+assert.match(await sheetOf("Crown & Anchor"), /£6\.64 off: Promotion Applied\./);
+assert.match(await sheetOf("Puzzle Pals"), /MX\$150\.00/);
+assert.deepEqual(errors, [], "no page errors");
+await ctx.close();
+console.log("ok - free cancellation, a cancel window, a subscription ending, a gift card, money taken off, and pesos are each said plainly");
 await browser.close(); server.close();
 console.log("PASS receipt items: '+ N more', item counts, 'may have missed some items' with Read it again and See the email");

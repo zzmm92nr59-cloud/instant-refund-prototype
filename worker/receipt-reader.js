@@ -6,7 +6,7 @@
 // ---- Who sent it on the shop's behalf ---------------------------------------------------------------------------------
 // Payment, ordering and email companies that send receipts for other businesses. Their name and web address say nothing
 // about the shop, so they never count as the shop (the shop's own name in the email does).
-export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|klarna\.(com|co\.uk)|giftpro\.co\.uk|mytoggle\.io|ventrata\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com|mandrillapp\.com|mailgun\.(org|net)|sparkpostmail\.com|amazonses\.com|mailjet\.com|sendinblue\.com|postmarkapp\.com|mcdlv\.net|rsgsv\.net)$/i;
+export const VIA_SENDER = /(^|\.)(shopifyemail\.com|shopify\.com|klarna\.(com|co\.uk)|giftpro\.co\.uk|mytoggle\.io|ventrata\.com|stripe\.com|squareup\.com|square\.com|squareupmessaging\.com|sumup\.com|dojo\.tech|global-e\.com|paypal\.(com|co\.uk)|social-commerce\.io|privaterelay\.appleid\.com|pepperhq\.com|ipg-online\.com|slerp\.com|sundayapp\.io|email-ticket\.com|touchtakeaway\.net|noreplies\.net|klaviyomail\.com|sendgrid\.net|mailchimpapp\.net|mcsv\.net|zettle\.com|izettle\.com|clover\.com|toasttab\.com|wixemails\.com|squarespace-mail\.com|bigcartel\.com|ecwid\.com|myshopify\.com|lightspeedhq\.com|epos\.now|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com|mandrillapp\.com|mailgun\.(org|net)|sparkpostmail\.com|amazonses\.com|mailjet\.com|sendinblue\.com|postmarkapp\.com|mcdlv\.net|rsgsv\.net)$/i;
 export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCase());
 
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
@@ -126,11 +126,17 @@ export function rankShop(clues) {
   // (Nor does a game's web shop sending under its own name, when the receipt names the game.)
   const viaName = c.senderName && (isVia(c.senderDomain) || c.titleName) && nameFitsDomain(cleanShopName(c.senderName) || "", c.senderDomain);
   if (c.senderName && !c.personal && !viaName) add(c.senderName, looksLikePerson(cleanShopName(c.senderName) || "", senderDomain || c.linkDomain) ? 1 : 5, senderDomain);
+  const sentAs = c.senderName && !c.personal && !viaName ? letters(cleanShopName(c.senderName) || "") : null;
   for (const n of c.bodyNames || []) add(n, 3, null);
   if (shopDomain) {
     const fromDomain = nameFromDomain(shopDomain);
     // The web address backs up any name that matches it.
-    for (const e of tally.values()) if (nameFitsDomain(e.name, shopDomain)) { e.score += 3; e.domain = e.domain || shopDomain; }
+    // (And the sender's name, when the subject gives it too, whose first word is the address's, "Google Play" from google.com: a
+    // brand's own store, not the company, "Google", in its footer. Round 13.)
+    for (const e of tally.values()) {
+      const store = c.senderInSubject && sentAs && letters(e.name) === sentAs && senderDomain === shopDomain && / /.test(e.name) && nameFitsDomain(e.name.split(" ")[0], shopDomain);
+      if (nameFitsDomain(e.name, shopDomain) || store) { e.score += store ? 6 : 3; e.domain = e.domain || shopDomain; }
+    }
     if (fromDomain) add(fromDomain, 2, shopDomain);
   }
   let best = null;
@@ -233,6 +239,8 @@ export function cleanItem(item) {
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
   if (/@|https?:|www\./i.test(name)) return null;
+  // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
+  if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;
   const { keepName, ...rest } = item;
   return { ...rest, name, qty: qty || 1 };
 }

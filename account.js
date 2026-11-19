@@ -3414,7 +3414,7 @@
   }
   // An amount in its own currency ("£12.00", "€80.00", "US$20.00"). Relay never converts one currency into another, and
   // only pounds are ever added up.
-  var MONEY_SIGN = { GBP: "£", EUR: "€", USD: "US$", CAD: "CA$", AUD: "A$" }, MONEY_NAME = { EUR: "euros", USD: "US dollars", CAD: "Canadian dollars", AUD: "Australian dollars" };
+  var MONEY_SIGN = { GBP: "£", EUR: "€", USD: "US$", CAD: "CA$", AUD: "A$", MXN: "MX$", PLN: "PLN " }, MONEY_NAME = { EUR: "euros", USD: "US dollars", CAD: "Canadian dollars", AUD: "Australian dollars", MXN: "Mexican pesos", PLN: "Polish złoty" };
   function moneyName(cur) { return MONEY_NAME[cur] || cur; }
   // A receipt whose amount isn't in pounds (and has one).
   function notPounds(x) { return Boolean(x && x.totalPence != null && x.currency && x.currency !== "GBP"); }
@@ -3508,11 +3508,22 @@
     (x.items || []).forEach(function (i) { if (i && i.name && typeof i.substitutedFor === "string" && i.substitutedFor) card.appendChild(el("p", { className: "rl-po-now", text: i.name + " was sent instead of " + i.substitutedFor + "." })); });
     // The shop's email says it can't be refunded (a non-refundable hotel rate): said plainly, no return window.
     if (x.returns && x.returns.nonRefundable === true) card.appendChild(el("p", { className: "rl-po-now", text: "Non-refundable, as the booking email says." }));
+    // A booking that can be cancelled for free until a day the email states (Booking.com). Round 13.
+    else if (x.returns && /^\d{4}-\d{2}-\d{2}$/.test(String(x.returns.freeCancellationUntil || ""))) card.appendChild(el("p", { className: "rl-po-now", text: "Free cancellation until " + longDate(x.returns.freeCancellationUntil) + " " + x.returns.freeCancellationUntil.slice(0, 4) + ", as the booking email says." }));
+    // Something digital that can be cancelled within days (Apple's "cancel within 14 days of receiving this invoice"), not a parcel to send back.
+    if (x.returns && x.returns.cancelWithin === true && Number(x.returns.windowDays) > 0) card.appendChild(el("p", { className: "rl-po-now", text: "You can cancel within " + Number(x.returns.windowDays) + " days of the invoice, as the email says." }));
+    // A subscription that ends (Google Play "your subscription will be cancelled"): when, and that nothing comes back.
+    if (x.subscriptionEnds && x.subscriptionEnds.on) card.appendChild(el("p", { className: "rl-po-now", text: "This subscription ends on " + longDate(x.subscriptionEnds.on) + " " + String(x.subscriptionEnds.on).slice(0, 4) + (x.subscriptionEnds.refund === false ? ", with no refund." : ".") }));
+    // Paid with a gift card (Amazon): the total is what was left to pay.
+    if (Number.isInteger(x.giftCardPence) && x.giftCardPence > 0) card.appendChild(el("p", { className: "rl-po-now", text: money(x.giftCardPence, "GBP") + " was paid with a gift card." }));
+    // Money the email took off (promotions, discounts, credit), each as the shop labelled it: why the items come to more than was paid.
+    (Array.isArray(x.discounts) ? x.discounts : []).slice(0, 4).forEach(function (d) { var pence = Array.isArray(d) ? d[2] : d && d.pence, label = Array.isArray(d) ? d[1] : d && d.label;
+      if (Number.isInteger(pence) && pence > 0) card.appendChild(el("p", { className: "rl-po-now", text: money(pence, x.currency) + " off" + (label ? ": " + String(label).replace(/[:\s]+$/, "") : "") + "." })); });
     if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && (x.itemsCheck.complete === false || x.itemsCheck.namesOk === false) && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
-    else if (x.returnable === false) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
+    else if (x.returnable === false && !(x.returns && x.returns.freeCancellationUntil) && !(x.returns && x.returns.cancelWithin)) card.appendChild(el("span", { text: "Usually can't be returned", style: "display:inline-block;margin:6px 6px 0 0;padding:4px 10px;border-radius:999px;font-weight:700;font-size:13px;background:var(--rl-fill);color:var(--rl-text2)" }));
     var left = daysLeft(statedDeadline(x));
     var leftText = left === null ? "" : left < 0 ? "Deadline passed" : left === 0 ? "Return today" : left + " day" + (left === 1 ? "" : "s") + " left";
     var leftTone = left === null ? "" : left < 0 ? "past" : left <= 2 ? "red" : left <= 7 ? "amber" : "green";

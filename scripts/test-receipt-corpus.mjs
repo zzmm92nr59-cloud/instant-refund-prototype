@@ -356,7 +356,46 @@ const joinWrong = [];
   attachReturnProgress(wine, [], [{ kind: "return_update", ...inv }]);
   if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it"}`);
+// Round 13 (Connor's real inbox, made-up copies): an Amazon email holding two orders makes a card for each, with its own
+// number, items and total (a gift card's £0.00 kept); Apple's and Google Play's cancel and withdrawal windows are read, and an
+// app store's two-hour rule is never given for a subscription; a subscription that won't renew says so on its latest payment
+// without cancelling it; PayPal's receipt for a game shop's purchase is the same purchase as the shop's own receipt.
+{
+  const { TWO_ORDERS } = await import("./fixtures/receipt-emails/holdout14a.mjs");
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const det = (id, app) => ({ ...classifyEmail(rawEmail(app ? forwarded(fx(id), app) : fx(id))).details, id });
+  for (const [id, want] of Object.entries(TWO_ORDERS)) for (const app of [null, "gmail"]) {
+    const cards = mergeOrderEmails([det(id, app)]);
+    const second = cards.find((c) => c.orderRef === want.orderRef);
+    const got = second && (second.items || []).map((i) => [i.name, i.qty || 1, i.pricePence]);
+    if (cards.length !== 2 || !second || second.totalPence !== want.totalPence || JSON.stringify(got) !== JSON.stringify(want.items) || !(second.itemsCheck && second.itemsCheck.complete))
+      joinWrong.push(`${id}${app ? "~" + app : ""}: the second order read as ${JSON.stringify(second ? [second.orderRef, second.totalPence, got] : cards.map((c) => c.orderRef))}`);
+  }
+  // (The same email as Amazon really sends it, every title cut short in the HTML: whole from the text part, and flagged,
+  // never passed off as whole, when there is no text part.)
+  const q = fx("holdout14a-amazon-qty-2024");
+  let cutHtml = q.html;
+  for (const n of [q.expected.items[0].name, ...TWO_ORDERS["holdout14a-amazon-qty-2024"].items.map((i) => i[0])]) cutHtml = cutHtml.split(n.replace(/&/g, "&amp;")).join(n.slice(0, 36) + "...");
+  const whole = parseReceiptEmail(rawEmail({ ...q, html: cutHtml }));
+  if (whole.items.map((i) => i.name).join("|") !== q.expected.items[0].name || (whole.moreOrders || [])[0]?.items.map((i) => i.name).join("|") !== TWO_ORDERS["holdout14a-amazon-qty-2024"].items.map((i) => i[0]).join("|"))
+    joinWrong.push("Amazon's cut titles not read whole from the text part: " + JSON.stringify([whole.items.map((i) => i.name), (whole.moreOrders || []).map((o) => o.items.map((i) => i.name))]));
+  const noText = parseReceiptEmail(rawEmail({ ...q, html: cutHtml, text: "" }));
+  if (!noText.itemsCheck || noText.itemsCheck.complete !== false) joinWrong.push("Amazon's cut titles with no text part not flagged: " + JSON.stringify(noText.itemsCheck));
+  const gift = det("holdout14a-amazon-qty-2024");
+  if (gift.giftCardPence !== 1475 || gift.totalPence !== 0 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
+  const apple = parseReceiptEmail(rawEmail(fx("holdout14a-apple-cancel-within")));
+  if (!(apple.returns && apple.returns.windowDays === 14 && apple.returns.cancelWithin)) joinWrong.push("Apple's 'cancel within 14 days' not read: " + JSON.stringify(apple.returns));
+  const play = parseReceiptEmail(rawEmail(fx("holdout14a-google-play-subscription")));
+  const said = (play.returns && play.returns.instructions || []).join(" ");
+  if (play.orderRef !== "GPA.3399-1234-5678-90123..3" || !(play.returns && play.returns.windowDays === 14) || /two hours/i.test(said) || !/cancel your subscription/i.test(said))
+    joinWrong.push("Google Play's subscription read as " + JSON.stringify([play.orderRef, play.returns]));
+  const sub = [det("holdout14a-google-play-subscription")];
+  attachCancellations(sub, [det("holdout14a-google-play-sub-ending")]);
+  if (!sub[0].subscriptionEnds || sub[0].subscriptionEnds.on !== "2019-08-13" || sub[0].subscriptionEnds.refund !== false || sub[0].cancelled) joinWrong.push("a subscription ending read on its payment as " + JSON.stringify([sub[0].subscriptionEnds, sub[0].cancelled]));
+  const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
+  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };

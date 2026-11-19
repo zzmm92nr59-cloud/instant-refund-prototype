@@ -1,0 +1,40 @@
+{
+ "id": "holdout14b-rail-same-type-legs-fee",
+ "sender": "RailHop",
+ "layout": "'Advance Single' over each leg; two 'Adult - Advance Single - [Railcard]' lines; 'Other costs', 'Booking Fee', '£1.50'",
+ "headers": {
+  "from": "RailHop <auto-confirm@railhop.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation for Hilltown to Riverside Quay (2 December at 08:10)",
+  "date": "Mon, 16 Nov 2026 08:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>RailHop</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.railhop.example/?utm_source=email\"><img src=\"https://www.railhop.example/static/email/logo.png\" alt=\"RailHop\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your trip to Riverside Quay departing Wednesday 2 December 2026 is confirmed</td></tr>\n<tr><td>Advance Single</td></tr>\n<tr><td>Hilltown to Midvale</td></tr>\n<tr><td>Stay on the same train</td></tr>\n<tr><td>Advance Single</td></tr>\n<tr><td>Midvale to Riverside Quay</td></tr>\n<tr><td>2x Advance Single</td></tr>\n<tr><td>Specified train only. No refunds.</td></tr>\n<tr><td>Payment information</td></tr>\n<tr><td>Transaction ID:</td></tr>\n<tr><td>700112233445</td></tr>\n<tr><td>Fare details |</td></tr>\n<tr><td>Adult - Advance Single - [Coach Railcard]</td></tr>\n<tr><td>&pound;12.10</td></tr>\n<tr><td>Adult - Advance Single - [Coach Railcard]</td></tr>\n<tr><td>&pound;6.40</td></tr>\n<tr><td>Other costs |</td></tr>\n<tr><td>Booking Fee</td></tr>\n<tr><td>&pound;1.50</td></tr>\n<tr><td>Total amount:</td><td>&pound;20.00 |</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 RailHop. All rights reserved.<br /><a href=\"https://www.railhop.example/help\">Help</a> | <a href=\"https://www.railhop.example/privacy\">Privacy</a> | <a href=\"https://www.railhop.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.railhop.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "RailHop",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Hilltown to Midvale",
+    "qty": 1,
+    "linePence": 1210
+   },
+   {
+    "name": "Midvale to Riverside Quay",
+    "qty": 1,
+    "linePence": 640
+   },
+   {
+    "name": "Booking fee",
+    "qty": 1,
+    "linePence": 150
+   }
+  ],
+  "subtotalPence": 2000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2000
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "holdout14a-paypal-debit-card",
+ "sender": "PayPal",
+ "layout": "a PayPal Debit Card purchase: 'Merchant' over 'TAQUERIA*EL FARO', 'Total amount' over '£12.30 GBP'",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your PayPal Debit Card purchase",
+  "date": "Mon, 1 Jun 2026 20:00:00 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt for your PayPal Debit Card purchase</td></tr>\n<tr><td>Sam Taylor, Receipt for your purchase at TAQUERIA*EL FARO.</td></tr>\n<tr><td>Here's your receipt for your PayPal Debit Card purchase</td></tr>\n<tr><td>You used your PayPal Debit Card ending in ••••1234 at TAQUERIA*EL FARO on 1 June 2026.</td></tr>\n<tr><td>Transaction details</td></tr>\n<tr><td>Transaction ID</td></tr>\n<tr><td>4AB12345CD6789012</td></tr>\n<tr><td>Transaction date</td></tr>\n<tr><td>1 June 2026</td></tr>\n<tr><td>Merchant</td></tr>\n<tr><td>TAQUERIA*EL FARO</td></tr>\n<tr><td>Total amount</td></tr>\n<tr><td>&pound;12.30 GBP</td></tr>\n<tr><td>Paid with PayPal balance</td></tr>\n<tr><td>&pound;12.30 GBP</td></tr></table><p>Copyright © 1999-2026 PayPal. All rights reserved.</p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "TAQUERIA*EL FARO",
+  "date": "2026-06-01",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1230
+ }
+}

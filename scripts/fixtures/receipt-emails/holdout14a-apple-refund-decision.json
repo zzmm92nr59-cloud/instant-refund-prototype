@@ -1,0 +1,18 @@
+{
+ "id": "holdout14a-apple-refund-decision",
+ "sender": "Apple",
+ "layout": "'Decision on refund request' that names no outcome: 'To review, please visit Report a Problem'",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Decision on refund request",
+  "date": "Sat, 14 Mar 2026 11:36:17 +0000"
+ },
+ "html": "",
+ "text": "Dear Sam,\n\nThere has been an update on the refund request for one or more items through Report a Problem. To review, please visit Report a Problem. After signing in, click “Check Status of Claims”.\n\nApple Support",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund_request"
+  }
+ }
+}

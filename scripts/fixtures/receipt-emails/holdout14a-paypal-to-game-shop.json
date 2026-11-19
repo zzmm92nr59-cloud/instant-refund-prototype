@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-paypal-to-game-shop",
+ "sender": "PayPal",
+ "layout": "'You paid $6.47 USD to Appcharge', the item with 'Qty: 1' and 'Product ID', 'Total $6.47 USD', paid '£5.03 GBP' at PayPal's conversion rate",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your payment to Appcharge",
+  "date": "Tue, 2 Jun 2026 15:31:50 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt for your payment to Appcharge</td></tr>\n<tr><td>Sam Taylor, you've successfully sent a payment.</td></tr>\n<tr><td>Hi Sam Taylor,</td></tr>\n<tr><td>You paid $6.47 USD to Appcharge</td></tr>\n<tr><td>Merchant</td><td>Appcharge help@appcharge.com</td></tr>\n<tr><td>Transaction date</td><td>2 Jun 2026</td></tr>\n<tr><td>Harbour Market Offer</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Product ID: harbour_offer_2</td></tr>\n<tr><td>US$5.99</td></tr>\n<tr><td>Subtotal</td><td>US$5.99</td></tr>\n<tr><td>Tax</td><td>US$0.48</td></tr>\n<tr><td>Total</td><td>$6.47 USD</td></tr>\n<tr><td>Paid Appcharge with</td></tr>\n<tr><td>VISA Debit ••4242</td><td>&pound;5.03 GBP</td></tr>\n<tr><td>PayPal&rsquo;s conversion rate: 1.0000 GBP = 1.2863 USD</td></tr>\n<tr><td>Currency conversion is performed by PayPal.</td></tr>\n<tr><td>Transaction ID: 7KL12345MN6789012</td></tr></table><p>Copyright © 1999-2026 PayPal. All rights reserved.</p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Appcharge",
+  "date": "2026-06-02",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "Harbour Market Offer",
+    "qty": 1,
+    "linePence": 599
+   }
+  ],
+  "subtotalPence": 599,
+  "feesPence": 48,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 647
+ }
+}

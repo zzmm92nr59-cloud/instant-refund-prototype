@@ -1,0 +1,40 @@
+{
+ "id": "holdout14b-pub-bill-paid",
+ "sender": "Taproom Pay",
+ "layout": "subject 'Your bill has been paid: #…'; 'Total paid' first; '1 | Name | £5.20' rows; Subtotal, Total, VAT included",
+ "headers": {
+  "from": "Taproom Pay <no-reply@pepperhq.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your bill has been paid: #20417733",
+  "date": "Sun, 8 Nov 2026 16:05:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Taproom Pay</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.taproompay.example/?utm_source=email\"><img src=\"https://www.taproompay.example/static/email/logo.png\" alt=\"Taproom Pay\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Hello Sam,</td></tr>\n<tr><td>Thanks for visiting The Anchor Rooms and using Taproom Pay.</td></tr>\n<tr><td>Total paid: &pound;13.00</td></tr>\n<tr><td>Here is your receipt:</td></tr>\n<tr><td>The Anchor Rooms</td></tr>\n<tr><td>1</td><td>Harbour Spiced Rum</td><td>&pound;5.20</td></tr>\n<tr><td>1</td><td>Cola Zero</td><td>&pound;1.70</td></tr>\n<tr><td>1</td><td>Juniper Gin</td><td>&pound;6.10</td></tr>\n<tr><td>Subtotal</td><td>&pound;13.00</td></tr>\n<tr><td>Total</td><td>&pound;13.00</td></tr>\n<tr><td>Vat included in total</td><td>&pound;2.17</td></tr>\n<tr><td>APPLEPAY</td><td>&pound;13.00</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Taproom Pay. All rights reserved.<br /><a href=\"https://www.taproompay.example/help\">Help</a> | <a href=\"https://www.taproompay.example/privacy\">Privacy</a> | <a href=\"https://www.taproompay.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.taproompay.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Taproom Pay",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Harbour Spiced Rum",
+    "qty": 1,
+    "linePence": 520
+   },
+   {
+    "name": "Cola Zero",
+    "qty": 1,
+    "linePence": 170
+   },
+   {
+    "name": "Juniper Gin",
+    "qty": 1,
+    "linePence": 610
+   }
+  ],
+  "subtotalPence": 1300,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1300
+ }
+}

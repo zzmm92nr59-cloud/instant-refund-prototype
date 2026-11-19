@@ -1,0 +1,33 @@
+{
+ "id": "holdout14a-apple-cancel-within",
+ "sender": "Apple",
+ "layout": "HTML only: app, thing bought, 'In-App Purchase', the phone it was bought on; 'To cancel your purchase within 14 days of receiving this invoice'",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Apple.",
+  "date": "Sat, 14 Mar 2026 20:41:50 +0000"
+ },
+ "html": "<html><body><table><tr><td>Invoice</td></tr><tr><td><span>APPLE ACCOUNT</span><br>sam.taylor@example.co.uk</td><td><span>BILLED TO</span><br>Visa .... 4242 (Apple Pay)<br>Sam Taylor<br>GBR</td></tr>\n<tr><td><span>INVOICE DATE</span><br><span dir=\"auto\">14 Mar 2026</span></td><td><span>SEQUENCE NO.</span><br>2-1122334455</td></tr><tr><td><span>ORDER ID</span><br><a href=\"https://support.apple.com/kb/HT204088\">MQTESTAB12</a></td><td><span>DOCUMENT NO.</span><br>700011122233</td></tr></table>\n<table><tr class=\"section-header\"><td colspan=\"3\"><span>App Store</span></td></tr><tr><td class=\"artwork-cell\"><img src=\"https://is1-ssl.mzstatic.com/image/thumb/app.png\" alt=\"\"></td><td class=\"item-cell\">\n<span class=\"title\" dir=\"auto\">\nLantern Isles\n</span><br><span class=\"artist\">Treasure Chest Bundle</span><br><span class=\"type\">\nIn-App Purchase        </span><br><span class=\"device\">Sam’s iPhone</span><br><a href=\"https://reportaproblem.apple.com/\">Report a Problem</a></td>\n<td class=\"price-cell\"><table><tr><td colspan=\"3\"><span>£2.99</span></td></tr><tr><td><span>Inclusive of VAT at <b>20%</b></span></td><td> </td><td><span>£0.50</span></td></tr></table></td></tr></table>\n<table><tr><td>Subtotal</td><td> </td><td>£2.49</td></tr><tr><td>VAT charged at 20%</td><td> </td><td>£0.50</td></tr><tr><td>TOTAL</td><td></td><td>£2.99</td></tr></table>\n<p>Get help with subscriptions and purchases. <a href=\"https://support.apple.com/billing\">Visit Apple Support</a>.<br><br>To cancel your purchase within 14 days of receiving this invoice, <a href=\"https://reportaproblem.apple.com/\">report a problem</a> or <a href=\"https://www.apple.com/uk/support/\">contact us</a>.<br><a href=\"https://www.apple.com/legal/\">Learn more about your right of withdrawal</a></p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Apple",
+  "date": "2026-03-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Treasure Chest Bundle",
+    "qty": 1,
+    "linePence": 299,
+    "extras": [
+     "Lantern Isles"
+    ]
+   }
+  ],
+  "subtotalPence": 299,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 299
+ }
+}

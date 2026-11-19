@@ -1,0 +1,46 @@
+{
+ "id": "holdout14b-pub-app-measures",
+ "sender": "The Tankard Group",
+ "layout": "'Qty | Description | Amount'; '1 | <b>Harbour Lager</b> (Pint) | £3.45'; 'Promotion Applied | -£1.50'",
+ "headers": {
+  "from": "The Tankard Group <orders@tankardgroup.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "The Tankard Group Order Confirmation: 4410",
+  "date": "Mon, 16 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>The Tankard Group</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tankardgroup.example/?utm_source=email\"><img src=\"https://www.tankardgroup.example/static/email/logo.png\" alt=\"The Tankard Group\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thank you for your order...</p><p>Order Id: <b>612004411</b><br/>Order Date: Monday, November 16, 2026<br/>Table Number: 12</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table border=\"1\"><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td><strong>Harbour Lager</strong><br>(Pint)</td><td align=\"right\">£3.45</td></tr><tr><td>1</td><td><strong>Smoky Bean Burrito</strong></td><td align=\"right\">£4.25</td></tr><tr><td>1</td><td><strong>Promotion Applied</strong></td><td align=\"right\">-£1.50</td></tr><tr><td>1</td><td><strong>Spiced Rum</strong><br>(Double Mixer)</td><td align=\"right\">£3.90</td></tr><tr><td colspan=\"2\">Payment Type</td><td>Apple Pay</td></tr><tr><td colspan=\"2\"><strong>Order Total</strong></td><td><strong>£10.10</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 The Tankard Group. All rights reserved.<br /><a href=\"https://www.tankardgroup.example/help\">Help</a> | <a href=\"https://www.tankardgroup.example/privacy\">Privacy</a> | <a href=\"https://www.tankardgroup.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tankardgroup.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "The Tankard Group",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Harbour Lager",
+    "qty": 1,
+    "linePence": 345,
+    "extras": [
+     "(Pint)"
+    ]
+   },
+   {
+    "name": "Smoky Bean Burrito",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Spiced Rum",
+    "qty": 1,
+    "linePence": 390,
+    "extras": [
+     "(Double Mixer)"
+    ]
+   }
+  ],
+  "subtotalPence": 1160,
+  "feesPence": 0,
+  "discountsPence": 150,
+  "tipsPence": 0,
+  "totalPence": 1010
+ }
+}

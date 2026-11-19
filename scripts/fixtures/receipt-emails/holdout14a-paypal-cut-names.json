@@ -1,0 +1,33 @@
+{
+ "id": "holdout14a-paypal-cut-names",
+ "sender": "PayPal",
+ "layout": "'Merchant' over 'Cellar Club Online L...', 'Invoice ID' over the order number, the item cut short over 'Qty: 1' and '£25.00'",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your payment to Cellar Club Online Limited",
+  "date": "Mon, 14 Apr 2025 08:00:00 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt for your payment to Cellar Club Online Limited</td></tr>\n<tr><td>Sam Taylor, you've successfully sent a payment.</td></tr>\n<tr><td>You paid &pound;25.00 GBP to Cellar Club Online Limited</td></tr>\n<tr><td>Transaction date</td></tr>\n<tr><td>14 Apr 2025</td></tr>\n<tr><td>Merchant</td></tr>\n<tr><td>Cellar Club Online L...</td></tr>\n<tr><td>Invoice ID</td></tr>\n<tr><td>CC10807999-P001</td></tr>\n<tr><td>Wine Plan recurring p...</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>&pound;25.00</td></tr>\n<tr><td>Subtotal</td><td>&pound;25.00</td></tr>\n<tr><td>Total</td><td>&pound;25.00 GBP</td></tr>\n<tr><td>Paid Cellar Club Online L... with</td></tr>\n<tr><td>Mastercard ••4242</td><td>&pound;25.00 GBP</td></tr></table><p>Copyright © 1999-2026 PayPal. All rights reserved.</p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Cellar Club Online L",
+  "date": "2025-04-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Wine Plan recurring p",
+    "qty": 1,
+    "linePence": 2500
+   }
+  ],
+  "subtotalPence": 2500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2500,
+  "shopAlso": [
+   "Cellar Club Online Limited"
+  ]
+ }
+}

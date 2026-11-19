@@ -1,0 +1,35 @@
+{
+ "id": "holdout14b-burger-app-numbered-name",
+ "sender": "Bunhouse",
+ "layout": "'Qty | Item Detail | Item Cost' heading cells; '1' over '9 Chicken Bites Box' over '£3.99'; a promotion line with no price; Discount",
+ "headers": {
+  "from": "BunhouseApp@bunhouse.example",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order!",
+  "date": "Sun, 15 Nov 2026 12:15:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Bunhouse</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.bunhouse.example/?utm_source=email\"><img src=\"https://www.bunhouse.example/static/email/logo.png\" alt=\"Bunhouse\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Here's the receipt for your order, sam</p><p>Order Date: 15/11/26 12:15</p><p>Order Number: 4417</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Qty</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Item Detail</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Item Cost</p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">1</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Get 20% Off! Make it a good day.</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\"></p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">1</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">9 Chicken Bites Box</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">&pound;3.99</p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">1</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Small Lemonade</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">&pound;1.49</p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\"></p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Discount:</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">-&pound;0.80</p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\"></p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">Total (including VAT):</p></div></td></tr></table></td><td><table width=\"100%\"><tr><td><div><p style=\"margin:0\">&pound;4.68</p></div></td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Bunhouse. All rights reserved.<br /><a href=\"https://www.bunhouse.example/help\">Help</a> | <a href=\"https://www.bunhouse.example/privacy\">Privacy</a> | <a href=\"https://www.bunhouse.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.bunhouse.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Bunhouse",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "9 Chicken Bites Box",
+    "qty": 1,
+    "linePence": 399
+   },
+   {
+    "name": "Small Lemonade",
+    "qty": 1,
+    "linePence": 149
+   }
+  ],
+  "subtotalPence": 548,
+  "feesPence": 0,
+  "discountsPence": 80,
+  "tipsPence": 0,
+  "totalPence": 468
+ }
+}

@@ -60,7 +60,7 @@ export function takeawayMerchant(shopName, domain, subject, text) {
   if (!app) return null;
   const pats = app === "je" ? [/\byour ([^\n|]{2,60}?) order (?:will be (?:with you|ready)|is being (?:prepped|prepared|made)|has been (?:accepted|received|sent|confirmed)|is on its way|is confirmed)\b/i,
     /\bgreat news!?\s+([^\n|]{2,60}?) has (?:received|accepted) your order\b/i]
-    : app === "dr" ? [/\byour order from ([^\n|]{2,60}?)(?:\s+(?:is|has|was)\b|[.!|\n]|$)/im, /\b([^\n|]{2,60}?) (?:has accepted|is preparing) your order\b/i]
+    : app === "dr" ? [/\byour order from ([^\n|]{2,60}?)(?:\s+(?:is|has|was)\b|[.!|\n]|$)/im, /\b([^\n|]{2,60}?) (?:has accepted|is preparing|has) your order\b/i]
     : [/\bhere(?:'|’)s your receipt for ([^\n|]{2,80}?)\s*\.?\s*(?:\||\n|$)/i];
   for (const re of pats) {
     const m = re.exec(t) || (app === "dr" ? re.exec(String(subject || "")) : null);
