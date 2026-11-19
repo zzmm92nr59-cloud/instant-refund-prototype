@@ -53,7 +53,7 @@
   const KINDS = Object.keys(KIND_LIST);
   // Sub-kinds whose group differs from their kind's, and sub-kinds of a lasting kind that still get used up.
   const SUB_GROUP = { toiletries: "beauty", batteries: "electronics", event: "experiences", personal_care: "beauty", stationery: "other" };
-  const USED_UP_SUB = new Set(["candles", "plants", "garden_care", "paint", "party"]);
+  const USED_UP_SUB = new Set(["candles", "plants", "garden_care", "paint", "party", "diy_supplies"]);
   // Kinds that are used up (eaten, drunk, washed with) and kinds that are kept: the two must never be mistaken for each other.
   const CONSUMABLE = new Set(["food_drink", "household", "beauty_health", "pets"]);
 
@@ -159,7 +159,9 @@
       plants: "seed starter kit, propagator, plant labels, plant, plants, roses, rose bush, house plant, houseplant, flowers, bouquet, roses bouquet, tulips, orchid, succulent, cactus, herb plant, basil plant, seeds, bulbs for planting, flower bulbs",
       garden_care: "compost, soil, potting compost, lawn feed, plant food, weed killer, slug pellets, bird seed, bird food, fat balls, grass seed, mulch, bark chippings",
       garden: "terracotta pot, terracotta pots, flower pot, flower pots, pruning shears, shears, gardening gloves, hose reel, plant pot, plant pots, planter, planters, garden furniture, garden chair, parasol, bbq, barbecue, hose, hosepipe, lawn mower, lawnmower, strimmer, hedge trimmer, watering can, wheelbarrow, garden shed, shed, greenhouse, bird feeder, bird box, trowel, spade, rake, secateurs, garden gloves, fire pit, patio heater, solar lights",
-      diy: "timber, planed timber, sawn timber, plasterboard, multi finish, bonding coat, pva, caulk, decorators caulk, caulking gun, sandpaper, sanding block, sanding sheets, dust sheet, dust sheets, angle bead, stop bead, architrave, skirting, skirting board, panel pins, masking tape, scrim tape, ptfe tape, duct tape, duck tape, copper pipe, copper tube, compression elbow, solder ring elbow, drill bit, drill bits, drill bit set, dust mask, dust masks, safety glasses, work gloves, knee pads, mixing paddle, builders bucket, woodscrews, fixings, cavity fixings, plumbers mait, smoothover, drill, cordless drill, screwdriver, screwdrivers, hammer, spanner, wrench, saw, tool kit, toolkit, toolbox, tool box, tape measure, spirit level, ladder, step ladder, stepladder, wallpaper, paint brush, paint brushes, paint roller, sander, workbench, screws, nails, wall plugs, rawlplugs, sealant, silicone sealant, filler, polyfilla, glue, superglue, wood glue, adhesive, grab adhesive, no more nails, expanding foam, cable ties, repair kit, puncture repair kit, wood primer, metal primer, paint primer, " +
+      // What building and decorating is done with, used up as it goes (not a thing to open Wrapped with).
+      diy_supplies: "timber, planed timber, sawn timber, plasterboard, multi finish, bonding coat, pva, caulk, decorators caulk, sandpaper, sanding sheets, dust sheet, dust sheets, angle bead, stop bead, architrave, skirting, skirting board, panel pins, masking tape, scrim tape, ptfe tape, duct tape, duck tape, copper pipe, copper tube, compression elbow, solder ring elbow, dust mask, dust masks, woodscrews, fixings, cavity fixings, plumbers mait, smoothover",
+      diy: "caulking gun, sanding block, drill bit, drill bits, drill bit set, safety glasses, work gloves, knee pads, mixing paddle, builders bucket, drill, cordless drill, screwdriver, screwdrivers, hammer, spanner, wrench, saw, tool kit, toolkit, toolbox, tool box, tape measure, spirit level, ladder, step ladder, stepladder, wallpaper, paint brush, paint brushes, paint roller, sander, workbench, screws, nails, wall plugs, rawlplugs, sealant, silicone sealant, filler, polyfilla, glue, superglue, wood glue, adhesive, grab adhesive, no more nails, expanding foam, cable ties, repair kit, puncture repair kit, wood primer, metal primer, paint primer, " +
         "@stanley fatmax, @polycell, @bostik, @forgefix, @rawlplug, @fischer, @unibond, @everbuild, @diall, @erbauer, @titan, @mac allister, @hozelock, @fatmax, @bosch, @dewalt, @makita, @black and decker, @ryobi",
       paint: "paint, masonry paint, fence paint, emulsion, gloss paint, primer, undercoat, wood stain, varnish, " +
         "@dulux, @crown paint, @ronseal, @cuprinol, @valspar",
@@ -402,7 +404,8 @@
   // Words that name two different things: the other one when a brand of that kind is on the line, or the shop sells it
   // ("Erbauer 600W Jigsaw" at B&Q, "Colours White Gloss 750ml", "Stabilo Boss Highlighters", "Frames: Ray-Ban").
   const DIY = { kind: "home", sub: "diy" }, STATIONERY = { kind: "other", sub: "stationery" };
-  const ALT = { jigsaw: DIY, jigsaws: DIY, gloss: { kind: "home", sub: "paint" }, plaster: DIY, tape: DIY, gloves: DIY, glove: DIY,
+  const SUPPLIES = { kind: "home", sub: "diy_supplies" };
+  const ALT = { jigsaw: DIY, jigsaws: DIY, gloss: { kind: "home", sub: "paint" }, plaster: SUPPLIES, tape: SUPPLIES, gloves: DIY, glove: DIY,
     highlighter: STATIONERY, highlighters: STATIONERY, marker: STATIONERY, markers: STATIONERY, frame: { kind: "accessories", sub: "wear" },
     frames: { kind: "accessories", sub: "wear" } };
   // Colours and cloths that are also things ("Merino Beanie Charcoal", "Silk Pillowcase Blush", "TV Bed King Grey Plush").
@@ -550,7 +553,7 @@
       if (head && shop === "eatery" && ["clothing", "footwear", "accessories", "pets"].includes(head.kind)) head = { ...head, kind: "food_drink", sub: "grocery" };
       // A DIY shop sells no food or make-up: its filler, plaster, gloss and tape are for the house (its bulbs and bleach stay
       // what they are).
-      if (head && shop === "diy" && !foodBrand && (head.kind === "food_drink" || head.kind === "beauty_health" || (head.kind === "household" && (head.sub === "kitchen_consumables" || head.sub === "toiletries")))) head = { ...head, kind: "home", sub: "diy" };
+      if (head && shop === "diy" && !foodBrand && (head.kind === "food_drink" || head.kind === "beauty_health" || (head.kind === "household" && (head.sub === "kitchen_consumables" || head.sub === "toiletries")))) head = { ...head, kind: "home", sub: "diy_supplies" };
       // At a pet shop, the chicken, the coat and the bed are the pet's.
       if (head && shop === "pets" && !["pets", "services", "gift_cards"].includes(head.kind)) head = { ...head, kind: "pets", sub: head.kind === "food_drink" ? "pet_food" : "pet_supplies" };
       // A gym's membership is to go there.
@@ -592,7 +595,7 @@
       if (shop === "travel") return result("travel", "stays", "medium", ["shop"].concat(packs.map((p) => p.words)));
       // (A 22 litre box at a home shop is for storage; a 500g one there is still food.)
       const litreBox = weight && /^(l|ltr|litres?|liters?)$/.test(weight[2]) && packs.some((p) => /^(box|boxes|tub|tubs)$/.test(p.words));
-      if (SHOP_KIND[shop] && !foodBrand && ((shop === "diy" || shop === "pets") || (!flavour && (!packed || litreBox)))) return result(SHOP_KIND[shop], null, "medium", ["shop"].concat(packs.map((p) => p.words)));
+      if (SHOP_KIND[shop] && !foodBrand && ((shop === "diy" || shop === "pets") || (!flavour && (!packed || litreBox)))) return result(SHOP_KIND[shop], shop === "diy" ? "diy_supplies" : null, "medium", ["shop"].concat(packs.map((p) => p.words)));
       if (shop === "beauty") return result("beauty_health", null, "medium", reasons.concat(packs.map((p) => p.words)));
       if (!flavour && !foodBrand && /^(fashion|home|electronics)$/.test(shop || "") && packs.some((p) => /^(bottle|bottles|flask)$/.test(p.words))) return result("home", "kitchenware", "medium", ["bottle"]);
       if (packed || flavour || shop === "grocer" || shop === "eatery" || shop === "food")
@@ -600,7 +603,7 @@
     }
     // A hamster's wheel, a kitten's dinner.
     if (PET_WORD.test(text.replace(/\bhot dogs?\b/g, "")) || shop === "pets") return result("pets", "pet_supplies", "medium", ["pet"]);
-    if (shop === "diy") return result("home", "diy", "medium", ["shop"]);
+    if (shop === "diy") return result("home", "diy_supplies", "medium", ["shop"]);
     // Only the kind of shop: a supermarket's or a takeaway's line is food, an app shop's an app, a rail shop's a journey.
     if (shop && SHOP_HINT[shop]) {
       const k = SHOP_HINT[shop];

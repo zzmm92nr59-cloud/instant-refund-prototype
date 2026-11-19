@@ -63,6 +63,7 @@ jobs:
           node scripts/test-ai-reader.mjs
           node scripts/test-item-kinds.mjs
           node scripts/test-item-kinds-accuracy.mjs
+          node scripts/test-item-kinds-corpus.mjs
           node scripts/test-bank.mjs
           node scripts/test-receipt-photo.mjs
           node scripts/test-shop-directory.mjs
