@@ -93,12 +93,11 @@ console.table(summary);
 // The rules. Every pasted receipt goes through the totals check and keeps nothing of the email but what was read; never
 // silently wrong; a total, when kept, is right; the text part reads as well as the email does.
 assert.ok(rows.every((r) => r.notRead || r.problem || (r.checked && r.pasted && !r.keptText)), "every pasted receipt is checked, marked as pasted and keeps no email text");
-// Known gaps, only when the shopper's phone gives Relay the copied text alone (no page): the item is there with its right
-// price, but its name carries the next cell ("Deluxe Double Room 2 nights", "Slim Fit Oxford Shirt 15.5 Sky Blue") or a
-// ticket's type instead of its route; and a "was £45.00 now £36.00" cell, flattened, joins two items into one whose price
-// still adds up. Not one more may join this list: anything else not exactly the email's must be flagged.
-const KNOWN = new Set(["html holdout2-gymshark-was-now-cell", "body holdout2-gymshark-was-now-cell", "html holdout3-booking-eur", "body holdout3-booking-eur",
-  "html holdout5-charlesbrook-five-cols", "body holdout5-charlesbrook-five-cols", "body lner-1", "body trainline-1"]);
+// Known gaps: none (round 8). The eight text-only cases listed here in round 7 are now read right (a cell over several
+// lines, cells set apart by tabs, "was … now …" in one cell) or flagged (a train ticket read only as its fare when the
+// pasted body never says where it goes: "Advance Single (Standard)", "1 Adult"). Not one may come back: anything not exactly
+// the email's must be flagged, however it was pasted.
+const KNOWN = new Set([]);
 assert.deepEqual(rows.filter((r) => r.silent && !KNOWN.has(r.way + " " + r.id)).map((r) => r.way + " " + r.id), [], "no silent misses: items not exactly the email's are always flagged");
 assert.deepEqual(rows.filter((r) => r.silent && (r.way === "text" || r.way === "clipboard")).map((r) => r.way + " " + r.id), [], "none at all for the text part or with the page");
 assert.deepEqual(rows.filter((r) => r.total && r.total !== "no total").map((r) => r.way + " " + r.id + ": " + r.total), [], "no wrong totals");

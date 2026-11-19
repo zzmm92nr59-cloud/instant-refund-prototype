@@ -292,6 +292,10 @@ function htmlToTextAll(html) {
   return decodeEntities(html
     .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    // (A "|" the email writes inside a cell, "SanDisk 128GB … | A1 | Class 10", is part of what the cell says, not the edge of
+    // a column: it is kept as "│" so the reader never splits a name there. Not when it sets facts apart, "Size: 8 | Qty: 2 |
+    // £24.00". Round 8.)
+    .replace(/>([^<>]*\|[^<>]*)</g, (m, t) => (/£|&pound;|&#163;|\b(?:qty|quantity|size|colou?r|price)\b\s*:/i.test(t) ? m : ">" + t.replace(/\|/g, "\u2502") + "<"))
     // A table cell that is only a picture says what it shows in the picture's alt text: an item shown only as its photo
     // ("Dorma Pure Cotton Duvet Cover Set"). Only a description of three words or more (a logo's alt is the shop's name),
     // and only when the email doesn't write those words anywhere else.
@@ -1064,6 +1068,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (stated && result.items.length && result.itemsCheck && result.itemsCheck.complete !== false && !isFlight && !journey && !gameShop &&
       stated !== result.items.length && stated !== result.items.reduce((n, i) => n + (i.qty || 1), 0)) {
     result.itemsCheck = { ...result.itemsCheck, complete: false, countStated: stated, countRead: result.items.length };
+  }
+  // A train ticket read only as its fare ("Advance Single (Standard)", "1 Adult" with "Anytime Day Return") when the email
+  // never says where it goes (a pasted body without its subject): the thing bought, the journey, is missing. Round 8.
+  const FARE = /\b(?:(?:super )?off-?peak|anytime|advance|open|flexi\w*|saver|standard|first(?: class)?|day)\b[^|]{0,20}\b(?:single|return)\b|\b(?:single|return)\b[^|]{0,6}\((?:standard|first(?: class)?)\)/i;
+  if (!isFlight && !journey && result.items.length && result.items.every((i) => FARE.test(String(i.name || "")) || (/^(?:\d+\s+)?(?:adults?|child(?:ren)?|seniors?|passengers?)$/i.test(String(i.name || "")) && FARE.test(String(i.variant || "")))) &&
+      !/\b\p{Lu}[\p{L}'’.&-]+(?: [\p{Lu}(][\p{L}'’.&()-]*){0,4} to \p{Lu}[\p{L}'’.&-]+/u.test(text + "\n" + (otherPart || "")) && result.itemsCheck && result.itemsCheck.complete !== false) {
+    result.itemsCheck = { ...result.itemsCheck, complete: false, fareOnly: true };
   }
   // No items read is never "complete", even when there is no total to compare with.
   if (!result.items.length && result.itemsCheck && result.itemsCheck.complete !== false) result.itemsCheck = { ...result.itemsCheck, complete: false };

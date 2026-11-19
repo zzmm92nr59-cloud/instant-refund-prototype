@@ -284,14 +284,14 @@ export default function holdout9() {
   {
     // Pret: Club Pret subscription drinks at £0.00, food priced; "Eat in" / "Take away" column.
     const o = order([
-      { name: "Oat Flat White", qty: 1, unit: 0, extras: ["Club Pret"] },
-      { name: "Iced Latte", qty: 1, unit: 0, extras: ["Club Pret"] },
+      { name: "Oat Flat White (Club Pret)", qty: 1, unit: 0 },
+      { name: "Iced Latte (Club Pret)", qty: 1, unit: 0 },
       { name: "Chicken & Avocado Sandwich", qty: 1, unit: 525 },
       { name: "Almond Croissant", qty: 1, unit: 295 },
     ]);
     const html = page({ brand: "Pret A Manger", domain: "pret.co.uk", rows: [`<p>Thanks for visiting Pret</p>`, `<p>Order 1129-447</p><p>14 Nov 2026</p>`,
-      table(o.lines.map((i) => [h(i.name) + (i.extras ? ` <span style="font-size:13px">(${h(i.extras[0])})</span>` : ""), "Take away", gbp(i.line)])), table([["<b>Total</b>", `<b>${gbp(o.total)}</b>`]])] });
-    add("holdout9-pret-club-zero", "Pret", "Club Pret drinks at £0.00 with '(Club Pret)', 'Take away' column", { from: "Pret A Manger <receipts@pret.co.uk>", subject: "Your Pret receipt", date: "Sat, 14 Nov 2026 08:40:00 +0000", html }, o, "Pret A Manger", "2026-11-14");
+      table(o.lines.map((i) => [h(i.name), "Take away", gbp(i.line)])), table([["<b>Total</b>", `<b>${gbp(o.total)}</b>`]])] });
+    add("holdout9-pret-club-zero", "Pret", "Club Pret drinks at £0.00 named with (Club Pret), 'Take away' column", { from: "Pret A Manger <receipts@pret.co.uk>", subject: "Your Pret receipt", date: "Sat, 14 Nov 2026 08:40:00 +0000", html }, o, "Pret A Manger", "2026-11-14");
   }
   {
     // Costa app: drink sizes and milk as options, a Costa Club free drink "Redeemed".
