@@ -37,7 +37,15 @@ const FREE_CELL = /^(?:(?:item\s+)?price\s*:?\s*)?(?:free|£0(?:\.00)?)$/i;
 const FEE_NAME = /^(?:[\p{L}'’&. -]{0,30}\s)?(?:fees?|surcharge|levy)\s*:?$|^(?:city|tourist|local|resort|accommodation) tax\s*:?$/iu;
 // A stay's or a booking's price worked out ("£85.00 x 3 nights") is a detail of what was booked, not its name.
 const PER_NIGHT = /^£\s?[\d,]+(?:\.\d{2})?\s*[x×]\s*\d{1,3}\s+(?:nights?|days?|weeks?|months?|guests?|people|persons?|adults?|children|rooms?)$/i;
-const COLOUR = "(?:black|white|grey|gray|navy|blue|red|green|pink|beige|brown|cream|ivory|khaki|silver|gold|purple|yellow|orange|charcoal|olive|burgundy|camel|multi(?:colou?r)?|light grey|dark grey|light blue|dark blue)";
+// (Round 3: the colours clothes and homeware shops print on a line of their own, "Rust", "Ecru", "Oatmeal", "Sage".)
+const COLOUR = "(?:black|white|grey|gray|navy|blue|red|green|pink|beige|brown|cream|ivory|khaki|silver|gold|purple|yellow|orange|charcoal|olive|burgundy|camel|multi(?:colou?r)?|light grey|dark grey|light blue|dark blue|rust|ecru|oatmeal|sage|terracotta|mustard|teal|coral|mint|lilac|taupe|stone|sand|natural|indigo|denim|plum|wine|rose|blush|nude|tan|mocha|chocolate|slate|ochre|forest green|emerald|bottle green|aqua|turquoise|lavender|peach|mauve|champagne|bronze|copper|clear|transparent|oat|off white|off-white)";
+// What a product is sold as, on a line of its own beside its price: a format, a platform, a kind of ticket (round 3).
+const FORMAT_LINE = /^(?:e-?book|audiobook|audio book|paperback|hardback|hardcover|kindle edition|digital(?: download| code| edition| key)?|download|dvd|blu-?ray|4k ultra hd|cd|vinyl|lp|steam|pc|mac|ps[45]|playstation [45]|xbox(?: series [xs]| one)?|nintendo switch(?: 2)?|e-?ticket|mobile ticket|print at home)$/i;
+// A weighed or measured line ("0.92 kg @ £0.84/kg", "38.42 L @ 142.9p/L"): how much, at what rate. A detail, never a name.
+const MEASURE = "\\d+(?:\\.\\d+)?\\s?(?:kg|g|l|ltr|litres?|m)\\s*@\\s*(?:£\\s?\\d+(?:\\.\\d+)?|\\d+(?:\\.\\d+)?p)\\s*\\/\\s*(?:kg|g|l|ltr|litre|m)";
+// An English label after its Welsh (or other) twin, "Nifer / Qty: 1", "Cyfanswm / Total £115.50": read as the English one.
+const BILINGUAL = /(^|\|\s*)[\p{L}'’-]{2,20}(?:[ -][\p{L}'’-]{2,20}){0,2}\s?\/\s?(?=(?:qty|quantity|sub-?\s?total|total|postage|delivery|shipping|price|order(?: number| date)?|date|vat|discount|item|product)\b)/gimu;
+export const prepText = (text) => inPoundSigns(text).replace(BILINGUAL, "$1");
 const COLOUR_LINE = new RegExp("^" + COLOUR + "(?:\\s?[/&,]\\s?" + COLOUR + ")*$", "i");
 // Receipts in euros or dollars read the same way: their amounts are read as they are written (never converted; the
 // receipt's currency comes from its total, receipt-parser.js). Only for an email with no pound amounts at all.
@@ -61,15 +69,16 @@ const NAME_LABEL = /^(?:plan|product|item|description|subscription)\s*:?$/i;
 
 // Where the item list ends: subtotals, fees, discounts, tips, payment. (Only once an item has been read: some emails put
 // their total at the top.)
-const END = /^(?:sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods )?total\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat)/i;
+const END = /^(?:sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods )?total\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$)))/i;
 // Lines that are never part of an item: greetings, sentences, order details, dates, column and section headings.
-const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d/i;
+const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d|^(?:order|transaction|receipt|invoice|booking|ref(?:erence)?)\s+(?:no\.?\s*|number\s*)?#?\d[\d -]{2,}$/i;
 const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|items? ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|shipment \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details|order|receipt|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?)$/i;
 const SKIP_START = /^(?:unavailable(?: items)?|missing items?|items? (?:not available|unavailable|we couldn(?:'|’)?t (?:find|deliver))|out of stock|sorry,? we couldn(?:'|’)?t|not (?:available|delivered))\b/i;
 const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your items|items delivered|shipment \d+)\b/i;
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
-const DETAIL = /^(?:(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
-const VARIANT = /^(?:colou?r|size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity)\s*:\s*\S/i;
+// (Round 3: barcodes and part numbers, "EAN: 4977961000000", "MPN: …"; a pre-order's release date; stock notes.)
+const DETAIL = /^(?:(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
+const VARIANT = /^(?:colou?r|(?:pack )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
 const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|nd|rd|th)?[\s/.-]+(?:\d{1,2}|[a-z]{3,9})[\s/.,-]+\d{2,4}\b[^|]{0,20}$|^\d{4}-\d{2}-\d{2}$/i;
 const GREETING = /^(?:hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
 const FULL_DATE = /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i;
@@ -93,11 +102,26 @@ function splitCell(raw) {
       // ("Sparks offer -£2.00": the dash against the pound sign is money off, even where a dash could also separate.)
       const neg = Boolean(m[2]) || /[-−–]\s?£\s?[\d,.\s]+$/.test(c) && !/\s[-–]\s+£/.test(c);
       if (!neg) out.prices.push(pence(m[3], m[4], m[5])); else out.negative = true; c = m[1];
+      // How many at what each before the line's price ("2 x £45.00   £90.00"), or only how many ("Qty: 1   £79.99").
+      const qa = !neg && new RegExp("^(\\d{1,3})\\s*[@x×]\\s*" + MONEY + "(?:\\s*each)?$", "i").exec(c);
+      if (qa) { out.qty = Number(qa[1]); out.unit = pence(qa[2], qa[3], qa[4]); c = ""; }
+      const qo = !neg && /^(?:qty|quantity|units?)\s*[:.]?\s*(\d{1,3})$/i.exec(c);
+      if (qo) { out.qty = Number(qo[1]); c = ""; }
       // A unit price before the line's price in the same column of text ("Timber 2.4m    £4.25    £12.75").
       const u = !neg && new RegExp("^(.*?\\p{L}.*?)\\s+" + MONEY + "(?:\\s*(?:each|ea\\.?))?$", "u").exec(c);
       if (u && /\p{L}{2}/u.test(u[1])) { out.unit = pence(u[2], u[3], u[4]); c = u[1]; }
     }
   }
+  // The price first, then the name ("£7.50   Oat Bars Chocolate Chip x3").
+  if (!out.prices.length && !out.negative && (m = new RegExp("^" + MONEY + "\\s+(?!(?:off|each|per|x|for|saved?|saving|discount|now|was|ea)\\b)(\\S.*\\p{L}.*)$", "iu").exec(c))) {
+    out.prices.push(pence(m[1], m[2], m[3])); c = m[4];
+  }
+  // How many at what each in brackets in the name: "Braeburn Apples (6 @ £0.40)", "Carrots (2 x £1.35 each)".
+  m = new RegExp("^(.*?\\S)\\s*\\((\\d{1,3})\\s*[@x×]\\s*" + MONEY + "(?:\\s*each)?\\)\\s*(.*)$", "i").exec(c);
+  if (m) { out.qty = Number(m[2]); out.unit = pence(m[3], m[4], m[5]); c = (m[1] + " " + m[6]).trim(); out.head = true; }
+  // A weighed or measured amount after the name, or on its own: a detail ("Unleaded  38.42 L @ 142.9p/L").
+  m = new RegExp("^(?:(.*?\\p{L}.*?)\\s+)?(" + MEASURE + ")$", "iu").exec(c);
+  if (m) { out.measure = m[2]; c = m[1] || ""; }
   // "Dash Cam Fitting - FREE": an item at no charge.
   if (!out.prices.length && !out.negative && (m = /^(.*?\p{L}.*?)(?:\s*[-–:]\s*|\s{2,})(?:free|no charge|£0\.00)$/iu.exec(c)) && !END.test(m[1])) { out.free = true; c = m[1]; }
   // An option's own price after it, "Oat milk +£0.45" (not one in brackets, which the item's price already includes).
@@ -122,7 +146,8 @@ function readLine(raw) {
     // "Qty 2 @ \u00a315.00" is how many at what each: "2 x \u00a315.00".
     .replace(new RegExp("^(?:qty|quantity)\\s*:?\\s*(\\d{1,3})\\s*(?:@|x|\u00d7)\\s*(?=" + MONEY + "$)", "i"), "$1 x "));
   line.lead = parts.length > 1 && parts[0] === "" && parts.slice(1).some(Boolean);
-  const cells = parts.filter(Boolean);
+  // ("Oatmeal · Qty 1": facts set apart by a middle dot are cells of their own.)
+  const cells = parts.flatMap((x) => x.split(/\s+[·•]\s+|\s+[·•]$/)).map((x) => x.trim()).filter(Boolean);
   line.cells = cells;
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i], next = cells[i + 1];
@@ -135,6 +160,10 @@ function readLine(raw) {
     if (nl && letters(nl[1]) >= 3 && !/£/.test(nl[1]) && !HEADING.test(nl[1])) { line.names.push(cleanName(nl[1])); line.namedByLabel = true; continue; }
     if (FREE_CELL.test(c) && LABEL_PRICE.test(c)) { line.free = true; line.priceLabelled = true; continue; }
     if (COLOUR_LINE.test(c) && i === 0) { line.variant.push(c); continue; }
+    if (FORMAT_LINE.test(c)) { line.variant.push(c); continue; }
+    // "2 @ £1.55   £3.10", "2 x £45.00   £90.00": how many, at what each, and the line's price.
+    const qup = new RegExp("^(\\d{1,3})\\s*[@x×]\\s*" + MONEY + "(?:\\s*each)?\\s+" + MONEY + "$", "i").exec(c);
+    if (qup) { line.qty = Number(qup[1]); line.unit = pence(qup[2], qup[3], qup[4]); line.prices.push(pence(qup[5], qup[6], qup[7])); continue; }
     if (PER_NIGHT.test(c)) { line.variant.push(c); continue; }
     if (/^(?:£\s?\d[\d,]*\.\d{2}\s+){1,3}£\s?\d[\d,]*\.\d{2}$/.test(c)) { for (const p of c.match(/£\s?\d[\d,]*\.\d{2}/g)) line.prices.push(pence(p.replace(/[£\s]/g, "").split(".")[0], p.split(".")[1])); continue; }
     if (FREE_CELL.test(c) && i > 0) { line.free = true; continue; }
@@ -166,6 +195,7 @@ function readLine(raw) {
     if (s.negative) line.negative = true;
     if (s.free) line.free = true;
     if (s.unit != null) line.unit = s.unit;
+    if (s.measure) line.variant.push(s.measure);
     if (s.addPrice != null) line.addPrice = s.addPrice;
     if (s.qty != null && line.qty == null) line.qty = s.qty;
     if (s.head) line.head = true;
@@ -233,7 +263,8 @@ export function readItems(text, opts = {}) {
   };
   const newBlock = (l, name) => { const q = qtyBefore; qtyBefore = null; const b = block(l, name); if (q != null && b.qty == null) { b.qty = q; b.head = true; } return b; };
   const block = (l, name) => ({ lines: 1, labelled: Boolean(l.namedByLabel), name, nameRaw: l.nameRaw || null, qty: l.qty, unit: l.unit, prices: [], extras: [...l.extras, ...l.names.slice(1)], variant: [...l.variant], head: Boolean(l.head) });
-  const raw = inPoundSigns(text).replace(/\r\n?/g, "\n").split("\n").filter((x) => x.trim() && !/^[\s|]+$/.test(x)).slice(0, 6000);
+  let raw = byColumns(prepText(text).replace(/\r\n?/g, "\n").split("\n").filter((x) => x.trim() && !/^[\s|]+$/.test(x)).slice(0, 6000));
+  if (opts.priceAbove) raw = priceAbove(raw);
   const read = raw.map(readLine);
   const priceOnly = (x) => x && !x.names.length && x.prices.length > 0 && !x.endWord && !x.negative;
   for (let n = 0; n < read.length && items.length < 200; n++) {
@@ -252,6 +283,8 @@ export function readItems(text, opts = {}) {
       if ((pend.qty || 1) * u === l.labelledTotal) { pend.lineFromLabel = l.labelledTotal; pend.unit = u; emit(); continue; }
     }
     if (l.lineTotal != null && !hasName && pend && pend.name) { pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
+    // How many on the line under the price ("Bosch Cordless Drill 18V", "£99.00", "Qty: 1").
+    if (pend && pend.name && pend.prices.length && pend.qty == null && !pend.head && !hasName && l.qty != null && !l.prices.length && l.unit == null && !l.endWord) { pend.qty = l.qty; emit(); continue; }
     if (pend && (pend.prices.length || pend.free)) emit();
     if (pend && pend.unitLabelled != null && !(l.labelledTotal != null)) { pend.prices.push(pend.unitLabelled); pend.unit = null; emit(); }
     // The list ends at its subtotal or total. A fee or a discount line only pauses it: some emails list an order per seller,
@@ -357,20 +390,76 @@ export function readItems(text, opts = {}) {
     return false;
   }
 }
+// ---- Tables read by their column headings (round 3) ------------------------------------------------------------------------
+// A row of column headings ("Qty | Description | Total | Unit price", or plain text "Item   Unit cost   Quantity   Amount")
+// says what each column holds, in whatever order the shop puts them. The rows under it are rewritten in the one order the
+// reader reads (name, details, "Qty: n", "£x each", the line's price), so a unit price is never taken for the line's price
+// and a code column is never taken for a name. A row that doesn't fit the headings is left as it is.
+const COLUMN = [
+  ["name", /^(?:items?|descriptions?|products?|articles?|item description|product name|product description|title|details|goods)$/i],
+  ["qty", /^(?:qty\.?|quantity|units?|no\.?|count|pcs|number)$/i],
+  ["unit", /^(?:unit price|unit cost|price each|cost each|each|per item|unit|rate|price per unit|item price)$/i],
+  ["line", /^(?:total|line total|item total|amount|sub-?\s?total|line price|total price|value|line value|cost)$/i],
+  ["price", /^price$/i],
+  ["code", /^(?:code|sku|ean|item code|product code|item no\.?|ref\.?|part no\.?|cat\.? no\.?|article no\.?|barcode)$/i],
+  ["detail", /^(?:size|colou?r|options?|variant|style)$/i],
+];
+const columnsOf = (line) => (/\|/.test(line) ? line.split("|").map((x) => x.trim()).filter(Boolean) : line.trim().split(/\s{2,}|\t+/).map((x) => x.trim()).filter(Boolean));
+const MONEY_ONLY = new RegExp("^" + MONEY_WHOLE + "$");
+function byColumns(lines) {
+  let cols = null, left = 0;
+  return lines.map((line) => {
+    const cells = columnsOf(line);
+    const roles = cells.map((c) => (COLUMN.find(([, re]) => re.test(c.replace(/[:*]+$/, ""))) || [null])[0]);
+    if (cells.length >= 2 && roles.every(Boolean) && roles.includes("name") && roles.some((r) => r === "line" || r === "price" || r === "unit") && new Set(roles).size === roles.length) {
+      // ("Price" is each item's price when there is also a total column, else the line's.)
+      cols = roles.map((r) => (r === "price" ? (roles.includes("line") ? "unit" : "line") : r)); left = 60;
+      return line;
+    }
+    if (!cols || left-- <= 0) return line;
+    if (cells.length !== cols.length) return line;
+    const at = (r) => cells[cols.indexOf(r)];
+    const name = at("name"), qty = at("qty"), unit = at("unit"), ln = at("line");
+    if (!name || !/\p{L}/u.test(name) || (qty != null && !/^\d{1,3}$/.test(qty)) || (unit != null && !MONEY_ONLY.test(unit)) || (ln != null && !MONEY_ONLY.test(ln))) return line;
+    const out = [name];
+    for (let k = 0; k < cols.length; k++) if (cols[k] === "detail") out.push(cells[k]);
+    if (qty != null) out.push("Qty: " + qty);
+    if (unit != null && ln != null) out.push(unit + " each");
+    out.push(ln ?? unit);
+    return out.join(" | ") + " |";
+  });
+}
+
+// ---- Prices printed above their names (round 3) -----------------------------------------------------------------------------
+// Some receipts print each price on the line above its item ("£3.60" over "Oat Flat White"). Read as a second way: the price
+// goes with the name under it. The totals check says which way the email meant.
+function priceAbove(lines) {
+  const out = [];
+  for (let k = 0; k < lines.length; k++) {
+    const a = readLine(lines[k]), b = lines[k + 1] != null ? readLine(lines[k + 1]) : null;
+    if (b && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
+        b.names.length && !b.prices.length && !b.noise && !b.heading && !b.endWord && b.unit == null) {
+      out.push(lines[k + 1].replace(/[\s|]+$/, "") + " | " + a.cells[0] + " |"); k++; continue;
+    }
+    out.push(lines[k]);
+  }
+  return out;
+}
+
 function addExtras(item, extras) {
   item.extras = [...(item.extras || []), ...extras].slice(0, 8);
   item.variant = [item.variant, ...extras].filter(Boolean).join(", ").slice(0, 160);
 }
 
 // ---- What the email says the items came to ---------------------------------------------------------------------------------
-const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|merchandise(?: total)?|guide price|item total)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
+const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|merchandise(?: total)?|guide price|item total|tickets?)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
 const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation) tax\b|\b(?:delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
 export function moneyOf(text) {
   const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, found: [] };
-  const lines = inPoundSigns(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim());
+  const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim());
   const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim()); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
   const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
