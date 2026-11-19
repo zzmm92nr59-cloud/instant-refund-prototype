@@ -865,6 +865,7 @@ function classify(rawText, ref, lenient = false) {
       // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
       // order's confirmation (mergeOrderEmails). Round 10.
       ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
+      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
@@ -1580,8 +1581,37 @@ export function mergeOrderEmails(orders) {
   return out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
-    const [lead, ...rest] = g.slice().sort((a, b) => score(b) - score(a) || a.createdAt - b.createdAt);
+    // (A changed order's email, "We got your changes", never leads: the order's own confirmation keeps its day and number.)
+    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
+    // The order as it now is: the latest change's whole list and estimated total ("We got your changes", sent after each
+    // change) replace what the confirmation listed, so taken-off items are gone and added ones are there. Round 12.
+    const changes = g.filter(o => o.orderUpdate === "amended" && (o.items || []).length).sort((a, b) => String(a.amendedAt || "").localeCompare(String(b.amendedAt || "")) || a.createdAt - b.createdAt);
+    const latest = changes[changes.length - 1];
+    if (latest) {
+      c.items = latest.items.map(i => ({ ...i }));
+      if (latest.itemsCheck) c.itemsCheck = latest.itemsCheck;
+      if (latest.totalPence != null) { c.totalPence = latest.totalPence; c.currency = latest.currency || c.currency; }
+      if (latest.itemCount) c.itemCount = latest.itemCount; else delete c.itemCount;
+      c.amended = { at: latest.amendedAt || null, changes: changes.length };
+    }
+    // What the shop swapped on the day ("Truffle Burrata" substituted with "Italian Burrata 150g £3.20"): the item that came
+    // and what it cost, saying what it replaced. Round 12.
+    const lowName = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    for (const o of g) for (const sub of o.substitutions || []) {
+      const it = c.items.find(i => !i.substitutedFor && lowName(i.name) === lowName(sub.from));
+      if (!it || !sub.to || !sub.to.name) continue;
+      it.substitutedFor = it.name; it.name = sub.to.name;
+      if (Number.isInteger(sub.to.pricePence)) { it.pricePence = sub.to.pricePence; it.qty = sub.to.qty || it.qty || 1; it.lineTotal = (it.qty || 1) > 1; }
+      delete it.variant;
+      if (c.itemsCheck && Number.isInteger(c.itemsCheck.itemsPence)) {
+        const sum = c.items.reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
+        // (The estimate moves with it, so the fees worked out against the paid total below stay what they were. Substitutions
+        // come only on the delivery-day email, whose paid total then becomes the order's.)
+        if (!Number.isNaN(sum) && c.totalPence != null && c.orderUpdate !== "paid") c.totalPence += sum - c.itemsCheck.itemsPence;
+        if (!Number.isNaN(sum)) c.itemsCheck = { ...c.itemsCheck, itemsPence: sum, substituted: true, ...(Number.isInteger(c.itemsCheck.expectedPence) ? { missingPence: c.itemsCheck.expectedPence - sum } : {}) };
+      }
+    }
     for (const o of rest) {
       // The currency goes with the amount: a total taken from another email of the order is in that email's currency.
       if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = o.currency || c.currency; }
@@ -1596,7 +1626,8 @@ export function mergeOrderEmails(orders) {
       // A split shipment (round 3): each parcel's email lists only what is in it. Unless the card's items are already all the
       // order's (they add up), the items from the order's other emails that aren't on the card yet are added, once each, so
       // nothing bought is dropped and nothing is shown twice. The card says the items are complete only when they then add up.
-      if (!(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
+      // (Not for a changed order: its latest list is the whole order, and what the earlier lists had more was taken off.)
+      if (!latest && !(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
         const named = new Set(c.items.map(i => String(i.name || "").toLowerCase().trim()));
         const more = (o.items || []).filter(i => i && i.name && !named.has(String(i.name).toLowerCase().trim()));
         if (more.length) {

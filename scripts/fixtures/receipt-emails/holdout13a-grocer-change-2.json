@@ -1,0 +1,52 @@
+{
+ "id": "holdout13a-grocer-change-2",
+ "sender": "Sainsbury's",
+ "layout": "a second 'We got your changes', sent later",
+ "headers": {
+  "from": "Sainsbury's <service@sainsburys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "We got your changes - 1388004127",
+  "date": "Fri, 09 Oct 2026 17:05:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Sainsbury's</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.sainsburys.co.uk/?utm_source=email\"><img src=\"https://www.sainsburys.co.uk/static/email/logo.png\" alt=\"Sainsbury's\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Order Confirmation - Sainsbury's</td></tr>\n<tr><td>Sam, thanks, we've got your changes! See the details below:</td></tr>\n<tr><td>What you need to know</td></tr>\n<tr><td>You've amended your order</td></tr>\n<tr><td>We've got your changes and your order has been updated.</td></tr>\n<tr><td>Order number</td></tr>\n<tr><td>1388004127</td></tr>\n<tr><td>Estimated total</td></tr>\n<tr><td>&pound;9.85*</td></tr>\n<tr><td>Your payment details</td></tr>\n<tr><td>Payment card: VISA ending in 4821</td></tr>\n<tr><td>Address:</td></tr>\n<tr><td>12 Example Road, Leeds, LS1 4AB</td></tr>\n<tr><td>Groceries</td></tr>\n<tr><td>(5 items)</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Quantity</td></tr>\n<tr><td>Price</td></tr>\n<tr><td>Sainsbury's Wholemeal Pittas x6</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;0.65</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Sainsbury's Free Range Eggs x12</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;3.40</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Sainsbury's 150g Buffalo Mozzarella, Taste the Difference</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;2.50</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Sainsbury's Unwaxed Lemons x4</td></tr>\n<tr><td>1</td></tr>\n<tr><td>&pound;1.20</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Sainsbury's Chopped Tomatoes 400g</td></tr>\n<tr><td>2</td></tr>\n<tr><td>&pound;1.10</td></tr>\n<tr><td>Substitution allowed</td></tr>\n<tr><td>Your order summary</td></tr>\n<tr><td>Trolley cost</td></tr>\n<tr><td>&pound;8.85</td></tr>\n<tr><td>Delivery cost</td></tr>\n<tr><td>&pound;1.00</td></tr>\n<tr><td>Estimated total</td></tr>\n<tr><td>&pound;9.85*</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Sainsbury's. All rights reserved.<br /><a href=\"https://www.sainsburys.co.uk/help\">Help</a> | <a href=\"https://www.sainsburys.co.uk/privacy\">Privacy</a> | <a href=\"https://www.sainsburys.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.sainsburys.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Sainsbury's",
+  "date": "2026-10-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sainsbury's Wholemeal Pittas x6",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Sainsbury's Free Range Eggs x12",
+    "qty": 1,
+    "linePence": 340
+   },
+   {
+    "name": "Sainsbury's 150g Buffalo Mozzarella, Taste the Difference",
+    "qty": 1,
+    "linePence": 250
+   },
+   {
+    "name": "Sainsbury's Unwaxed Lemons x4",
+    "qty": 1,
+    "linePence": 120
+   },
+   {
+    "name": "Sainsbury's Chopped Tomatoes 400g",
+    "qty": 2,
+    "linePence": 110
+   }
+  ],
+  "subtotalPence": 885,
+  "feesPence": 100,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 985,
+  "orderUpdate": "amended",
+  "orderRef": "1388004127"
+ }
+}

@@ -84,6 +84,30 @@ export function groceryDayOf(text) {
   return { paidPence: pence(MONEY.exec(paid[1])), orderRef: ref ? ref[1] : null };
 }
 
+// What the shop swapped on the day ("Substitutions (1)", then "Truffle Burrata 125g | at a quantity of 1 | £2.55 |",
+// "Substituted with", "Italian Burrata 150g | at a quantity of 1 | £3.20 |"): each item ordered and what came instead, so
+// the order's card can show what was actually delivered and paid for (gmail.js mergeOrderEmails). Round 12.
+const SUB_ITEM = /^(\p{L}[^|£]{2,150}?)\s*\|\s*(?:(?:at a )?(?:qty|quantity)(?: of)?\s*:?\s*)?(\d{1,3})\s*\|\s*(£\s?[\d,]+\.\d{2})\s*\|?$/iu;
+export function grocerySubstitutions(text) {
+  const list = rows(String(text || "").slice(0, 30000));
+  const out = [];
+  for (let k = 0; k + 1 < list.length && out.length < 60; k++) {
+    if (!/^(?:substituted|replaced|swapped) (?:with|by|for)\s*:?$/i.test(list[k])) continue;
+    const a = SUB_ITEM.exec(list[k - 1] || ""), b = SUB_ITEM.exec(list[k + 1] || "");
+    if (!a || !b) continue;
+    out.push({ from: a[1].trim(), to: { name: b[1].trim(), qty: Number(b[2]), pricePence: pence(MONEY.exec(b[3])) } });
+  }
+  return out;
+}
+
+// A changed order ("We got your changes", "You've amended your order", "Your order has been updated"): the shop's whole new
+// list and estimated total for the order it names. The latest one is the order (gmail.js mergeOrderEmails), never a second
+// purchase. Round 12.
+export function orderAmended(subject, text) {
+  const t = String(subject || "") + "\n" + String(text || "").slice(0, 3000).replace(/\s+/g, " ");
+  return /\bwe(?:'|’)?ve? got your changes\b|\byou(?:'|’)?ve (?:amended|changed|edited) your order\b|\byour order (?:has been|was) (?:amended|updated|changed)\b|\bchanges to your order (?:have been|are) (?:saved|confirmed)\b|^\s*(?:order amended|amended order)\b/i.test(t);
+}
+
 // ---- A game's web shop (Appcharge, Xsolla) --------------------------------------------------------------------------------
 // "Items" then each thing in the pack with how many ("Mixy Meow | 1", "Checkerboard | 10", "Coins | 4,500"), then the
 // subtotal: one purchase of the whole pack, named by what is in it ("Mixy Meow, 10 Checkerboard", "2,200 Coins").

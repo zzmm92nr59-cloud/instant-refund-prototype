@@ -477,6 +477,10 @@ export function readItems(text, opts = {}) {
     }
     if (!hasName && l.unitLabelled != null) { if (pend && pend.name) pend.unitLabelled = l.unitLabelled; continue; }
     if (!hasName && (l.qty != null || l.unit != null)) {
+      // (A bare number under a name that already said how many with a times sign, Shopify's "Swift Flights 3 × 1" over "25":
+      // the item's size or weight, never how many. A pack size glued to the name, "Toilet Rolls x9" over "1", is the pack,
+      // and the number under it is how many. Round 12.)
+      if (pend && pend.name && pend.nameRaw && /\s×\s\d{1,3}$/.test(pend.nameRaw) && pend.qty != null && l.unit == null && l.cells.length === 1 && /^\d{1,3}$/.test(l.cells[0])) continue;
       if (pend && pend.name) {
         // "Tempered Glass Screen Protector x2" over "Quantity: 2": the name's "x2" is part of its name (a 2-pack).
         if (l.qty != null && pend.nameRaw) { pend.name = pend.nameRaw; pend.nameRaw = null; pend.keepName = true; }

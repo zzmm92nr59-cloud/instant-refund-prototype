@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -1094,6 +1094,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A supermarket's delivery-day email for an order already confirmed ("Your order is ready for today", "Payment received").
   const dayOf = groceryDayOf(text);
   if (dayOf) { sig.subjectHit = true; sig.bodyHit = true; }
+  // (A changed order, "We got your changes - 1350718495", with the whole new list: the order as it now is. Round 12.)
+  const amended = !dayOf && orderAmended(subject, text);
+  if (amended && sig.bodyHit) sig.subjectHit = true;
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
   if (!isFlight && !(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
@@ -1175,6 +1178,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // The delivery-day email of a supermarket order: what was paid, for the order it names. Its few listed lines (substitutions,
   // short-life items) are not the order's items, which are on the confirmation and in the attached receipt.
   if (dayOf) { result.items = []; result.orderUpdate = "paid"; if (dayOf.orderRef) result.orderRef = dayOf.orderRef; result.totalPence = dayOf.paidPence; result.currency = "GBP"; }
+  // (What it swapped on the day, "Substituted with": the order's card shows what came instead. Round 12.)
+  const subs = dayOf ? (grocerySubstitutions(text).length ? grocerySubstitutions(text) : grocerySubstitutions(text === fromHtml ? plain : fromHtml)) : [];
+  if (subs.length) result.substitutions = subs;
+  // (A changed order's new list is the order as it now is; when it was sent says which change is the latest. Round 12.)
+  if (amended) { result.orderUpdate = "amended"; const d = headers.date ? new Date(headers.date) : null; if (d && !Number.isNaN(d.getTime())) result.amendedAt = d.toISOString(); }
   // A company's legal name as the sender ("Anthropic Ireland, Limited"): the shop is the brand, not the country it bills
   // from ("Anthropic"). Round 10.
   // (Forwarded, the original sender's name says it.)

@@ -286,7 +286,24 @@ const joinWrong = [];
   const mine = fwd.replace("From: Alex Morgan <alex.morgan@outlook.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace(/alex\.morgan@outlook\.com/g, "sam.taylor@outlook.com").replace("ALEX MORGAN", "SAM TAYLOR");
   if (!parseReceiptEmail(mine).ok) joinWrong.push("the shopper's own forwarded booking not read");
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases"}`);
+// Round 12 (Connor's real inbox): a changed order's emails ("We got your changes", each with the whole new list) make one card
+// with the latest list and no taken-off item; the delivery-day email's substitution shows what came instead, at its price.
+{
+  const card = (id, n) => ({ id: "g" + n, createdAt: n, kind: "receipt", status: "pending", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, id + ".json"), "utf8")))) });
+  // (In any order the emails were read: the change sent last is the order as it now is.)
+  for (const order of [[1, 2, 3, 4], [4, 3, 2, 1], [3, 1, 4, 2]]) {
+    const ids = ["holdout13a-grocer-confirmation", "holdout13a-grocer-change-1", "holdout13a-grocer-change-2", "holdout13a-grocer-day-of-substitution"];
+    const cards = mergeOrderEmails(order.map((k, n) => card(ids[k - 1], n + 1)));
+    if (cards.length !== 1) { joinWrong.push(`a changed order made ${cards.length} cards`); continue; }
+    const o = cards[0], names = (o.items || []).map((i) => i.name);
+    if (o.orderDate !== "2026-10-07") joinWrong.push(`changed order dated ${o.orderDate} for its confirmation's 2026-10-07`);
+    if (names.length !== 5 || names.some((n) => /Bacon/.test(n)) || !names.some((n) => /Chopped Tomatoes/.test(n))) joinWrong.push("changed order's items not the latest list: " + names.join(", "));
+    const sub = (o.items || []).find((i) => /Italian Mozzarella/.test(i.name));
+    if (!sub || sub.pricePence !== 185 || !/Buffalo Mozzarella/.test(sub.substitutedFor || "") || names.some((n) => /Buffalo/.test(n))) joinWrong.push("substitution not shown: " + JSON.stringify(sub || null));
+    if (o.totalPence !== 920) joinWrong.push(`changed order's total ${o.totalPence} for the paid 920`);
+  }
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
