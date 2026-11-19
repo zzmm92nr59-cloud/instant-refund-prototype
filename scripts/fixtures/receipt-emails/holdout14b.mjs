@@ -89,13 +89,13 @@ export default function holdout14b() {
         nested(["Qty", "Item Detail", "Item Cost"]), nested(["1", "Get 20% Off! Make it a good day.", ""]), nested(["1", "9 Chicken Bites Box", "£3.99"]), nested(["1", "Small Lemonade", "£1.49"]),
         nested(["", "Discount:", "-£0.80"]), nested(["", "Total (including VAT):", "£4.68"])] }) }, o, "Bunhouse", "2026-11-15");
   }
-  // ---- A pub chain's app: each drink's measure in brackets under its name, a promotion taken off --------------------------
+  // ---- A pub chain's app: each drink's measure in brackets under its name (its detail), a promotion taken off --------------------------
   {
-    const o = order([{ name: "Harbour Lager (Pint)", qty: 1, unit: 345 }, { name: "Smoky Bean Burrito", qty: 1, unit: 425 }, { name: "Spiced Rum (Double Mixer)", qty: 1, unit: 390 }], { discounts: [["Promotion Applied", 150]] });
+    const o = order([{ name: "Harbour Lager", qty: 1, unit: 345, extras: ["(Pint)"] }, { name: "Smoky Bean Burrito", qty: 1, unit: 425 }, { name: "Spiced Rum", qty: 1, unit: 390, extras: ["(Double Mixer)"] }], { discounts: [["Promotion Applied", 150]] });
     add("holdout14b-pub-app-measures", "The Tankard Group", "'Qty | Description | Amount'; '1 | <b>Harbour Lager</b> (Pint) | £3.45'; 'Promotion Applied | -£1.50'", {
       from: "The Tankard Group <orders@tankardgroup.example>", subject: "The Tankard Group Order Confirmation: 4410", date: "Mon, 16 Nov 2026 19:00:00 +0000",
       html: page({ brand: "The Tankard Group", domain: "tankardgroup.example", rows: ["<p>Thank you for your order...</p><p>Order Id: <b>612004411</b><br/>Order Date: Monday, November 16, 2026<br/>Table Number: 12</p>",
-        `<table border="1"><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td><strong>Harbour Lager</strong>\n(Pint)</td><td align="right">£3.45</td></tr><tr><td>1</td><td><strong>Smoky Bean Burrito</strong></td><td align="right">£4.25</td></tr><tr><td>1</td><td><strong>Promotion Applied</strong></td><td align="right">-£1.50</td></tr><tr><td>1</td><td><strong>Spiced Rum</strong>\n(Double Mixer)</td><td align="right">£3.90</td></tr><tr><td colspan="2">Payment Type</td><td>Apple Pay</td></tr><tr><td colspan="2"><strong>Order Total</strong></td><td><strong>£10.10</strong></td></tr></table>`] }) }, o, "The Tankard Group", "2026-11-16");
+        `<table border="1"><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td><strong>Harbour Lager</strong><br>(Pint)</td><td align="right">£3.45</td></tr><tr><td>1</td><td><strong>Smoky Bean Burrito</strong></td><td align="right">£4.25</td></tr><tr><td>1</td><td><strong>Promotion Applied</strong></td><td align="right">-£1.50</td></tr><tr><td>1</td><td><strong>Spiced Rum</strong><br>(Double Mixer)</td><td align="right">£3.90</td></tr><tr><td colspan="2">Payment Type</td><td>Apple Pay</td></tr><tr><td colspan="2"><strong>Order Total</strong></td><td><strong>£10.10</strong></td></tr></table>`] }) }, o, "The Tankard Group", "2026-11-16");
   }
   // ---- A rail booking: two tickets of the same type, each named by its own leg, and the booking fee its own line ------------
   {

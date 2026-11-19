@@ -541,7 +541,12 @@ function afterDiscount(text, m) {
   const was = money(m[1]), now = money(next[1]);
   if (!(now < was)) return null;
   const off = [...text.matchAll(/(?:[-−–]\s?£|£\s?[-−–])\s?(\d[\d,]*\.\d{2})/g)].map((x) => money(x[1]));
-  return off.some((o) => Math.abs(was - o - now) <= 1) || Math.abs(was - off.reduce((n, o) => n + o, 0) - now) <= 1 ? now : null;
+  if (off.some((o) => Math.abs(was - o - now) <= 1) || Math.abs(was - off.reduce((n, o) => n + o, 0) - now) <= 1) return now;
+  // (Or the email shows old prices beside new ones elsewhere too, an item's "£8.99" next to its old "£14.99" with nothing
+  // between: a copy of an email that struck its old prices through, the line through lost. The lower one is paid. Round 13.)
+  const lone = /^[ \t|]*£ ?(\d[\d,]*\.\d{2})[ \t|]*\n(?:[ \t|]*\n){0,2}[ \t|]*£ ?(\d[\d,]*\.\d{2})[ \t|]*$/gm;
+  const pairs = [...text.slice(0, m.index).matchAll(lone)].filter((x) => money(x[1]) !== money(x[2]));
+  return pairs.length ? now : null;
 }
 function fromText(text, refDate, ctx = {}) {
   // Some plain-text parts write the pound sign as "L" ("L69.00" on its own line). Only whole lines that are just an amount are changed.
@@ -1653,7 +1658,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && !isFlight && !journey) {
     const rows = String(text).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
     const got = [];
-    for (const r of rows) {
+    for (const r of rows.slice(0, 2000)) {
+      if (got.length >= 60) break;
       const m = /^(\d{1,2})\s?[x×]\s+(\p{Lu}[^£|]{2,80})$/u.exec(r);
       if (m && !/%\s*off\b|\bspend\b|\bfree\b|\bdeal\b|\bvoucher\b/i.test(m[2])) { got.push({ name: m[2].trim(), qty: Number(m[1]), pricePence: null }); continue; }
       if (got.length && /^\+\s?\p{L}[^£|]{1,60}$/u.test(r)) { const it = got[got.length - 1]; it.variant = [it.variant, r.replace(/^\+\s?/, "").trim()].filter(Boolean).join(", "); continue; }
@@ -1740,7 +1746,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
   if (result.items.length && (result.currency || "GBP") === "GBP") {
-    const off = (moneyOf(text).found || []).filter((f) => f[0] === "discount" && f[2] > 0).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    const off = (moneyOf(text).found || []).filter((f) => f[0] === "discount" && f[2] > 0 && /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1])) && !/\b(?:card|payment|paid|pay)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (off.length) result.discounts = off;
   }
   return result;
