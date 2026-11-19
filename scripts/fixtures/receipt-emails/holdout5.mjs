@@ -1,4 +1,4 @@
-// A sixth set of made-up emails (see lib.mjs): forty layouts written for round 3 of the item reader (19 Nov 2026), unlike
+// A sixth set of made-up emails (see lib.mjs): forty-four layouts written for round 3 of the item reader (19 Nov 2026), unlike
 // anything already in the corpus, and run BEFORE any change for them (their first-try scores are in the round 3 commit).
 // Table structures (nested tables, div grids, flexbox rows, inline spans, <br>-separated cells), prices before the name and
 // on the line above, item codes, colour and size on lines of their own, column headings in different orders, a Welsh and

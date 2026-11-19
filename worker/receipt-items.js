@@ -23,6 +23,13 @@
 // money rows ("Box price") are never items. The check also says "may have missed some" when an item's unit price times
 // how many isn't its line's price, when a money line was read as an item, and (receipt-parser.js) when the email says how
 // many items it has and the reading has a different number.
+//
+// Round 3 (19 Nov 2026), from 59 more layouts written before the fixes for them (holdout5.mjs, holdout6.mjs): tables read by
+// their column headings in any order (byColumns); prices printed above their names tried as another reading (priceAbove);
+// weighed and metered lines ("0.92 kg @ £0.84/kg"); barcodes, part numbers, release dates and formats ("eBook", "Platform:
+// Steam") as details; "Oatmeal · Qty 1"; "2 @ £1.55  £3.10"; "(6 @ £0.40)"; the price before the name; "— £18.00 (x2)";
+// Welsh and English labels; "You received: …"; a deal's parts at £0.00; levies, carriers and removal charges as fees. When
+// the email gives a subtotal, the items must come to it (or the total less fees plus discounts), never to the bare total.
 
 const MONEY = "£\\s?(\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.(\\d{2})|\\s(\\d{2}))";
 // (A cell that is only an amount can be in whole pounds, "£165", as some shops print them.)
