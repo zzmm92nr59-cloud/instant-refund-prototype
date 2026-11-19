@@ -36,6 +36,8 @@ import { cleanItems, isVia } from "./receipt-reader.js";
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
 import { ensureResaleTables } from "./resale.js";
+// Codes to show or scan (a return barcode, a drop-off QR code, a ticket): found when an email is read, kept with its receipt.
+import { RECEIPT_CODES_SQL, findCodes, codeEmailDetails, codeStatements, codeFetchCount, attachCodes, readCodeRows } from "./scan-codes.js";
 import { ensurePushTables, subsOf, sendPush } from "./push.js";
 
 // v5: the same permission, worded for Outlook as well as Gmail.
@@ -150,7 +152,10 @@ const GONE = Symbol("gone");
 // delivery-day payment (orderUpdate "paid", joined to its order), game packs, Apple service names and card-line totals, VAT on
 // top of a subtotal, changed Shopify orders, credits, Domino's total after its deal, and "there was no order" apologies.
 // 41: both of those together (the coverage round and round 10 were read as 40 on their own branches).
-export const PARSER_VERSION = 41;
+// 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
+// a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
+// it names is kept for it (kind "order_codes").
+export const PARSER_VERSION = 42;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -275,6 +280,8 @@ async function ensureGmailTablesRun(db) {
     PARCEL_TRACKS_SQL, PARCEL_USES_SQL,
     // Return tracking (return-tracking.js): "I've sent it back" and the return's tracking number, as the shopper gave them.
     RETURN_TRACKS_SQL,
+    // Codes to show or scan (scan-codes.js): each code's picture, the shop's words and any deadline, by the email it came from.
+    ...RECEIPT_CODES_SQL,
     // A scan the shopper started: where it has got to and how much it found, so it carries on after they leave the app.
     `CREATE TABLE IF NOT EXISTS mail_scan_jobs (
        shopper_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, state TEXT NOT NULL, full_read INTEGER NOT NULL DEFAULT 0, cursor TEXT,
@@ -302,6 +309,7 @@ export function gmailDeleteStatements(db, shopperId) {
     db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_photos WHERE shopper_id = ?").bind(shopperId),
+    db.prepare("DELETE FROM receipt_codes WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM receipt_learning WHERE shopper_id = ?").bind(shopperId),
     db.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ? OR shopper_id LIKE ?").bind(shopperId, shopperId + "~%"),
@@ -596,6 +604,7 @@ function inboxReceiptDeletes(db, shopperId, slot) {
     db.prepare(`UPDATE resale_requests SET status = 'closed' WHERE status = 'accepted' AND listing_id IN (SELECT id FROM resale_listings WHERE seller_id = ? AND receipt_id IN (${ids}))`).bind(shopperId, ...args),
     db.prepare(`UPDATE resale_listings SET status = 'withdrawn' WHERE seller_id = ? AND status IN ('active','matched') AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_images WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
+    db.prepare(`DELETE FROM receipt_codes WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM return_reminders WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_item_marks WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
     db.prepare(`DELETE FROM receipt_gifts WHERE shopper_id = ? AND receipt_id IN (${ids})`).bind(shopperId, ...args),
@@ -647,6 +656,7 @@ async function disconnect(env, shopperId, fetchImpl, { withdraw }) {
     env.RELAY_DB.prepare("DELETE FROM captured_receipts WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_images WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ?").bind(shopperId),
+    env.RELAY_DB.prepare("DELETE FROM receipt_codes WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM return_reminders WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM gmail_history_years WHERE shopper_id = ?").bind(shopperId),
     env.RELAY_DB.prepare("DELETE FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId),
@@ -898,7 +908,24 @@ function classify(rawText, ref, lenient = false) {
       status = "not_receipt";
     }
   }
-  return { details, status };
+  // A code to show or scan (scan-codes.js), only where the email clearly says what it is for. On a receipt it is the
+  // receipt's own; in any other email it joins the order the email names (attachCodes), so an email that names none keeps
+  // none. An email that is nothing else but carries a code for an order it names is kept for that (kind "order_codes").
+  // Only the count is kept here: the codes themselves go to receipt_codes. (A pasted email has no inbox to fetch for.)
+  let codes = [];
+  if (!ref.pasted) {
+    try { codes = findCodes(rawText, details); } catch { codes = []; }
+    if (codes.length && status === "not_receipt") {
+      const kept = codeEmailDetails(rawText);
+      if (kept) { details = { ...kept, ...ref, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION }; status = "pending"; }
+      else codes = [];
+    } else if (codes.length && details.kind !== "receipt" && !details.orderRef) {
+      const named = codeEmailDetails(rawText);
+      if (named) details.orderRef = named.orderRef; else codes = [];
+    }
+    if (codes.length) details.codeCount = codes.length;
+  }
+  return { details, status, codes };
 }
 
 // ---- The two kinds of mailbox. Each lists one date window of likely emails and reads one email as it was sent. ----
@@ -1100,10 +1127,14 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       const cls = classify(rawText, box.ref(listed.entries[i]));
       const details = slot ? { ...cls.details, mailbox: slot } : cls.details, status = cls.status;
       let imageToStore = null;
-      if (status === "not_receipt") ignored++;
       // One small product photo per receipt, fetched at most once.
       const prev = seen ? JSON.parse(seen.details) : {};
       const receiptId = seen ? seen.id : crypto.randomUUID();
+      // Its codes to show or scan: their pictures are fetched now, once (some stop working within days). An email whose
+      // pictures this round has no outside calls left for waits for the next round, unless it is the round's first.
+      if (codeFetchCount(cls.codes) && calls + codeFetchCount(cls.codes) + 2 > budget && fetched > 1) { fetched--; incomplete = true; continue; }
+      const codeWrites = await codeStatements(env, fetchImpl, shopperId, receiptId, cls.codes, { had: Boolean(prev.codeCount), now, orderRef: details.orderRef, sameOrderRef, canFetch: () => calls + 1 < budget });
+      if (status === "not_receipt") ignored++;
       if (details.kind === "receipt") {
         // A photo that failed once is tried again whenever the reader version changes (a transient failure should not be permanent).
         details.hasImage = Boolean(prev.hasImage); details.imageTried = Boolean(prev.imageTried) && (prev.hasImage || !stale);
@@ -1128,6 +1159,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         writes.push(env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ?, status = ? WHERE shopper_id = ? AND message_ref = ?")
           .bind(JSON.stringify(details), keep, shopperId, ref));
         if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
+        writes.push(...codeWrites);
         if (status !== "not_receipt") updated++;
         continue;
       }
@@ -1135,6 +1167,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
         .bind(receiptId, shopperId, ref, status, JSON.stringify(details), now));
       if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
+      writes.push(...codeWrites);
       if (status !== "not_receipt") { added++; fresh.push({ id: receiptId, details }); }
     }
     // Everything read in this window is saved in one database call.
@@ -1449,7 +1482,7 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
     if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
     rawText = mailText(unb64url(raw));
   }
-  const { details, status } = classify(rawText, outlook ? { outlookId: messageId, ...mark } : { gmailId: messageId, ...mark }, true);
+  const { details, status, codes } = classify(rawText, outlook ? { outlookId: messageId, ...mark } : { gmailId: messageId, ...mark }, true);
   if (status === "not_receipt") {
     // Say which checks failed (no email content), so a missed layout can be fixed.
     const why = parseReceiptEmail(rawText, { lenient: true }).signals || null;
@@ -1480,9 +1513,19 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
     await recordReceiptShops(env, shopperId, [{ id: receiptId, details }], now);
   }
   if (image) await saveImage(env, shopperId, { receiptId, ...image }, now);
+  const codeWrites = await codeStatements(env, fetchImpl, shopperId, receiptId, codes, { had: Boolean(prev.codeCount), now, orderRef: details.orderRef, sameOrderRef });
+  if (codeWrites.length) await env.RELAY_DB.batch(codeWrites);
   return { status: 200, body: { ok: true, kind: details.kind, store: (details.retailer && (details.retailer.name || details.retailer.domain)) || null, orderRef: details.orderRef || null } };
 }
 
+// A receipt the shopper removed takes its codes with it: its own, and those other emails carried for the same order.
+async function orderCodeDeletes(db, shopperId, receiptId, d) {
+  const out = [db.prepare("DELETE FROM receipt_codes WHERE shopper_id = ? AND receipt_id = ?").bind(shopperId, receiptId)];
+  if (!d || !d.orderRef) return out;
+  const from = ((await db.prepare("SELECT c.id AS id, json_extract(c.details, '$.orderRef') AS ref FROM captured_receipts c WHERE c.shopper_id = ? AND c.id IN (SELECT receipt_id FROM receipt_codes WHERE shopper_id = ?)").bind(shopperId, shopperId).all()).results) || [];
+  for (const r of from) if (r.id !== receiptId && r.ref && sameOrderRef(r.ref, d.orderRef)) out.push(db.prepare("DELETE FROM receipt_codes WHERE shopper_id = ? AND receipt_id = ?").bind(shopperId, r.id));
+  return out;
+}
 function imageStatement(env, shopperId, img, now) {
   return env.RELAY_DB.prepare("INSERT OR REPLACE INTO receipt_images (receipt_id,shopper_id,type,data,created_at) VALUES (?,?,?,?,?)")
     .bind(img.receiptId, shopperId, img.type, img.data, now);
@@ -1896,7 +1939,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const deliveries = all.filter(x => x.kind === "delivery_update");
   const updates = all.filter(x => x.kind === "return_update");
   const cancels = all.filter(x => x.kind === "order_update");
-  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update"));
+  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update" && x.kind !== "order_codes"));
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.flatMap(o => [storeKey(o), legacyStoreKey(o)]).filter(Boolean))];
@@ -1906,7 +1949,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, promo FROM receipt_learning WHERE shopper_id = ? AND store_key IN (${qs})`).bind(shopperId, ...chunk).all());
     lookups.push(env.RELAY_DB.prepare(`SELECT store_key AS k, category, COUNT(*) AS n FROM receipt_learning WHERE category IS NOT NULL AND store_key IN (${qs}) GROUP BY store_key, category`).bind(...chunk).all());
   }
-  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, aiTypes, ...learned] = await Promise.all([
+  const [gone, rem, marks, gifts, fixes, sent, aiReads, tracked, typedReturns, shopKinds, aiTypes, codeRows, ...learned] = await Promise.all([
     env.RELAY_DB.prepare("SELECT details FROM captured_receipts WHERE shopper_id = ? AND status = 'dismissed'").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, sent_at AS sentAt FROM return_reminders WHERE shopper_id = ?").bind(shopperId).all(),
     env.RELAY_DB.prepare("SELECT receipt_id AS id, item_index AS i, status, updated_at AS at FROM receipt_item_marks WHERE shopper_id = ?").bind(shopperId).all(),
@@ -1921,11 +1964,15 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     readShopKinds(env.RELAY_DB, orders.map(o => storeKey(o))),
     // What the AI said each thing is, for shoppers who switched AI for picks on (item-kinds.js); {} for everyone else.
     aiTypesFor(env, shopperId),
+    // Codes to show or scan (scan-codes.js): what each is for and whether its picture was kept, never the picture.
+    readCodeRows(env.RELAY_DB, shopperId),
     ...lookups
   ]);
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   attachDeliveries(orders, deliveries);
+  // Each code goes on the receipt of its order (its own email's, or the one order with that number from that shop).
+  attachCodes(orders, all, codeRows, sameOrderRef);
   attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted"));
   attachAdjustments(orders, cancels.filter(u => u.stage === "adjusted"));
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
@@ -2546,7 +2593,8 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       env.RELAY_DB.prepare("DELETE FROM shared_emails WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_ai_reads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
       env.RELAY_DB.prepare("DELETE FROM receipt_rereads WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
-      env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1])]);
+      env.RELAY_DB.prepare("DELETE FROM receipt_photos WHERE shopper_id = ? AND receipt_id = ?").bind(shopper.id, act[1]),
+      ...(await orderCodeDeletes(env.RELAY_DB, shopper.id, act[1], JSON.parse(res.details)))]);
     // "This is just promotions" teaches the app to hide that store's order-less emails for this shopper.
     const b = await request.json().catch(() => ({}));
     if (act[2] === "dismiss" && b && b.reason === "promo") {
@@ -2672,6 +2720,18 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     const row = await env.RELAY_DB.prepare(
       "SELECT type, data FROM receipt_images WHERE receipt_id = ? AND shopper_id = ?").bind(img[1], shopper.id).first();
     if (!row) return json({ error: "not_found" }, 404, cors);
+    return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
+      status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
+  }
+  // A code to show or scan on one of their own receipts (scan-codes.js): its picture, as n in that receipt's `codes`.
+  // Their own receipts only: anyone else's, or a code that isn't on that receipt, answers 404.
+  const cde = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/codes\/(\d{1,2})$/.exec(path);
+  if (cde && m === "GET") {
+    await ensureGmailTables(env.RELAY_DB);
+    const card = (await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 })).find((r) => r.id === cde[1]);
+    const code = card && (card.codes || []).find((c) => c.n === Number(cde[2]));
+    const row = code && code.kept ? await env.RELAY_DB.prepare("SELECT type, data FROM receipt_codes WHERE shopper_id = ? AND receipt_id = ? AND idx = ?").bind(shopper.id, code.kept.receiptId, code.kept.idx).first() : null;
+    if (!row || !row.data || !/^image\/(png|gif|jpeg|webp)$/.test(row.type || "")) return json({ error: "not_found" }, 404, cors);
     return new Response(Uint8Array.from(atob(row.data), c => c.charCodeAt(0)), {
       status: 200, headers: { ...cors, "Content-Type": row.type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" } });
   }

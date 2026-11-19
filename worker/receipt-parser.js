@@ -972,6 +972,24 @@ export function emailForReading(rawEmail) {
     plain: parts.text.join("\n").trim(), fromHtml: html ? htmlToText(html) : "" };
 }
 
+// An email for finding a code to show or scan (scan-codes.js): its headers, its HTML as shown (hidden copies left out) and
+// its text. htmlAsText turns a piece of that HTML into lines the way the reader does.
+export function emailForCodes(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_RAW);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n").slice(0, MAX_INPUT);
+  return { headers, html: html ? withoutHidden(html) : "", plain: parts.text.join("\n").trim() };
+}
+export function htmlAsText(html) { return htmlToTextAll(String(html || "")); }
+// The order an email is about, the day it was sent and the shop that sent it (also when the shopper forwarded it), for an
+// email that is kept only for its code.
+export function orderNewsOf(rawEmail) {
+  const u = updateParts(rawEmail);
+  return { orderRef: u.orderRef, at: u.at, subject: u.subject, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+}
+
 // A shop's till receipt that says once that it is in pounds ("GBP" over the price column) and then prints bare amounts
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
