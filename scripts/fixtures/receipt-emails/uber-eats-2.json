@@ -1,0 +1,48 @@
+{
+ "id": "uber-eats-2",
+ "sender": "Uber Eats",
+ "layout": "plain text, qty × name, price line under",
+ "headers": {
+  "from": "Uber Receipts <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Tuesday order from Uber Eats",
+  "date": "Wed, 11 Nov 2026 20:15:00 +0000"
+ },
+ "html": "",
+ "text": "Thanks for ordering, Sam\nHere's your receipt for Thai Orchid.\n11 November 2026\n\nTotal £45.94\n\n1 × Pad Thai Chicken\n    £10.95\n1 × Green Curry Tofu\n    Jasmine rice\n    £10.50\n2 × Chicken Satay Skewers\n    £13.00\n2 × Thai Iced Tea\n    £7.50\n\nSubtotal    £41.95\nDelivery Fee    £0.00\nService Fee    £1.99\nTip    £2.00\nTotal    £45.94\n\nUber Eats",
+ "expected": {
+  "shop": "Uber Eats",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Pad Thai Chicken",
+    "qty": 1,
+    "linePence": 1095
+   },
+   {
+    "name": "Green Curry Tofu",
+    "qty": 1,
+    "linePence": 1050,
+    "extras": [
+     "Jasmine rice"
+    ]
+   },
+   {
+    "name": "Chicken Satay Skewers",
+    "qty": 2,
+    "linePence": 1300
+   },
+   {
+    "name": "Thai Iced Tea",
+    "qty": 2,
+    "linePence": 750
+   }
+  ],
+  "subtotalPence": 4195,
+  "feesPence": 199,
+  "discountsPence": 0,
+  "tipsPence": 200,
+  "totalPence": 4594
+ }
+}

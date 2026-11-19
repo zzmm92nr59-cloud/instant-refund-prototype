@@ -1,0 +1,35 @@
+{
+ "id": "jd-sports-2",
+ "sender": "JD Sports",
+ "layout": "text with click & collect",
+ "headers": {
+  "from": "JD Sports <orders@jdsports.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your JD order",
+  "date": "Sat, 07 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "JD\nOrder number: 102938490\n7 November 2026\n\nITEM QTY PRICE\nadidas Originals Gazelle | 1 | £90.00\nJD Sports Gift Bag | 1 | £1.00\n\nSubtotal £91.00\nClick & Collect FREE\nTotal £91.00",
+ "expected": {
+  "shop": "JD Sports",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "adidas Originals Gazelle",
+    "qty": 1,
+    "linePence": 9000
+   },
+   {
+    "name": "JD Sports Gift Bag",
+    "qty": 1,
+    "linePence": 100
+   }
+  ],
+  "subtotalPence": 9100,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9100
+ }
+}

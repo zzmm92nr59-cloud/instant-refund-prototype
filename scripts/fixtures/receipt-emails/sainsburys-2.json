@@ -1,0 +1,170 @@
+{
+ "id": "sainsburys-2",
+ "sender": "Sainsbury's",
+ "layout": "text receipt: name line, qty x unit and line total under it",
+ "headers": {
+  "from": "Sainsbury's <groceries@sainsburys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Sainsbury's receipt",
+  "date": "Sat, 14 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Sainsbury's\nYour groceries receipt\nOrder number: 1029384799\nDelivered 14 November 2026\n\nSainsbury's British Semi Skimmed Milk 2.272L, 4 Pints\n2 x £1.65   £3.30\nWarburtons Medium Sliced White Bread 800G\n1 x £1.60   £1.60\nTaste the Difference Sourdough Bloomer 800G\n1 x £2.20   £2.20\nAnchor Spreadable Butter 500G\n1 x £4.50   £4.50\nCathedral City Mature Cheddar 550G\n1 x £5.75   £5.75\nSainsbury's Bananas Loose\n6 x £0.18   £1.08\nSainsbury's Braeburn Apple Minimum 5 Pack\n1 x £1.59   £1.59\nSainsbury's Carrots 1Kg\n1 x £0.59   £0.59\nSainsbury's Broccoli 335G\n2 x £0.69   £1.38\nSainsbury's Baby Potatoes 1Kg\n1 x £1.05   £1.05\nSainsbury's Brown Onions 3 Pack\n1 x £0.89   £0.89\nSainsbury's Cherry Tomatoes 330G\n1 x £0.99   £0.99\nSainsbury's Iceberg Lettuce Each\n1 x £0.65   £0.65\nSainsbury's British Chicken Breast Portions 650G\n1 x £4.99   £4.99\nSainsbury's 12 Pork Sausages 681G\n1 x £3.00   £3.00\nSainsbury's Beef Mince 5% Fat 500G\n1 x £4.25   £4.25\nSainsbury's Smoked Back Bacon 300G\n1 x £2.49   £2.49\nHeinz Baked Beans In Tomato Sauce 4X415g\n1 x £4.50   £4.50\nNapolina Chopped Tomatoes 400G\n3 x £0.85   £2.55\nSainsbury's Fusilli Pasta Twists 1Kg\n1 x £1.15   £1.15\nTilda Basmati Rice 1Kg\n1 x £3.75   £3.75\nKellogg's Corn Flakes Cereal 670G\n1 x £2.90   £2.90\nQuaker Oat So Simple Original 12X27g\n1 x £3.25   £3.25\nPG Tips 240 Pyramid Tea Bags 696G\n1 x £6.50   £6.50\nNescafe Gold Blend Instant Coffee 200G\n1 x £7.00   £7.00\nWalkers Ready Salted Crisps 6X25g\n2 x £2.25   £4.50\nMcVitie's Chocolate Digestives 433G\n1 x £2.25   £2.25\nCoca-Cola Zero Sugar 8X330ml\n1 x £5.25   £5.25\nTropicana Smooth Orange Juice 1.4L\n1 x £3.95   £3.95\n\nUnavailable\nSainsbury's British Free Range Large Eggs 12 Pack - not charged\n\nSubtotal £87.85\nDelivery £0.00\nNectar Prices savings -£1.80\nTotal charged £86.05",
+ "expected": {
+  "shop": "Sainsbury's",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sainsbury's British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "Taste the Difference Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "Sainsbury's Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "Sainsbury's Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "Sainsbury's Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "Sainsbury's Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "Sainsbury's Baby Potatoes 1Kg",
+    "qty": 1,
+    "linePence": 105
+   },
+   {
+    "name": "Sainsbury's Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "Sainsbury's Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "Sainsbury's Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Sainsbury's British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "Sainsbury's 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Sainsbury's Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Sainsbury's Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "Sainsbury's Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   }
+  ],
+  "subtotalPence": 8785,
+  "feesPence": 0,
+  "discountsPence": 180,
+  "tipsPence": 0,
+  "totalPence": 8605
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "id": "holdout-amazon-text",
+ "sender": "Amazon",
+ "layout": "plain-text part only",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Echo Dot (5th generation)\" and 1 more item.",
+  "date": "Wed, 04 Nov 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Hello Sam,\nThank you for shopping with us.\nOrder #205-5555555-1234567\nPlaced on Wednesday, 4 November 2026\n\nEcho Dot (5th generation)\nSold by Amazon\nQuantity: 1\n£54.99\n\nAmazon Basics HDMI Cable 2m\nSold by Amazon\nQuantity: 2\n£6.99\n\nItem(s) Subtotal: £68.97\nOrder Total: £68.97",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-11-04",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Echo Dot (5th generation)",
+    "qty": 1,
+    "linePence": 5499
+   },
+   {
+    "name": "Amazon Basics HDMI Cable 2m",
+    "qty": 2,
+    "linePence": 1398
+   }
+  ],
+  "subtotalPence": 6897,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6897
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "id": "holdout3-asos-full-refund",
+ "sender": "ASOS",
+ "layout": "a refund for the whole return",
+ "headers": {
+  "from": "ASOS <noreply@asos.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your refund is on its way",
+  "date": "Wed, 18 Nov 2026 11:00:00 +0000"
+ },
+ "html": "",
+ "text": "ASOS\nHi Sam, we've processed your refund.\nOrder number: 1122998877\n\nASOS DESIGN oversized hoodie in black  £32.00\nASOS DESIGN relaxed joggers  £25.00\n\nRefund total: £57.00\nIt should reach your account within 10 working days.",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 5700,
+   "orderRef": "1122998877"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

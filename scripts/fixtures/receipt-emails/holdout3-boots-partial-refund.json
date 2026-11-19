@@ -1,0 +1,25 @@
+{
+ "id": "holdout3-boots-partial-refund",
+ "sender": "Boots",
+ "layout": "partial refund for one item",
+ "headers": {
+  "from": "Boots <noreply@boots.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your refund for order 9876541122",
+  "date": "Fri, 20 Nov 2026 10:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Boots</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.boots.com/?utm_source=email\"><img src=\"https://www.boots.com/static/email/logo.png\" alt=\"Boots\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Hi Sam,</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>We've processed a refund of £4.99 for 1 item from your order.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 9876541122</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item refunded</td><td>Qty</td><td>Refund</td></tr><tr><td>Boots Tea Tree & Witch Hazel Face Wash 150ml</td><td>1</td><td>£4.99</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Refund total</td><td>£4.99</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>It can take 3-5 working days to reach your card.</p></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Boots. All rights reserved.<br /><a href=\"https://www.boots.com/help\">Help</a> | <a href=\"https://www.boots.com/privacy\">Privacy</a> | <a href=\"https://www.boots.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.boots.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 499,
+   "orderRef": "9876541122"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

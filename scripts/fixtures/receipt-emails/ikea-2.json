@@ -1,0 +1,35 @@
+{
+ "id": "ikea-2",
+ "sender": "IKEA",
+ "layout": "text",
+ "headers": {
+  "from": "IKEA <no-reply@order.ikea.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your IKEA order",
+  "date": "Mon, 12 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "IKEA\nOrder number: 1234567900\n12 October 2026\n\nLACK Side table, black-brown, 55x55 cm\n1 x £12.00\n£12.00\nIKEA 365+ Glass, clear glass, 30 cl\n4 x £1.50\n£6.00\n\nSubtotal £18.00\nClick & Collect £5.00\nTotal £23.00",
+ "expected": {
+  "shop": "IKEA",
+  "date": "2026-10-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "LACK Side table, black-brown, 55x55 cm",
+    "qty": 1,
+    "linePence": 1200
+   },
+   {
+    "name": "IKEA 365+ Glass, clear glass, 30 cl",
+    "qty": 4,
+    "linePence": 600
+   }
+  ],
+  "subtotalPence": 1800,
+  "feesPence": 500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2300
+ }
+}

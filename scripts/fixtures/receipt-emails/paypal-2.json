@@ -1,0 +1,30 @@
+{
+ "id": "paypal-2",
+ "sender": "PayPal",
+ "layout": "text receipt to a gym",
+ "headers": {
+  "from": "service@paypal.co.uk",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your payment to Example Fitness Leeds",
+  "date": "Fri, 30 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "PayPal\nYou sent a payment of £35.00 GBP to Example Fitness Leeds\nMerchant: Example Fitness Leeds\nTransaction ID: 1AB23456CD789099F\n30 October 2026\n\nMonthly Membership £35.00\n\nTotal £35.00",
+ "expected": {
+  "shop": "Example Fitness Leeds",
+  "date": "2026-10-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Monthly Membership",
+    "qty": 1,
+    "linePence": 3500
+   }
+  ],
+  "subtotalPence": 3500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3500
+ }
+}

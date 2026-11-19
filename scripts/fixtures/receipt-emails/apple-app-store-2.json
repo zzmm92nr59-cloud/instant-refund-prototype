@@ -1,0 +1,30 @@
+{
+ "id": "apple-app-store-2",
+ "sender": "Apple App Store",
+ "layout": "plain text, one subscription",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Apple.",
+  "date": "Sat, 14 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Receipt\n\nAPPLE ACCOUNT\nsam.taylor@example.co.uk\nDATE\n14 Nov 2026\nORDER ID\nMX12AB35EF\n\nApple Services\niCloud+\niCloud+ with 200 GB (Monthly)\nRenews 14 Dec 2026\nReport a Problem\n£2.99\n\nSubtotal\n£2.49\nVAT charged at 20%\n£0.50\nTOTAL\n£2.99",
+ "expected": {
+  "shop": "Apple",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "iCloud+",
+    "qty": 1,
+    "linePence": 299
+   }
+  ],
+  "subtotalPence": 249,
+  "feesPence": 50,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 299
+ }
+}

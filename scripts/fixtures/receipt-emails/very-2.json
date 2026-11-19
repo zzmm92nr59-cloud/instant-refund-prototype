@@ -1,0 +1,30 @@
+{
+ "id": "very-2",
+ "sender": "Very",
+ "layout": "text",
+ "headers": {
+  "from": "Very <orders@very.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Mon, 26 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Very\nOrder number: 9988776699\n26 October 2026\n\nSamsung Galaxy Buds FE\nQuantity: 1\n£69.00\n\nSubtotal £69.00\nDelivery FREE\nTotal £69.00",
+ "expected": {
+  "shop": "Very",
+  "date": "2026-10-26",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Samsung Galaxy Buds FE",
+    "qty": 1,
+    "linePence": 6900
+   }
+  ],
+  "subtotalPence": 6900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6900
+ }
+}

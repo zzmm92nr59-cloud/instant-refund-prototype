@@ -1,0 +1,43 @@
+{
+ "id": "holdout4-iceland-text-multibuy",
+ "sender": "Iceland",
+ "layout": "text columns, a multi-buy saving line",
+ "headers": {
+  "from": "Iceland <orders@iceland.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Iceland order confirmation 30019982",
+  "date": "Thu, 19 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Iceland Foods\nOrder confirmation\nOrder number: 30019982\nOrder date: 19/11/2026\n\nItem                                   Qty   Price    Total\nIceland Battered Cod Fillets 4 Pack      3   £2.00    £6.00\n  Multi-buy 3 for £5.00 saving                  -£1.00\nMcCain Home Chips 1.5kg                  1   £3.50    £3.50\nIceland Garden Peas 1kg                  2   £1.25    £2.50\n\nSubtotal   £12.00\nDelivery   FREE\nMulti-buy 3 for £5.00   -£1.00\nTotal   £11.00",
+ "expected": {
+  "shop": "Iceland",
+  "date": "2026-11-19",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Iceland Battered Cod Fillets 4 Pack",
+    "qty": 3,
+    "linePence": 600
+   },
+   {
+    "name": "McCain Home Chips 1.5kg",
+    "qty": 1,
+    "linePence": 350
+   },
+   {
+    "name": "Iceland Garden Peas 1kg",
+    "qty": 2,
+    "linePence": 250
+   }
+  ],
+  "subtotalPence": 1200,
+  "feesPence": 0,
+  "discountsPence": 100,
+  "tipsPence": 0,
+  "totalPence": 1100,
+  "shopAlso": [
+   "Iceland Foods"
+  ]
+ }
+}

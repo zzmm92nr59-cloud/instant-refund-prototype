@@ -1,0 +1,30 @@
+{
+ "id": "marks-and-spencer-2",
+ "sender": "M&S",
+ "layout": "text",
+ "headers": {
+  "from": "M&S <noreply@marksandspencer.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your M&S order confirmation",
+  "date": "Sat, 24 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "M&S\nOrder number: 1234567890ABD\n24 October 2026\n\nAutograph Cashmere Jumper\nColour: Navy Size: M\nQty: 1\n£99.00\n\nSubtotal £99.00\nCollect in store FREE\nTotal £99.00",
+ "expected": {
+  "shop": "M&S",
+  "date": "2026-10-24",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Autograph Cashmere Jumper",
+    "qty": 1,
+    "linePence": 9900
+   }
+  ],
+  "subtotalPence": 9900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9900
+ }
+}

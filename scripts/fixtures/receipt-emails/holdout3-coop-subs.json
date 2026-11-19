@@ -1,0 +1,40 @@
+{
+ "id": "holdout3-coop-subs",
+ "sender": "Co-op",
+ "layout": "substitution and unavailable sections",
+ "headers": {
+  "from": "Co-op <orders@coop.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Co-op delivery receipt",
+  "date": "Thu, 05 Nov 2026 18:00:00 +0000"
+ },
+ "html": "",
+ "text": "Co-op\nYour Co-op order has been delivered\nOrder number: COOP-778812\nDelivered: 5 November 2026\n\nDelivered items\n2 x Co-op British Semi Skimmed Milk 2 Pints  £2.90\n1 x Co-op Sourdough  £1.75\n\nSubstitutions\n1 x Warburtons Toastie White 800g  £1.65\n   instead of Hovis Soft White Medium 800g\n\nUnavailable items\n1 x Co-op Free Range Eggs 12  £3.25\n\nSubtotal £6.30\nDelivery fee £3.00\nBag charge £0.10\nTotal £9.40",
+ "expected": {
+  "shop": "Co-op",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Co-op British Semi Skimmed Milk 2 Pints",
+    "qty": 2,
+    "linePence": 290
+   },
+   {
+    "name": "Co-op Sourdough",
+    "qty": 1,
+    "linePence": 175
+   },
+   {
+    "name": "Warburtons Toastie White 800g",
+    "qty": 1,
+    "linePence": 165
+   }
+  ],
+  "subtotalPence": 630,
+  "feesPence": 310,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 940
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "id": "primark-2",
+ "sender": "Primark",
+ "layout": "text",
+ "headers": {
+  "from": "Primark <noreply@primark.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Primark order",
+  "date": "Wed, 28 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Primark\nOrder number: PK-88190\n28 October 2026\n\nStitch Hoodie (x1) £18.00\nCosy Slippers (x1) £8.00\n\nSubtotal £26.00\nClick & Collect Free\nTotal £26.00",
+ "expected": {
+  "shop": "Primark",
+  "date": "2026-10-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Stitch Hoodie",
+    "qty": 1,
+    "linePence": 1800
+   },
+   {
+    "name": "Cosy Slippers",
+    "qty": 1,
+    "linePence": 800
+   }
+  ],
+  "subtotalPence": 2600,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2600
+ }
+}

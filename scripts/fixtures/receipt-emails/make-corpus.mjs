@@ -1,0 +1,22 @@
+// Writes the receipt-email corpus: one JSON file per email (headers, HTML part, text part and the answer key).
+//   node scripts/fixtures/receipt-emails/make-corpus.mjs
+// Everything in it is made up (see lib.mjs). scripts/test-receipt-corpus.mjs reads the JSON files.
+import { writeFileSync, readdirSync, unlinkSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import food from "./food.mjs";
+import grocery from "./grocery.mjs";
+import retail from "./retail.mjs";
+import digital from "./digital.mjs";
+import holdout from "./holdout.mjs";
+import holdout2 from "./holdout2.mjs";
+import holdout3 from "./holdout3.mjs";
+import holdout4 from "./holdout4.mjs";
+
+const dir = dirname(fileURLToPath(import.meta.url));
+const all = [...food(), ...grocery(), ...retail(), ...digital(), ...holdout(), ...holdout2(), ...holdout3(), ...holdout4()];
+const ids = new Set();
+for (const f of all) { if (ids.has(f.id)) throw new Error("two fixtures called " + f.id); ids.add(f.id); }
+for (const name of readdirSync(dir)) if (name.endsWith(".json")) unlinkSync(join(dir, name));
+for (const f of all) writeFileSync(join(dir, f.id + ".json"), JSON.stringify(f, null, 1) + "\n");
+console.log(`wrote ${all.length} fixtures from ${new Set(all.map((f) => f.sender)).size} senders`);

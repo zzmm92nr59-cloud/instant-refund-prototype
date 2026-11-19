@@ -1,0 +1,35 @@
+{
+ "id": "john-lewis-2",
+ "sender": "John Lewis",
+ "layout": "text, free guarantee line",
+ "headers": {
+  "from": "John Lewis <noreply@johnlewis.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your John Lewis order confirmation",
+  "date": "Thu, 22 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "John Lewis & Partners\nOrder number: 1009988799\n22 October 2026\n\nApple AirPods Pro (2nd generation)\nQuantity: 1\n£229.00\nJohn Lewis 2 Year Guarantee\nQuantity: 1\n£0.00\n\nSubtotal £229.00\nClick & collect Free\nTotal £229.00",
+ "expected": {
+  "shop": "John Lewis",
+  "date": "2026-10-22",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Apple AirPods Pro (2nd generation)",
+    "qty": 1,
+    "linePence": 22900
+   },
+   {
+    "name": "John Lewis 2 Year Guarantee",
+    "qty": 1,
+    "linePence": 0
+   }
+  ],
+  "subtotalPence": 22900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 22900
+ }
+}

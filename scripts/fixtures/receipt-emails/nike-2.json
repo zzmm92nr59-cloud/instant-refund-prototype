@@ -1,0 +1,30 @@
+{
+ "id": "nike-2",
+ "sender": "Nike",
+ "layout": "text",
+ "headers": {
+  "from": "Nike <nike@official.nike.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Wed, 11 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "NIKE\nOrder Number: C01234567999\nOrder Date: 11 November 2026\n\nNike Pegasus 41 Men's Road Running Shoes\nSize UK 10\nQty 1\n£129.99\n\nSubtotal £129.99\nShipping Free\nPromo -£19.50\nTotal £110.49",
+ "expected": {
+  "shop": "Nike",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Nike Pegasus 41 Men's Road Running Shoes",
+    "qty": 1,
+    "linePence": 12999
+   }
+  ],
+  "subtotalPence": 12999,
+  "feesPence": 0,
+  "discountsPence": 1950,
+  "tipsPence": 0,
+  "totalPence": 11049
+ }
+}

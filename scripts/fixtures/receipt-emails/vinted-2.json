@@ -1,0 +1,35 @@
+{
+ "id": "vinted-2",
+ "sender": "Vinted",
+ "layout": "bundle in text",
+ "headers": {
+  "from": "Vinted <no-reply@vinted.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Vinted receipt",
+  "date": "Thu, 01 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Vinted\nReceipt\nTransaction ID: 9123456800\n1 Oct 2026\n\nBundle\nZara Knitted Cardigan £12.00\nNike Tech Fleece Joggers £30.00\nBuyer Protection fee £2.80\nPostage £2.89\nTotal £47.69",
+ "expected": {
+  "shop": "Vinted",
+  "date": "2026-10-01",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Zara Knitted Cardigan",
+    "qty": 1,
+    "linePence": 1200
+   },
+   {
+    "name": "Nike Tech Fleece Joggers",
+    "qty": 1,
+    "linePence": 3000
+   }
+  ],
+  "subtotalPence": 4200,
+  "feesPence": 569,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4769
+ }
+}

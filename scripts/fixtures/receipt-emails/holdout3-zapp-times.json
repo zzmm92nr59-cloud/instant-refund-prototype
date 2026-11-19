@@ -1,0 +1,40 @@
+{
+ "id": "holdout3-zapp-times",
+ "sender": "Zapp",
+ "layout": "'2 × Item' with a rider tip",
+ "headers": {
+  "from": "Zapp <hello@zapp.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Zapp order receipt #Z44912",
+  "date": "Wed, 21 Oct 2026 23:10:00 +0000"
+ },
+ "html": "",
+ "text": "Zapp\nOrder #Z44912\n21 October 2026, 23:08\n\n2 × Ben & Jerry's Cookie Dough 465ml   £11.00\n1 × Doritos Cool Original 180g   £2.50\n1 × Coca-Cola Zero 6 x 330ml   £5.25\n\nBasket £18.75\nDelivery fee £1.99\nService fee £0.99\nRider tip £1.00\nTotal £22.73",
+ "expected": {
+  "shop": "Zapp",
+  "date": "2026-10-21",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Ben & Jerry's Cookie Dough 465ml",
+    "qty": 2,
+    "linePence": 1100
+   },
+   {
+    "name": "Doritos Cool Original 180g",
+    "qty": 1,
+    "linePence": 250
+   },
+   {
+    "name": "Coca-Cola Zero 6 x 330ml",
+    "qty": 1,
+    "linePence": 525
+   }
+  ],
+  "subtotalPence": 1875,
+  "feesPence": 298,
+  "discountsPence": 0,
+  "tipsPence": 100,
+  "totalPence": 2273
+ }
+}

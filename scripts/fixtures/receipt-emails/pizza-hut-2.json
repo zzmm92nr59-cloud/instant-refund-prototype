@@ -1,0 +1,38 @@
+{
+ "id": "pizza-hut-2",
+ "sender": "Pizza Hut",
+ "layout": "name / Quantity / price on separate lines",
+ "headers": {
+  "from": "Pizza Hut Delivery <noreply@pizzahut.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your order",
+  "date": "Sat, 07 Nov 2026 20:30:00 +0000"
+ },
+ "html": "",
+ "text": "Pizza Hut Delivery\nThank you for your order!\nOrder ID: PH-5530011\nOrdered on 7 November 2026\n\nMedium Pepperoni Feast\nQuantity: 2\n£33.98\nChicken Wings\nQuantity: 1\n£6.49\n\nSubtotal £40.47\nDelivery fee FREE\nTotal £40.47",
+ "expected": {
+  "shop": "Pizza Hut",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Medium Pepperoni Feast",
+    "qty": 2,
+    "linePence": 3398
+   },
+   {
+    "name": "Chicken Wings",
+    "qty": 1,
+    "linePence": 649
+   }
+  ],
+  "subtotalPence": 4047,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4047,
+  "shopAlso": [
+   "Pizza Hut Delivery"
+  ]
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout3-ubereats-grocery-replaced",
+ "sender": "Uber Eats",
+ "layout": "grocery, a replacement on the same line",
+ "headers": {
+  "from": "Uber Eats <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Uber Eats order from Sainsbury's Local",
+  "date": "Tue, 20 Oct 2026 12:40:00 +0000"
+ },
+ "html": "",
+ "text": "Uber Eats\nThanks for ordering, Sam\nSainsbury's Local\nOrder #4410-UE\n20 October 2026\n\n4 Heinz Baked Beans 415g £5.60\n1 Branston Baked Beans 410g (replaced Heinz Baked Beans 415g) £1.20\n1 Hovis Best of Both 750g £1.75\n\nSubtotal £8.55\nDelivery fee £1.99\nService fee £1.50\nBag fee £0.20\nTotal £12.24",
+ "expected": {
+  "shop": "Uber Eats",
+  "date": "2026-10-20",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Heinz Baked Beans 415g",
+    "qty": 4,
+    "linePence": 560
+   },
+   {
+    "name": "Branston Baked Beans 410g",
+    "qty": 1,
+    "linePence": 120
+   },
+   {
+    "name": "Hovis Best of Both 750g",
+    "qty": 1,
+    "linePence": 175
+   }
+  ],
+  "subtotalPence": 855,
+  "feesPence": 369,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1224
+ }
+}

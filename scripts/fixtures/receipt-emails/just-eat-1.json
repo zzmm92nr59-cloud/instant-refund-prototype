@@ -1,0 +1,57 @@
+{
+ "id": "just-eat-1",
+ "sender": "Just Eat",
+ "layout": "qty cell, extras under the name, text part with + lines",
+ "headers": {
+  "from": "Just Eat <noreply@t.just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order, Sam",
+  "date": "Wed, 18 Nov 2026 19:42:10 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Just Eat</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.just-eat.co.uk/?utm_source=email\"><img src=\"https://www.just-eat.co.uk/static/email/logo.png\" alt=\"Just Eat\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1 style=\"font-size:24px\">Thanks for your order, Sam!</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p><strong>Golden Dragon</strong> has received your order and will start preparing it soon.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: <strong>1849203376</strong><br />Placed on Wed 18 Nov 2026, 19:41</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2 style=\"font-size:18px\">Your order</h2></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td width=\"40\" valign=\"top\">1 x</td><td valign=\"top\">Sweet and Sour Chicken Hong Kong Style</td><td align=\"right\" valign=\"top\">£6.99</td></tr><tr><td width=\"40\" valign=\"top\">1 x</td><td valign=\"top\">Salt and Pepper Chips<br /><span class=\"muted\" style=\"font-size:13px\">+ Large</span></td><td align=\"right\" valign=\"top\">£4.20</td></tr><tr><td width=\"40\" valign=\"top\">2 x</td><td valign=\"top\">Vegetable Spring Rolls (4)</td><td align=\"right\" valign=\"top\">£7.00</td></tr><tr><td width=\"40\" valign=\"top\">1 x</td><td valign=\"top\">Chicken Chow Mein<br /><span class=\"muted\" style=\"font-size:13px\">+ Egg Fried Rice</span><br /><span class=\"muted\" style=\"font-size:13px\">+ Extra chilli</span></td><td align=\"right\" valign=\"top\">£7.50</td></tr><tr><td width=\"40\" valign=\"top\">1 x</td><td valign=\"top\">Prawn Crackers</td><td align=\"right\" valign=\"top\">£1.80</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><hr /></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£27.49</td></tr><tr><td>Delivery fee</td><td align=\"right\">£2.49</td></tr><tr><td>Service charge</td><td align=\"right\">£0.99</td></tr><tr><td>Bag fee</td><td align=\"right\">£0.10</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£31.07</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Paid with Visa ending 1234</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Delivering to: 12 Example Road, Leeds, LS1 4AB</p></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Just Eat. All rights reserved.<br /><a href=\"https://www.just-eat.co.uk/help\">Help</a> | <a href=\"https://www.just-eat.co.uk/privacy\">Privacy</a> | <a href=\"https://www.just-eat.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.just-eat.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Thanks for your order, Sam!\n\nGolden Dragon has received your order and will start preparing it soon.\n\nOrder number: 1849203376\nPlaced on Wed 18 Nov 2026, 19:41\n\nYour order\n\n1 x Sweet and Sour Chicken Hong Kong Style  £6.99\n1 x Salt and Pepper Chips  £4.20\n+ Large\n2 x Vegetable Spring Rolls (4)  £7.00\n1 x Chicken Chow Mein  £7.50\n+ Egg Fried Rice\n+ Extra chilli\n1 x Prawn Crackers  £1.80\n\nSubtotal  £27.49\nDelivery fee  £2.49\nService charge  £0.99\nBag fee  £0.10\nTotal  £31.07\n\nPaid with Visa ending 1234\n\nDelivering to: 12 Example Road, Leeds, LS1 4AB\n\nJust Eat",
+ "expected": {
+  "shop": "Just Eat",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sweet and Sour Chicken Hong Kong Style",
+    "qty": 1,
+    "linePence": 699
+   },
+   {
+    "name": "Salt and Pepper Chips",
+    "qty": 1,
+    "linePence": 420,
+    "extras": [
+     "Large"
+    ]
+   },
+   {
+    "name": "Vegetable Spring Rolls (4)",
+    "qty": 2,
+    "linePence": 700
+   },
+   {
+    "name": "Chicken Chow Mein",
+    "qty": 1,
+    "linePence": 750,
+    "extras": [
+     "Egg Fried Rice",
+     "Extra chilli"
+    ]
+   },
+   {
+    "name": "Prawn Crackers",
+    "qty": 1,
+    "linePence": 180
+   }
+  ],
+  "subtotalPence": 2749,
+  "feesPence": 358,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3107
+ }
+}

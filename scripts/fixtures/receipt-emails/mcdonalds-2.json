@@ -1,0 +1,44 @@
+{
+ "id": "mcdonalds-2",
+ "sender": "McDonald's",
+ "layout": "plain text, qty name price",
+ "headers": {
+  "from": "McDonald's <noreply@mcdonalds.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your McDonald's order receipt",
+  "date": "Thu, 05 Nov 2026 08:15:00 +0000"
+ },
+ "html": "",
+ "text": "McDonald's\nOrder receipt\nOrder 042\nDate: 05/11/2026\n\n1 McCrispy Meal £7.99\n  Large Fries\n  Fanta Orange\n2 Hash Brown £2.38\n1 Latte £1.99\n\nTotal £12.36\nIncludes VAT",
+ "expected": {
+  "shop": "McDonald's",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "McCrispy Meal",
+    "qty": 1,
+    "linePence": 799,
+    "extras": [
+     "Large Fries",
+     "Fanta Orange"
+    ]
+   },
+   {
+    "name": "Hash Brown",
+    "qty": 2,
+    "linePence": 238
+   },
+   {
+    "name": "Latte",
+    "qty": 1,
+    "linePence": 199
+   }
+  ],
+  "subtotalPence": 1236,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1236
+ }
+}

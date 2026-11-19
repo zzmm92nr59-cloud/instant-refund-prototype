@@ -1,0 +1,30 @@
+{
+ "id": "argos-2",
+ "sender": "Argos",
+ "layout": "text, collection",
+ "headers": {
+  "from": "Argos <orders@argos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Argos order confirmation",
+  "date": "Fri, 16 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Argos\nOrder number: AO12345700\n16 October 2026\n\nLego Star Wars Millennium Falcon 75375\nQty: 1\n£74.99\n\nSubtotal £74.99\nFast Track collection Free\nTotal £74.99",
+ "expected": {
+  "shop": "Argos",
+  "date": "2026-10-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Lego Star Wars Millennium Falcon 75375",
+    "qty": 1,
+    "linePence": 7499
+   }
+  ],
+  "subtotalPence": 7499,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7499
+ }
+}

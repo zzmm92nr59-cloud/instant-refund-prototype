@@ -1,0 +1,40 @@
+{
+ "id": "adidas-1",
+ "sender": "adidas",
+ "layout": "Article / Size / Quantity table rows",
+ "headers": {
+  "from": "adidas <adidas@ord.adidas.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your order",
+  "date": "Tue, 10 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>adidas</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.adidas.co.uk/?utm_source=email\"><img src=\"https://www.adidas.co.uk/static/email/logo.png\" alt=\"adidas\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: AUK12345678</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 10.11.2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>10 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Product</td><td>Size</td><td>Quantity</td><td>Price</td></tr><tr><td>Samba OG Shoes</td><td>M</td><td>1</td><td>£100.00</td></tr><tr><td>Adicolor Classics 3-Stripes Tee</td><td>M</td><td>1</td><td>£30.00</td></tr><tr><td>Trefoil Crew Socks 3 Pairs</td><td>M</td><td>2</td><td>£28.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£158.00</td></tr><tr><td>Delivery</td><td>Free</td></tr><tr><td><strong>Total</strong></td><td><strong>£158.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 adidas. All rights reserved.<br /><a href=\"https://www.adidas.co.uk/help\">Help</a> | <a href=\"https://www.adidas.co.uk/privacy\">Privacy</a> | <a href=\"https://www.adidas.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.adidas.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "adidas",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Samba OG Shoes",
+    "qty": 1,
+    "linePence": 10000
+   },
+   {
+    "name": "Adicolor Classics 3-Stripes Tee",
+    "qty": 1,
+    "linePence": 3000
+   },
+   {
+    "name": "Trefoil Crew Socks 3 Pairs",
+    "qty": 2,
+    "linePence": 2800
+   }
+  ],
+  "subtotalPence": 15800,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 15800
+ }
+}

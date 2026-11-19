@@ -1,0 +1,35 @@
+{
+ "id": "next-2",
+ "sender": "Next",
+ "layout": "text",
+ "headers": {
+  "from": "Next <orders@next.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your Next order",
+  "date": "Sun, 01 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "NEXT\nOrder number: X12345700\n1 November 2026\n\n1 x Faux Fur Lined Slippers @ £24.00 = £24.00\n1 x Cosy Supersoft Socks 5 Pack @ £14.00 = £14.00\n\nGoods total £38.00\nDelivery to store FREE\nOrder total £38.00",
+ "expected": {
+  "shop": "Next",
+  "date": "2026-11-01",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Faux Fur Lined Slippers",
+    "qty": 1,
+    "linePence": 2400
+   },
+   {
+    "name": "Cosy Supersoft Socks 5 Pack",
+    "qty": 1,
+    "linePence": 1400
+   }
+  ],
+  "subtotalPence": 3800,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3800
+ }
+}

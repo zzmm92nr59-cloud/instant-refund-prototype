@@ -1,0 +1,185 @@
+{
+ "id": "asda-2",
+ "sender": "Asda",
+ "layout": "text receipt with a substitute note",
+ "headers": {
+  "from": "ASDA <noreply@asda.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Asda receipt",
+  "date": "Thu, 12 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "ASDA\nYour receipt\nOrder no: 300982114471\nDelivered: 12 November 2026\n\n2x ASDA British Semi Skimmed Milk 2.272L, 4 Pints £3.30\n1x Warburtons Medium Sliced White Bread 800G £1.60\n1x ASDA Extra Special Sourdough Bloomer 800G £2.20\n1x ASDA British Free Range Large Eggs 12 Pack £3.89\n1x Anchor Spreadable Butter 500G £4.50\n1x Cathedral City Mature Cheddar 550G £5.75\n6x ASDA Bananas Loose £1.08\n1x ASDA Braeburn Apple Minimum 5 Pack £1.59\n1x ASDA Carrots 1Kg £0.59\n2x ASDA Broccoli 335G £1.38\n1x ASDA Baby Potatoes 1Kg £1.05\n1x ASDA Brown Onions 3 Pack £0.89\n1x ASDA Cherry Tomatoes 330G £0.99\n1x ASDA Iceberg Lettuce Each £0.65\n1x ASDA British Chicken Breast Portions 650G £4.99\n1x ASDA 12 Pork Sausages 681G £3.00\n1x ASDA Beef Mince 5% Fat 500G £4.25\n1x ASDA Smoked Back Bacon 300G £2.49\n1x Heinz Baked Beans In Tomato Sauce 4X415g £4.50\n3x Napolina Chopped Tomatoes 400G £2.55\n1x ASDA Fusilli Pasta Twists 1Kg £1.15\n1x Tilda Basmati Rice 1Kg £3.75\n1x Kellogg's Corn Flakes Cereal 670G £2.90\n1x Quaker Oat So Simple Original 12X27g £3.25\n1x PG Tips 240 Pyramid Tea Bags 696G £6.50\n1x Nescafe Gold Blend Instant Coffee 200G £7.00\n2x Walkers Ready Salted Crisps 6X25g £4.50\n1x McVitie's Chocolate Digestives 433G £2.25\n1x Coca-Cola Zero Sugar 8X330ml £5.25\n1x Tropicana Smooth Orange Juice 1.4L £3.95\n1x Andrex Classic Clean Toilet Tissue 9 Rolls £6.00\n1x ASDA Large Free Range Eggs 6 Pack £1.75\n   (Substitute for ASDA Free Range Eggs 12 Pack)\n\nSubtotal £99.49\nDelivery charge £1.50\nTotal £100.99",
+ "expected": {
+  "shop": "Asda",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "ASDA British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "ASDA Extra Special Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "ASDA British Free Range Large Eggs 12 Pack",
+    "qty": 1,
+    "linePence": 389
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "ASDA Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "ASDA Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "ASDA Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "ASDA Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "ASDA Baby Potatoes 1Kg",
+    "qty": 1,
+    "linePence": 105
+   },
+   {
+    "name": "ASDA Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "ASDA Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "ASDA Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "ASDA British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "ASDA 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "ASDA Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "ASDA Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "ASDA Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   },
+   {
+    "name": "Andrex Classic Clean Toilet Tissue 9 Rolls",
+    "qty": 1,
+    "linePence": 600
+   },
+   {
+    "name": "ASDA Large Free Range Eggs 6 Pack",
+    "qty": 1,
+    "linePence": 175
+   }
+  ],
+  "subtotalPence": 9949,
+  "feesPence": 150,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 10099
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout-tesco-weighed",
+ "sender": "Tesco",
+ "layout": "a weighed item and a multibuy note between items",
+ "headers": {
+  "from": "Tesco.com <tesco@confirmations.tesco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Tesco order",
+  "date": "Thu, 05 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Order number: 942-5512-2400\nOrder date: 05/11/2026\n\n1 x Loose Carrots 0.52kg £0.31\n4 x Heinz Tomato Soup 400g £5.60\nAny 4 for £5\n1 x Hovis Soft White Bread 800g £1.50\n\nGuide price £7.41\nMultibuy savings -£0.60\nDelivery charge £4.50\nTotal guide price £11.31",
+ "expected": {
+  "shop": "Tesco",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Loose Carrots 0.52kg",
+    "qty": 1,
+    "linePence": 31
+   },
+   {
+    "name": "Heinz Tomato Soup 400g",
+    "qty": 4,
+    "linePence": 560
+   },
+   {
+    "name": "Hovis Soft White Bread 800g",
+    "qty": 1,
+    "linePence": 150
+   }
+  ],
+  "subtotalPence": 741,
+  "feesPence": 450,
+  "discountsPence": 60,
+  "tipsPence": 0,
+  "totalPence": 1131
+ }
+}

@@ -115,7 +115,15 @@ export function attachAiReads(orders, rows) {
     if (c.totalPence == null && f.totalPence != null) { c.totalPence = f.totalPence; c.currency = c.currency || f.currency || "GBP"; filled.push("total"); }
     if (!day(c.orderDate) && f.orderDate) { c.orderDate = f.orderDate; filled.push("date"); }
     if (!c.orderRef && f.orderRef) { c.orderRef = f.orderRef; filled.push("number"); }
-    if (!cleanItems(c.items || []).length && f.items && f.items.length) { c.items = f.items.map((i) => ({ ...i })); filled.push("items"); }
+    if (!cleanItems(c.items || []).length && f.items && f.items.length) {
+      c.items = f.items.map((i) => ({ ...i })); filled.push("items");
+      // The totals check goes with the items: the AI's add up to what the email said, or the receipt still says some may be missing.
+      if (c.itemsCheck && c.itemsCheck.expectedPence != null) {
+        const sum = c.items.reduce((n, i) => n + (Number.isInteger(i.pricePence) ? i.pricePence : NaN), 0);
+        const ok = Number.isFinite(sum) && Math.abs(sum - c.itemsCheck.expectedPence) <= 1;
+        c.itemsCheck = { ...c.itemsCheck, complete: ok, itemsPence: Number.isFinite(sum) ? sum : null, missingPence: ok ? 0 : Number.isFinite(sum) ? c.itemsCheck.expectedPence - sum : null };
+      }
+    }
     if (!shopOf(c) && f.shop) { c.retailer = { ...(c.retailer || {}), name: f.shop }; filled.push("shop"); }
     if (filled.length) { c.aiFilled = filled; if (c.status !== "confirmed") c.needsShopperConfirmation = true; }
   }

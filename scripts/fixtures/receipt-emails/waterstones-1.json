@@ -1,0 +1,35 @@
+{
+ "id": "waterstones-1",
+ "sender": "Waterstones",
+ "layout": "text",
+ "headers": {
+  "from": "Waterstones <orders@waterstones.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Waterstones order confirmation",
+  "date": "Sat, 10 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Waterstones\nOrder number: W12345678\n10 October 2026\n\nIntermezzo by Sally Rooney (Hardback)  Qty 1  £20.00\nThe Very Hungry Caterpillar (Board book)  Qty 2  £13.98\n\nSubtotal £33.98\nDelivery FREE\nTotal £33.98",
+ "expected": {
+  "shop": "Waterstones",
+  "date": "2026-10-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Intermezzo by Sally Rooney (Hardback)",
+    "qty": 1,
+    "linePence": 2000
+   },
+   {
+    "name": "The Very Hungry Caterpillar (Board book)",
+    "qty": 2,
+    "linePence": 1398
+   }
+  ],
+  "subtotalPence": 3398,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3398
+ }
+}

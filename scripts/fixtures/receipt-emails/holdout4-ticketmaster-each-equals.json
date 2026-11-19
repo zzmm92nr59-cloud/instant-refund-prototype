@@ -1,0 +1,33 @@
+{
+ "id": "holdout4-ticketmaster-each-equals",
+ "sender": "Ticketmaster",
+ "layout": "'2 x Name £65.00 each = £130.00'",
+ "headers": {
+  "from": "Ticketmaster UK <customer_support@email.ticketmaster.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "You got the tickets! Order 12-34567/LDN",
+  "date": "Thu, 12 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Ticketmaster\nYou got the tickets!\nOrder number: 12-34567/LDN\nOrder date: 12 November 2026\n\nThe Example Band - UK Tour 2027\nFirst Direct Arena, Leeds, Sat 6 Mar 2027\n\n2 x General Admission Standing £65.00 each = £130.00\nService fee: £13.50\nOrder processing fee: £2.75\nTotal: £146.25",
+ "expected": {
+  "shop": "Ticketmaster",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "General Admission Standing",
+    "qty": 2,
+    "linePence": 13000
+   }
+  ],
+  "subtotalPence": 13000,
+  "feesPence": 1625,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 14625,
+  "shopAlso": [
+   "Ticketmaster UK"
+  ]
+ }
+}

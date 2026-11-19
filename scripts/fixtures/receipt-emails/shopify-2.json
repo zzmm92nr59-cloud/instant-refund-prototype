@@ -1,0 +1,40 @@
+{
+ "id": "shopify-2",
+ "sender": "Shopify store",
+ "layout": "Shopify order confirmation: name × qty, variant, price",
+ "headers": {
+  "from": "Northern Brew Coffee <store+12345678@t.shopifyemail.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order #1050 confirmed",
+  "date": "Tue, 29 Sep 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Northern Brew Coffee</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.northernbrew.test/?utm_source=email\"><img src=\"https://www.northernbrew.test/static/email/logo.png\" alt=\"Northern Brew Coffee\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>Northern Brew Coffee</h2></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #1050</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>Thank you for your purchase!</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Hi Sam, we're getting your order ready to be shipped.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Order summary</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><img src=\"https://images.northernbrew.test/products/house-espresso-blend.jpg\" alt=\"House Espresso Blend\" width=\"120\" height=\"150\" /></td><td><span>House Espresso Blend &times; 1</span><br /><span class=\"muted\">Whole bean / 250g</span></td><td align=\"right\"><strong>£11.00</strong></td></tr><tr><td><img src=\"https://images.northernbrew.test/products/single-origin-ethiopia-yirgacheffe.jpg\" alt=\"Single Origin Ethiopia Yirgacheffe\" width=\"120\" height=\"150\" /></td><td><span>Single Origin Ethiopia Yirgacheffe &times; 2</span><br /><span class=\"muted\">Ground for filter / 250g</span></td><td align=\"right\"><strong>£27.00</strong></td></tr><tr><td><img src=\"https://images.northernbrew.test/products/ceramic-pour-over-dripper.jpg\" alt=\"Ceramic Pour Over Dripper\" width=\"120\" height=\"150\" /></td><td><span>Ceramic Pour Over Dripper &times; 1</span></td><td align=\"right\"><strong>£24.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£62.00</td></tr><tr><td>Shipping</td><td align=\"right\">Free</td></tr><tr><td>Discount (WELCOME10)</td><td align=\"right\">-£5.20</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£56.80</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>If you have any questions, reply to this email or contact us at hello@northernbrew.test</p></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">Northern Brew Coffee, Unit 4 Example Works, Leeds LS2 7AA</td></tr>\n</table></td></tr></table>\n<img src=\"https://click.northernbrew.test/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Northern Brew Coffee\nOrder #1050\nThank you for your purchase!\n\nOrder summary\nHouse Espresso Blend × 1\nWhole bean / 250g\n£11.00\nSingle Origin Ethiopia Yirgacheffe × 2\nGround for filter / 250g\n£27.00\nCeramic Pour Over Dripper × 1\n£24.00\n\nSubtotal\n£62.00\nShipping\nFree\nDiscount (WELCOME10)\n-£5.20\nTotal\n£56.80",
+ "expected": {
+  "shop": "Northern Brew Coffee",
+  "date": "2026-09-29",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "House Espresso Blend",
+    "qty": 1,
+    "linePence": 1100
+   },
+   {
+    "name": "Single Origin Ethiopia Yirgacheffe",
+    "qty": 2,
+    "linePence": 2700
+   },
+   {
+    "name": "Ceramic Pour Over Dripper",
+    "qty": 1,
+    "linePence": 2400
+   }
+  ],
+  "subtotalPence": 6200,
+  "feesPence": 0,
+  "discountsPence": 520,
+  "tipsPence": 0,
+  "totalPence": 5680
+ }
+}

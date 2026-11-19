@@ -1,0 +1,195 @@
+{
+ "id": "asda-1",
+ "sender": "Asda",
+ "layout": "Item | Qty | Price",
+ "headers": {
+  "from": "ASDA <noreply@asda.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Asda order is confirmed",
+  "date": "Fri, 13 Nov 2026 08:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Asda</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.asda.com/?utm_source=email\"><img src=\"https://www.asda.com/static/email/logo.png\" alt=\"Asda\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for shopping with Asda, Sam!</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order no: 300982114455</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 13/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>ASDA British Semi Skimmed Milk 2.272L, 4 Pints</td><td>2</td><td>£3.30</td></tr><tr><td>Warburtons Medium Sliced White Bread 800G</td><td>1</td><td>£1.60</td></tr><tr><td>ASDA Extra Special Sourdough Bloomer 800G</td><td>1</td><td>£2.20</td></tr><tr><td>ASDA British Free Range Large Eggs 12 Pack</td><td>1</td><td>£3.89</td></tr><tr><td>Anchor Spreadable Butter 500G</td><td>1</td><td>£4.50</td></tr><tr><td>Cathedral City Mature Cheddar 550G</td><td>1</td><td>£5.75</td></tr><tr><td>ASDA Bananas Loose</td><td>6</td><td>£1.08</td></tr><tr><td>ASDA Braeburn Apple Minimum 5 Pack</td><td>1</td><td>£1.59</td></tr><tr><td>ASDA Carrots 1Kg</td><td>1</td><td>£0.59</td></tr><tr><td>ASDA Broccoli 335G</td><td>2</td><td>£1.38</td></tr><tr><td>ASDA Baby Potatoes 1Kg</td><td>1</td><td>£1.05</td></tr><tr><td>ASDA Brown Onions 3 Pack</td><td>1</td><td>£0.89</td></tr><tr><td>ASDA Cherry Tomatoes 330G</td><td>1</td><td>£0.99</td></tr><tr><td>ASDA Iceberg Lettuce Each</td><td>1</td><td>£0.65</td></tr><tr><td>ASDA British Chicken Breast Portions 650G</td><td>1</td><td>£4.99</td></tr><tr><td>ASDA 12 Pork Sausages 681G</td><td>1</td><td>£3.00</td></tr><tr><td>ASDA Beef Mince 5% Fat 500G</td><td>1</td><td>£4.25</td></tr><tr><td>ASDA Smoked Back Bacon 300G</td><td>1</td><td>£2.49</td></tr><tr><td>Heinz Baked Beans In Tomato Sauce 4X415g</td><td>1</td><td>£4.50</td></tr><tr><td>Napolina Chopped Tomatoes 400G</td><td>3</td><td>£2.55</td></tr><tr><td>ASDA Fusilli Pasta Twists 1Kg</td><td>1</td><td>£1.15</td></tr><tr><td>Tilda Basmati Rice 1Kg</td><td>1</td><td>£3.75</td></tr><tr><td>Kellogg's Corn Flakes Cereal 670G</td><td>1</td><td>£2.90</td></tr><tr><td>Quaker Oat So Simple Original 12X27g</td><td>1</td><td>£3.25</td></tr><tr><td>PG Tips 240 Pyramid Tea Bags 696G</td><td>1</td><td>£6.50</td></tr><tr><td>Nescafe Gold Blend Instant Coffee 200G</td><td>1</td><td>£7.00</td></tr><tr><td>Walkers Ready Salted Crisps 6X25g</td><td>2</td><td>£4.50</td></tr><tr><td>McVitie's Chocolate Digestives 433G</td><td>1</td><td>£2.25</td></tr><tr><td>Coca-Cola Zero Sugar 8X330ml</td><td>1</td><td>£5.25</td></tr><tr><td>Tropicana Smooth Orange Juice 1.4L</td><td>1</td><td>£3.95</td></tr><tr><td>Andrex Classic Clean Toilet Tissue 9 Rolls</td><td>1</td><td>£6.00</td></tr><tr><td>Fairy Original Washing Up Liquid 820Ml</td><td>1</td><td>£2.50</td></tr><tr><td>Persil Bio Washing Liquid 38 Washes</td><td>1</td><td>£10.00</td></tr><tr><td>ASDA Sea Salt Dishwasher Tablets 30 Pack</td><td>1</td><td>£4.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Items subtotal</td><td>£114.24</td></tr><tr><td>Delivery charge</td><td>£3.00</td></tr><tr><td>Minimum basket charge</td><td>£0.00</td></tr><tr><td>Rollback savings</td><td>-£0.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£116.29</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Asda. All rights reserved.<br /><a href=\"https://www.asda.com/help\">Help</a> | <a href=\"https://www.asda.com/privacy\">Privacy</a> | <a href=\"https://www.asda.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.asda.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Asda",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "ASDA British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "ASDA Extra Special Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "ASDA British Free Range Large Eggs 12 Pack",
+    "qty": 1,
+    "linePence": 389
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "ASDA Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "ASDA Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "ASDA Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "ASDA Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "ASDA Baby Potatoes 1Kg",
+    "qty": 1,
+    "linePence": 105
+   },
+   {
+    "name": "ASDA Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "ASDA Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "ASDA Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "ASDA British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "ASDA 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "ASDA Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "ASDA Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "ASDA Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   },
+   {
+    "name": "Andrex Classic Clean Toilet Tissue 9 Rolls",
+    "qty": 1,
+    "linePence": 600
+   },
+   {
+    "name": "Fairy Original Washing Up Liquid 820Ml",
+    "qty": 1,
+    "linePence": 250
+   },
+   {
+    "name": "Persil Bio Washing Liquid 38 Washes",
+    "qty": 1,
+    "linePence": 1000
+   },
+   {
+    "name": "ASDA Sea Salt Dishwasher Tablets 30 Pack",
+    "qty": 1,
+    "linePence": 400
+   }
+  ],
+  "subtotalPence": 11424,
+  "feesPence": 300,
+  "discountsPence": 95,
+  "tipsPence": 0,
+  "totalPence": 11629
+ }
+}

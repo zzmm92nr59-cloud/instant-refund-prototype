@@ -1,0 +1,185 @@
+{
+ "id": "tesco-3",
+ "sender": "Tesco",
+ "layout": "plain text confirmation, 32 lines",
+ "headers": {
+  "from": "Tesco.com <tesco@confirmations.tesco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Tesco order",
+  "date": "Mon, 16 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Hello Sam,\nThanks for shopping with Tesco.\nOrder number: 942-5512-2310\nOrder date: 16 November 2026\n\nYour order\n2 x Tesco British Semi Skimmed Milk 2.272L, 4 Pints   £3.30\n1 x Warburtons Medium Sliced White Bread 800G   £1.60\n1 x Tesco Finest Sourdough Bloomer 800G   £2.20\n1 x Tesco British Free Range Large Eggs 12 Pack   £3.89\n1 x Anchor Spreadable Butter 500G   £4.50\n1 x Cathedral City Mature Cheddar 550G   £5.75\n6 x Tesco Bananas Loose   £1.08\n1 x Tesco Braeburn Apple Minimum 5 Pack   £1.59\n1 x Tesco Carrots 1Kg   £0.59\n2 x Tesco Broccoli 335G   £1.38\n1 x Tesco Baby Potatoes 1Kg   £1.05\n1 x Tesco Brown Onions 3 Pack   £0.89\n1 x Tesco Cherry Tomatoes 330G   £0.99\n1 x Tesco Iceberg Lettuce Each   £0.65\n1 x Tesco British Chicken Breast Portions 650G   £4.99\n1 x Tesco 12 Pork Sausages 681G   £3.00\n1 x Tesco Beef Mince 5% Fat 500G   £4.25\n1 x Tesco Smoked Back Bacon 300G   £2.49\n1 x Heinz Baked Beans In Tomato Sauce 4X415g   £4.50\n3 x Napolina Chopped Tomatoes 400G   £2.55\n1 x Tesco Fusilli Pasta Twists 1Kg   £1.15\n1 x Tilda Basmati Rice 1Kg   £3.75\n1 x Kellogg's Corn Flakes Cereal 670G   £2.90\n1 x Quaker Oat So Simple Original 12X27g   £3.25\n1 x PG Tips 240 Pyramid Tea Bags 696G   £6.50\n1 x Nescafe Gold Blend Instant Coffee 200G   £7.00\n2 x Walkers Ready Salted Crisps 6X25g   £4.50\n1 x McVitie's Chocolate Digestives 433G   £2.25\n1 x Coca-Cola Zero Sugar 8X330ml   £5.25\n1 x Tropicana Smooth Orange Juice 1.4L   £3.95\n1 x Andrex Classic Clean Toilet Tissue 9 Rolls   £6.00\n1 x Fairy Original Washing Up Liquid 820Ml   £2.50\n\nGuide price   £100.24\nDelivery charge   £3.99\nClubcard Prices savings   -£4.10\nTotal guide price   £100.13",
+ "expected": {
+  "shop": "Tesco",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Tesco British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "Tesco Finest Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Tesco British Free Range Large Eggs 12 Pack",
+    "qty": 1,
+    "linePence": 389
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "Tesco Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "Tesco Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "Tesco Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "Tesco Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "Tesco Baby Potatoes 1Kg",
+    "qty": 1,
+    "linePence": 105
+   },
+   {
+    "name": "Tesco Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "Tesco Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "Tesco Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Tesco British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "Tesco 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Tesco Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Tesco Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "Tesco Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   },
+   {
+    "name": "Andrex Classic Clean Toilet Tissue 9 Rolls",
+    "qty": 1,
+    "linePence": 600
+   },
+   {
+    "name": "Fairy Original Washing Up Liquid 820Ml",
+    "qty": 1,
+    "linePence": 250
+   }
+  ],
+  "subtotalPence": 10024,
+  "feesPence": 399,
+  "discountsPence": 410,
+  "tipsPence": 0,
+  "totalPence": 10013
+ }
+}

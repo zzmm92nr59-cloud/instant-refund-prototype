@@ -1,0 +1,35 @@
+{
+ "id": "superdrug-2",
+ "sender": "Superdrug",
+ "layout": "text",
+ "headers": {
+  "from": "Superdrug <noreply@superdrug.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Superdrug order",
+  "date": "Sun, 18 Oct 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Superdrug\nOrder number: SD1122334499\n18 October 2026\n\nSuperdrug Vitamin C Serum 30ml Qty: 1 £5.99\nNivea Men Sensitive Shaving Gel 200ml Qty: 2 £8.00\n\nSubtotal £13.99\nDelivery FREE\nTotal £13.99",
+ "expected": {
+  "shop": "Superdrug",
+  "date": "2026-10-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Superdrug Vitamin C Serum 30ml",
+    "qty": 1,
+    "linePence": 599
+   },
+   {
+    "name": "Nivea Men Sensitive Shaving Gel 200ml",
+    "qty": 2,
+    "linePence": 800
+   }
+  ],
+  "subtotalPence": 1399,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1399
+ }
+}

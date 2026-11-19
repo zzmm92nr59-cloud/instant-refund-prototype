@@ -1,0 +1,35 @@
+{
+ "id": "adidas-2",
+ "sender": "adidas",
+ "layout": "text",
+ "headers": {
+  "from": "adidas <adidas@ord.adidas.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your adidas order confirmation",
+  "date": "Mon, 09 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "adidas\nOrder number: AUK12345700\n9 November 2026\n\nUltraboost 5 Running Shoes x 1 £160.00\nEssentials Fleece Hoodie x 1 £50.00\n\nSubtotal £210.00\nDelivery £3.95\nadiClub discount -£21.00\nTotal £192.95",
+ "expected": {
+  "shop": "adidas",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Ultraboost 5 Running Shoes",
+    "qty": 1,
+    "linePence": 16000
+   },
+   {
+    "name": "Essentials Fleece Hoodie",
+    "qty": 1,
+    "linePence": 5000
+   }
+  ],
+  "subtotalPence": 21000,
+  "feesPence": 395,
+  "discountsPence": 2100,
+  "tipsPence": 0,
+  "totalPence": 19295
+ }
+}

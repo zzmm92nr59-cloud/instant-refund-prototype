@@ -1,0 +1,175 @@
+{
+ "id": "morrisons-2",
+ "sender": "Morrisons",
+ "layout": "a small table per item: name and price, Qty under",
+ "headers": {
+  "from": "Morrisons <noreply@morrisons.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Morrisons order",
+  "date": "Tue, 10 Nov 2026 07:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Morrisons</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.morrisons.com/?utm_source=email\"><img src=\"https://www.morrisons.com/static/email/logo.png\" alt=\"Morrisons\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 7731201</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>10 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons British Semi Skimmed Milk 2.272L, 4 Pints</td><td align=\"right\">£3.30</td></tr><tr><td class=\"muted\">Qty 2</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Warburtons Medium Sliced White Bread 800G</td><td align=\"right\">£1.60</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons The Best Sourdough Bloomer 800G</td><td align=\"right\">£2.20</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons British Free Range Large Eggs 12 Pack</td><td align=\"right\">£3.89</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Anchor Spreadable Butter 500G</td><td align=\"right\">£4.50</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Cathedral City Mature Cheddar 550G</td><td align=\"right\">£5.75</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Bananas Loose</td><td align=\"right\">£1.08</td></tr><tr><td class=\"muted\">Qty 6</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Braeburn Apple Minimum 5 Pack</td><td align=\"right\">£1.59</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Carrots 1Kg</td><td align=\"right\">£0.59</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Broccoli 335G</td><td align=\"right\">£1.38</td></tr><tr><td class=\"muted\">Qty 2</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Baby Potatoes 1Kg</td><td align=\"right\">£1.05</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Brown Onions 3 Pack</td><td align=\"right\">£0.89</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Cherry Tomatoes 330G</td><td align=\"right\">£0.99</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Iceberg Lettuce Each</td><td align=\"right\">£0.65</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons British Chicken Breast Portions 650G</td><td align=\"right\">£4.99</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons 12 Pork Sausages 681G</td><td align=\"right\">£3.00</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Beef Mince 5% Fat 500G</td><td align=\"right\">£4.25</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Smoked Back Bacon 300G</td><td align=\"right\">£2.49</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Heinz Baked Beans In Tomato Sauce 4X415g</td><td align=\"right\">£4.50</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Napolina Chopped Tomatoes 400G</td><td align=\"right\">£2.55</td></tr><tr><td class=\"muted\">Qty 3</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Morrisons Fusilli Pasta Twists 1Kg</td><td align=\"right\">£1.15</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Tilda Basmati Rice 1Kg</td><td align=\"right\">£3.75</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Kellogg's Corn Flakes Cereal 670G</td><td align=\"right\">£2.90</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Quaker Oat So Simple Original 12X27g</td><td align=\"right\">£3.25</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>PG Tips 240 Pyramid Tea Bags 696G</td><td align=\"right\">£6.50</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Nescafe Gold Blend Instant Coffee 200G</td><td align=\"right\">£7.00</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Walkers Ready Salted Crisps 6X25g</td><td align=\"right\">£4.50</td></tr><tr><td class=\"muted\">Qty 2</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>McVitie's Chocolate Digestives 433G</td><td align=\"right\">£2.25</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Coca-Cola Zero Sugar 8X330ml</td><td align=\"right\">£5.25</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\"><tr><td>Tropicana Smooth Orange Juice 1.4L</td><td align=\"right\">£3.95</td></tr><tr><td class=\"muted\">Qty 1</td><td></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£91.74</td></tr><tr><td>Delivery</td><td>Free</td></tr><tr><td><strong>Total</strong></td><td><strong>£91.74</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Morrisons. All rights reserved.<br /><a href=\"https://www.morrisons.com/help\">Help</a> | <a href=\"https://www.morrisons.com/privacy\">Privacy</a> | <a href=\"https://www.morrisons.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.morrisons.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Morrisons",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Morrisons British Semi Skimmed Milk 2.272L, 4 Pints",
+    "qty": 2,
+    "linePence": 330
+   },
+   {
+    "name": "Warburtons Medium Sliced White Bread 800G",
+    "qty": 1,
+    "linePence": 160
+   },
+   {
+    "name": "Morrisons The Best Sourdough Bloomer 800G",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Morrisons British Free Range Large Eggs 12 Pack",
+    "qty": 1,
+    "linePence": 389
+   },
+   {
+    "name": "Anchor Spreadable Butter 500G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Cathedral City Mature Cheddar 550G",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "Morrisons Bananas Loose",
+    "qty": 6,
+    "linePence": 108
+   },
+   {
+    "name": "Morrisons Braeburn Apple Minimum 5 Pack",
+    "qty": 1,
+    "linePence": 159
+   },
+   {
+    "name": "Morrisons Carrots 1Kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "Morrisons Broccoli 335G",
+    "qty": 2,
+    "linePence": 138
+   },
+   {
+    "name": "Morrisons Baby Potatoes 1Kg",
+    "qty": 1,
+    "linePence": 105
+   },
+   {
+    "name": "Morrisons Brown Onions 3 Pack",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "Morrisons Cherry Tomatoes 330G",
+    "qty": 1,
+    "linePence": 99
+   },
+   {
+    "name": "Morrisons Iceberg Lettuce Each",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Morrisons British Chicken Breast Portions 650G",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "Morrisons 12 Pork Sausages 681G",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Morrisons Beef Mince 5% Fat 500G",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Morrisons Smoked Back Bacon 300G",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Heinz Baked Beans In Tomato Sauce 4X415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Napolina Chopped Tomatoes 400G",
+    "qty": 3,
+    "linePence": 255
+   },
+   {
+    "name": "Morrisons Fusilli Pasta Twists 1Kg",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Tilda Basmati Rice 1Kg",
+    "qty": 1,
+    "linePence": 375
+   },
+   {
+    "name": "Kellogg's Corn Flakes Cereal 670G",
+    "qty": 1,
+    "linePence": 290
+   },
+   {
+    "name": "Quaker Oat So Simple Original 12X27g",
+    "qty": 1,
+    "linePence": 325
+   },
+   {
+    "name": "PG Tips 240 Pyramid Tea Bags 696G",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Nescafe Gold Blend Instant Coffee 200G",
+    "qty": 1,
+    "linePence": 700
+   },
+   {
+    "name": "Walkers Ready Salted Crisps 6X25g",
+    "qty": 2,
+    "linePence": 450
+   },
+   {
+    "name": "McVitie's Chocolate Digestives 433G",
+    "qty": 1,
+    "linePence": 225
+   },
+   {
+    "name": "Coca-Cola Zero Sugar 8X330ml",
+    "qty": 1,
+    "linePence": 525
+   },
+   {
+    "name": "Tropicana Smooth Orange Juice 1.4L",
+    "qty": 1,
+    "linePence": 395
+   }
+  ],
+  "subtotalPence": 9174,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9174
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "id": "asos-2",
+ "sender": "ASOS",
+ "layout": "plain text",
+ "headers": {
+  "from": "ASOS <order_confirmation@asos.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your ASOS order confirmation",
+  "date": "Fri, 13 Nov 2026 12:00:00 +0000"
+ },
+ "html": "",
+ "text": "ASOS\nThanks for your order\nOrder No.: 1074420017\nOrder date: 13 Nov, 2026\n\nASOS DESIGN puffer jacket in khaki\nQty: 1\n£60.00\nCOLLUSION unisex hoodie\nQty: 1\n£28.00\n\nSubtotal £88.00\nStandard Delivery £4.50\nTotal £92.50",
+ "expected": {
+  "shop": "ASOS",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "ASOS DESIGN puffer jacket in khaki",
+    "qty": 1,
+    "linePence": 6000
+   },
+   {
+    "name": "COLLUSION unisex hoodie",
+    "qty": 1,
+    "linePence": 2800
+   }
+  ],
+  "subtotalPence": 8800,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9250
+ }
+}

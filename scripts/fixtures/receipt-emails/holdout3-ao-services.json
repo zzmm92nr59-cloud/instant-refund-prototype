@@ -1,0 +1,43 @@
+{
+ "id": "holdout3-ao-services",
+ "sender": "AO.com",
+ "layout": "appliance and services, a free one",
+ "headers": {
+  "from": "AO.com <orders@ao.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your AO order confirmation AO-4410098",
+  "date": "Wed, 11 Nov 2026 09:45:00 +0000"
+ },
+ "html": "",
+ "text": "AO.com\nOrder confirmation\nOrder number: AO-4410098\nOrder date: 11 November 2026\n\nBosch Series 4 WGG04409GB 9kg Washing Machine\nQuantity: 1\nPrice: £429.00\n\nRemove and recycle your old appliance\nQuantity: 1\nPrice: £20.00\n\nConnection\nQuantity: 1\nPrice: Free\n\nDelivery: Free\nOrder total: £449.00",
+ "expected": {
+  "shop": "AO.com",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Bosch Series 4 WGG04409GB 9kg Washing Machine",
+    "qty": 1,
+    "linePence": 42900
+   },
+   {
+    "name": "Remove and recycle your old appliance",
+    "qty": 1,
+    "linePence": 2000
+   },
+   {
+    "name": "Connection",
+    "qty": 1,
+    "linePence": 0
+   }
+  ],
+  "subtotalPence": 44900,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 44900,
+  "shopAlso": [
+   "AO"
+  ]
+ }
+}

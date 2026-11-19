@@ -1,0 +1,40 @@
+{
+ "id": "greggs-2",
+ "sender": "Greggs",
+ "layout": "plain text, name xN price",
+ "headers": {
+  "from": "Greggs <noreply@greggs.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Greggs receipt",
+  "date": "Tue, 03 Nov 2026 12:10:00 +0000"
+ },
+ "html": "",
+ "text": "Greggs\nOrder receipt\nOrder number: GR-77441\n3 November 2026\n\nChicken Bake x1 £2.20\nSausage, Bean & Cheese Melt x1 £2.10\nRegular Americano x2 £3.90\n\nTotal £8.20",
+ "expected": {
+  "shop": "Greggs",
+  "date": "2026-11-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Bake",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Sausage, Bean & Cheese Melt",
+    "qty": 1,
+    "linePence": 210
+   },
+   {
+    "name": "Regular Americano",
+    "qty": 2,
+    "linePence": 390
+   }
+  ],
+  "subtotalPence": 820,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 820
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "id": "holdout-jd-item-total",
+ "sender": "JD Sports",
+ "layout": "Size line and Item Total per line",
+ "headers": {
+  "from": "JD Sports <orders@jdsports.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your JD order confirmation",
+  "date": "Tue, 03 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "JD\nOrder number: 102939000\n3 November 2026\n\nNike Air Max 90\nSize: 9\nQty: 1\nItem Total: £130.00\n\nNike Everyday Plus Socks (3 Pairs)\nSize: L\nQty: 2\nItem Total: £32.00\n\nSubtotal £162.00\nStandard delivery £3.99\nTotal £165.99",
+ "expected": {
+  "shop": "JD Sports",
+  "date": "2026-11-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Nike Air Max 90",
+    "qty": 1,
+    "linePence": 13000
+   },
+   {
+    "name": "Nike Everyday Plus Socks (3 Pairs)",
+    "qty": 2,
+    "linePence": 3200
+   }
+  ],
+  "subtotalPence": 16200,
+  "feesPence": 399,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 16599
+ }
+}

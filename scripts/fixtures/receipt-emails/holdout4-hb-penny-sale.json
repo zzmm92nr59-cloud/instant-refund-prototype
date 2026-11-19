@@ -1,0 +1,40 @@
+{
+ "id": "holdout4-hb-penny-sale",
+ "sender": "Holland & Barrett",
+ "layout": "second item for 1p",
+ "headers": {
+  "from": "Holland & Barrett <orders@hollandandbarrett.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Holland & Barrett order HB-55102",
+  "date": "Tue, 10 Nov 2026 13:00:00 +0000"
+ },
+ "html": "",
+ "text": "Holland & Barrett\nOrder confirmation\nOrder number: HB-55102\nDate: 10 November 2026\n\nHolland & Barrett Vitamin D3 25ug 250 Tablets   Qty 1   £9.99\nHolland & Barrett Vitamin D3 25ug 250 Tablets   Qty 1   £0.01\nNature's Garden Cashews 200g   Qty 1   £4.49\n\nSubtotal £14.49\nStandard delivery £3.99\nTotal £18.48",
+ "expected": {
+  "shop": "Holland & Barrett",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Holland & Barrett Vitamin D3 25ug 250 Tablets",
+    "qty": 1,
+    "linePence": 999
+   },
+   {
+    "name": "Holland & Barrett Vitamin D3 25ug 250 Tablets",
+    "qty": 1,
+    "linePence": 1
+   },
+   {
+    "name": "Nature's Garden Cashews 200g",
+    "qty": 1,
+    "linePence": 449
+   }
+  ],
+  "subtotalPence": 1449,
+  "feesPence": 399,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1848
+ }
+}

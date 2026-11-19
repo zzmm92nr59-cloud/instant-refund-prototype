@@ -1,0 +1,43 @@
+{
+ "id": "holdout3-wagamama-service",
+ "sender": "Wagamama",
+ "layout": "service charge and tip",
+ "headers": {
+  "from": "wagamama <receipts@wagamama.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your wagamama receipt",
+  "date": "Sun, 01 Nov 2026 19:50:00 +0000"
+ },
+ "html": "",
+ "text": "wagamama\nLeeds Trinity\n1 November 2026\nBill 2290\n\nChicken Katsu Curry x2 ... £31.00\nYasai Gyoza ... £7.50\nRaw Juice Clean Green ... £5.25\n\nSubtotal £43.75\nService charge 12.5% £6.00\nTip £2.00\nTotal £51.75",
+ "expected": {
+  "shop": "wagamama",
+  "date": "2026-11-01",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Katsu Curry",
+    "qty": 2,
+    "linePence": 3100
+   },
+   {
+    "name": "Yasai Gyoza",
+    "qty": 1,
+    "linePence": 750
+   },
+   {
+    "name": "Raw Juice Clean Green",
+    "qty": 1,
+    "linePence": 525
+   }
+  ],
+  "subtotalPence": 4375,
+  "feesPence": 600,
+  "discountsPence": 0,
+  "tipsPence": 200,
+  "totalPence": 5175,
+  "shopAlso": [
+   "Wagamama"
+  ]
+ }
+}
