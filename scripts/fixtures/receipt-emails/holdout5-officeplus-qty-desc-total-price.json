@@ -1,0 +1,40 @@
+{
+ "id": "holdout5-officeplus-qty-desc-total-price",
+ "sender": "Office Plus",
+ "layout": "Qty | Description | Total | Unit price",
+ "headers": {
+  "from": "Office Plus <orders@officeplus.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation OP-551208",
+  "date": "Mon, 9 Nov 2026 11:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Office Plus</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.officeplus.co.uk/?utm_source=email\"><img src=\"https://www.officeplus.co.uk/static/email/logo.png\" alt=\"Office Plus\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: OP-551208</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 09/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Qty</td><td>Description</td><td>Total</td><td>Unit price</td></tr><tr><td>2</td><td>A4 Copier Paper 80gsm Box of 5 Reams</td><td>£47.98</td><td>£23.99</td></tr><tr><td>3</td><td>Pilot G2 Gel Pens Black Pack of 12</td><td>£26.97</td><td>£8.99</td></tr><tr><td>1</td><td>Leitz Lever Arch File A4</td><td>£4.50</td><td>£4.50</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£79.45</td></tr><tr><td>Delivery</td><td>Free</td></tr><tr><td><strong>Total</strong></td><td><strong>£79.45</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Office Plus. All rights reserved.<br /><a href=\"https://www.officeplus.co.uk/help\">Help</a> | <a href=\"https://www.officeplus.co.uk/privacy\">Privacy</a> | <a href=\"https://www.officeplus.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.officeplus.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Office Plus",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "A4 Copier Paper 80gsm Box of 5 Reams",
+    "qty": 2,
+    "linePence": 4798
+   },
+   {
+    "name": "Pilot G2 Gel Pens Black Pack of 12",
+    "qty": 3,
+    "linePence": 2697
+   },
+   {
+    "name": "Leitz Lever Arch File A4",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 7945,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7945
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "id": "holdout5-streamly-renewal",
+ "sender": "Streamly",
+ "layout": "renewal: plan and billing period",
+ "headers": {
+  "from": "Streamly <billing@streamly.tv>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Streamly subscription has renewed",
+  "date": "Sat, 31 Oct 2026 06:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Streamly</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.streamly.tv/?utm_source=email\"><img src=\"https://www.streamly.tv/static/email/logo.png\" alt=\"Streamly\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Hi Sam, your subscription has renewed.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Invoice number: STR-2026-10-998812</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Date: 31 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Plan</td><td>Premium Family</td></tr><tr><td>Billing period</td><td>31 Oct 2026 – 30 Nov 2026</td></tr><tr><td>Amount</td><td>£19.99</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Total charged</td><td>£19.99</td></tr><tr><td>Includes VAT at 20%</td><td>£3.33</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Streamly. All rights reserved.<br /><a href=\"https://www.streamly.tv/help\">Help</a> | <a href=\"https://www.streamly.tv/privacy\">Privacy</a> | <a href=\"https://www.streamly.tv/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.streamly.tv/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Streamly",
+  "date": "2026-10-31",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Premium Family",
+    "qty": 1,
+    "linePence": 1999
+   }
+  ],
+  "subtotalPence": 1999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1999
+ }
+}

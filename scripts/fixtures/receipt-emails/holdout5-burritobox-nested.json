@@ -1,0 +1,47 @@
+{
+ "id": "holdout5-burritobox-nested",
+ "sender": "Burrito Box",
+ "layout": "takeaway: options nested three deep",
+ "headers": {
+  "from": "Burrito Box <orders@burritobox.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed #BB-30091",
+  "date": "Fri, 23 Oct 2026 19:30:00 +0000"
+ },
+ "html": "",
+ "text": "Burrito Box\nOrder #BB-30091\n23 October 2026\n\n1x Build Your Own Burrito   £11.00\n    Filling\n        Chicken\n            Add guacamole: Guacamole (+£1.50)\n    Salsa\n        Hot\n1x Loaded Nachos   £6.50\n    Toppings\n        Jalapeños\n2x Horchata   £7.00\n\nSubtotal £24.50\nDelivery fee £1.99\nService fee £0.99\nRider tip £1.00\nTotal £28.48",
+ "expected": {
+  "shop": "Burrito Box",
+  "date": "2026-10-23",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Build Your Own Burrito",
+    "qty": 1,
+    "linePence": 1100,
+    "extras": [
+     "Chicken",
+     "Guacamole"
+    ]
+   },
+   {
+    "name": "Loaded Nachos",
+    "qty": 1,
+    "linePence": 650,
+    "extras": [
+     "Jalapeños"
+    ]
+   },
+   {
+    "name": "Horchata",
+    "qty": 2,
+    "linePence": 700
+   }
+  ],
+  "subtotalPence": 2450,
+  "feesPence": 298,
+  "discountsPence": 0,
+  "tipsPence": 100,
+  "totalPence": 2848
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout6-iceland-ordered-received",
+ "sender": "Iceland",
+ "layout": "'Ordered: X' then 'You received: Y'",
+ "headers": {
+  "from": "Iceland <groceries@iceland.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Iceland delivery receipt 7711204",
+  "date": "Tue, 10 Nov 2026 18:00:00 +0000"
+ },
+ "html": "",
+ "text": "Iceland\nOrder number: 7711204\nDelivered 10 November 2026\n\nHeinz Baked Beans 415g\nQty 4   £5.60\n\nSubstitutions\nOrdered: Pilgrims Choice Mature 350g\nYou received: Cathedral City Mature 350g\nQty 1   £4.25\n\nHovis Seed Sensations 800g\nQty 1   £1.75\n\nSubtotal   £11.60\nDelivery   £3.00\nTotal   £14.60",
+ "expected": {
+  "shop": "Iceland",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Heinz Baked Beans 415g",
+    "qty": 4,
+    "linePence": 560
+   },
+   {
+    "name": "Cathedral City Mature 350g",
+    "qty": 1,
+    "linePence": 425
+   },
+   {
+    "name": "Hovis Seed Sensations 800g",
+    "qty": 1,
+    "linePence": 175
+   }
+  ],
+  "subtotalPence": 1160,
+  "feesPence": 300,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1460
+ }
+}

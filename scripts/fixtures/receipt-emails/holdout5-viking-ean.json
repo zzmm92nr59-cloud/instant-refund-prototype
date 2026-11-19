@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-viking-ean",
+ "sender": "Viking",
+ "layout": "product code and EAN lines under the name",
+ "headers": {
+  "from": "Viking <orders@viking-direct.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order acknowledgement 30044112",
+  "date": "Wed, 11 Nov 2026 16:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Viking</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.viking-direct.co.uk/?utm_source=email\"><img src=\"https://www.viking-direct.co.uk/static/email/logo.png\" alt=\"Viking\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 30044112</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 11/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Product</td><td>Qty</td><td>Total</td></tr><tr><td>Brother P-Touch Label Printer<br>Product code: 4400120<br>EAN: 4977961000000</td><td>1</td><td>£34.99</td></tr><tr><td>Brother TZe 12mm Tape Black on White<br>Product code: 4400121<br>EAN: 4977961000001</td><td>4</td><td>£47.96</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£82.95</td></tr><tr><td>Next day delivery</td><td>FREE</td></tr><tr><td><strong>Total</strong></td><td><strong>£82.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Viking. All rights reserved.<br /><a href=\"https://www.viking-direct.co.uk/help\">Help</a> | <a href=\"https://www.viking-direct.co.uk/privacy\">Privacy</a> | <a href=\"https://www.viking-direct.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.viking-direct.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Viking",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Brother P-Touch Label Printer",
+    "qty": 1,
+    "linePence": 3499
+   },
+   {
+    "name": "Brother TZe 12mm Tape Black on White",
+    "qty": 4,
+    "linePence": 4796
+   }
+  ],
+  "subtotalPence": 8295,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8295
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout5-coop-weighed",
+ "sender": "Co-op",
+ "layout": "weighed item: '0.92 kg @ £0.84/kg', '2 @ £1.55'",
+ "headers": {
+  "from": "Co-op <ereceipts@coop.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Co-op e-receipt",
+  "date": "Sat, 17 Oct 2026 12:30:00 +0000"
+ },
+ "html": "",
+ "text": "Co-op Food Headingley\n17/10/2026 12:28\nTransaction 3301\n\nBananas Loose\n  0.92 kg @ £0.84/kg   £0.77\nSemi Skimmed Milk 4 Pints\n  2 @ £1.55   £3.10\nMature Cheddar 400g   £3.75\n\nTotal   £7.62\nCard   £7.62",
+ "expected": {
+  "shop": "Co-op",
+  "date": "2026-10-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Bananas Loose",
+    "qty": 1,
+    "linePence": 77
+   },
+   {
+    "name": "Semi Skimmed Milk 4 Pints",
+    "qty": 2,
+    "linePence": 310
+   },
+   {
+    "name": "Mature Cheddar 400g",
+    "qty": 1,
+    "linePence": 375
+   }
+  ],
+  "subtotalPence": 762,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 762
+ }
+}

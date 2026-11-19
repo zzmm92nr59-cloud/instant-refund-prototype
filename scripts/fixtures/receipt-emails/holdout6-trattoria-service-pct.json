@@ -1,0 +1,45 @@
+{
+ "id": "holdout6-trattoria-service-pct",
+ "sender": "Trattoria Lina",
+ "layout": "covers, 'Discretionary service (12.5%)'",
+ "headers": {
+  "from": "Trattoria Lina <receipts@trattorialina.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Trattoria Lina",
+  "date": "Fri, 13 Nov 2026 22:30:00 +0000"
+ },
+ "html": "",
+ "text": "Trattoria Lina\nTable 7  Covers 2\n13/11/2026 22:14\nCheck 3310\n\n1 Burrata    £11.00\n2 Cacio e Pepe    £32.00\n1 Tiramisu    £8.00\n1 House Red 500ml    £24.00\n\nSubtotal    £75.00\nDiscretionary service (12.5%)    £9.38\nTotal    £84.38\nPaid Visa ****",
+ "expected": {
+  "shop": "Trattoria Lina",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Burrata",
+    "qty": 1,
+    "linePence": 1100
+   },
+   {
+    "name": "Cacio e Pepe",
+    "qty": 2,
+    "linePence": 3200
+   },
+   {
+    "name": "Tiramisu",
+    "qty": 1,
+    "linePence": 800
+   },
+   {
+    "name": "House Red 500ml",
+    "qty": 1,
+    "linePence": 2400
+   }
+  ],
+  "subtotalPence": 7500,
+  "feesPence": 938,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8438
+ }
+}

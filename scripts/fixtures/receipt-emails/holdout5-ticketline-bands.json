@@ -1,0 +1,38 @@
+{
+ "id": "holdout5-ticketline-bands",
+ "sender": "Ticketline",
+ "layout": "tickets: '2 x £45.00', seats, fees",
+ "headers": {
+  "from": "Ticketline <tickets@ticketline.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your tickets for The Lumineers - order TL-8812309",
+  "date": "Thu, 29 Oct 2026 12:00:00 +0000"
+ },
+ "html": "",
+ "text": "Ticketline\nOrder confirmation\nOrder number: TL-8812309\nBooked: 29 October 2026\n\nThe Lumineers\nFirst Direct Arena, Leeds\nSaturday 13 March 2027, doors 6:30pm\n\nStanding General Admission\n2 x £45.00   £90.00\n\nSeated Tier 2\nBlock 204, Row K, Seat 18\n1 x £62.50   £62.50\n\nTickets £152.50\nService fee £10.80\nOrder processing fee £2.75\nTotal £166.05",
+ "expected": {
+  "shop": "Ticketline",
+  "date": "2026-10-29",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Standing General Admission",
+    "qty": 2,
+    "linePence": 9000
+   },
+   {
+    "name": "Seated Tier 2",
+    "qty": 1,
+    "linePence": 6250,
+    "extras": [
+     "Block 204"
+    ]
+   }
+  ],
+  "subtotalPence": 15250,
+  "feesPence": 1355,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 16605
+ }
+}

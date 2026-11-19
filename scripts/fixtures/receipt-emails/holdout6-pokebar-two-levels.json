@@ -1,0 +1,39 @@
+{
+ "id": "holdout6-pokebar-two-levels",
+ "sender": "Poke Bar",
+ "layout": "options two levels deep, '(+£1.50)'",
+ "headers": {
+  "from": "Poke Bar <orders@pokebar.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Poke Bar order #PB2231",
+  "date": "Wed, 11 Nov 2026 13:10:00 +0000"
+ },
+ "html": "",
+ "text": "Poke Bar\nOrder #PB2231\n11 November 2026 13:02\n\n1 x Build Your Own Bowl   £12.50\n   Base\n      Brown Rice\n   Protein\n      Teriyaki Chicken (+£1.50)\n   Toppings\n      Edamame\n      Pickled Ginger\n1 x Miso Soup   £3.50\n\nSubtotal   £16.00\nDelivery fee   £1.99\nService fee   £0.99\nTotal   £18.98",
+ "expected": {
+  "shop": "Poke Bar",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Build Your Own Bowl",
+    "qty": 1,
+    "linePence": 1250,
+    "extras": [
+     "Brown Rice",
+     "Teriyaki Chicken"
+    ]
+   },
+   {
+    "name": "Miso Soup",
+    "qty": 1,
+    "linePence": 350
+   }
+  ],
+  "subtotalPence": 1600,
+  "feesPence": 298,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1898
+ }
+}

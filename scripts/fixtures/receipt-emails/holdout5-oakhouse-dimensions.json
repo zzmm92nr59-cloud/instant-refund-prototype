@@ -1,0 +1,38 @@
+{
+ "id": "holdout5-oakhouse-dimensions",
+ "sender": "Oak House",
+ "layout": "dimension lines between name and price",
+ "headers": {
+  "from": "Oak House Furniture <orders@oakhouse.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation OH-33091",
+  "date": "Sat, 10 Oct 2026 15:00:00 +0000"
+ },
+ "html": "",
+ "text": "Oak House Furniture\nOrder number: OH-33091\nOrder date: 10 October 2026\n\nHamar Oak Dining Table\nW 180 x D 90 x H 76 cm\nQuantity: 1\n£599.00\n\nHamar Dining Chair\nW 45 x D 52 x H 88 cm\nQuantity: 4\n£516.00\n\nSubtotal £1,115.00\nDelivery and assembly £49.00\nTotal £1,164.00",
+ "expected": {
+  "shop": "Oak House Furniture",
+  "date": "2026-10-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Hamar Oak Dining Table",
+    "qty": 1,
+    "linePence": 59900
+   },
+   {
+    "name": "Hamar Dining Chair",
+    "qty": 4,
+    "linePence": 51600
+   }
+  ],
+  "subtotalPence": 111500,
+  "feesPence": 4900,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 116400,
+  "shopAlso": [
+   "Oak House"
+  ]
+ }
+}

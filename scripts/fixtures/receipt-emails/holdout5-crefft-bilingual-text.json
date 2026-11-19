@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-crefft-bilingual-text",
+ "sender": "Crefft",
+ "layout": "text: 'Nifer / Qty: 1' lines",
+ "headers": {
+  "from": "Crefft <helo@crefft.cymru>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Archeb / Order CR-1102",
+  "date": "Thu, 15 Oct 2026 11:00:00 +0000"
+ },
+ "html": "",
+ "text": "Crefft\nRhif archeb / Order number: CR-1102\nDyddiad / Date: 15/10/2026\n\nSlate Coasters Set of 4\nNifer / Qty: 1\n£22.00\n\nWelsh Blanket Throw\nNifer / Qty: 1\n£89.00\n\nIs-gyfanswm / Subtotal £111.00\nPostio / Postage £4.50\nCyfanswm / Total £115.50",
+ "expected": {
+  "shop": "Crefft",
+  "date": "2026-10-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Slate Coasters Set of 4",
+    "qty": 1,
+    "linePence": 2200
+   },
+   {
+    "name": "Welsh Blanket Throw",
+    "qty": 1,
+    "linePence": 8900
+   }
+  ],
+  "subtotalPence": 11100,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 11550
+ }
+}

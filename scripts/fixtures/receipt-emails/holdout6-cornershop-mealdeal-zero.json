@@ -1,0 +1,38 @@
+{
+ "id": "holdout6-cornershop-mealdeal-zero",
+ "sender": "Daily Bread",
+ "layout": "meal deal parts at £0.00 under it",
+ "headers": {
+  "from": "Daily Bread <receipts@dailybread.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Daily Bread",
+  "date": "Wed, 4 Nov 2026 12:40:00 +0000"
+ },
+ "html": "",
+ "text": "Daily Bread Kings Cross\nReceipt 4410-221\n04/11/2026 12:38\n\nMeal Deal   £5.50\n  Chicken Club Sandwich   £0.00\n  Sea Salt Crisps   £0.00\n  Still Water 500ml   £0.00\nFlat White   £3.20\n\nTotal   £8.70\nCard   £8.70",
+ "expected": {
+  "shop": "Daily Bread",
+  "date": "2026-11-04",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Meal Deal",
+    "qty": 1,
+    "linePence": 550,
+    "extras": [
+     "Chicken Club Sandwich"
+    ]
+   },
+   {
+    "name": "Flat White",
+    "qty": 1,
+    "linePence": 320
+   }
+  ],
+  "subtotalPence": 870,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 870
+ }
+}

@@ -10,7 +10,7 @@
 
 const MAX_INPUT = 600_000;
 import { flightBooking, flightItemName } from "./flight-booking.js";
-import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems } from "./receipt-reader.js";
+import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems, looksLikePerson } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 
@@ -184,9 +184,10 @@ function htmlToText(html) {
     // (Its name is in the alt text only when it isn't written anywhere else.)
     // (An item's extras in their own <div> or <p> inside the name's cell are lines of their own, not part of its name. A block
     // that opens straight after another closes starts the one new line the closing gave.)
-    .replace(/(<\/(?:p|div|tr|li|h[1-6]|table)>)(?:\s*<(?:p|div|li|h[1-6])\b[^>]*>)+/gi, "$1")
-    .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n")
-    .replace(/<(p|div|li|h[1-6])\b[^>]*>/gi, "\n")
+    // (A definition list's terms and descriptions, <dt> and <dd>, are lines of their own too.)
+    .replace(/(<\/(?:p|div|tr|li|h[1-6]|table|dt|dd|dl)>)(?:\s*<(?:p|div|li|h[1-6]|dt|dd|dl)\b[^>]*>)+/gi, "$1")
+    .replace(/<\/(p|div|tr|li|h[1-6]|table|dt|dd|dl)>/gi, "\n")
+    .replace(/<(p|div|li|h[1-6]|dt|dd|dl)\b[^>]*>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/t[dh]>/gi, " | ")
     .replace(/<[^>]+>/g, " "))
@@ -315,7 +316,20 @@ function slashDate(a, b, y, refDate) {
   return gap(us) < gap(uk) ? us : uk;
 }
 
+// The order's date. A date labelled as the order's ("Order date: 01/11/2026", "Placed on …") comes first, and a date after
+// the email was sent (a pre-order's release date, a concert's day, a renewal's next date) is never the order's: the next
+// date in the text is tried instead (round 3, 19 Nov 2026).
+const ORDER_DATE_LABEL = /\b(?:order(?:ed)?|placed|purchase|booked|booking|transaction|invoice|receipt)\s*(?:date|on|made)?\s*(?:\/\s*[\p{L} ]{2,20})?\s*[:|]\s*\|?\s*([^\n]{6,40})/giu;
 export function parseDate(text, refDate) {
+  const t = String(text || "");
+  const late = (v) => Boolean(v) && refDate instanceof Date && !Number.isNaN(refDate.getTime()) && new Date(v + "T00:00:00Z").getTime() > refDate.getTime() + 2 * 86400000;
+  for (const m of t.slice(0, 20000).matchAll(ORDER_DATE_LABEL)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
+  const v = dateFound(t, refDate);
+  if (!late(v)) return v;
+  for (const line of t.split("\n")) { const w = dateFound(line, refDate); if (w && !late(w)) return w; }
+  return null;
+}
+function dateFound(text, refDate) {
   let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})(?!\d)/);
   if (m && ymdOf(+m[1], +m[2], +m[3])) return `${m[1]}-${m[2]}-${m[3]}`;
   m = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
@@ -543,6 +557,10 @@ function extractReturns(text, html, orderDate) {
 }
 
 // An email that is not an order confirmation must not be turned into a purchase.
+// Some of an order's items sent ("2 of your 3 items have shipped", "Part of your order HF-1 has been dispatched"): the items
+// in it are the order's, so it is read like its receipt and joins the order's card by its order number (gmail.js
+// mergeOrderEmails). Without an order number it would be a second card for the same order, so it is then not read at all.
+const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?:have |has )?(?:shipped|dispatched|been sent|on (?:their|its) way)\b|\b(?:part|some) of your order\b[^!?]{0,40}\b(?:shipped|dispatched|sent|on its way)\b|\bsome of your items\b[^!?]{0,30}\b(?:shipped|dispatched|on (?:their|its) way)\b/i;
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
@@ -553,6 +571,10 @@ function receiptSignals(subject, text) {
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     // "Reservation confirmed for Manchester", "Your booking is confirmed at …", "Your … order PK-338812", "Your order … has been placed".
     /\b(?:reservation|booking|order|purchase)\b[^!?]{0,30}\bconfirmed\b|\byour\b[^!?]{0,40}\border\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border\b[^!?]{0,30}\b(?:has been|was|is) placed\b|(?:^|[!.:]\s+)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) ||
+    // "Order acknowledgement 30044112", "Your … subscription has renewed", "Receipt for your Notely Pro renewal", a
+    // bilingual "Archeb / Order CR-1102" (round 3).
+    // "Your Iceland delivery receipt 7711204" (round 3).
+    /\b(?:delivery |order |e-?)?receipt\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border acknowledge?ment\b|\bsubscription\b[^!?]{0,30}\b(?:has )?renew(?:ed|al)\b|\breceipt for your\b|(?:^|\/\s*)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) || SHIPMENT_SUBJECT.test(s) ||
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
@@ -719,6 +741,7 @@ const ORDER_NOTICE_SUBJECT = new RegExp([
   "\\b(?:update|message|news)\\s+(?:regarding|about|on|concerning)\\s+your\\b[^\\n]{0,30}\\border\\b",
   "\\bbenefit confirmation\\b",
 ].join("|"), "i");
+const PRICE_ADJUSTMENT = /\bprice (?:adjustment|match(?:ed)?|difference|drop|protection|promise)\b|\brefunded the (?:price )?difference\b|\bmatched a lower price\b|\bprice of an item you bought has (?:dropped|gone down|fallen)\b/i;
 const NOT_A_PURCHASE_SUBJECT = /\b(?:refund(?:ed|s)?|cancell?(?:ed|ation)|price (?:adjustment|match(?:ed)?|difference)|credit note)\b/i;
 const NOT_A_PURCHASE_TOP = /\b(?:your|the|this) order (?:has been|was|is) cancell?ed\b|\bwe(?:'|’)?ve cancell?ed your order\b|\b(?:some )?items? (?:in|from|of) your order (?:has|have) been cancell?ed\b|\bpart of your order has been cancell?ed\b|\bwe(?:'|’)?ve (?:matched a lower price|refunded the (?:price )?difference)\b/i;
 const ACCOUNT_DEPOSIT = /\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
@@ -741,6 +764,8 @@ export function emailForReading(rawEmail) {
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
 function tillPounds(t) {
+  // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
+  if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
   if (!t || /£/.test(t) || !/(?:^|[\s|])GBP(?:$|[\s|/])/m.test(t)) return t;
   return t.replace(/(\d{1,5}\.\d{2}) ?GBP\b/g, "£$1").replace(/(\S[ \t]{2,})(-?)(\d{1,5}\.\d{2})(?:[ \t]+[A-Z])?[ \t]*$/gm, "$1$2£$3");
 }
@@ -839,6 +864,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     cands.push({ items: result.items, money: moneyOf(text) });
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
     if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
+    // Prices printed above their names (round 3): tried after every other reading, so it is taken only when nothing else adds up.
+    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
     // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
     const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money }));
@@ -868,6 +895,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }
+  if (SHIPMENT_SUBJECT.test(String(subject || "")) && !result.orderRef) return { ok: false, reason: "shipment_without_order_number", source: "shopper_email" };
   // A notice about an order placed earlier, with no total of its own, is not a purchase. (One that does give the order's
   // total is kept: it can be the only record of that order.)
   if (!opts.lenient && result.totalPence == null && ORDER_NOTICE_SUBJECT.test(subject || "")) {
@@ -1085,11 +1113,23 @@ export function parseReturnUpdateEmail(rawEmail) {
   const html = parts.html.join("\n");
   const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
   const both = subject + "\n" + text.slice(0, 6000);
+  // Money back for a price drop, or for an order the shop cancelled, is not a return: nothing was sent back, so Relay must
+  // not show a return as refunded (round 3, 19 Nov 2026). The order's own card already says what was bought.
+  const subj = subject.replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
+  const top = text.slice(0, 1500).replace(/\s+/g, " ");
+  if (PRICE_ADJUSTMENT.test(subj) || PRICE_ADJUSTMENT.test(top)) return { ok: false, reason: "price_adjustment" };
+  if (/\bcancell?(?:ed|ation)\b/i.test(subj) || NOT_A_PURCHASE_TOP.test(top) && !/\breturn(?:ed|s)?\b/i.test(subj)) return { ok: false, reason: "cancellation" };
   let stage = null;
   if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b/i.test(both)) stage = "refunded";
   else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
   if (!stage) return { ok: false, reason: "not_a_return_update" };
   const sender = retailerFromFrom(headers.from);
+  // A refund email the shopper forwarded from their own mailbox is the shop's: the shop is read from the forwarded
+  // message, as for a receipt, so it still attaches to the order by its number. The shopper's own address is never the shop.
+  const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
+  const shop = shopOf({ ld: null, sender, fromName, subject, text, html, otherText: html && parts.text.length ? htmlToText(html) : "" });
+  if (shop.domain && PERSONAL_MAIL.test(shop.domain)) shop.domain = null;
+  if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
   const refDate = headers.date ? new Date(headers.date) : null;
   const amt = stage === "refunded" ? (both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
   const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
@@ -1099,7 +1139,7 @@ export function parseReturnUpdateEmail(rawEmail) {
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
     amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
     orderRef: ref ? ref[1] : null, returnId: rid ? rid[1] : null,
-    retailer: { name: sender?.name || null, domain: sender?.domain || null },
+    retailer: { name: shop.name || null, domain: shop.domain || null },
   };
 }
 

@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-fuelbox-price-first-text",
+ "sender": "Fuel Box",
+ "layout": "text: '£7.50  Oat Bars x3'",
+ "headers": {
+  "from": "Fuel Box <orders@fuelbox.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order FB-30012 confirmed",
+  "date": "Fri, 16 Oct 2026 07:00:00 +0000"
+ },
+ "html": "",
+ "text": "Fuel Box\nOrder FB-30012\nOrder date: 16 October 2026\n\n£7.50   Oat Bars Chocolate Chip x3\n£5.98   Protein Shake Vanilla 330ml x2\n\nSubtotal £13.48\nDelivery Free\nTotal £13.48",
+ "expected": {
+  "shop": "Fuel Box",
+  "date": "2026-10-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Oat Bars Chocolate Chip",
+    "qty": 3,
+    "linePence": 750
+   },
+   {
+    "name": "Protein Shake Vanilla 330ml",
+    "qty": 2,
+    "linePence": 598
+   }
+  ],
+  "subtotalPence": 1348,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1348
+ }
+}

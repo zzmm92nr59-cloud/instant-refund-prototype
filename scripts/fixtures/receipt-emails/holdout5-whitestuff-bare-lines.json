@@ -1,0 +1,41 @@
+{
+ "id": "holdout5-whitestuff-bare-lines",
+ "sender": "White Stuff",
+ "layout": "colour and size lines with no labels",
+ "headers": {
+  "from": "White Stuff <orders@whitestuff.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order WS1188273",
+  "date": "Tue, 10 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "White Stuff\nOrder number: WS1188273\nOrder date: 10 November 2026\n\nWide Leg Cord Trousers\nRust\nUK 12 Regular\nQty 1\n£46.00\n\nChunky Knit Cardigan\nEcru\nM\nQty 1\n£55.00\n\nSubtotal £101.00\nDelivery £4.95\nTotal £105.95",
+ "expected": {
+  "shop": "White Stuff",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Wide Leg Cord Trousers",
+    "qty": 1,
+    "linePence": 4600,
+    "extras": [
+     "Rust"
+    ]
+   },
+   {
+    "name": "Chunky Knit Cardigan",
+    "qty": 1,
+    "linePence": 5500,
+    "extras": [
+     "Ecru"
+    ]
+   }
+  ],
+  "subtotalPence": 10100,
+  "feesPence": 495,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 10595
+ }
+}

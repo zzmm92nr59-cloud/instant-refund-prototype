@@ -11,7 +11,8 @@ export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCas
 
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
 // Words senders add after the shop's name: "Swarovski Customer Service GB", "Tempur UK Consumer Support", "The Buyagift Team".
-const NAME_TAIL = /\s*(?:[-–|:,]\s*)?(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|transactions?|online\s+(?:store|shop)|digital\s+edition|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
+// (A tail is a word of its own: "Zapp" is not "Z" and "app".)
+const NAME_TAIL = /\s*(?:[-–|:,]\s*)?\b(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|transactions?|online\s+(?:store|shop)|digital\s+edition|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
 const COUNTRY_TAIL = /\s+(?:uk|gb|eu|ie|united kingdom)$/i;
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu;
 const GENERIC_NAME = /^(orders?|order confirmation|receipts?|your receipt|no-?reply|noreply|do not reply|donotreply|info|hello|hi|team|support|customer service|customer services|sales|shop|store|notifications?|alerts?|updates?|accounts?|billing|payments?|admin|mailer|newsletter)$/i;
@@ -25,6 +26,9 @@ export function cleanShopName(raw) {
   if (!name) return null;
   // "Admiralcasino.co.uk" → "Admiralcasino" (a web address used as a name).
   let fromAddress = false;
+  // A brand that is written as its web address, capital first and ".com" ("Booking.com", "Hotels.com"), keeps it: that is
+  // its name. A name that is only an address ("admiralcasino.co.uk", "Admiralcasino.co.uk") is turned into a name.
+  if (/^\p{Lu}[\p{Ll}\d-]{2,30}\.com$/u.test(name)) return name;
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(name) && TLD.test(name)) { name = name.replace(TLD, "").replace(/^www\./i, "").split(".").pop(); fromAddress = true; }
   let cut = false;
   for (let i = 0; i < 3; i++) {
@@ -149,7 +153,8 @@ export function shopNamesInText(text, subject) {
     /\breceipt from ([A-Z][\w&'’. -]{1,38}?)(?:[.!,\n]|$)/g,
     // A pay-later or payment company's email names the shop it paid: "Payment received for lululemon".
     /\bpayment (?:received |made |sent )?(?:for|to) (\p{L}[\w&'’. -]{1,38}?)(?:[.!,\n]|$)/giu,
-    /©\s*(?:\d{4}\s*(?:[-–]\s*\d{4}\s*)?)?([A-Z][\w&'’. -]{1,38}?)(?:\s*(?:ltd|limited|plc|llc|inc)\.?)?(?:[.,|\n]|\s+all rights|$)/gi,
+    // ("© 2026 Booking.com. All rights reserved": a brand written as its web address keeps its ".com".)
+    /©\s*(?:\d{4}\s*(?:[-–]\s*\d{4}\s*)?)?([A-Z][\w&'’. -]{1,38}?(?:\.com\b)?)(?:\s*(?:ltd|limited|plc|llc|inc)\.?)?(?:[.,|\n]|\s+all rights|$)/gi,
   ]) for (const m of body.matchAll(re)) grab(m[1]);
   const s = String(subject || "");
   const sm = s.match(/\b(?:your|an?) ([A-Z][\w&'’.-]{1,25}(?: [A-Z][\w&'’.-]{1,20}){0,2}) (?:order|receipt)\b/) || s.match(/\b(?:order|receipt) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,]|$| #| -)/);

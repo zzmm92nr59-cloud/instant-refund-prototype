@@ -1,0 +1,40 @@
+{
+ "id": "holdout5-hobbycraft-nested-tables",
+ "sender": "Hobbycraft",
+ "layout": "an item table inside each item's cell",
+ "headers": {
+  "from": "Hobbycraft <orders@hobbycraft.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your Hobbycraft order HC10098812",
+  "date": "Wed, 18 Nov 2026 10:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Hobbycraft</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.hobbycraft.co.uk/?utm_source=email\"><img src=\"https://www.hobbycraft.co.uk/static/email/logo.png\" alt=\"Hobbycraft\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: HC10098812</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 18 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"70%\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td><strong>Wilton Ultimate Cake Decorating Kit</strong></td></tr><tr><td class=\"muted\">Quantity: 1</td></tr></table></td><td align=\"right\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td>£32.00</td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"70%\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td><strong>Cricut Joy Starter Bundle</strong></td></tr><tr><td class=\"muted\">Quantity: 1</td></tr></table></td><td align=\"right\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td>£179.00</td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td width=\"70%\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td><strong>Papermania Kraft Card A4 50 Sheets</strong></td></tr><tr><td class=\"muted\">Quantity: 2</td></tr></table></td><td align=\"right\"><table cellpadding=\"0\" cellspacing=\"0\"><tr><td>£13.00</td></tr></table></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£224.00</td></tr><tr><td>Standard delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£227.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Hobbycraft. All rights reserved.<br /><a href=\"https://www.hobbycraft.co.uk/help\">Help</a> | <a href=\"https://www.hobbycraft.co.uk/privacy\">Privacy</a> | <a href=\"https://www.hobbycraft.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.hobbycraft.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Hobbycraft",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Wilton Ultimate Cake Decorating Kit",
+    "qty": 1,
+    "linePence": 3200
+   },
+   {
+    "name": "Cricut Joy Starter Bundle",
+    "qty": 1,
+    "linePence": 17900
+   },
+   {
+    "name": "Papermania Kraft Card A4 50 Sheets",
+    "qty": 2,
+    "linePence": 1300
+   }
+  ],
+  "subtotalPence": 22400,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 22795
+ }
+}

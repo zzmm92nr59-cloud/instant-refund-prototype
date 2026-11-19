@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-game-preorder",
+ "sender": "GAME",
+ "layout": "pre-order: release date line, pay on dispatch",
+ "headers": {
+  "from": "GAME <orders@game.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your pre-order is confirmed G-77120044",
+  "date": "Sun, 1 Nov 2026 18:00:00 +0000"
+ },
+ "html": "",
+ "text": "GAME\nPre-order confirmation\nOrder number: G-77120044\nOrder date: 01/11/2026\n\nHollow Knight: Silksong Collector's Edition (Nintendo Switch 2)\nRelease date: 12 March 2027\nQty: 1   £79.99\n\nPro Controller Charging Dock\nIn stock - dispatches today\nQty: 1   £24.99\n\nYou won't be charged for pre-order items until they are dispatched.\n\nSubtotal £104.98\nDelivery FREE\nTotal £104.98",
+ "expected": {
+  "shop": "GAME",
+  "date": "2026-11-01",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Hollow Knight: Silksong Collector's Edition (Nintendo Switch 2)",
+    "qty": 1,
+    "linePence": 7999
+   },
+   {
+    "name": "Pro Controller Charging Dock",
+    "qty": 1,
+    "linePence": 2499
+   }
+  ],
+  "subtotalPence": 10498,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 10498
+ }
+}

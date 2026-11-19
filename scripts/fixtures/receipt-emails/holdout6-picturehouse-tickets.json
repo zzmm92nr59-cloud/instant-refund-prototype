@@ -1,0 +1,40 @@
+{
+ "id": "holdout6-picturehouse-tickets",
+ "sender": "Riverside Cinema",
+ "layout": "'Adult x 2  £25.00', a booking fee",
+ "headers": {
+  "from": "Riverside Cinema <tickets@riversidecinema.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your tickets for Paddington in Peru - booking RC-90021",
+  "date": "Fri, 6 Nov 2026 17:00:00 +0000"
+ },
+ "html": "",
+ "text": "Riverside Cinema\nBooking reference: RC-90021\nBooked on 6 November 2026\n\nPaddington in Peru (PG)\nSunday 8 November 2026, 14:30, Screen 2\nSeats E7, E8, E9\n\nAdult x 2   £25.00\nChild x 1   £8.50\nLarge Popcorn Combo   £9.50\n\nSubtotal   £43.00\nBooking fee   £1.95\nTotal   £44.95",
+ "expected": {
+  "shop": "Riverside Cinema",
+  "date": "2026-11-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Adult",
+    "qty": 2,
+    "linePence": 2500
+   },
+   {
+    "name": "Child",
+    "qty": 1,
+    "linePence": 850
+   },
+   {
+    "name": "Large Popcorn Combo",
+    "qty": 1,
+    "linePence": 950
+   }
+  ],
+  "subtotalPence": 4300,
+  "feesPence": 195,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4495
+ }
+}

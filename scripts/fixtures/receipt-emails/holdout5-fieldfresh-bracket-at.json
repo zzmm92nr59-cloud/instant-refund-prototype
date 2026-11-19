@@ -1,0 +1,40 @@
+{
+ "id": "holdout5-fieldfresh-bracket-at",
+ "sender": "Field Fresh",
+ "layout": "'Apples (6 @ £0.40)  £2.40'",
+ "headers": {
+  "from": "Field Fresh <orders@fieldfresh.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Field Fresh order 20041",
+  "date": "Sun, 18 Oct 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Field Fresh\nOrder 20041\n18 October 2026\n\nBraeburn Apples (6 @ £0.40)   £2.40\nVine Tomatoes   £2.20\nOrganic Carrots 1kg (2 @ £1.35)   £2.70\n\nSubtotal £7.30\nDelivery £1.50\nTotal £8.80",
+ "expected": {
+  "shop": "Field Fresh",
+  "date": "2026-10-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Braeburn Apples",
+    "qty": 6,
+    "linePence": 240
+   },
+   {
+    "name": "Vine Tomatoes",
+    "qty": 1,
+    "linePence": 220
+   },
+   {
+    "name": "Organic Carrots 1kg",
+    "qty": 2,
+    "linePence": 270
+   }
+  ],
+  "subtotalPence": 730,
+  "feesPence": 150,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 880
+ }
+}

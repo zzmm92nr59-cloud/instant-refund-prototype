@@ -1,0 +1,45 @@
+{
+ "id": "holdout5-thelarder-service",
+ "sender": "The Larder",
+ "layout": "restaurant: '2 Lamb Rump £48.00', service charge, tip",
+ "headers": {
+  "from": "The Larder <bills@paytab.app>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from The Larder",
+  "date": "Wed, 28 Oct 2026 22:30:00 +0000"
+ },
+ "html": "",
+ "text": "The Larder\n14 Example Street, Leeds\nTable 12 - 28/10/2026 22:14\n\n1 Sourdough & Butter      £4.50\n1 Burrata                 £11.00\n2 Lamb Rump               £48.00\n3 Peroni 330ml            £16.50\n\nSubtotal                  £80.00\nDiscretionary service 12.5%   £10.00\nTip                       £5.00\nTotal                     £95.00\n\nPaid by Visa ending 1234",
+ "expected": {
+  "shop": "The Larder",
+  "date": "2026-10-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sourdough & Butter",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Burrata",
+    "qty": 1,
+    "linePence": 1100
+   },
+   {
+    "name": "Lamb Rump",
+    "qty": 2,
+    "linePence": 4800
+   },
+   {
+    "name": "Peroni 330ml",
+    "qty": 3,
+    "linePence": 1650
+   }
+  ],
+  "subtotalPence": 8000,
+  "feesPence": 1000,
+  "discountsPence": 0,
+  "tipsPence": 500,
+  "totalPence": 9500
+ }
+}

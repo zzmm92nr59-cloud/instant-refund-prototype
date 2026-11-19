@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-fieldfest-label-lines",
+ "sender": "Field Fest",
+ "layout": "tickets: 'Ticket type' over the name, 'Quantity' over 2",
+ "headers": {
+  "from": "Field Fest <tickets@fieldfest.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Field Fest 2027 tickets, order FF-221093",
+  "date": "Wed, 14 Oct 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Field Fest</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fieldfest.co.uk/?utm_source=email\"><img src=\"https://www.fieldfest.co.uk/static/email/logo.png\" alt=\"Field Fest\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: FF-221093</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Ordered on 14 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><div><div>Ticket type</div><div>Weekend Camping Ticket</div><div>Quantity</div><div>2</div><div>Price</div><div>£470.00</div></div></td></tr>\n<tr><td style=\"padding:6px 24px\"><div><div>Ticket type</div><div>Car Park Pass</div><div>Quantity</div><div>1</div><div>Price</div><div>£35.00</div></div></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£505.00</td></tr><tr><td>Booking fee</td><td>£24.00</td></tr><tr><td><strong>Total</strong></td><td><strong>£529.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Field Fest. All rights reserved.<br /><a href=\"https://www.fieldfest.co.uk/help\">Help</a> | <a href=\"https://www.fieldfest.co.uk/privacy\">Privacy</a> | <a href=\"https://www.fieldfest.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fieldfest.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Field Fest",
+  "date": "2026-10-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Weekend Camping Ticket",
+    "qty": 2,
+    "linePence": 47000
+   },
+   {
+    "name": "Car Park Pass",
+    "qty": 1,
+    "linePence": 3500
+   }
+  ],
+  "subtotalPence": 50500,
+  "feesPence": 2400,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 52900
+ }
+}
