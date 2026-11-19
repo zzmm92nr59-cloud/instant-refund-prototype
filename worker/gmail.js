@@ -140,7 +140,11 @@ const GONE = Symbol("gone");
 // at £0.00, sizes under a row, guide prices, "Ordered on" dates, cells copied with tabs, fares without a journey flagged.
 // 39 (round 9): the name check (item-names.js): itemsCheck.namesOk and suspectNames, so a note, a label, a size or a code
 // read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
-export const PARSER_VERSION = 39;
+// 40 (round 10, Connor's real inbox): Uber Eats receipts with no item list (merchant, itemsCheck.noItemList), Uber rides
+// as one ride, Uber Eats total adjustments (order_update "adjusted"), the takeaway restaurant (merchant), Sainsbury's
+// delivery-day payment (orderUpdate "paid", joined to its order), game packs, Apple service names and card-line totals, VAT on
+// top of a subtotal, changed Shopify orders, credits, Domino's total after its deal, and "there was no order" apologies.
+export const PARSER_VERSION = 40;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);

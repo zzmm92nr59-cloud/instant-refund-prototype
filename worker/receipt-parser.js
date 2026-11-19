@@ -1144,7 +1144,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     // (For one of something the price is the line's either way, so a new reading doesn't say which.)
     result.items = chosen.items.map(({ extras, ...i }) => { if (chosen !== older && (i.qty || 1) === 1 && i.lineTotal) delete i.lineTotal; return i; });
     // (Money taken off under an item, "Multi-buy discount: -£3.10", is a discount, never what the item is. Round 10.)
-    for (const i of result.items) if (i.variant) { const v = String(i.variant).split(/,\s*/).filter((p) => !MONEY_OFF_NOTE.test(p.trim())).join(", "); if (v) i.variant = v; else delete i.variant; }
+    for (const i of result.items) if (i.variant) { const v = String(i.variant).split(", ").filter((p) => !MONEY_OFF_NOTE.test(p.trim())).join(", "); if (v) i.variant = v; else delete i.variant; }
     result.itemsCheck = pick.check;
   } else {
     result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
@@ -1153,8 +1153,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // the thing bought is the row's name-like cell, the plan, not "SIM 1". Round 10.
   for (const i of result.items) {
     if (!/^(?:sim|line|item|row|s\.?\s?no\.?)\s*\d{1,2}$/i.test(String(i.name || "")) || !i.variant) continue;
-    const named = String(i.variant).split(/,\s*/).find((p) => /\p{Ll}/u.test(p) && (p.match(/\p{L}/gu) || []).length >= 5 && !/^e-?sim$|^(?:national|international|monthly|weekly|prepaid|pay as you go)$/i.test(p) && !/\d{6,}/.test(p));
-    if (named) { const rest = String(i.variant).split(/,\s*/).filter((p) => p !== named && !/^[A-Z0-9]{10,}$/.test(p)); i.name = named; if (rest.length) i.variant = rest.join(", "); else delete i.variant; }
+    const named = String(i.variant).split(", ").find((p) => /\p{Ll}/u.test(p) && (p.match(/\p{L}/gu) || []).length >= 5 && !/^e-?sim$|^(?:national|international|monthly|weekly|prepaid|pay as you go)$/i.test(p) && !/\d{6,}/.test(p));
+    if (named) { const rest = String(i.variant).split(", ").filter((p) => p !== named && !/^[A-Z0-9]{10,}$/.test(p)); i.name = named; if (rest.length) i.variant = rest.join(", "); else delete i.variant; }
   }
   // No total written, one thing bought, and its price the only amount anywhere in the email: that is what was paid.
   if (result.totalPence == null && result.items.length === 1 && Number.isInteger(result.items[0].pricePence) && (result.items[0].qty || 1) === 1) {

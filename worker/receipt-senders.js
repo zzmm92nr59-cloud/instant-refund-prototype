@@ -27,14 +27,16 @@ const tidyName = (s) => String(s || "").replace(/\s+/g, " ").replace(/[\s.,|]+$/
 //  * a changed total for an earlier Eats order ("We adjusted the total for your recent order from Grill & Do", "Previous
 //    total", "Refund -£8.76", "New Total"): money back on that order, never a new purchase.
 export function uberEmail(domain, subject, text) {
-  if (!/(^|\.)uber\.com$/i.test(domain || "")) return null;
   const t = String(text || "").slice(0, 20000), list = rows(t);
+  // (A receipt pasted in has no sender: it is Uber's when it says so itself.)
+  if (!/(^|\.)uber\.com$/i.test(domain || "") && !(!domain && /\buber\b/i.test(t.slice(0, 3000) + " " + (subject || "")))) return null;
   const top = t.slice(0, 3000);
   const adj = /\bwe (?:adjusted|have adjusted|(?:'|’)ve adjusted) the total for your (?:recent )?order from ([^\n|]{2,80}?)\s*[.|\n]/i.exec(top);
   if (adj || (/\bprevious total\b/i.test(t) && /\bnew total\b/i.test(t))) {
     return { kind: "adjusted", merchant: adj ? tidyName(adj[1]) : null, refundPence: labelled(list, /refund/), previousPence: labelled(list, /previous total/), newPence: labelled(list, /new total/) };
   }
-  if (/\bthanks for riding\b|\bwe hope you enjoyed your (?:ride|trip)\b|\byour [^\n]{0,30}\btrip with uber\b/i.test(top + "\n" + (subject || "")) && /\btrip fare\b|\bfare\b/i.test(t)) {
+  if ((/\bthanks for riding\b|\bwe hope you enjoyed your (?:ride|trip)\b|\byour [^\n]{0,30}\btrip with uber\b/i.test(top + "\n" + (subject || "")) && /\btrip fare\b|\bfare\b/i.test(t)) ||
+      (/^[\s|]*trip fare\b/im.test(t) && !/\bhere(?:'|’)s your receipt for\b|\buber eats\b/i.test(top))) {
     const pet = /\buber pet\b|\bpet fee\b/i.test(t);
     return { kind: "ride", item: pet ? "Uber Pet ride" : "Uber ride" };
   }
