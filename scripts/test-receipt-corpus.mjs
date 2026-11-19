@@ -170,6 +170,15 @@ else {
 }
 console.log(`  Split shipments: ${splitWrong.length ? splitWrong.join("; ") : "one card per order, every item once, complete only when it is"}`);
 
+// Round 4: an email whose HTML is mostly one enormous attribute (a 300 KB tracking address and style) is still read, and
+// quickly: the order after it is not pushed out of what is read. (Made-up email.)
+const longAttr = "x".repeat(300000);
+const bulky = `From: Example Shop <orders@exampleshop.co.uk>\r\nSubject: Your Example Shop order ES-30001\r\nDate: Mon, 16 Nov 2026 10:00:00 +0000\r\nContent-Type: text/html; charset=utf-8\r\n\r\n` +
+  `<html><body><a href="https://t.example.com/?u=${longAttr}">View in browser</a><p>Order number: ES-30001</p><table style="${"color:#222;".repeat(30000)}"><tr><td>Linen Shirt White</td><td>Qty 1</td><td>£35.00</td></tr></table><p>Subtotal £35.00</p><p>Total £35.00</p></body></html>`;
+const bulkyAt = Date.now(), bulkyRead = parseReceiptEmail(bulky), bulkyMs = Date.now() - bulkyAt;
+const bulkyOk = bulkyRead.ok && bulkyRead.totalPence === 3500 && bulkyRead.items.length === 1 && bulkyRead.itemsCheck.complete === true && bulkyMs < 2000;
+console.log(`  A 600 KB email that is mostly one attribute: ${bulkyOk ? "read" : "NOT read"} in ${bulkyMs} ms`);
+
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
@@ -180,6 +189,7 @@ need(sameAsSent.length === 0, "a forwarded email reads the same as the original 
 need(rows.filter((r) => r.count).length === 0, "the number of items an email states is read");
 need(rows.filter((r) => r.ok && r.attachment).length === 0, "a receipt only in its attachment says so, and no other receipt does");
 need(splitWrong.length === 0, "a split shipment's emails make one card with every item once");
+need(bulkyOk, "an email that is mostly one enormous attribute is still read, quickly");
 need(countCaught, "the item count an email states flags a miss the money can't see");
 need(a.shop === a.n && b.shop === b.n, "the shop is named right on every email, as sent and forwarded");
 need(a.date === a.n && b.date === b.n, "the order's date is read right on every email, as sent and forwarded");

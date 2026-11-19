@@ -185,7 +185,9 @@ function collectParts(headers, body, out, depth = 0) {
   }
   // (Line ends as sent, "\r\n", become "\n": a shop's name at the end of a line would otherwise carry the "\r".)
   let decoded = decodeBody(headers, body);
-  if (/text\/html/i.test(type)) decoded = decoded.replace(/\bdata:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{200,}/gi, "data:,");
+  // (And any attribute far longer than a person would read, a tracking address or a style written out 300 KB long, is
+  // emptied: it says nothing about the order and would push the order out of what is read.)
+  if (/text\/html/i.test(type)) decoded = decoded.replace(/\bdata:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{200,}/gi, "data:,").replace(/(\s[a-z][a-z0-9:-]*\s*=\s*)(["'])[^"'<>]{4000,}?\2/gi, '$1""');
   decoded = withoutMojibake(withoutInvisible(unwrapSafeLinks(decoded.slice(0, MAX_INPUT)))).replace(/\r\n?/g, "\n");
   if (/text\/html/i.test(type)) out.html.push(decoded);
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
