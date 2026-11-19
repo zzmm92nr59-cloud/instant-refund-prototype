@@ -212,6 +212,50 @@ export const MAX_EMAIL_BYTES = 3_000_000;
 // The emails of one round, as text, are held together until the window is saved: once they come to this much, the rest of
 // the window is left for the next round (the round says there is more).
 const ROUND_TEXT_CHARS = 12_000_000;
+// ---- One round's work is bounded (19 Nov 2026) ----
+// Connor's mailbox, re-read for reader 43, stalled: about half the year rounds the app asked for ended with "Failed to
+// fetch", and the background catch-up stopped moving at all. Two things together:
+//  * The reader took time that grew with the square of a line's length on a long line (receipt-items.js splitCell and the
+//    "£ ... total" check in receipt-parser.js): a 16,000-character line took a minute, a whole email written as one long
+//    line many minutes. Cloudflare ends such a request for using too much processing time, with its own error page (no
+//    CORS headers, so the app sees only "Failed to fetch"). Those checks now take time in proportion to the line.
+//  * A round read every email of a date window and saved them all at the end, so a round ended part-way saved nothing:
+//    the next round read the same emails, met the same email, and was ended again, every time (the catch-up for good).
+// Now a round reads, goes through and saves a few emails at a time, stops starting more after ROUND_MS (the next round
+// carries on), and a year round or catch-up round remembers which emails it is in the middle of: when a round was ended
+// part-way, each of those is read on its own next time, and after MAX_READ_TRIES such ends it is left out as not read
+// (a receipt already read by an older reader keeps what it had), so no email can stop a mailbox being read.
+const ROUND_MS = 15_000;
+const MAX_SUSPECTS = 60;
+// Only one year round or background catch-up reads a mailbox at a time (they used to read the same mailbox side by side).
+// The app's year round goes first: the catch-up leaves a mailbox alone while the app has asked for a year round in the
+// last APP_READ_MS, and waits for the app's round to finish. A round that was ended part-way gives the mailbox back after
+// READ_LEASE_MS (or at once to the app's next year round: the app asks for one round at a time).
+const READ_LEASE_MS = 60_000, APP_READ_MS = 120_000;
+export function ensureReadColumns(db) {
+  return ensureOnce(db, "mail-read-lease", async () => {
+    for (const col of ["read_lease_until INTEGER", "read_lease_kind TEXT", "read_lease_id TEXT", "read_inflight TEXT", "read_suspects TEXT", "app_read_at INTEGER"]) {
+      try { await db.prepare("ALTER TABLE gmail_connections ADD COLUMN " + col).run(); } catch { /* already there */ }
+    }
+  });
+}
+// Takes the mailbox for one round ("app": a year round the app asked for; "bg": the background catch-up). Returns a
+// release function, or { busyMs } when the other kind has it.
+async function takeMailbox(env, boxId, kind, now) {
+  const db = env.RELAY_DB;
+  await ensureReadColumns(db);
+  const id = randomToken();
+  if (kind === "app") await db.prepare("UPDATE gmail_connections SET app_read_at = ? WHERE shopper_id = ?").bind(now, boxId).run();
+  const got = await db.prepare(
+    `UPDATE gmail_connections SET read_lease_until = ?, read_lease_kind = ?, read_lease_id = ? WHERE shopper_id = ?
+       AND (read_lease_until IS NULL OR read_lease_until < ? OR (? = 'app' AND read_lease_kind = 'app')) RETURNING shopper_id`)
+    .bind(now + READ_LEASE_MS, kind, id, boxId, now, kind).first();
+  if (!got) {
+    const r = await db.prepare("SELECT read_lease_until AS until FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
+    return { busyMs: Math.max(1000, Math.min(READ_LEASE_MS, ((r && r.until) || now) - now)) };
+  }
+  return { release: () => db.prepare("UPDATE gmail_connections SET read_lease_until = NULL, read_lease_kind = NULL, read_lease_id = NULL WHERE shopper_id = ? AND read_lease_id = ?").bind(boxId, id).run().catch(() => {}) };
+}
 // A response's body up to max bytes: { bytes, cut } (cut: there was more, and it was not downloaded).
 async function bodyUpTo(res, max) {
   const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
@@ -489,13 +533,17 @@ const CATCH_UP_MAILBOXES = 2;
 // A catch-up round reads twice what a round the app waits for does (that one has to answer quickly): a long-time shopper's
 // look-back period and earlier years come to several thousand emails, and nobody is waiting on this round's reply.
 const CATCH_UP_FETCH = 80, CATCH_UP_BUDGET = 240;
+// (It shares its minute with the scans the shoppers left running, so it stops starting new reads after this long.)
+const CATCH_UP_MS = 20_000;
 export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
   if (!env.RELAY_DB) return { checked: 0 };
   await ensureGmailTables(env.RELAY_DB);
   await ensureAutoColumns(env.RELAY_DB);
+  await ensureReadColumns(env.RELAY_DB);
+  const started = Date.now();
   const staleYear = `SELECT h.year FROM gmail_history_years h WHERE h.shopper_id = g.shopper_id AND h.done_at IS NOT NULL AND COALESCE(h.rev, 0) < ? ORDER BY h.year DESC LIMIT 1`;
   const rows = ((await env.RELAY_DB.prepare(
-    `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev,
+    `SELECT g.shopper_id AS id, g.last_scan_at AS lastScanAt, g.auto_cursor AS cursor, g.provider AS provider, g.full_rev AS fullRev, g.app_read_at AS appReadAt,
        (${staleYear}) AS staleYear FROM gmail_connections g
      WHERE (COALESCE(g.full_rev, 0) < ? OR (${staleYear}) IS NOT NULL)
        AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
@@ -507,15 +555,23 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
     if (calls > CATCH_UP_BUDGET - 12) continue;
     const recent = needsFullRead(r.lastScanAt, r.provider, r.fullRev);
     if (!recent && !r.staleYear) continue;
+    // The app is reading a year of this mailbox: it goes first (see takeMailbox).
+    if (r.appReadAt && now - r.appReadAt < APP_READ_MS) continue;
+    const left = CATCH_UP_MS - (Date.now() - started);
+    if (left < 2000) continue;
+    const lease = await takeMailbox(env, r.id, "bg", now);
+    if (lease.busyMs) continue;
     let back, year = null;
+    const o = { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH, track: true, deadlineMs: left };
     try {
-      if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH });
+      if (recent) back = await scan(env, r.id, fetchImpl, now, cursorFor(r.cursor) || "", false, o);
       else {
         year = r.staleYear;
         const h = await env.RELAY_DB.prepare("SELECT cursor FROM gmail_history_years WHERE shopper_id = ? AND year = ?").bind(r.id, year).first();
-        back = await scan(env, r.id, fetchImpl, now, cursorFor(h && h.cursor) || "", false, { budget: CATCH_UP_BUDGET - calls, maxFetch: CATCH_UP_FETCH, year });
+        back = await scan(env, r.id, fetchImpl, now, cursorFor(h && h.cursor) || "", false, { ...o, year });
       }
     } catch (e) { back = { status: 500, body: {} }; }
+    finally { await lease.release(); }
     calls += back.calls || 3;
     // Where to carry on from next minute (the 15-minute check uses the same place, so the two never go over the same ground).
     // A finished year is marked with its reader by scan() itself.
@@ -1125,6 +1181,29 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   const token = access.token;
   const box = row.provider === "microsoft" ? outlookMailbox(fetchImpl, token) : gmailMailbox(fetchImpl, token);
   let added = 0, skipped = 0, ignored = 0, updated = 0, fetched = 0, imagesTried = 0;
+  // How long this round may keep starting to read more emails, and how much email text it may go through (see "One round's
+  // work is bounded" above).
+  const startedAt = Date.now(), deadlineMs = o.deadlineMs || ROUND_MS;
+  let held = 0;
+  // A year round or a background catch-up (each holds the mailbox, see takeMailbox) remembers which emails it is reading
+  // until they are saved. If the last such round was ended part-way (Cloudflare ends a request that runs out of memory or
+  // processing time, and nothing in this code can catch that), those emails are under suspicion: each is read on its own.
+  let track = null, trackStatement = null;
+  if (o.track) {
+    const t = await env.RELAY_DB.prepare("SELECT read_inflight AS inflight, read_suspects AS suspects FROM gmail_connections WHERE shopper_id = ?").bind(boxId).first();
+    let suspects = {};
+    try { suspects = (t && t.suspects && JSON.parse(t.suspects)) || {}; } catch { suspects = {}; }
+    let inflight = [];
+    try { inflight = (t && t.inflight && JSON.parse(t.inflight)) || []; } catch { inflight = []; }
+    for (const ref of Array.isArray(inflight) ? inflight : []) if (typeof ref === "string") suspects[ref] = (suspects[ref] || 0) + 1;
+    // (Kept short: an email that has since gone from the mailbox is forgotten after a while.)
+    const keys = Object.keys(suspects);
+    for (const k of keys.slice(0, Math.max(0, keys.length - MAX_SUSPECTS))) delete suspects[k];
+    track = { suspects };
+    trackStatement = (refs) => env.RELAY_DB.prepare("UPDATE gmail_connections SET read_inflight = ?, read_suspects = ? WHERE shopper_id = ?")
+      .bind(refs && refs.length ? JSON.stringify(refs) : null, Object.keys(track.suspects).length ? JSON.stringify(track.suspects) : null, boxId);
+    if (inflight.length) await trackStatement(null).run();
+  }
   // After one complete scan, later scans only look at recent mail (with a few days of overlap), so opening the app never re-reads the whole mailbox.
   const fullLimit = now - LOOKBACK_DAYS * DAY_MS;
   const sinceLast = o.sinceMs ? Math.max(fullLimit, o.sinceMs) : !full && !needsFullRead(row.last_scan_at, row.provider, row.full_rev) ? Math.max(fullLimit, row.last_scan_at - 3 * DAY_MS) : fullLimit;
@@ -1139,6 +1218,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
   let incomplete = false, windows = 0, outOfBudget = false, span = o.span || WINDOW_DAYS;
   while (windows < MAX_WINDOWS_PER_CALL && before > limitDay) {
     if (calls + 4 > budget) { outOfBudget = true; break; }
+    if (windows > 0 && Date.now() - startedAt > deadlineMs) break;   // the next round carries on from here
     const afterD = ymd(fromYmd(before) - span * DAY_MS);
     incomplete = false;
     const listed = await box.list(afterD, before, () => calls + 4 <= budget);
@@ -1162,25 +1242,20 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
     const toRead = [];
     for (let i = 0; i < ids.length && fetched + toRead.length < maxFetch && calls + toRead.length + 2 < budget; i++) {
       const sn = known.get(refs[i]);
-      if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
+      if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(i);
     }
     const rawById = new Map(), writes = [], fresh = [], par = box.parallel || FETCH_PARALLEL;
-    let held = 0;
-    for (let i = 0; i < toRead.length && held < ROUND_TEXT_CHARS; i += par) {
-      await Promise.all(toRead.slice(i, i + par).map(async (mid) => {
-        try { const t = await box.read(mid); rawById.set(mid, t); if (typeof t === "string") held += t.length; } catch (e) { rawById.set(mid, null); }
-      }));
-    }
-    for (let i = 0; i < ids.length; i++) {
+    // What one email comes to (unchanged from when a whole window was read first and then gone through).
+    const handle = async (i, giveUpNow) => {
       const id = ids[i], ref = refs[i];
       const seen = known.get(ref);
       // Anything read by an older version of the reader is read once more.
       const stale = seen && JSON.parse(seen.details).parserVersion !== PARSER_VERSION;
-      if (seen && !stale) { skipped++; continue; }
-      if (!rawById.has(id)) { incomplete = true; continue; }   // left for the next round
+      if (seen && !stale) { skipped++; return; }
+      if (!rawById.has(id)) { incomplete = true; return; }   // left for the next round
       fetched++;
       const rawText = rawById.get(id);
-      if (rawText === GONE) continue;   // deleted or moved since it was listed
+      if (rawText === GONE) return;   // deleted or moved since it was listed
       // One email the reader trips over must not stop the round (and with it the whole year, every time it is tried): it is
       // remembered as not read, the same way as an email the mailbox couldn't give, and the rest are read.
       let cls = null;
@@ -1192,7 +1267,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         // The mailbox couldn't give this email just now. It used to be skipped for good (that is how Outlook receipts went
         // missing); now it is remembered and read again in a later round, up to MAX_READ_TRIES times.
         const prevDetails = seen ? JSON.parse(seen.details) : null;
-        const tries = ((prevDetails && prevDetails.readTries) || 0) + 1, giveUp = tries >= MAX_READ_TRIES;
+        const tries = Math.max(((prevDetails && prevDetails.readTries) || 0) + 1, giveUpNow ? MAX_READ_TRIES : 0), giveUp = tries >= MAX_READ_TRIES;
         if (prevDetails && prevDetails.kind !== "not_receipt") {
           // A receipt already read by an older reader keeps what it has; it is only re-read once the email can be fetched.
           writes.push(env.RELAY_DB.prepare("UPDATE captured_receipts SET details = ? WHERE shopper_id = ? AND message_ref = ?")
@@ -1205,7 +1280,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
               .bind(crypto.randomUUID(), shopperId, ref, "not_receipt", placeholder, now));
         }
         if (!giveUp) incomplete = true;   // this window is read again next round
-        continue;
+        return;
       }
       const details = slot ? { ...cls.details, mailbox: slot } : cls.details, status = cls.status;
       let imageToStore = null;
@@ -1214,7 +1289,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       const receiptId = seen ? seen.id : crypto.randomUUID();
       // Its codes to show or scan: their pictures are fetched now, once (some stop working within days). An email whose
       // pictures this round has no outside calls left for waits for the next round, unless it is the round's first.
-      if (codeFetchCount(cls.codes) && calls + codeFetchCount(cls.codes) + 2 > budget && fetched > 1) { fetched--; incomplete = true; continue; }
+      if (codeFetchCount(cls.codes) && calls + codeFetchCount(cls.codes) + 2 > budget && fetched > 1) { fetched--; incomplete = true; return; }
       const codeWrites = await codeStatements(env, fetchImpl, shopperId, receiptId, cls.codes, { had: Boolean(prev.codeCount), now, orderRef: details.orderRef, sameOrderRef, canFetch: () => calls + 1 < budget });
       if (status === "not_receipt") ignored++;
       if (details.kind === "receipt") {
@@ -1248,7 +1323,7 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
         writes.push(...codeWrites);
         if (status !== "not_receipt") updated++;
-        continue;
+        return;
       }
       writes.push(env.RELAY_DB.prepare(
         "INSERT OR IGNORE INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
@@ -1256,11 +1331,46 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (imageToStore) writes.push(imageStatement(env, shopperId, imageToStore, now));
       writes.push(...codeWrites);
       if (status !== "not_receipt") { added++; fresh.push({ id: receiptId, details }); }
+    };
+    // Emails already read by this reader are counted; the rest that this round has no room for are left for the next.
+    const reading = new Set(toRead);
+    for (let i = 0; i < ids.length; i++) if (!reading.has(i)) await handle(i);
+    // The emails are read, gone through and saved a few at a time (see "One round's work is bounded" above): what a round
+    // has read is kept even if it is ended part-way, it holds only a few emails' text at once, and it stops starting
+    // more once it has used its time. An email that was being read when a round was ended is read on its own next time,
+    // and left out (as not read) once that has happened MAX_READ_TRIES times.
+    const groups = [];
+    for (const i of toRead) {
+      if (track && track.suspects[refs[i]]) groups.push([i]);
+      else if (groups.length && groups[groups.length - 1].length < par && !(track && track.suspects[refs[groups[groups.length - 1][0]]])) groups[groups.length - 1].push(i);
+      else groups.push([i]);
     }
-    // Everything read in this window is saved in one database call.
+    let g = 0;
+    for (; g < groups.length; g++) {
+      if (held >= ROUND_TEXT_CHARS || (g > 0 || windows > 0) && Date.now() - startedAt > deadlineMs) break;
+      const group = groups[g], over = new Set();
+      if (track) {
+        for (const i of group) if ((track.suspects[refs[i]] || 0) >= MAX_READ_TRIES) over.add(i);
+        const go = group.filter(i => !over.has(i)).map(i => refs[i]);
+        if (go.length) await trackStatement(go).run();
+      }
+      await Promise.all(group.filter(i => !over.has(i)).map(async (i) => {
+        const mid = ids[i];
+        try { const t = await box.read(mid); rawById.set(mid, t); if (typeof t === "string") held += t.length; } catch (e) { rawById.set(mid, null); }
+      }));
+      for (const i of group) {
+        if (over.has(i)) rawById.set(ids[i], null);
+        await handle(i, over.has(i));
+        rawById.delete(ids[i]);
+      }
+      if (track) { for (const i of group) delete track.suspects[refs[i]]; writes.push(trackStatement(null)); }
+      if (writes.length) await env.RELAY_DB.batch(writes.splice(0));
+      // The shops of new receipts are counted in Relay's shop directory (shop-directory.js: the shop only, never who).
+      if (fresh.length) await recordReceiptShops(env, shopperId, fresh.splice(0), now);
+    }
+    // Whatever this round had no time left for is read next round, from this window.
+    if (g < groups.length) incomplete = true;
     if (writes.length) await env.RELAY_DB.batch(writes.splice(0));
-    // The shops of new receipts are counted in Relay's shop directory (shop-directory.js: the shop only, never who).
-    if (fresh.length) await recordReceiptShops(env, shopperId, fresh.splice(0), now);
     windows++;
     if (incomplete) break;       // stay on this window until every email in it is read
     // An Outlook window with more emails than one round lists carries on from the day of the oldest one listed
@@ -1296,9 +1406,15 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
 // inbox has (then asking again reads them all again). An inbox that needs connecting again is passed over too, and the
 // answer says so (skipped), so the others are still read.
 async function yearRound(env, shopperId, fetchImpl, now, year, cursorIn, small) {
-  const o = { ...(small ? { maxFetch: 2 } : {}), year };
+  const o = { ...(small ? { maxFetch: 2 } : {}), year, track: true };
+  // One round reads one inbox, holding it while it does (see takeMailbox): the background catch-up waits meanwhile.
+  const held = async (boxId, cursor) => {
+    const lease = await takeMailbox(env, boxId, "app", now);
+    if (lease.busyMs) return { status: 503, body: { error: "scan_busy", retryAfterMs: lease.busyMs } };
+    try { return await scan(env, boxId, fetchImpl, now, cursor, false, o); } finally { await lease.release(); }
+  };
   const boxes = await inboxesOf(env.RELAY_DB, shopperId);
-  if (boxes.length <= 1) return scan(env, shopperId, fetchImpl, now, cursorIn, false, o);
+  if (boxes.length <= 1) return held(shopperId, cursorIn);
   const ids = boxes.map(b => b.shopper_id);
   const done = new Set(((await env.RELAY_DB.prepare("SELECT shopper_id FROM gmail_history_years WHERE (shopper_id = ? OR shopper_id LIKE ?) AND year = ? AND done_at IS NOT NULL")
     .bind(shopperId, shopperId + "~%", year).all()).results || []).map(x => x.shopper_id));
@@ -1312,7 +1428,7 @@ async function yearRound(env, shopperId, fetchImpl, now, year, cursorIn, small) 
   const next = todo.find(id => ids.indexOf(id) > ids.indexOf(boxId));
   const inboxOf = (id) => { const b = boxes.find(x => x.shopper_id === id); return { mailbox: slotOf(id), provider: b && b.provider === "microsoft" ? "microsoft" : "google" }; };
   const inbox = inboxOf(boxId);
-  const r = await scan(env, boxId, fetchImpl, now, dateCursor, false, o);
+  const r = await held(boxId, dateCursor);
   if (r.status !== 200) {
     if (boxId === shopperId || r.status >= 500) return r;
     const skipped = { ...inbox, error: r.body && r.body.error };
