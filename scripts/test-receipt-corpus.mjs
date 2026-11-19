@@ -406,7 +406,12 @@ const joinWrong = [];
   // The inbox scan never asks for the shopper's own sent mail (a receipt forwarded to someone else is a copy). Round 14.
   if (!/const windowQuery = [^\n]*-in:sent /.test(readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8"))) joinWrong.push("the Gmail search asks for sent mail");
   // A table booked but not paid for: read with its number and price, never a purchase in the inbox.
-  const { TABLE_BOOKING, PERSONAL_REPLY } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  const { TABLE_BOOKING, PERSONAL_REPLY, POINTS_FLIGHT } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const r = parseReceiptEmail(rawEmail(app ? forwarded(POINTS_FLIGHT, app) : POINTS_FLIGHT));
+    if (!r.ok || r.retailer.name !== "British Airways" || r.orderDate !== "2026-11-06" || r.totalPence !== 310 || !r.items.length || r.items[0].variant !== "plus 12,500 points")
+      joinWrong.push(`points flight${app ? " (" + app + ")" : ""} read as ${r.ok ? [r.retailer.name, r.orderDate, r.totalPence, r.items[0] && r.items[0].variant].join(" ") : r.reason}`);
+  }
   { const r = parseReceiptEmail(rawEmail(PERSONAL_REPLY)); if (r.ok || r.reason !== "reply") joinWrong.push("a person's reply about an order read as " + (r.ok ? "a purchase" : r.reason)); }
   for (const app of [null, "gmail", "outlook", "apple"]) {
     const raw = rawEmail(app ? forwarded(TABLE_BOOKING, app) : TABLE_BOOKING);

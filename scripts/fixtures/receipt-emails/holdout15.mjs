@@ -91,3 +91,13 @@ export const TABLE_BOOKING = fixture("holdout15-table-booking-not-paid", "Tablef
 export const PERSONAL_REPLY = fixture("holdout15-personal-reply", "a person", "'Re: Thanks for your order!' from a personal address, quoting the order with its total", {
     from: "Alex Taylor <alex.taylor.example@hotmail.co.uk>", to: "sam.taylor.example@gmail.com", subject: "Re: Thanks for your order!", date: "Thu, 19 Nov 2026 14:01:00 +0000",
     text: "Done it\n\nFrom: Sam Taylor <sam.taylor@example.co.uk>\nSent: 19 November 2026 13:56\nSubject: Fwd: Thanks for your order!\n\nThanks for your order! Order number: VX-77120\nDriving Experience Voucher £89.00\nTotal £89.00" }, { notPurchase: { kind: "reply" } });
+
+// ---- An airline's e-ticket receipt for a reward flight: points and a small payment, paid two days before the flight -------
+// (Checked in the corpus test: the airline's name without "e-ticket", the payment's day, and the points beside the price.)
+export const POINTS_FLIGHT = fixture("holdout15-points-flight-eticket", "British Airways", "sender British Airways e-ticket (its real address, as the airline fixtures use; the rest made up); itinerary rows; 'Points debited | 12500'; 'Payment Total | GBP 3.10'; 'Payment Date | 6 Nov 2026'", {
+  from: "British Airways e-ticket <BA.e-ticket@email.ba.com>", subject: "Your e-ticket receipt QW7RT2: 8 Nov 2026 18:40", date: "Fri, 6 Nov 2026 09:00:00 +0000",
+  html: mail("Skyline Air", "skylineair.example", ["Your e-ticket receipt", "Dear Mr Taylor , | Booking reference: QW7RT2", "Thank you for booking with British Airways.", "Ticket Type: e-ticket",
+    "Your Itinerary", "BA0412", "British Airways", "Economy", "Confirmed", "8 Nov 2026", "18:40", "Heathrow (London)", "Terminal 5", "8 Nov 2026", "21:50", "Charles de Gaulle (Paris)", "Terminal 2A",
+    "Passenger | MR SAM TAYLOR", "Payment Information", "Ticket Number(s) | 555-0000000001", "Redemption Type | Standard", "Card Type | Visa Debit", "Points debited | 12500",
+    "Payment Total | GBP 3.10", "Payment Date | 6 Nov 2026", "Flight tickets issued by | British Airways, UK"]),
+  text: "Your e-ticket receipt\nBooking reference: QW7RT2\nThank you for booking with British Airways.\nYour Itinerary\nBA0412: British Airways | Economy | Confirmed\nDepart: 8 Nov 2026 18:40 - Heathrow (London) - Terminal 5\nArrive: 8 Nov 2026 21:50 - Charles de Gaulle (Paris) - Terminal 2A\nPayment Information\nPoints debited: 12500\nPayment Total: GBP 3.10\nPayment Date : 6 Nov 2026\n" }, { shop: "British Airways", date: "2026-11-06" });

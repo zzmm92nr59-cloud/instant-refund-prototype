@@ -1287,6 +1287,9 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   // runs the bookings): the subject names who was paid. Round 13.
   const paidTo = !sentName && /^(\p{Lu}[\p{L}\d&'’.-]{1,30}(?:\s+\p{Lu}[\p{L}\d&'’.-]{1,30}){0,2})\s+(?:[Cc]onfirmation of [Pp]ayment|[Pp]ayment [Cc]onfirmation)\s*$/u.exec(subject);
   if (paidTo) { ranked.name = paidTo[1]; ranked.domain = null; }
+  // ("British Airways e-ticket", "… Bookings": the sender's name for one kind of its emails; the shop is the name before it.
+  // Round 14.)
+  if (ranked.name) { const bare = ranked.name.replace(/\s+(?:e-?tickets?|bookings?|booking confirmations?|reservations)$/i, ""); if (bare !== ranked.name && bare.length >= 2) ranked.name = bare; }
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
   if (ranked.via) out.via = ranked.via;
@@ -1797,6 +1800,15 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (!result.orderRef && flight.ref) result.orderRef = flight.ref;
     if (result.totalPence == null && flight.paid) { result.totalPence = flight.paid.pence; result.currency = flight.paid.currency; }
     result.items = [{ name: flightItemName(flight.legs), qty: 1, pricePence: result.totalPence ?? null }];
+    // (A flight paid for with points, "Avios debited: 10750" over "Payment Total: GBP 2.50": the points said beside it, so the
+    // card never passes £2.50 off as the fare. Round 14.)
+    const both = (plain || "") + "\n" + (fromHtml || "");
+    const pts = /\b(avios|points|miles)\s+(?:debited|redeemed|used|spent)\s*:?[\s|]*([\d,]{2,9})\b/i.exec(both) || /\b([\d,]{2,9})\s+(avios|points|miles)\s+(?:debited|redeemed|used|spent)\b/i.exec(both);
+    if (pts) { const [n, unit] = /^\d/.test(pts[1]) ? [pts[1], pts[2]] : [pts[2], pts[1]]; const v = Number(n.replace(/,/g, "")); if (v > 0) result.items[0].variant = `plus ${v.toLocaleString("en-GB")} ${/^avios$/i.test(unit) ? "Avios" : unit.toLowerCase()}`; }
+    // (The day it was paid for, "Payment Date : 8 Jul 2026", not the day of the flight. Round 14.)
+    const paidOn = /\b(?:payment|purchase|booking|issue) date\s*:?[\s|]*(\d{1,2} [A-Za-z]{3,9},? \d{4})\b/i.exec(both) || /\bdate of (?:issue|payment|purchase)\s*:?[\s|]*(\d{1,2} [A-Za-z]{3,9},? \d{4})\b/i.exec(both);
+    const pd = paidOn ? parseDate(paidOn[1], refDate) : null;
+    if (pd) result.orderDate = pd;
   }
   // A travel booking names the journey in its subject: the journey is what was bought (its fare lines, "Anytime Day Return",
   // "1 Adult", are not things).
