@@ -157,5 +157,32 @@ for (const b of await page.locator(".rl-miss .rl-btn").all()) { const hgt = awai
 assert.deepEqual(errors, [], "no page errors");
 await ctx.close();
 console.log("ok - an email with no item list says so with the total (never 'missed'); a later refund shows the new total; a payment-only email says so");
+
+// 6. Round 12 (a real inbox): a hotel that can't be refunded, credit back, a booking paid in parts, a swapped item, and a
+// second order inside one email (shown, with its email, but nothing that would change the first order).
+const HOTEL = base("88888888-8888-4888-8888-888888888888", "Stayfinder", { totalPence: 11513, currency: "EUR", orderDate: day(-4), items: [{ name: "Standard Double Room", variant: "Harbour Hotel", qty: 1, pricePence: 11513 }],
+  itemsCheck: { complete: true, itemsPence: 11513, expectedPence: 11513, missingPence: 0 }, returns: { nonRefundable: true } });
+const CREDIT = base("99999999-9999-4999-8999-999999999999", "Just Eat", { merchant: "Olive Grove", totalPence: 2410, orderDate: day(-5), items: [{ name: "Falafel Wrap", qty: 1, pricePence: 2410 }],
+  itemsCheck: { complete: true, itemsPence: 2410, expectedPence: 2410, missingPence: 0 }, adjusted: { refundPence: 499, creditPence: 399, currency: "GBP" } });
+const TRIP = base("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "Sunbreaks", { totalPence: null, orderDate: day(-6), items: [], payments: [{ pence: 3800 }, { pence: 20077 }], paidSoFarPence: 23877,
+  itemsCheck: { complete: false, itemsPence: 0, expectedPence: null, missingPence: null } });
+const SWAP = base("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "Fresh Basket", { totalPence: 320, orderDate: day(-7), items: [{ name: "Italian Burrata 150g", qty: 1, pricePence: 320, substitutedFor: "Truffle Burrata 125g" }],
+  itemsCheck: { complete: true, itemsPence: 320, expectedPence: 320, missingPence: 0 } });
+const SECOND = base("cccccccc-cccc-4ccc-8ccc-cccccccccccc-2", "Riverside Market", { fromEmail: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", gmailId: "msgcccc0000", totalPence: 2400, orderDate: day(0), items: [{ name: "Eau de Toilette 30ml", qty: 1, pricePence: 2400 }],
+  itemsCheck: { complete: true, itemsPence: 2400, expectedPence: 2400, missingPence: 0 } });
+st = { receipts: [HOTEL, CREDIT, TRIP, SWAP, SECOND], log: [], reread: (id, j) => j({ error: "x" }, 500) };
+({ ctx, page, errors } = await shopper());
+const sheetOf = async (shop) => { await openFromHome(page, shop); const t = await sheetText(page); await page.locator(".rl-back").last().click({ position: { x: 10, y: 10 } }); await page.locator(".rl-back").last().waitFor({ state: "detached" }).catch(() => {}); return t; };
+assert.match(await sheetOf("Stayfinder"), /Non-refundable, as the booking email says\./);
+txt = await sheetOf("Olive Grove"); assert.match(txt, /£4\.99 refunded/); assert.match(txt, /£3\.99 given back as account credit\./);
+assert.match(await sheetOf("Sunbreaks"), /Paid so far: £238\.77 in 2 payments\./);
+assert.match(await sheetOf("Fresh Basket"), /Italian Burrata 150g was sent instead of Truffle Burrata 125g\./);
+await openFromHome(page, "Riverside Market");
+txt = await sheetText(page);
+assert.match(txt, /Eau de Toilette 30ml/);
+for (const word of ["Fix it yourself", "I'm sending this back", "Remind me"]) assert.ok(!txt.includes(word), "no '" + word + "' on a second order inside one email\n" + txt);
+assert.deepEqual(errors, [], "no page errors");
+await ctx.close();
+console.log("ok - non-refundable, credit back, paid so far, a swapped item, and a second order inside one email (shown, nothing that changes the first)");
 await browser.close(); server.close();
 console.log("PASS receipt items: '+ N more', item counts, 'may have missed some items' with Read it again and See the email");
