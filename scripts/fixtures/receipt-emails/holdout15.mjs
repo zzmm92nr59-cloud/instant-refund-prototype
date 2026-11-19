@@ -52,6 +52,23 @@ export default function holdout15() {
         "Riverside Quay 4, Quay Walk Bristol BS1 0ZZ", "Bill ID: 71200455 Customer: Guest Order Placed: 16/11/2026 12:30",
         "1 | Large Noodle Box | £10.49", "Subtotal | £10.49", "Total | £10.49"]) }, o, "Wokbox", "2026-11-16", { merchant: "Riverside Quay", orderRef: "71200455" });
   }
+  // ---- Not purchases: a parcel handed to the courier, and adverts that tell the shopper to order -------------------------
+  {
+    const np = (id, sender, layout, m, kind) => out.push(fixture(id, sender, layout, m, { notPurchase: { kind } }));
+    np("holdout15-parcel-with-courier", "Fitfuel", "a tracking service's 'Your Fitfuel order is with Royal Mail'; 'Our courier Royal Mail has received your order, 7781200.' and the items", {
+      from: "Fitfuel <Fitfuel@parcel-progress.example>", subject: "Your Fitfuel order is with Royal Mail", date: "Wed, 18 Nov 2026 07:00:00 +0000",
+      html: mail("Fitfuel", "fitfuel.example", ["Hello Sam,", "Our courier Royal Mail has received your order, 7781200.", "We'll let you know when your order is out for delivery.", "Track your delivery",
+        "Order number: 7781200", "Whey Blend 1kg | £24.99", "Shaker | £4.99", "Total | £29.98"]) }, "delivery_update");
+    np("holdout15-advert-order-now", "Giftcraft", "a newsletter 'Order now for Mother's Day delivery!' with products, prices and an offer code", {
+      from: "Giftcraft <news@email.giftcraft.example>", subject: "Order now for Mother's Day delivery!", date: "Thu, 19 Nov 2026 06:00:00 +0000",
+      html: mail("Giftcraft", "giftcraft.example", ["With Saturday delivery option", "Order number reference: GC-20417", "Engraved Photo Frame | £19.99", "Total | £19.99", "Shop now"]) }, "advert");
+    np("holdout15-advert-win-your-order", "Harbour Knit", "'Shop 25% off today to WIN your order' from newsletter@, with 'Your order number' in the competition terms", {
+      from: "Harbour Knit <newsletter@email.harbourknit.example>", subject: "Shop 25% off today to WIN your order", date: "Thu, 19 Nov 2026 06:30:00 +0000",
+      html: mail("Harbour Knit", "harbourknit.example", ["One winner every hour", "Your order number: HK-551023 enters you automatically", "Cable Jumper | £60.00", "Total | £45.00"]) }, "advert");
+    np("holdout15-advert-pre-order", "Grocer & Co", "'there’s still time to pre-order your Christmas Food to order' from a loyalty scheme's address", {
+      from: "Grocer & Co at Points <noreply@emails.grocerpoints.example>", subject: "Sam, there’s still time to pre-order your Grocer & Co Christmas Food to order", date: "Thu, 19 Nov 2026 07:00:00 +0000",
+      html: mail("Grocer & Co", "grocerco.example", ["Make hosting hassle free this Christmas", "Order number: 4410293", "Turkey Crown | £30.00", "Total | £30.00"]) }, "advert");
+  }
   return out;
 }
 

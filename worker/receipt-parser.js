@@ -842,6 +842,8 @@ function extractReturns(text, html, orderDate) {
 // Some of an order's items sent ("2 of your 3 items have shipped", "Part of your order HF-1 has been dispatched"): the items
 // in it are the order's, so it is read like its receipt and joins the order's card by its order number (gmail.js
 // mergeOrderEmails). Without an order number it would be a second card for the same order, so it is then not read at all.
+const CARRIER_WORDS = "royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|fedex|our courier|the courier|our delivery partner";
+const CARRIER_PROGRESS = new RegExp("\\b(?:order|parcel|package|delivery)\\b[^!?\\n]{0,30}\\b(?:is|has been) (?:now )?(?:with|handed (?:over )?to|collected by|received by) (?:" + CARRIER_WORDS + ")\\b|\\b(?:order|parcel|package)\\b[^!?\\n]{0,30}\\b(?:is out for delivery|has been delivered|was delivered)\\b", "i");
 const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?:have |has )?(?:shipped|dispatched|been sent|on (?:their|its) way)\b|\b(?:part|some) of your order\b[^!?]{0,40}\b(?:shipped|dispatched|sent|on its way)\b|\bsome of your items\b[^!?]{0,30}\b(?:shipped|dispatched|on (?:their|its) way)\b/i;
 // An invoice the email says is paid ("Thank you for your payment", "Amount paid £60.00", "Balance due £0.00"), and nothing in it
 // asks for money still to come ("Amount due £160.80", "Please pay by …", "Due date: …"). Round 8.
@@ -911,6 +913,7 @@ function looksLikeReceipt(subject, text) {
 // Promotions have their own place in Relay, so these are not receipts. An email that carries an order number is never treated as a promotion.
 // ("Grand Theft Auto VI: order now", "you've got until 16th December to place your pre-order": asking for an order. Round 11.)
 const PROMO_SUBJECT = /\b(order now|pre-?order|place your (?:pre-?)?order|buy now|book now|shop now|you(?:'|’)?ve saved|you saved|\d{1,3}\s?% off|up to \d{1,3}\s?%|sale\b|offers?\b|deals?\b|win\b|rewards?|earn(?:ed)? (?:\d+ )?points|your points|nectar|clubcard|new in\b|back in stock|just for you|don'?t miss|last chance|exclusive|voucher|refer a friend|rate your|how did we do|leave a review|review your|survey|newsletter|wishlist|abandoned|still thinking)\b/i;
+const STRONG_PROMO_SUBJECT = /^\W*order now\b|\bwin your (?:order|basket|purchase)\b|\bstill time to (?:pre-?)?order\b|\b(?:pre-?)?order (?:now|today|yours|in time) (?:for|before|to)\b/i;
 const ORDERISH_SUBJECT = /\b(order (?:confirmation|confirmed|received|number|summary)|your order|your receipt|receipt for|thanks? for your (?:order|purchase)|invoice|payment received)\b/i;
 // Money off the next order ("Up to £7 off your next order", "Save £5 on your first shop").
 const MONEY_OFF_SUBJECT = /(?:^|[\s(])(?:up to |save |get )?£\s?\d{1,4}(?:\.\d{2})?\s+off\b|\boff your (?:next|first)\b|(?:^|\s)save £\s?\d/i;
@@ -919,6 +922,13 @@ const MONEY_OFF_SUBJECT = /(?:^|[\s(])(?:up to |save |get )?£\s?\d{1,4}(?:\.\d{
 const PROMO_CREDIT_SUBJECT = /\b(?:promo(?:tional)?|discount) (?:code|credit)s?\b|\bhere(?:'|’)?s your (?:promo|promotional|discount|voucher|reward)\b|\b\d[\d,]*\s+bonus\s+(?:avios|points|miles)\b/i;
 export function looksPromotional(subject, headers, hasOrderRef) {
   const sub = String(subject || "");
+  // (An advert that tells the shopper to order, "Order now for Father's Day delivery!", "there's still time to pre-order your
+  // … Food to order", "Shop 25% off today to WIN your order": never a purchase, whatever order-like words or numbers it has.
+  // Round 14.)
+  if (STRONG_PROMO_SUBJECT.test(sub)) return true;
+  // (Nor a promotion sent from a shop's newsletter address, "news@", "newsletter@", "offers@". Round 14.)
+  const fromAddr = ((String((headers && headers.from) || "").match(/<([^>]+)>/) || [])[1] || String((headers && headers.from) || "")).trim();
+  if (/^(?:news|newsletters?|marketing|promo(?:tions?)?|offers|deals|specialoffers)@/i.test(fromAddr) && (PROMO_SUBJECT.test(sub) || MONEY_OFF_SUBJECT.test(sub))) return true;
   if (ORDERISH_SUBJECT.test(sub)) return false;
   if (PROMO_CREDIT_SUBJECT.test(sub)) return true;
   if (hasOrderRef) return false;
@@ -1653,6 +1663,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (its number, its price) and marked, and the inbox scan never makes it a purchase: the bill is. Round 14.)
   const tableBooking = /\btable for \d{1,2}\b|\byour table (?:is|has been) (?:booked|reserved|confirmed)\b/i.test(text.slice(0, 4000)) &&
     !/\b(?:paid|prepaid|pre-paid|deposit|charged|payment (?:received|taken|of)|amount taken|receipt)\b/i.test(String(subject || "") + "\n" + text.slice(0, 12000));
+  // (A parcel's progress, "Your Myprotein order is with Royal Mail", "Our courier … has received your order", "… is out for
+  // delivery", "… has been delivered": the order's journey, never a purchase of its own. Round 14.)
+  if (!opts.lenient && (CARRIER_PROGRESS.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || /\bour courier\b[^.\n]{0,40}\bhas (?:received|collected) your (?:order|parcel)\b/i.test(text.slice(0, 1500)))) {
+    return { ok: false, reason: "delivery_update", source: "shopper_email" };
+  }
   // A shop owning up that an earlier "order confirmation" was a marketing email ("There was no order. Nothing has been
   // charged"): nothing was bought (round 10).
   if (NO_ORDER.test(String(subject || "") + "\n" + text.slice(0, 3000).replace(/\s+/g, " "))) return { ok: false, reason: "no_order", source: "shopper_email" };
