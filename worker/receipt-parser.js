@@ -488,6 +488,18 @@ function dateFound(text, refDate) {
   return null;
 }
 
+// "Total: £62.75" with "£35.51" on the line under it, and money taken off in the email ("50% OFF PIZZAS … £-27.24") that is
+// the difference: the lower amount is what was paid (Domino's prints the total before its deal, then after). Round 10.
+function afterDiscount(text, m) {
+  if (m.index == null) return null;
+  const after = text.slice(m.index + m[0].length, m.index + m[0].length + 80);
+  const next = /^[\s|]*\n[\s|]*£\s?(\d[\d,]*\.\d{2})[\s|]*(?:\n|$)/.exec(after);
+  if (!next) return null;
+  const was = money(m[1]), now = money(next[1]);
+  if (!(now < was)) return null;
+  const off = [...text.matchAll(/(?:[-−–]\s?£|£\s?[-−–])\s?(\d[\d,]*\.\d{2})/g)].map((x) => money(x[1]));
+  return off.some((o) => Math.abs(was - o - now) <= 1) || Math.abs(was - off.reduce((n, o) => n + o, 0) - now) <= 1 ? now : null;
+}
 function fromText(text, refDate) {
   // Some plain-text parts write the pound sign as "L" ("L69.00" on its own line). Only whole lines that are just an amount are changed.
   text = text.replace(/^([ \t|]*)L\s?([0-9][0-9,]*\.[0-9]{2})[ \t|]*$/gm, "$1£$2");
@@ -609,7 +621,7 @@ function fromText(text, refDate) {
     orderRef: ref ? ref[1] : null,
     orderDate: parseDate(text, refDate),
     currency: /£|GBP/.test(text) ? "GBP" : foreign ? foreign.currency : null,
-    totalPence: totalMatch ? money(totalMatch[1]) : foreign ? foreign.minor : null,
+    totalPence: totalMatch ? afterDiscount(text, totalMatch) ?? money(totalMatch[1]) : foreign ? foreign.minor : null,
     items,
   };
 }
@@ -1068,6 +1080,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // The delivery-day email of a supermarket order: what was paid, for the order it names. Its few listed lines (substitutions,
   // short-life items) are not the order's items, which are on the confirmation and in the attached receipt.
   if (dayOf) { result.items = []; result.orderUpdate = "paid"; if (dayOf.orderRef) result.orderRef = dayOf.orderRef; result.totalPence = dayOf.paidPence; result.currency = "GBP"; }
+  // A company's legal name as the sender ("Anthropic Ireland, Limited"): the shop is the brand, not the country it bills
+  // from ("Anthropic"). Round 10.
+  if (fromName && /,?\s+(?:limited|ltd\.?|plc|inc\.?|llc|pbc|gmbh)\s*$/i.test(fromName) && result.retailer.name) {
+    const m = /^(.+?)\s+(?:ireland|uk|europe|emea|international)$/i.exec(result.retailer.name);
+    if (m && !/\b(?:of|de|bank)$/i.test(m[1]) && fromName.toLowerCase().startsWith(m[1].toLowerCase())) result.retailer = { ...result.retailer, name: m[1] };
+  }
   // The restaurant a takeaway app's order came from ("Your East Ocean order will be with you soon"), beside the app's name.
   const merchant = (uber && uber.kind === "eats" && uber.merchant) || takeawayMerchant(result.retailer.name, sender?.domain, subject, text);
   if (merchant) result.merchant = merchant;
@@ -1128,6 +1146,18 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     result.itemsCheck = pick.check;
   } else {
     result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+  }
+  // A row named only by its place in a table ("SIM 1 | ORDA… | eSIM | -- | National Plus | National | £5.00", Lycamobile):
+  // the thing bought is the row's name-like cell, the plan, not "SIM 1". Round 10.
+  for (const i of result.items) {
+    if (!/^(?:sim|line|item|row|s\.?\s?no\.?)\s*\d{1,2}$/i.test(String(i.name || "")) || !i.variant) continue;
+    const named = String(i.variant).split(/,\s*/).find((p) => /\p{Ll}/u.test(p) && (p.match(/\p{L}/gu) || []).length >= 5 && !/^e-?sim$|^(?:national|international|monthly|weekly|prepaid|pay as you go)$/i.test(p) && !/\d{6,}/.test(p));
+    if (named) { const rest = String(i.variant).split(/,\s*/).filter((p) => p !== named && !/^[A-Z0-9]{10,}$/.test(p)); i.name = named; if (rest.length) i.variant = rest.join(", "); else delete i.variant; }
+  }
+  // No total written, one thing bought, and its price the only amount anywhere in the email: that is what was paid.
+  if (result.totalPence == null && result.items.length === 1 && Number.isInteger(result.items[0].pricePence) && (result.items[0].qty || 1) === 1) {
+    const amounts = [...new Set([...text.matchAll(/£\s?(\d[\d,]*\.\d{2})/g)].map((m) => money(m[1])))];
+    if (amounts.length === 1 && amounts[0] === result.items[0].pricePence) { result.totalPence = amounts[0]; result.currency = "GBP"; result.totalFrom = "only_amount"; result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: amounts[0], expectedPence: amounts[0], missingPence: 0 }; }
   }
   const stated = statedItemCount(text) ?? (otherPart ? statedItemCount(otherPart) : null) ?? statedItemCount(String(subject || ""));
   if (stated) result.itemCount = stated;
