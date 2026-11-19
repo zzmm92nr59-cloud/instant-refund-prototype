@@ -57,7 +57,9 @@ const COLOUR_LINE = new RegExp("^" + COLOUR + "(?:\\s?[/&,]\\s?" + COLOUR + ")*$
 // Receipts in euros or dollars read the same way: their amounts are read as they are written (never converted; the
 // receipt's currency comes from its total, receipt-parser.js). Only for an email with no pound amounts at all.
 export function inPoundSigns(text) {
-  const t = String(text || "");
+  let t = String(text || "");
+  // (Pounds only in brackets beside dollars, "VAT $10.00 (£7.38)", are left out: the receipt is in dollars. Round 11.)
+  if (/£/.test(t) && !/£/.test(t.replace(/\(\s*£\s?[\d,]+(?:\.\d{2})?\s*\)/g, "")) && /\$\s?\d/.test(t)) t = t.replace(/\(\s*£\s?[\d,]+(?:\.\d{2})?\s*\)/g, "");
   if (/£/.test(t)) return t;
   return t.replace(/(?:US\s?\$|CA\$|AU?\$|€|\$)\s?(?=\d)/g, "£").replace(/(?<![\d.,])(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})\s?(?:€|EUR\b)/g, "£$1.$2")
     // ("39,95 €", "1.299,00 €": the comma is the decimal point.)

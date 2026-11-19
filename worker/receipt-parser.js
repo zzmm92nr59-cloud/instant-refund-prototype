@@ -369,8 +369,11 @@ export function foreignMinor(raw) {
   const n = Number(m[1].replace(/[.,]/g, "")) * 100 + Number(m[3] || 0);
   return Number.isSafeInteger(n) ? n : null;
 }
-function foreignTotal(text) {
-  if (/£|\bGBP\b/.test(text)) return null;
+function foreignTotal(text, opts = {}) {
+  // (Pounds only in brackets, "VAT $10.00 (£7.38)", is the tax shown in pounds for the record: the money is in dollars.
+  // Round 11.)
+  const poundsAside = String(text).replace(/\(\s*£\s?[\d,]+(?:\.\d{2})?\s*\)/g, "");
+  if (/£|\bGBP\b/.test(poundsAside)) return null;
   const found = [];
   for (const m of text.matchAll(F_BEFORE)) found.push({ index: m.index, label: m[0], sign: m[1], amount: m[2] });
   for (const m of text.matchAll(F_AFTER)) found.push({ index: m.index, label: m[0], sign: m[2], amount: m[1] });
@@ -382,7 +385,10 @@ function foreignTotal(text) {
   const sign = pick.sign.toUpperCase();
   let currency = sign === "€" || sign === "EUR" ? "EUR" : sign === "US$" || sign === "US $" || sign === "USD" ? "USD" : sign === "CA$" || sign === "CAD" ? "CAD" : /^(AU?\$|AUD)$/.test(sign) ? "AUD" : null;
   // A bare "$": only when the email names exactly one kind of dollar.
-  if (!currency && sign === "$") { const named = DOLLARS.filter(([, re]) => re.test(text)).map(([c]) => c); if (named.length === 1) currency = named[0]; }
+  if (!currency && sign === "$") { const named = DOLLARS.filter(([, re]) => re.test(text)).map(([c]) => c); if (named.length === 1) currency = named[0];
+    // (A software company's card receipt through Stripe that names no kind of dollar, "Receipt from Eleven Labs Inc.",
+    // "$60.00": Stripe writes every other dollar with its country, "CA$", "A$", so a bare "$" there is the US dollar. Round 11.)
+    else if (!named.length && opts.stripe) currency = "USD"; }
   const minor = foreignMinor(pick.amount);
   return currency && minor != null ? { currency, minor } : null;
 }
@@ -521,7 +527,7 @@ function afterDiscount(text, m) {
   const off = [...text.matchAll(/(?:[-−–]\s?£|£\s?[-−–])\s?(\d[\d,]*\.\d{2})/g)].map((x) => money(x[1]));
   return off.some((o) => Math.abs(was - o - now) <= 1) || Math.abs(was - off.reduce((n, o) => n + o, 0) - now) <= 1 ? now : null;
 }
-function fromText(text, refDate) {
+function fromText(text, refDate, ctx = {}) {
   // Some plain-text parts write the pound sign as "L" ("L69.00" on its own line). Only whole lines that are just an amount are changed.
   text = text.replace(/^([ \t|]*)L\s?([0-9][0-9,]*\.[0-9]{2})[ \t|]*$/gm, "$1£$2");
   // Bold written the plain-text way ("| **Total** | **£500.00** |") reads as the words themselves.
@@ -542,6 +548,8 @@ function fromText(text, refDate) {
     text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     // A shop that sends an invoice instead of an order confirmation ("Invoice number: INV-2290"): its number is the order's
     // (round 7), so its later emails (dispatch, refund) can find it. Only with a digit in it ("Invoice No. attached" isn't one).
+    // (A receipt's own number, "Receipt #2937-1380-5587" (Stripe's receipts, which name it in the subject too). Round 11.)
+    text.match(/\breceipt\s*(?:number|no\.?|#)\s*[:#\s]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i);
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
@@ -643,7 +651,7 @@ function fromText(text, refDate) {
   if (!cleanItems(items).length) items.splice(0, items.length, ...itemsFromCells(text));
   const sub = text.match(/\bsub-?\s?total(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
   // Not in pounds: the total as it's written, in its own currency (never converted).
-  const foreign = totalMatch ? null : foreignTotal(text);
+  const foreign = totalMatch ? null : foreignTotal(text, ctx);
 
   return {
     method: "text",
@@ -651,7 +659,7 @@ function fromText(text, refDate) {
     retailerName: null,
     orderRef: ref ? ref[1] : null,
     orderDate: parseDate(text, refDate),
-    currency: /£|GBP/.test(text) ? "GBP" : foreign ? foreign.currency : null,
+    currency: foreign ? foreign.currency : /£|GBP/.test(text) ? "GBP" : null,
     totalPence: totalMatch ? afterDiscount(text, totalMatch) ?? money(totalMatch[1]) : foreign ? foreign.minor : null,
     items,
   };
@@ -790,7 +798,8 @@ function receiptSignals(subject, text) {
     /\bthank(?:s| you) for (?:buying|purchasing)\b|\bthank(?:s| you) for joining\b[^!?]{0,60}\b(?:membership|subscription)\b|\breceived your payment\b[^!?]{0,40}\byour order\b|\bpurchase\s+(?:is|was|has been)\s+(?:complete|completed|successful)\b/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}[£€]/i.test(text);
+  // (A total in dollars counts too, "Total | $60.00": round 11.)
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)/i.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -1115,10 +1124,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (ACCOUNT_DEPOSIT.test(text.slice(0, 3000))) return { ok: false, reason: "account_deposit", source: "shopper_email" };
   const ld = html ? fromJsonLd(html) : null;
   const refDate = headers.date ? new Date(headers.date) : null;
-  let txt = fromText(text, refDate);
+  const stripe = /(^|\.)stripe\.com$/i.test(sender?.domain || "");
+  let txt = fromText(text, refDate, { stripe });
   // Many senders include a skimpy plain-text part next to the full HTML one: use whichever reads richer.
   if (plain && fromHtml) {
-    const alt = fromText(fromHtml, refDate);
+    const alt = fromText(fromHtml, refDate, { stripe });
     const richness = (r) => (r.items.length ? 2 : 0) + (r.items.some((i) => i.pricePence != null) ? 1 : 0) + (r.items.some((i) => i.variant) ? 1 : 0) + (r.orderDate ? 1 : 0) + (r.totalPence != null ? 1 : 0) + (r.orderRef ? 1 : 0);
     if (richness(alt) > richness(txt)) { txt = alt; text = fromHtml; }
   }
@@ -1164,7 +1174,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Forwarded, the original sender's name says it.)
   const legalName = (fwdFrom && fwdFrom.name) || fromName;
   if (legalName && /,?\s+(?:limited|ltd\.?|plc|inc\.?|llc|pbc|gmbh)\s*$/i.test(legalName) && result.retailer.name) {
-    const m = /^(.+?)\s+(?:ireland|uk|europe|emea|international)$/i.exec(result.retailer.name);
+    const m = /^(.+?)\s+(?:ireland|uk|europe|emea|international)$/i.exec(result.retailer.name.replace(/,?\s+(?:limited|ltd\.?|plc|inc\.?|llc|pbc|gmbh)\s*$/i, ""));
     if (m && !/\b(?:of|de|bank)$/i.test(m[1]) && legalName.toLowerCase().startsWith(m[1].toLowerCase())) result.retailer = { ...result.retailer, name: m[1] };
   }
   // The restaurant a takeaway app's order came from ("Your East Ocean order will be with you soon"), beside the app's name.
