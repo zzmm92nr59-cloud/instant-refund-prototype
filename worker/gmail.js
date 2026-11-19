@@ -142,8 +142,8 @@ const GONE = Symbol("gone");
 export const PARSER_VERSION = 39;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
-const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
-const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
+export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
+export const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
