@@ -331,7 +331,7 @@
     skmmd: "skimmed", mlk: "milk", whl: "whole", ktchn: "kitchen", choc: "chocolate", chc: "chocolate", bttns: "buttons", frzn: "frozen",
     crsps: "crisps", bluebrrs: "blueberries", blubrrs: "blueberries", ssgs: "sausages", lrg: "large", orgnc: "organic", grk: "greek",
     fllt: "fillet", fllts: "fillets", fnst: "finest", crm: "cream", cttn: "cotton", wtr: "water", headbrd: "headboard", vit: "vitamin",
-    lett: "lettuce", yog: "yoghurt", dbl: "double", drw: "drawer", tom: "tomato", toms: "tomatoes", veg: "veg", sndwch: "sandwich", chse: "cheese" };
+    lett: "lettuce", yog: "yoghurt", dbl: "double", drw: "drawer", sndwch: "sandwich", chse: "cheese" };
   // A line's words, as Relay reads them: short forms written out, words run together split when the two words are a known
   // phrase ("TVBED" is "tv bed", "OTTOMANBED" "ottoman bed"), and the shop's own name in front dropped when it is also a thing
   // ("Boots Flu Jab" is not boots).
