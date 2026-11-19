@@ -56,7 +56,7 @@ found" (404) where even saying it exists would tell too much.
 
 | Resource | Visitor | Shopper | Relay admin | Shop | Shopify / Square | Scheduled jobs |
 |---|---|---|---|---|---|---|
-| Sign in, sign out | Start and finish sign-in | Sign out; sign out other devices | As a shopper | | | Tidy old text-message records |
+| Sign in, sign out | Start and finish sign-in; start a sign-in to approve from a phone (`/relay/auth/phone/start`: a short code to show and a 43-character poll token only that device holds; 5 minutes; at most 5 live per address) and ask whether it was approved (`/relay/auth/phone/check`, with the poll token: a session once, for the account that approved it) | Sign out; sign out other devices; approve a sign-in on another device by its code (`/relay/my/devices/look` says which kind of device, `/relay/my/devices/approve` approves it: Relay's own app only, 8 wrong codes per 15 minutes per account, an email to the shopper; the new session passes the second step only if the approving one had) | As a shopper | | | Tidy old text-message records |
 | Account (email, name, photo, passkeys, two-step, phone) | | Own: read, change, delete the whole account, download a copy | As a shopper | | | |
 | Email connections (Gmail, Outlook) | | Own: connect up to 5, connect one of them again when its access has ended (same place, same receipts), disconnect, withdraw permission | As a shopper | | Google and Microsoft (not Shopify or Square): say that a connected inbox has new mail (signed, or with the subscription's secret), which makes Relay read that inbox's newest mail with the usual reader. A notice says which inbox, never anything about an email | Read connected inboxes for new receipts (every 15 min); set up and renew each inbox's Gmail watch or Outlook subscription; read inboxes whose notices are waiting |
 | Receipts and their pictures | | Own: list, add (search, paste: the copied text, and the copied page as HTML when the clipboard has it, `html`; read with the same reader and totals check as an email, and only what was read is kept), confirm, hide, change category, mark items, tag as a gift (and who for), fix what was read wrong, add their own photo of the item (or take it away), reminders, open the original email | As a shopper | | | Return reminders |
@@ -353,6 +353,7 @@ appeared in a public commit"). Fix whatever was slow or unclear.
 |---|---|---|
 | `scripts/test-validation.mjs` | Input checks and rate limits, every route, the app's own requests | Every pull request and every deploy |
 | `scripts/test-access-control.mjs` | Who can do what | Every pull request and every deploy |
+| `scripts/test-phone-signin.mjs` | Approving a sign-in from a phone: codes found only while live, used once, guessing capped, the email, the second step carried over | Sign-in pull requests and every deploy |
 | `scripts/test-review-account.mjs` | The reviewer sign-in | Pull requests that change sign-in, and every deploy |
 | `scripts/check-secrets.mjs` | No keys in the repository | Every pull request and every deploy |
 | `scripts/test-shop-directory.mjs` | The shop directory keeps nothing about anyone; test shops and the reviewer left out | Every pull request and every deploy |

@@ -29,7 +29,7 @@ export const LIMITS = {
 // Signing in, checking a code, and the pages Google, Microsoft, Square and Shopify send people back to.
 const SIGN_IN = new Set([
   "/relay/auth/request", "/relay/auth/verify", "/relay/auth/claim", "/relay/auth/verify-code", "/relay/auth/google/start", "/relay/auth/microsoft/start",
-  "/relay/auth/passkey/options", "/relay/auth/passkey/verify", "/relay/auth/2fa/verify", "/relay/auth/2fa/text",
+  "/relay/auth/passkey/options", "/relay/auth/passkey/verify", "/relay/auth/phone/start", "/relay/my/devices/look", "/relay/my/devices/approve", "/relay/auth/2fa/verify", "/relay/auth/2fa/text",
   "/relay/gmail/callback", "/relay/microsoft/callback", "/relay/bank/callback",
   "/relay/square/connect", "/relay/square/oauth/callback",
   "/relay/shopify/connect", "/relay/shopify/launch", "/relay/shopify/oauth/callback", "/relay/shopify/embedded/session"

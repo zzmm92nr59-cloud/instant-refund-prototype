@@ -135,6 +135,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-real-shops-ui.mjs
       - name: Test two-step sign-in for everyone (protect the account first, once per tap, the last can't go, team signs in again, passkey finish)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-second-step-ui.mjs
+      - name: Test signing in with your phone (a code, approved once from the phone, signs itself in, stops asking, runs out plainly)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-phone-signin-ui.mjs
       - name: Test the help chat (an AI that says so, answers, once per tap, plain errors, a person by email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-support-chat-ui.mjs
       - name: Test delivery details and Buy filling in a shop's checkout (what goes to the shop, once per tap, plain words, without details)

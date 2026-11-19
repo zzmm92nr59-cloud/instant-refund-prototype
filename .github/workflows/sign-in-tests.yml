@@ -10,6 +10,8 @@ on:
       - 'worker/passkeys.js'
       - 'worker/security-mail.js'
       - 'worker/review-account.js'
+      - 'worker/phone-signin.js'
+      - 'scripts/test-phone-signin.mjs'
       - 'worker/migrations/**'
       - 'scripts/test-auth.mjs'
       - 'scripts/test-security-mail.mjs'
@@ -31,5 +33,7 @@ jobs:
         run: node scripts/test-auth.mjs
       - name: Security emails and signing out other devices
         run: node scripts/test-security-mail.mjs
+      - name: Approving a sign-in from a phone
+        run: node scripts/test-phone-signin.mjs
       - name: Sign-in for app reviewers
         run: node scripts/test-review-account.mjs

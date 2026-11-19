@@ -59,6 +59,11 @@ const ROUTES = new Map(Object.entries({
   "/relay/auth/2fa/verify": { fields: { pendingToken: str(200), code: str(40) } },
   "/relay/auth/2fa/text": { fields: { pendingToken: str(200) } },
   "/relay/auth/logout": NOTHING,
+  // Signing in on a new device by approving it from a phone that's already signed in (phone-signin.js).
+  "/relay/auth/phone/start": NOTHING,
+  "/relay/auth/phone/check": { fields: { pollToken: str(200) } },
+  "/relay/my/devices/look": { fields: { code: str(40) } },
+  "/relay/my/devices/approve": { fields: { code: str(40) } },
   // The shopper's account and devices.
   "/relay/my/devices/sign-out-others": NOTHING,
   "/relay/my/delete": NOTHING,
