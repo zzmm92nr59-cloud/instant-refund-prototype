@@ -1,0 +1,671 @@
+{
+ "about": "Wrong item lists that older Relay readers (round 3 to round 8, the commit before each holdout set was added) produced from the made-up holdout5-10 emails in scripts/fixtures/receipt-emails, as sent. Made up: no real orders or people. totalsFlagged: the totals check already flagged it. scripts/test-item-names.mjs measures the name check on them (round 9, 19 Nov 2026).",
+ "lists": [
+  {
+   "id": "holdout5-arket-flex",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "ARKET",
+   "names": [
+    "Oatmeal ·",
+    "White ·"
+   ],
+   "right": [
+    "Merino Crew Jumper",
+    "Organic Cotton Tee"
+   ]
+  },
+  {
+   "id": "holdout5-brewbar-price-above",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Brew Bar",
+   "names": [
+    "November 2026 08:44",
+    "Almond Croissant"
+   ],
+   "right": [
+    "Oat Flat White",
+    "Almond Croissant",
+    "Sparkling Water"
+   ]
+  },
+  {
+   "id": "holdout5-chemistdirect-pharmacy",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Chemist Direct",
+   "names": [
+    "Pack size: 30 tablets",
+    "Pack size: 120 tablets"
+   ],
+   "right": [
+    "Cetirizine Hayfever Tablets 10mg",
+    "Vitamin D3 1000IU"
+   ]
+  },
+  {
+   "id": "holdout5-coop-weighed",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Co-op",
+   "names": [
+    "Mature Cheddar 400g"
+   ],
+   "right": [
+    "Bananas Loose",
+    "Semi Skimmed Milk 4 Pints",
+    "Mature Cheddar 400g"
+   ]
+  },
+  {
+   "id": "holdout5-fieldfresh-bracket-at",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Field Fresh",
+   "names": [
+    "Vine Tomatoes"
+   ],
+   "right": [
+    "Braeburn Apples",
+    "Vine Tomatoes",
+    "Organic Carrots 1kg"
+   ]
+  },
+  {
+   "id": "holdout5-fuelstop-petrol",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "FuelStop",
+   "names": [
+    "Lucozade Energy 500ml"
+   ],
+   "right": [
+    "Unleaded",
+    "Lucozade Energy 500ml"
+   ]
+  },
+  {
+   "id": "holdout5-greenhouse-text-unitcost",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Greenhouse Supplies",
+   "names": [
+    "Galvanised Garden Bucket 10L £12.95",
+    "Wooden Plant Labels Pack of 50 £4.50"
+   ],
+   "right": [
+    "Galvanised Garden Bucket 10L",
+    "Wooden Plant Labels Pack of 50"
+   ]
+  },
+  {
+   "id": "holdout5-habitat-price-above-html",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Habitat",
+   "names": [
+    "Linen Cushion Cover Terracotta"
+   ],
+   "right": [
+    "Linen Cushion Cover Terracotta",
+    "Jute Round Rug 120cm"
+   ]
+  },
+  {
+   "id": "holdout5-keyhouse-digital",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Key House",
+   "names": [
+    "Platform: Steam",
+    "Platform: Steam"
+   ],
+   "right": [
+    "Baldur's Gate 3",
+    "Stardew Valley"
+   ]
+  },
+  {
+   "id": "holdout5-kobo-ebooks",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Rakuten Kobo",
+   "names": [
+    "eBook",
+    "eBook"
+   ],
+   "right": [
+    "The Thursday Murder Club",
+    "Atomic Habits"
+   ]
+  },
+  {
+   "id": "holdout5-officeplus-qty-desc-total-price",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Office Plus",
+   "names": [
+    "A4 Copier Paper 80gsm Box of 5 Reams",
+    "Pilot G2 Gel Pens Black Pack of 12",
+    "Leitz Lever Arch File A4"
+   ],
+   "right": [
+    "A4 Copier Paper 80gsm Box of 5 Reams",
+    "Pilot G2 Gel Pens Black Pack of 12",
+    "Leitz Lever Arch File A4"
+   ]
+  },
+  {
+   "id": "holdout5-screwfix-br-cell",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Screwfix",
+   "names": [
+    "Stanley FatMax Tape Measure 8m"
+   ],
+   "right": [
+    "Bosch Cordless Drill 18V",
+    "Stanley FatMax Tape Measure 8m"
+   ]
+  },
+  {
+   "id": "holdout5-ticketline-bands",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Ticketline",
+   "names": [
+    "Tickets"
+   ],
+   "right": [
+    "Standing General Admission",
+    "Seated Tier 2"
+   ]
+  },
+  {
+   "id": "holdout5-whitestuff-bare-lines",
+   "reader": "0e4e5e1",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "White Stuff",
+   "names": [
+    "Wide Leg Cord Trousers Rust",
+    "Chunky Knit Cardigan Ecru"
+   ],
+   "right": [
+    "Wide Leg Cord Trousers",
+    "Chunky Knit Cardigan"
+   ]
+  },
+  {
+   "id": "holdout8-invoice-attached",
+   "reader": "1ef5cb5",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Workshop Supplies Direct",
+   "names": [
+    "Invoice total"
+   ],
+   "right": []
+  },
+  {
+   "id": "holdout6-cornershop-mealdeal-zero",
+   "reader": "30f4307",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Daily Bread",
+   "names": [
+    "Meal Deal",
+    "Chicken Club Sandwich",
+    "Sea Salt Crisps",
+    "Still Water 500ml",
+    "Flat White"
+   ],
+   "right": [
+    "Meal Deal",
+    "Flat White"
+   ]
+  },
+  {
+   "id": "holdout6-papier-dl",
+   "reader": "30f4307",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Papier",
+   "names": [
+    "Personalised Leather Keyring Quantity: 1 £18.00 Botanical Print A3"
+   ],
+   "right": [
+    "Personalised Leather Keyring",
+    "Botanical Print A3"
+   ]
+  },
+  {
+   "id": "holdout6-teapigs-li-dash",
+   "reader": "30f4307",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Leaf & Whisk",
+   "names": [
+    "Bamboo Whisk — £18.00",
+    "Royal Mail 2nd Class"
+   ],
+   "right": [
+    "Matcha Ceremonial Grade 30g",
+    "Bamboo Whisk"
+   ]
+  },
+  {
+   "id": "holdout9-amazon-long-title-giftcard",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Amazon",
+   "names": [
+    "SanDisk 128GB Ultra microSDXC card + SD adapter, up to 140 MB/s",
+    "Duracell Plus AA Batteries, Pack of 12"
+   ],
+   "right": [
+    "SanDisk 128GB Ultra microSDXC card + SD adapter, up to 140 MB/s | A1 | Class 10",
+    "Duracell Plus AA Batteries, Pack of 12"
+   ]
+  },
+  {
+   "id": "holdout9-amazon-two-deliveries",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Amazon",
+   "names": [
+    "Dispatches from and sold by Amazon",
+    "Dispatches from and sold by NaturePantry Ltd",
+    "Dispatches from and sold by NaturePantry Ltd"
+   ],
+   "right": [
+    "Echo Dot (5th generation) Charcoal",
+    "Organic Coconut Oil 1L",
+    "Phone Stand Adjustable Aluminium"
+   ]
+  },
+  {
+   "id": "holdout9-asda-product-qty-price",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "ASDA",
+   "names": [
+    "ASDA Extra Special Steak Pie",
+    "Age restricted product",
+    "ASDA Bananas Loose",
+    "Rollback"
+   ],
+   "right": [
+    "ASDA Extra Special Steak Pie",
+    "Carling Lager 18 x 440ml",
+    "ASDA Bananas Loose",
+    "Fairy Original Washing Up Liquid 780ml"
+   ]
+  },
+  {
+   "id": "holdout9-asos-two-sizes-price-first",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "ASOS",
+   "names": [
+    "ASOS DESIGN slim jeans in mid blue",
+    "Blue / Size: W30 L32 /",
+    "Blue / Size: W32 L32 /"
+   ],
+   "right": [
+    "ASOS DESIGN slim jeans in mid blue",
+    "ASOS DESIGN slim jeans in mid blue",
+    "ASOS DESIGN crew neck jumper in navy"
+   ]
+  },
+  {
+   "id": "holdout9-costa-redeemed",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Costa",
+   "names": [
+    "Oat milk +45p",
+    "Ham & Cheese Toastie"
+   ],
+   "right": [
+    "Flat White",
+    "Cappuccino",
+    "Ham & Cheese Toastie"
+   ]
+  },
+  {
+   "id": "holdout9-fiveguys-toppings-zero",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Five Guys",
+   "names": [
+    "1 Cheeseburger",
+    "Lettuce",
+    "Pickles",
+    "Grilled Onions",
+    "Ketchup",
+    "1 Little Bacon Burger",
+    "Mayo",
+    "Jalapeño Peppers",
+    "1 Regular Cajun Fries",
+    "1 Milkshake",
+    "Biscoff",
+    "Banana"
+   ],
+   "right": [
+    "Cheeseburger",
+    "Little Bacon Burger",
+    "Regular Cajun Fries",
+    "Milkshake"
+   ]
+  },
+  {
+   "id": "holdout9-greggs-mealdeal-with",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Greggs",
+   "names": [
+    "Breakfast Meal Deal",
+    "Sausage Roll"
+   ],
+   "right": [
+    "Breakfast Meal Deal",
+    "Sausage Roll",
+    "Yum Yum (Reward)"
+   ]
+  },
+  {
+   "id": "holdout9-je-item-tables-options-row",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Just Eat",
+   "names": [
+    "1 Lamb Biryani",
+    "1 Paneer Tikka Starter",
+    "2 Garlic Naan",
+    "1 Pilau Rice"
+   ],
+   "right": [
+    "Lamb Biryani",
+    "Paneer Tikka Starter",
+    "Garlic Naan",
+    "Pilau Rice"
+   ]
+  },
+  {
+   "id": "holdout9-morrisons-aisles-qty",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Morrisons",
+   "names": [
+    "Morrisons Wonky Carrots 1kg",
+    "Morrisons British Beef Mince 500g",
+    "My Morrisons Price £3.00 (was £4.00)"
+   ],
+   "right": [
+    "Morrisons Wonky Carrots 1kg",
+    "Morrisons British Beef Mince 500g",
+    "Yorkshire Tea 80 Bags"
+   ]
+  },
+  {
+   "id": "holdout9-sainsburys-nectar-xn",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Sainsbury's",
+   "names": [
+    "Sainsbury's British Pork Sausages x8 454g",
+    "Sainsbury's Loose Courgettes",
+    "Sainsbury's Free Range Eggs Large"
+   ],
+   "right": [
+    "Sainsbury's British Pork Sausages x8 454g",
+    "Sainsbury's Loose Courgettes",
+    "Andrex Classic Clean Toilet Tissue x9",
+    "Sainsbury's Free Range Eggs Large x6"
+   ]
+  },
+  {
+   "id": "holdout9-sainsburys-text-substituted",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Sainsbury's",
+   "names": [
+    "Sainsbury's Semi Skimmed Milk 2.27L",
+    "Birds Eye Fish Fingers",
+    "Napolina Penne 500g"
+   ],
+   "right": [
+    "Sainsbury's Semi Skimmed Milk 2.27L",
+    "Birds Eye Fish Fingers x10",
+    "Napolina Penne 500g"
+   ]
+  },
+  {
+   "id": "holdout9-tesco-clubcard-under-age",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Tesco",
+   "names": [
+    "Bags",
+    "Guide price"
+   ],
+   "right": [
+    "Tesco Loose Brown Onions",
+    "Tesco Finest Chicken Breast Fillets 500G",
+    "Yellow Tail Shiraz 75Cl",
+    "Tesco Whole Milk 2.272L",
+    "Heinz Tomato Ketchup 460G"
+   ]
+  },
+  {
+   "id": "holdout9-ue-bogof-zero-line",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Uber Eats",
+   "names": [
+    "Whopper",
+    "Whopper (Buy One Get One Free)",
+    "Large Fries",
+    "No mayo"
+   ],
+   "right": [
+    "Whopper",
+    "Whopper (Buy One Get One Free)",
+    "Large Fries",
+    "Chicken Royale"
+   ]
+  },
+  {
+   "id": "holdout9-ue-grocery-struck-unavailable",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Uber Eats",
+   "names": [
+    "Unavailable – refunded",
+    "Replaced Lurpak Slightly Salted 250g"
+   ],
+   "right": [
+    "Heinz Baked Beanz 4 x 415g",
+    "Flora Original 450g",
+    "Kingsmill 50/50 800g"
+   ]
+  },
+  {
+   "id": "holdout9-wagamama-item-price-qty",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "wagamama",
+   "names": [
+    "chicken katsu curry",
+    "no egg",
+    "duck gyoza"
+   ],
+   "right": [
+    "chicken katsu curry",
+    "yaki soba",
+    "duck gyoza"
+   ]
+  },
+  {
+   "id": "holdout9-waitrose-picked-weight",
+   "reader": "5b8e7c9",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Waitrose",
+   "names": [
+    "Waitrose Duchy Organic Carrots",
+    "Picked weight 0.523kg",
+    "Over 18s only"
+   ],
+   "right": [
+    "Waitrose Duchy Organic Carrots",
+    "Waitrose Loose Vine Tomatoes",
+    "Waitrose Blueprint Sauvignon Blanc 75cl"
+   ]
+  },
+  {
+   "id": "holdout7-also-bought-before-money",
+   "reader": "c4781fb",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Crema Home",
+   "names": [
+    "Espresso Machine Compact",
+    "Milk Jug 350ml",
+    "Descaler Tablets",
+    "Knock Box",
+    "Tamper 58mm"
+   ],
+   "right": [
+    "Espresso Machine Compact",
+    "Milk Jug 350ml"
+   ]
+  },
+  {
+   "id": "holdout7-mojibake",
+   "reader": "c4781fb",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "Northbound Supply",
+   "names": [
+    "Menâ€™s Flannel Shirt",
+    "Corduroy Cap"
+   ],
+   "right": [
+    "Men’s Flannel Shirt",
+    "Corduroy Cap"
+   ]
+  },
+  {
+   "id": "holdout7-mso-copy",
+   "reader": "c4781fb",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Stillpoint Yoga",
+   "names": [
+    "Recycled Yoga Mat 5mm",
+    "Cork Yoga Block",
+    "Recycled Yoga Mat 5mm",
+    "Cork Yoga Block"
+   ],
+   "right": [
+    "Recycled Yoga Mat 5mm",
+    "Cork Yoga Block"
+   ]
+  },
+  {
+   "id": "holdout7-reply-to-forward",
+   "reader": "c4781fb",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Wheelhouse Toys",
+   "names": [
+    "> Kids Scooter Blue",
+    "> Helmet Small",
+    "> Subtotal",
+    "> Delivery",
+    "> Total"
+   ],
+   "right": [
+    "Kids Scooter Blue",
+    "Helmet Small"
+   ]
+  },
+  {
+   "id": "holdout7-two-level-quote",
+   "reader": "c4781fb",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "Brightsmile",
+   "names": [
+    ">> Electric Toothbrush Heads 4 Pack",
+    ">> Water Flosser Travel",
+    ">> Subtotal",
+    ">> Total"
+   ],
+   "right": [
+    "Electric Toothbrush Heads 4 Pack",
+    "Water Flosser Travel"
+   ]
+  },
+  {
+   "id": "holdout10-shein-unit-x-qty-text",
+   "reader": "ea33efd",
+   "unseen": true,
+   "totalsFlagged": true,
+   "shop": "SHEIN",
+   "names": [
+    "Retail Price"
+   ],
+   "right": [
+    "SHEIN Teddy Fleece Hoodie",
+    "SHEIN Fluffy Slipper Socks 5 Pairs"
+   ]
+  },
+  {
+   "id": "holdout10-zara-blocks-price-under",
+   "reader": "ea33efd",
+   "unseen": true,
+   "totalsFlagged": false,
+   "shop": "ZARA",
+   "names": [
+    "XS | BLACK",
+    "S | BLACK"
+   ],
+   "right": [
+    "RIBBED KNIT MIDI DRESS",
+    "FAUX LEATHER BIKER JACKET"
+   ]
+  }
+ ]
+}

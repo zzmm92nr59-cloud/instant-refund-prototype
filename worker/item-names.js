@@ -26,6 +26,10 @@ import KindCore from "./item-kind-core.js";
 
 const NOTE = [
   /\bage[\s-]?restrict/i, /\bover\s?1[68]s?\b(?:\s+only)?/i, /\bchallenge\s?2[15]\b/i, /\b(?:proof of age|id required|id needed|i\.?d\.? check)\b/i,
+  // (Round 9, after the 20 new emails' first run: age verification, weighed items, "Gift wrapped", estimated delivery,
+  // pharmacy limits.)
+  /\bage (?:verification|check)\b/i, /\bweighed (?:item|at|weight)\b/i, /^gift[- ]wrapped$/i, /\b(?:estimated|expected) (?:delivery|dispatch|arrival)\b/i,
+  /\bpharmacy (?:medicine|only)\b/i, /\bmax(?:imum)?\.? \d+ (?:packs?|per (?:customer|order|person))\b/i,
   /\b(?:substitut(?:e|ed|ion|es)|replaced with|swapped for|unavailable|out of stock|not available|couldn'?t get|could not get)\b/i,
   /\b(?:clubcard|nectar|my morrisons|asda) price\b/i, /\brollback\b/i, /\bprice ?match\b/i, /\b(?:promo(?:tion)?|offer) (?:applied|price|saving)\b/i,
   /\b(?:you saved|you save|saving of|saved £)\b/i, /^(?:was|now|save|saving)\b[\s:£]/i,
@@ -39,7 +43,7 @@ const NOTE = [
   /\b(?:reward|points?) (?:earned|redeemed|applied|used)\b/i, /^(?:pack(?:ed)? in|bagged|bag \d)/i,
 ];
 // "Field: value": a field of the item, not its name.
-const LABEL = /^(?:size|sizes|colou?r|shade|pack size|pack|platform|format|edition|style(?: no\.?| number)?|fit|length|leg|width|waist|ref(?:erence)?|sku|ean|upc|mpn|isbn|asin|code|product code|item code|item no\.?|item number|barcode|article(?: no\.?)?|art\.? ?no\.?|cat(?:alogue)?\.? ?no\.?|qty|quantity|price|unit price|each|weight|seller|condition|option|options|variant|choice|type|model(?: no\.?)?|serial(?: no\.?)?|delivery|dispatch|status)\s*[:#=]/i;
+const LABEL = /^(?:size|sizes|colou?r|shade|pack size|pack|platform|format|edition|style(?: no\.?| number)?|fit|length|leg|width|waist|ref(?:erence)?|sku|ean|upc|mpn|isbn|asin|code|product code|item code|item no\.?|item number|barcode|article(?: no\.?)?|art\.? ?no\.?|cat(?:alogue)?\.? ?no\.?|qty|quantity|price|unit price|each|weight|seller|condition|option|options|variant|choice|type|model(?: no\.?)?|serial(?: no\.?)?|delivery|dispatch|status|personali[sz]ation|engraving|monogram|initials|message|gift message|note)\s*[:#=]/i;
 const CODE_LABEL = /^(?:sku|ean|upc|mpn|isbn|asin|product code|item code|item no\.?|style no\.?|cat(?:alogue)?\.? ?no\.?|art\.? ?no\.?|ref(?:erence)?)\b\s*[:.#]?\s*[\w-]*\d/i;
 const HEADING_WORD = "(?:item|items|description|product|products|product name|item name|name|qty|quantity|price|unit price|each|total|line total|amount|details|article|size|colour|color|order|your order|order summary|summary|order details|subtotal|cost|tickets?|goods)";
 const HEADING = new RegExp(`^${HEADING_WORD}(?:\\s*[/|&,]?\\s*${HEADING_WORD})*\\s*:?$`, "i");
