@@ -99,5 +99,12 @@ export default function holdout13b() {
     add("holdout13b-age-band-qty-text", "Strike Lanes", "plain text 'Junior - aged 6+ 3 £25.50'", { from: "Strike Lanes <bookings@strikelanes.example>", subject: "Your booking confirmation", date: "Sun, 15 Nov 2026 15:00:00 +0000",
       text: ["Strike Lanes", "Booking reference: SL-449JQ", "Sunday, 15 November 2026", "16:00 - 17:00", "Junior - aged 6+ 3 £25.50", "Total Price: £25.50"].join("\n") }, { ...o, bought: o.bought.map((i) => ({ ...i, line: 2550 })) }, "Strike Lanes", "2026-11-15");
   }
+  // ---- A pub's table order: "Ref:" on its own line, a spirit at £0.00 then its measure with the price -----------------------------
+  {
+    const o = order([{ name: "OLD HARBOUR RUM 25ml", qty: 1, unit: 520 }, { name: "Lemonade", qty: 1, unit: 120 }]);
+    add("holdout13b-pub-ref-measure-row", "The Lamp & Anchor", "'Ref: 551203' line; 'OLD HARBOUR RUM' 1 £0.00 then '25ml' 1 £5.20", { from: "The Lamp & Anchor <orders@lampanchor.example>", subject: "Thanks for your order!", date: "Fri, 13 Nov 2026 20:15:00 +0000",
+      html: mail("The Lamp & Anchor", "lampanchor.example", ["Your order details", "Thanks for your order", "Here's a confirmation of your order:", "Location:", "The Lamp & Anchor", "Ref: 551203", "Table: 12", "Order Date: 13/11/2026", "Item", "Qty", "Price",
+        "OLD HARBOUR RUM", "1", "£0.00", "25ml", "1", "£5.20", "Lemonade", "1", "£1.20", "Total (exc. VAT): £5.33", "VAT: £1.07", "Total (inc. VAT): £6.40"]) }, o, "The Lamp & Anchor", "2026-11-13");
+  }
   return out;
 }

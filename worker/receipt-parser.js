@@ -1512,6 +1512,15 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (CLIPPED.test(text) || (otherPart && CLIPPED.test(otherPart))) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, clipped: true };
   if (saysAttached && !result.items.length) { result.detailsInAttachment = attachedDoc.kind; result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, inAttachment: attachedDoc.kind }; }
   for (const i of result.items) delete i.unitPence;
+  // A drink at £0.00 then its measure with the price ("SAILOR JERRY RUM £0.00", "50ml £10.45"): one drink, that size, that
+  // price. Round 12.
+  for (let k = 0; k + 1 < result.items.length; k++) {
+    const a = result.items[k], b = result.items[k + 1];
+    if (a.pricePence === 0 && /^\d+(?:\.\d+)?\s?(?:ml|cl|l|g|kg|oz)$/i.test(String(b.name || "").trim()) && b.pricePence) {
+      result.items.splice(k, 2, { ...b, name: `${a.name} ${b.name.trim()}` });
+      result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+    }
+  }
   // One thing, priced before tax, with the tax on its own line and the total after it ("Meta Quest+ £6.66", "Tax included:
   // £1.33", "Today's total: £7.99"): what it cost is the total. Round 12.
   if (result.items.length === 1 && result.totalPence != null && result.itemsCheck && result.itemsCheck.complete === false && result.items[0].pricePence != null) {
