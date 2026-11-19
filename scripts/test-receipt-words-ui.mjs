@@ -51,6 +51,8 @@ await inbox.scan();
 const ALL = await inbox.receipts(true), NEWEST = await inbox.receipts(false), WRAPPED = await inbox.wrapped(2026);
 if (process.env.RECEIPT_WORDS_DUMP) (await import("node:fs")).writeFileSync(process.env.RECEIPT_WORDS_DUMP, JSON.stringify({ ALL, NEWEST, WRAPPED }, null, 1));
 const receipts = ALL.receipts.filter((r) => (r.kind || "receipt") === "receipt");
+// (Round 7) A shop that sends an invoice: its invoice number is the order number.
+assert.equal((receipts.find((r) => r.retailer && r.retailer.name === "Bramble Home") || {}).orderRef, "INV-2290", "the invoice number is the order number");
 
 // ---- What each receipt says, for the checks ------------------------------------------------------------------------------
 const SIGN = { GBP: "£", EUR: "€", USD: "US$" };

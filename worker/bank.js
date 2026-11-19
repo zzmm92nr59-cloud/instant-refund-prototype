@@ -20,6 +20,7 @@ import { sealToken, openToken, receiptTotals, ensureGmailTables } from "./gmail.
 import { isAdmin, isTester } from "./resale-admin.js";
 import { decodePhoto, MAX_RECEIPT_PHOTO_BYTES } from "./photos.js";
 import { readReceiptPhoto } from "./receipt-photo.js";
+import { checkItems } from "./receipt-items.js";
 import { aiAvailable } from "./ai-reader.js";
 import { seedShops, classificationSays, classificationToKeep, loadShopDirectory, learnedShop, EXCLUDED_KINDS } from "./shop-directory.js";
 
@@ -488,6 +489,16 @@ export async function handleBankRoute(path, method, request, env, url, cors, sho
 // and the app shows both. 20 photos a shopper a day; 1,000 read by AI a day across Relay (after that, kept without reading).
 export const RECEIPT_PHOTOS_PER_DAY = 20;
 export const RECEIPT_PHOTO_AI_ALL_DAY = 1000;
+// The items a photo's reading keeps (round 7). Only from a reading the AI was reasonably sure of: from a "low" one (most of it
+// hard to read) none are kept, so none are invented, and the receipt says Relay couldn't read them. Kept items go through
+// the same totals check as an email's (receipt-items.js checkItems): when they don't add up to the photo's own total, the
+// receipt says Relay may have missed some. No reading at all (AI off, busy, not a receipt): no items and no check.
+export function photoItemsOf(read, confidence, photoTotal) {
+  if (!read) return { items: [], itemsCheck: null };
+  const unsure = confidence !== "high" && confidence !== "medium";
+  const items = !unsure && Array.isArray(read.items) ? read.items : [];
+  return { items, itemsCheck: { ...checkItems(items, {}, photoTotal), ...(unsure ? { unsure: true } : {}) } };
+}
 async function addReceiptPhoto(env, request, cors, shopper, o) {
   const db = env.RELAY_DB, now = o.now || Date.now();
   const b = await request.json().catch(() => null);
@@ -514,6 +525,7 @@ async function addReceiptPhoto(env, request, cors, shopper, o) {
   const bankPaid = { amountPence: p.amount_minor, currency: bankCurrency, date: p.paid_on, account: p.account || null };
   const photoTotal = read && read.totalPence != null ? read.totalPence : null;
   const photoCurrency = photoTotal != null ? (read.currency || bankCurrency) : null;
+  const { items: photoItems, itemsCheck } = photoItemsOf(read, got.confidence, photoTotal);
   const details = {
     kind: "receipt", source: "receipt_photo", photoReceipt: true, bankPaymentId: p.payment_id,
     retailer: { name: (read && read.shop) || shopName(p.description, p.merchant) || "Shop", domain: null },
@@ -521,7 +533,7 @@ async function addReceiptPhoto(env, request, cors, shopper, o) {
     // The total is what the photo says when it says one, otherwise what the bank paid: never one forced to fit the other.
     totalPence: photoTotal != null ? photoTotal : p.amount_minor, currency: photoTotal != null ? photoCurrency : bankCurrency,
     totalFrom: photoTotal != null ? "photo" : "bank",
-    items: read ? read.items : [],
+    items: photoItems, ...(itemsCheck ? { itemsCheck } : {}),
     receiptNumber: read && read.orderRef ? read.orderRef : null,
     readBy: read ? "ai" : null, confidence: read ? got.confidence : null,
     // Why nothing was read from the photo: "off" (no AI reader), "unclear" (no receipt could be read in it), "busy".

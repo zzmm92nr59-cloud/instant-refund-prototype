@@ -163,7 +163,25 @@ assert.match(sent.system, /Never guess, work out or invent anything/);
 const zaraCard = (await (await call("/relay/my/receipts", { token: jess })).json()).receipts.find((c) => c.id === out.id);
 assert.deepEqual([zaraCard.totalPence, zaraCard.totalMismatch, zaraCard.bankPaid.amountPence, zaraCard.needsShopperConfirmation, zaraCard.orderRef], [4599, true, 4999, true, undefined],
   "both totals shown; read by AI so the shopper is asked to check it; no order number (so no online-order return date is guessed)");
+assert.equal(zaraCard.itemsCheck && zaraCard.itemsCheck.complete, true, "items that add up to the photo's own total pass the same totals check as an email's");
 console.log("ok - with the AI reader: exactly what it read; a different total kept and flagged beside what the bank paid");
+
+// 6a. (Round 7) Items only from a reading the AI was sure of, and through the totals check: a "low" reading keeps no items
+// (none invented) and says so; items that don't add up to the photo's total are flagged; no reading, no items and no check.
+{
+  const { photoItemsOf } = await import("../worker/bank.js");
+  const two = [{ name: "Linen shirt", qty: 1, pricePence: 2999 }, { name: "Leather belt", qty: 1, pricePence: 1600 }];
+  let k = photoItemsOf({ items: two }, "low", 4599);
+  assert.deepEqual([k.items, k.itemsCheck.complete, k.itemsCheck.unsure], [[], false, true], "unsure: no items kept, and the receipt says it couldn't read them");
+  k = photoItemsOf({ items: two }, null, 4599);
+  assert.deepEqual([k.items, k.itemsCheck.complete], [[], false], "no confidence given counts as unsure");
+  k = photoItemsOf({ items: two }, "medium", 5999);
+  assert.deepEqual([k.items.length, k.itemsCheck.complete, k.itemsCheck.missingPence], [2, false, 1400], "items £14.00 short of the photo's total: flagged");
+  k = photoItemsOf({ items: two }, "high", 4599);
+  assert.deepEqual([k.items.length, k.itemsCheck.complete], [2, true]);
+  assert.deepEqual(photoItemsOf(null, "high", 4599), { items: [], itemsCheck: null }, "nothing read: nothing kept, nothing checked");
+}
+console.log("ok - photo items only from a sure reading, and through the totals check");
 
 // 6b. A photo the AI can't read as a receipt, or the AI busy: the bank's facts, no items, and it says why.
 aiAnswer = { isPurchase: false, shop: null, orderDate: null, totalPence: null, items: [] };

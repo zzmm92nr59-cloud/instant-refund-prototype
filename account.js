@@ -3576,6 +3576,7 @@
     box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
     var short = x.itemsCheck.missingPence;
     if (inFile) box.appendChild(el("span", { className: "rl-ret-why", text: (inFile === "image" ? "The shop sent the receipt as a picture" : "The shop sent the receipt as a PDF") + ". Open the email to see what you bought, or add the items yourself." }));
+    else if (x.itemsCheck.unsure) box.appendChild(el("span", { className: "rl-ret-why", text: "Your photo was hard to read, so Relay didn't guess what's on it. Add the items yourself if you like." }));
     else if (x.itemsCheck.namesDoubtful) box.appendChild(el("span", { className: "rl-ret-why", text: "Copying the email can mix up its lines, so check the items below are right, or fix them yourself." }));
     else if (x.itemsCheck.clipped) box.appendChild(el("span", { className: "rl-ret-why", text: "Gmail cut this email short, so some of it may not have reached Relay." }));
     else if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));

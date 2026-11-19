@@ -132,7 +132,8 @@ const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 // 35 (round 4): emails as they arrive: 8bit windows-1252 parts, forwards attached whole, attachments never read as text,
 // hidden and Outlook-only copies left out, replies quoted with "> ", recommendations, clipped emails, receipts only in a PDF.
-export const PARSER_VERSION = 36;
+// 37 (round 7): an invoice number ("Invoice number: INV-2290") is the order number when the email gives no other.
+export const PARSER_VERSION = 37;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
