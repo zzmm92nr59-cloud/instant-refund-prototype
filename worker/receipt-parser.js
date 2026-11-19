@@ -555,7 +555,9 @@ function fromText(text, refDate, ctx = {}) {
     // (round 7), so its later emails (dispatch, refund) can find it. Only with a digit in it ("Invoice No. attached" isn't one).
     // (A receipt's own number, "Receipt #2937-1380-5587" (Stripe's receipts, which name it in the subject too). Round 11.)
     text.match(/\breceipt\s*(?:number|no\.?|#)\s*[:#\s]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
-    text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i);
+    text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
+    // ("Ref: 419694" on a line of its own, a pub's order. Round 12.)
+    text.match(/^[\s|]*ref(?:erence)?\s*:\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im);
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
@@ -1194,7 +1196,8 @@ function withoutGiftNotes(lines) {
 }
 function soleItemOverPrice(text, m, total) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
-  const basket = m && m.subtotal != null ? m.subtotal : total;
+  // (Only against a stated basket or subtotal: a name over the bare total may be a heading over it.)
+  const basket = m && m.subtotal != null ? m.subtotal : null;
   if (basket == null) return null;
   const hits = [];
   for (let i = 0; i + 1 < rows.length; i++) {
@@ -1206,8 +1209,19 @@ function soleItemOverPrice(text, m, total) {
   }
   return hits.length === 1 ? hits[0] : null;
 }
+// A plain-text name wrapped onto two lines ("Duchess Dolby Atmos 5.1.2 Cinematic Surround Sound", then "Ottoman Storage TV
+// Bed Frame × 1"): one name again, when it starts after a blank line and its second line ends with how many. Round 12.
+function unwrapNames(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const a = lines[i], b = lines[i + 1];
+    if (b && (i === 0 || !lines[i - 1].trim()) && /^\p{Lu}[^£|:]{10,90}$/u.test(a.trim()) && /^\p{L}[^£|]{2,80}\s[x×]\s?\d{1,3}$/u.test(b.trim()) && a.length >= 40) { out.push(a.trim() + " " + b.trim()); i++; continue; }
+    out.push(a);
+  }
+  return out;
+}
 function withoutRecommendations(t) {
-  const lines = withoutGiftNotes(rowsUnderHeading(servedWith(String(t || "").split("\n").filter((l) => !FROM_PRICE.test(l) && !VAT_NOTE.test(l)))));
+  const lines = unwrapNames(withoutGiftNotes(rowsUnderHeading(servedWith(String(t || "").split("\n").filter((l) => !FROM_PRICE.test(l) && !VAT_NOTE.test(l))))));
   if (!lines.some((l) => RECOMMEND_HEAD.test(l))) return lines.join("\n");
   const out = [];
   for (let i = 0, skip = false; i < lines.length; i++) {
@@ -1409,7 +1423,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     result.itemsCheck = { complete: false, itemsPence: 0, expectedPence: dayOf ? null : result.totalPence ?? null, missingPence: null, ...(noList ? { noItemList: true } : { orderUpdate: true }) };
   } else if (!isFlight && !journey && !gameShop && !ride) {
     const cands = [];
-    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
+    // (A currency's code on its own, "GBP" from "£20.47 GBP", is never a thing. Round 12.)
+    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim()) && !/^(?:gbp|eur|usd|cad|aud|chf|sek|nok|dkk|pln)$/i.test(String(i.name || "").trim())));
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
     // are left out of the item readings. Round 4.)
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];
@@ -1496,6 +1511,26 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const it = result.items[0];
     if (tax && (it.qty || 1) === 1 && it.pricePence + money(tax[1]) === result.totalPence) {
       it.pricePence = result.totalPence;
+      result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+    }
+  }
+  // A membership or trial bought through a billing company for a website it names ("You've just bought 2-day trial Example
+  // membership", "Website | example.com", "Receipt 291429567"): the membership is the item, the website the shop, the
+  // receipt's number the reference. Any biller, any site. Round 12.
+  if (!result.items.length && result.totalPence != null) {
+    const flatT = String(fromHtml || text).replace(/[\s|]+/g, " ");
+    const bought = /\byou(?:'|’)?ve just bought (.{3,80}?)\s?\.(?:\s|$)/i.exec(flatT) || /\bthank you for buying (.{3,80}?)(?:\s(?:receipt|dear|hi|hello)\b|[.!])/i.exec(flatT);
+    const site = /\bwebsite\s*:?\s+((?:[a-z0-9-]+\.)+[a-z]{2,})\b/i.exec(flatT);
+    if (bought && /\b(?:membership|subscription|trial|plan|pass)\b/i.test(bought[1])) {
+      result.items = [{ name: bought[1].trim(), qty: 1, pricePence: result.totalPence }];
+      const siteDomain = site ? site[1].toLowerCase() : null;
+      if (siteDomain && siteDomain !== String(result.retailer.domain || "").toLowerCase()) {
+        const base = domainBase(siteDomain);
+        const named = (bought[1].match(/[\p{L}\d]+/gu) || []).find((w) => w.toLowerCase() === base.replace(/-/g, ""));
+        result.retailer = { ...result.retailer, name: named || base.charAt(0).toUpperCase() + base.slice(1), domain: siteDomain };
+      }
+      const rn = /\breceipt\s*(?:number|no\.?|#)?\s*:?\s*(\d{6,14})\b/i.exec(flatT);
+      if (!result.orderRef && rn) result.orderRef = rn[1];
       result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
     }
   }
