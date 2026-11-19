@@ -351,6 +351,14 @@ export function readItems(text, opts = {}) {
     // (A row copied with tabs ended when its last cell is its price or is empty: "1 <tab> Big Breakfast" goes on below.)
     afterRow.push(rowEnded); raw.push(x); rowEnded = tabbed ? /\t\s*$|(?:£\s?[\d,]+(?:\.\d{2})?|free)\s*$/i.test(all[k]) : /\|\s*$/.test(x);
   }
+  // (A label on its line and its value on the next, "size:" over "150x200 cm [King]", "Product code:" over "UKI83120652": one
+  // line, so the value is the item's size or code, never a name. Round 11.)
+  for (let k = raw.length - 2; k >= 0; k--) {
+    if (/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
+      raw.splice(k, 2, raw[k].replace(/[\s|]+$/, "") + " " + raw[k + 1].replace(/^[\s|]+/, ""));
+      afterRow.splice(k + 1, 1);
+    }
+  }
   const asWritten = raw;
   raw = byColumns(raw);
   if (opts.priceAbove) raw = priceAbove(raw);
@@ -500,6 +508,16 @@ export function readItems(text, opts = {}) {
   }
   if (pend && !pend.prices.length && !pend.free) foldPend();
   emit();
+  // (A section's heading over its first item, "Capsules" then "Roasted Hazelnut", "10 x £0.77": the heading, one word in
+  // the plural, was read as the name and the item's own name as its extra. The item is the name under it. Round 11.)
+  for (const it of items) {
+    if (Array.isArray(it.extras) && it.extras.length === 1 && /^\p{Lu}\p{Ll}{3,}s$/u.test(it.name) && /\p{L}{3}.*\s\S|\p{L}{6}/u.test(it.extras[0]) && !/£|\d{3}/.test(it.extras[0])) {
+      const n = it.extras[0];
+      it.name = n; delete it.extras;
+      const rest = String(it.variant || "").split(", ").filter((v) => v && v !== n);
+      if (rest.length) it.variant = rest.join(", "); else delete it.variant;
+    }
+  }
   // A free carrier bag on a shop's till receipt ("NON CHARGEABLE LRG SHOPPER £0.00") is not a thing bought.
   return items.filter((i) => !(i.pricePence === 0 && /\b(?:non[- ]?chargeable|carrier bag|shopper|bag for life|paper bag)\b/i.test(i.name)));
   // Does the line at n begin an item of its own? A quantity, a size or colour, or a product code comes before any price.

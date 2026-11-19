@@ -1502,24 +1502,56 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 // A receipt the shopper forwarded from their own mailbox (gmail.com...) has the shop's order number but not the shop's
 // address, so it joins the shop's own emails for that order when the order number matches and the amounts agree.
 const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
+// The shop an order email is from, for joining one order's emails: its address without the part a shop sends a kind of
+// email from ("order.detalecph.com" is detalecph.com). Round 11.
+const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m)\./i;
+function joinStore(o) {
+  const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
+  return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
+}
 export function mergeOrderEmails(orders) {
   const out = [], groups = new Map();
   const shopFor = new Map(); // order number -> the shop it belongs to, when exactly one shop used it
   for (const o of orders) {
     if (!o.orderRef || isForwarded(o)) continue;
     const ref = String(o.orderRef).toUpperCase(), e = shopFor.get(ref) || { keys: new Set(), totals: new Set() };
-    e.keys.add(storeKey(o)); if (o.totalPence != null) e.totals.add(o.totalPence); shopFor.set(ref, e);
+    e.keys.add(joinStore(o)); if (o.totalPence != null) e.totals.add(o.totalPence); shopFor.set(ref, e);
   }
+  // (A parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1", joins that order. Round 11.)
+  const refsOf = new Map();
+  for (const o of orders) if (o.orderRef) { const k = joinStore(o); if (!refsOf.has(k)) refsOf.set(k, new Set()); refsOf.get(k).add(String(o.orderRef).toUpperCase()); }
+  const baseRef = (o, ref) => { const m = /^(.{5,})-\d{1,2}$/.exec(ref); return m && (refsOf.get(joinStore(o)) || new Set()).has(m[1]) ? m[1] : ref; };
   const keyOf = (o) => {
     if (!o.orderRef) return null;
-    const ref = String(o.orderRef).toUpperCase();
+    const ref = baseRef(o, String(o.orderRef).toUpperCase());
     if (isForwarded(o)) {
       const e = shopFor.get(ref);
       if (e && e.keys.size === 1 && (o.totalPence == null || !e.totals.size || e.totals.has(o.totalPence))) return [...e.keys][0] + "|" + ref;
     }
-    return storeKey(o) + "|" + ref;
+    return joinStore(o) + "|" + ref;
   };
+  // (A shop's invoice email that is only its PDF, no items and no total of its own (Nespresso, Tempur), sent within a few days
+  // of the shop's own itemised order email: it is that order's, not a second purchase. Joined only when exactly one such
+  // order email of the shop fits. Round 11.)
+  const bare = (o) => o.detailsInAttachment && !(o.items || []).length && o.totalPence == null && o.kind !== "order_update";
+  const folded = new Map();
   for (const o of orders) {
+    if (!bare(o) || !o.orderDate) continue;
+    const fits = orders.filter((p) => p !== o && !bare(p) && (p.items || []).length && p.orderDate && joinStore(p) === joinStore(o) &&
+      (!p.orderRef || !o.orderRef || sameOrderRef(p.orderRef, o.orderRef)) &&
+      // (Within three days either way, or an invoice sent later, up to 60 days after the order, when no other order of the
+      // shop came in between.)
+      (Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5 || (p.orderDate <= o.orderDate && Date.parse(o.orderDate) - Date.parse(p.orderDate) <= 60 * 864e5)));
+    const near = fits.filter((p) => Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5);
+    if (near.length === 1) folded.set(o, near[0]); else if (!near.length && fits.length === 1) folded.set(o, fits[0]);
+  }
+  for (const o of orders) {
+    if (folded.has(o)) {
+      const p = folded.get(o);
+      if (!p.orderRef && o.orderRef) p.orderRef = o.orderRef;
+      if (!p.detailsInAttachment) Object.defineProperty(p, "invoiceAttached", { value: o.detailsInAttachment, enumerable: false, configurable: true });
+      continue;
+    }
     const k = keyOf(o);
     if (!k) { out.push(o); continue; }
     if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }

@@ -756,6 +756,8 @@ function receiptSignals(subject, text) {
     /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
     // "Your Sainsbury's order summary" (round 8).
     /\byour\b[^!?]{0,40}\border summary\b/.test(s) ||
+    // "Order Info - DET-7vxlt1dlf1s", "NESPRESSO Club: Your order on www.nespresso.com" (round 11).
+    /\border\b[^!?]{0,20}?\s[-–:#]\s*(?=[a-z0-9-]*\d)[a-z0-9-]{5,24}\s*$|\byour order (?:on|at|from) (?:www\.)?[a-z0-9-]+(?:\.[a-z]{2,6}){1,2}\s*$/.test(s) ||
     // "Your invoice from Brightwave Window Cleaning", "Invoice from …" that says it has been paid (round 8). Never an invoice
     // that is overdue, a reminder or still to pay: that is a bill, not a purchase (checked against the email below).
     (/^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w&'’.-]+\s+){0,3}invoice\b/.test(s) && !/\b(?:overdue|reminder|due|unpaid|outstanding|final notice|statement|request|pay now|awaiting|proforma|pro-forma|quote|estimate)\b/.test(s) && paidInvoice(text)) ||
@@ -792,7 +794,8 @@ function looksLikeReceipt(subject, text) {
 
 // Marketing and loyalty emails that merely look like receipts ("You've saved £4 with Nectar", "20% off", "rate your order").
 // Promotions have their own place in Relay, so these are not receipts. An email that carries an order number is never treated as a promotion.
-const PROMO_SUBJECT = /\b(you(?:'|’)?ve saved|you saved|\d{1,3}\s?% off|up to \d{1,3}\s?%|sale\b|offers?\b|deals?\b|win\b|rewards?|earn(?:ed)? (?:\d+ )?points|your points|nectar|clubcard|new in\b|back in stock|just for you|don'?t miss|last chance|exclusive|voucher|refer a friend|rate your|how did we do|leave a review|review your|survey|newsletter|wishlist|abandoned|still thinking)\b/i;
+// ("Grand Theft Auto VI: order now", "you've got until 16th December to place your pre-order": asking for an order. Round 11.)
+const PROMO_SUBJECT = /\b(order now|pre-?order|place your (?:pre-?)?order|buy now|book now|shop now|you(?:'|’)?ve saved|you saved|\d{1,3}\s?% off|up to \d{1,3}\s?%|sale\b|offers?\b|deals?\b|win\b|rewards?|earn(?:ed)? (?:\d+ )?points|your points|nectar|clubcard|new in\b|back in stock|just for you|don'?t miss|last chance|exclusive|voucher|refer a friend|rate your|how did we do|leave a review|review your|survey|newsletter|wishlist|abandoned|still thinking)\b/i;
 const ORDERISH_SUBJECT = /\b(order (?:confirmation|confirmed|received|number|summary)|your order|your receipt|receipt for|thanks? for your (?:order|purchase)|invoice|payment received)\b/i;
 // Money off the next order ("Up to £7 off your next order", "Save £5 on your first shop").
 const MONEY_OFF_SUBJECT = /(?:^|[\s(])(?:up to |save |get )?£\s?\d{1,4}(?:\.\d{2})?\s+off\b|\boff your (?:next|first)\b|(?:^|\s)save £\s?\d/i;
@@ -986,6 +989,10 @@ export function emailForReading(rawEmail) {
 function tillPounds(t) {
   // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
   if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
+  // ("137.5 GBP", "17 GBP", "0 GBP": a shop that drops the pence it doesn't need, Detale. Round 11.)
+  const twoPlaces = (n, p) => n + "." + String(p || "").padEnd(2, "0");
+  // (Only when every "GBP" follows an amount: a till receipt's "GBP" over its price column is read below.)
+  if (t && !/£/.test(t) && /(?<![\d.,])\d[\d,]*(?:\.\d{1,2})?[ \t]GBP\b/.test(t) && (t.match(/\bGBP\b/g) || []).length === (t.match(/\d[ \t]GBP\b/g) || []).length) return t.replace(/(?<![\d.,])(\d[\d,]*)(?:\.(\d{1,2}))?[ \t]GBP\b/g, (m, n, p) => "£" + twoPlaces(n, p));
   if (!t || /£/.test(t) || !/(?:^|[\s|])GBP(?:$|[\s|/])/m.test(t)) return t;
   return t.replace(/(\d{1,5}\.\d{2}) ?GBP\b/g, "£$1").replace(/(\S[ \t]{2,})(-?)(\d{1,5}\.\d{2})(?:[ \t]+[A-Z])?[ \t]*$/gm, "$1$2£$3");
 }
@@ -1079,6 +1086,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A shop owning up that an earlier "order confirmation" was a marketing email ("There was no order. Nothing has been
   // charged"): nothing was bought (round 10).
   if (NO_ORDER.test(String(subject || "") + "\n" + text.slice(0, 3000).replace(/\s+/g, " "))) return { ok: false, reason: "no_order", source: "shopper_email" };
+  // (A shop's reply to the shopper's own message, "RE: Order #1806 confirmed", "RE: Thank you for your order: …": support
+  // writing back, quoting the order. The order's own email is the purchase, never this. Round 11.)
+  if (!opts.lenient && /^\s*re\s*:/i.test(String(subject || "")) && (headers["in-reply-to"] || headers.references)) return { ok: false, reason: "reply", source: "shopper_email" };
+  // (Someone else's purchase they forwarded to the shopper: forwarded from a personal address by a person whose name is not
+  // the shopper's, and it was first sent to that person ("To: their address" in what they forwarded). Their booking, not the
+  // shopper's. Round 11.)
+  if (!opts.lenient && /^\s*(?:fwd?|fw)\s*:/i.test(String(subject || "")) && PERSONAL_MAIL.test(sender?.domain || "")) {
+    const addr = (h) => ((String(h || "").match(/<([^>]+)>/) || [])[1] || String(h || "").trim()).toLowerCase();
+    const nameOf = (h) => (String(h || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || "";
+    const fromA = addr(headers.from), toName = nameOf(headers.to), fromName0 = nameOf(headers.from);
+    const innerTo = /^[>\s*]*to:\s*(.+)$/im.exec(text.slice(0, 4000));
+    const words = (n) => new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3));
+    const shared = [...words(fromName0)].some((w) => words(toName).has(w));
+    if (fromA && innerTo && innerTo[1].toLowerCase().includes(fromA) && toName && fromName0 && !shared) return { ok: false, reason: "someone_elses_purchase", source: "shopper_email" };
+  }
   // A notice that the payment didn't go through is not a receipt ("we couldn't charge your account for your order").
   if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
     return { ok: false, reason: "payment_problem", source: "shopper_email" };
@@ -1109,6 +1131,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  // (The order number only in the subject, "Order Info - DET-7vxlt1dlf1s": Detale. Round 11.)
+  if (!result.orderRef) { const sr = /\border\b[^!?\n]{0,20}?\s[-–:#]\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{5,24})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
@@ -1270,6 +1294,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   result.needsShopperConfirmation = result.confidence !== "high";
   if (result.orderDate && !/^\d{4}-\d{2}-\d{2}$/.test(result.orderDate)) result.orderDate = null;
   // No date in the text: the day the shop sent the email is the best guess (used for sorting and display, never for confidence).
+  // (A date more than a year before the email was sent is not this purchase's: "These Terms and Conditions were last updated
+  // in 14th Feb 2022" under an invoice sent in 2025. The email's own date is. Round 11.)
+  if (result.orderDate && refDate && !Number.isNaN(refDate.getTime()) && Date.parse(result.orderDate) < refDate.getTime() - 400 * 864e5) result.orderDate = null;
   if (!result.orderDate && refDate && !Number.isNaN(refDate.getTime())) { result.orderDate = isoDate(refDate); result.orderDateFrom = "email"; }
   return result;
 }
