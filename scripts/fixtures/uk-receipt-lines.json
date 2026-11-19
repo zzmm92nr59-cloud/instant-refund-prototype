@@ -1,5 +1,5 @@
 {
- "about": "Made-up but realistic UK receipt item lines, each with what it really is (worker/item-kind-core.js KIND_LIST). No real orders or people. Toiletries count as household; hair dryers, straighteners and electric toothbrushes as electronics; candles, plants and paint as home; pet food and pet things as pets; stationery and greetings cards as other; event tickets and delivery charges as services. scripts/test-item-kinds-accuracy.mjs reads it. Groups marked setTwo were written after the rules were first tuned and scored before the rules saw them: 209 of 229 right (91.3%), with 3 of 182 never-wrong lines wrong. The rules were then improved on them too, so the whole file is now tuning data; that first 91.3% is the honest estimate for lines Relay hasn't seen. Groups marked setThree (round 5, 19 Nov 2026) are 330 lines in harder styles (till-roll short forms like \"JS BTRNT SQSH\", colour and size codes, model numbers, DIY, pets, baby, vapes, gift cards, fees), scored before the rules saw them: 264 of 330 right (80.0%), with 14 never-wrong lines wrong. The rules were then improved on them, so they are tuning data too.",
+ "about": "Made-up but realistic UK receipt item lines, each with what it really is (worker/item-kind-core.js KIND_LIST). No real orders or people. Toiletries count as household; hair dryers, straighteners and electric toothbrushes as electronics; candles, plants and paint as home; pet food and pet things as pets; stationery and greetings cards as other; event tickets and delivery charges as services. scripts/test-item-kinds-accuracy.mjs reads it. Groups marked setTwo were written after the rules were first tuned and scored before the rules saw them: 209 of 229 right (91.3%), with 3 of 182 never-wrong lines wrong. The rules were then improved on them too, so the whole file is now tuning data; that first 91.3% is the honest estimate for lines Relay hasn't seen. Groups marked setThree (round 5, 19 Nov 2026) are 330 lines in harder styles (till-roll short forms like \"JS BTRNT SQSH\", colour and size codes, model numbers, DIY, pets, baby, vapes, gift cards, fees), scored before the rules saw them: 264 of 330 right (80.0%), with 14 never-wrong lines wrong. The rules were then improved on them, so they are tuning data too. Groups marked setFour (68 lines, one already in the file) were written after the round 5 fixes as a check and scored before the rules saw them: 65 of 68 right (95.6%), none of the never-wrong lines wrong; the three misses were then fixed too.",
  "groups": [
   {"shop": "Sainsbury's", "domain": "sainsburys.co.uk", "lines": [
     ["Rowntree's 130g Fruit Pastilles Sweets Sharing Bag Lollies", "food_drink"],
@@ -1624,6 +1624,111 @@
     ["Standing - General Admission", "services"],
     ["Fee", "services"],
     ["Order Processing Fee", "services"]
+  ] },
+  {"shop": "Morrisons", "domain": "morrisons.com", "setFour": true, "lines": [
+    ["M BEST CHKN KIEV 2PK", "food_drink"],
+    ["MORR SAVERS BKD BNS", "food_drink"],
+    ["M GRTD MOZZ 250G", "food_drink"],
+    ["NUTMEG GIRLS SCHOOL SKIRT 2PK", "clothing"],
+    ["NUTMEG KIDS SLIDERS", "footwear"],
+    ["M KTCHN FOIL 10M", "household"],
+    ["MORRISONS MARKET ST LOAF", "food_drink"],
+    ["M FAIRTRADE BANANAS", "food_drink"]
+  ] },
+  {"shop": "Waitrose", "domain": "waitrose.com", "setFour": true, "lines": [
+    ["WR ESS SMKD SALMON TRIM", "food_drink"],
+    ["WTRS NO1 BEEF WELLINGTON", "food_drink"],
+    ["WR DUCHY ORG CARROTS", "food_drink"],
+    ["WR LAVENDER HAND WASH", "household"],
+    ["WR CORNISH PASTY", "food_drink"],
+    ["Waitrose Cellar Rioja Crianza", "food_drink"]
+  ] },
+  {"shop": "Co-op", "domain": "coop.co.uk", "setFour": true, "lines": [
+    ["CO OP IRRESISTIBLE STEAK PIE", "food_drink"],
+    ["CO-OP CARRIER BAG", "household"],
+    ["COOP 2L SEMI", "food_drink"],
+    ["CO OP CHAPSTICK", "beauty_health"]
+  ] },
+  {"shop": "Superdrug", "domain": "superdrug.com", "setFour": true, "lines": [
+    ["SD OPTIMUM HYALURONIC SERUM", "beauty_health"],
+    ["COLLECTION LASTING PERFECTION CONCEALER", "beauty_health"],
+    ["SD SUNCARE SPF50 200ML", "beauty_health"],
+    ["SD ANTIBAC HAND GEL 50ML", "household"]
+  ] },
+  {"shop": "Boots", "domain": "boots.com", "setFour": true, "lines": [
+    ["Boots Pharmaceuticals Loratadine 10mg 30 Tablets", "beauty_health"],
+    ["Braun Series 7 Electric Shaver", "electronics"],
+    ["Boots Shapers Meal Deal Wrap", "food_drink"],
+    ["Soap & Glory The Righteous Butter 300ml", "beauty_health"]
+  ] },
+  {"shop": "JD Sports", "domain": "jdsports.co.uk", "setFour": true, "lines": [
+    ["Nike Tech Fleece Joggers Black/Black L", "clothing"],
+    ["adidas Originals Handball Spezial Navy UK 8", "footwear"],
+    ["The North Face 1996 Retro Nuptse Gilet", "clothing"],
+    ["Nike Heritage Crossbody Bag Black", "accessories"],
+    ["Jordan Jumpman Cap", "accessories"]
+  ] },
+  {"shop": "Office", "domain": "office.co.uk", "setFour": true, "lines": [
+    ["Office Leading Lady Ballet Flats Black Leather 5", "footwear"],
+    ["Shoe Care Kit", "household"],
+    ["Ugg Tasman Chestnut 6", "footwear"]
+  ] },
+  {"shop": "Currys", "domain": "currys.co.uk", "setFour": true, "lines": [
+    ["ACER Aspire 3 A315 15.6\" Laptop - Intel Core i5, 512 GB SSD", "electronics"],
+    ["SONY PS5 Slim Console Digital Edition", "electronics"],
+    ["SWITCH Joy-Con Pair Neon", "electronics"],
+    ["BEKO CDFY24 24\" Fridge Freezer", "electronics"]
+  ] },
+  {"shop": "Screwfix", "domain": "screwfix.com", "setFour": true, "lines": [
+    ["Dewalt DCD796N 18V XR Combi Drill Body Only", "home"],
+    ["Flomasta Basin Mixer Tap", "home"],
+    ["Easyfix Floor Plates 150pk", "home"],
+    ["Everbuild 703 Decorators Caulk 380ml White", "home"]
+  ] },
+  {"shop": "IKEA", "domain": "ikea.com", "setFour": true, "lines": [
+    ["POÄNG Armchair, birch veneer/Knisa light beige", "home"],
+    ["HEMNES 8-drawer dresser, white stain", "home"],
+    ["Meatballs 1kg frozen", "food_drink"],
+    ["FRAKTA Shopping bag, large, blue", "household"]
+  ] },
+  {"shop": "Pets at Home", "domain": "petsathome.com", "setFour": true, "lines": [
+    ["Harringtons Grain Free Salmon 2kg", "pets"],
+    ["AvoDerm Natural Lamb Biscuits", "pets"],
+    ["Rosewood Chewy Rope Ball", "pets"]
+  ] },
+  {"shop": "Smyths Toys", "domain": "smythstoys.com", "setFour": true, "lines": [
+    ["Barbie Dreamhouse 2025", "toys_hobbies"],
+    ["Hot Wheels Monster Trucks 5 Pack", "toys_hobbies"],
+    ["Pokémon TCG Scarlet & Violet Booster", "toys_hobbies"]
+  ] },
+  {"shop": "Holland & Barrett", "domain": "hollandandbarrett.com", "setFour": true, "lines": [
+    ["Holland & Barrett Magnesium Citrate 120 Capsules", "beauty_health"],
+    ["Meridian Smooth Peanut Butter 1kg", "food_drink"],
+    ["Nakd Cocoa Delight Bar 35g", "food_drink"]
+  ] },
+  {"shop": "Vape Club", "domain": "vapeclub.co.uk", "setFour": true, "lines": [
+    ["Elf Bar 2000 Pod Kit Cherry", "other"],
+    ["Hayati Pro Max 4000 Blue Razz", "other"]
+  ] },
+  {"shop": "Deliveroo", "domain": "deliveroo.co.uk", "setFour": true, "lines": [
+    ["Chicken Wrap & Wedges", "food_drink"],
+    ["Kids Box Meal", "food_drink"]
+  ] },
+  {"shop": "Very", "domain": "very.co.uk", "setFour": true, "lines": [
+    ["Shark NZ690UK Anti Hair Wrap Upright Vacuum", "home"],
+    ["Everyday Ribbed Jersey Midi Dress Black 14", "clothing"],
+    ["Very Home Mirror 60x90cm", "home"]
+  ] },
+  {"shop": "John Lewis", "domain": "johnlewis.com", "setFour": true, "lines": [
+    ["John Lewis Classic Cotton Bath Towel, Navy", "home"],
+    ["Sage the Bambino Plus Coffee Machine", "home"]
+  ] },
+  {"shop": "Trainline", "domain": "thetrainline.com", "setFour": true, "lines": [
+    ["Off-Peak Day Return (Adult)", "travel"]
+  ] },
+  {"shop": "Gift Card Mall", "domain": "giftcardmall.example", "setFour": true, "lines": [
+    ["Costa Coffee Gift Card £15", "gift_cards"],
+    ["Nando's eGift £25", "gift_cards"]
   ] }
  ]
 }
