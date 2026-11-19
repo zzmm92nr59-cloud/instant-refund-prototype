@@ -1,0 +1,18 @@
+{
+ "id": "holdout14a-apple-refund-request",
+ "sender": "Apple",
+ "layout": "'A refund request has been received': decisions take 24-48 hours",
+ "headers": {
+  "from": "Apple <no_reply@email.apple.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "A refund request has been received",
+  "date": "Fri, 13 Mar 2026 13:17:05 +0000"
+ },
+ "html": "",
+ "text": "Dear Sam,\n\nThis confirms a refund request for one or more items. Refund decisions take 24–48 hours to complete. Once a decision has been made on your refund request, you will get a follow-up email.\n\nApple Support",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund_request"
+  }
+ }
+}

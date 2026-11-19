@@ -1,0 +1,18 @@
+{
+ "id": "holdout14a-google-play-sub-ending",
+ "sender": "Google Play",
+ "layout": "'Your … subscription will be cancelled': it ends on a day, no refund",
+ "headers": {
+  "from": "Google Play <googleplay-noreply@google.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Inkwell: Draw, Sketch & Paint Anywhere subscription will be cancelled",
+  "date": "Mon, 15 Jul 2019 11:17:31 +0000"
+ },
+ "html": "",
+ "text": "Google Play\n\nYour Inkwell: Draw, Sketch & Paint Anywhere subscription from Google Commerce Limited on Google Play will be cancelled on 13 Aug 2019. No refunds will be issued (Refund Policy).\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "subscription_ending"
+  }
+ }
+}

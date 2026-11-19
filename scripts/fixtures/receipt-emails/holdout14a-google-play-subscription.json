@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-google-play-subscription",
+ "sender": "Google Play",
+ "layout": "a subscription renewal: 'Item Price', the name wrapped onto a second line with '(by developer)' and '£8.99/month', GPA order number",
+ "headers": {
+  "from": "Google Play <googleplay-noreply@google.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Google Play Order Receipt from 13-Apr-2019",
+  "date": "Sat, 13 Apr 2019 13:17:45 +0000"
+ },
+ "html": "<html><head><title></title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you.</td></tr>\n<tr><td>Your subscription from Google Commerce Limited on Google Play continues and you've been charged.</td></tr>\n<tr><td>Order number: GPA.3399-1234-5678-90123..3</td></tr>\n<tr><td>Order date: 13-Apr-2019 14:17:42 BST</td></tr>\n<tr><td>Item</td><td>Price</td></tr>\n<tr><td>Sketchbook Pro yearly with trial (Inkwell: Draw, Sketch &amp; Paint Anywhere) (by Inkwell Studio Ltd)</td><td>&pound;8.99/month</td></tr>\n<tr><td>Monthly Subscription ‐ Next payment automatically charged on 13 May 2019</td></tr>\n<tr><td>Total: &pound;8.99/month</td></tr>\n<tr><td>(Includes VAT of &pound;1.50)</td></tr>\n<tr><td>Payment method:</td><td>Visa-4242</td></tr>\n<tr><td>© 2019 Google</td><td>All Rights Reserved.</td></tr></table></body></html>",
+ "text": "Google Play\n\nThank you.\n\nYour subscription from Google Commerce Limited on Google Play continues and\nyou've been charged.\n\nOrder number: GPA.3399-1234-5678-90123..3\nOrder date: 13-Apr-2019 14:17:42 BST\n\nItem Price\n\nSketchbook Pro yearly with trial (Inkwell: Draw, Sketch & Paint Anywhere) (by\nInkwell Studio Ltd) £8.99/month\n\nMonthly Subscription ‐ Next payment automatically charged on 13 May 2019\n\nTotal: £8.99/month\n\n(Includes VAT of £1.50)\n\nPayment method:\n\nVisa-4242\n\nBy subscribing, you authorise us to charge you the subscription cost (as\ndescribed above) automatically, charged monthly to the payment method\nprovided. You can cancel at any time (learn more).\n\nUnder the law, you have an automatic statutory right of withdrawal from\ncontracts for the purchase of digital services for 14 days after you make\nthe purchase. Use this form to withdraw. After the first 14 days you will\nnot be eligible for a refund (or any alternative remedy) unless the\nservices are defective, unavailable or don't perform as stated. However,\nyou can cancel your subscription, and the cancellation will be effective\nfrom the start of the next payment period.\nAfter purchasing an app or game on Google Play, you can return it within\ntwo hours for a full refund. This does not apply for in-app purchases or\nin-app subscriptions.\n\n© 2019 Google | All Rights Reserved.",
+ "expected": {
+  "shop": "Google Play",
+  "date": "2019-04-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sketchbook Pro yearly with trial (Inkwell: Draw, Sketch & Paint Anywhere)",
+    "qty": 1,
+    "linePence": 899
+   }
+  ],
+  "subtotalPence": 899,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 899
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-game-shop-usd",
+ "sender": "Lantern Isles",
+ "layout": "a game shop's receipt bought in the United States: a bare '$', 'Country United States, TX'",
+ "headers": {
+  "from": "no-reply <no-reply@appcharge.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your LANTERN ISLES-BRIGHTFOX receipt #612-904-337",
+  "date": "Tue, 2 Jun 2026 15:30:58 +0000"
+ },
+ "html": "<html><head><title>Purchase Confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>LANTERN ISLES-BRIGHTFOX</td></tr>\n<tr><td>Receipt Number</td><td>612-904-337</td></tr>\n<tr><td>Payment Method</td><td>PayPal</td></tr>\n<tr><td>Payment Date</td><td>June 02, 2026 3:30 PM UTC</td></tr>\n<tr><td>Country</td><td>United States, TX</td></tr>\n<tr><td>Order ID</td><td>6b0c1d2e3f405162738495a6</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Storm Lantern</td><td>1</td></tr>\n<tr><td>Pearls</td><td>600</td></tr>\n<tr><td>Subtotal</td><td>$5.99</td></tr>\n<tr><td>Sales Tax (8%)</td><td>$0.48</td></tr>\n<tr><td>Total</td><td>$6.47</td></tr></table><p>Powered by <img alt=\"Appcharge\" src=\"https://cdn.appcharge.com/logo.png\"> For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new\">Appcharge support</a></p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Lantern Isles",
+  "date": "2026-06-02",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "Storm Lantern, 600 Pearls",
+    "qty": 1,
+    "linePence": 647
+   }
+  ],
+  "subtotalPence": 647,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 647
+ }
+}

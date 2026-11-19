@@ -1,0 +1,18 @@
+{
+ "id": "holdout14a-paypal-to-person",
+ "sender": "PayPal",
+ "layout": "'You sent a payment of £20.00 GBP to Sarah Jones': money to a person",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your payment to Sarah Jones",
+  "date": "Mon, 2 Jun 2025 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "You sent a payment of £20.00 GBP to Sarah Jones\nTransaction ID: 1AB23456CD789012E\nTransaction date 2 Jun 2025\nTotal £20.00 GBP\nPaid with PayPal balance\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "payment_to_person"
+  }
+ }
+}
