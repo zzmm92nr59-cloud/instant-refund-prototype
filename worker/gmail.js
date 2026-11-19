@@ -970,6 +970,7 @@ function classify(rawText, ref, lenient = false) {
     } else if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
+        ...(can.subscription ? { subscription: true, subscriptionName: can.subscriptionName, endsOn: can.endsOn, refund: can.refund } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
       details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
@@ -1936,10 +1937,28 @@ function attachPayments(orders, pays) {
     last.paidSoFarPence = list.reduce((n, x) => n + x.amountPence, 0);
   }
 }
+// A subscription that won't renew ("Your Microsoft Word: … subscription will be cancelled … on 13 Aug 2019. No refunds will
+// be issued"): it says so on the subscription's latest payment before it, from the same shop, named by the same words
+// (two or more words of four letters, "Microsoft", "Word", "docs"), within a year. That payment is not cancelled: it
+// stays bought, and its card says when the subscription ends and whether money comes back. Never when no payment fits.
+// Round 13.
+const subWords = (s) => new Set(String(s || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !/^(?:with|from|subscription|monthly|yearly|annual|plan|trial|edit|your)$/.test(w)));
+function attachSubscriptionEnds(orders, ends) {
+  for (const u of ends) {
+    const want = subWords(u.subscriptionName);
+    if (want.size < 2) continue;
+    const fits = orders.filter((o) => o.retailer && sameShop(u, o) && Array.isArray(o.items) && o.items.length && o.orderDate && (!u.at || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 370 * 864e5)) &&
+      o.items.some((it) => [...subWords(it && it.name)].filter((w) => want.has(w)).length >= 2));
+    if (!fits.length) continue;
+    const latest = fits.sort((a, b) => String(b.orderDate).localeCompare(String(a.orderDate)))[0];
+    latest.subscriptionEnds = { on: u.endsOn || null, at: u.at || null, refund: u.refund === false ? false : null };
+  }
+}
 export function attachCancellations(orders, cancels) {
   // (Payments towards a purchase come with the order's other news: they are not cancellations.)
   attachPayments(orders, cancels.filter(u => u.stage === "payment"));
-  cancels = cancels.filter(u => u.stage !== "payment");
+  attachSubscriptionEnds(orders, cancels.filter(u => u.subscription));
+  cancels = cancels.filter(u => u.stage !== "payment" && !u.subscription);
   // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
   // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
   const byItems = new Map();

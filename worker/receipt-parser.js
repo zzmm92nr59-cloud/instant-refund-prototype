@@ -690,8 +690,37 @@ function extractReturns(text, html, orderDate) {
   const flat = text.replace(/[ \t]+/g, " ");
 
   // Window: "within 28 days of delivery", "30-day returns", "return ... within 14 days".
-  const sentences = flat.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  // (A text part wrapped at a fixed width, "you can return it within\ntwo hours for a full refund", is read as the sentences
+  // it holds: a long line that stops mid-sentence runs on into the next. Round 13.)
+  const unwrapped = flat.split("\n").reduce((acc, line, k, all) => acc + line + (k === all.length - 1 ? "" : line.length >= 50 && !/[.!?:|]\s*$/.test(line) && /^[ \t]*[\p{Ll}\d(]/u.test(all[k + 1]) ? " " : "\n"), "");
+  const sentences = unwrapped.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  // (A subscription: an app store's rule for returning an app within two hours is not for it, "This does not apply for
+  // in-app purchases or in-app subscriptions".)
+  const subscription = /\b(?:your subscription|subscription (?:from|renews|continues)|monthly subscription|yearly subscription|annual subscription)\b|£\s?\d+\.\d{2}\s*\/\s*(?:month|year|week)\b/i.test(flat.slice(0, 4000));
+  const appRule = (x) => subscription && /\bwithin (?:two|2) hours\b|\bthis does not apply for in-app\b/i.test(x);
+  // (A digital purchase's right to cancel, Apple's "To cancel your purchase within 14 days of receiving this invoice, report a
+  // problem or contact us": its window, counted from the invoice, and marked a cancellation, not a parcel to send back. It
+  // comes before a refund window for something narrower, "a full refund within 15 days of a monthly subscription upgrade". Round 13.)
   for (const sent of sentences) {
+    const withdraw = sent.length <= 500 && /\bright (?:of|to) withdraw(?:al)?\b[^.]{0,100}?\bfor (\d{1,3}) days (?:after|from) (?:you make the purchase|(?:the )?(?:date of )?purchase)/i.exec(sent);
+    if (withdraw) {
+      out.windowDays = Number(withdraw[1]); out.windowFrom = "order"; out.cancelWithin = true;
+      out.instructions.push(sent);
+      const next = sentences.find((r) => r.length <= 300 && /\bcan cancel your subscription\b/i.test(r));
+      if (next) out.instructions.push(next);
+      break;
+    }
+    const cancelWin = sent.length <= 400 && /\bcancel\b[^.]{0,40}\b(?:purchase|order|subscription|contract)\b[^.]{0,20}\bwithin\s+(\d{1,3})\s+days?\s+(?:of|from|after)\s+(?:receiving\s+)?(?:this|the|your)\s+(invoice|receipt|purchase|order|email)/i.exec(sent);
+    if (!cancelWin) continue;
+    out.windowDays = Number(cancelWin[1]); out.windowFrom = "order"; out.cancelWithin = true;
+    out.instructions.push(sent.replace(/\s+([.,;:!?])/g, "$1").replace(/:$/, "."));
+    // (With it, what the email says about money back, "You may contact Apple for a full refund within 15 days of a monthly
+    // subscription upgrade", word for word.)
+    for (const r of sentences) if (out.instructions.length < 3 && r.length <= 300 && /\brefund\b[^.]{0,40}\bwithin\s+\d{1,3}\s+days?\b/i.test(r)) out.instructions.push(r.replace(/\s+([.,;:!?])/g, "$1"));
+    break;
+  }
+  for (const sent of sentences) {
+    if (out.cancelWithin) break;
     if (!/return|refund|exchange/i.test(sent) || sent.length > 400) continue;
     let m = sent.match(/within\s+(\d{1,3})\s+(?:calendar\s+|working\s+)?days?(?:\s+(?:of|from|after)\s+(?:the\s+)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
       sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i);
@@ -741,7 +770,7 @@ function extractReturns(text, html, orderDate) {
   const seen = new Set();
   for (const sent of sentences) {
     if (out.instructions.length >= 3) break;
-    if (sent.length < 25 || sent.length > 220 || !/\breturn/i.test(sent)) continue;
+    if (sent.length < 25 || sent.length > 220 || !/\breturn/i.test(sent) || appRule(sent)) continue;
     if (/unsubscribe|view (this )?(email|in browser)/i.test(sent)) continue;
     // (Money given back on its own, a card hold "returned to you in full", is not how to send something back. Round 12.)
     if (/\b(?:amount|money|deposit|hold|funds?)\b[^.]{0,40}\breturned\b|\breturned to (?:you|your (?:card|account))\b/i.test(sent)) continue;
@@ -920,6 +949,27 @@ export function amazonItems(html, given) {
   return given ? items : items.map(({ above, ...i }) => i);
 }
 
+// Google Play's receipt lists what was bought between "Item Price" and "Total:", one paragraph each (the name can wrap over
+// lines), the price at the end of the paragraph, "£5.99" or a plan's "£5.99/month"; "(by Microsoft Corporation)" is the
+// developer, not part of the name. Round 13.
+function googlePlayItems(text) {
+  const t = String(text || "").replace(/\r/g, "");
+  const head = /^[ \t|]*item[ \t|]+price[ \t|]*$/im.exec(t);
+  if (!head) return [];
+  const rest = t.slice(head.index + head[0].length);
+  const end = /^[ \t|]*total\s*:/im.exec(rest);
+  const body = end ? rest.slice(0, end.index) : rest.slice(0, 2000);
+  const out = [];
+  for (const para of body.split(/\n[ \t|]*\n/)) {
+    const p = para.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s+/g, " ").trim();
+    const m = /^(.{3,300}?)\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*\/\s*(?:month|year|week|day))?$/i.exec(p);
+    if (!m) continue;
+    const name = m[1].replace(/\s*\(by [^()]{2,60}\)\s*$/i, "").trim();
+    if (name.length >= 3) out.push({ name, qty: 1, pricePence: money(m[2]) });
+  }
+  return out;
+}
+
 // One Amazon confirmation can hold several orders ("Your purchase has been divided into 2 orders"): each "Order #" with its
 // own items and its own "Order Total:". Read from the HTML, where each order's rows sit under its number (an order sent in
 // two parcels has its number over each), with each title Amazon cut short ("Minky 3 Tier Plus Clothes Airer, Sil...") taken
@@ -1063,6 +1113,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     dataName: ld?.retailerName || null,
     forwardedName: asSent ? null : fw?.name || null, forwardedDomain: asSent ? null : fw?.domain || null,
     senderName: sentName, senderDomain: sentDomain, personal: asSent ? false : personal,
+    senderInSubject: Boolean(sentName && sentName.length >= 5 && subject.includes(sentName.trim())),
     // (Not the forward's own header lines: its "Subject:" would count the subject twice.)
     bodyNames: shopNamesInText(asSent ? text.replace(/^[ \t>*]*(?:from|subject|date|to|sent|cc)[ \t*]*:.*$/gim, "") : text, subject),
     // A payment platform's own receipt names the business that was paid ("Merchant: Example Lettings").
@@ -1448,6 +1499,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     totalPence: chosen.totalPence ?? txt.totalPence,
     items: chosen.items.length ? chosen.items : txt.items,
   };
+  // (An order number with dots in it, Google Play's "Order number: GPA.3332-1627-7044-99184..6": the whole of it. Round 13.)
+  if (!result.orderRef) { const gp = /\border (?:number|no\.?|id)\s*:?\s*\*{0,2}\s*([A-Z]{2,5}\.\d{4}-\d{4}-\d{4}-\d{4,6}(?:\.\.\d{1,4})?)(?![\w.-])/i.exec(text) || /\border (?:number|no\.?|id)\s*:?\s*\*{0,2}\s*([A-Z]{2,5}\.\d{4}-\d{4}-\d{4}-\d{4,6}(?:\.\.\d{1,4})?)(?![\w.-])/i.exec(text === fromHtml ? plain : fromHtml || ""); if (gp) result.orderRef = gp[1]; }
   // (The order number only in the subject, "Order Info - DET-7vxlt1dlf1s": Detale. Round 11.)
   if (!result.orderRef) { const sr = /\border\b[^!?\n]{0,20}?\s[-–:#]\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{5,24})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // ("… Tickets - Order Number [#160104]": the number in brackets. Round 12.)
@@ -1583,6 +1636,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     result.itemsCheck = pick.check;
   } else {
     result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+  }
+  // (Google Play's receipt: the thing bought over "Item Price", its name wrapped over lines and its developer after it,
+  // "Office 365 personal with trial (…) (by Microsoft Corporation) £5.99/month", a plan's price per month. Round 13.)
+  if (!result.items.length && /(^|\.)google\.com$/i.test(sender?.domain || result.retailer.domain || "") && /\bgoogle play\b/i.test(text.slice(0, 3000))) {
+    const gp = googlePlayItems(plain || text);
+    if (gp.length) { result.items = gp; result.itemsCheck = checkItems(gp, moneyOf(text), result.totalPence); }
   }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)
@@ -1946,6 +2005,10 @@ export function parseReturnUpdateEmail(rawEmail) {
   const ub = uberEmail(retailerFromFrom(headers.from)?.domain, subject, text);
   if (ub && ub.kind === "adjusted") return { ok: false, reason: "order_adjusted" };
   if (/\bcancell?(?:ed|ation)\b/i.test(subj) || NOT_A_PURCHASE_TOP.test(top) && !/\breturn(?:ed|s)?\b/i.test(subj)) return { ok: false, reason: "cancellation" };
+  // (A request for money back, Apple's "A refund request has been received" and "Decision on refund request" that only says
+  // to look at Report a Problem: nothing says money came back, so it is never a refund. Only one that says the request was
+  // approved, or the refund issued, is. Round 13.)
+  if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b/i.test(both)) return { ok: false, reason: "refund_request" };
   let stage = null;
   if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b/i.test(both)) stage = "refunded";
   else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
@@ -2118,6 +2181,18 @@ export function parseCancellationEmail(rawEmail) {
   if (returnCarrierOf(u.headers.from) || CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || "")))) return no;
   const top = u.text.slice(0, 1500).replace(/\s+/g, " ");
   const said = /\bcancell?(?:ed|ation)\b/i.test(u.subject) || NOT_A_PURCHASE_TOP.test(top);
+  // (A subscription that will stop, Google Play's "Your Microsoft Word: … subscription will be cancelled" with "will be
+  // cancelled on 13 Aug 2019. No refunds will be issued": nothing bought is undone, it just doesn't renew. Kept as news for
+  // the subscription's latest payment (gmail.js attachCancellations): the day it ends and that no money comes back. Round 13.)
+  const sub = /^\s*(?:(?:fwd?|fw)\s*:\s*)*your (.{2,80}?) subscription (?:will be|has been|is|was) cancell?ed\b/i.exec(u.subject);
+  if (sub) {
+    const on = /\b(?:will be|has been|was|is) cancell?ed (?:on|from) (\d{1,2}[ -][A-Za-z]{3,9}[ -]\d{4}|[A-Za-z]{3,9} \d{1,2},? \d{4})/i.exec(top);
+    // (A day still to come: read without the email's own date, which only allows days before it.)
+    const endsOn = on ? parseDate(on[1].replace(/-/g, " ")) : null;
+    return { ok: true, kind: "order_update", stage: "cancelled", subscription: true, subscriptionName: sub[1].trim(), endsOn: endsOn || null,
+      refund: /\bno refunds? (?:will be|is|are) (?:issued|given|made|due)\b/i.test(top) ? false : null, partial: false, at: u.at, orderRef: u.orderRef || null,
+      amountPence: null, currency: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+  }
   // A price adjustment or a subscription ("Your membership has been cancelled") is not a cancelled order.
   if (!said || PRICE_ADJUSTMENT.test(u.subject + " " + top) || /\b(?:subscription|membership|plan|direct debit|account|booking|reservation|appointment|trial)\b/i.test(u.subject)) return no;
   if (!/\border\b/i.test(u.subject + " " + top)) return no;

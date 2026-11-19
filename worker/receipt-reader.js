@@ -126,11 +126,17 @@ export function rankShop(clues) {
   // (Nor does a game's web shop sending under its own name, when the receipt names the game.)
   const viaName = c.senderName && (isVia(c.senderDomain) || c.titleName) && nameFitsDomain(cleanShopName(c.senderName) || "", c.senderDomain);
   if (c.senderName && !c.personal && !viaName) add(c.senderName, looksLikePerson(cleanShopName(c.senderName) || "", senderDomain || c.linkDomain) ? 1 : 5, senderDomain);
+  const sentAs = c.senderName && !c.personal && !viaName ? letters(cleanShopName(c.senderName) || "") : null;
   for (const n of c.bodyNames || []) add(n, 3, null);
   if (shopDomain) {
     const fromDomain = nameFromDomain(shopDomain);
     // The web address backs up any name that matches it.
-    for (const e of tally.values()) if (nameFitsDomain(e.name, shopDomain)) { e.score += 3; e.domain = e.domain || shopDomain; }
+    // (And the sender's name, when the subject gives it too, whose first word is the address's, "Google Play" from google.com: a
+    // brand's own store, not the company, "Google", in its footer. Round 13.)
+    for (const e of tally.values()) {
+      const store = c.senderInSubject && sentAs && letters(e.name) === sentAs && senderDomain === shopDomain && / /.test(e.name) && nameFitsDomain(e.name.split(" ")[0], shopDomain);
+      if (nameFitsDomain(e.name, shopDomain) || store) { e.score += store ? 6 : 3; e.domain = e.domain || shopDomain; }
+    }
     if (fromDomain) add(fromDomain, 2, shopDomain);
   }
   let best = null;
