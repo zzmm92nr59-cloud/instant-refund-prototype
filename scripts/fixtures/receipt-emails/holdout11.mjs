@@ -64,7 +64,7 @@ export default function holdout11() {
       "Inclusive of VAT at 20%£1.67", "Billing and Payment", SHOPPER.name, SHOPPER.address, "United Kingdom", "Subtotal", "£8.32", "VAT charged at 20%", "£1.67", "Visa •••• 4821 (Apple Pay)", "£9.99",
       "You can turn off renewal receipts to stop getting emails for each subscription renewal or payment.", "Manage Subscriptions ›", "Report a Problem ›"];
     add("holdout11-apple-service-renewal", "Apple", "an Apple service over its plan; no 'Total', the amount on the card line; VAT on top of the subtotal", { from: "Apple <no_reply@email.apple.com>", subject: "Your receipt from Apple.", date: "Mon, 16 Nov 2026 08:00:00 +0000",
-      html: mail("Apple", "apple.com", lines) }, order([{ name: "Apple TV", qty: 1, unit: 999 }]), "Apple", "2026-11-16");
+      html: mail("Apple", "apple.com", lines) }, order([{ name: "Apple TV (Monthly)", qty: 1, unit: 999 }]), "Apple", "2026-11-16");
   }
   // ---- Sainsbury's: the confirmation, then the delivery-day email for the same order -------------------------------------
   {

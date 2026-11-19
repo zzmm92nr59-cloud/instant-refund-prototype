@@ -356,6 +356,8 @@ export function gameTitle(text) {
   for (const c of cellsOf(text).slice(0, 12)) {
     if (c.length < 3 || c.length > 48 || /\d/.test(c) || !/\p{L}{2}/u.test(c)) continue;
     if (/\b(purchase|confirmation|receipt|order|thank|thanks|hello|hi|dear|payment|invoice|powered|contact|support|help|questions?|assistance|support team)\b/i.test(c)) continue;
+    // (The web shop's own heading, "Appcharge Reciept" (sic), is not the game: a misspelt receipt, or the shop's name. Round 12.)
+    if (/\breci?ei?pt\b|\b(?:appcharge|xsolla)\b/i.test(c)) continue;
     // (A forward's own header lines, "From: Puzzle Pals <receipts@…>", are not the game's title. Round 10.)
     if (/^(?:from|to|sent|subject|date|cc)\s*:|@/i.test(c)) continue;
     let name = c.replace(/\s*[-–]\s*[A-Z0-9][A-Z0-9 &.]{1,30}$/, "").trim() || c;

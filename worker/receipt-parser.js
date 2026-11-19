@@ -742,7 +742,13 @@ function extractReturns(text, html, orderDate) {
     if (!seen.has(key)) { seen.add(key); out.instructions.push(sent); }
   }
 
-  out.qrMentioned = /\bqr\b|\bqr[- ]code/i.test(flat) || /<img[^>]+(?:alt|src)=["'][^"']*qr/i.test(html || "");
+  // A QR code for a return. Not one to download the shop's app, a ticket's or an eSIM's code, or the letters "qr" inside
+  // a tracking link's picture address (round 12: a hotel booking, a train ticket, a phone plan and a gift receipt were all
+  // flagged "QR code" for that).
+  const NOT_RETURN_QR = /download|\bapp\b|app store|google play|e-?sim|activat|install|ticket|boarding|barcode|check[- ]?in|entry|admission|wallet|sign[- ]?in|log[- ]?in/i;
+  const qrLines = String(flat).split(/(?<=[.!?])\s+|\n/).filter((l) => /\bqr\b/i.test(l));
+  const qrImg = [...String(html || "").matchAll(/<img\b[^>]*>/gi)].map((m) => m[0]).filter((t) => /\balt=["'][^"']*\bqr\b|\bsrc=["'][^"']*(?:\bqr[-_]?code|[\/_-]qr[\/_.-])/i.test(t));
+  out.qrMentioned = qrLines.some((l) => !NOT_RETURN_QR.test(l)) || qrImg.some((t) => !NOT_RETURN_QR.test(t));
   out.labelMentioned = /(prepaid|printable|return)\s+label|drop[- ]?off|drop (?:it )?off|collect\+|evri|royal mail|inpost|dpd|ups access point/i.test(flat);
   const any = out.windowDays || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned;
   return any ? out : null;
@@ -888,26 +894,55 @@ export function amazonItems(html) {
   return items;
 }
 
+// A plan row under an app or service: "Individual (Monthly)", "Weekly Unlimited Access (7 days)", "Premium (Annual)".
+const APPLE_PLAN = /\((?:monthly|yearly|annual|annually|weekly|quarterly|\d+\s*(?:days?|weeks?|months?|years?))\)\s*$|^(?:weekly|monthly|yearly|annual)\b.{2,60}$/i;
+// The phone or computer it was bought on: "Sam's iPhone", "iPad Pro". Never the thing bought.
+const APPLE_DEVICE = /^(?:[\p{L}\p{N} .'’-]{1,40}['’]s\s+)?(?:iphone|ipad|ipod|mac(?:book)?|apple watch|apple vision pro|apple tv)(?:\s?[\w ]{0,12})?$/iu;
+// An app's store title often runs on after its name ("MobiPDF・PDF Editor・Reader・Sign", "Notes - Write & Plan"): the
+// name is the part before the first separator.
+const appShort = (s) => String(s).split(/\s*[・·|]\s*|\s+[-–—:]\s+|:\s+/)[0].trim() || String(s);
 export function appleItems(text) {
-  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  // ("Report a Problem | £1.59": a price in the cell beside the last row is that purchase's price, on a row of its own.)
+  const rows = String(text || "").split("\n").flatMap((x) => x.replace(/^(.+?)(?:\s*\|\s*|\t+|\s{2,})(£\s*[0-9][0-9,]*\.[0-9]{2}|free)\s*\|?\s*$/i, "$1\n$2").split("\n")).map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   const items = [];
   for (let i = 0; i < rows.length; i++) {
     if (/^(subtotal|total|vat|tax)\b|\b(inclusive of|includes|incl\.?) vat\b/i.test(rows[i])) break;
-    const pm = rows[i].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/);
+    const pm = rows[i].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})$/) || (/^free$/i.test(rows[i]) ? [rows[i], "0.00"] : null);
     if (!pm) continue;
+    // The rows above the price, nearest first: the app (or Apple's own service), then what was bought in it or the plan.
     const found = [];
-    for (let j = i - 1; j >= 0 && j >= i - 6 && found.length < 2; j--) {
+    let plan = null, inApp = false;
+    for (let j = i - 1; j >= 0 && j >= i - 7 && found.length < 2; j--) {
       const r = rows[j];
-      if (/^£/.test(r) || APPLE_LABEL.test(r)) break;
-      // (Apple's own service over its plan, "Apple Music" over "Individual (Monthly)": the service is what was bought. A store's
-      // heading, "App Store" over a game, is not. Round 10.)
-      if (APPLE_SECTION.test(r)) { if (!found.length || (found.length === 1 && /^(apple arcade|apple tv|apple music|apple one|icloud)$/i.test(r))) found.push(r); break; }
-      if (APPLE_NOISE.test(r) || r.length > 90) continue;
+      if (/^£|^free$/i.test(r) || APPLE_LABEL.test(r)) break;
+      if (/in-app purchase/i.test(r)) { inApp = true; continue; }
+      // (Apple's own service over its plan, "Apple Music" over "Individual (Monthly)". A store's heading, "App Store" over a
+      // game, is not. Round 10.)
+      // (A service's name right over a free game, "Apple Arcade" under "Monument Valley 3", says where it came from: the game
+      // above it is the item.)
+      if (APPLE_SECTION.test(r)) {
+        if (!found.length && !plan && /^apple arcade$/i.test(r)) continue;
+        if (!found.length || (found.length === 1 && /^(apple arcade|apple tv|apple music|apple one|icloud)$/i.test(r))) found.push(r);
+        break;
+      }
+      if (!plan && APPLE_PLAN.test(r) && !/^renews\b|^free trial/i.test(r)) { plan = r; continue; }
+      if (APPLE_DEVICE.test(r) || APPLE_NOISE.test(r) || r.length > 90) continue;
       found.push(r);
     }
-    if (!found.length) continue;
-    const [app, what] = found.length === 2 ? [found[1], found[0]] : [found[0], null];
-    items.push({ name: app, ...(what && what.toLowerCase() !== app.toLowerCase() ? { variant: what } : {}), qty: 1, pricePence: money(pm[1]) });
+    if (!found.length && !plan) continue;
+    const app = found.length ? found[found.length - 1] : null;
+    const what = found.length === 2 ? found[0] : null;
+    const pricePence = pm[1] === "0.00" ? 0 : money(pm[1]);
+    // Round 12: the item is what was bought, with the app as its detail ("Stack of Coins" in Match Masters); a plan is named
+    // with its app ("Apple Music Individual (Monthly)"), unless the plan already says it ("iCloud+ with 200 GB (Monthly)").
+    if (what && (inApp || !plan)) { items.push({ name: what, variant: appShort(app), qty: 1, pricePence }); continue; }
+    if (plan) {
+      const short = app ? appShort(app) : "";
+      const name = !short || plan.toLowerCase().includes(short.toLowerCase()) ? plan : `${short} ${plan}`;
+      items.push({ name, qty: 1, pricePence });
+      continue;
+    }
+    items.push({ name: app, qty: 1, pricePence });
   }
   return items;
 }
@@ -970,7 +1005,41 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
 }
 
 // "Your booking confirmation for London to Orpington (27 September at 12:54)", "... for return trip London to Nottingham (20 August ...".
-const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L} .'’&-]{1,40}?) to (\p{Lu}[\p{L} .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
+const JOURNEY = /\b(?:booking|reservation|tickets?|trip|journey)\b[^()\n]*?\bfor (return trip )?(?:from )?(\p{Lu}[\p{L}\d .'’&-]{1,40}?) to (\p{Lu}[\p{L}\d .'’&-]{1,40}?)(?=\s*\(|\s*[-–,]|\s*$)/u;
+// A rail booking's own list of tickets: "Adult - Anytime Day Single - [26-30 Railcard]" over its price, a line or a cell
+// apart. Each is a ticket bought (round 12: two tickets for one trip, a split ticket, are two items, each with its price).
+const RAIL_TICKET = /^(?:(\d{1,2})\s*x\s*)?(adults?|child(?:ren)?|seniors?|young persons?|students?)\s*[-–]\s*(.{3,60}?)(?:\s*[-–]\s*\[([^\]]{2,40})\])?\s*(?:\|\s*(£\s?[\d,]+\.\d{2}))?\s*\|?$/i;
+function railTickets(text) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const m = RAIL_TICKET.exec(rows[i]);
+    if (!m) continue;
+    const price = m[5] || (/^£\s?[\d,]+\.\d{2}$/.test(rows[i + 1] || "") ? rows[i + 1] : null);
+    if (!price) continue;
+    out.push({ type: m[3].trim(), passenger: m[2], card: m[4] || null, qty: m[1] ? Number(m[1]) : 1, pricePence: money(price.replace(/^£\s?/, "")) });
+  }
+  return out;
+}
+// Which leg a ticket is for: its type over the leg, "Anytime Day Single" then "Seaford Sussex to Brighton".
+function legOf(text, type) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (rows[i].toLowerCase() !== type.toLowerCase()) continue;
+    const leg = /^(\p{Lu}[\p{L}\d .'’&-]{1,40}?) to (\p{Lu}[\p{L}\d .'’&-]{1,40})$/u.exec(rows[i + 1]);
+    if (leg) return rows[i + 1];
+  }
+  return null;
+}
+// A station the subject shortens ("London") that the email's own lines name in full ("London Bridge"): the full name,
+// when exactly one line starts with it and is a place name a word or two longer.
+function fullStation(text, short) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const re = new RegExp("^" + short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?: \\p{Lu}[\\p{L}'’&-]{1,20}){1,2}$", "u");
+  // ("London Terminals", "London Underground" are fare zones, not the station.)
+  const longer = [...new Set(rows.filter((r) => re.test(r) && !/\b(?:underground|terminals?)$/i.test(r)))];
+  return longer.length === 1 ? longer[0] : short;
+}
 // A message about an order that was already placed is not its receipt: a delay ("Delay in shipping your … order"), a notice
 // ("Important information regarding your product order", "An important message regarding your order", "Update on your
 // order") or a benefit confirmed for it ("Benefit Confirmation for your Order").
@@ -1159,12 +1228,28 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
-  if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
+  // (An App Store or Apple services receipt: from Apple, or pasted with Apple named and its App Store layout.)
+  const appleLayout = /^\s*\|?\s*(?:app store|apple services|itunes store|apple arcade)\s*\|?\s*$|\bin-app purchase\b|\brenews \d/im.test(text);
+  const appleDigital = appleLayout && (/(^|\.)apple\.com$/i.test(result.retailer.domain || "") || /^apple$/i.test(result.retailer.name || "") || (!result.retailer.name && /\breport a problem\b/i.test(text)));
+  if (!result.items.length && appleDigital) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
+  // (Round 12: Apple's own layout names what was bought under its app, "Match Masters" over "Stack of Coins". When a
+  // general reading found the same purchases, Apple's reading of them is kept: the item, with its app as the detail.)
+  else if (result.items.length && appleDigital) {
+    const sum = (xs) => xs.reduce((a, x) => a + (x.pricePence || 0) * (x.lineTotal ? 1 : x.qty || 1), 0);
+    const a = [text, fromHtml].map((t) => (t ? appleItems(t) : [])).find((xs) => xs.length === result.items.length && sum(xs) === sum(result.items));
+    if (a) result.items = a;
+  }
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
   const gameShop = GAME_SHOP.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
   // (A pack of several things, "Mixy Meow | 1", "Checkerboard | 10", is one purchase named by all of them. Round 10.)
   const bundle = gameShop ? gameBundle(fromHtml) || gameBundle(text) : null;
   if (bundle) result.items = [{ name: bundle, qty: 1, pricePence: result.totalPence ?? null }];
+  // (A game web shop's receipt has a receipt number, which its subject and its support form use, and a long hex "Order ID"
+  // for its own system: the receipt number is the one the shopper is asked for. Round 12.)
+  if (gameShop) {
+    const rn = /\breceipt (?:number|no\.?)\s*[:#]?\s*\|?\s*(\d{3}-\d{3}-\d{3,4}|\d{6,12})\b/i.exec(fromHtml || text) || /\breceipt #?(\d{3}-\d{3}-\d{3,4})\b/i.exec(subject);
+    if (rn) result.orderRef = rn[1];
+  }
   if (!result.items.length && gameShop) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
   // An Uber ride is travel: one ride, for what was paid (its fare, fees and credits are not things). An Uber Eats receipt that
   // only links to the full one lists nothing: no items are made up, and the check says the email has no item list. Round 10.
@@ -1198,7 +1283,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A travel booking names the journey in its subject: the journey is what was bought (its fare lines, "Anytime Day Return",
   // "1 Adult", are not things).
   const journey = !isFlight && !gameShop ? JOURNEY.exec(subject || "") : null;
-  if (journey) result.items = [{ name: `${journey[2].trim()} to ${journey[3].trim()}${journey[1] ? " (return)" : ""}`, qty: 1, pricePence: result.totalPence ?? null }];
+  if (journey) {
+    const body = fromHtml || text;
+    const from = fullStation(body, journey[2].trim()), to = fullStation(body, journey[3].trim());
+    const trip = `${from} to ${to}${journey[1] ? " (return)" : ""}`;
+    const tickets = railTickets(body);
+    const sum = tickets.reduce((a, t) => a + t.pricePence * t.qty, 0);
+    const detail = (t) => [t.type, t.card].filter(Boolean).join(", ");
+    // Two or more tickets that add up to what was paid: each ticket, named by its leg. One ticket: the trip, with the ticket.
+    if (tickets.length > 1 && result.totalPence != null && sum === result.totalPence) {
+      result.items = tickets.map((t) => ({ name: legOf(body, t.type) || trip, variant: detail(t), qty: t.qty, pricePence: t.pricePence }));
+    } else result.items = [{ name: trip, ...(tickets.length === 1 ? { variant: detail(tickets[0]) } : {}), qty: 1, pricePence: result.totalPence ?? null }];
+    // (The booking's number is its "Transaction ID", on the line under its label.)
+    const tx = /\btransaction id\s*:?\s*\|?\s*\n?\s*\|?\s*([A-Z0-9][A-Z0-9-]{5,24})\b/i.exec(body);
+    if (!result.orderRef && tx) result.orderRef = tx[1];
+  }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -1212,7 +1311,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];
     // (Apple's own reading comes first for an App Store or subscription receipt: it names the app or service, "Apple Music",
     // where the plain reading takes the plan under it, "Individual (Monthly)". Round 10.)
-    const isApple = /(^|\.)apple\.com$/i.test(result.retailer.domain || "") && /\b(?:app store|in-app purchase|renews \d|apple account:?)/i.test(text);
+    const isApple = (/(^|\.)apple\.com$/i.test(result.retailer.domain || "") && /\b(?:app store|in-app purchase|renews \d|apple account:?)/i.test(text)) || appleDigital;
     if (isApple) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });

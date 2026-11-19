@@ -95,9 +95,13 @@ export function gameBundle(text) {
   for (let k = i + 1; k < list.length && k < i + 40; k++) {
     const r = list[k];
     if (/^(?:sub-?\s?total|total|tax|vat)\b/i.test(r)) break;
-    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
-    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && /^(\d{1,3}(?:,\d{3})*|\d{1,7})$/.test(list[k + 1] || "")) { m = [null, r, list[k + 1]]; k++; }
-    if (!m) return parts.length ? parts : null;
+    // (How many, as "6,000" or "x 15". Round 12.)
+    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
+    const next = /^(?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
+    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1]]; k++; }
+    // (Whatever follows the list ends it: the pack is what was read so far. A list of objects was once returned here, and
+    // read as an item named "[object Object]". Round 12.)
+    if (!m) break;
     parts.push({ name: m[1].trim(), amount: m[2] });
   }
   if (!parts.length) return null;

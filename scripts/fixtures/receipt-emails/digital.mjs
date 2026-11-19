@@ -7,7 +7,7 @@ export default function digital() {
 
   // ---- Apple: App Store and Apple Store -------------------------------------------------------------------------------
   {
-    const o = order([{ name: "Royal Match", qty: 1, unit: 159 }, { name: "Duolingo", qty: 1, unit: 1299 }]);
+    const o = order([{ name: "5,000 Coins", qty: 1, unit: 159 }, { name: "Super Duolingo (Monthly)", qty: 1, unit: 1299 }]);
     const rows = [`<h1>Receipt</h1>`, table([["APPLE ACCOUNT", SHOPPER.email], ["DATE", "15 Nov 2026"], ["ORDER ID", "MX12AB34CD"], ["DOCUMENT NO.", "123456789012"]]),
       `<p><b>App Store</b></p>`, table([["Royal Match<br />5,000 Coins<br />In-App Purchase<br />Report a Problem", "£1.59"], ["Duolingo<br />Super Duolingo (Monthly)<br />Renews 15 Dec 2026<br />Report a Problem", "£12.99"]]),
       table([["Subtotal", gbp(o.subtotal)], ["VAT charged at 20%", "£2.43"], ["<b>TOTAL</b>", `<b>${gbp(o.total)}</b>`]]), `<p>Billed to Visa .... 1234</p>`];
@@ -15,7 +15,7 @@ export default function digital() {
       html: page({ brand: "Apple", domain: "apple.com", rows }) }, o, "Apple", "2026-11-15");
   }
   {
-    const o = order([{ name: "iCloud+", qty: 1, unit: 299 }]);
+    const o = order([{ name: "iCloud+ with 200 GB (Monthly)", qty: 1, unit: 299 }]);
     const text = ["Receipt", "", "APPLE ACCOUNT", SHOPPER.email, "DATE", "14 Nov 2026", "ORDER ID", "MX12AB35EF", "", "Apple Services", "iCloud+", "iCloud+ with 200 GB (Monthly)", "Renews 14 Dec 2026", "Report a Problem", "£2.99", "", "Subtotal", "£2.49", "VAT charged at 20%", "£0.50", "TOTAL", "£2.99"].join("\n");
     add("apple-app-store-2", "Apple App Store", "plain text, one subscription", { from: "Apple <no_reply@email.apple.com>", subject: "Your receipt from Apple.", date: "Sat, 14 Nov 2026 10:00:00 +0000", text }, { ...o, subtotal: o.subtotal }, "Apple", "2026-11-14", { subtotalPence: 249, feesPence: 50 });
   }
