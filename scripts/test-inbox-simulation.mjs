@@ -20,6 +20,32 @@ import { handleAuthRoute } from "../worker/auth.js";
 import { CONSENT_VERSION, sealToken, PARSER_VERSION } from "../worker/gmail.js";
 
 const REPORT = process.env.SIM_REPORT === "1";
+
+// ---- The pure parts first ------------------------------------------------------------------------------------------------
+{
+  const { sameOrderRef } = await import("../worker/gmail.js");
+  const { parseDispatchEmail, parseCancellationEmail } = await import("../worker/receipt-parser.js");
+  for (const [a, b] of [["#55012", "55012"], ["ORD-55012", "#55012"], ["Order55012", "55012"], ["ko-1001", "KO-1001"], ["NO.12345", "12345"]]) assert.ok(sameOrderRef(a, b), a + " is " + b);
+  for (const [a, b] of [["KO-1001", "1001"], ["ORD-123", "123"], ["", ""], [null, "1001"], ["AB-1001", "CD-1001"]]) assert.ok(!sameOrderRef(a, b), a + " is not " + b);
+  const m = (from, subject, body) => `From: ${from}\r\nTo: sam@example.com\r\nSubject: ${subject}\r\nDate: Mon, 16 Nov 2026 10:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`;
+  const shop = "Kestrel Outdoor <orders@kestrel-outdoor.example>";
+  const d = parseDispatchEmail(m(shop, "Your order KO-1001 has been dispatched", "Your order is on its way.\nRoyal Mail tracking number: KO123456789GB"));
+  assert.deepEqual([d.ok, d.status, d.orderRef, d.trackingNumber, d.retailer.domain], [true, "shipped", "KO-1001", "KO123456789GB", "kestrel-outdoor.example"]);
+  for (const [from, subject, body, why] of [
+    [shop, "Your order has been dispatched", "It's on its way!", "no order number: it couldn't join anything"],
+    [shop, "Your return KO-1001 is on its way to us", "Order KO-1001", "a return, not a dispatch"],
+    [shop, "Your order KO-1001 has been delayed but will be dispatched soon", "Order KO-1001", "a delay"],
+    ["Royal Mail <no-reply@royalmail.com>", "Your parcel has been dispatched", "Order KO-1001. Tracking number: KO123456789GB", "a carrier's (parseDeliveryEmail reads those)"],
+    [shop, "New in: jackets that have shipped from our studio", "Shop now", "a promotion"]]) assert.equal(parseDispatchEmail(m(from, subject, body)).ok, false, why);
+  const c = parseCancellationEmail(m(shop, "Your order KO-1001 has been cancelled", "Your order KO-1001 has been cancelled. We've refunded £20.00 to your card."));
+  assert.deepEqual([c.ok, c.partial, c.orderRef, c.amountPence, c.currency], [true, false, "KO-1001", 2000, "GBP"]);
+  const p = parseCancellationEmail(m(shop, "Part of your order KO-1001 has been cancelled", "Sorry, part of your order has been cancelled. Order number: KO-1001. Refund of £5.00."));
+  assert.deepEqual([p.ok, p.partial, p.amountPence], [true, true, 500]);
+  for (const [subject, body, why] of [["Your membership has been cancelled", "Order KO-1001", "a membership"], ["Your order has been cancelled", "Sorry about that.", "no order number"],
+    ["Price adjustment for order KO-1001", "We've refunded the difference of £5.00. Your order was cancelled", "a price adjustment"], ["Your booking KO-1001 has been cancelled", "Order KO-1001", "a booking (not a shop order)"]])
+    assert.equal(parseCancellationEmail(m(shop, subject, body)).ok, false, why);
+  console.log("ok - order numbers written different ways; dispatch and cancellation emails read only with an order number, never a return, delay, carrier, promotion or membership");
+}
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter((f) => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
 function stmt(sql, args = []) {
