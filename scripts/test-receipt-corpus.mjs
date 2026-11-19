@@ -15,8 +15,8 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations, attachAdjustments } from "../worker/gmail.js";
-import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
+import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, classifyEmail } from "../worker/gmail.js";
+import { rawEmail, forwarded, SHOPPER } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
 const only = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
@@ -303,7 +303,37 @@ const joinWrong = [];
     if (o.totalPence !== 920) joinWrong.push(`changed order's total ${o.totalPence} for the paid 920`);
   }
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions"}`);
+// Round 12: money back joins the order it is for. A support reply's refund and account credit by the order number it names
+// (the first number that is one of the shop's orders); a payment service's refund naming no order by what was first paid, to
+// whom and when, and only when one order fits; a refund naming the shop's invoice by that number.
+{
+  const mail = (from, subject, date, body) => `From: ${from}\r\nTo: ${SHOPPER.email}\r\nSubject: ${subject}\r\nDate: ${date}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${body}`;
+  const je = (n, ref, total) => ({ id: "je" + n, createdAt: n, kind: "receipt", retailer: { name: "Just Eat", domain: "just-eat.co.uk" }, orderRef: ref, orderDate: "2025-08-31", totalPence: total, currency: "GBP", items: [] });
+  const orders = [je(1, "664851790", 2397), je(2, "771200999", 1500)];
+  const reply = (body) => classifyEmail(mail("Just Eat UK <info@just-eat.co.uk>", "[Just Eat UK] Re: Just Eat Order 664851790", "Sun, 07 Sep 2025 10:50:00 +0000", body)).details;
+  const a1 = reply("Thank you for reaching out about your recent order 552658111.\n\nI can see that we refunded you £4**.99** on 31/08/25.");
+  const a2 = reply("We are sorry items were missing from your recent order 664851790.\n\nWe've added a £3.99 credit to your Just Eat account, which covers the value of the affected items.");
+  const no = reply("We're sorry, but we are unable to offer a refund of £5.00 for order 664851790.");
+  if (no.kind === "order_update") joinWrong.push("a refused refund read as money back");
+  attachAdjustments(orders, [a1, a2].filter((x) => x.kind === "order_update"));
+  const adj = orders[0].adjusted;
+  if (!(adj && adj.refundPence === 499 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
+  const ride = (n, total, day) => ({ id: "u" + n, createdAt: n, kind: "receipt", retailer: { name: "Uber", domain: "uber.com" }, orderRef: null, orderDate: day, totalPence: total, currency: "GBP", items: [] });
+  const pp = classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've got a refund from UBER PAYMENTS UK LIMITED", "Wed, 18 Mar 2026 09:00:00 +0000",
+    "You've got a refund from UBER PAYMENTS UK LIMITED\nYour refund of £3.06 GBP from UBER PAYMENTS UK LIMITED\nRefund complete! Available now in your balance.\nYou originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026. View receipt\nRefund total\n£3.06 GBP")).details;
+  const rides = [ride(1, 499, "2026-03-05"), ride(2, 499, "2026-03-09"), ride(3, 720, "2026-03-05")];
+  attachReturnProgress(rides, [], [pp]);
+  if (!(rides[0].returnProgress && rides[0].returnProgress.refundPence === 306) || rides[1].returnProgress || rides[2].returnProgress) joinWrong.push("payment service's refund not joined by what was first paid: " + JSON.stringify(pp.paidPence) + " " + JSON.stringify(rides.map((r) => r.returnProgress && r.returnProgress.refundPence)));
+  const twice = [ride(4, 499, "2026-03-05"), ride(5, 499, "2026-03-05")];
+  attachReturnProgress(twice, [], [pp]);
+  if (twice.some((r) => r.returnProgress)) joinWrong.push("payment service's refund guessed between two rides for the same money");
+  const inv = parseReturnUpdateEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-paypal-refund-invoice.json"), "utf8"))));
+  const wine = [{ id: "w1", createdAt: 1, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22001544-P001", orderDate: "2026-06-13", totalPence: 3000, items: [] },
+    { id: "w2", createdAt: 2, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22170130-P001", orderDate: "2026-07-14", totalPence: 3000, items: [] }];
+  attachReturnProgress(wine, [], [{ kind: "return_update", ...inv }]);
+  if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, and money back joins its order"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };

@@ -51,5 +51,24 @@ export default function holdout13a() {
       none, "Sainsbury's", "2026-10-10", { totalPence: 920, attachmentOnly: "pdf", orderUpdate: "paid", orderRef: GROCER.ref });
     day.attach = [{ type: "application/pdf", name: "e-receipt.pdf" }];
   }
+  // ---- Money back: a supermarket's refund with its amount on the line under its label; a furniture shop's refund with a
+  // full-width pound sign; a payment service's refund naming the shop's invoice; a takeaway app's support reply -----------
+  const not = (id, sender, layout, m, notPurchase) => out.push(fixture(id, sender, layout, m, { notPurchase, items: [], shop: null, date: null, currency: null, totalPence: null }));
+  not("holdout13a-grocer-refund-label-over-amount", "Sainsbury's", "'Refunded total: |' with the amount on the row under it, the returned item listed", { from: "Sainsbury's <service@sainsburys.co.uk>", subject: "Refund for your Sainsbury’s order " + GROCER.ref,
+    date: "Sun, 11 Oct 2026 17:50:00 +0000", html: mail("Sainsbury's", "sainsburys.co.uk", ["Order cancelled - Sainsbury's", "We’ve processed the refund for your returned items", "Your refund will be credited to your original payment card in 3-5 business days",
+      "Order number: |", GROCER.ref + " |", "Refunded total: |", "£1.20", "Payment card: VISA ending in 4821", "Returned item", "(1)", "Items", "Quantity", "Price", "Sainsbury's Unwaxed Lemons x4", "1", "£1.20"]) },
+    { kind: "refund", refundPence: 120, orderRef: GROCER.ref });
+  not("holdout13a-furniture-refund-fullwidth", "Larkspur Living", "'Here comes the refund about your order#…', 'has been successfully refunded', 'Refund Amount: ￡ 89.50'", { from: "\"Larkspur Living\" <service@larkspur-living.example>", subject: "Here comes the refund about your order",
+    date: "Sat, 12 Sep 2026 04:46:00 +0000", html: mail("Larkspur Living", "larkspur-living.example", ["Dear customer,", "Hope this mail finds you well.", "Here comes the refund about your", "order#LKL2608141203998877 .",
+      "Your payment has been successfully refunded to your original payment account. For details, please contact your bank to check the billing record.", "Refund Amount: ￡ 89.50"]) },
+    { kind: "refund", refundPence: 8950, orderRef: "LKL2608141203998877" });
+  not("holdout13a-paypal-refund-invoice", "PayPal", "'Cellar Club Ltd. sent you a refund of £30.00 GBP', the shop's 'Invoice ID: CC22001544-P001'", { from: "\"service@paypal.co.uk\" <service@paypal.co.uk>", subject: "Refund from Cellar Club Ltd.",
+    date: "Wed, 22 Jul 2026 11:00:00 +0000", html: mail("PayPal", "paypal.co.uk", ["Cellar Club Ltd. sent you a refund of £30.00 GBP.", "It may take a few moments for this transaction to appear in your account.", "Merchant", "Cellar Club Ltd.", "Refund amount", "£30.00 GBP",
+      "Transaction ID", "7HK31122AB4455667 |", "Invoice ID: CC22001544-P001"]) },
+    { kind: "refund", refundPence: 3000, orderRef: "CC22001544-P001" });
+  not("holdout13a-support-partial-refund", "Just Eat", "a support reply ('Re: Conversation with …') saying it processed a partial refund for an order it names", { from: "Just Eat UK <info@just-eat.co.uk>", subject: "[Just Eat UK] Re: Conversation with " + SHOPPER.email,
+    date: "Mon, 12 Oct 2026 10:34:00 +0000", text: ["##- Please type your reply above this line -##", "", "Priya, 12 Oct 2026, 11:34 BST", "", `Hi ${SHOPPER.first},`, "", "I have personally taken ownership of your ticket regarding order #771200341 from Napoli Corner.", "",
+      "I have overridden the automated decline and processed a partial refund of £6.25 back to your original payment card. Please allow 5-7 business days for this to reflect in your account.", "", "Kind regards,", "This email is a service from Just Eat UK."].join("\n") },
+    { kind: "adjusted", refundPence: 625, merchant: null });
   return out;
 }

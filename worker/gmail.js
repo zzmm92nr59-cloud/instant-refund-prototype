@@ -835,6 +835,7 @@ function classify(rawText, ref, lenient = false) {
   if (upd.ok) {
     details = {
       kind: "return_update", ...ref, stage: upd.stage, at: upd.at, amountPence: upd.amountPence, currency: upd.currency,
+      ...(upd.paidPence != null ? { paidPence: upd.paidPence, paidOn: upd.paidOn || null } : {}),
       orderRef: upd.orderRef, returnId: upd.returnId, retailer: upd.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else if (par.ok) {
@@ -887,6 +888,7 @@ function classify(rawText, ref, lenient = false) {
       // A takeaway app's changed total for an order it already charged (money back for part of it): never a purchase, joined
       // to that order by attachAdjustments. Round 10.
       details = { kind: "order_update", ...ref, stage: "adjusted", at: adj.at, orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
+        ...(adj.orderRefs ? { orderRefs: adj.orderRefs } : {}), ...(adj.creditPence ? { creditPence: adj.creditPence } : {}), ...(adj.bySupport ? { bySupport: true } : {}),
         previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency, ...(can.byItems ? { byItems: true } : {}),
@@ -1848,6 +1850,19 @@ export function attachAdjustments(orders, adjusts) {
   const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   for (const a of adjusts) {
     if (!Number.isInteger(a.amountPence)) continue;
+    // (Money back a shop's support team wrote about an order it names, "order #966874418": that order of that shop, when
+    // exactly one of the numbers it names is one of the shop's orders. A card refund and account credit are said apart. Round 12.)
+    if (a.bySupport) {
+      const refs = (a.orderRefs || [a.orderRef]).filter(Boolean).map((r) => String(r).toUpperCase());
+      const base = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]+\.(?:(?:co|org|ac)\.uk|[a-z]{2,6}))$/, "$1");
+      const sameShop = (o) => (base(o.retailer && o.retailer.domain) && base(o.retailer && o.retailer.domain) === base(a.retailer && a.retailer.domain)) || low(o.retailer && o.retailer.name).startsWith(low(a.retailer && a.retailer.name).split(" ")[0] || "-");
+      const hit = refs.map((r) => orders.filter((o) => o.kind !== "order_update" && o.orderRef && String(o.orderRef).toUpperCase() === r && sameShop(o))).find((l) => l.length);
+      if (!hit || hit.length !== 1) continue;
+      const o = hit[0], was = o.adjusted || {};
+      o.adjusted = { at: a.at || was.at || null, refundPence: (was.refundPence || 0) + a.amountPence, newTotalPence: was.newTotalPence ?? null, currency: a.currency || o.currency || "GBP",
+        ...((was.creditPence || 0) + (a.creditPence || 0) ? { creditPence: (was.creditPence || 0) + (a.creditPence || 0) } : {}) };
+      continue;
+    }
     const fits = orders.filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
       (!a.merchant || low(o.merchant) === low(a.merchant)) && (a.previousTotalPence == null || o.totalPence === a.previousTotalPence) &&
       (!a.at || !o.orderDate || (o.orderDate <= a.at && Date.parse(a.at) - Date.parse(o.orderDate) <= 7 * 864e5)));
@@ -1877,6 +1892,22 @@ export function estimateReturnBy(o, today) {
 
 // Where a return has got to: the return parcel (carrier emails about its tracking number) and the shop's own
 // "we've received your return" / "your refund has been processed" emails, matched by order number.
+// A payment service's refund that names no order but says what was first paid, to whom and on which day ("You originally
+// paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026"): the one order of that shop for that money on that day, or
+// the next (a shop's email can be dated the day after). Never a guess between two. Round 12.
+function refundFits(u, o, orders) {
+  if (u.stage !== "refunded" || !Number.isInteger(u.paidPence) || !/^\d{4}-\d{2}-\d{2}$/.test(u.paidOn || "")) return false;
+  const words = (x) => String(x || "").toLowerCase().replace(/\b(?:payments?|uk|ltd|limited|plc|inc|online|the|gb|europe|services?)\b|[^a-z0-9 ]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  const fit = (x) => {
+    if (x.kind === "order_update" || x.totalPence !== u.paidPence || !x.orderDate) return false;
+    const days = (Date.parse(x.orderDate) - Date.parse(u.paidOn)) / 864e5;
+    if (days < -1 || days > 1) return false;
+    const a = words(u.retailer && u.retailer.name), b = words(x.retailer && x.retailer.name);
+    return a.length > 0 && b.length > 0 && (a[0] === b[0] || a.join(" ").startsWith(b.join(" ")) || b.join(" ").startsWith(a.join(" ")));
+  };
+  if (!fit(o)) return false;
+  return orders.filter(fit).length === 1;
+}
 export function attachReturnProgress(orders, deliveries, updates) {
   for (const o of orders) {
     const plan = o.returnPlan || null;
@@ -1887,7 +1918,8 @@ export function attachReturnProgress(orders, deliveries, updates) {
       if (d.trackingNumber !== t) continue;
       if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
     }
-    const mine = ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [];
+    const mine = (ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
+      .concat(updates.filter(u => !u.orderRef && refundFits(u, o, orders)));
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;

@@ -108,6 +108,25 @@ export function orderAmended(subject, text) {
   return /\bwe(?:'|’)?ve? got your changes\b|\byou(?:'|’)?ve (?:amended|changed|edited) your order\b|\byour order (?:has been|was) (?:amended|updated|changed)\b|\bchanges to your order (?:have been|are) (?:saved|confirmed)\b|^\s*(?:order amended|amended order)\b/i.test(t);
 }
 
+// Money back a shop's support team wrote out in a reply about an order ("I have processed a partial refund of £11.46 back to
+// your original payment card", "we refunded you £4.99 on 31/08/25", "We've added a £3.99 credit to your account"): what
+// came back and which order numbers the email names (the one the sentence names first, then the subject's). Only said
+// as done; a refusal ("we're unable to refund") says nothing. Round 12.
+const AMT = "£\\s?(\\d{1,3}(?:,\\d{3})+|\\d+)\\.(\\d{2})";
+export function supportRefund(subject, text) {
+  const t = String(text || "").slice(0, 8000).replace(/\*\*/g, "").replace(/\s+/g, " ");
+  const one = (res) => { for (const re of res) { const m = new RegExp(re, "i").exec(t); if (m) return Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]); } return null; };
+  const refundPence = one([
+    "\\b(?:processed|issued|sent|given you|arranged|approved) (?:you )?an? (?:partial |full |further )?refund of " + AMT,
+    "\\bwe(?:'|’)?(?:ve| have)? refunded (?:you |your (?:card|account|original payment method) )?(?:with )?" + AMT,
+    "\\ban? (?:partial |full )?refund of " + AMT + " (?:has been|was|is being) (?:processed|issued|sent|made)\\b"]);
+  const creditPence = one(["\\b(?:we(?:'|’)?(?:ve| have) )?added an? " + AMT + " credit to your\\b", "\\b" + AMT + " (?:of )?(?:account )?credit (?:has been|was) added\\b"]);
+  if (refundPence == null && creditPence == null) return null;
+  const refs = [];
+  for (const src of [t, String(subject || "")]) for (const m of src.matchAll(/\border\s*(?:number|no\.?|id)?\s*[:#]?\s*#?\s*(\d{6,14})\b/gi)) if (!refs.includes(m[1])) refs.push(m[1]);
+  return { refundPence, creditPence, refs };
+}
+
 // ---- A game's web shop (Appcharge, Xsolla) --------------------------------------------------------------------------------
 // "Items" then each thing in the pack with how many ("Mixy Meow | 1", "Checkerboard | 10", "Coins | 4,500"), then the
 // subtotal: one purchase of the whole pack, named by what is in it ("Mixy Meow, 10 Checkerboard", "2,200 Coins").
