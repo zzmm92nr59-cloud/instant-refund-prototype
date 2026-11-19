@@ -956,7 +956,7 @@ export function amazonItems(html, given) {
       items.push({ name: tidy(name), ...cut(name), ...(at > 0 ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: 1, pricePence: price });
     }
   }
-  return given ? items : items.map(({ above, ...i }) => i);
+  return given ? items : items.map(({ above, cut, ...i }) => i);
 }
 
 // A PayPal receipt lists each thing as its name, "Qty: 2", an optional "Product ID: …" line and its price in the payment's
@@ -989,14 +989,79 @@ function googlePlayItems(text) {
   const end = /^[ \t|]*total\s*:/im.exec(rest);
   const body = end ? rest.slice(0, end.index) : rest.slice(0, 2000);
   const out = [];
-  for (const para of body.split(/\n[ \t|]*\n/)) {
-    const p = para.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s+/g, " ").trim();
+  // (Paragraphs in the text part; in the HTML's text, one row a line, the cells apart by "|".)
+  const paras = body.split(/\n[ \t|]*\n/);
+  const pieces = paras.length > 1 ? paras : body.split("\n");
+  for (const para of pieces) {
+    const p = para.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim();
     const m = /^(.{3,300}?)\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*\/\s*(?:month|year|week|day))?$/i.exec(p);
     if (!m) continue;
     const name = m[1].replace(/\s*\(by [^()]{2,60}\)\s*$/i, "").trim();
     if (name.length >= 3) out.push({ name, qty: 1, pricePence: money(m[2]) });
   }
   return out;
+}
+
+// The same from the text part alone (an email pasted as text, or one with no HTML): "Order #206-…" lines at the top name the
+// orders in turn; each order's "Ordered item(s):" lists its things, each name before its price ("2 x BOSS … £29.00" is two at
+// £29.00), with "Condition: New", "Sold by: …" and "Fulfilled by Amazon" between them (run together with the next name in
+// the newer layout: a seller ends at "Fulfilled by Amazon", at Amazon's own "Amazon EU S.a.r.L." or at the line's end); and
+// "Order Total:" closes it. Null when the text isn't laid out this way. Round 13.
+export function amazonPlainOrders(plain) {
+  const t = String(plain || "").replace(/\r/g, "").replace(/<br\s*\/?>/gi, "");
+  if (!/\bOrdered item\(s\):/i.test(t)) return null;
+  const refs = [...new Set([...t.slice(0, 600).matchAll(/^\s*Order\s*#\s*((?:\d{3}|D\d{2})-\d{7}-\d{7})\s*$/gim)].map((m) => m[1]))];
+  if (!refs.length) return null;
+  const lines = t.split("\n");
+  const out = [];
+  let buf = [], inItems = false;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const tot = /^\s*Order Total:\s*(?:£\s?([\d,]+\.\d{2}))?\s*$/i.exec(l);
+    if (tot) {
+      let total = tot[1] ? money(tot[1]) : null;
+      if (total == null) { const nx = /^\s*£\s?([\d,]+\.\d{2})\s*$/.exec(lines[i + 1] || ""); if (nx) { total = money(nx[1]); i++; } }
+      out.push({ text: buf.join("\n"), totalPence: total }); buf = []; inItems = false; continue;
+    }
+    const start = /^\s*Ordered item\(s\):\s*(.*)$/i.exec(l);
+    if (start) { inItems = true; buf.push(start[1]); continue; }
+    if (!inItems) continue;
+    const ship = /^(.*?)(?:Shipment \d{1,2} of \d{1,2}\b.*|^\s*Arriving:.*)$/i.exec(l);
+    if (ship) { buf.push(ship[1]); inItems = false; continue; }
+    buf.push(l);
+  }
+  if (out.length !== refs.length || out.some((o) => o.totalPence == null)) return null;
+  const strip = (s) => {
+    for (let k = 0; k < 6; k++) {
+      const before = s;
+      s = s.replace(/^\s+/, "").replace(/^Condition:\s*[A-Za-z -]*?(?=Sold by:|Fulfill?ed by|\n|$)/i, "").replace(/^\s+/, "");
+      if (/^Sold by:/i.test(s)) {
+        const amz = /^Sold by:\s*Amazon(?: EU)? S\.?[aà]\.?r\.?l\.?/i.exec(s), ful = /^Sold by:[^\n]*?Fulfill?ed by Amazon/i.exec(s);
+        s = amz ? s.slice(amz[0].length) : ful ? s.slice(ful[0].length) : s.replace(/^[^\n]*/, "");
+      }
+      s = s.replace(/^\s*Fulfill?ed by Amazon/i, "");
+      if (s === before) break;
+    }
+    return s.replace(/\s+/g, " ").trim();
+  };
+  const read = out.map((o, k) => {
+    const items = [];
+    let last = 0;
+    for (const m of o.text.matchAll(/£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/g)) {
+      let name = strip(o.text.slice(last, m.index));
+      last = m.index + m[0].length;
+      let qty = 1;
+      const q = /^(\d{1,3}) x (.{3,})$/.exec(name);
+      if (q) { qty = Number(q[1]); name = q[2].trim(); }
+      if (name.length < 3 || name.length > 400) return null;
+      items.push({ name, qty, pricePence: money(m[1]) });
+    }
+    if (!items.length || strip(o.text.slice(last)).length > 0 && /£/.test(o.text.slice(last))) return null;
+    const itemsPence = items.reduce((n, i) => n + i.pricePence * i.qty, 0);
+    const check = { complete: Math.abs(itemsPence - o.totalPence) <= 1, itemsPence, expectedPence: o.totalPence, missingPence: o.totalPence - itemsPence };
+    return { orderRef: refs[k], items, totalPence: o.totalPence, currency: "GBP", itemsCheck: { ...check, ...namesCheck(items, {}) } };
+  });
+  return read.every(Boolean) ? read : null;
 }
 
 // One Amazon confirmation can hold several orders ("Your purchase has been divided into 2 orders"): each "Order #" with its
@@ -1014,7 +1079,9 @@ export function amazonOrders(html, plain) {
     if (/^Order\s*#\s*:?$/i.test(rows[i])) { const r = AMZ_REF.exec(rows[i + 1] || ""); if (r) heads.push({ i, ref: r[1] }); }
   }
   if (!heads.length) return null;
-  const text = String(plain || "").replace(/\r/g, "");
+  // (The newer layout gives each product picture the whole title as its alt text.)
+  const alts = [...String(html || "").matchAll(/<img\b[^>]{0,600}?\balt="([^"]{12,400})"/gi)].map((m) => m[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")).filter((a) => !/(?:\.\.\.|…)$/.test(a));
+  const text = String(plain || "").replace(/\r/g, "") + (alts.length ? "\n" + alts.join("\n") : "");
   const flat = text.replace(/[ \t]+/g, " ");
   const whole = (it) => {
     let name = it.name;
@@ -1028,7 +1095,8 @@ export function amazonOrders(html, plain) {
     // (A book's author on the row under its title: the text part says "Title of Author". Round 13.)
     if (it.above && flat.includes(it.above + " of " + name)) name = it.above + " of " + name;
     const { cut, above, ...rest } = it;
-    return { ...rest, name };
+    // (A title still cut short, when the email has no text part to take it whole from: flagged, never passed off as whole.)
+    return { ...rest, name, ...(cut && name === it.name ? { stillCut: true } : {}) };
   };
   const orders = new Map();
   heads.forEach((h, k) => {
@@ -1053,7 +1121,10 @@ export function amazonOrders(html, plain) {
     const expectedPence = o.totalPence + o.giftCardPence;
     const check = { complete: o.items.length > 0 && Math.abs(itemsPence - expectedPence) <= 1, itemsPence, expectedPence, missingPence: expectedPence - itemsPence, ...(o.giftCardPence ? { giftCardPence: o.giftCardPence } : {}) };
     const { giftCardPence, ...rest } = o;
-    return { ...rest, currency: "GBP", ...(giftCardPence ? { giftCardPence } : {}), itemsCheck: { ...check, ...namesCheck(o.items, {}) } };
+    const cutNames = o.items.filter((i) => i.stillCut).map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }));
+    rest.items = o.items.map(({ stillCut, ...i }) => i);
+    const names = namesCheck(rest.items, {});
+    return { ...rest, currency: "GBP", ...(giftCardPence ? { giftCardPence } : {}), itemsCheck: { ...check, ...names, ...(cutNames.length ? { complete: false, namesCut: true, namesOk: false, suspectNames: [...(names.suspectNames || []), ...cutNames].slice(0, 10) } : {}) } };
   });
 }
 
@@ -1262,6 +1333,8 @@ export function orderNewsOf(rawEmail) {
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
 function tillPounds(t) {
+  // (A price set as three cells, "£" over "16" over "99" (Amazon's newer emails, as text): £16.99. Round 13.)
+  if (t && /£[ \t|]*\n/.test(t)) t = t.replace(/£[ \t|]*\n[ \t|]*(\d{1,5})[ \t|]*\n[ \t|]*(\d{2})(?=[ \t|]*(?:\n|$))/g, "£$1.$2");
   // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
   if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
   // ("137.5 GBP", "17 GBP", "0 GBP": a shop that drops the pence it doesn't need, Detale; only in an email that writes an
@@ -1687,7 +1760,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef && viaPayPal) { const oid = /^[ \t|]*(?:order id|order number|invoice id)[ \t]*[:|]?[ \t|]*\n?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,63})[ \t]*\|?[ \t]*$/im.exec(text); if (oid) result.orderRef = oid[1]; }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)
-  const amazonSplit = html && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") ? amazonOrders(html, plain) : null;
+  const isAmazon = /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "");
+  // (From the HTML when it shows the orders; else from the text part alone.)
+  const amazonSplit = isAmazon ? (html && amazonOrders(html, plain)) || amazonPlainOrders(plain || text) : null;
   if (amazonSplit) {
     const mine = amazonSplit[0];
     if (!result.orderRef || String(result.orderRef).toUpperCase() === mine.orderRef.toUpperCase()) {
@@ -1749,6 +1824,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (v === String(i.variant).split(/,\s*/).join(", ")) continue;
     if (v) i.variant = v; else delete i.variant;
   }
+  // (A name the email itself cut short, "Harbourline Insulated Lunch Bag f...", read without its dots: the list is flagged, so
+  // the app never passes a cut name off as whole. Round 13.)
+  // (Not a payment service's receipt: PayPal cuts every long name and never gives it whole, so its name is said as given.)
+  const cutShort = viaPayPal ? [] : result.items.filter((i) => i.name && String(i.name).length >= 8 && [text, otherPart].some((t) => t && (t.includes(i.name + "...") || t.includes(i.name + "…"))));
+  if (cutShort.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, complete: false, namesCut: true, namesOk: false, suspectNames: [...(result.itemsCheck.suspectNames || []), ...cutShort.map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }))].slice(0, 10) };
   for (const i of result.items) delete i.unitPence;
   // A drink at £0.00 then its measure with the price ("SAILOR JERRY RUM £0.00", "50ml £10.45"): one drink, that size, that
   // price. Round 12.

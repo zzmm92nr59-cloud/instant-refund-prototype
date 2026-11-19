@@ -371,6 +371,16 @@ const joinWrong = [];
     if (cards.length !== 2 || !second || second.totalPence !== want.totalPence || JSON.stringify(got) !== JSON.stringify(want.items) || !(second.itemsCheck && second.itemsCheck.complete))
       joinWrong.push(`${id}${app ? "~" + app : ""}: the second order read as ${JSON.stringify(second ? [second.orderRef, second.totalPence, got] : cards.map((c) => c.orderRef))}`);
   }
+  // (The same email as Amazon really sends it, every title cut short in the HTML: whole from the text part, and flagged,
+  // never passed off as whole, when there is no text part.)
+  const q = fx("holdout14a-amazon-qty-2024");
+  let cutHtml = q.html;
+  for (const n of [q.expected.items[0].name, ...TWO_ORDERS["holdout14a-amazon-qty-2024"].items.map((i) => i[0])]) cutHtml = cutHtml.split(n.replace(/&/g, "&amp;")).join(n.slice(0, 36) + "...");
+  const whole = parseReceiptEmail(rawEmail({ ...q, html: cutHtml }));
+  if (whole.items.map((i) => i.name).join("|") !== q.expected.items[0].name || (whole.moreOrders || [])[0]?.items.map((i) => i.name).join("|") !== TWO_ORDERS["holdout14a-amazon-qty-2024"].items.map((i) => i[0]).join("|"))
+    joinWrong.push("Amazon's cut titles not read whole from the text part: " + JSON.stringify([whole.items.map((i) => i.name), (whole.moreOrders || []).map((o) => o.items.map((i) => i.name))]));
+  const noText = parseReceiptEmail(rawEmail({ ...q, html: cutHtml, text: "" }));
+  if (!noText.itemsCheck || noText.itemsCheck.complete !== false) joinWrong.push("Amazon's cut titles with no text part not flagged: " + JSON.stringify(noText.itemsCheck));
   const gift = det("holdout14a-amazon-qty-2024");
   if (gift.giftCardPence !== 1475 || gift.totalPence !== 0 || !gift.itemsCheck.complete) joinWrong.push("a gift-card order read as " + JSON.stringify([gift.totalPence, gift.giftCardPence, gift.itemsCheck]));
   const apple = parseReceiptEmail(rawEmail(fx("holdout14a-apple-cancel-within")));

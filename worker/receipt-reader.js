@@ -239,6 +239,8 @@ export function cleanItem(item) {
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
   if (/@|https?:|www\./i.test(name)) return null;
+  // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
+  if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;
   const { keepName, ...rest } = item;
   return { ...rest, name, qty: qty || 1 };
 }

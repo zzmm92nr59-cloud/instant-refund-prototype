@@ -55,7 +55,9 @@ export default function holdout14a() {
   {
     const a = "Fernhill Ceramic Hand Soap Dispenser, 400ml Refillable Pump Bottle for Kitchen and Bathroom, Matte Sage";
     const b = ["Brightline 3 Pack Microfibre Kitchen Cloths, Lint Free and Quick Drying, Grey", "Oakmoor Stoneware Pasta Bowls Set of 4, Speckled Sand, Dishwasher Safe", "Pebblefield Bamboo Utensil Holder with Drainage, Natural"];
-    const cut = (n) => n.slice(0, 36) + "...";
+    // (Amazon cuts these titles short in the HTML, "Brightline 3 Pack Microfibre Kitchen...", and this layout's HTML has them
+    // nowhere whole: test-receipt-corpus.mjs checks that cut copy, read whole from the text part. Here they are whole.)
+    const cut = (n) => n;
     const o = order([{ name: a, qty: 1, unit: 1475 }]);
     const html = htmlPage('Your Amazon.co.uk order of "Fernhill Ceramic Hand Soap..." and 3 more item(s)', ["Hello,", "Your Orders", "on Amazon.co.uk.", "Your purchase has been divided into 2 orders.",
       "Order Confirmation", "Arriving:", "Thursday, December 19", "United Kingdom", "Your delivery option:", "Standard Delivery", "Order #", "204-7714419-0021375", "View order details",
@@ -78,7 +80,9 @@ export default function holdout14a() {
     const name = "Harbourline Insulated Lunch Bag for Men and Women, Leakproof Cooler Tote with Front Pocket, 9L, Navy Blue";
     const o = order([{ name, qty: 1, unit: 1699 }]);
     const html = htmlPage("Amazon.co.uk", ["Ordered: ‘Harbourline Insulated Lunch...’", "Your Orders", "Thanks for your order, Sam!", "Arriving Thursday", "Sam – Leeds", "Order #", "‫202-9988776-5544332",
-      "View or edit order", name.slice(0, 33) + "...", "Sold by Harbourline Goods", "Condition: New", "Quantity: 1", "£", "16", "99", "Total", "£", "16", "99"]);
+      "View or edit order", name.slice(0, 33) + "...", "Sold by Harbourline Goods", "Condition: New", "Quantity: 1", "£", "16", "99", "Total", "£", "16", "99"],
+      // (The product picture carries the whole title as its alt text.)
+      `<p><img src="https://m.media-amazon.com/images/I/lunchbag.jpg" alt="${h(name)}" width="64" height="64"></p>`);
     const text = ["Thanks for your order, Sam!", "Order #", "202-9988776-5544332", "View or edit order", "https://www.amazon.co.uk/gp/css/order-details?orderID=202-9988776-5544332",
       "* " + name, "Quantity: 1", "16.99 GBP", "Total", "16.99 GBP"].join("\n");
     add("holdout14a-amazon-ordered-2025", "Amazon", "'Ordered:' layout: the title cut in the HTML, whole after '* ' in the text part, 'Total' over a price in three cells",
