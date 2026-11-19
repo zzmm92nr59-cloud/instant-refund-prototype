@@ -51,6 +51,20 @@ export default function holdout13a() {
       none, "Sainsbury's", "2026-10-10", { totalPence: 920, attachmentOnly: "pdf", orderUpdate: "paid", orderRef: GROCER.ref });
     day.attach = [{ type: "application/pdf", name: "e-receipt.pdf" }];
   }
+  // ---- A marketplace: one email confirming two orders, each with its own number, items and total ---------------------------
+  {
+    const o = order([{ name: "Noise Cancelling Earbuds", qty: 1, unit: 1999 }, { name: "Whitening Toothpaste 75ml", qty: 2, unit: 125 }]);
+    add("holdout13a-two-orders-one-email", "Parcelhaus", "'Order # …' with its items and '| Total |', then a second 'Order # …' with its own", { from: "Parcelhaus <shipment-tracking@parcelhaus.example>", subject: "Ordered: \"Noise Cancelling Earbuds\" and 2 more items",
+      date: "Tue, 07 Oct 2026 08:00:00 +0000",
+      html: mail("Parcelhaus", "parcelhaus.example", ["Thanks for your order, Sam!", "Arriving tomorrow", "Sam – Leeds", "Order # 301-5510022-4410001", "View or edit order |", "Noise Cancelling Earbuds", "Sold by Parcelhaus", "Quantity: 1", "£19.99",
+        "Whitening Toothpaste 75ml", "Sold by Parcelhaus", "Quantity: 2", "£2.50", "| Total | £22.49 |", "Arriving tomorrow", "Sam – Leeds", "Order # 301-5510022-4410002", "View or edit order |", "Eau de Parfum 50ml", "Sold by Parcelhaus", "Quantity: 1", "£31.00",
+        "| Total | £31.00 |"]) }, o, "Parcelhaus", "2026-10-07");
+  }
+  // ---- A walk-out shop's receipt: no item list, only a link to the itemised receipt, the subtotal, a promotion and the total --
+  add("holdout13a-shop-visit-no-items", "Grabngo", "'View itemised receipt' link, 'Subtotal', 'Promotions applied - £0.40', 'Total'; no items in the email", { from: "Grabngo <receipts@grabngo.example>", subject: "Your 16 July receipt for 1 item",
+    date: "Thu, 16 Jul 2026 17:11:00 +0000", text: ["Hi Sam,", "", "Thank you for shopping with us. Here is the receipt for your recent trip. View itemised receipt:", "  https://www.grabngo.example/store/order/204-5500321-1100220", "", "Thursday, 16 July, 2026",
+      "Order # 204-5500321-1100220 (Items: 1)", "Trip time: 2m 10s", "", "Subtotal                                         £4.15", "Promotions applied                        -  £0.40", "Total                                            £3.75"].join("\n") },
+    order([]), "Grabngo", "2026-07-16", { totalPence: 375, noItemList: true });
   // ---- Money back: a supermarket's refund with its amount on the line under its label; a furniture shop's refund with a
   // full-width pound sign; a payment service's refund naming the shop's invoice; a takeaway app's support reply -----------
   const not = (id, sender, layout, m, notPurchase) => out.push(fixture(id, sender, layout, m, { notPurchase, items: [], shop: null, date: null, currency: null, totalPence: null }));

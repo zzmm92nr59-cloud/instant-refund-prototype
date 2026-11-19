@@ -839,7 +839,7 @@ const APPLE_NOISE = /report a problem|write a review|in-app purchase|^(iphone|ip
 const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
 // A money line read as an item ("Invoice total", "Order total", "Amount due"): never something bought (round 4).
 const MONEY_LABEL = /^(?:(?:invoice|order|grand|basket|bag|payment|final|overall)\s+total|total\s+(?:paid|due|amount|to pay|charged)|amount\s+(?:due|paid|payable|charged)|balance\s+(?:due|paid))\s*:?$/i;
-const PRICE_WORDS = /^(you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
+const PRICE_WORDS = /^(?:(?:promotions?|offers?|discounts?|vouchers?|coupons?|savings?)\s+applied|you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
 // Amazon's order emails put each thing bought in its own little boxes, so the usual line reading finds nothing. Two layouts:
 //  * things to be delivered: the item's name (Amazon cuts long ones short with "..."), "Sold by …", maybe "Colour: …" and
 //    "Size: …", "Condition: New", "Quantity: 2", then the price split into "£", "4" and "99" (pounds big, pence small);
@@ -1042,6 +1042,28 @@ function withoutRecommendations(t) {
     if (!skip) out.push(lines[i]);
   }
   return out.join("\n");
+}
+
+function moreOrders(text, firstRef) {
+  const lines = String(text || "").split("\n");
+  const heads = [];
+  lines.forEach((l, i) => { const m = /^[\s|]*order\s*(?:#|number\s*:?|no\.?\s*:?)\s*([A-Z0-9][A-Z0-9-]{6,30})[\s|]*$/i.exec(l); if (m && /\d{5}/.test(m[1])) heads.push({ i, ref: m[1] }); });
+  const refs = [...new Set(heads.map((h) => h.ref.toUpperCase()))];
+  if (refs.length < 2 || refs.length > 6 || !firstRef || refs[0] !== String(firstRef).toUpperCase()) return [];
+  const firsts = refs.map((r) => heads.find((h) => h.ref.toUpperCase() === r));
+  const out = [];
+  for (let k = 1; k < firsts.length; k++) {
+    const seg = lines.slice(firsts[k].i, k + 1 < firsts.length ? firsts[k + 1].i : lines.length).join("\n");
+    const tot = /^[\s|]*(?:order )?total\s*:?[\s|]*£\s?([\d,]+\.\d{2})[\s|]*$/im.exec(seg);
+    if (!tot) return [];
+    const totalPence = money(tot[1]);
+    const items = cleanItems(readItems(seg.slice(0, tot.index + tot[0].length)));
+    const check = checkItems(items, moneyOf(seg), totalPence);
+    // (Only when this order's own items add up to its own total: a second order number elsewhere in an email is not proof.)
+    if (!items.length || !check || check.complete !== true) return [];
+    out.push({ orderRef: firsts[k].ref, totalPence, currency: "GBP", items, itemsCheck: { ...check, ...namesCheck(items, {}) } });
+  }
+  return out;
 }
 
 export function parseReceiptEmail(rawEmail, opts = {}) {
@@ -1285,6 +1307,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // No items read is never "complete", even when there is no total to compare with.
   if (!result.items.length && result.itemsCheck && result.itemsCheck.complete !== false) result.itemsCheck = { ...result.itemsCheck, complete: false };
+  // (A shop visit's receipt that only links to its itemised receipt, "View itemised receipt", with the money and no list: it
+  // lists no items, and says so, rather than taking a money line for one. Round 12.)
+  if (!result.items.length && !noList && result.itemsCheck && /\bview (?:your |the )?(?:itemi[sz]ed|full|detailed) receipt\b/i.test(text.slice(0, 3000))) result.itemsCheck = { ...result.itemsCheck, noItemList: true };
   // Gmail cut the email short ("[Message clipped]  View entire message"): what came after the cut isn't in it, so the items
   // can never be called complete, even when what is there adds up.
   if (CLIPPED.test(text) || (otherPart && CLIPPED.test(otherPart))) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, clipped: true };
@@ -1332,6 +1357,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // in 14th Feb 2022" under an invoice sent in 2025. The email's own date is. Round 11.)
   if (result.orderDate && refDate && !Number.isNaN(refDate.getTime()) && Date.parse(result.orderDate) < refDate.getTime() - 400 * 864e5) result.orderDate = null;
   if (!result.orderDate && refDate && !Number.isNaN(refDate.getTime())) { result.orderDate = isoDate(refDate); result.orderDateFrom = "email"; }
+  // (One email confirming two orders, "Order # 202-…" then its items and "Total", then "Order # 202-…" again: each order is
+  // a purchase of its own. The first is this email's reading; the others go with it as orders of their own, each with its
+  // number, its items and its total, and gmail.js mergeOrderEmails makes a card of each. Round 12.)
+  const others = isFlight || dayOf || amended ? [] : moreOrders(text, result.orderRef).length ? moreOrders(text, result.orderRef) : moreOrders(otherPart, result.orderRef);
+  if (others.length) result.moreOrders = others;
   return result;
 }
 

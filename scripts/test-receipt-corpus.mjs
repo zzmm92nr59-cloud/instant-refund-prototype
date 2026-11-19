@@ -327,6 +327,10 @@ const joinWrong = [];
   const twice = [ride(4, 499, "2026-03-05"), ride(5, 499, "2026-03-05")];
   attachReturnProgress(twice, [], [pp]);
   if (twice.some((r) => r.returnProgress)) joinWrong.push("payment service's refund guessed between two rides for the same money");
+  // One email confirming two orders: a card for each, each with its own number, total and items.
+  const two = mergeOrderEmails([{ id: "t1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-two-orders-one-email.json"), "utf8")))) }]);
+  if (two.length !== 2 || two[1].orderRef !== "301-5510022-4410002" || two[1].totalPence !== 3100 || (two[1].items || []).map((i) => i.name).join() !== "Eau de Parfum 50ml" || two[0].totalPence !== 2249)
+    joinWrong.push("an email with two orders made " + JSON.stringify(two.map((o) => [o.orderRef, o.totalPence, (o.items || []).length])));
   const inv = parseReturnUpdateEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-paypal-refund-invoice.json"), "utf8"))));
   const wine = [{ id: "w1", createdAt: 1, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22001544-P001", orderDate: "2026-06-13", totalPence: 3000, items: [] },
     { id: "w2", createdAt: 2, kind: "receipt", retailer: { name: "Cellar Club Ltd", domain: null, via: "paypal.co.uk" }, orderRef: "CC22170130-P001", orderDate: "2026-07-14", totalPence: 3000, items: [] }];
