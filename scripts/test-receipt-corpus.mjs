@@ -60,7 +60,8 @@ for (const f of fixtures) {
 // A forwarded email must read the same as the original: the same shop, date, total and items.
 const sameAsSent = rows.filter((r) => r.fwd).filter((r) => { const o = rows.find((x) => !x.fwd && x.id === r.id.split("~")[0]); return !o || o.shopName !== r.shopName || Boolean(o.items) !== Boolean(r.items) || Boolean(o.total) !== Boolean(r.total) || Boolean(o.date) !== Boolean(r.date); });
 // An email with no item list in it ("Your order of 3 items") is incomplete by nature: the check must say so.
-const wantsFlag = (row) => { const f = fixtures.find((x) => row.id.split("~")[0] === x.id); return f.expected.items.length === 0; };
+// So is a shipment email that lists only the items in its parcel under the whole order's total (expected.partial).
+const wantsFlag = (row) => { const f = fixtures.find((x) => row.id.split("~")[0] === x.id); return f.expected.items.length === 0 || Boolean(f.expected.partial); };
 const silent = rows.filter((r) => r.ok && (r.items || wantsFlag(r)) && !r.flagged);
 const falseAlarm = rows.filter((r) => r.ok && !r.items && !wantsFlag(r) && r.flagged);
 const pct = (n, d) => (d ? Math.round((1000 * n) / d) / 10 : 100) + "%";

@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-fuelstop-petrol",
+ "sender": "FuelStop",
+ "layout": "petrol: litres @ pence a litre, a shop item",
+ "headers": {
+  "from": "FuelStop <ereceipts@fuelstop.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your FuelStop e-receipt",
+  "date": "Sun, 25 Oct 2026 07:40:00 +0000"
+ },
+ "html": "",
+ "text": "FuelStop Leeds Ring Road\nReceipt 0044 1923\n25/10/2026 07:38\n\nPump 4\nUnleaded   38.42 L @ 142.9p/L   £54.90\nLucozade Energy 500ml   £1.85\n\nTotal   £56.75\nVisa contactless   £56.75\nVAT included   £9.46",
+ "expected": {
+  "shop": "FuelStop",
+  "date": "2026-10-25",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Unleaded",
+    "qty": 1,
+    "linePence": 5490
+   },
+   {
+    "name": "Lucozade Energy 500ml",
+    "qty": 1,
+    "linePence": 185
+   }
+  ],
+  "subtotalPence": 5675,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5675
+ }
+}

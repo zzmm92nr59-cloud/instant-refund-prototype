@@ -1,0 +1,30 @@
+{
+ "id": "holdout5-notely-annual-vat",
+ "sender": "Notely",
+ "layout": "annual plan, net and VAT lines",
+ "headers": {
+  "from": "Notely <billing@notely.io>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your Notely Pro renewal",
+  "date": "Tue, 13 Oct 2026 03:00:00 +0000"
+ },
+ "html": "",
+ "text": "Notely\nReceipt #NTL-88120\nDate paid: October 13, 2026\n\nPro Plan (annual)   £96.00\nOct 13, 2026 – Oct 12, 2027\n\nSubtotal   £80.00\nVAT (20%)   £16.00\nTotal   £96.00\nAmount paid   £96.00",
+ "expected": {
+  "shop": "Notely",
+  "date": "2026-10-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Pro Plan (annual)",
+    "qty": 1,
+    "linePence": 9600
+   }
+  ],
+  "subtotalPence": 9600,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9600
+ }
+}

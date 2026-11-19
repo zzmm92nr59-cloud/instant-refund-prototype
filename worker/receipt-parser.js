@@ -315,7 +315,20 @@ function slashDate(a, b, y, refDate) {
   return gap(us) < gap(uk) ? us : uk;
 }
 
+// The order's date. A date labelled as the order's ("Order date: 01/11/2026", "Placed on …") comes first, and a date after
+// the email was sent (a pre-order's release date, a concert's day, a renewal's next date) is never the order's: the next
+// date in the text is tried instead (round 3, 19 Nov 2026).
+const ORDER_DATE_LABEL = /\b(?:order(?:ed)?|placed|purchase|booked|booking|transaction|invoice|receipt)\s*(?:date|on|made)?\s*(?:\/\s*[\p{L} ]{2,20})?\s*[:|]\s*\|?\s*([^\n]{6,40})/giu;
 export function parseDate(text, refDate) {
+  const t = String(text || "");
+  const late = (v) => Boolean(v) && refDate instanceof Date && !Number.isNaN(refDate.getTime()) && new Date(v + "T00:00:00Z").getTime() > refDate.getTime() + 2 * 86400000;
+  for (const m of t.slice(0, 20000).matchAll(ORDER_DATE_LABEL)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
+  const v = dateFound(t, refDate);
+  if (!late(v)) return v;
+  for (const line of t.split("\n")) { const w = dateFound(line, refDate); if (w && !late(w)) return w; }
+  return null;
+}
+function dateFound(text, refDate) {
   let m = text.match(/\b(\d{4})-(\d{2})-(\d{2})(?!\d)/);
   if (m && ymdOf(+m[1], +m[2], +m[3])) return `${m[1]}-${m[2]}-${m[3]}`;
   m = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
@@ -543,6 +556,10 @@ function extractReturns(text, html, orderDate) {
 }
 
 // An email that is not an order confirmation must not be turned into a purchase.
+// Some of an order's items sent ("2 of your 3 items have shipped", "Part of your order HF-1 has been dispatched"): the items
+// in it are the order's, so it is read like its receipt and joins the order's card by its order number (gmail.js
+// mergeOrderEmails). Without an order number it would be a second card for the same order, so it is then not read at all.
+const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?:have |has )?(?:shipped|dispatched|been sent|on (?:their|its) way)\b|\b(?:part|some) of your order\b[^!?]{0,40}\b(?:shipped|dispatched|sent|on its way)\b|\bsome of your items\b[^!?]{0,30}\b(?:shipped|dispatched|on (?:their|its) way)\b/i;
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
@@ -553,6 +570,9 @@ function receiptSignals(subject, text) {
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     // "Reservation confirmed for Manchester", "Your booking is confirmed at …", "Your … order PK-338812", "Your order … has been placed".
     /\b(?:reservation|booking|order|purchase)\b[^!?]{0,30}\bconfirmed\b|\byour\b[^!?]{0,40}\border\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border\b[^!?]{0,30}\b(?:has been|was|is) placed\b|(?:^|[!.:]\s+)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) ||
+    // "Order acknowledgement 30044112", "Your … subscription has renewed", "Receipt for your Notely Pro renewal", a
+    // bilingual "Archeb / Order CR-1102" (round 3).
+    /\border acknowledge?ment\b|\bsubscription\b[^!?]{0,30}\b(?:has )?renew(?:ed|al)\b|\breceipt for your\b|(?:^|\/\s*)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) || SHIPMENT_SUBJECT.test(s) ||
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
@@ -868,6 +888,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };
   }
+  if (SHIPMENT_SUBJECT.test(String(subject || "")) && !result.orderRef) return { ok: false, reason: "shipment_without_order_number", source: "shopper_email" };
   // A notice about an order placed earlier, with no total of its own, is not a purchase. (One that does give the order's
   // total is kept: it can be the only record of that order.)
   if (!opts.lenient && result.totalPence == null && ORDER_NOTICE_SUBJECT.test(subject || "")) {

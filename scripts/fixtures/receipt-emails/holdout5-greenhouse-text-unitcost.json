@@ -1,0 +1,38 @@
+{
+ "id": "holdout5-greenhouse-text-unitcost",
+ "sender": "Greenhouse Supplies",
+ "layout": "text: Item, Unit cost, Quantity, Amount",
+ "headers": {
+  "from": "Greenhouse Supplies <orders@greenhousesupplies.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation GS/2026/11/0456",
+  "date": "Sat, 7 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Greenhouse Supplies Ltd\nOrder confirmation\nOrder: GS/2026/11/0456\nDate: 07/11/2026\n\nItem                            Unit cost   Quantity   Amount\nGalvanised Garden Bucket 10L       £12.95          2   £25.90\nWooden Plant Labels Pack of 50      £4.50          1    £4.50\n\nSubtotal   £30.40\nP&P   £3.95\nTotal   £34.35",
+ "expected": {
+  "shop": "Greenhouse Supplies",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Galvanised Garden Bucket 10L",
+    "qty": 2,
+    "linePence": 2590
+   },
+   {
+    "name": "Wooden Plant Labels Pack of 50",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 3040,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3435,
+  "shopAlso": [
+   "Greenhouse Supplies Ltd"
+  ]
+ }
+}

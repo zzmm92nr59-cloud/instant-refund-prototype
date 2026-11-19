@@ -1,0 +1,23 @@
+{
+ "id": "holdout5-boden-cancel-refund",
+ "sender": "Boden",
+ "layout": "cancelled, 'refund' in the subject",
+ "headers": {
+  "from": "Boden <orders@boden.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order has been cancelled and refunded",
+  "date": "Thu, 19 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Boden\nWe're sorry: we've cancelled your order because the item is out of stock.\nOrder number: BD-5512093\n\nWool Blend Coat  £180.00\n\nYour refund of £180.00 will reach your card in 3-5 working days.",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancellation"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

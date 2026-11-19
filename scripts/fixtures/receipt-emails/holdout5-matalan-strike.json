@@ -1,0 +1,35 @@
+{
+ "id": "holdout5-matalan-strike",
+ "sender": "Matalan",
+ "layout": "struck-through old price, link name, small code",
+ "headers": {
+  "from": "Matalan <orders@matalan.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Matalan order MAT-5512099",
+  "date": "Mon, 19 Oct 2026 20:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Matalan</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.matalan.co.uk/?utm_source=email\"><img src=\"https://www.matalan.co.uk/static/email/logo.png\" alt=\"Matalan\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: MAT-5512099</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>19 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><a href=\"https://www.matalan.co.uk/p/1\">Teddy Fleece Duvet Set Double</a><br><small>Product code 4412009</small></td><td>1</td><td><s>£30.00</s> £24.00</td></tr><tr><td><a href=\"https://www.matalan.co.uk/p/2\">Blackout Eyelet Curtains 66x72</a><br><small>Product code 4413371</small></td><td>1</td><td><s>£40.00</s> £32.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£56.00</td></tr><tr><td>Delivery</td><td>£3.99</td></tr><tr><td><strong>Total</strong></td><td><strong>£59.99</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Matalan. All rights reserved.<br /><a href=\"https://www.matalan.co.uk/help\">Help</a> | <a href=\"https://www.matalan.co.uk/privacy\">Privacy</a> | <a href=\"https://www.matalan.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.matalan.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Matalan",
+  "date": "2026-10-19",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Teddy Fleece Duvet Set Double",
+    "qty": 1,
+    "linePence": 2400
+   },
+   {
+    "name": "Blackout Eyelet Curtains 66x72",
+    "qty": 1,
+    "linePence": 3200
+   }
+  ],
+  "subtotalPence": 5600,
+  "feesPence": 399,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5999
+ }
+}
