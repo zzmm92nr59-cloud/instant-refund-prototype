@@ -104,7 +104,7 @@ assert.ok(mine.length > 80, "found the shopper routes (" + mine.length + ")");
     category: "fashion", items: [{ name: "Trail Runner Shoes", qty: 1, pricePence: 8900 }], returns: { deadline: "2026-10-31" } };
   sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)").run(id, aliceId, "m-1", "pending", JSON.stringify(details), now);
   const before = JSON.stringify(sqlite.prepare("SELECT status, details FROM captured_receipts WHERE id = ?").get(id));
-  const tries = [["GET", "/original"], ["GET", "/image"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
+  const tries = [["GET", "/original"], ["GET", "/image"], ["GET", "/codes/1"], ["POST", "/confirm", {}], ["POST", "/dismiss", { reason: "promo" }], ["POST", "/category", { category: "home" }],
     ["POST", "/items", { items: [{ index: 0, status: "returning" }] }], ["POST", "/remind", { on: false }], ["POST", "/gift", { gift: true, for: "Bob" }], ["POST", "/fix", { totalPence: 1 }],
     ["GET", "/share"], ["POST", "/share", { note: "mine now" }], ["POST", "/return-sent", { trackingNumber: "KO123456789GB" }], ["GET", "/return-parcel"], ["POST", "/reread", {}]];
   for (const [method, end, body] of tries) {
