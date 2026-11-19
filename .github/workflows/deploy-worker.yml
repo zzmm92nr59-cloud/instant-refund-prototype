@@ -41,6 +41,7 @@ jobs:
           node scripts/test-auth.mjs
           node scripts/test-review-account.mjs
           node scripts/test-security-mail.mjs
+          node scripts/test-phone-signin.mjs
           node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-corpus.mjs

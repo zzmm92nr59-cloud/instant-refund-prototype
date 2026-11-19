@@ -881,6 +881,7 @@
     // Codes: a big, even 6-digit box; two-step methods as small cards; recovery codes in a box that selects in one tap.
     "input.rl-field{display:block;width:100%;box-sizing:border-box;min-height:52px;padding:14px 16px;border:1px solid var(--rl-line);border-radius:16px;font:inherit;font-size:16px;background:var(--rl-card);color:var(--rl-text);margin:0 0 12px}" +
     ".rl-asub input.rl-field{background:var(--rl-sheet)}input.rl-field:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
+    ".rl-asub p.rl-adevice{font-size:20px;font-weight:700;margin:4px 0 8px;color:var(--rl-text)}.rl-pcode{font-size:32px;font-weight:700;letter-spacing:.12em;text-align:center;font-variant-numeric:tabular-nums;padding:18px 16px;margin:16px 0 8px;border-radius:16px;background:var(--rl-card);color:var(--rl-text);overflow-wrap:anywhere}.rl-pcode.rl-skel{min-height:78px}.rl-pcode-off{opacity:.4}input.rl-pfield{font-size:22px;letter-spacing:.12em;text-align:center;font-weight:700;text-transform:uppercase}input.rl-pfield::placeholder{letter-spacing:normal;font-weight:400;font-size:16px;text-transform:none}" +
     "input.rl-code{font-size:24px;letter-spacing:.3em;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}input.rl-code::placeholder{letter-spacing:normal;font-weight:400;font-size:16px}" +
     ".rl-2s{border:1px solid var(--rl-line);border-radius:16px;padding:14px;margin:0 0 12px;background:var(--rl-sheet)}" +
     ".rl-2s-h{display:flex;align-items:center;gap:10px;margin:0 0 6px;color:var(--rl-text)}.rl-2s-h b{flex:1;min-width:0;font-size:16px}" +
@@ -1915,6 +1916,7 @@
     trash: '<path d="M4.5 7h15M10 7V5h4v2M6.5 7l1 13h9l1-13"/>',
     face: '<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 16c1.5 1.2 3.5 1.2 5 0"/>',
     back: '<path d="m15 6-6 6 6 6"/>',
+    phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.6"/><path d="M10.5 18.5h3"/>',
     ret: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     card: '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
@@ -2317,6 +2319,8 @@
     body.appendChild(choices);
     body.appendChild(msg);
     if (passkeysSupported()) { var pk = passkeyButton(msg); pk.className = "rl-textbtn"; pk.insertBefore(jIc("face", 22), pk.firstChild); body.appendChild(pk); }
+    // Already signed in on a phone: approve this device from there, with nothing typed here (phoneSignInStep).
+    if (!fresh) body.appendChild(el("button", { type: "button", className: "rl-textbtn rl-phonein", onclick: function () { phoneSignInStep(sheet); } }, [jIc("phone", 22), el("span", { text: "Sign in with your phone" })]));
     // What Relay does with the inbox, said in one line before anyone goes to Google or Microsoft (Connor, 17 Nov 2026: a
     // panel of points made the page busy). The points and the exact wording open under it with one tap.
     var perm = null, words = null;
@@ -2398,6 +2402,45 @@
       if (r.body && r.body.error === "consent_version_mismatch") providersAsked = null;
       say(note, r.status === 503 ? who + " sign-in isn't switched on yet. Continue with email instead." : r.body && r.body.error === "consent_version_mismatch" ? "Relay's wording has just changed. Please try again." : "Couldn't open " + who + ". Please try again.", true);
     }).catch(function () { free(); say(note, "Couldn't reach Relay. Check your connection.", true); });
+  }
+  // Signing in by approving this device from a phone that's already signed in (worker/phone-signin.js). This screen shows a
+  // short code; on the phone, Settings → Sign in on another device takes it. While the code is on screen this
+  // asks Relay every few seconds whether it was approved (keepFresh: only while showing, never in the background), and
+  // stops once it was, or once the code runs out after 5 minutes.
+  function phoneSignInStep(sheet) {
+    var body = jFrame(sheet, { back: function () { signedOutView(sheet, signInOpts); }, title: "Sign in with your phone",
+      sub: "On a phone that's signed in to Relay, tap your picture, then Settings, then Sign in on another device. Type this code there and tap Approve." });
+    var code = el("div", { className: "rl-pcode rl-skel", role: "status" });
+    code.setAttribute("aria-label", "Your code is on its way");
+    var msg = el("div", { className: "rl-msg" });
+    var again = el("button", { type: "button", className: "rl-btn", text: "Get a new code", onclick: function () { if (!again.disabled) { again.disabled = true; phoneSignInStep(sheet); } } });
+    again.style.display = "none";
+    [code, msg, again].forEach(function (n) { body.appendChild(n); });
+    var done = false, poll = "", until = 0, asking = false;
+    function over(text, bad) { done = true; code.classList.add("rl-pcode-off"); say(msg, text, bad); again.style.display = ""; again.disabled = false; }
+    api("/relay/auth/phone/start", { method: "POST", body: {} }).then(function (r) {
+      if (!document.body.contains(code)) return;
+      if (!r.ok || !r.body || !r.body.code) { code.classList.remove("rl-skel"); code.style.display = "none"; return over(r.status === 503 ? "Sign-in isn't switched on yet." : r.status === 429 ? "Too many codes from here at once. Wait a few minutes, then get a new code." : "Couldn't get a code. Check your connection and try again.", true); }
+      // The phone's clock may differ from Relay's, so the 5 minutes are counted from now (Relay checks its own clock too).
+      poll = r.body.pollToken; until = Date.now() + 5 * 60 * 1000;
+      code.classList.remove("rl-skel");
+      code.textContent = r.body.code.slice(0, 4) + " " + r.body.code.slice(4);
+      code.setAttribute("aria-label", "Your code: " + r.body.code.split("").join(" "));
+      say(msg, "Waiting for your phone. The code works for 5 minutes.");
+      keepFresh(code, 3000, ask, function () { return !done; });
+    }, function () { code.classList.remove("rl-skel"); code.style.display = "none"; over("Couldn't reach Relay. Check your connection.", true); });
+    function ask() {
+      if (done || asking || !poll) return;
+      if (Date.now() > until) return over("That code has run out. Get a new one and try again.");
+      asking = true;
+      api("/relay/auth/phone/check", { method: "POST", body: { pollToken: poll } }).then(function (r) {
+        asking = false;
+        if (done || !document.body.contains(code)) return;
+        if (r.ok && r.body && r.body.sessionToken) { done = true; say(msg, "Approved. Signing you in…"); return signedIn(r.body); }
+        if (r.ok && r.body && r.body.needsSecondStep) { done = true; return secondStepView(sheet, r.body); }
+        if (r.status === 410) return over("That code has run out. Get a new one and try again.");
+      }, function () { asking = false; });
+    }
   }
   // Step 2 by email: a one-time link or code.
   function emailStep(sheet, typed) {
@@ -5657,6 +5700,7 @@
       var twoRow = accRow("lock", "Two-step sign-in", "", openTwoStep);
       secRows.push(twoRow);
       var devicesRow = accRow("devices", "Devices", "Phones and computers you're signed in on", function () { page("Devices", devicesPage); });
+      secRows.push(accRow("devices", "Sign in on another device", "Approve a computer or tablet with its code", function () { page("Sign in on another device", approveDevicePage); }));
       secRows.push(devicesRow);
       var cardRow = accRow("card", "Card for swaps", "", function () { page("Card for swaps", function (b) { var cb = el("div"); b.appendChild(cb); cardSection(cb); }); });
       cardRow.style.display = "none"; secRows.push(cardRow);
@@ -5902,6 +5946,56 @@
       b.appendChild(go);
       b.appendChild(note);
       b.appendChild(el("p", { className: "rl-anote", text: "Relay emails you whenever how you sign in changes (two-step sign-in, your phone number, a passkey or a recovery code), so you'd know if it wasn't you." }));
+    }
+    // Approving a sign-in on another device (worker/phone-signin.js): the code from that screen, which device it is, then
+    // Approve. Typing the code only finds the request; nothing is signed in until Approve.
+    function approveDevicePage(b) {
+      b.textContent = "";
+      b.appendChild(el("p", { text: "On the computer or tablet, open Relay and choose Sign in with your phone. Type the code it shows." }));
+      var input = el("input", { type: "text", id: "rl-device-code", className: "rl-field rl-pfield", placeholder: "8-character code", autocomplete: "off", maxLength: 9 });
+      input.setAttribute("aria-label", "Code from the other device"); input.setAttribute("autocapitalize", "characters"); input.setAttribute("spellcheck", "false"); input.setAttribute("enterkeyhint", "go");
+      var note = el("div", { className: "rl-msg" });
+      var go = el("button", { type: "button", className: "rl-btn", text: "Continue" });
+      var problem = function (r) {
+        var e = r && r.body && r.body.error;
+        return e === "code_not_found" ? "That code isn't right or has run out. Check the other screen, or get a new code there."
+          : e === "too_many_requests" ? "Too many codes tried. Wait 15 minutes, then try again."
+          : e === "second_step_needed" ? "Set up two-step sign-in on this phone first."
+          : "That didn't work. Check your connection and try again.";
+      };
+      go.onclick = function () {
+        if (go.disabled) return;
+        var typed = input.value.replace(/[\s-]/g, "").toUpperCase();
+        if (typed.length !== 8) return say(note, "Type all 8 characters of the code.", true);
+        go.disabled = true; go.textContent = "Checking…"; say(note, "");
+        api("/relay/my/devices/look", { method: "POST", body: { code: typed } }).then(function (r) {
+          go.disabled = false; go.textContent = "Continue";
+          if (!r.ok || !r.body || !r.body.device) return say(note, problem(r), true);
+          confirmStep(typed, r.body.device);
+        }, function () { go.disabled = false; go.textContent = "Continue"; say(note, problem(null), true); });
+      };
+      input.addEventListener("keydown", function (e) { if (e.key === "Enter") go.click(); });
+      [input, go, note].forEach(function (n) { b.appendChild(n); });
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 50);
+      function confirmStep(typed, device) {
+        b.textContent = "";
+        b.appendChild(el("p", { className: "rl-adevice", text: "Sign in " + device + "?" }));
+        b.appendChild(el("p", { text: "It will be signed in to your Relay account, " + email + ". Only approve if this code is on a screen in front of you now. Never approve a code someone sent you." }));
+        var note2 = el("div", { className: "rl-msg" });
+        var yes = el("button", { type: "button", className: "rl-btn", text: "Approve" });
+        var no = el("button", { type: "button", className: "rl-btn ghost", text: "Cancel", onclick: function () { approveDevicePage(b); } });
+        yes.onclick = function () {
+          if (yes.disabled) return;
+          yes.disabled = no.disabled = true; yes.textContent = "Approving…";
+          api("/relay/my/devices/approve", { method: "POST", body: { code: typed } }).then(function (r) {
+            if (!r.ok) { yes.disabled = no.disabled = false; yes.textContent = "Approve"; return say(note2, problem(r), true); }
+            b.textContent = "";
+            b.appendChild(el("p", { className: "rl-adevice", text: "Done" }));
+            b.appendChild(el("p", { text: device + " is signed in to your Relay account. If you ever lose it, Devices can sign it out." }));
+          }, function () { yes.disabled = no.disabled = false; yes.textContent = "Approve"; say(note2, problem(null), true); });
+        };
+        [yes, no, note2].forEach(function (n) { b.appendChild(n); });
+      }
     }
     function ordersPage(b) {
       b.appendChild(el("p", { text: "Orders the shop itself confirmed to Relay." }));

@@ -13,6 +13,7 @@ const NOTES = {
   passkey_added: ["A passkey was added", d => "A passkey" + (d.name ? " called “" + d.name + "”" : "") + " was added to your Relay account. It can now be used to sign in with Face ID, Touch ID or a screen lock."],
   passkey_removed: ["A passkey was removed", d => "A passkey" + (d.name ? " called “" + d.name + "”" : "") + " was removed from your Relay account."],
   recovery_used: ["A recovery code was used", d => "Someone signed in to your Relay account with one of your recovery codes. " + (d.left === 1 ? "1 is" : d.left + " are") + " left."],
+  device_approved: ["A new device was signed in from your phone", d => (d.device || "A device") + " was signed in to your Relay account after you approved it on a phone that was already signed in."],
   others_out: ["Your other devices were signed out", d => "Relay was signed out on " + (d.count === 1 ? "1 other device" : d.count + " other devices") + ". The device you did this on stays signed in."],
 };
 const IF_NOT_YOU = "If this wasn't you, sign in to Relay with your email, tap your picture at the top of the screen, then Security and privacy, choose Devices and sign out your other devices. Then check Two-step sign-in there.";

@@ -43,6 +43,8 @@ import { PASSKEY_TABLE_SQL, passkeyDeleteStatements, handlePasskeyAuthRoute, han
 import { ensureGmailTables, gmailDeleteStatements, revokeAllMailboxes, handleGmailRoute, handleGmailCallback, handleOutlookCallback, outlookConfigured, microsoftRedirect, MS_AUTH,
   CONSENT_VERSION, CONSENT_TEXT, OUTLOOK_SCOPE, GMAIL_SCOPE, saveConnection, recordConsent, sealToken, openToken } from "./gmail.js";
 import { tellShopper } from "./security-mail.js";
+import { PHONE_SIGNIN_TABLE_SQL, handlePhoneSigninStart, handlePhoneSigninApprove } from "./phone-signin.js";
+import { addressOf } from "./limits.js";
 import { ensureOrderNowColumn } from "./order-ref.js";
 import { REVIEW_TABLE_SQL, REVIEW_MAX_FAILURES_PER_DAY, isReviewAddress, reviewBlocked, reviewCode, handleReviewAdminRoute } from "./review-account.js";
 const LINK_TTL_MS = 15 * 60 * 1000;
@@ -115,7 +117,8 @@ async function ensureAuthTablesRun(db) {
     ...PASSKEY_TABLE_SQL,
     ...TOTP_TABLE_SQL,
     ...PHONE_TABLE_SQL,
-    ...REVIEW_TABLE_SQL
+    ...REVIEW_TABLE_SQL,
+    ...PHONE_SIGNIN_TABLE_SQL
   ];
   await runAll(db, statements);
   // Whether a Microsoft sign-in also asked to connect Outlook (the wording version the shopper agreed to on the sign-in screen).
@@ -363,6 +366,8 @@ async function verifyCode(request, env, cors, opts) {
 
 function rpId(env) { return new URL(env.RELAY_APP_URL || DEFAULT_APP_URL).hostname; }
 const passkeyHelpers = { json, readJson, allowedOrigins, startSession: (...a) => startSession(...a), sha256Hex, rpId };
+// For approving a sign-in from a phone that's already signed in (phone-signin.js).
+const phoneSigninHelpers = { json, readJson, allowedOrigins, startSession: (...a) => startSession(...a), sha256Hex, randomToken, addressOf, tellShopper };
 
 // ---- Sign in with Google (identity only: openid + email; no Gmail access) ----
 const GOOGLE_STATE_TTL_MS = 10 * 60 * 1000;
@@ -633,6 +638,8 @@ async function deleteShopper(env, shopper, o) {
     env.RELAY_DB.prepare("DELETE FROM auth_sessions WHERE shopper_id = ?").bind(shopper.id),
     env.RELAY_DB.prepare("DELETE FROM auth_login_tokens WHERE email IN (?, ?)").bind(shopper.email, "code:" + shopper.email),
     env.RELAY_DB.prepare("DELETE FROM auth_code_failures WHERE email = ?").bind(shopper.email),
+    env.RELAY_DB.prepare("DELETE FROM auth_phone_requests WHERE shopper_id = ?").bind(shopper.id),
+    env.RELAY_DB.prepare("DELETE FROM auth_phone_code_failures WHERE shopper_id = ?").bind(shopper.id),
     env.RELAY_DB.prepare("DELETE FROM shoppers WHERE id = ?").bind(shopper.id)
   ]);
 }
@@ -672,6 +679,10 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
     }
     if (!configured(env)) return json({ error: "sign_in_not_configured" }, 503, cors);
     await ensureAuthTables(env.RELAY_DB);
+    if (path.startsWith("/relay/auth/phone/")) {
+      const ph = await handlePhoneSigninStart(path, request, env, cors, o, phoneSigninHelpers);
+      if (ph) return ph;
+    }
     if (path === "/relay/gmail/callback" && request.method === "GET") {
       const g = await googleCallback(request, env, url, o);
       if (g) return g;
@@ -716,6 +727,8 @@ export async function handleAuthRoute(request, env, url, cors = {}, opts = {}) {
       if (count) await tellShopper(env, o, shopper.email, "others_out", { count });
       return json({ ok: true, count }, 200, cors);
     }
+    const approve = await handlePhoneSigninApprove(path, request, env, cors, o, shopper, phoneSigninHelpers);
+    if (approve) return approve;
     if (path === "/relay/my/delete" && request.method === "POST") {
       await deleteShopper(env, shopper, o);
       return json({ ok: true }, 200, cors);
