@@ -105,9 +105,17 @@
   // Kept on the device too, so reopening the app straight after signing in can't land on a copy that hasn't caught up.
   var BOOKMARK_KEY = "relay.bookmark.v1", bookmark = null;
   try { bookmark = localStorage.getItem(BOOKMARK_KEY) || null; if (bookmark && !/^[0-9A-Za-z._:-]{8,160}$/.test(bookmark)) bookmark = null; } catch (e) {}
+  // Coming back from connecting (or connecting again) an inbox: what Relay said about the inboxes before that is out of
+  // date, so it's forgotten, and an answer that was still on its way is asked for again instead of being shown.
+  var MAIL_PATH = "/relay/my/gmail", mailGen = 0;
+  function forgetMail() {
+    mailGen++; memo.gmail = null;
+    Object.keys(reads).forEach(function (k) { if (k.slice(k.indexOf(" ") + 1) === MAIL_PATH) delete reads[k]; });
+  }
   function api(path, opts) {
     opts = opts || {};
-    var method = opts.method || "GET", s = load(), headers = {};
+    var method = opts.method || "GET", s = load(), headers = {}, mailAt = mailGen;
+    var current = function (p) { return method === "GET" && path === MAIL_PATH ? p.then(function (r) { return mailAt === mailGen ? r : api(path, opts); }) : p; };
     // Reads carry no body, so they don't say it's JSON (one less reason for the browser to ask first).
     if (method !== "GET") { headers["Content-Type"] = "application/json"; reads = {};
       // Any change to a receipt (a gift, a fix, a category, one added or removed) changes Wrapped too: it's built again next
@@ -116,7 +124,7 @@
     if (s && s.token) headers.Authorization = "Bearer " + s.token;
     if (bookmark) headers["X-D1-Bookmark"] = bookmark;
     var key = method === "GET" ? (s && s.token ? s.token.slice(-10) : "-") + " " + path : null, hit = key && reads[key];
-    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return hit.answer.then(copyAnswer);
+    if (hit && !opts.fresh && (hit.waiting || Date.now() - hit.at < (OWN_READS[path] ? OWN_REUSE_MS : READ_REUSE_MS))) return current(hit.answer.then(copyAnswer));
     inflight++;
     var answer = fetch(API + path, { method: method, headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined })
       .then(function (r) {
@@ -134,7 +142,7 @@
       answer.then(function (r) { entry.waiting = false; entry.at = Date.now(); if (!r.ok && reads[key] === entry) delete reads[key]; },
         function () { if (reads[key] === entry) delete reads[key]; });
     }
-    return answer.then(copyAnswer);
+    return current(answer.then(copyAnswer));
   }
   // How many requests are on their way, so pull to refresh knows when the screen has its new copy.
   var inflight = 0, idleWaiters = [];
@@ -4248,8 +4256,9 @@
             loadList();
             if (x.body.more && rounds < 150) { progress(job); return step(); }
             if (x.body.more) return finish("Still reading in the background. New receipts will appear here as they're found.");
-            // "Connected. Scanning for receipts…" is out of date once the scan has finished.
-            if (onPage && msg.textContent && !/\berr\b/.test(msg.className)) say(msg, "");
+            // "Connected. Scanning for receipts…" is out of date once the scan has finished. Any other note (connected again,
+            // inbox added) stays: what the read found has its own line (status).
+            if (onPage && msg.getAttribute("data-passing") === msg.textContent) { msg.removeAttribute("data-passing"); say(msg, ""); }
             try { if (job && job.finishedAt) localStorage.setItem("relay.scanSeen", String(job.finishedAt)); } catch (e) {}
             var found = job ? job.found : (x.body.added || 0) + (x.body.updated || 0);
             finish(found ? "Found or updated " + found + " receipt or return email" + (found === 1 ? "" : "s") + ". Please check them below." : "Nothing new found.");
@@ -6608,7 +6617,7 @@
   }
   // What to say when Google or Microsoft sends the shopper back after "Connect Gmail" / "Connect Outlook".
   function mailNote(result, name) {
-    var notes = { connected: [name + " connected. Scanning for receipts…", false], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
+    var notes = { connected: [name + " connected. Scanning for receipts…", false, true], denied: ["You chose not to connect " + name + ". Relay needs a way to see your receipts, so you can try again or paste one.", true],
       failed: ["Couldn't connect " + name + ". Please try again.", true], consent_needed: ["Please agree to the permission step first, then connect " + name + ".", true], not_configured: [name + " connection isn't switched on yet.", true],
       added: [name + " inbox added. Relay is reading it now, and its receipts appear here in a few minutes.", false], already_connected: ["That inbox is already connected to Relay.", false],
       reconnected: [name + " is connected again. Relay is catching up on what it missed, and new receipts come in as before.", false] };
@@ -6620,14 +6629,15 @@
     var again = false; try { again = sessionStorage.getItem("relay.reconnecting") === "1"; sessionStorage.removeItem("relay.reconnecting"); } catch (e) {}
     if (again && result === "denied") return { text: name + " wasn't connected again, so Relay still can't read it. You can try again from your picture at the top of the screen, then Inboxes.", bad: true };
     if (again && result === "failed") return { text: "Couldn't connect " + name + " again. Please try again from your picture at the top of the screen, then Inboxes.", bad: true };
-    return { text: notes[result][0], bad: notes[result][1] };
+    // passing: the note only says the first read is under way, so it goes once that read has finished.
+    return { text: notes[result][0], bad: notes[result][1], passing: Boolean(notes[result][2]) };
   }
   function completeGmail() {
     var m = /(?:^|[#&])(gmail|outlook)=(connected|added|reconnected|already_connected|denied|failed|consent_needed|not_configured)(?:&|$)/.exec(location.hash || "");
     if (!m) return;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     var s = load(); if (!s || !s.token) return open(signedOutView);
-    memo.gmail = null; staleReceipts();
+    forgetMail(); staleReceipts();
     if (m[2] === "connected") rememberMailbox({ connected: true, provider: m[1] === "outlook" ? "microsoft" : "google" });
     var note = mailNote(m[2], m[1] === "outlook" ? "Outlook" : "Gmail");
     var wasAt = obGet(s.email).back;
@@ -6701,7 +6711,7 @@
       }
       var box = el("div");
       host.appendChild(box); host.appendChild(msg);
-      if (notice) say(msg, notice.text, notice.bad);
+      if (notice) { say(msg, notice.text, notice.bad); if (notice.passing) msg.setAttribute("data-passing", notice.text); }
       gmailSection(box, r.body, msg, true);
     }).catch(function () { host.textContent = ""; host.appendChild(el("p", { text: "Couldn't reach Relay." })); });
   }
