@@ -772,6 +772,29 @@ export function pastedAsEmail(text, now = Date.now()) {
   return "From: " + lines[i].trim() + "\n" + (subject ? "Subject: " + subject.slice(0, 200) + "\n" : "") + (d ? "Date: " + d.toUTCString() + "\n" : "") + "\n" + lines.slice(i + 1).join("\n");
 }
 
+// A receipt pasted with the page it was copied from (round 7): what the clipboard holds as HTML (a mail app or browser copies
+// the email as shown, tables and all) is read as the email itself, an HTML email, so a paste is read exactly like the email
+// it came from (its tables, not the lines a copy flattens them into). The sender, subject and date come from the copied
+// text's top lines, as for a text-only paste. (If the HTML doesn't read as a receipt, the route reads the text instead.)
+export function pastedWithHtml(text, html, now = Date.now()) {
+  const asMail = pastedAsEmail(text, now), cut = asMail.indexOf("\n\n");
+  const head = cut > 0 && /^[A-Za-z-]+\s*:/.test(asMail) ? asMail.slice(0, cut) : "";
+  const keep = head.split("\n").filter((l) => /^(from|subject|date|to)\s*:/i.test(l)).join("\r\n");
+  return (keep ? keep + "\r\n" : "") + "MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n" + html;
+}
+// Names a pasted text can't really be (round 7). Copying an email flattens its tables into lines, and a line under an item
+// (its catalogue number, an "each" price, the table's own headings) can then be read as the item: the prices still add up,
+// so the totals check can't tell. A pasted receipt with such a name says Relay may have missed something instead.
+const NOT_A_NAME = [
+  /^(cat(alogue)?\.?\s*no|ean|sku|upc|mpn|product code|item code|item no|style no|platform|order( number| no)?|ref(erence)?)\b\s*[:.#]?/i,
+  /^(product|description|item|qty|quantity|price|unit price|size|colour|color|total)(\s+(product|description|item|qty|quantity|price|unit price|size|colour|color|total))+$/i,
+  /^[£€$]\s?\d[\d,]*(\.\d\d)?\s*(each|ea)$/i,
+  /^\d+\s+\d/,
+  /^(black|white|grey|gray|blue|red|green|navy|pink|ebook|e-book|paperback|hardback|audiobook|download)$/i,
+  /^(extra|add|no|without|with)\s+\S+$/i,
+];
+export function pastedNamesDoubtful(items) { return (items || []).some((i) => i && typeof i.name === "string" && NOT_A_NAME.some((re) => re.test(i.name.trim()))); }
+
 function classify(rawText, ref, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:
@@ -2400,15 +2423,21 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/receipts/add-pasted" && m === "POST") {
     const raw = await request.text().catch(() => "");
     let body = null;
-    if (raw.length <= 300000) { try { body = JSON.parse(raw); } catch { body = null; } }
+    if (raw.length <= 1000000) { try { body = JSON.parse(raw); } catch { body = null; } }
     const text = body && typeof body.email === "string" ? body.email : "";
     if (text.trim().length < 40 || text.length > 250000) return json({ error: "invalid_receipt" }, 400, cors);
+    // The page it was copied from, when the clipboard had it (round 7): read as the email's HTML part.
+    const html = body && typeof body.html === "string" && body.html.length <= 600000 && /<(table|div|p|td|br|span)\b/i.test(body.html) ? body.html : null;
     await ensureGmailTables(env.RELAY_DB);
     const recent = await env.RELAY_DB.prepare(
       "SELECT COUNT(*) AS n FROM captured_receipts WHERE shopper_id = ? AND created_at > ? AND json_extract(details, '$.pasted') = 1").bind(shopper.id, opts.now - 3600000).first();
     if ((recent?.n || 0) >= 30) return json({ error: "too_many_requests" }, 429, cors);
-    const { details, status } = classify(pastedAsEmail(text, opts.now), { pasted: true }, true);
+    let { details, status } = classify(html ? pastedWithHtml(text, html, opts.now) : pastedAsEmail(text, opts.now), { pasted: true }, true);
+    // The HTML didn't read as a receipt (it can be only part of what was copied): the text is read on its own, as before.
+    if (html && (status === "not_receipt" || !details || details.kind === "not_receipt")) ({ details, status } = classify(pastedAsEmail(text, opts.now), { pasted: true }, true));
     if (status === "not_receipt" || !details || details.kind === "not_receipt") return json({ ok: false, reason: "not_recognised" }, 200, cors);
+    // A name a flattened copy can't really be: the receipt says Relay may have missed something, never shows it as all right.
+    if (details.kind === "receipt" && details.itemsCheck && details.itemsCheck.complete && pastedNamesDoubtful(details.items)) details.itemsCheck = { ...details.itemsCheck, complete: false, namesDoubtful: true };
     const ref = await sha256Hex("pasted:" + text.replace(/\s+/g, " ").trim());
     const seen = await env.RELAY_DB.prepare("SELECT id, status FROM captured_receipts WHERE shopper_id = ? AND message_ref = ?").bind(shopper.id, ref).first();
     let id = seen ? seen.id : crypto.randomUUID();

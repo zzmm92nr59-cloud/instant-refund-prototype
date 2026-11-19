@@ -3576,6 +3576,7 @@
     box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
     var short = x.itemsCheck.missingPence;
     if (inFile) box.appendChild(el("span", { className: "rl-ret-why", text: (inFile === "image" ? "The shop sent the receipt as a picture" : "The shop sent the receipt as a PDF") + ". Open the email to see what you bought, or add the items yourself." }));
+    else if (x.itemsCheck.namesDoubtful) box.appendChild(el("span", { className: "rl-ret-why", text: "Copying the email can mix up its lines, so check the items below are right, or fix them yourself." }));
     else if (x.itemsCheck.clipped) box.appendChild(el("span", { className: "rl-ret-why", text: "Gmail cut this email short, so some of it may not have reached Relay." }));
     else if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));
     else if (none && x.itemCount) box.appendChild(el("span", { className: "rl-ret-why", text: "The email says " + (x.itemCount === 1 ? "1 item" : x.itemCount + " items") + "." }));
@@ -4472,12 +4473,15 @@
     var btn = el("button", { type: "button", className: "rl-btn", text: "Paste", style: "margin-top:10px" });
     var msg = el("div", { className: "rl-msg" }), out = el("div"), busy = false;
     function label() { btn.disabled = busy; btn.textContent = busy ? "Reading…" : box.hidden ? "Paste" : "Add it"; }
-    function read(text) {
+    // html: the page the email was copied from, when the clipboard has it (round 7): Relay reads its tables the way it reads
+    // the email itself, rather than the lines a copy flattens them into.
+    function read(text, html) {
       if (busy) return;
       text = String(text || "");
+      html = typeof html === "string" && html.length <= 600000 && /<(table|div|p|td|br|span)\b/i.test(html) ? html : null;
       if (text.trim().length < 40) return say(msg, "That's too short to be an order email. Copy the whole email (Select All, then Copy) and try again.", true);
       busy = true; label(); out.textContent = ""; say(msg, "");
-      api("/relay/my/receipts/add-pasted", { method: "POST", body: { email: text } }).then(function (r) {
+      api("/relay/my/receipts/add-pasted", { method: "POST", body: html ? { email: text, html: html } : { email: text } }).then(function (r) {
         busy = false; label();
         if (r.status === 401) { save(null); close(); return; }
         if (r.status === 429) return say(msg, "That's a lot of receipts in one go. Try again in an hour.", true);
@@ -4491,12 +4495,22 @@
     btn.onclick = function () {
       if (busy) return;
       if (!box.hidden) return read(box.value);
-      try { if (navigator.clipboard && navigator.clipboard.readText) { navigator.clipboard.readText().then(function (t) { if (t && t.trim()) read(t); else byHand(); }, byHand); return; } } catch (e) {}
+      // The copied page as well as its text, where the phone allows it; just the text where it doesn't.
+      var withHtml = function (t) {
+        if (!(navigator.clipboard && navigator.clipboard.read && window.Blob)) return read(t);
+        navigator.clipboard.read().then(function (list) {
+          var it = (list || []).filter(function (c) { return c.types && c.types.indexOf("text/html") !== -1; })[0];
+          if (!it) return read(t);
+          return it.getType("text/html").then(function (b) { return b.text(); }).then(function (h) { read(t, h); });
+        }).catch(function () { read(t); });
+      };
+      try { if (navigator.clipboard && navigator.clipboard.readText) { navigator.clipboard.readText().then(function (t) { if (t && t.trim()) withHtml(t); else byHand(); }, byHand); return; } } catch (e) {}
       byHand();
     };
     box.addEventListener("paste", function (e) {
       var t = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData("text/plain") : "";
-      if (t && t.trim()) { e.preventDefault(); box.value = t; read(t); return; }
+      var h = e.clipboardData && e.clipboardData.getData ? e.clipboardData.getData("text/html") : "";
+      if (t && t.trim()) { e.preventDefault(); box.value = t; read(t, h); return; }
       setTimeout(function () { read(box.value); }, 0);
     });
     // An email pasted (or typed) here last time and not added yet is still here.

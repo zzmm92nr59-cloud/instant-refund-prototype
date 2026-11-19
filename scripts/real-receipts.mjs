@@ -60,6 +60,8 @@ export function realInbox({ now = Date.UTC(2026, 10, 19, 12) } = {}) {
     async scan() { for (let i = 0; i < 60; i++) { const r = await call("/relay/my/gmail/scan", { method: "POST", body: { full: true } }); if (r.status !== 200) throw new Error("scan " + JSON.stringify(r.body)); if (!r.body.more) return r.body; } throw new Error("scan never finished"); },
     receipts: async (all = true) => (await call("/relay/my/receipts" + (all ? "?all=1" : ""))).body,
     wrapped: async (year = 2026) => (await call("/relay/my/wrapped?year=" + year)).body,
+    // What Relay kept for one receipt (its details), as stored.
+    details: (id) => { const r = sqlite.prepare("SELECT details FROM captured_receipts WHERE id = ?").get(id); return r ? JSON.parse(r.details) : null; },
     paste: async (email) => call("/relay/my/receipts/add-pasted", { method: "POST", body: { email } }),
     call,
   };
