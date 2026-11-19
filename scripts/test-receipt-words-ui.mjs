@@ -7,6 +7,7 @@
 //   * every item's name, quantity ("2 ×") and price, and each total, in its own currency (€ stays €, never £);
 //   * "+ N more" counts the other items exactly;
 //   * "Relay may have missed some items" only when the totals check says so (and always when it does);
+//   * "Some item names on this receipt may not be right" only when the name check says so (round 9), never on Home;
 //   * "Cancelled" / "Part cancelled" on cancelled orders; refunded money is said, never counted as spending without saying so;
 //   * a return date only when the email states one; Relay's own estimate is worded as an estimate ("at least");
 //   * no facts glued with dots ("A · B · C"); no raw codes, JSON or "undefined".
@@ -33,6 +34,7 @@ const order = (shop, ref, daysAgo, items, extra = [], refLabel = "Order number")
   ["Thanks for your order, Sam!", `${refLabel}: ${ref}`, `Order date: ${longDay(daysAgo)}`, "", ...items.map(([n, q, p]) => `${n} - Qty ${q} - ${gbp(q * p)}`), "",
     `Subtotal: ${gbp(items.reduce((s, [, q, p]) => s + q * p, 0))}`, `Order total: ${gbp(items.reduce((s, [, q, p]) => s + q * p, 0))}`, ...extra]);
 const KESTREL = { name: "Kestrel Outdoor", domain: "kestrel-outdoor.example" }, LARK = { name: "Lark & Finch", domain: "larkandfinch.example" };
+const WREN = { name: "Wren Pharmacy", domain: "wrenpharmacy.example" };
 const MOSS = { name: "Moss Lane Clothing", domain: "mosslane.example" }, BRAMBLE = { name: "Bramble Home", domain: "bramblehome.example" }, FERN = { name: "Fern & Tide", domain: "fernandtide.example" };
 const MADE_UP = [
   order(KESTREL, "KO-20001", 12, [["Ridge Fleece Jacket", 1, 6400], ["Trail Socks", 2, 1000]]),
@@ -42,6 +44,8 @@ const MADE_UP = [
   order(MOSS, "ML-4001", 6, [["Cord Overshirt", 1, 4500], ["Wool Beanie", 1, 1800]], ["", "You can return unworn items by 15 December 2026."]),
   order(BRAMBLE, "INV-2290", 8, [["Rattan Lamp Shade", 1, 3200], ["Cotton Throw", 1, 2800]], [], "Invoice number"),
   order(FERN, "FT-5001", 30, [["Canvas Tote Bag", 1, 2400], ["Enamel Pin Set", 3, 500]]),
+  // (Round 9) The money adds up, but a name is a label from the email: the name check flags it.
+  order(WREN, "WP-7001", 4, [["Hayfever Relief Tablets", 1, 450], ["Pack size: 30 tablets", 1, 350]]),
   mail(`${FERN.name} <returns@${FERN.domain}>`, "Your refund for order FT-5001 has been processed", 5, ["We've processed your refund of £39.00.", "Order number: FT-5001", "It can take 3-5 working days to reach your account."]),
 ];
 const inbox = await realInbox({ now: NOW }).start();
@@ -85,6 +89,10 @@ function pageWords(where, r, text) {
   const flagged = Boolean(r.itemsCheck && r.itemsCheck.complete === false);
   const says = /Relay may have missed some items|Relay couldn't read the items|items on this receipt are in its attachment/.test(flat);
   check(flagged === says, where + ": " + (flagged ? "the totals check says items may be missing, but the page doesn't say so" : "the page says items may be missing, but they add up"));
+  const namesFlag = !flagged && Boolean(r.itemsCheck && r.itemsCheck.namesOk === false);
+  const saysNames = /Some item names on this receipt may not be right/.test(flat);
+  check(namesFlag === saysNames, where + ": " + (namesFlag ? "the name check says a name may be wrong, but the page doesn't say so" : "the page says names may be wrong, but the name check doesn't"));
+  if (namesFlag) check(/See the email/.test(flat) && /Read it again/.test(flat), where + ": a suspect name offers neither the email nor Read it again");
   if (r.cancelled) check(/cancelled/i.test(flat), where + ": cancelled order not said to be cancelled");
   else check(!/\bcancelled\b/i.test(flat), where + ": says cancelled but isn't");
   const stated = r.returns && r.returns.deadline;
@@ -138,6 +146,9 @@ if (SHOTS) await mkdir(SHOTS, { recursive: true });
 // 1. Home: every receipt Home shows has its "+ N more" right, and nothing raw or dotted.
 const home = await page.locator("#homePage").innerText();
 everywhere("Home", home);
+// (Round 9) Home's cards stay quiet: the name check is said only on the receipt's own page.
+check(!/item names on this receipt may not be right/i.test(home), "Home: the name check's wording shows on Home");
+check(receipts.some((r) => r.itemsCheck && r.itemsCheck.namesOk === false && r.itemsCheck.complete !== false), "the made-up label-as-name receipt is flagged by the name check");
 for (const r of NEWEST.receipts.filter((x) => (x.kind || "receipt") === "receipt")) {
   const more = / \+ (\d+) more/.exec(home.split("\n").find((l) => named(r).some((i) => l.startsWith(i.name + " + "))) || "");
   if (more) check(Number(more[1]) === named(r).length - 1, "Home: " + shopOf(r) + " says + " + more[1] + " more for " + named(r).length + " items");

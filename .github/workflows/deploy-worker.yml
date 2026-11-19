@@ -44,6 +44,7 @@ jobs:
           node scripts/test-d1-session.mjs
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-corpus.mjs
+          node scripts/test-item-names.mjs
           node scripts/test-inbox-simulation.mjs
           node scripts/test-receipt-reread.mjs
           node scripts/test-receipt-category.mjs

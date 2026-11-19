@@ -1,4 +1,5 @@
-// "Read it again": the shopper taps it on a receipt whose items don't add up (itemsCheck.complete === false). Relay reads
+// "Read it again": the shopper taps it on a receipt whose items don't add up (itemsCheck.complete === false), or one with an
+// item name that doesn't look like a thing bought (itemsCheck.namesOk === false, item-names.js, round 9). Relay reads
 // that one email again from their inbox: first with its own rules, with a wider pass than the scan uses; and, only if the
 // items still don't add up and ANTHROPIC_API_KEY is set, Claude (Anthropic's AI) reads the email's order section.
 //
@@ -16,6 +17,7 @@
 import { aiAvailable } from "./ai-reader.js";
 import { checkItems, moneyOf, lineOf } from "./receipt-items.js";
 import { cleanItems } from "./receipt-reader.js";
+import { namesCheck } from "./item-names.js";
 
 export const REREADS_PER_DAY = 20;
 export const REREAD_AI_PER_DAY = 10;
@@ -98,11 +100,13 @@ export function namedInEmail(reading, sectionText) {
   const inEmail = new Set(words(sectionText));
   return Boolean(reading && reading.items.length) && reading.items.every((i) => { const w = words(i.name); return w.length > 0 && w.every((x) => inEmail.has(x)); });
 }
-export function acceptAiItems(reading, sectionText, totalPence) {
+// (Round 9: and every name the AI gives looks like a thing bought (item-names.js). A note or a size given as a name is
+// treated like a missing item: nothing it said is kept.)
+export function acceptAiItems(reading, sectionText, totalPence, shop) {
   if (!reading || !reading.items.length) return null;
   const money = moneyOf(sectionText);
-  const check = checkItems(reading.items, money, totalPence);
-  return check.complete ? { items: reading.items, check } : null;
+  const check = { ...checkItems(reading.items, money, totalPence), ...namesCheck(reading.items, { shop: shop || "" }) };
+  return check.complete && check.namesOk ? { items: reading.items, check } : null;
 }
 
 // How many re-reads the shopper (and Relay) has used in the last day.

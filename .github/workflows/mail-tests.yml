@@ -19,6 +19,8 @@ on:
       - 'scripts/test-item-kinds-corpus.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/fixtures/corpus-item-kinds.json'
+      - 'scripts/fixtures/item-names-wrong.json'
+      - 'scripts/test-item-names.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -43,6 +45,8 @@ on:
       - 'scripts/test-item-kinds-corpus.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
       - 'scripts/fixtures/corpus-item-kinds.json'
+      - 'scripts/fixtures/item-names-wrong.json'
+      - 'scripts/test-item-names.mjs'
       - 'scripts/test-delete-account.mjs'
       - 'scripts/test-more-inboxes.mjs'
       - 'scripts/test-return-policies.mjs'
@@ -65,6 +69,7 @@ jobs:
         run: |
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-corpus.mjs
+          node scripts/test-item-names.mjs
           node scripts/test-inbox-simulation.mjs
           node scripts/test-receipt-reread.mjs
           node scripts/test-receipt-reader.mjs

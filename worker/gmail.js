@@ -24,6 +24,7 @@ import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
+import { namesCheck } from "./item-names.js";
 import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
@@ -135,7 +136,9 @@ const GONE = Symbol("gone");
 // 37 (round 7): an invoice number ("Invoice number: INV-2290") is the order number when the email gives no other.
 // 38 (round 8): takeaway, supermarket, Amazon and fashion layouts: a table cell over several lines, notes under an item, toppings
 // at £0.00, sizes under a row, guide prices, "Ordered on" dates, cells copied with tabs, fares without a journey flagged.
-export const PARSER_VERSION = 38;
+// 39 (round 9): the name check (item-names.js): itemsCheck.namesOk and suspectNames, so a note, a label, a size or a code
+// read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
+export const PARSER_VERSION = 39;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -1522,7 +1525,8 @@ export function mergeOrderEmails(orders) {
           const sum = c.items.reduce((n, i) => n + (i.pricePence == null ? NaN : i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)), 0);
           const want = [c.itemsCheck, o.itemsCheck].map(x => x && x.expectedPence).filter(x => Number.isInteger(x));
           c.itemsCheck = { ...(c.itemsCheck || {}), itemsPence: Number.isNaN(sum) ? null : sum, complete: !Number.isNaN(sum) && want.some(x => Math.abs(x - sum) <= 1),
-            ...(want.length ? { expectedPence: want[0], missingPence: Number.isNaN(sum) ? null : want[0] - sum } : {}), merged: true };
+            ...(want.length ? { expectedPence: want[0], missingPence: Number.isNaN(sum) ? null : want[0] - sum } : {}), merged: true,
+            ...namesCheck(c.items, { shop: (c.retailer && c.retailer.name) || "" }) };
         }
       }
       if (o.shipment && o.shipment.trackingNumber && !(c.shipment && c.shipment.trackingNumber)) c.shipment = o.shipment;
@@ -2413,11 +2417,14 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     if (!got.raw) return json({ error: got.error }, got.status, cors);
     const log = (ai, outcome) => db.prepare("INSERT INTO receipt_rereads (shopper_id, receipt_id, ai, outcome, created_at) VALUES (?,?,?,?,?)").bind(shopper.id, rr[1], ai ? 1 : 0, outcome, now).run();
     const save = async (patch) => { const next = { ...d, ...patch, rereadAt: now }; await db.prepare("UPDATE captured_receipts SET details = ? WHERE id = ? AND shopper_id = ?").bind(JSON.stringify(next), rr[1], shopper.id).run(); return next; };
-    const reply = (next, via) => json({ ok: true, complete: Boolean(next.itemsCheck && next.itemsCheck.complete), via, items: next.items || [], itemsCheck: next.itemsCheck || null,
+    // (Round 9: right means the money adds up AND every name looks like a thing bought: a suspect name is treated like a
+    // missing item, so "Read it again" keeps trying, and its answer is kept only when both are right.)
+    const right = (c) => Boolean(c && c.complete && c.namesOk !== false);
+    const reply = (next, via) => json({ ok: true, complete: right(next.itemsCheck), via, items: next.items || [], itemsCheck: next.itemsCheck || null,
       totalPence: next.totalPence == null ? null : next.totalPence, itemCount: next.itemCount || null }, 200, cors);
     // 1. The rules, with every reading tried on both parts of the email.
     const r = parseReceiptEmail(got.raw, { lenient: true, wide: true });
-    if (r.ok && r.itemsCheck && r.itemsCheck.complete) {
+    if (r.ok && right(r.itemsCheck)) {
       const next = await save({ items: r.items, itemsCheck: r.itemsCheck, ...(d.totalPence == null && r.totalPence != null ? { totalPence: r.totalPence, currency: r.currency } : {}), ...(r.itemCount ? { itemCount: r.itemCount } : {}), itemsFrom: "rules" });
       await log(false, "rules");
       return reply(next, "rules");
@@ -2429,7 +2436,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       const section = orderSection(copy.copy && copy.copy.text);
       const total = d.totalPence ?? (r.ok ? r.totalPence : null);
       const ans = section ? await askForItems(env, section, opts.fetchImpl) : { error: "unreadable" };
-      const kept = ans.reading && namedInEmail(ans.reading, section) ? acceptAiItems(ans.reading, section, total) : null;
+      const kept = ans.reading && namedInEmail(ans.reading, section) ? acceptAiItems(ans.reading, section, total, d.retailer && d.retailer.name) : null;
       await log(true, kept ? "ai" : ans.error || "didnt_add_up");
       if (kept) return reply(await save({ items: kept.items, itemsCheck: kept.check, itemsFrom: "ai", ...(d.totalPence == null && total != null ? { totalPence: total, currency: d.currency || "GBP" } : {}) }), "ai");
       return json({ ok: true, complete: false, via: null, reason: ans.error === "ai_busy" || ans.error === "ai_unreachable" ? "busy" : "not_sure", items: d.items || [], itemsCheck: d.itemsCheck || null }, 200, cors);
