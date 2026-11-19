@@ -1981,6 +1981,25 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Not a payment service's receipt: PayPal cuts every long name and never gives it whole, so its name is said as given.)
   const cutShort = viaPayPal ? [] : result.items.filter((i) => i.name && String(i.name).length >= 8 && [text, otherPart].some((t) => t && (t.includes(i.name + "...") || t.includes(i.name + "…"))));
   if (cutShort.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, complete: false, namesCut: true, namesOk: false, suspectNames: [...(result.itemsCheck.suspectNames || []), ...cutShort.map((i) => ({ name: String(i.name).slice(0, 120), why: "cut" }))].slice(0, 10) };
+  // (A product named by its model above its style code, "608" over "Style #:" over "WX608RG1", then its size and colour: the
+  // thing bought is the model, its colour a detail. Only when the email labels the code. Round 14.)
+  if (result.items.length) {
+    const ls = String(fromHtml || text).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 4000);
+    for (const it of result.items) {
+      const at = ls.indexOf(String(it.name || "").trim());
+      if (at < 2) continue;
+      for (let j = at - 1; j >= Math.max(1, at - 4); j--) {
+        // (Only the item's own lines between: a price or a quantity there belongs to the item before.)
+        if (/£|\b(?:qty|quantity|price)\b/i.test(ls[j])) break;
+        if (!/^(?:style|style no\.?|model(?: no\.?)?)\s*#?\s*:?(?:\s*[A-Z0-9-]{4,20})?$/i.test(ls[j])) continue;
+        const nm = ls[j - 1];
+        if (nm && !result.items.some((o) => o !== it && String(o.name || "").trim() === nm) && nm.length >= 3 && nm.length <= 80 && /^[\p{L}\d][\p{L}\d '’&.+/-]*$/u.test(nm) && !/:|£|\b(?:order|qty|quantity|price|total|size)\b/i.test(nm)) {
+          it.variant = [it.name, it.variant].filter(Boolean).join(", "); it.name = nm; if (!/\p{L}{2}/u.test(nm)) it.namedBy = "model";
+        }
+        break;
+      }
+    }
+  }
   for (const i of result.items) delete i.unitPence;
   // A drink at £0.00 then its measure with the price ("SAILOR JERRY RUM £0.00", "50ml £10.45"): one drink, that size, that
   // price. Round 12.

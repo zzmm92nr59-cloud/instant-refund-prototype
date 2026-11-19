@@ -76,6 +76,14 @@ export default function holdout15() {
       from: "Clinic Direct <noreply@clinicdirect.example>", subject: "Your Clinic Direct order no: CD_4410321_1", date: "Wed, 18 Nov 2026 14:05:00 +0000",
       html: mail("Clinic Direct", "clinicdirect.example", ["Your order number: CD_4410321_1", "Item | Price", "Antihistamine Tablets | £12.99", "TOTAL | £12.99", "Check below for more information about your order"]) }, o, "Clinic Direct", "2026-11-18", { orderRef: "CD_4410321_1" });
   }
+  // ---- A trainer named by its model number over its style code, its colour and size under it ------------------------------
+  {
+    const o = order([{ name: "574", qty: 1, unit: 7500 }], { fees: [["Shipping", 450]] });
+    add("holdout15-model-over-style-code", "Stridewell", "'574' over 'Style #:' over 'ML574EV2', 'UK Size: UK 9', the colour, 'QUANTITY: 1', 'PRICE: £75.00'", {
+      from: "Stridewell <orders@stridewell.example>", subject: "Your Stridewell order NK0441190", date: "Tue, 17 Nov 2026 11:00:00 +0000",
+      html: mail("Stridewell", "stridewell.example", ["Thanks for your order", "Order Number: NK0441190", "574", "Style #:", "ML574EV2", "UK Size: UK 9", "Navy with Grey", "QUANTITY: 1", "PRICE: £75.00",
+        "Order Subtotal: £75.00", "Shipping: £4.50", "Order Total: £79.50"]) }, o, "Stridewell", "2026-11-17");
+  }
   return out;
 }
 
