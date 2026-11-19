@@ -746,7 +746,7 @@ function receiptSignals(subject, text) {
     // "Your tickets: The Winter's Tale, booking RT-55101", "Invoice INV-2290 for window cleaning" (round 6): a booking or an
     // invoice named by its number. (The body must still show a total, below.)
     /\btickets?\b[^!?]{0,60}\bbooking\s+(?:ref(?:erence)?\s*|no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\b/.test(s) ||
-    // (An invoice named by its number is a purchase only when the email isn't asking for the money: a shop's "Invoice #1004"
+    // (An invoice named by its number is a purchase only when the email isn't asking for the money: a shop's "Invoice #2207"
     // that says "Payment of £15.00 is due" and "Pay now" is a request to pay, not a receipt. Coverage round.)
     (/^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?invoice\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{3,24}\b(?![^!?]*\b(?:overdue|reminder|due|unpaid|outstanding)\b)/.test(s) &&
       !/\b(?:payment of\s+[£€$]\s?[\d,.]+\s+is due|is due (?:on|by)|amount due|balance due|pay now|please pay|awaiting payment)\b/i.test(String(text || "").slice(0, 8000))) ||
