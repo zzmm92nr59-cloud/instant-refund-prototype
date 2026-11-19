@@ -1835,13 +1835,13 @@ function isRelayEmail(c, env) {
 const COMPANION_FOOD = /coffee|espresso|nespresso|capsule|\bpods?\b|lungo|ristretto|\btea\b|teabag|\bwine\b|prosecco|champagne/i;
 // Each receipt's shop, date and total, for matching bank and card payments to receipts (bank.js).
 export async function receiptTotals(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   return cards.filter((c) => c.kind !== "return_instructions" && ((c.photoReceipt && c.bankPaymentId) || (Number.isInteger(c.totalPence) && c.totalPence > 0 && c.orderDate)))
     .map((c) => ({ id: c.id, shop: (c.retailer && (c.retailer.name || c.retailer.domain)) || "", domain: (c.retailer && c.retailer.domain) || "",
       date: String(c.orderDate).slice(0, 10), totalPence: c.totalPence, currency: c.currency || "GBP", bankPaymentId: c.photoReceipt && c.bankPaymentId ? String(c.bankPaymentId) : null }));
 }
 export async function styleThings(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   const things = [];
     // Each item by what it is: a jacket from a supermarket counts, the bread in the same order doesn't.
     const NOT_THINGS = ["travel", "digital"];
@@ -1861,7 +1861,7 @@ export async function styleThings(env, shopperId) {
 // picks, item-kinds.js; only for shoppers who switched it on). Names and shops only: no prices, dates or order numbers.
 // Forwarded receipts' senders are people, so no shop is given for those.
 export async function boughtNames(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   const out = [];
   for (const c of cards) {
     if (c.kind === "return_instructions") continue;
@@ -1872,16 +1872,23 @@ export async function boughtNames(env, shopperId) {
   return out;
 }
 
+// Every receipt a shopper has, for the whole list, Wrapped, bank matching and finding one by its id. It used to be 3,000
+// rows read newest-READ first: after Relay read earlier years (2016 onwards) those thousands of rows came first and pushed
+// out receipts read before them, so most of December 2025 to August 2026 vanished from the list (Connor, 19 Nov 2026).
+export const ALL_ROWS = 20000;
+const ALL = { rows: ALL_ROWS, cards: ALL_ROWS };
+// Newest by the date the email is about (the order's date, a parcel update's date), not by when Relay happened to read it.
+const BY_ORDER_DATE = "ORDER BY COALESCE(json_extract(details, '$.orderDate'), substr(json_extract(details, '$.at'), 1, 10), strftime('%Y-%m-%d', created_at / 1000, 'unixepoch')) DESC, created_at DESC";
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
   const rows = await env.RELAY_DB.prepare(
-    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT " + maxRows)
+    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') " + BY_ORDER_DATE + " LIMIT " + maxRows)
     .bind(shopperId).all();
   // Recent orders always come too, even when lots of newer emails were read after them (otherwise an order still inside
   // its return window could miss the wallet just because many receipts arrived since).
   let recentRows = [];
-  if (!opts.rows || opts.rows < 3000) {
+  if (!opts.rows || opts.rows < ALL_ROWS) {
     const since = new Date(Date.now() - RECENT_ORDER_DAYS * DAY_MS).toISOString().slice(0, 10);
     recentRows = (await env.RELAY_DB.prepare(
       "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') AND json_extract(details, '$.orderDate') >= ? ORDER BY created_at DESC LIMIT 1000")
@@ -2022,7 +2029,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
 // shopper's own word. null when the receipt isn't theirs. See return-tracking.js returnFacts and docs/SECURITY.md.
 export async function returnFactsFor(env, shopperId, receiptId) {
   if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
-  const c = (await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 })).find((r) => r.id === receiptId);
+  const c = (await listReceipts(env, shopperId, null, ALL)).find((r) => r.id === receiptId);
   return c ? returnFacts(c) : null;
 }
 
@@ -2032,7 +2039,7 @@ export async function returnFactsFor(env, shopperId, receiptId) {
 const HELP_BASIS = { uk_law: "Relay's estimate from UK law's 14 days", window: "from the return window in the shop's email", policy: "from the shop's published returns policy" };
 export async function receiptForHelp(env, shopperId, receiptId) {
   if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
-  const list = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const list = await listReceipts(env, shopperId, null, ALL);
   const c = list.find((r) => r.id === receiptId);
   if (!c) return null;
   const clip = (v, n) => String(v || "").replace(/https?:\/\/\S+/gi, "").replace(/[<>{}\[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -2341,7 +2348,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     // what it is. Off, or with no AI key: Relay's own rules only.
     // Wrapped never waits for the AI (Connor, 18 Nov 2026: it stopped loading while it did): it's built from what's known
     // now, and things and shops not read yet are read after the response, for next time.
-    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    const cards = await listReceipts(env, shopper.id, null, ALL);
     if (opts.later) opts.later((async () => {
       await learnItemKinds(env, shopper, { now: opts.now, fetchImpl: opts.fetchImpl }).catch(() => null);
       await learnShopKinds(env, cards, { fetchImpl: opts.fetchImpl, now: opts.now }).catch(() => 0);
@@ -2354,7 +2361,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/receipts" && m === "GET") {
     // The Receipts page asks for everything (?all=1); Home and the wallet only need the newest, so they stay quick.
     const all = url.searchParams.get("all") === "1";
-    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? { rows: 3000, cards: 3000 } : {});
+    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? ALL : {});
     await markTestShopReceipts(env, list);
     // Shop payments from a connected bank or card with no receipt yet (bank.js), so Home can say so without asking again.
     const needReceipt = await receiptsToAdd(env, shopper.id, opts.now || Date.now());
@@ -2365,7 +2372,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   const parcel = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/parcel$/.exec(path);
   if (parcel && m === "GET") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
-    const mine = (await listReceipts(env, shopper.id, {})).find((r) => r.id === parcel[1]);
+    const mine = (await listReceipts(env, shopper.id, null, ALL)).find((r) => r.id === parcel[1]);
     if (!mine) return json({ error: "not_found" }, 404, cors);
     return json(await liveParcel(env, shopper.id, mine, opts), 200, cors);
   }
@@ -2376,7 +2383,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (rtn && ((rtn[2] === "return-sent" && m === "POST") || (rtn[2] === "return-parcel" && m === "GET"))) {
     await ensureGmailTables(env.RELAY_DB);
     const now = opts.now || Date.now();
-    const find = async () => (await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000, now })).find((r) => r.id === rtn[1]);
+    const find = async () => (await listReceipts(env, shopper.id, null, { ...ALL, now })).find((r) => r.id === rtn[1]);
     const mine = await find();
     if (!mine) return json({ error: "not_found" }, 404, cors);
     if (rtn[2] === "return-sent") {
