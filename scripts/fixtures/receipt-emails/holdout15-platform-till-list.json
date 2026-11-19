@@ -1,0 +1,46 @@
+{
+ "id": "holdout15-platform-till-list",
+ "sender": "Cantina Norte",
+ "layout": "ordering platform; subject 'Your order with <venue> is paid'; items in <pre> as '1 Name   8.50'; '+ £3.78' service charge; 'Total you’ve paid'; card line '-£…'",
+ "headers": {
+  "from": "Orders <orders@tableorder.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order with Cantina Norte Shoreditch is paid",
+  "date": "Fri, 13 Nov 2026 20:15:00 +0000"
+ },
+ "html": "<html><body><table><tr><td><b>Order</b> <b><span>#</span><span>55120931</span></b></td><td><b>13 November 2026</b></td></tr>\n<tr><td>Thanks for your payment.</td></tr><tr><td><p><b>Table:</b></p><p><b>31</b></p></td></tr>\n<tr><td><p><b>Venue</b></p><p>Cantina Norte Shoreditch</p><p><b>Confirmation code</b></p><p>QWPA</p></td></tr></table>\n<span style=\"font-family: monospace;\"><pre>1 Bean Tostada                   8.50    \n1 Chicken Taco                  10.25    \n1 Corn Ribs                      5.75    \n1 Corn Ribs                      5.75    \n     1 No Salsa                          </pre></span>\n<table><tr><td><p>Service Charge</p></td><td></td><td>+ &pound;3.78</td></tr></table>\n<table><tr><td><b>Total you&rsquo;ve paid</b></td><td><b>&pound;34.03</b></td></tr><tr><td><b>Total check remaining</b></td><td><b>&pound;0.00</b></td></tr></table>\n<table><tr><td>visa - 4321</td><td><b>-&pound;34.03</b></td></tr></table>\n<table><tr><td><b>External Order</b></td><td><b>#118804/2231</b></td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Cantina Norte Shoreditch",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Bean Tostada",
+    "qty": 1,
+    "linePence": 850
+   },
+   {
+    "name": "Chicken Taco",
+    "qty": 1,
+    "linePence": 1025
+   },
+   {
+    "name": "Corn Ribs",
+    "qty": 1,
+    "linePence": 575
+   },
+   {
+    "name": "Corn Ribs",
+    "qty": 1,
+    "linePence": 575
+   }
+  ],
+  "subtotalPence": 3025,
+  "feesPence": 378,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3403,
+  "orderRef": "55120931"
+ }
+}

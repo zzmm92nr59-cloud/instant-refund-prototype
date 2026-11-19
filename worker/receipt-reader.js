@@ -163,7 +163,7 @@ export function shopNamesInText(text, subject) {
     /©\s*(?:\d{4}\s*(?:[-–]\s*\d{4}\s*)?)?([A-Z][\w&'’. -]{1,38}?(?:\.com\b)?)(?:\s*(?:ltd|limited|plc|llc|inc)\.?)?(?:[.,|\n]|\s+all rights|$)/gi,
   ]) for (const m of body.matchAll(re)) grab(m[1]);
   const s = String(subject || "");
-  const sm = s.match(/\b(?:your|an?) ([A-Z][\w&'’.-]{1,25}(?: [A-Z][\w&'’.-]{1,20}){0,2}) (?:order|receipt)\b/) || s.match(/\b(?:order|receipt) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,]|$| #| -)/);
+  const sm = s.match(/\b(?:your|an?) ([A-Z][\w&'’.-]{1,25}(?: [A-Z][\w&'’.-]{1,20}){0,2}) (?:order|receipt)\b/) || s.match(/\b(?:order|receipt) (?:from|with|at) ([A-Z][\w&'’. -]{1,38}?)(?:[.!,]|$| #| -| (?:is|has been|was) (?:paid|confirmed|ready|on its way|complete)\b)/);
   if (sm) grab(sm[1]);
   return out.filter((n) => !/^(the|your|our|this|us|you|an?|order|receipt|all rights)$/i.test(n) && !/^(your|our|this|an?) /i.test(n) && !/^the (order|payment|amount|total|items?|balance|returns?|refunds?|goods|products?|delivery|cost|difference|full|remaining|rest|price|value|money|account|card|booking|ticket|subscription)\b/i.test(n)).slice(0, 6);
 }

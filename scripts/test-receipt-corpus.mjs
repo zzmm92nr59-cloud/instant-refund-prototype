@@ -395,6 +395,22 @@ const joinWrong = [];
   const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
   if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
 }
+{
+  // Round 14: a reference only the bill or the counter gives ("Order Number:" over "042", "Bill ID: 71200455") is the order's
+  // number, as sent and as forwarded.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  for (const id of ["holdout15-platform-till-list", "holdout15-burger-app-short-number", "holdout15-bill-id"]) for (const app of [null, "gmail", "outlook", "apple"]) {
+    const f = fx(id), r = parseReceiptEmail(rawEmail(app ? forwarded(f, app) : f));
+    if (!r.ok || r.orderRef !== f.expected.orderRef) joinWrong.push(`${id}${app ? " (" + app + ")" : ""}: order number ${r.ok ? r.orderRef : r.reason} for ${f.expected.orderRef}`);
+  }
+  // A table booked but not paid for: read with its number and price, never a purchase in the inbox.
+  const { TABLE_BOOKING } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const raw = rawEmail(app ? forwarded(TABLE_BOOKING, app) : TABLE_BOOKING);
+    const r = parseReceiptEmail(raw), k = classifyEmail(raw).details.kind;
+    if (!r.ok || r.orderRef !== "4410098812" || !r.tableBooking || k === "receipt") joinWrong.push(`table booking${app ? " (" + app + ")" : ""} read as ${k} ${r.orderRef} ${r.tableBooking}`);
+  }
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

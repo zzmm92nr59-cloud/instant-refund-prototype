@@ -989,7 +989,8 @@ function classify(rawText, ref, lenient = false) {
       estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl, trackingNumber: ret.trackingNumber || null,
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
-  } else if (receipt.ok) {
+  // (A restaurant table booked but not paid for is never a purchase in the inbox: the bill is. Round 14.)
+  } else if (receipt.ok && !(receipt.tableBooking && !lenient)) {
     // Keep only extracted fields. The email text is dropped here.
     details = {
       kind: "receipt", ...ref,

@@ -668,7 +668,7 @@ export function moneyOf(text) {
   // (Blank lines between an HTML email's rows say nothing: "Subtotal" and its amount can have one between them. Round 10.)
   const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x));
   // ("£-27.24": Domino's writes the minus after the pound sign. Round 10.)
-  const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim().replace(/^£\s?[-−–]\s?(?=\d)/, "-£")); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
+  const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim().replace(/^£\s?[-−–]\s?(?=\d)/, "-£").replace(/^\+\s?(?=£)/, "")); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
   const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
     const cells = lines[i].split("|").map((x) => x.trim()).filter(Boolean);
@@ -701,6 +701,8 @@ export function moneyOf(text) {
     if (/\btotal\b/i.test(label) && !SUBTOTAL_LABEL.test(label)) continue;
     if (SUBTOTAL_LABEL.test(label)) { if (out.subtotal == null) out.subtotal = amt.p; continue; }
     if (TIP_LABEL.test(label)) { out.tips += amt.p; out.found.push(["tip", label, amt.p]); continue; }
+    // (The card the bill was paid with, "mastercard - 7613 | -£57.09": the payment, never money off. Round 14.)
+    if (amt.neg && /^(?:visa|master ?card|maestro|amex|american express|debit card|credit card|card)\b[^|]{0,24}?\d{4}$/i.test(label)) continue;
     if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p]); continue; }
     if (FEE_LABEL.test(label)) { out.fees += amt.p; out.found.push(["fee", label, amt.p]); continue; }
   }
