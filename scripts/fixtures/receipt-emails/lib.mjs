@@ -1,3 +1,4 @@
+import { mailText } from "../../../worker/receipt-parser.js";
 // Helpers for the receipt-email corpus (make-corpus.mjs). Every shop name in the corpus is a real UK sender, but every
 // order, person, address, order number and card in it is MADE UP: there is no real customer's data here. The layouts are
 // written to look like each sender's order emails as they are commonly laid out; real emails can differ, which is why
@@ -80,7 +81,10 @@ export function fixture(id, sender, layout, { from, subject, date, html = "", te
 }
 
 // A raw email (RFC 822, as Gmail's "raw" format gives it) made from a fixture: multipart/alternative when it has both parts.
+// A fixture written as the exact bytes a mailbox gives (rawB64, round 4: MIME layouts, other character sets, attachments)
+// goes through the same step the mailbox readers use to turn those bytes into text (mailText, worker/receipt-parser.js).
 export function rawEmail(f) {
+  if (f.rawB64) return mailText(Buffer.from(f.rawB64, "base64"));
   const H = f.headers;
   const head = `From: ${H.from}\r\nTo: ${H.to}\r\nSubject: ${H.subject}\r\nDate: ${H.date}\r\nMessage-ID: <${f.id}@corpus.relay.test>\r\nMIME-Version: 1.0\r\n`;
   const b64 = (s) => Buffer.from(s, "utf8").toString("base64").replace(/(.{76})/g, "$1\r\n");
@@ -92,12 +96,17 @@ export function rawEmail(f) {
     while (l.length > 75) { let cut = 75; while (cut > 0 && /=[0-9A-F]?$/.test(l.slice(0, cut))) cut--; out.push(l.slice(0, cut) + "="); l = l.slice(cut); }
     out.push(l); return out.join("\r\n");
   }).join("\r\n");
+  let body;
   if (f.html && f.text) {
     const b = "=_relay_" + f.id.replace(/[^a-z0-9]/gi, "");
-    return head + `Content-Type: multipart/alternative; boundary="${b}"\r\n\r\n--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.text)}\r\n--${b}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(f.html)}\r\n--${b}--\r\n`;
-  }
-  if (f.html) return head + `Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.html)}`;
-  return head + `Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.text)}`;
+    body = `Content-Type: multipart/alternative; boundary="${b}"\r\n\r\n--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.text)}\r\n--${b}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64(f.html)}\r\n--${b}--\r\n`;
+  } else if (f.html) body = `Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.html)}`;
+  else body = `Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n${qp(f.text)}`;
+  // Files attached to the email (attach: [{ type, name }], round 4), which a forward carries with it: made-up bytes only.
+  if (!f.attach || !f.attach.length) return head + body;
+  const m = "=_relay_mix_" + f.id.replace(/[^a-z0-9]/gi, "");
+  return head + `Content-Type: multipart/mixed; boundary="${m}"\r\n\r\n--${m}\r\n${body}\r\n` + f.attach.map((a) =>
+    `--${m}\r\nContent-Type: ${a.type}; name="${a.name}"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename="${a.name}"\r\n\r\n${Buffer.from("made-up attachment " + a.name).toString("base64")}\r\n`).join("") + `--${m}--\r\n`;
 }
 
 // The same email forwarded by the shopper from their own inbox, the way each email app writes a forward.
@@ -122,7 +131,8 @@ export function forwarded(f, app) {
   }
   const later = new Date(new Date(H.date).getTime() + 3 * 3600e3).toUTCString().replace("GMT", "+0000");
   return {
-    ...f, id: f.id + "~fwd-" + app, layout: f.layout + " (forwarded, " + app + ")",
+    // (A forward is written afresh by the shopper's email app from what it showed: the original's own bytes don't go with it.)
+    ...f, rawB64: undefined, id: f.id + "~fwd-" + app, layout: f.layout + " (forwarded, " + app + ")",
     headers: { from: `${SHOPPER.name} <${app === "outlook" ? "sam.taylor@outlook.com" : app === "apple" ? "sam.taylor@icloud.com" : "sam.taylor@gmail.com"}>`, to: "receipts@example.com",
       subject: (app === "outlook" ? "FW: " : "Fwd: ") + H.subject, date: later },
     text: f.text ? textHead + f.text : "",

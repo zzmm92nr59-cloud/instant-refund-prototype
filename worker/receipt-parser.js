@@ -67,6 +67,39 @@ function decodeMimeWords(value) {
 const INVISIBLE = /[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]|&(?:zwnj|zwj|shy|lrm|rlm);|&#(?:x200[b-f]|x202[a-e]|xad|x34f|xfeff|820[3-7]|823[4-8]|173|847|65279);/gi;
 export const withoutInvisible = (s) => String(s || "").replace(INVISIBLE, "");
 
+// An email's bytes, as a mailbox gives them (Gmail's "raw", Outlook's "$value"), as text for the reader. Most emails are
+// UTF-8 or 7-bit, but a part sent as 8bit in windows-1252 or iso-8859-1 has bytes that aren't UTF-8 ("£" is the single byte
+// 0xA3): those bytes are read as windows-1252, and everything that is UTF-8 stays UTF-8 (round 4, 19 Nov 2026: the whole
+// email used to be read as UTF-8, so such a "£" was lost and no price could be read).
+const CP1252_HIGH = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
+export function mailText(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(b); } catch { /* some bytes aren't UTF-8 */ }
+  let out = "", i = 0;
+  const utf8 = new TextDecoder("utf-8", { fatal: true });
+  while (i < b.length) {
+    const c = b[i];
+    if (c < 0x80) { let j = i; while (j < b.length && b[j] < 0x80 && j - i < 8192) j++; out += String.fromCharCode.apply(null, b.subarray(i, j)); i = j; continue; }
+    const n = c >= 0xf0 && c <= 0xf4 ? 4 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xc2 && c <= 0xdf ? 2 : 0;
+    if (n && i + n <= b.length) { try { out += utf8.decode(b.subarray(i, i + n)); i += n; continue; } catch { /* not a UTF-8 character */ } }
+    out += c < 0xa0 ? CP1252_HIGH[c - 0x80] : String.fromCharCode(c);
+    i++;
+  }
+  return out;
+}
+
+// Mojibake: a shop's own system read its UTF-8 as windows-1252 before sending, so "£" arrives as "Â£" and "’" as "â€™".
+// Only when the email has those tell-tale pairs, each run of such characters is put back to what it was meant to be (when
+// it is a real UTF-8 character once turned back into bytes).
+const MOJIBAKE_SIGN = /Â[£\u00a0©®°±·]|â€[™˜œ“”¦¢\u009d]|â‚¬/;
+const MOJIBAKE_RUN = /[\u00c2-\u00df][\u0080-\u00bf€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]|[\u00e0-\u00ef][\u0080-\u00bf€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]{2}/g;
+export function withoutMojibake(text) {
+  const t = String(text || "");
+  if (!MOJIBAKE_SIGN.test(t)) return t;
+  const back = (ch) => { const k = CP1252_HIGH.indexOf(ch); return k >= 0 ? 0x80 + k : ch.charCodeAt(0); };
+  return t.replace(MOJIBAKE_RUN, (m) => { try { return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from([...m].map(back))); } catch { return m; } });
+}
+
 function parseHeaders(block) {
   const headers = {};
   const unfolded = block.replace(/\r?\n[ \t]+/g, " ");
@@ -103,7 +136,13 @@ export function unwrapSafeLinks(text) {
   });
 }
 
-// Collects text/plain and text/html parts, walking nested multipart bodies.
+// Collects text/plain and text/html parts, walking nested multipart bodies. Round 4 (19 Nov 2026):
+//  * An email attached whole (Outlook's "Forward as attachment", message/rfc822) is read as a forward: its own sender, date
+//    and subject written above its text, the way a forward writes them.
+//  * Attachments (a PDF, a picture, a file of terms) are never read as the email's text; what was attached is noted
+//    (out.attached), so a receipt that is only in its attachment can say so instead of showing nothing.
+//  * Only text parts are decoded (an attached PDF is never decoded), each at most MAX_INPUT long, with pictures written
+//    into the HTML itself (data: addresses) left out first: they can be far longer than the rest of the email.
 function collectParts(headers, body, out, depth = 0) {
   if (depth > 6) return;
   const type = headers["content-type"] || "text/plain";
@@ -117,11 +156,42 @@ function collectParts(headers, body, out, depth = 0) {
     }
     return;
   }
+  if (/^\s*message\/rfc822/i.test(type)) {
+    const inner = splitMessage(decodeBody(headers, body).replace(/^\r?\n/, ""));
+    const got = { text: [], html: [], attached: out.attached };
+    collectParts(inner.headers, inner.body, got, depth + 1);
+    const H = inner.headers, esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const lines = ["---------- Forwarded message ---------", "From: " + (H.from || ""), "Date: " + (H.date || ""), "Subject: " + (H.subject || ""), "To: " + (H.to || "")];
+    if (got.text.length) out.text.push(lines.join("\n") + "\n\n" + got.text.join("\n"));
+    if (got.html.length) out.html.push("<div>" + lines.map(esc).join("<br>") + "</div><br>" + got.html.join("\n"));
+    return;
+  }
+  const disposition = headers["content-disposition"] || "";
+  const textual = /^\s*text\/(?:html|plain)\b/i.test(type) || !headers["content-type"];
+  if (/^\s*attachment\b/i.test(disposition) || !textual) {
+    if (out.attached) {
+      const name = String((/\bfilename\*?="?([^";\r\n]{1,120})"?/i.exec(disposition) || /\bname\*?="?([^";\r\n]{1,120})"?/i.exec(type) || [])[1] || "");
+      const kind = /^\s*application\/pdf\b/i.test(type) || /\.pdf$/i.test(name) ? "pdf" : /^\s*image\//i.test(type) || /\.(?:jpe?g|png|gif|webp|heic)$/i.test(name) ? "image" : textual ? "text" : "other";
+      // (A picture shown inside the email, a logo with a Content-ID, is not something attached; nor is a part that is
+      // another way of showing the email, such as Gmail's AMP copy.)
+      const shownInside = kind === "image" && headers["content-id"] && !/^\s*attachment\b/i.test(disposition);
+      if (!shownInside && !/^\s*text\//i.test(type)) out.attached.push({ kind, name });
+      else if (textual && /^\s*attachment\b/i.test(disposition)) out.attached.push({ kind, name });
+    }
+    if (!textual) return;
+    // (An attached text file is kept apart: read only when the email has no text of its own.)
+    if (out.attachedText) out.attachedText.push(withoutInvisible(decodeBody(headers, body.slice(0, MAX_INPUT * 2))).replace(/\r\n?/g, "\n").slice(0, MAX_INPUT));
+    return;
+  }
   // (Line ends as sent, "\r\n", become "\n": a shop's name at the end of a line would otherwise carry the "\r".)
-  const decoded = withoutInvisible(unwrapSafeLinks(decodeBody(headers, body))).replace(/\r\n?/g, "\n");
+  let decoded = decodeBody(headers, body);
+  if (/text\/html/i.test(type)) decoded = decoded.replace(/\bdata:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]{200,}/gi, "data:,");
+  decoded = withoutMojibake(withoutInvisible(unwrapSafeLinks(decoded.slice(0, MAX_INPUT)))).replace(/\r\n?/g, "\n");
   if (/text\/html/i.test(type)) out.html.push(decoded);
   else if (/text\/plain/i.test(type)) out.text.push(decoded);
 }
+// The longest raw email split into its parts (attachments are skipped without being decoded, so this is cheap).
+const MAX_RAW = 12_000_000;
 
 // A raw email split up for showing it as it was sent: its text, its HTML and the pictures inside it (with their
 // Content-ID, so the HTML's "cid:" pictures can be put back). Only those parts are decoded; attachments are skipped.
@@ -169,7 +239,51 @@ function decodeEntities(text) {
     return v === undefined ? m : v;
   });
 }
+// What an email builder's HTML has that no one sees (round 4, 19 Nov 2026), left out before it is read:
+//  * Outlook-only copies inside <!--[if mso]> … <![endif]--> (everyone else is shown the copy after it), and comments;
+//  * anything hidden with display:none, inline or by a class the email's style sheet hides outside its @media rules: a
+//    preheader that names an item and its price, the mobile copy of the item table next to the desktop one.
+// When leaving the hidden parts out would leave no price at all, they are kept (an email that shows its items only once
+// its style sheet's @media rules apply).
+const HIDDEN_STYLE = /\bstyle\s*=\s*(["'])[^"']*?\bdisplay\s*:\s*none\b[^"']*\1/i;
+function hiddenClasses(html) {
+  const out = new Set();
+  for (const [, css] of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+    let flat = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    // (Rules inside @media apply only on some screens: they are left out, with their braces.)
+    for (let k = 0; k < 3; k++) flat = flat.replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/gi, "");
+    for (const [, sel, body] of flat.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\bdisplay\s*:\s*none\b/i.test(body)) continue;
+      for (const one of sel.split(",")) { const m = /^\s*(?:[a-z0-9]+)?\.([a-z0-9_-]+)\s*$/i.exec(one); if (m) out.add(m[1].toLowerCase()); }
+    }
+  }
+  return out;
+}
+function withoutHidden(html) {
+  let t = html.replace(/<!--\[if\s+(?![^\]]*!)[^\]]*\]>[\s\S]*?<!\[endif\]-->/gi, " ").replace(/<!--[\s\S]*?-->/g, " ");
+  const classes = hiddenClasses(t);
+  const isHidden = (tag) => HIDDEN_STYLE.test(tag) || (classes.size > 0 && [...((/\bclass\s*=\s*["']([^"']*)["']/i.exec(tag) || [])[1] || "").toLowerCase().split(/\s+/)].some((c) => classes.has(c)));
+  const OPEN = /<(div|table|span|p|td|tr|tbody|center|section|a|font|ul|li)\b[^>]*>/gi;
+  let out = "", from = 0, guard = 0;
+  for (let m; (m = OPEN.exec(t)) && guard < 5000; guard++) {
+    if (!isHidden(m[0])) continue;
+    // The hidden element ends at its own closing tag (the same kind of tag, counted through any nested inside it).
+    const name = m[1].toLowerCase(), re = new RegExp("<(/?)" + name + "\\b[^>]*>", "gi");
+    re.lastIndex = m.index + m[0].length;
+    let depth = 1, end = -1;
+    for (let x; (x = re.exec(t)); ) { depth += x[1] ? -1 : 1; if (!depth) { end = x.index + x[0].length; break; } }
+    if (end === -1) break;
+    out += t.slice(from, m.index) + " ";
+    from = end; OPEN.lastIndex = end;
+  }
+  out += t.slice(from);
+  return out;
+}
 function htmlToText(html) {
+  const shown = withoutHidden(html);
+  return htmlToTextAll(/£|&pound;|&#163;|&#xa3;/i.test(shown) || !/£|&pound;|&#163;|&#xa3;/i.test(html) ? shown : html);
+}
+function htmlToTextAll(html) {
   // (The words the email shows, to tell a picture that is the only place an item is named from one beside its name.)
   let shown = null;
   const shownText = () => shown ?? (shown = decodeEntities(html.replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").toLowerCase());
@@ -391,7 +505,9 @@ function fromText(text, refDate) {
     pool.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || pool[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
-    [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop();
+    [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
+    // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
+    text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -751,7 +867,7 @@ const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?
 // same way the reader turns it. Used for "Send this email to Relay" (shared-emails.js), so what a person at Relay reads is
 // what the reader read. Pictures, attachments and the other headers are left out.
 export function emailForReading(rawEmail) {
-  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
+  const raw = String(rawEmail || "").slice(0, MAX_RAW);
   const { headers, body } = splitMessage(raw);
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
@@ -770,22 +886,56 @@ function tillPounds(t) {
   return t.replace(/(\d{1,5}\.\d{2}) ?GBP\b/g, "£$1").replace(/(\S[ \t]{2,})(-?)(\d{1,5}\.\d{2})(?:[ \t]+[A-Z])?[ \t]*$/gm, "$1$2£$3");
 }
 
-export function parseReceiptEmail(rawEmail, opts = {}) {
-  const raw = String(rawEmail || "").slice(0, MAX_INPUT);
-  const { headers, body } = splitMessage(raw);
-  const parts = { text: [], html: [] };
-  collectParts(headers, body, parts);
-  const html = parts.html.join("\n");
-  const plain = tillPounds(parts.text.join("\n").trim());
-  const fromHtml = html ? tillPounds(htmlToText(html)) : "";
-  let text = (plain || fromHtml).trim();
+// Gmail's own note where it cut a long email short, as it shows in a forward or a copy of what it showed.
+const CLIPPED = /\[\s*message clipped\s*\]/i;
+// A reply quotes what it answers with "> " (and "> > " or ">> " a level deeper). When most of the email is quoted, the marks
+// are taken off so its lines read as written ("> Kids Scooter Blue | Qty 1 | £49.99"). Round 4.
+function unquoted(t) {
+  const s = String(t || "");
+  const lines = s.split("\n"), quoted = lines.filter((l) => /^[ \t]*>/.test(l)).length;
+  return quoted >= 5 && quoted * 3 >= lines.filter((l) => l.trim()).length ? s.replace(/^[ \t]*(?:>[ \t]?)+/gm, "") : s;
+}
+// Sections of products the shop recommends ("You might also like", "Customers also bought", "Recommended for you",
+// "Complete the look"): from the heading to the next money line (Subtotal, Total, Delivery) or heading of the order's own
+// ("Your order", "Order summary"), or to the end. Their prices are never items.
+const RECOMMEND_HEAD = /^[\s|]*(?:you (?:might|may) also (?:like|love)|customers (?:also|who bought this also) (?:bought|viewed|liked)|(?:people|others) also bought|frequently bought together|recommended (?:for you|products|items)|we (?:think|thought) you(?:'|’)?(?:ll| will| would|d) (?:like|love)|complete the look|shop the look|more (?:you(?:'|’)ll love|to explore|like this)|inspired by your (?:order|purchase|browsing)|trending now|you might be interested in|picked for you|just for you)\b[^\n]{0,40}$/i;
+const RECOMMEND_END = /^[\s|]*(?:sub-?\s?total|(?:order |grand )?total|delivery|shipping|postage|your order|order (?:summary|details)|items? (?:in your order|ordered)|payment|billing|vat)\b/i;
+function withoutRecommendations(t) {
+  const lines = String(t || "").split("\n");
+  if (!lines.some((l) => RECOMMEND_HEAD.test(l))) return t;
+  const out = [];
+  for (let i = 0, skip = false; i < lines.length; i++) {
+    if (RECOMMEND_HEAD.test(lines[i])) { skip = true; continue; }
+    if (skip && RECOMMEND_END.test(lines[i])) skip = false;
+    if (!skip) out.push(lines[i]);
+  }
+  return out.join("\n");
+}
 
+export function parseReceiptEmail(rawEmail, opts = {}) {
+  const raw = String(rawEmail || "").slice(0, MAX_RAW);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [], attached: [], attachedText: [] };
+  collectParts(headers, body, parts);
+  if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
+  const html = parts.html.join("\n").slice(0, MAX_INPUT);
+  const plain = tillPounds(unquoted(parts.text.join("\n").trim()));
+  const fromHtml = html ? tillPounds(unquoted(htmlToText(html))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
   // The sender's display name exactly as written (retailerFromFrom drops generic ones such as "Orders").
   const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
+  // (A text part that only says to look at the HTML one, "This email needs an HTML-capable email client", is not the
+  // email: the HTML is read when only it looks like a receipt. Round 4.)
+  let text = (plain && !(fromHtml && !receiptSignals(subject, plain).bodyHit && receiptSignals(subject, fromHtml).bodyHit) ? plain : fromHtml || plain).trim();
 
   const sig = receiptSignals(subject, text);
+  // A receipt that is only in its attachment ("Your receipt is attached", a PDF or a photo of the till receipt): it is
+  // still the shop's receipt, read for what the email itself says (the shop, the day, a total if written), and it says
+  // that the details are in the attachment. Nothing is read from the attachment, so nothing is made up.
+  const attachedDoc = (parts.attached || []).find((a) => a.kind === "pdf" || a.kind === "image");
+  const saysAttached = Boolean(attachedDoc) && /\b(?:receipt|invoice|order|bill)\b[^.\n]{0,60}\b(?:is |are )?attached\b|\battached\b[^.\n]{0,40}\b(?:receipt|invoice)\b|\b(?:receipt|invoice)\b[^.\n]{0,30}\bas an? (?:pdf|attachment)\b/i.test(text.slice(0, 4000));
+  if (saysAttached) sig.bodyHit = true;
   // A flight booked with an airline or a travel site (flight-booking.js): its confirmation is the receipt even when it
   // doesn't say "order" ("Your booking is confirmed", "Ryanair Travel Itinerary", "Total paid GBP 245.98"). A check-in
   // reminder, a boarding pass or a delay notice about it is not a purchase.
@@ -858,14 +1008,17 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!isFlight && !journey && !gameShop) {
     const cands = [];
     const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
-    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
-    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
-    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
+    // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
+    // are left out of the item readings. Round 4.)
+    const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];
+    for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
+    for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
+    for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
     cands.push({ items: result.items, money: moneyOf(text) });
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
     if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     // Prices printed above their names (round 3): tried after every other reading, so it is taken only when nothing else adds up.
-    for (const t of [text, otherPart]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
+    for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
     // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
     const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money }));
@@ -891,6 +1044,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       stated !== result.items.length && stated !== result.items.reduce((n, i) => n + (i.qty || 1), 0)) {
     result.itemsCheck = { ...result.itemsCheck, complete: false, countStated: stated, countRead: result.items.length };
   }
+  // No items read is never "complete", even when there is no total to compare with.
+  if (!result.items.length && result.itemsCheck && result.itemsCheck.complete !== false) result.itemsCheck = { ...result.itemsCheck, complete: false };
+  // Gmail cut the email short ("[Message clipped]  View entire message"): what came after the cut isn't in it, so the items
+  // can never be called complete, even when what is there adds up.
+  if (CLIPPED.test(text) || (otherPart && CLIPPED.test(otherPart))) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, clipped: true };
+  if (saysAttached && !result.items.length) { result.detailsInAttachment = attachedDoc.kind; result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, inAttachment: attachedDoc.kind }; }
   for (const i of result.items) delete i.unitPence;
   if (!opts.lenient && !isFlight && looksPromotional(subject, headers, Boolean(result.orderRef))) {
     return { ok: false, reason: "promotional", source: "shopper_email" };

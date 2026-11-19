@@ -1,0 +1,36 @@
+{
+ "id": "holdout7-latin1-8bit",
+ "sender": "Lumen & Oak",
+ "layout": "text/plain iso-8859-1, 8bit, '£' as byte 0xA3",
+ "headers": {
+  "from": "Lumen & Oak <orders@lumenandoak.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmation LO-88213",
+  "date": "Tue, 17 Nov 2026 14:20:00 +0000"
+ },
+ "html": "",
+ "text": "Lumen & Oak\nThanks for your order, Sam.\nOrder number: LO-88213\nOrder date: 17 November 2026\n\nBrass Desk Lamp | Qty 1 | £48.00\nLinen Lampshade 30cm | Qty 2 | £33.00\n\nSubtotal £81.00\nStandard delivery £4.99\nTotal £85.99",
+ "expected": {
+  "shop": "Lumen & Oak",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Brass Desk Lamp",
+    "qty": 1,
+    "linePence": 4800
+   },
+   {
+    "name": "Linen Lampshade 30cm",
+    "qty": 2,
+    "linePence": 3300
+   }
+  ],
+  "subtotalPence": 8100,
+  "feesPence": 499,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8599
+ },
+ "rawB64": "RnJvbTogTHVtZW4gJiBPYWsgPG9yZGVyc0BsdW1lbmFuZG9hay5jby51az4NClRvOiBzYW0udGF5bG9yQGV4YW1wbGUuY28udWsNClN1YmplY3Q6IE9yZGVyIGNvbmZpcm1hdGlvbiBMTy04ODIxMw0KRGF0ZTogVHVlLCAxNyBOb3YgMjAyNiAxNDoyMDowMCArMDAwMA0KTWVzc2FnZS1JRDogPGhvbGRvdXQ3LWxhdGluMS04Yml0QGNvcnB1cy5yZWxheS50ZXN0Pg0KTUlNRS1WZXJzaW9uOiAxLjANCkNvbnRlbnQtVHlwZTogdGV4dC9wbGFpbjsgY2hhcnNldD1pc28tODg1OS0xDQpDb250ZW50LVRyYW5zZmVyLUVuY29kaW5nOiA4Yml0DQoNCkx1bWVuICYgT2FrDQpUaGFua3MgZm9yIHlvdXIgb3JkZXIsIFNhbS4NCk9yZGVyIG51bWJlcjogTE8tODgyMTMNCk9yZGVyIGRhdGU6IDE3IE5vdmVtYmVyIDIwMjYNCg0KQnJhc3MgRGVzayBMYW1wIHwgUXR5IDEgfCCjNDguMDANCkxpbmVuIExhbXBzaGFkZSAzMGNtIHwgUXR5IDIgfCCjMzMuMDANCg0KU3VidG90YWwgozgxLjAwDQpTdGFuZGFyZCBkZWxpdmVyeSCjNC45OQ0KVG90YWwgozg1Ljk5DQo="
+}

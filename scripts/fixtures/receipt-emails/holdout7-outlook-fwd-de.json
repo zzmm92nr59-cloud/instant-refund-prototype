@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-outlook-fwd-de",
+ "sender": "Bergwerk Outdoor",
+ "layout": "Outlook forward header in de",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@outlook.com>",
+  "to": "receipts@example.com",
+  "subject": "WG: Your Bergwerk Outdoor order BW-77310",
+  "date": "Sun, 25 Oct 2026 22:00:00 +0000"
+ },
+ "html": "<html><body><div><br></div><hr style=\"display:inline-block;width:98%\" tabindex=\"-1\"><div id=\"divRplyFwdMsg\" dir=\"ltr\"><font face=\"Calibri, sans-serif\" style=\"font-size:11pt\" color=\"#000000\"><b>Von:</b> Bergwerk Outdoor &lt;orders@bergwerkoutdoor.co.uk&gt;<br><b>Gesendet:</b> Sonntag, 25. Oktober 2026 16:20<br><b>An:</b> Sam Taylor &lt;sam.taylor@example.co.uk&gt;<br><b>Betreff:</b> Your Bergwerk Outdoor order BW-77310</font><div>&nbsp;</div></div>\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.bergwerkoutdoor.co.uk/?utm_source=email\"><img src=\"https://www.bergwerkoutdoor.co.uk/static/email/logo.png\" alt=\"Bergwerk Outdoor\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order, Sam.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: BW-77310</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 25 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Insulated Flask 750ml</td><td>2</td><td>£48.00</td></tr><tr><td>Camping Mug Enamel</td><td>1</td><td>£11.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£59.00</td></tr><tr><td>Delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£62.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Bergwerk Outdoor. All rights reserved.<br /><a href=\"https://www.bergwerkoutdoor.co.uk/help\">Help</a> | <a href=\"https://www.bergwerkoutdoor.co.uk/privacy\">Privacy</a> | <a href=\"https://www.bergwerkoutdoor.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.bergwerkoutdoor.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "\n\n________________________________\nVon: Bergwerk Outdoor <orders@bergwerkoutdoor.co.uk>\nGesendet: Sonntag, 25. Oktober 2026 16:20\nAn: Sam Taylor <sam.taylor@example.co.uk>\nBetreff: Your Bergwerk Outdoor order BW-77310\n\nBergwerk Outdoor\nThanks for your order, Sam.\nOrder number: BW-77310\nOrder date: 25 October 2026\n\nInsulated Flask 750ml | Qty 2 | £48.00\nCamping Mug Enamel | Qty 1 | £11.00\n\nSubtotal £59.00\nDelivery £3.95\nTotal £62.95",
+ "expected": {
+  "shop": "Bergwerk Outdoor",
+  "date": "2026-10-25",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Insulated Flask 750ml",
+    "qty": 2,
+    "linePence": 4800
+   },
+   {
+    "name": "Camping Mug Enamel",
+    "qty": 1,
+    "linePence": 1100
+   }
+  ],
+  "subtotalPence": 5900,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6295
+ }
+}

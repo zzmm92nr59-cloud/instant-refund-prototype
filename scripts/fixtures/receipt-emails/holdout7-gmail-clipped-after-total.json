@@ -1,0 +1,36 @@
+{
+ "id": "holdout7-gmail-clipped-after-total",
+ "sender": "Hide & Stitch",
+ "layout": "'[Message clipped]' after the total",
+ "headers": {
+  "from": "Hide & Stitch <orders@hideandstitch.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order HS-9902 confirmed",
+  "date": "Thu, 22 Oct 2026 16:00:00 +0000"
+ },
+ "html": "",
+ "text": "Hide & Stitch\nThanks for your order, Sam.\nOrder number: HS-9902\nOrder date: 22 October 2026\n\nLeather Card Holder Tan | Qty 1 | £35.00\nMonogram Embossing | Qty 1 | £5.00\n\nSubtotal £40.00\nDelivery FREE\nTotal £40.00\n\n[Message clipped]  View entire message",
+ "expected": {
+  "shop": "Hide & Stitch",
+  "date": "2026-10-22",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Leather Card Holder Tan",
+    "qty": 1,
+    "linePence": 3500
+   },
+   {
+    "name": "Monogram Embossing",
+    "qty": 1,
+    "linePence": 500
+   }
+  ],
+  "subtotalPence": 4000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4000,
+  "partial": true
+ }
+}

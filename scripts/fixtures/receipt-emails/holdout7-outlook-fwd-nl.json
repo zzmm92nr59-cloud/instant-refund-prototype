@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-outlook-fwd-nl",
+ "sender": "Fietsfabriek",
+ "layout": "Outlook forward header in nl",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@outlook.com>",
+  "to": "receipts@example.com",
+  "subject": "Doorst: Your Fietsfabriek order FF-55002",
+  "date": "Sat, 24 Oct 2026 22:00:00 +0000"
+ },
+ "html": "<html><body><div><br></div><hr style=\"display:inline-block;width:98%\" tabindex=\"-1\"><div id=\"divRplyFwdMsg\" dir=\"ltr\"><font face=\"Calibri, sans-serif\" style=\"font-size:11pt\" color=\"#000000\"><b>Van:</b> Fietsfabriek &lt;orders@fietsfabriek.co.uk&gt;<br><b>Verzonden:</b> zaterdag 24 oktober 2026 09:12<br><b>Aan:</b> Sam Taylor &lt;sam.taylor@example.co.uk&gt;<br><b>Onderwerp:</b> Your Fietsfabriek order FF-55002</font><div>&nbsp;</div></div>\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fietsfabriek.co.uk/?utm_source=email\"><img src=\"https://www.fietsfabriek.co.uk/static/email/logo.png\" alt=\"Fietsfabriek\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order, Sam.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: FF-55002</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 24 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Bike Lights Set USB</td><td>1</td><td>£35.00</td></tr><tr><td>Bike Lock D Shackle</td><td>1</td><td>£42.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£77.00</td></tr><tr><td>Delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£80.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Fietsfabriek. All rights reserved.<br /><a href=\"https://www.fietsfabriek.co.uk/help\">Help</a> | <a href=\"https://www.fietsfabriek.co.uk/privacy\">Privacy</a> | <a href=\"https://www.fietsfabriek.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fietsfabriek.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "\n\n________________________________\nVan: Fietsfabriek <orders@fietsfabriek.co.uk>\nVerzonden: zaterdag 24 oktober 2026 09:12\nAan: Sam Taylor <sam.taylor@example.co.uk>\nOnderwerp: Your Fietsfabriek order FF-55002\n\nFietsfabriek\nThanks for your order, Sam.\nOrder number: FF-55002\nOrder date: 24 October 2026\n\nBike Lights Set USB | Qty 1 | £35.00\nBike Lock D Shackle | Qty 1 | £42.00\n\nSubtotal £77.00\nDelivery £3.95\nTotal £80.95",
+ "expected": {
+  "shop": "Fietsfabriek",
+  "date": "2026-10-24",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Bike Lights Set USB",
+    "qty": 1,
+    "linePence": 3500
+   },
+   {
+    "name": "Bike Lock D Shackle",
+    "qty": 1,
+    "linePence": 4200
+   }
+  ],
+  "subtotalPence": 7700,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8095
+ }
+}

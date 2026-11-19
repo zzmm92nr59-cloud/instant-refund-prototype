@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-reply-to-forward",
+ "sender": "Wheelhouse Toys",
+ "layout": "reply above a forward, quoted with '> '",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@gmail.com>",
+  "to": "receipts@example.com",
+  "subject": "Re: Fwd: Order WT-30442 confirmed",
+  "date": "Wed, 28 Oct 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Adding this one too, the helmet is the wrong size.\n\nOn Tue, 27 Oct 2026 at 12:00, Sam Taylor <sam.taylor@gmail.com> wrote:\n\n> ---------- Forwarded message ---------\n> From: Wheelhouse Toys <orders@wheelhousetoys.co.uk>\n> Date: Tue, 27 Oct 2026 at 09:00\n> Subject: Order WT-30442 confirmed\n> To: <sam.taylor@example.co.uk>\n> \n> Wheelhouse Toys\n> Thanks for your order, Sam.\n> Order number: WT-30442\n> Order date: 27 October 2026\n> \n> Kids Scooter Blue | Qty 1 | £49.99\n> Helmet Small | Qty 1 | £19.99\n> \n> Subtotal £69.98\n> Delivery £3.99\n> Total £73.97",
+ "expected": {
+  "shop": "Wheelhouse Toys",
+  "date": "2026-10-27",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Kids Scooter Blue",
+    "qty": 1,
+    "linePence": 4999
+   },
+   {
+    "name": "Helmet Small",
+    "qty": 1,
+    "linePence": 1999
+   }
+  ],
+  "subtotalPence": 6998,
+  "feesPence": 399,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7397
+ }
+}

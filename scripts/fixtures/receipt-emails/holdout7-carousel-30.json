@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-carousel-30",
+ "sender": "Cosy Haven",
+ "layout": "30 'Recommended for you' products after the total",
+ "headers": {
+  "from": "Cosy Haven <orders@cosyhaven.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Cosy Haven order CH-66120",
+  "date": "Sun, 18 Oct 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Cosy Haven</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.cosyhaven.co.uk/?utm_source=email\"><img src=\"https://www.cosyhaven.co.uk/static/email/logo.png\" alt=\"Cosy Haven\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order, Sam.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: CH-66120</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 18 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Chunky Knit Throw Grey</td><td>1</td><td>£59.00</td></tr><tr><td>Scented Reed Diffuser</td><td>1</td><td>£22.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£81.00</td></tr><tr><td>Delivery</td><td>£3.95</td></tr><tr><td><strong>Total</strong></td><td><strong>£84.95</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><h2>Recommended for you</h2></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r0.jpg\" width=\"150\" alt=\"\"><br>Velvet Cushion 1<br>£15.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r1.jpg\" width=\"150\" alt=\"\"><br>Boucle Throw 2<br>£17.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r2.jpg\" width=\"150\" alt=\"\"><br>Linen Lamp 3<br>£20.00</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r3.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Rug 4<br>£22.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r4.jpg\" width=\"150\" alt=\"\"><br>Waffle Candle 5<br>£25.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r5.jpg\" width=\"150\" alt=\"\"><br>Velvet Vase 6<br>£27.50</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r6.jpg\" width=\"150\" alt=\"\"><br>Boucle Cushion 7<br>£30.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r7.jpg\" width=\"150\" alt=\"\"><br>Linen Throw 8<br>£32.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r8.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Lamp 9<br>£35.00</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r9.jpg\" width=\"150\" alt=\"\"><br>Waffle Rug 10<br>£37.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r10.jpg\" width=\"150\" alt=\"\"><br>Velvet Candle 11<br>£40.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r11.jpg\" width=\"150\" alt=\"\"><br>Boucle Vase 12<br>£42.50</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r12.jpg\" width=\"150\" alt=\"\"><br>Linen Cushion 13<br>£45.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r13.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Throw 14<br>£47.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r14.jpg\" width=\"150\" alt=\"\"><br>Waffle Lamp 15<br>£50.00</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r15.jpg\" width=\"150\" alt=\"\"><br>Velvet Rug 16<br>£52.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r16.jpg\" width=\"150\" alt=\"\"><br>Boucle Candle 17<br>£55.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r17.jpg\" width=\"150\" alt=\"\"><br>Linen Vase 18<br>£57.50</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r18.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Cushion 19<br>£60.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r19.jpg\" width=\"150\" alt=\"\"><br>Waffle Throw 20<br>£62.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r20.jpg\" width=\"150\" alt=\"\"><br>Velvet Lamp 21<br>£65.00</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r21.jpg\" width=\"150\" alt=\"\"><br>Boucle Rug 22<br>£67.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r22.jpg\" width=\"150\" alt=\"\"><br>Linen Candle 23<br>£70.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r23.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Vase 24<br>£72.50</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r24.jpg\" width=\"150\" alt=\"\"><br>Waffle Cushion 25<br>£75.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r25.jpg\" width=\"150\" alt=\"\"><br>Velvet Throw 26<br>£77.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r26.jpg\" width=\"150\" alt=\"\"><br>Boucle Lamp 27<br>£80.00</td></tr><tr><td><img src=\"https://www.cosyhaven.co.uk/p/r27.jpg\" width=\"150\" alt=\"\"><br>Linen Rug 28<br>£82.50</td><td><img src=\"https://www.cosyhaven.co.uk/p/r28.jpg\" width=\"150\" alt=\"\"><br>Faux Fur Candle 29<br>£85.00</td><td><img src=\"https://www.cosyhaven.co.uk/p/r29.jpg\" width=\"150\" alt=\"\"><br>Waffle Vase 30<br>£87.50</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Cosy Haven. All rights reserved.<br /><a href=\"https://www.cosyhaven.co.uk/help\">Help</a> | <a href=\"https://www.cosyhaven.co.uk/privacy\">Privacy</a> | <a href=\"https://www.cosyhaven.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.cosyhaven.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Cosy Haven",
+  "date": "2026-10-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chunky Knit Throw Grey",
+    "qty": 1,
+    "linePence": 5900
+   },
+   {
+    "name": "Scented Reed Diffuser",
+    "qty": 1,
+    "linePence": 2200
+   }
+  ],
+  "subtotalPence": 8100,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8495
+ }
+}

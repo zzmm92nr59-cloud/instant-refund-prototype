@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-shopify-notification",
+ "sender": "Field Day Apparel",
+ "layout": "'Name × 2' summary, discount code, taxes included",
+ "headers": {
+  "from": "Field Day Apparel <store+5512@t.shopifyemail.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order #1043 confirmed",
+  "date": "Sat, 31 Oct 2026 14:10:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Field Day Apparel</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fielddayapparel.com/?utm_source=email\"><img src=\"https://www.fielddayapparel.com/static/email/logo.png\" alt=\"Field Day Apparel\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #1043</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thank you for your purchase! Placed 31 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Order summary</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><span style=\"font-size:16px;font-weight:600\">Organic Cotton Hoodie Oat × 2</span></td><td align=\"right\"><strong>£90.00</strong></td></tr><tr><td><span style=\"font-size:16px;font-weight:600\">Embroidered Patch Set × 1</span></td><td align=\"right\"><strong>£9.00</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£99.00</td></tr><tr><td>Discount (AUTUMN10)</td><td>-£9.90</td></tr><tr><td>Shipping</td><td>£4.50</td></tr><tr><td>Taxes (included)</td><td>£13.35</td></tr><tr><td><strong>Total</strong></td><td><strong>£93.60 GBP</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Field Day Apparel. All rights reserved.<br /><a href=\"https://www.fielddayapparel.com/help\">Help</a> | <a href=\"https://www.fielddayapparel.com/privacy\">Privacy</a> | <a href=\"https://www.fielddayapparel.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fielddayapparel.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Field Day Apparel",
+  "date": "2026-10-31",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Organic Cotton Hoodie Oat",
+    "qty": 2,
+    "linePence": 9000
+   },
+   {
+    "name": "Embroidered Patch Set",
+    "qty": 1,
+    "linePence": 900
+   }
+  ],
+  "subtotalPence": 9900,
+  "feesPence": 450,
+  "discountsPence": 990,
+  "tipsPence": 0,
+  "totalPence": 9360
+ }
+}

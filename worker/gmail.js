@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -24,7 +24,7 @@ import { policyFor, policyForApp, policyReturnBy } from "./return-policies.js";
 import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
-import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, rereadsUsed } from "./receipt-reread.js";
+import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
@@ -130,7 +130,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 34;
+export const PARSER_VERSION = 35;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -812,6 +812,8 @@ function classify(rawText, ref, lenient = false) {
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
+      // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
+      ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
       // A flight booking's flights (airport codes, day, flight number, out or back): for the receipt and for Wrapped.
       ...(receipt.flights ? { flights: receipt.flights } : {}),
@@ -853,7 +855,7 @@ function gmailMailbox(fetchImpl, token) {
       const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
       if (r.status === 404) return GONE;
       const raw = r.ok ? (await r.json().catch(() => ({}))).raw : null;
-      return typeof raw === "string" ? new TextDecoder().decode(unb64url(raw)) : null;
+      return typeof raw === "string" ? mailText(unb64url(raw)) : null;
     },
     parallel: FETCH_PARALLEL,
     ref: e => ({ gmailId: e.id })
@@ -1370,7 +1372,7 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
   else {
     const raw = (await res.json().catch(() => ({}))).raw;
     if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
-    rawText = new TextDecoder().decode(unb64url(raw));
+    rawText = mailText(unb64url(raw));
   }
   const { details, status } = classify(rawText, outlook ? { outlookId: messageId, ...mark } : { gmailId: messageId, ...mark }, true);
   if (status === "not_receipt") {
@@ -2323,13 +2325,14 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
       await log(false, "rules");
       return reply(next, "rules");
     }
-    // 2. Claude, on the order section only, with personal details hidden.
-    if (aiAvailable(env) && used.mineAi < REREAD_AI_PER_DAY && used.allAi < REREAD_AI_ALL_DAY) {
+    // 2. Claude, on the order section only, with personal details hidden. (Not for a receipt whose items are only in its
+    // attachment: the email has no item list to read, and nothing is read from the attachment.)
+    if (!(r.ok && r.detailsInAttachment) && aiAvailable(env) && used.mineAi < REREAD_AI_PER_DAY && used.allAi < REREAD_AI_ALL_DAY) {
       const copy = await hiddenCopyFromRaw(env, shopper, got.raw);
       const section = orderSection(copy.copy && copy.copy.text);
       const total = d.totalPence ?? (r.ok ? r.totalPence : null);
       const ans = section ? await askForItems(env, section, opts.fetchImpl) : { error: "unreadable" };
-      const kept = ans.reading ? acceptAiItems(ans.reading, section, total) : null;
+      const kept = ans.reading && namedInEmail(ans.reading, section) ? acceptAiItems(ans.reading, section, total) : null;
       await log(true, kept ? "ai" : ans.error || "didnt_add_up");
       if (kept) return reply(await save({ items: kept.items, itemsCheck: kept.check, itemsFrom: "ai", ...(d.totalPence == null && total != null ? { totalPence: total, currency: d.currency || "GBP" } : {}) }), "ai");
       return json({ ok: true, complete: false, via: null, reason: ans.error === "ai_busy" || ans.error === "ai_unreachable" ? "busy" : "not_sure", items: d.items || [], itemsCheck: d.itemsCheck || null }, 200, cors);

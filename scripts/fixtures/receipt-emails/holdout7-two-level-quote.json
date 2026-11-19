@@ -1,0 +1,35 @@
+{
+ "id": "holdout7-two-level-quote",
+ "sender": "Brightsmile",
+ "layout": "two levels of quoting ('>> ')",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@gmail.com>",
+  "to": "receipts@example.com",
+  "subject": "Re: Re: Fwd: Your Brightsmile order BS-120334",
+  "date": "Tue, 27 Oct 2026 08:00:00 +0000"
+ },
+ "html": "",
+ "text": "Yes, this one.\n\nOn Tue, 27 Oct 2026, Alex Taylor <alex.taylor@example.co.uk> wrote:\n> Which order was the flosser on?\n>\n> On Mon, 26 Oct 2026 at 18:00, Sam Taylor <sam.taylor@gmail.com> wrote:\n>> ---------- Forwarded message ---------\n>> From: Brightsmile <orders@brightsmile.co.uk>\n>> Date: Mon, 26 Oct 2026 at 15:30\n>> Subject: Your Brightsmile order BS-120334\n>> To: <sam.taylor@example.co.uk>\n>> \n>> Brightsmile\n>> Thanks for your order, Sam.\n>> Order number: BS-120334\n>> Order date: 26 October 2026\n>> \n>> Electric Toothbrush Heads 4 Pack | Qty 2 | £32.00\n>> Water Flosser Travel | Qty 1 | £39.00\n>> \n>> Subtotal £71.00\n>> Delivery FREE\n>> Total £71.00",
+ "expected": {
+  "shop": "Brightsmile",
+  "date": "2026-10-26",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Electric Toothbrush Heads 4 Pack",
+    "qty": 2,
+    "linePence": 3200
+   },
+   {
+    "name": "Water Flosser Travel",
+    "qty": 1,
+    "linePence": 3900
+   }
+  ],
+  "subtotalPence": 7100,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7100
+ }
+}

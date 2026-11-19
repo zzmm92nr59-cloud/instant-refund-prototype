@@ -1,0 +1,36 @@
+{
+ "id": "holdout7-gmail-clipped-mid",
+ "sender": "Larder & Co",
+ "layout": "'[Message clipped]' after the items, before the money",
+ "headers": {
+  "from": "Larder & Co <orders@larderandco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Larder & Co order LC-40019",
+  "date": "Fri, 23 Oct 2026 10:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Larder &amp; Co</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.larderandco.co.uk/?utm_source=email\"><img src=\"https://www.larderandco.co.uk/static/email/logo.png\" alt=\"Larder &amp; Co\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: LC-40019</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order date: 23 October 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Item</td><td>Qty</td><td>Price</td></tr><tr><td>Festive Hamper Large</td><td>1</td><td>£75.00</td></tr><tr><td>Mulled Wine Spice Kit</td><td>1</td><td>£12.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><div style=\"margin:16px 0\">[Message clipped]&nbsp;&nbsp;<a href=\"https://mail.google.com/mail/u/0?ui=2&amp;ik=abc&amp;view=lg&amp;permmsgid=msg-f:123\">View entire message</a></div></td></tr>\n\n</table></td></tr></table>\n<img src=\"https://click.larderandco.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Larder & Co",
+  "date": "2026-10-23",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Festive Hamper Large",
+    "qty": 1,
+    "linePence": 7500
+   },
+   {
+    "name": "Mulled Wine Spice Kit",
+    "qty": 1,
+    "linePence": 1200
+   }
+  ],
+  "subtotalPence": 8700,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": null,
+  "partial": true
+ }
+}
