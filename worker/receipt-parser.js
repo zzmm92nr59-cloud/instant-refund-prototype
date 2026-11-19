@@ -1065,7 +1065,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
-  const gameShop = GAME_SHOP.test(sender?.domain || "");
+  const gameShop = GAME_SHOP.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
   // (A pack of several things, "Mixy Meow | 1", "Checkerboard | 10", is one purchase named by all of them. Round 10.)
   const bundle = gameShop ? gameBundle(fromHtml) || gameBundle(text) : null;
   if (bundle) result.items = [{ name: bundle, qty: 1, pricePence: result.totalPence ?? null }];
@@ -1082,9 +1082,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (dayOf) { result.items = []; result.orderUpdate = "paid"; if (dayOf.orderRef) result.orderRef = dayOf.orderRef; result.totalPence = dayOf.paidPence; result.currency = "GBP"; }
   // A company's legal name as the sender ("Anthropic Ireland, Limited"): the shop is the brand, not the country it bills
   // from ("Anthropic"). Round 10.
-  if (fromName && /,?\s+(?:limited|ltd\.?|plc|inc\.?|llc|pbc|gmbh)\s*$/i.test(fromName) && result.retailer.name) {
+  // (Forwarded, the original sender's name says it.)
+  const legalName = (fwdFrom && fwdFrom.name) || fromName;
+  if (legalName && /,?\s+(?:limited|ltd\.?|plc|inc\.?|llc|pbc|gmbh)\s*$/i.test(legalName) && result.retailer.name) {
     const m = /^(.+?)\s+(?:ireland|uk|europe|emea|international)$/i.exec(result.retailer.name);
-    if (m && !/\b(?:of|de|bank)$/i.test(m[1]) && fromName.toLowerCase().startsWith(m[1].toLowerCase())) result.retailer = { ...result.retailer, name: m[1] };
+    if (m && !/\b(?:of|de|bank)$/i.test(m[1]) && legalName.toLowerCase().startsWith(m[1].toLowerCase())) result.retailer = { ...result.retailer, name: m[1] };
   }
   // The restaurant a takeaway app's order came from ("Your East Ocean order will be with you soon"), beside the app's name.
   const merchant = (uber && uber.kind === "eats" && uber.merchant) || takeawayMerchant(result.retailer.name, sender?.domain, subject, text);
@@ -1583,11 +1585,13 @@ export function parseOrderAdjustmentEmail(rawEmail) {
   const no = { ok: false, reason: "not_an_adjustment" };
   const u = updateParts(rawEmail);
   const sender = retailerFromFrom(u.headers.from);
-  const ub = uberEmail(sender?.domain, u.subject, u.text);
+  // (Forwarded from the shopper's own mailbox, the original sender says it is Uber.)
+  const fw = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(u.text, { subject: u.headers.subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
+  const ub = uberEmail((fw && fw.domain) || sender?.domain, u.subject, u.text);
   if (!ub || ub.kind !== "adjusted" || ub.refundPence == null) return no;
   return { ok: true, kind: "order_update", stage: "adjusted", at: u.at, orderRef: u.orderRef || null, merchant: ub.merchant || null,
     amountPence: ub.refundPence, previousTotalPence: ub.previousPence, newTotalPence: ub.newPence, currency: "GBP",
-    retailer: { name: "Uber Eats", domain: sender.domain } };
+    retailer: { name: "Uber Eats", domain: (fw && fw.domain) || sender.domain } };
 }
 
 // ---- Product photos ---------------------------------------------------------------

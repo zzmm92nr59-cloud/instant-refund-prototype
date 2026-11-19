@@ -1,0 +1,30 @@
+{
+ "id": "holdout11-uber-pet-ride",
+ "sender": "Uber",
+ "layout": "ride: trip fare, pet fee, Uber One credits used and earned",
+ "headers": {
+  "from": "Uber Receipts <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Thursday evening trip with Uber",
+  "date": "Thu, 12 Nov 2026 18:50:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Uber</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.uber.com/?utm_source=email\"><img src=\"https://www.uber.com/static/email/logo.png\" alt=\"Uber\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>12 Nov 2026</td></tr>\n<tr><td>18:05</td></tr>\n<tr><td>12 Nov 2026 , 18:05</td></tr>\n<tr><td>Thanks for riding, Sam</td></tr>\n<tr><td>We hope you enjoyed your ride this evening.</td></tr>\n<tr><td>Total</td><td>&pound;27.85</td></tr>\n<tr><td>&pound;1.39</td></tr>\n<tr><td>Uber One credits earned</td></tr>\n<tr><td>Trip fare</td></tr>\n<tr><td>&pound;25.62</td></tr>\n<tr><td>Uber pet fee</td><td>&pound;3.47</td></tr>\n<tr><td>Uber One credits</td><td>-&pound;1.24</td></tr>\n<tr><td>Payments</td></tr>\n<tr><td>Visa •••• 4821</td><td>&pound;27.85</td></tr>\n<tr><td>This is not a tax invoice.</td></tr>\n<tr><td>Trip details</td></tr>\n<tr><td>6.10 miles, 31 minutes</td></tr>\n<tr><td>You rode with Alex</td><td>4.91</td></tr>\n<tr><td>Rate or tip</td></tr>\n<tr><td>Report lost item</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Uber. All rights reserved.<br /><a href=\"https://www.uber.com/help\">Help</a> | <a href=\"https://www.uber.com/privacy\">Privacy</a> | <a href=\"https://www.uber.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.uber.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Uber",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Uber Pet ride",
+    "qty": 1,
+    "linePence": 2785
+   }
+  ],
+  "subtotalPence": 2785,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2785
+ }
+}

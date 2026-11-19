@@ -12,7 +12,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
 import { mergeOrderEmails, attachCancellations } from "../worker/gmail.js";
@@ -61,6 +61,11 @@ for (const f of fixtures) {
     // A receipt that is only in its attachment (a PDF, a photo) says so, and nothing is read from the attachment; no other
     // email says its details are in an attachment (round 4).
     res.attachment = (r.detailsInAttachment || null) === (w.attachmentOnly || null) ? null : `details in attachment: ${r.detailsInAttachment || "not said"} for ${w.attachmentOnly || "none"}`;
+    // Round 10 (Connor's real inbox): the restaurant on a takeaway app's order; an Uber Eats receipt that lists no items says
+    // so (never a saving read as an item); a supermarket's delivery-day email is the order's payment, joined by its number.
+    res.more = [w.merchant !== undefined && norm(r.merchant) !== norm(w.merchant) ? `merchant "${r.merchant || ""}" for "${w.merchant}"` : null,
+      w.noItemList && !(r.itemsCheck && r.itemsCheck.noItemList) ? "no 'lists no items' state" : null,
+      w.orderUpdate && (r.orderUpdate !== w.orderUpdate || r.orderRef !== w.orderRef) ? `order update ${r.orderUpdate} ${r.orderRef} for ${w.orderUpdate} ${w.orderRef}` : null].filter(Boolean).join("; ") || null;
     rows.push(res);
   }
 }
@@ -77,15 +82,16 @@ const originals = rows.filter((r) => !r.fwd), fwds = rows.filter((r) => r.fwd);
 const sum = (list) => ({ n: list.length, items: list.filter((r) => !r.items).length, total: list.filter((r) => !r.total).length, shop: list.filter((r) => !r.shop).length, date: list.filter((r) => !r.date).length });
 const a = sum(originals), b = sum(fwds);
 
-if (report || silent.length || falseAlarm.length || a.items < a.n || a.total < a.n || b.items < b.n || b.total < b.n) {
+const moreWrong = rows.filter((r) => r.more);
+if (report || moreWrong.length || silent.length || falseAlarm.length || a.items < a.n || a.total < a.n || b.items < b.n || b.total < b.n) {
   const bySender = new Map();
   for (const r of rows) { const e = bySender.get(r.sender) || []; e.push(r); bySender.set(r.sender, e); }
   console.log("\nPer shop (originals and forwards together): items right / totals right / shop right / date right");
   for (const [s, list] of [...bySender].sort()) { const x = sum(list); console.log(`  ${s.padEnd(18)} ${String(x.items).padStart(3)}/${x.n} items  ${String(x.total).padStart(3)}/${x.n} totals  ${String(x.shop).padStart(3)}/${x.n} shop  ${String(x.date).padStart(3)}/${x.n} date`); }
-  const misses = rows.filter((r) => r.items || r.total || r.shop || r.date || r.count || r.attachment);
+  const misses = rows.filter((r) => r.items || r.total || r.shop || r.date || r.count || r.attachment || r.more);
   if (misses.length) {
     console.log("\nMisses:");
-    for (const r of misses) console.log(`  ${r.id.padEnd(34)} ${[r.items, r.total, r.shop, r.date, r.count, r.attachment].filter(Boolean).join("; ")}${r.items ? (r.flagged ? "  [flagged]" : "  [NOT FLAGGED]") : ""}`);
+    for (const r of misses) console.log(`  ${r.id.padEnd(34)} ${[r.items, r.total, r.shop, r.date, r.count, r.attachment, r.more].filter(Boolean).join("; ")}${r.items ? (r.flagged ? "  [flagged]" : "  [NOT FLAGGED]") : ""}`);
   }
   if (falseAlarm.length) { console.log("\nFlagged although the items are right:"); for (const r of falseAlarm) console.log("  " + r.id, JSON.stringify(r.check)); }
 }
@@ -111,6 +117,11 @@ for (const f of notPurchases) {
       if (parseReturnUpdateEmail(raw).ok) notRight.push(`${email.id}: read as a return's news (${w.kind})`);
       if (parseReturnEmail(raw).ok) notRight.push(`${email.id}: read as return instructions (${w.kind})`);
       if (parseReturnParcelEmail(raw).ok) notRight.push(`${email.id}: read as a return parcel (${w.kind})`);
+    }
+    // A takeaway app's changed total: money back on the order, with the refund and the restaurant read (round 10).
+    if (w.kind === "adjusted") {
+      const a = parseOrderAdjustmentEmail(raw);
+      if (!a.ok || a.amountPence !== w.refundPence || norm(a.merchant) !== norm(w.merchant)) notRight.push(`${email.id}: adjustment read as ${JSON.stringify(a.ok ? { refund: a.amountPence, merchant: a.merchant } : a.reason)}`);
     }
     if (w.kind === "refund") {
       const u = parseReturnUpdateEmail(raw);
@@ -209,6 +220,7 @@ console.log(`  Part-cancelled orders: ${cancelWrong.length ? cancelWrong.join(";
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
+need(!moreWrong.length, "the restaurant, the 'lists no items' state and a delivery-day payment read right (round 10)");
 need(cancelWrong.length === 0, "a part-cancelled order marks the item its email names as cancelled, and only that");
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
 need(a.total === a.n && b.total === b.n, "totals right on every email");
