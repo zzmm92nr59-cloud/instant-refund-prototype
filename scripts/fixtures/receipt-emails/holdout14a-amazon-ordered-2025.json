@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-amazon-ordered-2025",
+ "sender": "Amazon",
+ "layout": "'Ordered:' layout: the title cut in the HTML, whole after '* ' in the text part, 'Total' over a price in three cells",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Ordered: ‘Harbourline Insulated Lunch...’",
+  "date": "Wed, 2 Jul 2025 08:00:00 +0000"
+ },
+ "html": "<html><head><title>Amazon.co.uk</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Ordered: ‘Harbourline Insulated Lunch...&rsquo;</td></tr>\n<tr><td>Your Orders</td></tr>\n<tr><td>Thanks for your order, Sam!</td></tr>\n<tr><td>Arriving Thursday</td></tr>\n<tr><td>Sam – Leeds</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>‫202-9988776-5544332</td></tr>\n<tr><td>View or edit order</td></tr>\n<tr><td>Harbourline Insulated Lunch Bag f...</td></tr>\n<tr><td>Sold by Harbourline Goods</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Quantity: 1</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>16</td></tr>\n<tr><td>99</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;</td></tr>\n<tr><td>16</td></tr>\n<tr><td>99</td></tr></table></body></html>",
+ "text": "Thanks for your order, Sam!\nOrder #\n202-9988776-5544332\nView or edit order\nhttps://www.amazon.co.uk/gp/css/order-details?orderID=202-9988776-5544332\n* Harbourline Insulated Lunch Bag for Men and Women, Leakproof Cooler Tote with Front Pocket, 9L, Navy Blue\nQuantity: 1\n16.99 GBP\nTotal\n16.99 GBP",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2025-07-02",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Harbourline Insulated Lunch Bag for Men and Women, Leakproof Cooler Tote with Front Pocket, 9L, Navy Blue",
+    "qty": 1,
+    "linePence": 1699
+   }
+  ],
+  "subtotalPence": 1699,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1699
+ }
+}

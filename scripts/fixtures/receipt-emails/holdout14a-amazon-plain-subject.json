@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-amazon-plain-subject",
+ "sender": "Amazon",
+ "layout": "subject 'Your Amazon.co.uk order.' with a full stop; title, 'Condition: New', 'Sold by:', seller, 'Fulfilled by Amazon', price",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order.",
+  "date": "Fri, 3 Dec 2021 09:26:24 +0000"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"Kestrelwood 2 Pack Silicone...\"</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Orders</td></tr>\n<tr><td>Your Account</td></tr>\n<tr><td>Amazon.co.uk</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Order # 206-3141592-6535897</td></tr>\n<tr><td>Hello,</td></tr>\n<tr><td>Thanks for your order. We&rsquo;ll let you know once your item(s) have dispatched.</td></tr>\n<tr><td>Arriving:</td></tr>\n<tr><td>Friday, December 10</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;11.99</td></tr>\n<tr><td>Selected Payment Method:</td></tr>\n<tr><td>Visa</td></tr>\n<tr><td>Kestrelwood 2 Pack Silicone Baking Mats, Non Stick Reusable Oven Liners for Cookies and Pastry, 42 x 29.5 cm</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Sold by:</td></tr>\n<tr><td>Hearth &amp; Home Supplies</td></tr>\n<tr><td>Fulfilled by Amazon</td></tr>\n<tr><td>&pound;11.99</td></tr>\n<tr><td>We hope to see you again soon.</td></tr>\n<tr><td>Amazon.co.uk</td></tr>\n<tr><td>Fulfilled By Amazon (usually referred to as FBA) items are generally sold by third-party sellers but stored in an Amazon Fulfilment Centre and sent to you from there.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2021-12-03",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Kestrelwood 2 Pack Silicone Baking Mats, Non Stick Reusable Oven Liners for Cookies and Pastry, 42 x 29.5 cm",
+    "qty": 1,
+    "linePence": 1199
+   }
+  ],
+  "subtotalPence": 1199,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1199
+ }
+}

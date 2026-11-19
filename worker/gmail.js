@@ -31,7 +31,7 @@ import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, live
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
 import { aiTypesFor, learnItemKinds } from "./item-kinds.js";
 import { categorise, itemCategories, itemKinds, returnableItems, storeKey, legacyStoreKey, agreedShopNames, logoDomainFor, CATEGORIES, shopDisplayName, PERSONAL_MAIL } from "./receipt-category.js";
-import { cleanItems, isVia } from "./receipt-reader.js";
+import { cleanItems, isVia, nameFitsDomain } from "./receipt-reader.js";
 // Instant email: Gmail and Outlook say when new mail arrives (mail-push.js), so it's read at once rather than on the next round.
 import { stopMailPush, gmailPushOn, outlookPushOn } from "./mail-push.js";
 const CATEGORY_KEYS = Object.keys(CATEGORIES);;
@@ -947,6 +947,9 @@ function classify(rawText, ref, lenient = false) {
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
+      // (When the email was sent, to the minute, so a payment service's receipt can find the shop's receipt for the same
+      // purchase, and what a gift card paid of an Amazon order. Round 13.)
+      ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
       ...(receipt.detailsInAttachment ? { detailsInAttachment: receipt.detailsInAttachment } : {}),
       needsShopperConfirmation: receipt.needsShopperConfirmation, method: receipt.method, returns: receipt.returns, shipment: receipt.shipment || null,
@@ -1663,6 +1666,18 @@ export function mergeOrderEmails(orders) {
       (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1) &&
       (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
     if (fits.length === 1) paidVia.set(p, fits[0]);
+  }
+  // (A payment service's receipt with no order number, PayPal's "Receipt for your payment to Appcharge", "You paid $5.39 USD",
+  // sent within minutes of the shop's own receipt for the same money, "Your MATCH MASTERS-CANDIVORE receipt #672-235-462",
+  // Total $5.39, from the shop the payment names (appcharge.com for "Appcharge"): the same purchase, one card. Only when
+  // exactly one receipt fits each way. Round 13.)
+  const near = (a, b) => a.sentAt && b.sentAt && Math.abs(Date.parse(a.sentAt) - Date.parse(b.sentAt)) <= 10 * 60000;
+  const paidFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && o.retailer.domain && p.retailer.name &&
+    nameFitsDomain(p.retailer.name, o.retailer.domain) && o.totalPence != null && o.totalPence === p.totalPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o, p);
+  const unref = orders.filter((p) => p.retailer && p.retailer.via && !p.orderRef && p.totalPence != null && p.sentAt && !isForwarded(p));
+  for (const p of unref) {
+    const fits = orders.filter((o) => paidFits(p, o));
+    if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
   }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }

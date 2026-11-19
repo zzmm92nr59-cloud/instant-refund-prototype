@@ -1,0 +1,30 @@
+{
+ "id": "holdout14a-amazon-divided-2023",
+ "sender": "Amazon",
+ "layout": "two orders in one email, each 'Order #' over its address, 'Order Total:' and items; a book's author on its own row",
+ "headers": {
+  "from": "\"Amazon.co.uk\" <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"The Allotment Year...\" and 1 more item(s)",
+  "date": "Mon, 6 Feb 2023 22:44:34 +0000"
+ },
+ "html": "<html><head><title>Your Amazon.co.uk order of \"The Allotment Year...\" and 1 more item(s)</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Amazon.co.uk</td></tr>\n<tr><td>Order Confirmation</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>206-5550122-1100457</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>206-5550123-7781204</td></tr>\n<tr><td>Hello,</td></tr>\n<tr><td>Your Orders</td></tr>\n<tr><td>on Amazon.co.uk.</td></tr>\n<tr><td>Your purchase has been divided into 2 orders.</td></tr>\n<tr><td>Order summary</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>206-5550122-1100457</td></tr>\n<tr><td>Placed on February 06, 2023</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;6.49</td></tr>\n<tr><td>Selected Payment Method:</td></tr>\n<tr><td>Mastercard</td></tr>\n<tr><td>Willowmere Set of 12 Beeswax Tealight Candles, Unscented, 4 Hour Burn Time, Natural Honey Colour</td></tr>\n<tr><td>Condition: New</td></tr>\n<tr><td>Sold by:</td></tr>\n<tr><td>Glowfield Crafts</td></tr>\n<tr><td>Fulfilled by Amazon</td></tr>\n<tr><td>&pound;6.49</td></tr>\n<tr><td>Order #</td></tr>\n<tr><td>206-5550123-7781204</td></tr>\n<tr><td>Placed on February 06, 2023</td></tr>\n<tr><td>Your order will be sent to:</td></tr>\n<tr><td>Sam</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>United Kingdom</td></tr>\n<tr><td>Order Total:</td></tr>\n<tr><td>&pound;12.49</td></tr>\n<tr><td>Selected Payment Method:</td></tr>\n<tr><td>Mastercard</td></tr>\n<tr><td>The Allotment Year: A Grower's Diary of Seasons</td></tr>\n<tr><td>Hartley, Rowan</td></tr>\n<tr><td>Sold by: Amazon EU S.a.r.L.</td></tr>\n<tr><td>&pound;12.49</td></tr>\n<tr><td>We hope to see you again soon.</td></tr>\n<tr><td>Fulfilled By Amazon (usually referred to as FBA) items are generally sold by third-party sellers but stored in an Amazon Fulfilment Centre and sent to you from there.</td></tr></table></body></html>",
+ "text": "Amazon.co.uk Order Confirmation\nOrder #206-5550122-1100457\nOrder #206-5550123-7781204\nHello,\nYour purchase has been divided into 2 orders.\nArriving:\nTuesday, February 7\nOrdered item(s):\nWillowmere Set of 12 Beeswax Tealight Candles, Unscented, 4 Hour Burn Time, Natural Honey Colour\n£6.49\nCondition: New\nSold by: Glowfield Crafts\nFulfilled by Amazon\nOrder Total:                      £6.49\n=======================================================================================\nArriving:\nWednesday, February 8\nOrdered item(s):\nThe Allotment Year: A Grower's Diary of Seasons of Hartley, Rowan\n£12.49\nSold by: Amazon EU S.a.r.L.\nOrder Total:                      £12.49\n=======================================================================================\nWe hope to see you again soon.",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2023-02-06",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Willowmere Set of 12 Beeswax Tealight Candles, Unscented, 4 Hour Burn Time, Natural Honey Colour",
+    "qty": 1,
+    "linePence": 649
+   }
+  ],
+  "subtotalPence": 649,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 649
+ }
+}
