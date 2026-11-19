@@ -1,0 +1,48 @@
+{
+ "id": "holdout9-ue-two-pizzas-halves-text",
+ "sender": "Uber Eats",
+ "layout": "text: 'n x Name - £', same pizza twice, halves, allergy line",
+ "headers": {
+  "from": "Uber Eats <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order from Slice Society",
+  "date": "Sat, 14 Nov 2026 21:00:00 +0000"
+ },
+ "html": "",
+ "text": "Uber Eats\nThanks for ordering from Slice Society\n14 November 2026\n\n1 x Large Pizza - £14.99\n   1/2 Pepperoni\n   1/2 Mushroom\n1 x Large Pizza - £15.99\n   Meat Feast\n   Extra cheese +£1.00\n1 x Garlic Dough Balls - £4.50\n\nAllergy info: no nuts please\n\nSubtotal - £35.48\nDelivery Fee - £1.99\nService Fee - £0.99\nBag Fee - £0.10\nTotal - £38.56",
+ "expected": {
+  "shop": "Uber Eats",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Large Pizza",
+    "qty": 1,
+    "linePence": 1499,
+    "extras": [
+     "1/2 Pepperoni",
+     "1/2 Mushroom"
+    ]
+   },
+   {
+    "name": "Large Pizza",
+    "qty": 1,
+    "linePence": 1599,
+    "extras": [
+     "Meat Feast",
+     "Extra cheese +£1.00"
+    ]
+   },
+   {
+    "name": "Garlic Dough Balls",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 3548,
+  "feesPence": 308,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3856
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout10-iceland-challenge25",
+ "sender": "Iceland",
+ "layout": "'Challenge 25: ID required' under a name, 'Qty 2' cell",
+ "headers": {
+  "from": "Iceland <groceries@iceland.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Iceland order confirmation",
+  "date": "Tue, 10 Nov 2026 12:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Iceland</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.iceland.co.uk/?utm_source=email\"><img src=\"https://www.iceland.co.uk/static/email/logo.png\" alt=\"Iceland\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Your order is on its way</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order No: 400099120</p><p>Order Date: 10/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Iceland Southern Fried Chicken Strips 600g</td><td>Qty 2</td><td>£6.00</td></tr><tr><td>Iceland Garlic Bread Slices 10 pack</td><td>Qty 1</td><td>£1.00</td></tr><tr><td>Kopparberg Mixed Fruit 500ml<br/>Challenge 25: ID required</td><td>Qty 1</td><td>£2.50</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£9.50</td></tr><tr><td>Delivery</td><td align=\"right\">FREE</td></tr><tr><td>Bags</td><td align=\"right\">£0.40</td></tr><tr><td>2 for &pound;5</td><td align=\"right\">-£1.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£8.90</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Iceland. All rights reserved.<br /><a href=\"https://www.iceland.co.uk/help\">Help</a> | <a href=\"https://www.iceland.co.uk/privacy\">Privacy</a> | <a href=\"https://www.iceland.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.iceland.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Iceland",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Iceland Southern Fried Chicken Strips 600g",
+    "qty": 2,
+    "linePence": 600
+   },
+   {
+    "name": "Iceland Garlic Bread Slices 10 pack",
+    "qty": 1,
+    "linePence": 100
+   },
+   {
+    "name": "Kopparberg Mixed Fruit 500ml",
+    "qty": 1,
+    "linePence": 250
+   }
+  ],
+  "subtotalPence": 950,
+  "feesPence": 40,
+  "discountsPence": 100,
+  "tipsPence": 0,
+  "totalPence": 890
+ }
+}

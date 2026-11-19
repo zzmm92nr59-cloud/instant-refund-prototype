@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-ue-text-indented-options",
+ "sender": "Uber Eats",
+ "layout": "text: '1  Name  £', options indented, promotion and small order fee",
+ "headers": {
+  "from": "Uber Eats <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Tuesday lunch order with Uber Eats",
+  "date": "Tue, 17 Nov 2026 13:10:00 +0000"
+ },
+ "html": "",
+ "text": "Uber Eats\nHere's your receipt for Burrito Bros, Sam.\nOrder date: 17 November 2026\n\n1  Chicken Burrito  £8.99\n     Black beans\n     Hot salsa\n     No sour cream\n1  Chips & Guacamole  £3.99\n\nSubtotal  £12.98\nDelivery Fee  £1.99\nService Fee  £0.99\nSmall Order Fee  £1.50\nPromotion  -£3.00\nTotal  £14.46",
+ "expected": {
+  "shop": "Uber Eats",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Burrito",
+    "qty": 1,
+    "linePence": 899,
+    "extras": [
+     "Black beans",
+     "Hot salsa",
+     "No sour cream"
+    ]
+   },
+   {
+    "name": "Chips & Guacamole",
+    "qty": 1,
+    "linePence": 399
+   }
+  ],
+  "subtotalPence": 1298,
+  "feesPence": 448,
+  "discountsPence": 300,
+  "tipsPence": 0,
+  "totalPence": 1446
+ }
+}

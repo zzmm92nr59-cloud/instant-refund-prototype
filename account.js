@@ -3376,8 +3376,9 @@
   function lineMoney(i, cur) { return Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), cur || "GBP") : null; }
   // One item on its own line: how many ("2 × "), its name and size or colour, and what the line cost (round 7: a receipt's
   // page listed names only, with no quantities or prices).
-  function itemLine(i, cur) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; var p = lineMoney(i, cur);
-    return el("li", {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }), p ? el("b", { text: p }) : null].filter(Boolean)); }
+  // (An item the shop's email says it cancelled says so in place of its price, round 8: only when the email named it.)
+  function itemLine(i, cur) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; var p = i.cancelled === true ? "Cancelled" : lineMoney(i, cur);
+    return el("li", i.cancelled === true ? { className: "rl-item-cancelled" } : {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }), p ? el("b", { text: p }) : null].filter(Boolean)); }
   // Money a shop's email says it refunded on a receipt, in pounds. Shown beside what was spent, never silently taken off it
   // (round 7: Relay's totals are what was paid; refunds are said next to them).
   function refundOf(r) { var p = r && r.returnProgress; return p && p.refundedAt && Number.isInteger(p.refundPence) && (!p.currency || p.currency === "GBP") && !notPounds(r) ? p.refundPence : 0; }

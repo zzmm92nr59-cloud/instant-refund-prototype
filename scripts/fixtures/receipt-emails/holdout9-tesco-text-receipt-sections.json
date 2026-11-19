@@ -1,0 +1,45 @@
+{
+ "id": "holdout9-tesco-text-receipt-sections",
+ "sender": "Tesco",
+ "layout": "text receipt: delivered / substitutions / unavailable / savings sections",
+ "headers": {
+  "from": "Tesco.com <tesco@confirmations.tesco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Tesco receipt",
+  "date": "Tue, 17 Nov 2026 20:00:00 +0000"
+ },
+ "html": "",
+ "text": "Tesco.com\nYour receipt\nOrder number: 7701-4410-0087\nDelivered on 17 November 2026\n\nDelivered items\n6 Tesco Bananas Loose £0.84\n3 Muller Corner Strawberry 124G £2.25\n3 Muller Corner Blueberry 124G £2.25\n\nSubstitutions\n1 Hovis Best Of Both 750G £1.50\n   Substituted for Hovis Wholemeal 800G\n\nUnavailable items\n1 Tesco Basmati Rice 1Kg (not charged)\n\nSavings\nAny 6 for £3.50 -£1.00\n\nSubtotal £6.84\nDelivery £3.50\nTotal £9.34",
+ "expected": {
+  "shop": "Tesco",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Tesco Bananas Loose",
+    "qty": 6,
+    "linePence": 84
+   },
+   {
+    "name": "Muller Corner Strawberry 124G",
+    "qty": 3,
+    "linePence": 225
+   },
+   {
+    "name": "Muller Corner Blueberry 124G",
+    "qty": 3,
+    "linePence": 225
+   },
+   {
+    "name": "Hovis Best Of Both 750G",
+    "qty": 1,
+    "linePence": 150
+   }
+  ],
+  "subtotalPence": 684,
+  "feesPence": 350,
+  "discountsPence": 100,
+  "tipsPence": 0,
+  "totalPence": 934
+ }
+}

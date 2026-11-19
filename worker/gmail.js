@@ -133,7 +133,9 @@ const GONE = Symbol("gone");
 // 35 (round 4): emails as they arrive: 8bit windows-1252 parts, forwards attached whole, attachments never read as text,
 // hidden and Outlook-only copies left out, replies quoted with "> ", recommendations, clipped emails, receipts only in a PDF.
 // 37 (round 7): an invoice number ("Invoice number: INV-2290") is the order number when the email gives no other.
-export const PARSER_VERSION = 37;
+// 38 (round 8): takeaway, supermarket, Amazon and fashion layouts: a table cell over several lines, notes under an item, toppings
+// at £0.00, sizes under a row, guide prices, "Ordered on" dates, cells copied with tabs, fares without a journey flagged.
+export const PARSER_VERSION = 38;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -853,6 +855,7 @@ function classify(rawText, ref, lenient = false) {
     const dis = can.ok ? { ok: false } : parseDispatchEmail(rawText);
     if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency,
+        ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (dis.ok) {
       details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
@@ -1676,8 +1679,23 @@ export function attachCancellations(orders, cancels) {
     const sums = mine.filter(u => Number.isInteger(u.amountPence) && (u.currency || "GBP") === cur);
     const amount = sums.length === mine.length ? sums.reduce((n, u) => n + u.amountPence, 0) : null;
     o.cancelled = { at, partial: true, amountPence: amount != null && (o.totalPence == null || amount <= o.totalPence) ? amount : null, currency: amount != null ? cur : null };
+    // The items the shop's email names as cancelled are marked on the order (round 8), only when the name is the item's own
+    // (the same words, or one name the whole of the other): never guessed from the amount alone.
+    const named = mine.flatMap(u => (Array.isArray(u.cancelledItems) ? u.cancelledItems : [])).map(c => cancelKey(c && c.name)).filter(k => k.length >= 3);
+    if (named.length && Array.isArray(o.items)) {
+      const marked = [];
+      o.items = o.items.map((it) => {
+        const k = cancelKey(it && it.name);
+        const hit = k.length >= 3 && named.some(n => n === k || (n.length >= 6 && k.length >= 6 && (" " + k + " ").includes(" " + n + " ")) || (n.length >= 6 && k.length >= 6 && (" " + n + " ").includes(" " + k + " ")));
+        if (hit) marked.push(it.name);
+        return hit ? { ...it, cancelled: true } : it;
+      });
+      // (Every item named and none left: that is the whole order, but the shop said part, so nothing is marked.)
+      if (marked.length && marked.length === o.items.length) o.items = o.items.map(({ cancelled, ...it }) => it);
+    }
   }
 }
+const cancelKey = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
 // When the emails give no return date, the earliest one that is safe to go by, counted from the order date (the parcel can
 // only arrive after it): the window the email gives ("30 days to return", without saying from when), or, for an online

@@ -10,7 +10,7 @@
 
 const MAX_INPUT = 600_000;
 import { flightBooking, flightItemName } from "./flight-booking.js";
-import { cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems, looksLikePerson } from "./receipt-reader.js";
+import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mainLinkDomain, isVia, itemsFromCells, GAME_SHOP, gameTitle, gameItems, looksLikePerson } from "./receipt-reader.js";
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 
@@ -292,6 +292,10 @@ function htmlToTextAll(html) {
   return decodeEntities(html
     .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    // (A "|" the email writes inside a cell, "SanDisk 128GB … | A1 | Class 10", is part of what the cell says, not the edge of
+    // a column: it is kept as "│" so the reader never splits a name there. Not when it sets facts apart, "Size: 8 | Qty: 2 |
+    // £24.00", "XS | BLACK" (short words first). Round 8.)
+    .replace(/>([^<>]*\|[^<>]*)</g, (m, t) => (/£|&pound;|&#163;|\b(?:qty|quantity|size|colou?r|price)\b\s*:/i.test(t) || t.split("|")[0].trim().split(/\s+/).length <= 3 ? m : ">" + t.replace(/\|/g, "\u2502") + "<"))
     // A table cell that is only a picture says what it shows in the picture's alt text: an item shown only as its photo
     // ("Dorma Pure Cotton Duvet Cover Set"). Only a description of three words or more (a logo's alt is the shop's name),
     // and only when the email doesn't write those words anywhere else.
@@ -440,6 +444,9 @@ export function parseDate(text, refDate) {
   const t = String(text || "");
   const late = (v) => Boolean(v) && refDate instanceof Date && !Number.isNaN(refDate.getTime()) && new Date(v + "T00:00:00Z").getTime() > refDate.getTime() + 2 * 86400000;
   for (const m of t.slice(0, 20000).matchAll(ORDER_DATE_LABEL)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
+  // ("Ordered on 18 November 2026", "Placed on Wed 18 Nov 2026" with no colon: still the order's date, before a delivery
+  // day written higher up. Round 8.)
+  for (const m of t.slice(0, 20000).matchAll(/\b(?:ordered|placed|order placed)\s+on\s+([^\n|]{6,40})/gi)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
   const v = dateFound(t, refDate);
   if (!late(v)) return v;
   for (const line of t.split("\n")) { const w = dateFound(line, refDate); if (w && !late(w)) return w; }
@@ -498,7 +505,7 @@ function fromText(text, refDate) {
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
   // includes delivery ("Total Including Delivery | £315.78") beats a plain one.
-  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay(?: in store)?|due|guide price))?(?:\s+(?:by|with|on|using) (?:card|cash|[a-z]+ card|apple pay|google pay|paypal))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
+  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay(?: in store)?|due|guide price))?(?:\s+(?:by|with|on|using) (?:card|cash|[a-z]+ card|apple pay|google pay|paypal))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*|[-–]\s+(?=£)){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
   // Not the items' own total ("Products total", "Goods total", "Items total"), and, when there is a subtotal, a total after it
   // (an email can print the total at the top too, or a "Total" for each line of its item list).
   const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
@@ -509,6 +516,8 @@ function fromText(text, refDate) {
   const totalMatch =
     pool.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || pool[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    // A supermarket's order before it is picked gives a guide price, not a total ("Guide price | £27.69"). Round 8.
+    text.match(/^[\s|]*(?:estimated |order )?guide price\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/im) ||
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
     [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
     // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
@@ -682,6 +691,13 @@ function extractReturns(text, html, orderDate) {
 // in it are the order's, so it is read like its receipt and joins the order's card by its order number (gmail.js
 // mergeOrderEmails). Without an order number it would be a second card for the same order, so it is then not read at all.
 const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?:have |has )?(?:shipped|dispatched|been sent|on (?:their|its) way)\b|\b(?:part|some) of your order\b[^!?]{0,40}\b(?:shipped|dispatched|sent|on its way)\b|\bsome of your items\b[^!?]{0,30}\b(?:shipped|dispatched|on (?:their|its) way)\b/i;
+// An invoice the email says is paid ("Thank you for your payment", "Amount paid £60.00", "Balance due £0.00"), and nothing in it
+// asks for money still to come ("Amount due £160.80", "Please pay by …", "Due date: …"). Round 8.
+function paidInvoice(text) {
+  const t = String(text || "").slice(0, 8000).replace(/\b(?:balance|amount)\s+(?:due|outstanding|to pay)\s*[:|]?\s*\|?\s*£\s?0(?:\.00)?\b/gi, " ");
+  return /\b(?:thank you for your payment|payment received|we(?:'|’)?ve received your payment|amount paid|total paid|paid in full|paid with|paid by|paid on)\b/i.test(t) &&
+    !/\b(?:amount due|balance due|total due|payment due|due date|due by|due on|please pay|pay by|pay now|pay online|overdue|outstanding|payment terms|to be paid|awaiting payment)\b/i.test(t);
+}
 function receiptSignals(subject, text) {
   const s = `${subject || ""}`.toLowerCase();
   // ("Your Ted Baker order" and "Your Café Lumière receipt" count too: the shop's name between "your" and "order".)
@@ -689,6 +705,13 @@ function receiptSignals(subject, text) {
     // "Your Friday evening trip with Uber", "Your Deliveroo order from Wagamama", "We're processing your order W123",
     // "Your Etsy Purchase from …", "Your purchase with lululemon", "Receipt for your payment to …", "Your LNER tickets for …".
     /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
+    // "Your Sainsbury's order summary" (round 8).
+    /\byour\b[^!?]{0,40}\border summary\b/.test(s) ||
+    // "Your invoice from Brightwave Window Cleaning", "Invoice from …" that says it has been paid (round 8). Never an invoice
+    // that is overdue, a reminder or still to pay: that is a bill, not a purchase (checked against the email below).
+    (/^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w&'’.-]+\s+){0,3}invoice\b/.test(s) && !/\b(?:overdue|reminder|due|unpaid|outstanding|final notice|statement|request|pay now|awaiting|proforma|pro-forma|quote|estimate)\b/.test(s) && paidInvoice(text)) ||
+    // "Your order is on its way to the restaurant", "Your order has been sent to Golden Dragon" (a takeaway app). Round 8.
+    /\byour order\b[^!?]{0,20}\b(?:on its way|been sent|gone|sent) to the (?:restaurant|kitchen|takeaway)\b/.test(s) ||
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     // "Reservation confirmed for Manchester", "Your booking is confirmed at …", "Your … order PK-338812", "Your order … has been placed".
     /\b(?:reservation|booking|order|purchase)\b[^!?]{0,30}\bconfirmed\b|\byour\b[^!?]{0,40}\border\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border\b[^!?]{0,30}\b(?:has been|was|is) placed\b|(?:^|[!.:]\s+)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) ||
@@ -847,6 +870,14 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   });
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
+  // "Tesco.com" as the sender's name, when the email calls the shop "Tesco" again and again (its own products, "Tesco Whole
+  // Milk"): the shop is Tesco. (A brand whose name is its address, "Booking.com", writes it that way throughout.) Round 8.
+  const dotCom = /^(\p{Lu}[\p{Ll}\d-]{2,30})\.com$/u.exec(ranked.name || "");
+  if (dotCom && (String(text).match(new RegExp("\\b" + dotCom[1] + "\\b(?!\\.com)", "g")) || []).length >= 2) ranked.name = dotCom[1];
+  // "Costa Coffee" from costa.co.uk, "Domino's Pizza" from dominos.co.uk, "Waitrose & Partners" from waitrose.com: the shop is
+  // the name its address gives, so the same shop is one shop in Relay whichever of its emails named it. Round 8.
+  const brand = /^(.+?)\s+(?:&\s*partners|coffee|pizza|pizzas|restaurants?|uk|group|stores?|foods?|burgers?|grill|express|online)$/i.exec(ranked.name || "");
+  if (brand && sentDomain && brand[1].toLowerCase().replace(/[^a-z0-9]/g, "") === domainBase(sentDomain).replace(/-/g, "")) ranked.name = brand[1];
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
   if (ranked.via) out.via = ranked.via;
@@ -1053,6 +1084,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (stated && result.items.length && result.itemsCheck && result.itemsCheck.complete !== false && !isFlight && !journey && !gameShop &&
       stated !== result.items.length && stated !== result.items.reduce((n, i) => n + (i.qty || 1), 0)) {
     result.itemsCheck = { ...result.itemsCheck, complete: false, countStated: stated, countRead: result.items.length };
+  }
+  // A train ticket read only as its fare ("Advance Single (Standard)", "1 Adult" with "Anytime Day Return") when the email
+  // never says where it goes (a pasted body without its subject): the thing bought, the journey, is missing. Round 8.
+  const FARE = /\b(?:(?:super )?off-?peak|anytime|advance|open|flexi\w*|saver|standard|first(?: class)?|day)\b[^|]{0,20}\b(?:single|return)\b|\b(?:single|return)\b[^|]{0,6}\((?:standard|first(?: class)?)\)/i;
+  if (!isFlight && !journey && result.items.length && result.items.every((i) => FARE.test(String(i.name || "")) || (/^(?:\d+\s+)?(?:adults?|child(?:ren)?|seniors?|passengers?)$/i.test(String(i.name || "")) && FARE.test(String(i.variant || "")))) &&
+      !/\b\p{Lu}[\p{L}'’.&-]+(?: [\p{Lu}(][\p{L}'’.&()-]*){0,4} to \p{Lu}[\p{L}'’.&-]+/u.test(text + "\n" + (otherPart || "")) && result.itemsCheck && result.itemsCheck.complete !== false) {
+    result.itemsCheck = { ...result.itemsCheck, complete: false, fareOnly: true };
   }
   // No items read is never "complete", even when there is no total to compare with.
   if (!result.items.length && result.itemsCheck && result.itemsCheck.complete !== false) result.itemsCheck = { ...result.itemsCheck, complete: false };
@@ -1404,6 +1442,33 @@ export function parseDispatchEmail(rawEmail) {
 // "Your order LF-6006 has been cancelled", "Part of your order has been cancelled": the shop cancelled all or part of an order.
 // Nothing was bought (or that part wasn't), so it is not a purchase and not money spent; the order's card says so. The amount
 // is what the email says came back, when it says.
+// Which items a part-cancelled order lost, only where the email names them (round 8): under a "Cancelled items" heading, or in
+// a sentence ("We've had to cancel the Linen Shirt White from your order"). Never worked out from an amount.
+const CANCELLED_HEAD = /^[\s|]*(?:cancell?ed items?|items? (?:that )?(?:we(?:'|’)?ve |we have |have been |has been |were |was )?cancell?ed|the following items? (?:has|have) been cancell?ed|what(?:'|’)?s been cancell?ed|item\(s\) cancell?ed)\s*:?[\s|]*$/im;
+function cancelledNames(text) {
+  const t = String(text || "");
+  const out = [];
+  const h = CANCELLED_HEAD.exec(t);
+  if (h) {
+    const after = t.slice(h.index + h[0].length).split("\n");
+    // The list under the heading, to the next heading or money line ("Amount to be refunded", "The rest of your order").
+    const stop = after.findIndex((l, k) => k > 0 && /^[\s|]*(?:amount|refund|total|sub-?total|the rest|your other items|items? (?:still )?(?:on (?:its|their) way|being sent|to follow)|still coming|we(?:'|’)?ll|you(?:'|’)?ll|if you|questions)/i.test(l));
+    const list = after.slice(0, stop > 0 ? stop : 40);
+    for (const i of readItems(list.join("\n"))) if (i.name) out.push({ name: i.name, qty: i.qty || 1 });
+    // A list with no prices: each name on its own line.
+    if (!out.length) for (const l of list.slice(0, 12)) {
+      const n = l.replace(/[|]/g, " ").replace(/\s+/g, " ").trim();
+      if (n && /\p{L}{3}/u.test(n) && n.length <= 90 && !/^(?:size|colou?r|qty|quantity|price)\b|£|:\s*$/i.test(n) && !/[.!?]$/.test(n)) out.push({ name: n, qty: 1 });
+      else if (out.length && !n) break;
+    }
+  }
+  const sm = /\bwe(?:'|’)?ve (?:had to )?cancel(?:led)?|\bwe have (?:had to )?cancel(?:led)?|\bwe(?:'|’)?re sorry,? but we(?:'|’)?ve cancelled/i.exec(t.slice(0, 2000));
+  if (!out.length && sm) {
+    const m = /^\s+(?:the |your )?(?:item\s+)?["“]?([^"”.\n]{3,80}?)["”]?\s+(?:from|in|on) your order\b/i.exec(t.slice(sm.index + sm[0].length, sm.index + sm[0].length + 160));
+    if (m && !/^(?:items?|some|part|parts|one|order|it|them|these|those)$/i.test(m[1].split(/\s+/)[0])) out.push({ name: m[1].trim(), qty: 1 });
+  }
+  return out.slice(0, 20);
+}
 export function parseCancellationEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_cancellation" };
   const u = updateParts(rawEmail);
@@ -1417,6 +1482,7 @@ export function parseCancellationEmail(rawEmail) {
     !/(?<!\b(?:part|some|one|items?) (?:of|in|from) )\b(?:your|the|this) (?:whole |entire )?order (?:has been|was|is) cancell?ed\b/i.test(u.subject + " " + top);
   const amt = (top.match(/\brefund(?:ed)?\b[^£€\n]{0,40}([£€])\s*([0-9][0-9,]*\.[0-9]{2})/i) || top.match(/([£€])\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\b(?:refund|back to your|returned to your)/i));
   return { ok: true, kind: "order_update", stage: "cancelled", partial, at: u.at, orderRef: u.orderRef,
+    ...(partial ? { cancelledItems: cancelledNames(u.text) } : {}),
     amountPence: amt ? money(amt[2]) : null, currency: amt ? (amt[1] === "€" ? "EUR" : "GBP") : null,
     retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
 }

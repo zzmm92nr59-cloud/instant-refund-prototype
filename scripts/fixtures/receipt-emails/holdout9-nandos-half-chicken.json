@@ -1,0 +1,48 @@
+{
+ "id": "holdout9-nandos-half-chicken",
+ "sender": "Nando's",
+ "layout": "text: '1/2 Chicken x1 £', '- ' options, total only",
+ "headers": {
+  "from": "Nando's <noreply@nandos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Nando's order",
+  "date": "Wed, 18 Nov 2026 17:45:00 +0000"
+ },
+ "html": "",
+ "text": "Nando's\nThanks for your order!\nOrder number: N-88213\nCollection from Nando's Leeds Trinity\n18 November 2026\n\n1/2 Chicken x1 £9.95\n- Hot\n- Spicy Rice\n- Corn on the Cob\nWing Platter x1 £16.50\n- Lemon & Herb\nBottomless Soft Drink x2 £6.70\n\nTotal £33.15\n\nYou earned 1 chilli on your Nando's card",
+ "expected": {
+  "shop": "Nando's",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "1/2 Chicken",
+    "qty": 1,
+    "linePence": 995,
+    "extras": [
+     "Hot",
+     "Spicy Rice",
+     "Corn on the Cob"
+    ]
+   },
+   {
+    "name": "Wing Platter",
+    "qty": 1,
+    "linePence": 1650,
+    "extras": [
+     "Lemon & Herb"
+    ]
+   },
+   {
+    "name": "Bottomless Soft Drink",
+    "qty": 2,
+    "linePence": 670
+   }
+  ],
+  "subtotalPence": 3315,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3315
+ }
+}

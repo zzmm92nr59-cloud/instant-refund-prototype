@@ -1,0 +1,59 @@
+{
+ "id": "holdout9-fiveguys-toppings-zero",
+ "sender": "Five Guys",
+ "layout": "toppings as their own £0.00 rows under each item, VAT included line",
+ "headers": {
+  "from": "Five Guys <orders@fiveguys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Five Guys order FG-55021",
+  "date": "Mon, 16 Nov 2026 18:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Five Guys</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fiveguys.co.uk/?utm_source=email\"><img src=\"https://www.fiveguys.co.uk/static/email/logo.png\" alt=\"Five Guys\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for ordering with Five Guys</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #FG-55021</p><p>Pickup at 18:20, 16 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1 Cheeseburger</td><td align=\"right\">£12.25</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Lettuce</span></td><td align=\"right\">£0.00</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Pickles</span></td><td align=\"right\">£0.00</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Grilled Onions</span></td><td align=\"right\">£0.00</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Ketchup</span></td><td align=\"right\">£0.00</td></tr><tr><td>1 Little Bacon Burger</td><td align=\"right\">£10.25</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Mayo</span></td><td align=\"right\">£0.00</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Jalapeño Peppers</span></td><td align=\"right\">£0.00</td></tr><tr><td>1 Regular Cajun Fries</td><td align=\"right\">£5.95</td></tr><tr><td>1 Milkshake</td><td align=\"right\">£6.25</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Biscoff</span></td><td align=\"right\">£0.00</td></tr><tr><td><span style=\"padding-left:12px;font-size:13px\">Banana</span></td><td align=\"right\">£0.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td>£34.70</td></tr><tr><td>VAT included</td><td>£5.78</td></tr><tr><td><b>Total</b></td><td><b>£34.70</b></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Five Guys. All rights reserved.<br /><a href=\"https://www.fiveguys.co.uk/help\">Help</a> | <a href=\"https://www.fiveguys.co.uk/privacy\">Privacy</a> | <a href=\"https://www.fiveguys.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fiveguys.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Five Guys",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Cheeseburger",
+    "qty": 1,
+    "linePence": 1225,
+    "extras": [
+     "Lettuce",
+     "Pickles",
+     "Grilled Onions",
+     "Ketchup"
+    ]
+   },
+   {
+    "name": "Little Bacon Burger",
+    "qty": 1,
+    "linePence": 1025,
+    "extras": [
+     "Mayo",
+     "Jalapeño Peppers"
+    ]
+   },
+   {
+    "name": "Regular Cajun Fries",
+    "qty": 1,
+    "linePence": 595
+   },
+   {
+    "name": "Milkshake",
+    "qty": 1,
+    "linePence": 625,
+    "extras": [
+     "Biscoff",
+     "Banana"
+    ]
+   }
+  ],
+  "subtotalPence": 3470,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3470
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "id": "holdout10-hm-two-sizes-pipes-text",
+ "sender": "H&M",
+ "layout": "text: 'Name | Colour | Size 10 | 1 | £', same jacket in two sizes",
+ "headers": {
+  "from": "H&M <info@email.hm.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your H&M order confirmation",
+  "date": "Sun, 8 Nov 2026 14:00:00 +0000"
+ },
+ "html": "",
+ "text": "H&M\nOrder confirmation\nOrder number: 61009988776\nOrder date: 8 November 2026\n\nOversized Puffer Jacket | Black | Size 10 | 1 | £69.99\nOversized Puffer Jacket | Black | Size 12 | 1 | £69.99\n\nSubtotal £139.98\nDelivery Free\nTotal £139.98",
+ "expected": {
+  "shop": "H&M",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Oversized Puffer Jacket",
+    "qty": 1,
+    "linePence": 6999,
+    "extras": [
+     "Size 10"
+    ]
+   },
+   {
+    "name": "Oversized Puffer Jacket",
+    "qty": 1,
+    "linePence": 6999,
+    "extras": [
+     "Size 12"
+    ]
+   }
+  ],
+  "subtotalPence": 13998,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 13998
+ }
+}

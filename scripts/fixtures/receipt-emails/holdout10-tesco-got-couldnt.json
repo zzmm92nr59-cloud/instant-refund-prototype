@@ -1,0 +1,45 @@
+{
+ "id": "holdout10-tesco-got-couldnt",
+ "sender": "Tesco",
+ "layout": "'What you got' / 'What we couldn't get', substitute and age notes under names",
+ "headers": {
+  "from": "Tesco.com <tesco@confirmations.tesco.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Tesco receipt",
+  "date": "Fri, 13 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Tesco</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tesco.com/?utm_source=email\"><img src=\"https://www.tesco.com/static/email/logo.png\" alt=\"Tesco\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for shopping with us</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 7701-5501-3302</p><p>Ordered on 13 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>What you got</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1</td><td>Tesco Finest Steak Pie 550G</td><td>£4.50</td></tr><tr><td>1</td><td>Tesco Mixed Peppers 3 Pack<br/>Substitute for Tesco Red Peppers 3 Pack</td><td>£1.50</td></tr><tr><td>1</td><td>Gordon's Gin 70Cl<br/>Age restricted. Clubcard Price £13.00</td><td>£18.00</td></tr><tr><td>4</td><td>Tesco Loose Lemons</td><td>£1.20</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>What we couldn't get</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1</td><td>Tesco Greek Yogurt 500G</td><td>Not charged</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£25.20</td></tr><tr><td>Delivery</td><td align=\"right\">£3.00</td></tr><tr><td>Bags</td><td align=\"right\">£0.00</td></tr><tr><td>Clubcard Prices</td><td align=\"right\">-£5.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£23.20</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Tesco. All rights reserved.<br /><a href=\"https://www.tesco.com/help\">Help</a> | <a href=\"https://www.tesco.com/privacy\">Privacy</a> | <a href=\"https://www.tesco.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tesco.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Tesco",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Tesco Finest Steak Pie 550G",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Tesco Mixed Peppers 3 Pack",
+    "qty": 1,
+    "linePence": 150
+   },
+   {
+    "name": "Gordon's Gin 70Cl",
+    "qty": 1,
+    "linePence": 1800
+   },
+   {
+    "name": "Tesco Loose Lemons",
+    "qty": 4,
+    "linePence": 120
+   }
+  ],
+  "subtotalPence": 2520,
+  "feesPence": 300,
+  "discountsPence": 500,
+  "tipsPence": 0,
+  "totalPence": 2320
+ }
+}

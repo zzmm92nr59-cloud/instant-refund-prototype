@@ -1,0 +1,45 @@
+{
+ "id": "holdout9-asda-product-qty-price",
+ "sender": "Asda",
+ "layout": "Product | Qty | Price header, 'Rollback' and age notes",
+ "headers": {
+  "from": "ASDA <noreply@asda.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your Asda order",
+  "date": "Sat, 14 Nov 2026 10:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Asda</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.asda.com/?utm_source=email\"><img src=\"https://www.asda.com/static/email/logo.png\" alt=\"Asda\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order confirmation</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 300991200045</p><p>Order date: 14/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Product</td><td>Qty</td><td>Price</td></tr><tr><td>ASDA Extra Special Steak Pie</td><td>2</td><td>£3.50</td></tr><tr><td>Carling Lager 18 x 440ml<br/><span style=\"font-size:13px\">Age restricted product</span></td><td>1</td><td>£15.00</td></tr><tr><td>ASDA Bananas Loose</td><td>1</td><td>£0.89</td></tr><tr><td>Fairy Original Washing Up Liquid 780ml<br/><span style=\"font-size:13px\">Rollback</span></td><td>1</td><td>£2.50</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£21.89</td></tr><tr><td>Delivery</td><td align=\"right\">£3.00</td></tr><tr><td>2 for &pound;3 saving</td><td align=\"right\">-£0.50</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£24.39</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Asda. All rights reserved.<br /><a href=\"https://www.asda.com/help\">Help</a> | <a href=\"https://www.asda.com/privacy\">Privacy</a> | <a href=\"https://www.asda.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.asda.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Asda",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "ASDA Extra Special Steak Pie",
+    "qty": 2,
+    "linePence": 350
+   },
+   {
+    "name": "Carling Lager 18 x 440ml",
+    "qty": 1,
+    "linePence": 1500
+   },
+   {
+    "name": "ASDA Bananas Loose",
+    "qty": 1,
+    "linePence": 89
+   },
+   {
+    "name": "Fairy Original Washing Up Liquid 780ml",
+    "qty": 1,
+    "linePence": 250
+   }
+  ],
+  "subtotalPence": 2189,
+  "feesPence": 300,
+  "discountsPence": 50,
+  "tipsPence": 0,
+  "totalPence": 2439
+ }
+}

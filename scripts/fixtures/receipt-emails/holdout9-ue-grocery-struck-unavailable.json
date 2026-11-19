@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-ue-grocery-struck-unavailable",
+ "sender": "Uber Eats",
+ "layout": "grocery: unavailable item struck through, 'Replaced X' note",
+ "headers": {
+  "from": "Uber Eats <noreply@uber.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order from Tesco Express",
+  "date": "Mon, 16 Nov 2026 11:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Uber Eats</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.uber.com/?utm_source=email\"><img src=\"https://www.uber.com/static/email/logo.png\" alt=\"Uber Eats\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Your Tesco Express order</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>16 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1</td><td>Heinz Baked Beanz 4 x 415g</td><td>£4.50</td></tr><tr><td>1</td><td><s>Lurpak Slightly Salted 250g</s><br/><span style=\"font-size:13px\">Unavailable &ndash; refunded</span></td><td><s>£2.99</s></td></tr><tr><td>1</td><td>Flora Original 450g<br/><span style=\"font-size:13px\">Replaced Lurpak Slightly Salted 250g</span></td><td>£2.49</td></tr><tr><td>2</td><td>Kingsmill 50/50 800g</td><td>£3.10</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£10.09</td></tr><tr><td>Delivery Fee</td><td align=\"right\">£1.99</td></tr><tr><td>Service Fee</td><td align=\"right\">£1.25</td></tr><tr><td>Bag Fee</td><td align=\"right\">£0.10</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£13.43</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Uber Eats. All rights reserved.<br /><a href=\"https://www.uber.com/help\">Help</a> | <a href=\"https://www.uber.com/privacy\">Privacy</a> | <a href=\"https://www.uber.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.uber.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Uber Eats",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Heinz Baked Beanz 4 x 415g",
+    "qty": 1,
+    "linePence": 450
+   },
+   {
+    "name": "Flora Original 450g",
+    "qty": 1,
+    "linePence": 249
+   },
+   {
+    "name": "Kingsmill 50/50 800g",
+    "qty": 2,
+    "linePence": 310
+   }
+  ],
+  "subtotalPence": 1009,
+  "feesPence": 334,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1343
+ }
+}

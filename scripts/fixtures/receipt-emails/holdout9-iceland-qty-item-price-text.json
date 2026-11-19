@@ -1,0 +1,45 @@
+{
+ "id": "holdout9-iceland-qty-item-price-text",
+ "sender": "Iceland",
+ "layout": "text: 'QTY ITEM PRICE' header, multibuy savings section",
+ "headers": {
+  "from": "Iceland <groceries@iceland.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Iceland Order Confirmation",
+  "date": "Tue, 10 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Iceland\nOrder Confirmation\nOrder No: 400012233\nDate: 10 November 2026\n\nQTY ITEM PRICE\n1 Iceland 20 Battered Chicken Breast Nuggets 400g £4.00\n1 Iceland Luxury Lasagne 1kg £4.00\n1 Iceland Luxury Fish Pie 1kg £4.00\n2 Warburtons Crumpets 6 pack £2.20\n\nMultibuy savings\n3 for £10 multibuy -£2.00\n\nSubtotal £14.20\nDelivery FREE\nCarrier bags £0.60\nOrder Total £12.80",
+ "expected": {
+  "shop": "Iceland",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Iceland 20 Battered Chicken Breast Nuggets 400g",
+    "qty": 1,
+    "linePence": 400
+   },
+   {
+    "name": "Iceland Luxury Lasagne 1kg",
+    "qty": 1,
+    "linePence": 400
+   },
+   {
+    "name": "Iceland Luxury Fish Pie 1kg",
+    "qty": 1,
+    "linePence": 400
+   },
+   {
+    "name": "Warburtons Crumpets 6 pack",
+    "qty": 2,
+    "linePence": 220
+   }
+  ],
+  "subtotalPence": 1420,
+  "feesPence": 60,
+  "discountsPence": 200,
+  "tipsPence": 0,
+  "totalPence": 1280
+ }
+}

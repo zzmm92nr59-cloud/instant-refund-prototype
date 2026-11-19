@@ -1,0 +1,18 @@
+{
+ "id": "holdout10-invoice-overdue",
+ "sender": "Brightwave Window Cleaning",
+ "layout": "an overdue invoice: never a purchase",
+ "headers": {
+  "from": "Brightwave Window Cleaning <accounts@brightwavecleaning.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Invoice BW-2301 is overdue",
+  "date": "Thu, 19 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Brightwave Window Cleaning\nInvoice number: BW-2301\nInvoice date: 1 November 2026\nWindow cleaning (front and back)  £25.00\nTotal £25.00\nAmount due £25.00\nThis invoice is now overdue. Please pay by 26 November 2026.",
+ "expected": {
+  "notPurchase": {
+   "kind": "unpaid invoice"
+  }
+ }
+}

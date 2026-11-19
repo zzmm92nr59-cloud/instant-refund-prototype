@@ -1,0 +1,35 @@
+{
+ "id": "holdout9-amazon-text-price-label",
+ "sender": "Amazon",
+ "layout": "text: name, Sold by, Condition, 'Price: £'",
+ "headers": {
+  "from": "Amazon.co.uk <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of \"Nintendo Switch Joy-Con...\"",
+  "date": "Sat, 14 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Amazon.co.uk\nOrder Confirmation\nOrder #206-7788990-0011223\nPlaced on 14 November 2026\n\nNintendo Switch Joy-Con Pair (Neon Red/Blue)\nSold by: GameZone UK\nCondition: New\nPrice: £49.99\n\nMario Kart 8 Deluxe (Nintendo Switch)\nSold by: RetroPlay\nCondition: Used - Very Good\nPrice: £34.50\n\nItem(s) Subtotal: £84.49\nPostage & Packing: £2.99\nOrder Total: £87.48",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Nintendo Switch Joy-Con Pair (Neon Red/Blue)",
+    "qty": 1,
+    "linePence": 4999
+   },
+   {
+    "name": "Mario Kart 8 Deluxe (Nintendo Switch)",
+    "qty": 1,
+    "linePence": 3450
+   }
+  ],
+  "subtotalPence": 8449,
+  "feesPence": 299,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8748
+ }
+}

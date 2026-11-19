@@ -1,0 +1,49 @@
+{
+ "id": "holdout9-next-item-code-cols-text",
+ "sender": "Next",
+ "layout": "text: Item | Description | Size | Qty | Price with item codes, 'Goods total'",
+ "headers": {
+  "from": "Next <orders@next.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Next order X12345678",
+  "date": "Sun, 15 Nov 2026 21:00:00 +0000"
+ },
+ "html": "",
+ "text": "NEXT\nOrder Confirmation\nOrder number: X12345678\nOrder date: 15 November 2026\n\nItem | Description | Size | Qty | Price\nA12-345 | Black Skinny Jeans | 10R | 1 | £30.00\nA12-345 | Black Skinny Jeans | 12R | 1 | £30.00\nB99-001 | Cream Cable Knit Jumper | M | 1 | £38.00\n\nGoods total £98.00\nDelivery charge £4.50\nTotal £102.50",
+ "expected": {
+  "shop": "Next",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Black Skinny Jeans",
+    "qty": 1,
+    "linePence": 3000,
+    "extras": [
+     "10R"
+    ]
+   },
+   {
+    "name": "Black Skinny Jeans",
+    "qty": 1,
+    "linePence": 3000,
+    "extras": [
+     "12R"
+    ]
+   },
+   {
+    "name": "Cream Cable Knit Jumper",
+    "qty": 1,
+    "linePence": 3800,
+    "extras": [
+     "M"
+    ]
+   }
+  ],
+  "subtotalPence": 9800,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 10250
+ }
+}

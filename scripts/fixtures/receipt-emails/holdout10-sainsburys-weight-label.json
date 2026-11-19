@@ -1,0 +1,40 @@
+{
+ "id": "holdout10-sainsburys-weight-label",
+ "sender": "Sainsbury's",
+ "layout": "'Weight: 0.46kg' under a name, 'Lemons x4' with a qty column",
+ "headers": {
+  "from": "Sainsbury's <groceries@sainsburys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Sainsbury's order summary",
+  "date": "Thu, 12 Nov 2026 21:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Sainsbury's</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.sainsburys.co.uk/?utm_source=email\"><img src=\"https://www.sainsburys.co.uk/static/email/logo.png\" alt=\"Sainsbury's\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order summary</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 1009999012</p><p>Order date: 12 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Product</td><td>Quantity</td><td>Price</td></tr><tr><td>Sainsbury's Taste the Difference Sourdough</td><td>1</td><td>£1.75</td></tr><tr><td>Sainsbury's Lemons x4</td><td>1</td><td>£1.00</td></tr><tr><td>Sainsbury's Loose Tomatoes<br/>Weight: 0.46kg</td><td>1</td><td>£0.92</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£3.67</td></tr><tr><td>Delivery charge</td><td align=\"right\">£1.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£4.67</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Sainsbury's. All rights reserved.<br /><a href=\"https://www.sainsburys.co.uk/help\">Help</a> | <a href=\"https://www.sainsburys.co.uk/privacy\">Privacy</a> | <a href=\"https://www.sainsburys.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.sainsburys.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Sainsbury's",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sainsbury's Taste the Difference Sourdough",
+    "qty": 1,
+    "linePence": 175
+   },
+   {
+    "name": "Sainsbury's Lemons x4",
+    "qty": 1,
+    "linePence": 100
+   },
+   {
+    "name": "Sainsbury's Loose Tomatoes",
+    "qty": 1,
+    "linePence": 92
+   }
+  ],
+  "subtotalPence": 367,
+  "feesPence": 100,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 467
+ }
+}

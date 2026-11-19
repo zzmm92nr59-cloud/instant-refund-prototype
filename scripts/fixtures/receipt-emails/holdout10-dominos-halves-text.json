@@ -1,0 +1,44 @@
+{
+ "id": "holdout10-dominos-halves-text",
+ "sender": "Domino's",
+ "layout": "text: 'Half 1: …' and 'Half 2: …' lines, voucher",
+ "headers": {
+  "from": "Domino's Pizza <orders@dominos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Domino's order",
+  "date": "Mon, 16 Nov 2026 19:30:00 +0000"
+ },
+ "html": "",
+ "text": "Domino's Pizza\nOrder Number: 1188\nOrder date: 16/11/2026\n\n1 x Large Create Your Own £17.99\n    Half 1: Pepperoni, Mushrooms\n    Half 2: Ham, Pineapple\n1 x Potato Wedges £4.99\n2 x Garlic & Herb Dip £1.98\n\nSubtotal £24.96\nDelivery £1.99\nVoucher 50% off -£9.00\nTotal £17.95",
+ "expected": {
+  "shop": "Domino's",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Large Create Your Own",
+    "qty": 1,
+    "linePence": 1799,
+    "extras": [
+     "Half 1: Pepperoni, Mushrooms",
+     "Half 2: Ham, Pineapple"
+    ]
+   },
+   {
+    "name": "Potato Wedges",
+    "qty": 1,
+    "linePence": 499
+   },
+   {
+    "name": "Garlic & Herb Dip",
+    "qty": 2,
+    "linePence": 198
+   }
+  ],
+  "subtotalPence": 2496,
+  "feesPence": 199,
+  "discountsPence": 900,
+  "tipsPence": 0,
+  "totalPence": 1795
+ }
+}

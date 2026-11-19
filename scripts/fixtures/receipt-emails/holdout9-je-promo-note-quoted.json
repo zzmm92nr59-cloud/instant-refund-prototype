@@ -1,0 +1,43 @@
+{
+ "id": "holdout9-je-promo-note-quoted",
+ "sender": "Just Eat",
+ "layout": "'2 for £12 offer' saving line, item note in quotes",
+ "headers": {
+  "from": "Just Eat <noreply@t.just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed: Tokyo Kitchen",
+  "date": "Wed, 18 Nov 2026 18:20:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Just Eat</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.just-eat.co.uk/?utm_source=email\"><img src=\"https://www.just-eat.co.uk/static/email/logo.png\" alt=\"Just Eat\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Tokyo Kitchen has your order.</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 1860559013<br/>18 Nov 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>2 x Chicken Katsu Curry</td><td align=\"right\">£15.90</td></tr><tr><td><em>&ldquo;Extra sauce please&rdquo;</em></td><td></td></tr><tr><td>1 x Chicken Gyoza (5)</td><td align=\"right\">£5.50</td></tr><tr><td>1 x Edamame</td><td align=\"right\">£3.95</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£25.35</td></tr><tr><td>Delivery fee</td><td align=\"right\">£2.99</td></tr><tr><td>Service charge</td><td align=\"right\">£0.99</td></tr><tr><td>Bag fee</td><td align=\"right\">£0.10</td></tr><tr><td>2 for &pound;12 offer</td><td align=\"right\">-£3.90</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£25.53</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Just Eat. All rights reserved.<br /><a href=\"https://www.just-eat.co.uk/help\">Help</a> | <a href=\"https://www.just-eat.co.uk/privacy\">Privacy</a> | <a href=\"https://www.just-eat.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.just-eat.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Just Eat",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Katsu Curry",
+    "qty": 2,
+    "linePence": 1590,
+    "extras": [
+     "Extra sauce please"
+    ]
+   },
+   {
+    "name": "Chicken Gyoza (5)",
+    "qty": 1,
+    "linePence": 550
+   },
+   {
+    "name": "Edamame",
+    "qty": 1,
+    "linePence": 395
+   }
+  ],
+  "subtotalPence": 2535,
+  "feesPence": 408,
+  "discountsPence": 390,
+  "tipsPence": 0,
+  "totalPence": 2553
+ }
+}
