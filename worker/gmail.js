@@ -155,7 +155,7 @@ const GONE = Symbol("gone");
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 44;
+export const PARSER_VERSION = 45;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -178,7 +178,9 @@ const SEARCH_TERMS =
   ' OR from:(royalmail.com OR parcelforce.com OR evri.com OR dpd.co.uk OR inpost.co.uk OR yodel.co.uk OR collectplus.co.uk) OR subject:(delivered OR "out for delivery" OR dispatched OR shipped OR "dropped off")';
 const ymd = ms => new Date(ms).toISOString().slice(0, 10).replace(/-/g, "/");
 const fromYmd = t => Date.parse(t.replace(/\//g, "-") + "T00:00:00Z");
-const windowQuery = (after, before) => "after:" + after + " before:" + before + " " + SEARCH_TERMS;
+// (Never the shopper's own sent mail: a receipt they forwarded or replied about to someone else is a copy of one already in
+// their inbox, and it made a second card of the same order. Round 14.)
+const windowQuery = (after, before) => "after:" + after + " before:" + before + " -in:sent " + SEARCH_TERMS;
 const encoder = new TextEncoder();
 
 async function sha256Hex(text) {
@@ -989,7 +991,8 @@ function classify(rawText, ref, lenient = false) {
       estimatedRefundPence: ret.estimatedRefundPence, currency: ret.currency, trackUrl: ret.trackUrl, trackingNumber: ret.trackingNumber || null,
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
-  } else if (receipt.ok) {
+  // (A restaurant table booked but not paid for is never a purchase in the inbox: the bill is. Round 14.)
+  } else if (receipt.ok && !(receipt.tableBooking && !lenient)) {
     // Keep only extracted fields. The email text is dropped here.
     details = {
       kind: "receipt", ...ref,

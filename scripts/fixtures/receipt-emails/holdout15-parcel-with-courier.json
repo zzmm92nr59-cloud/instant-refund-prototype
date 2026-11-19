@@ -1,0 +1,18 @@
+{
+ "id": "holdout15-parcel-with-courier",
+ "sender": "Fitfuel",
+ "layout": "a tracking service's 'Your Fitfuel order is with Royal Mail'; 'Our courier Royal Mail has received your order, 7781200.' and the items",
+ "headers": {
+  "from": "Fitfuel <Fitfuel@parcel-progress.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Fitfuel order is with Royal Mail",
+  "date": "Wed, 18 Nov 2026 07:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Fitfuel</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.fitfuel.example/?utm_source=email\"><img src=\"https://www.fitfuel.example/static/email/logo.png\" alt=\"Fitfuel\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Hello Sam,</td></tr><tr><td>Our courier Royal Mail has received your order, 7781200.</td></tr><tr><td>We'll let you know when your order is out for delivery.</td></tr><tr><td>Track your delivery</td></tr><tr><td>Order number: 7781200</td></tr><tr><td>Whey Blend 1kg</td><td>&pound;24.99</td></tr><tr><td>Shaker</td><td>&pound;4.99</td></tr><tr><td>Total</td><td>&pound;29.98</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Fitfuel. All rights reserved.<br /><a href=\"https://www.fitfuel.example/help\">Help</a> | <a href=\"https://www.fitfuel.example/privacy\">Privacy</a> | <a href=\"https://www.fitfuel.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.fitfuel.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "delivery_update"
+  }
+ }
+}

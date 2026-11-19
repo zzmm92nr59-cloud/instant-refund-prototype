@@ -395,6 +395,40 @@ const joinWrong = [];
   const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
   if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
 }
+{
+  // Round 14: a reference only the bill or the counter gives ("Order Number:" over "042", "Bill ID: 71200455") is the order's
+  // number, as sent and as forwarded.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  for (const id of ["holdout15-platform-till-list", "holdout15-burger-app-short-number", "holdout15-bill-id", "holdout15-order-number-underscores"]) for (const app of [null, "gmail", "outlook", "apple"]) {
+    const f = fx(id), r = parseReceiptEmail(rawEmail(app ? forwarded(f, app) : f));
+    if (!r.ok || r.orderRef !== f.expected.orderRef) joinWrong.push(`${id}${app ? " (" + app + ")" : ""}: order number ${r.ok ? r.orderRef : r.reason} for ${f.expected.orderRef}`);
+  }
+  // An email with thousands of blank rows (a jeweller's order email took minutes and never finished): read in moments.
+  { const t = Date.now(); parseReceiptEmail(`From: Shop <orders@shop.example>\nSubject: Thank You For Your Order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number: 12345\nUnused time on the plan here\n${"| \n".repeat(20000)}Order Total £5.00`);
+    if (Date.now() - t > 3000) joinWrong.push("an email of blank rows took " + (Date.now() - t) + " ms"); }
+  // A total's own amount is never the price of the line under it ("Order Total" / "£310.00" / "The Gift Box").
+  { const r = parseReceiptEmail(`From: Jeweller <no-reply@jeweller.example>\nSubject: Thank You For Your Order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number\n00412233\nOrder Total\n£310.00\nThe Signature Gift Box\nEvery purchase arrives wrapped in our gift box.`);
+    if (r.ok && r.items.some((i) => /gift box/i.test(i.name))) joinWrong.push("the gift box under a total read as the thing bought"); }
+  // A model that is all figures over its labelled style code ("608" / "Style #:" / "WX608RG1" / its colour): the model is
+  // the name, the colour a detail, and the name check takes it as a name.
+  { const r = parseReceiptEmail(`From: Stridewell <orders@stridewell.example>\nSubject: Your Stridewell order NK0441191\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number: NK0441191\n608\nStyle #:\nWX608RG1\nUK Size: UK 5.5\nTeam Away Grey with White\nQUANTITY: 1\nPRICE: £60.00\nOrder Subtotal: £60.00\nOrder Total: £60.00`);
+    if (!r.ok || !r.items.length || r.items[0].name !== "608" || !/grey/i.test(r.items[0].variant || "") || r.itemsCheck.namesOk !== true) joinWrong.push("a model number over its style code read as " + JSON.stringify(r.ok ? r.items : r.reason)); }
+  // The inbox scan never asks for the shopper's own sent mail (a receipt forwarded to someone else is a copy). Round 14.
+  if (!/const windowQuery = [^\n]*-in:sent /.test(readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8"))) joinWrong.push("the Gmail search asks for sent mail");
+  // A table booked but not paid for: read with its number and price, never a purchase in the inbox.
+  const { TABLE_BOOKING, PERSONAL_REPLY, POINTS_FLIGHT } = await import("./fixtures/receipt-emails/holdout15.mjs");
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const r = parseReceiptEmail(rawEmail(app ? forwarded(POINTS_FLIGHT, app) : POINTS_FLIGHT));
+    if (!r.ok || r.retailer.name !== "British Airways" || r.orderDate !== "2026-11-06" || r.totalPence !== 310 || !r.items.length || r.items[0].variant !== "plus 12,500 points")
+      joinWrong.push(`points flight${app ? " (" + app + ")" : ""} read as ${r.ok ? [r.retailer.name, r.orderDate, r.totalPence, r.items[0] && r.items[0].variant].join(" ") : r.reason}`);
+  }
+  { const r = parseReceiptEmail(rawEmail(PERSONAL_REPLY)); if (r.ok || r.reason !== "reply") joinWrong.push("a person's reply about an order read as " + (r.ok ? "a purchase" : r.reason)); }
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const raw = rawEmail(app ? forwarded(TABLE_BOOKING, app) : TABLE_BOOKING);
+    const r = parseReceiptEmail(raw), k = classifyEmail(raw).details.kind;
+    if (!r.ok || r.orderRef !== "4410098812" || !r.tableBooking || k === "receipt") joinWrong.push(`table booking${app ? " (" + app + ")" : ""} read as ${k} ${r.orderRef} ${r.tableBooking}`);
+  }
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

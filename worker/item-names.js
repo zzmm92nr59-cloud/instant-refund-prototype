@@ -96,7 +96,9 @@ function why(name, opts, all) {
 export function suspectItemNames(items, opts = {}) {
   const list = (Array.isArray(items) ? items : []).filter((i) => i && typeof i.name === "string");
   const out = [];
-  list.forEach((i, k) => { const w = why(i.name, opts, list); if (w) out.push({ index: k, name: i.name, why: w }); });
+  // (A model the email itself names over its labelled style code, "608" over "Style #: WX608RG1", is a name even when it is
+  // all figures. Round 14.)
+  list.forEach((i, k) => { const w = why(i.name, opts, list); if (w && !(w === "short" && i.namedBy === "model")) out.push({ index: k, name: i.name, why: w }); });
   return out;
 }
 
