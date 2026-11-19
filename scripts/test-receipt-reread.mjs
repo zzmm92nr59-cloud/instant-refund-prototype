@@ -26,6 +26,11 @@ import { rawEmail } from "./fixtures/receipt-emails/lib.mjs";
   assert.equal(checkItems([], m, 1000).complete, false, "no items read is never complete");
   assert.equal(checkItems([{ name: "A", qty: 1, pricePence: null }], { subtotal: 1000 }, 1000).complete, false, "an item with no price can't be checked");
   assert.equal(checkItems([{ name: "A", qty: 1, pricePence: 600 }], {}, null).complete, null, "nothing to compare with: unknown, not complete");
+  // Round 2 (19 Nov 2026): misses the money alone can't show.
+  assert.equal(checkItems([{ name: "A", qty: 2, pricePence: 1000, lineTotal: true, unitPence: 300 }], { subtotal: 1000 }, 1000).complete, false, "2 at £3.00 is not £10.00: a quantity or price misread");
+  assert.equal(checkItems([{ name: "A", qty: 2, pricePence: 600, lineTotal: true, unitPence: 300 }], { subtotal: 600 }, 600).complete, true, "2 at £3.00 is £6.00");
+  assert.equal(checkItems([{ name: "Retail price", qty: 1, pricePence: 1000 }], { subtotal: null }, 1000).complete, false, "a money line read as the only item is never complete");
+  assert.equal(checkItems([{ name: "Cleaning fee", qty: 1, pricePence: 1000 }], {}, 1000).complete, false, "a fee read as an item is never complete");
   // The AI's answer is checked like anything typed, and kept only when it adds up.
   const ans = cleanRereadAnswer('Here: {"items":[{"name":"Katsu Curry","qty":1,"pricePence":1150},{"name":"[name]\'s Gyoza","qty":1,"pricePence":595},{"name":"Gyoza","qty":"2","pricePence":595},{"name":"Edamame","qty":1,"pricePence":-1}],"totalPence":1745}');
   assert.deepEqual(ans.items.map((i) => [i.name, i.qty, i.pricePence]), [["Katsu Curry", 1, 1150], ["Gyoza", 1, 595]], "markers, bad numbers and negative prices are dropped");

@@ -1,0 +1,39 @@
+{
+ "id": "holdout3-starbucks-addons",
+ "sender": "Starbucks",
+ "layout": "'+ add-on £0.45' rows that add to the drink",
+ "headers": {
+  "from": "Starbucks <starbucks@e.starbucks.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Starbucks receipt",
+  "date": "Sat, 17 Oct 2026 08:20:00 +0000"
+ },
+ "html": "",
+ "text": "Starbucks\nLeeds Albion Street\n17/10/2026 08:19\nOrder 7712\n\nGrande Caffè Latte  £3.65\n  + Oat Milk  £0.45\n  + Vanilla Syrup  £0.35\nBlueberry Muffin  £2.95\n\nTotal  £7.40\nStars earned: 14",
+ "expected": {
+  "shop": "Starbucks",
+  "date": "2026-10-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Grande Caffè Latte",
+    "qty": 1,
+    "linePence": 445,
+    "extras": [
+     "Oat Milk",
+     "Vanilla Syrup"
+    ]
+   },
+   {
+    "name": "Blueberry Muffin",
+    "qty": 1,
+    "linePence": 295
+   }
+  ],
+  "subtotalPence": 740,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 740
+ }
+}

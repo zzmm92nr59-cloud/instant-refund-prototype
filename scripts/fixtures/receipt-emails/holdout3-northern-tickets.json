@@ -1,0 +1,35 @@
+{
+ "id": "holdout3-northern-tickets",
+ "sender": "Northern",
+ "layout": "ticket types with '2 x'",
+ "headers": {
+  "from": "Northern <tickets@northernrailway.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Northern ticket purchase receipt",
+  "date": "Sun, 18 Oct 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Northern\nTicket receipt\nTransaction reference: NT-88120034\nPurchased: 18 October 2026\n\nLeeds to York, out Sat 24 Oct\n\n2 x Off-Peak Return Adult  £57.20\n1 x Off-Peak Return Child  £14.30\nBooking fee  FREE\n\nTotal paid  £71.50",
+ "expected": {
+  "shop": "Northern",
+  "date": "2026-10-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Off-Peak Return Adult",
+    "qty": 2,
+    "linePence": 5720
+   },
+   {
+    "name": "Off-Peak Return Child",
+    "qty": 1,
+    "linePence": 1430
+   }
+  ],
+  "subtotalPence": 7150,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7150
+ }
+}

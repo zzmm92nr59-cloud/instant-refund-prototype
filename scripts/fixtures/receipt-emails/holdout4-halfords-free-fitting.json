@@ -1,0 +1,40 @@
+{
+ "id": "holdout4-halfords-free-fitting",
+ "sender": "Halfords",
+ "layout": "'1 x' lines, free fitting",
+ "headers": {
+  "from": "Halfords <orders@halfords.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Halfords order confirmation",
+  "date": "Mon, 16 Nov 2026 14:00:00 +0000"
+ },
+ "html": "",
+ "text": "Halfords\nOrder number: HAL-8871203\nOrder date: 16 November 2026\nCollect from: Halfords Leeds Kirkstall\n\n1 x Halfords Advanced Dash Cam HDC400 - £89.99\n1 x Dash Cam Fitting - FREE\n2 x Halfords Screenwash 5L - £10.00\n\nSubtotal £99.99\nCollection FREE\nTotal £99.99",
+ "expected": {
+  "shop": "Halfords",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Halfords Advanced Dash Cam HDC400",
+    "qty": 1,
+    "linePence": 8999
+   },
+   {
+    "name": "Dash Cam Fitting",
+    "qty": 1,
+    "linePence": 0
+   },
+   {
+    "name": "Halfords Screenwash 5L",
+    "qty": 2,
+    "linePence": 1000
+   }
+  ],
+  "subtotalPence": 9999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 9999
+ }
+}

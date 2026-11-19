@@ -1,0 +1,30 @@
+{
+ "id": "holdout3-depop-labelled",
+ "sender": "Depop",
+ "layout": "one item, labelled money lines",
+ "headers": {
+  "from": "Depop <noreply@depop.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Depop receipt",
+  "date": "Thu, 22 Oct 2026 15:00:00 +0000"
+ },
+ "html": "",
+ "text": "Depop\nThanks for your purchase!\nOrder number: DP-0091822\nDate: 22 October 2026\nSeller: @vintage_finds_leeds\n\nVintage Levi's 501 Jeans W32 L30\nItem price: £22.00\nShipping: £3.99\nBuyer protection fee: £1.30\nTotal: £27.29",
+ "expected": {
+  "shop": "Depop",
+  "date": "2026-10-22",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Vintage Levi's 501 Jeans W32 L30",
+    "qty": 1,
+    "linePence": 2200
+   }
+  ],
+  "subtotalPence": 2200,
+  "feesPence": 529,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2729
+ }
+}

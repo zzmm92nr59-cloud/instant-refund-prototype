@@ -1,0 +1,39 @@
+{
+ "id": "holdout3-amazon-text-labels",
+ "sender": "Amazon",
+ "layout": "plain text 'Quantity: 2' and 'Item subtotal'",
+ "headers": {
+  "from": "Amazon.co.uk <auto-confirm@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Amazon.co.uk order of 2 items",
+  "date": "Mon, 19 Oct 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Amazon.co.uk\nOrder Confirmation\nOrder #204-5512298-1120934\nPlaced on 19 October 2026\n\nAnker USB C Charger 20W\nSold by: Anker Direct\nQuantity: 2\n£25.98\n\nDuracell Plus AA Batteries 12 Pack\nSold by: Amazon EU S.a.r.L.\nQuantity: 1\n£8.49\n\nItem Subtotal: £34.47\nPostage & Packing: £0.00\nOrder Total: £34.47",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-10-19",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Anker USB C Charger 20W",
+    "qty": 2,
+    "linePence": 2598
+   },
+   {
+    "name": "Duracell Plus AA Batteries 12 Pack",
+    "qty": 1,
+    "linePence": 849
+   }
+  ],
+  "subtotalPence": 3447,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3447,
+  "shopAlso": [
+   "Amazon.co.uk"
+  ],
+  "itemCount": 2
+ }
+}

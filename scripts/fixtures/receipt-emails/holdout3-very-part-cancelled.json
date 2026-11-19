@@ -1,0 +1,23 @@
+{
+ "id": "holdout3-very-part-cancelled",
+ "sender": "Very",
+ "layout": "some items cancelled",
+ "headers": {
+  "from": "Very <orders@very.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Part of your order V99812234 has been cancelled",
+  "date": "Fri, 13 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "very\nSome items in your order have been cancelled\nOrder number: V99812234\n\nCancelled items\nV by Very Ankle Boots\nSize 6\nQuantity 1\nPrice £40.00\n\nAmount to be refunded: £40.00\nThe rest of your order is on its way.",
+ "expected": {
+  "notPurchase": {
+   "kind": "cancellation"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "id": "holdout3-very-stacked",
+ "sender": "Very",
+ "layout": "name, size, quantity, price on lines of their own",
+ "headers": {
+  "from": "Very <orders@very.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Thu, 12 Nov 2026 21:10:00 +0000"
+ },
+ "html": "",
+ "text": "very\nThanks for your order, Sam\nOrder number: V99812234\nOrder date: 12/11/2026\n\nGlamorous Satin Midi Dress\nSize 12\nQuantity 1\nPrice £35.00\n\nV by Very Ankle Boots\nSize 6\nQuantity 1\nPrice £40.00\n\nGoods total £75.00\nNext day delivery £5.99\nTotal £80.99",
+ "expected": {
+  "shop": "Very",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Glamorous Satin Midi Dress",
+    "qty": 1,
+    "linePence": 3500
+   },
+   {
+    "name": "V by Very Ankle Boots",
+    "qty": 1,
+    "linePence": 4000
+   }
+  ],
+  "subtotalPence": 7500,
+  "feesPence": 599,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8099
+ }
+}

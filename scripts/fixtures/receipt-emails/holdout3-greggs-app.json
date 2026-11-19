@@ -1,0 +1,44 @@
+{
+ "id": "holdout3-greggs-app",
+ "sender": "Greggs",
+ "layout": "'Item x2 £2.70', a deal with its parts",
+ "headers": {
+  "from": "Greggs <noreply@greggs.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Greggs order receipt",
+  "date": "Wed, 04 Nov 2026 08:12:00 +0000"
+ },
+ "html": "",
+ "text": "Greggs\nOrder #G-551209\n4 November 2026 08:11\nCollect from Leeds Station\n\nSausage Roll x2  £2.70\nBreakfast Deal  £3.95\n  - Bacon Breakfast Roll\n  - Regular Latte\nYum Yum  £1.10\n\nTotal £7.75\nPaid with Visa ending 1234",
+ "expected": {
+  "shop": "Greggs",
+  "date": "2026-11-04",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sausage Roll",
+    "qty": 2,
+    "linePence": 270
+   },
+   {
+    "name": "Breakfast Deal",
+    "qty": 1,
+    "linePence": 395,
+    "extras": [
+     "Bacon Breakfast Roll",
+     "Regular Latte"
+    ]
+   },
+   {
+    "name": "Yum Yum",
+    "qty": 1,
+    "linePence": 110
+   }
+  ],
+  "subtotalPence": 775,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 775
+ }
+}

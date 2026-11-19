@@ -1,0 +1,30 @@
+{
+ "id": "holdout3-hellofresh-plan",
+ "sender": "HelloFresh",
+ "layout": "'Plan:' with a labelled price",
+ "headers": {
+  "from": "HelloFresh <hello@hellofresh.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your HelloFresh order confirmation",
+  "date": "Wed, 28 Oct 2026 09:30:00 +0000"
+ },
+ "html": "",
+ "text": "HelloFresh\nOrder confirmation\nOrder number: HF-98120034\nOrder date: 28 October 2026\n\nPlan: 3 meals for 2 people\nPrice: £42.99\n\nDiscount code: -£15.00\nShipping: £4.99\nTotal: £32.98",
+ "expected": {
+  "shop": "HelloFresh",
+  "date": "2026-10-28",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "3 meals for 2 people",
+    "qty": 1,
+    "linePence": 4299
+   }
+  ],
+  "subtotalPence": 4299,
+  "feesPence": 499,
+  "discountsPence": 1500,
+  "tipsPence": 0,
+  "totalPence": 3298
+ }
+}

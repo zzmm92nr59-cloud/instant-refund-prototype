@@ -1,0 +1,49 @@
+{
+ "id": "holdout3-lidl-plus-no-pound",
+ "sender": "Lidl",
+ "layout": "till receipt, no £ signs, VAT letters",
+ "headers": {
+  "from": "Lidl Plus <noreply@lidlplus.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Lidl Plus receipt",
+  "date": "Sat, 07 Nov 2026 17:22:00 +0000"
+ },
+ "html": "",
+ "text": "Lidl GB\nLeeds Kirkstall\nReceipt 7731 07.11.26 17:21\n\n                              GBP\nBananas Loose                0.65 A\n  0.540 kg x 1.20 GBP/kg\nWhole Milk 2 Pints           1.15 A\nSourdough Bloomer            1.49 A\nFree Range Eggs 6            1.78 A\n  2 x 0.89\nLidl Plus discount          -0.30\n------------------------------\nTOTAL                        4.77\nCard                         4.77\n\nDate: 07/11/2026",
+ "expected": {
+  "shop": "Lidl",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Bananas Loose",
+    "qty": 1,
+    "linePence": 65
+   },
+   {
+    "name": "Whole Milk 2 Pints",
+    "qty": 1,
+    "linePence": 115
+   },
+   {
+    "name": "Sourdough Bloomer",
+    "qty": 1,
+    "linePence": 149
+   },
+   {
+    "name": "Free Range Eggs 6",
+    "qty": 2,
+    "linePence": 178
+   }
+  ],
+  "subtotalPence": 507,
+  "feesPence": 0,
+  "discountsPence": 30,
+  "tipsPence": 0,
+  "totalPence": 477,
+  "shopAlso": [
+   "Lidl Plus",
+   "Lidl GB"
+  ]
+ }
+}

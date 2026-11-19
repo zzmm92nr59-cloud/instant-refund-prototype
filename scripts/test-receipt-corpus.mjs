@@ -12,11 +12,15 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseReceiptEmail } from "../worker/receipt-parser.js";
+import { parseReceiptEmail, parseReturnUpdateEmail } from "../worker/receipt-parser.js";
 import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
-const fixtures = readdirSync(dir).filter((n) => n.endsWith(".json")).sort().map((n) => JSON.parse(readFileSync(join(dir, n), "utf8")));
+const only = (process.argv.find((a) => a.startsWith("--only=")) || "").slice(7);
+const everything = readdirSync(dir).filter((n) => n.endsWith(".json") && (!only || n.startsWith(only))).sort().map((n) => JSON.parse(readFileSync(join(dir, n), "utf8")));
+// Refunds, cancellations and price adjustments (expected.notPurchase) are read separately below: never a purchase.
+const fixtures = everything.filter((f) => !f.expected.notPurchase);
+const notPurchases = everything.filter((f) => f.expected.notPurchase);
 const report = process.argv.includes("--report");
 const norm = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 const lineOf = (i) => (i.pricePence == null ? null : i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1));
@@ -82,6 +86,26 @@ console.log(`  Forwarded: items right ${b.items}/${b.n} (${pct(b.items, b.n)}), 
 console.log(`  Forwards that read differently from the original: ${sameAsSent.length}`);
 console.log(`  Totals check: ${silent.length} silent misses, ${falseAlarm.length} false alarms`);
 
+// A refund, a cancellation or a price adjustment is never read as a new purchase, as sent or forwarded. A refund's amount and
+// order number are read (parseReturnUpdateEmail), so it can attach to the order it belongs to (return-tracking.js).
+const notRight = [];
+for (const f of notPurchases) {
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const email = app ? forwarded(f, app) : f;
+    const raw = rawEmail(email), w = f.expected.notPurchase;
+    if (parseReceiptEmail(raw).ok) notRight.push(`${email.id}: read as a purchase (${w.kind})`);
+    if (w.kind === "refund") {
+      const u = parseReturnUpdateEmail(raw);
+      if (!u.ok || u.stage !== "refunded") notRight.push(`${email.id}: refund not read as a refund`);
+      else {
+        if (u.amountPence !== w.refundPence) notRight.push(`${email.id}: refund ${u.amountPence} for ${w.refundPence}`);
+        if (u.orderRef !== w.orderRef) notRight.push(`${email.id}: refund's order ${u.orderRef} for ${w.orderRef}`);
+      }
+    }
+  }
+}
+if (notPurchases.length) console.log(`  Refunds, cancellations and price adjustments: ${notPurchases.length} emails (${notPurchases.length * 4} reads), ${notRight.length} wrong${notRight.length ? ":\n    " + notRight.join("\n    ") : ""}`);
+
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
@@ -90,5 +114,6 @@ need(silent.length === 0, "the totals check flags every email whose items are in
 need(falseAlarm.length === 0, "the totals check never flags an email whose items are all there");
 need(sameAsSent.length === 0, "a forwarded email reads the same as the original (" + sameAsSent.map((r) => r.id).join(", ") + ")");
 need(rows.filter((r) => r.count).length === 0, "the number of items an email states is read");
+need(notRight.length === 0, "refunds, cancellations and price adjustments are never purchases, and a refund's amount and order are read");
 if (failed) process.exit(1);
 console.log("ok - receipt corpus");

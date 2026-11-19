@@ -1,0 +1,235 @@
+{
+ "id": "holdout3-wickes-42-lines",
+ "sender": "Wickes",
+ "layout": "42 lines, qty/description/each/total columns in plain text",
+ "headers": {
+  "from": "Wickes <orders@wickes.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Wickes order WK10098812 is confirmed",
+  "date": "Tue, 10 Nov 2026 07:55:00 +0000"
+ },
+ "html": "",
+ "text": "Wickes\nOrder confirmation\nOrder number: WK10098812\nOrder date: 10/11/2026\n\nQty  Description                                            Each       Total\n1    Wickes Treated Sawn Timber 22x47mm 2.4m                   £1.50      £1.50\n2    Wickes Treated Sawn Timber 38x63mm 2.4m                   £2.87      £5.74\n3    Wickes General Purpose Screws 4x40mm 200pk                £4.24     £12.72\n4    Wickes Wood Screws 5x70mm 100pk                           £5.61     £22.44\n1    Wickes Plasterboard 12.5mm 2.4m x 1.2m                    £6.98      £6.98\n2    Wickes Multi Finish Plaster 25kg                          £8.35     £16.70\n3    Wickes Bonding Coat 25kg                                  £9.72     £29.16\n4    Wickes PVA 5L                                            £11.09     £44.36\n1    Wickes Decorators Caulk 380ml                            £12.46     £12.46\n2    Wickes Frame Sealant White 310ml                         £13.83     £27.66\n3    Wickes Masking Tape 25mm x 50m                           £15.20     £45.60\n4    Wickes Dust Sheet 12x9ft                                 £16.57     £66.28\n1    Wickes Vinyl Matt Emulsion Brilliant White 10L           £17.94     £17.94\n2    Wickes Trade Silk Magnolia 10L                           £19.31     £38.62\n3    Wickes Paint Roller Set 9in                              £20.68     £62.04\n4    Wickes Synthetic Paint Brush 2in                         £22.05     £88.20\n1    Wickes Synthetic Paint Brush 1in                         £23.42     £23.42\n2    Wickes Filler 1kg                                        £24.79     £49.58\n3    Wickes Sandpaper Assorted 10pk                            £2.16      £6.48\n4    Wickes Sanding Block                                      £3.53     £14.12\n1    Wickes Stanley Knife Blades 10pk                          £4.90      £4.90\n2    Wickes Spirit Level 600mm                                 £6.27     £12.54\n3    Wickes Tape Measure 5m                                    £7.64     £22.92\n4    Wickes Claw Hammer 16oz                                   £9.01     £36.04\n1    Wickes Plastering Trowel 11in                            £10.38     £10.38\n2    Wickes Bucket 14L                                        £11.75     £23.50\n3    Wickes Mixing Paddle                                     £13.12     £39.36\n4    Wickes Plasterboard Screws 3.5x32mm 1000pk               £14.49     £57.96\n1    Wickes Angle Bead 2.4m                                   £15.86     £15.86\n2    Wickes Stop Bead 2.4m                                    £17.23     £34.46\n3    Wickes Scrim Tape 100mm x 90m                            £18.60     £55.80\n4    Wickes Corner Trowel                                     £19.97     £79.88\n1    Wickes Skirting Board Torus 119mm x 2.4m                 £21.34     £21.34\n2    Wickes Architrave Ogee 69mm x 2.1m                       £22.71     £45.42\n3    Wickes Panel Pins 25mm 500g                              £24.08     £72.24\n4    Wickes Wood Glue 1L                                      £25.45    £101.80\n1    Wickes Mitre Box and Saw                                  £2.82      £2.82\n2    Wickes Grab Adhesive 310ml                                £4.19      £8.38\n3    Wickes Caulking Gun                                       £5.56     £16.68\n4    Wickes Knee Pads                                          £6.93     £27.72\n1    Wickes Safety Glasses                                     £8.30      £8.30\n2    Wickes Work Gloves Large                                  £9.67     £19.34\n\nSubtotal   £1,309.64\nDelivery   £15.00\nTotal   £1,324.64",
+ "expected": {
+  "shop": "Wickes",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Wickes Treated Sawn Timber 22x47mm 2.4m",
+    "qty": 1,
+    "linePence": 150
+   },
+   {
+    "name": "Wickes Treated Sawn Timber 38x63mm 2.4m",
+    "qty": 2,
+    "linePence": 574
+   },
+   {
+    "name": "Wickes General Purpose Screws 4x40mm 200pk",
+    "qty": 3,
+    "linePence": 1272
+   },
+   {
+    "name": "Wickes Wood Screws 5x70mm 100pk",
+    "qty": 4,
+    "linePence": 2244
+   },
+   {
+    "name": "Wickes Plasterboard 12.5mm 2.4m x 1.2m",
+    "qty": 1,
+    "linePence": 698
+   },
+   {
+    "name": "Wickes Multi Finish Plaster 25kg",
+    "qty": 2,
+    "linePence": 1670
+   },
+   {
+    "name": "Wickes Bonding Coat 25kg",
+    "qty": 3,
+    "linePence": 2916
+   },
+   {
+    "name": "Wickes PVA 5L",
+    "qty": 4,
+    "linePence": 4436
+   },
+   {
+    "name": "Wickes Decorators Caulk 380ml",
+    "qty": 1,
+    "linePence": 1246
+   },
+   {
+    "name": "Wickes Frame Sealant White 310ml",
+    "qty": 2,
+    "linePence": 2766
+   },
+   {
+    "name": "Wickes Masking Tape 25mm x 50m",
+    "qty": 3,
+    "linePence": 4560
+   },
+   {
+    "name": "Wickes Dust Sheet 12x9ft",
+    "qty": 4,
+    "linePence": 6628
+   },
+   {
+    "name": "Wickes Vinyl Matt Emulsion Brilliant White 10L",
+    "qty": 1,
+    "linePence": 1794
+   },
+   {
+    "name": "Wickes Trade Silk Magnolia 10L",
+    "qty": 2,
+    "linePence": 3862
+   },
+   {
+    "name": "Wickes Paint Roller Set 9in",
+    "qty": 3,
+    "linePence": 6204
+   },
+   {
+    "name": "Wickes Synthetic Paint Brush 2in",
+    "qty": 4,
+    "linePence": 8820
+   },
+   {
+    "name": "Wickes Synthetic Paint Brush 1in",
+    "qty": 1,
+    "linePence": 2342
+   },
+   {
+    "name": "Wickes Filler 1kg",
+    "qty": 2,
+    "linePence": 4958
+   },
+   {
+    "name": "Wickes Sandpaper Assorted 10pk",
+    "qty": 3,
+    "linePence": 648
+   },
+   {
+    "name": "Wickes Sanding Block",
+    "qty": 4,
+    "linePence": 1412
+   },
+   {
+    "name": "Wickes Stanley Knife Blades 10pk",
+    "qty": 1,
+    "linePence": 490
+   },
+   {
+    "name": "Wickes Spirit Level 600mm",
+    "qty": 2,
+    "linePence": 1254
+   },
+   {
+    "name": "Wickes Tape Measure 5m",
+    "qty": 3,
+    "linePence": 2292
+   },
+   {
+    "name": "Wickes Claw Hammer 16oz",
+    "qty": 4,
+    "linePence": 3604
+   },
+   {
+    "name": "Wickes Plastering Trowel 11in",
+    "qty": 1,
+    "linePence": 1038
+   },
+   {
+    "name": "Wickes Bucket 14L",
+    "qty": 2,
+    "linePence": 2350
+   },
+   {
+    "name": "Wickes Mixing Paddle",
+    "qty": 3,
+    "linePence": 3936
+   },
+   {
+    "name": "Wickes Plasterboard Screws 3.5x32mm 1000pk",
+    "qty": 4,
+    "linePence": 5796
+   },
+   {
+    "name": "Wickes Angle Bead 2.4m",
+    "qty": 1,
+    "linePence": 1586
+   },
+   {
+    "name": "Wickes Stop Bead 2.4m",
+    "qty": 2,
+    "linePence": 3446
+   },
+   {
+    "name": "Wickes Scrim Tape 100mm x 90m",
+    "qty": 3,
+    "linePence": 5580
+   },
+   {
+    "name": "Wickes Corner Trowel",
+    "qty": 4,
+    "linePence": 7988
+   },
+   {
+    "name": "Wickes Skirting Board Torus 119mm x 2.4m",
+    "qty": 1,
+    "linePence": 2134
+   },
+   {
+    "name": "Wickes Architrave Ogee 69mm x 2.1m",
+    "qty": 2,
+    "linePence": 4542
+   },
+   {
+    "name": "Wickes Panel Pins 25mm 500g",
+    "qty": 3,
+    "linePence": 7224
+   },
+   {
+    "name": "Wickes Wood Glue 1L",
+    "qty": 4,
+    "linePence": 10180
+   },
+   {
+    "name": "Wickes Mitre Box and Saw",
+    "qty": 1,
+    "linePence": 282
+   },
+   {
+    "name": "Wickes Grab Adhesive 310ml",
+    "qty": 2,
+    "linePence": 838
+   },
+   {
+    "name": "Wickes Caulking Gun",
+    "qty": 3,
+    "linePence": 1668
+   },
+   {
+    "name": "Wickes Knee Pads",
+    "qty": 4,
+    "linePence": 2772
+   },
+   {
+    "name": "Wickes Safety Glasses",
+    "qty": 1,
+    "linePence": 830
+   },
+   {
+    "name": "Wickes Work Gloves Large",
+    "qty": 2,
+    "linePence": 1934
+   }
+  ],
+  "subtotalPence": 130964,
+  "feesPence": 1500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 132464
+ }
+}

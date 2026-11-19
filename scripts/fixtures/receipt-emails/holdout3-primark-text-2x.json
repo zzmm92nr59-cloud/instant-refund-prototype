@@ -1,0 +1,40 @@
+{
+ "id": "holdout3-primark-text-2x",
+ "sender": "Primark",
+ "layout": "plain text, '2 x Item £24.00'",
+ "headers": {
+  "from": "Primark <noreply@primark.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Primark Click & Collect order PK-338812",
+  "date": "Sun, 15 Nov 2026 11:00:00 +0000"
+ },
+ "html": "",
+ "text": "PRIMARK\n\nThanks for your Click & Collect order!\nOrder number: PK-338812\nOrder date: 15 November 2026\nCollect from: Primark Leeds Briggate\n\n2 x Fleece Pyjama Set £24.00\n1 x Stitch Fluffy Socks 3 Pack £6.00\n3 x Ribbed Beanie Hat £10.50\n\nSubtotal £40.50\nClick & Collect FREE\nTotal £40.50\n\nWe'll email you when it's ready to collect.",
+ "expected": {
+  "shop": "Primark",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Fleece Pyjama Set",
+    "qty": 2,
+    "linePence": 2400
+   },
+   {
+    "name": "Stitch Fluffy Socks 3 Pack",
+    "qty": 1,
+    "linePence": 600
+   },
+   {
+    "name": "Ribbed Beanie Hat",
+    "qty": 3,
+    "linePence": 1050
+   }
+  ],
+  "subtotalPence": 4050,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4050
+ }
+}
