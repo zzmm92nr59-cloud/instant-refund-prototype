@@ -4496,16 +4496,22 @@
     btn.onclick = function () {
       if (busy) return;
       if (!box.hidden) return read(box.value);
-      // The copied page as well as its text, where the phone allows it; just the text where it doesn't.
-      var withHtml = function (t) {
-        if (!(navigator.clipboard && navigator.clipboard.read && window.Blob)) return read(t);
-        navigator.clipboard.read().then(function (list) {
-          var it = (list || []).filter(function (c) { return c.types && c.types.indexOf("text/html") !== -1; })[0];
-          if (!it) return read(t);
-          return it.getType("text/html").then(function (b) { return b.text(); }).then(function (h) { read(t, h); });
-        }).catch(function () { read(t); });
-      };
-      try { if (navigator.clipboard && navigator.clipboard.readText) { navigator.clipboard.readText().then(function (t) { if (t && t.trim()) withHtml(t); else byHand(); }, byHand); return; } } catch (e) {}
+      // The copied page as well as its text, in one read of the clipboard (one "Paste" prompt on a phone, asked straight
+      // from the tap); just the text where the phone only allows that.
+      var asText = function (b) { return b.text(); };
+      try {
+        if (navigator.clipboard && navigator.clipboard.read && window.Blob) {
+          navigator.clipboard.read().then(function (list) {
+            list = list || [];
+            var pick = function (type) { var it = list.filter(function (c) { return c.types && c.types.indexOf(type) !== -1; })[0]; return it ? it.getType(type).then(asText) : Promise.resolve(""); };
+            return Promise.all([pick("text/plain"), pick("text/html")]).then(function (both) {
+              if (both[0] && both[0].trim()) read(both[0], both[1]); else byHand();
+            });
+          }).catch(byHand);
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.readText) { navigator.clipboard.readText().then(function (t) { if (t && t.trim()) read(t); else byHand(); }, byHand); return; }
+      } catch (e) {}
       byHand();
     };
     box.addEventListener("paste", function (e) {
