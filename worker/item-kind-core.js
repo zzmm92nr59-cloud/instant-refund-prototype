@@ -108,7 +108,7 @@
         "@colgate, @sensodyne, @aquafresh, @macleans, @oral b, @oralb, @listerine, @corsodyl, @dove, @imperial leather, @radox, @original source, @carex, @sanex, @palmolive, @lynx, @sure, @rexona, @right guard, @mitchum, @soft and gentle, @head and shoulders, @head shoulders, @pantene, @tresemme, @herbal essences, @aussie, @alberto balsam, @vo5, @batiste, @gillette, @wilkinson sword, @bic, @king of shaves, @always, @tampax, @bodyform, @lil lets, @pampers, @huggies, @johnsons, @johnson's, @tena, @childs farm, @simple wipes, @waterwipes, @cussons",
     },
     beauty_health: {
-      skincare: "face oil, facial oil, essence, muslin cloth, muslin cloths, moisturiser, moisturizer, moisturising cream, face cream, day cream, night cream, eye cream, hand cream, foot cream, heel cream, heel balm, body lotion, body cream, body butter, shea butter, body oil, lotion, serum, serums, cleanser, face wash, micellar water, cleansing water, micellar cleansing water, mist, face mist, setting mist, pillow mist, pillow spray, sleep spray, toner, face mask, sheet mask, clay mask, exfoliator, scrub, lip scrub, body scrub, sugar scrub, face scrub, sunscreen, sun cream, suncream, sun lotion, spf, after sun, tan, fake tan, self tan, tanning, retinol, hyaluronic acid, niacinamide, vitamin c serum, eye gel, balm, lip balm, cleansing balm, barrier cream, nappy cream, bath salts, bath bomb, bath bombs, bath oil, makeup remover, make up remover, cleansing wipes, facial wipes, " +
+      skincare: "treatment, treatments, face oil, facial oil, essence, muslin cloth, muslin cloths, moisturiser, moisturizer, moisturising cream, face cream, day cream, night cream, eye cream, hand cream, foot cream, heel cream, heel balm, body lotion, body cream, body butter, shea butter, body oil, lotion, serum, serums, cleanser, face wash, micellar water, cleansing water, micellar cleansing water, mist, face mist, setting mist, pillow mist, pillow spray, sleep spray, toner, face mask, sheet mask, clay mask, exfoliator, scrub, lip scrub, body scrub, sugar scrub, face scrub, sunscreen, sun cream, suncream, sun lotion, spf, after sun, tan, fake tan, self tan, tanning, retinol, hyaluronic acid, niacinamide, vitamin c serum, eye gel, balm, lip balm, cleansing balm, barrier cream, nappy cream, bath salts, bath bomb, bath bombs, bath oil, makeup remover, make up remover, cleansing wipes, facial wipes, " +
         "@cerave, @cosrx, @la roche posay, @the ordinary, @the inkey list, @inkey list, @nivea, @e45, @aveeno, @vaseline, @simple, @garnier, @neutrogena, @olay, @no7, @no 7, @clinique, @elemis, @kiehls, @drunk elephant, @paulas choice, @glow recipe, @bio oil, @palmers, @soap and glory, @sol de janeiro, @cetaphil, @eucerin, @bioderma, @nuxe, @sudocrem, @scholl, @carmex, @blistex, @burts bees, @lush, @the body shop, @rituals, @neom, @aesop, @soltan, @ambre solaire, @hawaiian tropic, @piz buin, @st tropez, @bondi sands, @tanologist",
       makeup: "makeup, make up, foundation, concealer, powder, setting powder, blusher, blush, bronzer, highlighter, primer, setting spray, mascara, eyeliner, eye liner, eyeshadow, eye shadow, eyeshadow palette, palette, brow pencil, brow gel, lipstick, lip gloss, gloss, butter gloss, lip liner, lip oil, lip tint, nail polish, nail varnish, gel polish, nail file, false lashes, lashes, press on nails, false nails, nail clippers, tweezers, insoles, gel insoles, makeup brushes, beauty blender, makeup sponge, " +
         "@maybelline, @loreal, @l oreal, @rimmel, @max factor, @revlon, @nyx, @e l f, @mac, @benefit, @charlotte tilbury, @fenty, @fenty beauty, @rare beauty, @huda beauty, @urban decay, @too faced, @nars, @bareminerals, @estee lauder, @makeup revolution, @barry m, @catrice, @bourjois, @kiko, @glossier, @milk makeup, @tarte",
@@ -185,7 +185,7 @@
     toys_hobbies: {
       toys: "toy, toys, soft toy, teddy, teddy bear, plush, plushie, doll, dolls, action figure, figure, figures, play set, playset, building set, building blocks, blocks, puzzle, jigsaw, jigsaw puzzle, board game, card game, games, game, family game, playing cards, rubiks cube, fidget toy, slime, play doh, playdough, toy car, remote control car, rc car, train set, scooter, kids scooter, balance bike, trampoline, paddling pool, water gun, water pistol, nerf gun, kite, bubbles, colouring book, sticker book, stickers, craft kit, crafts, model kit, magnetic tiles, " +
         "@lego, @duplo, @barbie, @hot wheels, @playmobil, @nerf, @play-doh, @play doh, @squishmallow, @squishmallows, @jellycat, @sylvanian families, @paw patrol, @peppa pig, @bluey, @pokemon cards, @pokemon tcg, @funko pop, @funko, @hatchimals, @lol surprise, @my little pony, @monopoly, @cluedo, @scrabble, @jenga, @uno, @hungry hippos, @connect 4, @warhammer, @games workshop, @vtech, @fisher price, @little tikes, @melissa and doug, @tonies, @toniebox, @yoto",
-      hobbies: "yarn, wool, embroidery hoop, pom poms, paint pens, glue gun, glue sticks, craft kit, felt, beads, knitting needles, crochet hook, sewing kit, sewing machine, fabric, fat quarters, embroidery kit, cross stitch, paints, acrylic paints, watercolours, watercolour paints, paintbrushes, sketchbook, sketch pad, canvas board, easel, colouring pencils, felt tips, markers, crayons, felt tip, felt tip pens, felt pens, colouring pens, clay, air dry clay, guitar, guitar strings, ukulele, keyboard piano, violin, drum sticks, plectrums, fishing rod, fishing tackle, telescope, binoculars, microscope, " +
+      hobbies: "patch set, iron on patches, sew on patches, embroidered patches, yarn, wool, embroidery hoop, pom poms, paint pens, glue gun, glue sticks, craft kit, felt, beads, knitting needles, crochet hook, sewing kit, sewing machine, fabric, fat quarters, embroidery kit, cross stitch, paints, acrylic paints, watercolours, watercolour paints, paintbrushes, sketchbook, sketch pad, canvas board, easel, colouring pencils, felt tips, markers, crayons, felt tip, felt tip pens, felt pens, colouring pens, clay, air dry clay, guitar, guitar strings, ukulele, keyboard piano, violin, drum sticks, plectrums, fishing rod, fishing tackle, telescope, binoculars, microscope, " +
         "@cricut, @posca, @crayola, @winsor and newton",
       party: "balloons, balloon, party bags, party poppers, banner, bunting, christmas crackers, crackers box, party decorations, birthday banner, confetti",
     },
@@ -196,7 +196,7 @@
         "@ea sports fc, @radio times, @fifa 24, @fc 25, @call of duty, @mario kart, @zelda, @minecraft, @hogwarts legacy, @gta",
     },
     sport_outdoor: {
-      fitness: "yoga mat, yoga block, yoga blocks, yoga brick, exercise mat, gym mat, dumbbell, dumbbells, kettlebell, kettlebells, weights, weight plates, barbell, resistance bands, resistance band, skipping rope, jump rope, foam roller, massage gun, pull up bar, exercise bike, treadmill, rowing machine, gym gloves, lifting straps, weight belt, protein shaker, shaker bottle, " +
+      fitness: "arm band, armband, running armband, yoga mat, yoga block, yoga blocks, yoga brick, exercise mat, gym mat, dumbbell, dumbbells, kettlebell, kettlebells, weights, weight plates, barbell, resistance bands, resistance band, skipping rope, jump rope, foam roller, massage gun, pull up bar, exercise bike, treadmill, rowing machine, gym gloves, lifting straps, weight belt, protein shaker, shaker bottle, " +
         "@theragun",
       sports: "football, footballs, rugby ball, basketball, netball, tennis racket, tennis balls, badminton racket, shuttlecocks, squash racket, padel racket, golf balls, golf club, golf clubs, golf bag, golf glove, cricket bat, hockey stick, shin pads, shin guards, goalkeeper gloves, boxing gloves, punch bag, swimming goggles, goggles, swim cap, wetsuit, paddleboard, paddle board, surfboard, skateboard, roller skates, ice skates, helmet, bike helmet, cycling helmet, bike, bicycle, mountain bike, ebike, e bike, bike lock, bike light, bike lights, bike pump, inner tube, dartboard, darts, snooker cue, table tennis bats, " +
         "@wilson, @spalding, @titleist, @callaway, @slazenger",
@@ -292,22 +292,70 @@
   const CUT = new Set(["for", "with", "in", "featuring", "inc", "incl", "including", "suitable", "compatible", "fits"]);
   // Pack sizes and weights: these say a thing gets used up.
   const WEIGHT = /(?:^|[^a-z0-9])(\d+(?:\.\d+)?)\s?(g|gm|gr|grams?|kg|kilos?|mg|ml|cl|l|ltr|litres?|liters?|oz|lb)(?![a-z])/;
-  const MULTI = /(?:^|[^a-z0-9])\d+\s?x\s?\d+(?:\.\d+)?\s?(g|kg|ml|cl|l)?(?![a-z])/;
+  // ("6 x 330ml", "4X415g", "12 x 52"; not a size: "4x40mm", "15x11 inches", "80x28x202 cm".)
+  const MULTI_ANY = /(?:^|[^a-z0-9.])\d+(?:\.\d+)?\s?x\s?\d+(?:\.\d+)?\s?(g|kg|ml|cl|l)?(?![a-z0-9.])/;
+  const SIZE_AFTER = /^\s?(mm|cm|m|in|inch|inches|ft|feet|"|x\s?\d)(?![a-z])/;
+  const MULTI = { exec(text) { const m = MULTI_ANY.exec(text); return m && !m[1] && SIZE_AFTER.test(text.slice(m.index + m[0].length)) ? null : m; } };
   const COUNT = /(?:^|[^a-z0-9])(\d+\s?(pk|pack|pcs|pieces|count|ct)|pack of \d+|x\s?\d+|\d+\s?x)(?![a-z])/;
   // A journey ("London Euston to Manchester Piccadilly (Return)").
   const JOURNEY = /^\s*(?:from\s+)?\p{Lu}[\p{L}0-9 .'’&()-]{1,48}?\s+(?:to|→|->)\s+\p{Lu}[\p{L}0-9 .'’&()-]{1,48}?\s*$/u;
   // Kinds of shop whose lines are nearly all one kind, when the line itself names nothing.
   const GROCER_NAME = /\b(sainsburys?|tesco|asda|morrisons|waitrose|ocado|lidl|aldi|iceland|co ?op|cooperative|spar|budgens|londis|nisa|costco|farmfoods|heron foods|booths|amazon fresh|getir|gorillas|zapp|m and s food|one stop|whole foods|planet organic|abel and cole|riverford|oddbox|milk and more)\b/;
-  const EATERY_NAME = /\b(deliveroo|just eat|justeat|uber eats|ubereats|bolt food|wolt|dominos|pizza hut|papa johns|mcdonalds|kfc|burger king|nandos|wagamama|five guys|greggs|pret|leon|itsu|wasabi|yo sushi|subway|costa|starbucks|caffe nero|wetherspoons?|pub|restaurant|cafe|takeaway|pizzeria|grill|diner|bistro|tavern|chippy|kebab|curry house|noodle bar|sushi bar)\b/;
+  const EATERY_NAME = /\b(deliveroo|just eat|justeat|uber eats|ubereats|bolt food|wolt|dominos|pizza hut|papa johns|mcdonalds|kfc|burger king|nandos|wagamama|five guys|greggs|pret|leon|itsu|wasabi|yo sushi|subway|costa|starbucks|caffe nero|wetherspoons?|pub|restaurant|cafe|takeaway|pizzeria|grill|diner|bistro|tavern|chippy|kebab|curry house|noodle bar|sushi bar|trattoria|osteria|taverna|cantina|ristorante|brasserie|steakhouse|canteen|poke bar)\b/;
+  // DIY and trade shops (nothing there is food), pet shops (their chicken is for the dog), gyms (a membership is to go there)
+  // and shops that sell only downloads.
+  const DIY_NAME = /\b(b and q|bandq|wickes|screwfix|toolstation|homebase|plumb centre|plumbcentre|travis perkins|jewson|selco|city plumbing|toolstop|machine mart)\b/;
+  const PET_SHOP_NAME = /\b(pets at home|zooplus|jollyes|pet ?planet|viovet|medivet|pets corner|purely pets|pet supermarket|pet shop|petshop|pet store|pet supplies)\b/;
+  const GYM_NAME = /\b(gym|gyms|fitness|leisure|health club|puregym|david lloyd|nuffield health|virgin active|everyone active)\b/;
+  const DIGITAL_SHOP_NAME = /\b(kobo|audible|steam|google play|app store|playstation store|xbox store|nintendo eshop|itch io)\b/;
   // What a box, jar or pack is at a shop that sells one kind of lasting thing.
-  const SHOP_KIND = { home: "home", electronics: "electronics" };
+  const SHOP_KIND = { home: "home", electronics: "electronics", diy: "home", pets: "pets" };
   const SHOP_HINT = { food: "food_drink", grocer: "food_drink", eatery: "food_drink", digital: "digital", travel: "travel", experiences: "services" };
   function readShop(opts) {
     const o = opts || {}, n = norm(o.shop || "");
     if (o.shopKind === "grocer" || o.shopKind === "eatery") return o.shopKind;
     if (GROCER_NAME.test(n)) return "grocer";
     if (EATERY_NAME.test(n)) return "eatery";
-    return typeof o.shopKind === "string" ? o.shopKind : null;
+    if (DIY_NAME.test(n)) return "diy";
+    if (PET_SHOP_NAME.test(n)) return "pets";
+    if (typeof o.shopKind === "string" && o.shopKind) return o.shopKind;
+    if (DIGITAL_SHOP_NAME.test(n)) return "digital";
+    if (GYM_NAME.test(n)) return "gym";
+    return null;
+  }
+
+  // Till-roll short forms that are never words of their own ("TESCO FNST SMKD SALMN", "JS CTTN BUDS", "SD VIT E NIGHT CRM").
+  const ABBREV = { chkn: "chicken", brst: "breast", smkd: "smoked", salmn: "salmon", sqsh: "squash", btrnt: "butternut", skmd: "skimmed",
+    skmmd: "skimmed", mlk: "milk", whl: "whole", ktchn: "kitchen", choc: "chocolate", chc: "chocolate", bttns: "buttons", frzn: "frozen",
+    crsps: "crisps", bluebrrs: "blueberries", blubrrs: "blueberries", ssgs: "sausages", lrg: "large", orgnc: "organic", grk: "greek",
+    fllt: "fillet", fllts: "fillets", fnst: "finest", crm: "cream", cttn: "cotton", wtr: "water", headbrd: "headboard", vit: "vitamin",
+    lett: "lettuce", yog: "yoghurt", dbl: "double", drw: "drawer", tom: "tomato", toms: "tomatoes", veg: "veg", sndwch: "sandwich", chse: "cheese" };
+  // A line's words, as Relay reads them: short forms written out, words run together split when the two words are a known
+  // phrase ("TVBED" is "tv bed", "OTTOMANBED" "ottoman bed"), and the shop's own name in front dropped when it is also a thing
+  // ("Boots Flu Jab" is not boots).
+  function lineTokens(raw, shop) {
+    let toks = tokens(raw);
+    const out = [];
+    for (let i = 0; i < toks.length; i++) {
+      const t = toks[i], two = toks[i + 1] ? t + " " + toks[i + 1] : null;
+      if (ABBREV[t] && !(two && INDEX.has(two))) { out.push(ABBREV[t]); continue; }
+      if (t.length >= 5 && /^[a-z]+$/.test(t) && !INDEX.has(t)) {
+        let split = null;
+        for (let k = 2; k <= t.length - 3 && !split; k++) {
+          const a = t.slice(0, k), b = t.slice(k), e = INDEX.get(a + " " + b);
+          if (e && e.role === "noun") split = [a, b];
+        }
+        if (split) { out.push(...split); continue; }
+      }
+      out.push(t);
+    }
+    toks = out;
+    const own = tokens(shop || "");
+    if (own.length && toks.length > own.length && own.every((w, i) => toks[i] === w)) {
+      const first = matches(toks)[0];
+      if (first && first.at === 0 && first.end === own.length && (first.role === "noun" || first.role === "weak")) toks = toks.slice(own.length);
+    }
+    return toks;
   }
 
   const COUNT_NOUNS = new Set(["roll", "rolls", "sheet", "sheets", "pc", "pcs", "piece", "pieces", "stick", "sticks", "bar", "bars", "tablet", "tablets", "tabs",
@@ -351,6 +399,17 @@
   // Names that could be food or a toiletry (water, oil, butter, powder): a brand of another kind says which.
   const AMBIG = new Set(["water", "waters", "oil", "oils", "butter", "milk", "powder", "powders", "cream", "sugar", "salt", "honey", "gel"]);
   const TOY_BRAND = (b) => b.kind === "toys_hobbies";
+  // Words that name two different things: the other one when a brand of that kind is on the line, or the shop sells it
+  // ("Erbauer 600W Jigsaw" at B&Q, "Colours White Gloss 750ml", "Stabilo Boss Highlighters", "Frames: Ray-Ban").
+  const DIY = { kind: "home", sub: "diy" }, STATIONERY = { kind: "other", sub: "stationery" };
+  const ALT = { jigsaw: DIY, jigsaws: DIY, gloss: { kind: "home", sub: "paint" }, plaster: DIY, tape: DIY, gloves: DIY, glove: DIY,
+    highlighter: STATIONERY, highlighters: STATIONERY, marker: STATIONERY, markers: STATIONERY, frame: { kind: "accessories", sub: "wear" },
+    frames: { kind: "accessories", sub: "wear" } };
+  // Colours and cloths that are also things ("Merino Beanie Charcoal", "Silk Pillowcase Blush", "TV Bed King Grey Plush").
+  const DESCRIBES = new Set(["charcoal", "blush", "plush", "nude", "coral", "rust", "slate"]);
+  const DESCRIBED = (m) => m.kind === "clothing" || m.kind === "footwear" || m.kind === "accessories" || (m.kind === "home" && (m.sub === "furniture" || m.sub === "bedding_textiles"));
+  // What a pan or a dish is made of says it is a pan or a dish, not the food it shares a name with ("Cast Iron Casserole").
+  const MATERIAL = /\b(cast iron|stoneware|ceramic|enamel|enamelled|porcelain|stainless steel|silicone|terracotta|earthenware|non stick)\b/;
   const FASHION_BRAND = (b) => b.kind === "clothing" || b.kind === "footwear" || b.kind === "accessories";
 
   // The same lines come up again and again (the weekly shop), so each answer is remembered for a while.
@@ -367,8 +426,8 @@
     const raw = String(name == null ? "" : name).trim();
     if (!raw) return result("other", null, "low", []);
     const shop = readShop(opts);
-    const text = norm(raw);
-    const all = tokens(raw);
+    const all = lineTokens(raw, (opts || {}).shop);
+    const text = norm(raw) + " " + all.join(" ");
     const reasons = [];
     const weight = WEIGHT.exec(text), multi = MULTI.exec(text), count = COUNT.exec(text);
     const packed = Boolean(weight || multi);
@@ -410,11 +469,22 @@
       const before = nouns.slice(0, -1).filter((m) => m.role === "noun" && m.kind !== "food_drink").pop();
       if (before) head = before;
     }
+    if (head && head.role === "noun" && DESCRIBES.has(head.words)) {
+      const before = nouns.slice(0, -1).filter((m) => m.role === "noun" && m.kind !== head.kind && DESCRIBED(m)).pop();
+      if (before) head = before;
+    }
+    if (head && ALT[head.words]) {
+      const alt = ALT[head.words];
+      const say = brands.some((b) => b.kind === alt.kind && (alt.kind !== "home" || b.sub === "diy" || b.sub === "paint")) ||
+        (alt.kind === "home" && shop === "diy") || (alt === DIY && /^(jigsaws?)$/.test(head.words) && /\b\d+\s?(w|v|watt|volt)\b/.test(text)) ||
+        (head.words === "plaster" && weight && /^(kg|kilos?)$/.test(weight[2]));
+      if (say) head = { ...head, kind: alt.kind, sub: alt.sub };
+    }
     if (head) {
       const w = head.words;
       if (head.role === "served") {
         // A bowl, a basket, a cup: what's in it when food is named or the shop serves food; otherwise the thing itself.
-        if (foodNamed || shop === "eatery") {
+        if (foodNamed || shop === "eatery" || weak.some((m) => m.kind === "food_drink" && /^(food|drink|drinks)$/.test(m.words))) {
           const f = nouns.filter((m) => m.role === "noun" && m.kind === "food_drink").pop() || brands.find((m) => m.kind === "food_drink");
           return result("food_drink", f ? f.sub : "grocery", "high", [f ? f.words : w].concat(reasons));
         }
@@ -423,7 +493,7 @@
         if (CLEANING_WORD.test(text)) head = { ...head, kind: "household", sub: "cleaning" };
         else if (MEDICINE_WORD.test(text) || count || brands.some((b) => b.kind === "beauty_health")) head = { ...head, kind: "beauty_health", sub: "health" };
         else head = { ...head, kind: "electronics", sub: "computing" };
-      } else if (/^(capsules?|caplets?)$/.test(w)) {
+      } else if (/^(capsules?|caplets?)$/.test(w) || (/^caps?$/.test(w) && (CLEANING_WORD.test(text) || COFFEE_WORD.test(text)))) {
         if (CLEANING_WORD.test(text)) head = { ...head, kind: "household", sub: "laundry" };
         else if (COFFEE_WORD.test(text) || foodBrand) head = { ...head, kind: "food_drink", sub: "coffee_tea" };
       } else if (w === "glass" || w === "glasses") {
@@ -463,7 +533,34 @@
       if (head && shop === "travel" && head.kind === "services" && head.sub === "care") head = { ...head, kind: "travel", sub: "rail" };
       // Paper towels come in rolls, not sets: a set of kitchen towels is tea towels.
       if (head && head.kind === "household" && head.sub === "paper" && /\bsets?\b/.test(text)) head = { ...head, kind: "home", sub: "bedding_textiles" };
+      // Gummy vitamins are vitamins.
+      if (head && head.kind === "food_drink" && head.sub === "sweets" && /\b(vitamins?|multivitamins?|supplements?)\b/.test(text)) head = { ...head, kind: "beauty_health", sub: "health" };
+      // A cookware maker's casserole or a cast iron one is the pot (but a weighed one is food).
+      const grams = weight && /^(g|gm|gr|grams?|kg|kilos?|mg)$/.test(weight[2]);
+      if (head && head.kind === "food_drink" && !foodBrand && !grams && (MATERIAL.test(text) || brands.some((b) => b.kind === "home" && b.sub === "kitchenware"))) head = { ...head, kind: "home", sub: "kitchenware" };
+      // A candle or a perfume named after something to eat ("Yankee Candle Vanilla Cupcake") is the candle or the perfume.
+      const scent = brands.find((b) => (b.kind === "home" && b.sub === "candles") || (b.kind === "beauty_health" && b.sub === "fragrance"));
+      if (head && head.kind === "food_drink" && !foodBrand && scent) head = { ...head, kind: scent.kind, sub: scent.sub };
+      // "Champagne Delivery Gift Box": the champagne, delivered.
+      if (head && head.words === "delivery" && head.end < all.length) {
+        const before = nouns.slice(0, -1).filter((m) => m.role === "noun" && m.kind !== "services").pop();
+        if (before) head = before;
+      }
+      // A takeaway's wedges are potato; nothing a café or takeaway sells is clothes or a dog's.
+      if (head && shop === "eatery" && ["clothing", "footwear", "accessories", "pets"].includes(head.kind)) head = { ...head, kind: "food_drink", sub: "grocery" };
+      // A DIY shop sells no food or make-up: its filler, plaster, gloss and tape are for the house (its bulbs and bleach stay
+      // what they are).
+      if (head && shop === "diy" && !foodBrand && (head.kind === "food_drink" || head.kind === "beauty_health" || (head.kind === "household" && (head.sub === "kitchen_consumables" || head.sub === "toiletries")))) head = { ...head, kind: "home", sub: "diy" };
+      // At a pet shop, the chicken, the coat and the bed are the pet's.
+      if (head && shop === "pets" && !["pets", "services", "gift_cards"].includes(head.kind)) head = { ...head, kind: "pets", sub: head.kind === "food_drink" ? "pet_food" : "pet_supplies" };
+      // A gym's membership is to go there.
+      if (head && shop === "gym" && head.kind === "digital" && head.sub === "subscriptions") head = { ...head, kind: "services", sub: "care" };
+      // A bottle at a shop that sells no drinks is a bottle to drink from.
+      if (head && head.kind === "food_drink" && !foodNamed && /^(fashion|home|electronics)$/.test(shop || "") && ms.some((m) => m.role === "pack" && /^(bottle|bottles|flask)$/.test(m.words))) head = { ...head, kind: "home", sub: "kitchenware" };
     }
+    // Vapes and nicotine pouches are never food, whatever they taste of (nicotine gum and patches are a medicine).
+    const vape = ms.find((m) => m.kind === "other" && m.sub === "vape");
+    if (vape && !brands.some((b) => b.kind === "beauty_health")) return result("other", "vape", "high", [vape.words]);
     // "iPhone 15 Case": the case, not the phone.
     if (head && head.kind === "electronics" && head.sub === "phones" && packs.some((p) => p.words === "case" && p.at > head.at)) head = { ...head, sub: "phone_accessories", words: head.words + " case" };
     if (head) return result(head.kind, head.sub, "high", [head.words].concat(reasons));
@@ -473,6 +570,9 @@
     const caseWord = packs.some((p) => p.words === "case") || /\b(case|cover)\b/.test(text);
     if (caseWord && phoneAnywhere && !packed) return result("electronics", "phone_accessories", "high", ["phone case"]);
     const later = rest.filter(named).pop();
+    // "Mario Kart World (Nintendo Switch 2)": the game, for the console.
+    const zoneBrand = zone.filter((m) => m.role === "brand" && (m.kind === "books_media" || m.kind === "toys_hobbies")).pop();
+    if (zoneBrand && later && later.kind === "electronics") return result(zoneBrand.kind, zoneBrand.sub, "high", [zoneBrand.words].concat(reasons));
     if (later && !packs.length) return result(later.kind, later.sub, "medium", [later.words].concat(reasons));
 
     // A bag with nothing in it named is a bag (not at a supermarket, and not with a weight or a food brand on it).
@@ -492,11 +592,15 @@
       if (shop === "travel") return result("travel", "stays", "medium", ["shop"].concat(packs.map((p) => p.words)));
       // (A 22 litre box at a home shop is for storage; a 500g one there is still food.)
       const litreBox = weight && /^(l|ltr|litres?|liters?)$/.test(weight[2]) && packs.some((p) => /^(box|boxes|tub|tubs)$/.test(p.words));
-      if (SHOP_KIND[shop] && !flavour && !foodBrand && (!packed || litreBox)) return result(SHOP_KIND[shop], null, "medium", ["shop"].concat(packs.map((p) => p.words)));
+      if (SHOP_KIND[shop] && !foodBrand && ((shop === "diy" || shop === "pets") || (!flavour && (!packed || litreBox)))) return result(SHOP_KIND[shop], null, "medium", ["shop"].concat(packs.map((p) => p.words)));
       if (shop === "beauty") return result("beauty_health", null, "medium", reasons.concat(packs.map((p) => p.words)));
+      if (!flavour && !foodBrand && /^(fashion|home|electronics)$/.test(shop || "") && packs.some((p) => /^(bottle|bottles|flask)$/.test(p.words))) return result("home", "kitchenware", "medium", ["bottle"]);
       if (packed || flavour || shop === "grocer" || shop === "eatery" || shop === "food")
         return result("food_drink", "grocery", "medium", reasons.concat(flavour ? [flavour.words] : packs.map((p) => p.words)));
     }
+    // A hamster's wheel, a kitten's dinner.
+    if (PET_WORD.test(text.replace(/\bhot dogs?\b/g, "")) || shop === "pets") return result("pets", "pet_supplies", "medium", ["pet"]);
+    if (shop === "diy") return result("home", "diy", "medium", ["shop"]);
     // Only the kind of shop: a supermarket's or a takeaway's line is food, an app shop's an app, a rail shop's a journey.
     if (shop && SHOP_HINT[shop]) {
       const k = SHOP_HINT[shop];
