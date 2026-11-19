@@ -687,6 +687,31 @@ for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "
   assert.equal(all[259].orderRef, "R10259", "including the oldest");
   console.log("ok - more than 100 receipts: all of them reach the Receipts page");
 }
+// Reading earlier years later (Wrapped history, 2016 onwards) makes thousands of rows that were READ after this year's
+// receipts. The list goes by the order's own date, and has room for them all, so this year's receipts never drop out
+// (19 Nov 2026: with 3,000 rows newest-read first, most of Dec 2025 to Aug 2026 vanished from a real shopper's list).
+{
+  const hist = await signIn("history.reader@example.com", "8.8.8.10");
+  await post("/relay/my/consent", hist, { version: CONSENT_VERSION });
+  const xid = sqlite.prepare("SELECT id FROM shoppers WHERE email = 'history.reader@example.com'").get().id;
+  const ins = sqlite.prepare("INSERT INTO captured_receipts (id, shopper_id, message_ref, status, details, created_at) VALUES (?,?,?,?,?,?)");
+  const rec = (ref, d) => JSON.stringify({ kind: "receipt", retailer: { name: "Shop " + ref, domain: "shop.example" }, orderRef: ref, orderDate: d, totalPence: 500, currency: "GBP", items: [{ name: "Thing " + ref, qty: 1, pricePence: 500 }] });
+  sqlite.exec("BEGIN");
+  // This year's receipts, read first (oldest created_at)...
+  for (let i = 0; i < 300; i++) ins.run(crypto.randomUUID(), xid, "now" + i, "pending", rec("N" + i, new Date(Date.UTC(2026, 7, 31) - i * 86400000).toISOString().slice(0, 10)), 1000 + i);
+  // ...then 3,500 receipts from 2016 to 2025, read afterwards, and their not-receipt neighbours.
+  for (let i = 0; i < 3500; i++) ins.run(crypto.randomUUID(), xid, "old" + i, "pending", rec("O" + i, new Date(Date.UTC(2025, 9, 1) - i * 86400000).toISOString().slice(0, 10)), 900000 + i);
+  for (let i = 0; i < 2000; i++) ins.run(crypto.randomUUID(), xid, "nr" + i, "not_receipt", JSON.stringify({ kind: "not_receipt" }), 2000000 + i);
+  sqlite.exec("COMMIT");
+  const all = (await (await call("/relay/my/receipts?all=1", { token: hist })).json()).receipts;
+  assert.equal(all.length, 3800, "every receipt, this year's and the earlier years'");
+  assert.equal(all[0].orderRef, "N0", "newest order first, whenever it was read");
+  assert.ok(all.some(x => x.orderRef === "N299") && all.some(x => x.orderRef === "O3499"), "the oldest of each");
+  const home = (await (await call("/relay/my/receipts", { token: hist })).json()).receipts;
+  assert.equal(home[0].orderRef, "N0", "Home's newest are the newest orders, not the latest emails read");
+  assert.ok(home.every(x => x.orderRef.startsWith("N")), "no 2016 receipts crowd this year's off Home");
+  console.log("ok - reading earlier years never pushes this year's receipts out of the list");
+}
 // A recent order still in its return window reaches Home even when hundreds of emails were read after it, and receipts
 // stored by an older reader are tidied when listed (no payment lines as items, one clean shop name, no payment company as the shop).
 {

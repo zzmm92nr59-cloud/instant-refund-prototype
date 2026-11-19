@@ -36,7 +36,8 @@ function decodeQuotedPrintable(text, charset = "utf-8") {
 // "£" is one byte that would come out garbled if read as UTF-8).
 function decodeBase64(text, charset = "utf-8") {
   let bytes;
-  try { bytes = Uint8Array.from(atob(text.replace(/\s+/g, "")), (c) => c.charCodeAt(0)); } catch { return ""; }
+  // (Filled byte by byte: Uint8Array.from(text, fn) builds a list with an entry per byte first, many times a long part's size.)
+  try { const bin = atob(text.replace(/\s+/g, "")); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch { return ""; }
   try { return new TextDecoder(charset, { fatal: false }).decode(bytes); }
   catch { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
 }
@@ -1001,6 +1002,24 @@ export function emailForReading(rawEmail) {
   const html = parts.html.join("\n");
   return { subject: headers.subject || "", from: headers.from || "", date: headers.date || "",
     plain: parts.text.join("\n").trim(), fromHtml: html ? htmlToText(html) : "" };
+}
+
+// An email for finding a code to show or scan (scan-codes.js): its headers, its HTML as shown (hidden copies left out) and
+// its text. htmlAsText turns a piece of that HTML into lines the way the reader does.
+export function emailForCodes(rawEmail) {
+  const raw = String(rawEmail || "").slice(0, MAX_RAW);
+  const { headers, body } = splitMessage(raw);
+  const parts = { text: [], html: [] };
+  collectParts(headers, body, parts);
+  const html = parts.html.join("\n").slice(0, MAX_INPUT);
+  return { headers, html: html ? withoutHidden(html) : "", plain: parts.text.join("\n").trim() };
+}
+export function htmlAsText(html) { return htmlToTextAll(String(html || "")); }
+// The order an email is about, the day it was sent and the shop that sent it (also when the shopper forwarded it), for an
+// email that is kept only for its code.
+export function orderNewsOf(rawEmail) {
+  const u = updateParts(rawEmail);
+  return { orderRef: u.orderRef, at: u.at, subject: u.subject, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
 }
 
 // A shop's till receipt that says once that it is in pounds ("GBP" over the price column) and then prints bare amounts
