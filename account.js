@@ -10010,11 +10010,13 @@
     var p = (!fresh && memo.purchases) || api(purchasesPath(), fresh ? { fresh: true } : null);
     return Promise.all([p.then(function (r) {
         if (!r.ok) return null;
-        if (memo.walletPurchases && r.raw && r.raw === memo.rawPurchases) return memo.walletPurchases;
-        memo.rawPurchases = r.raw;
+        // The answer's text is kept together with the list made from it: two screens loading at once share one answer,
+        // and the second must get that answer's list, not the one shown before it.
+        if (memo.purchasesKept && r.raw && r.raw === memo.purchasesKept.raw) return memo.purchasesKept.list;
         var list = (r.body && r.body.purchases) || [];
         // The first answer since opening: the same as the copy kept on the phone keeps that copy.
-        if (memo.walletPurchases && JSON.stringify(list) === JSON.stringify(memo.walletPurchases)) return memo.walletPurchases;
+        if (memo.walletPurchases && JSON.stringify(list) === JSON.stringify(memo.walletPurchases)) list = memo.walletPurchases;
+        memo.purchasesKept = { raw: r.raw, list: list };
         return list;
       }, function () { return null; }),
       api("/relay/my/receipts", fresh ? { fresh: true } : null).then(function (r) {
