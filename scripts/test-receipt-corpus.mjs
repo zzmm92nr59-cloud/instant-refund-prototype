@@ -403,6 +403,12 @@ const joinWrong = [];
     const f = fx(id), r = parseReceiptEmail(rawEmail(app ? forwarded(f, app) : f));
     if (!r.ok || r.orderRef !== f.expected.orderRef) joinWrong.push(`${id}${app ? " (" + app + ")" : ""}: order number ${r.ok ? r.orderRef : r.reason} for ${f.expected.orderRef}`);
   }
+  // An email with thousands of blank rows (a jeweller's order email took minutes and never finished): read in moments.
+  { const t = Date.now(); parseReceiptEmail(`From: Shop <orders@shop.example>\nSubject: Thank You For Your Order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number: 12345\nUnused time on the plan here\n${"| \n".repeat(20000)}Order Total £5.00`);
+    if (Date.now() - t > 3000) joinWrong.push("an email of blank rows took " + (Date.now() - t) + " ms"); }
+  // A total's own amount is never the price of the line under it ("Order Total" / "£310.00" / "The Gift Box").
+  { const r = parseReceiptEmail(`From: Jeweller <no-reply@jeweller.example>\nSubject: Thank You For Your Order\nDate: Mon, 16 Nov 2026 10:00:00 +0000\nContent-Type: text/plain\n\nOrder Number\n00412233\nOrder Total\n£310.00\nThe Signature Gift Box\nEvery purchase arrives wrapped in our gift box.`);
+    if (r.ok && r.items.some((i) => /gift box/i.test(i.name))) joinWrong.push("the gift box under a total read as the thing bought"); }
   // The inbox scan never asks for the shopper's own sent mail (a receipt forwarded to someone else is a copy). Round 14.
   if (!/const windowQuery = [^\n]*-in:sent /.test(readFileSync(new URL("../worker/gmail.js", import.meta.url), "utf8"))) joinWrong.push("the Gmail search asks for sent mail");
   // A table booked but not paid for: read with its number and price, never a purchase in the inbox.

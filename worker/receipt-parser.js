@@ -2039,8 +2039,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // A credit set out like an item under the one thing bought ("Unused time on Claude Pro after 26 Oct 2026", "Qty 1",
   // "-£11.10"): kept as that item's detail, so the card says why less was paid. Round 12.
+  // (Written so blank rows between them never make it slow: an email with thousands of them took minutes. Round 14.)
   if (result.items.length === 1) {
-    const cr = /^[\s|]*(\p{L}[^\n|£]{8,80}?)[\s|]*\n(?:[\s|]*\n)*[\s|]*qty\s*:?\s*1[\s|]*\n(?:[\s|]*\n)*[\s|]*[-−–]\s?£\s?([\d,]+\.\d{2})[\s|]*$/imu.exec(fromHtml || text);
+    const cr = /^[ \t|]*(\p{L}[^\n|£]{8,80}?)[ \t|]*\n[\s|]*qty\s*:?\s*1[ \t|]*\n[\s|]*[-−–]\s?£\s?([\d,]+\.\d{2})[\s|]*$/imu.exec(fromHtml || text);
     if (cr && !/\b(?:discount|voucher|promo)/i.test(cr[1])) { const it = result.items[0]; const note = `${cr[1].trim()} −£${cr[2]}`; it.variant = it.variant ? `${it.variant}, ${note}` : note; }
   }
   // A stay booked through a booking site: the room is the item, and the hotel it is at ("Your booking is confirmed at
