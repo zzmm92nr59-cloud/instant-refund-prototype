@@ -92,7 +92,7 @@ function deadlineIn(text, sentAt) {
   }
   return null;
 }
-const EVENT_DAY = /^[\s|]*(?:event date|date of (?:the )?event|event starts?|event day)\s*[:|]\s*([^\n|]{4,60})/im;
+const EVENT_DAY = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:event date|date of (?:the )?event|event starts?|event day)\s*[:|]\s*([^\n|]{4,60})/im;
 
 // A short fingerprint of some text (FNV-1a, twice over), only for telling two codes apart: never a secret.
 function fingerprint(text) {

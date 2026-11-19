@@ -332,7 +332,9 @@ function htmlToTextAll(html) {
     // (A "|" the email writes inside a cell, "SanDisk 128GB … | A1 | Class 10", is part of what the cell says, not the edge of
     // a column: it is kept as "│" so the reader never splits a name there. Not when it sets facts apart, "Size: 8 | Qty: 2 |
     // £24.00", "XS | BLACK" (short words first). Round 8.)
-    .replace(/>([^<>]*\|[^<>]*)</g, (m, t) => (/£|&pound;|&#163;|\b(?:qty|quantity|size|colou?r|price)\b\s*:/i.test(t) || t.split("|")[0].trim().split(/\s+/).length <= 3 ? m : ">" + t.replace(/\|/g, "\u2502") + "<"))
+    // (Each run of text between tags is taken whole and only one with a "|" is looked at: asking for the "|" in the pattern
+    // itself took minutes on a long run with many "|" and no tag after it.)
+    .replace(/>([^<>]*)</g, (m, t) => (!t.includes("|") ? m : /£|&pound;|&#163;|\b(?:qty|quantity|size|colou?r|price)\b\s*:/i.test(t) || t.split("|")[0].trim().split(/\s+/).length <= 3 ? m : ">" + t.replace(/\|/g, "\u2502") + "<"))
     // A table cell that is only a picture says what it shows in the picture's alt text: an item shown only as its photo
     // ("Dorma Pure Cotton Duvet Cover Set"). Only a description of three words or more (a logo's alt is the shop's name),
     // and only when the email doesn't write those words anywhere else.
@@ -572,7 +574,7 @@ function fromText(text, refDate, ctx = {}) {
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
     // ("Order:" alone on its line, the number on the next: Homary. Round 11.)
-    text.match(/^[\s|]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
+    text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
     // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
     text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     // ("Confirmation: 6943887618", a hotel booking's number with no word for "number": digits only. Round 12.)
@@ -583,7 +585,7 @@ function fromText(text, refDate, ctx = {}) {
     text.match(/\breceipt\s*(?:number|no\.?|#)\s*[:#\s]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     // ("Ref: 419694" on a line of its own, a pub's order. Round 12.)
-    text.match(/^[\s|]*ref(?:erence)?\s*:\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im);
+    text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*ref(?:erence)?\s*:\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im);
 
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
@@ -605,19 +607,19 @@ function fromText(text, refDate, ctx = {}) {
     pool.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || pool[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
     // A supermarket's order before it is picked gives a guide price, not a total ("Guide price | £27.69"). Round 8.
-    text.match(/^[\s|]*(?:estimated |order )?guide price\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/im) ||
+    text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:estimated |order )?guide price\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/im) ||
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
-    [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
+    [...text.matchAll(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
     // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
     text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
     // No total named, but what the card was charged after the subtotal and VAT ("Mastercard •••• 1234 (Apple Pay) | £10.99",
     // Apple's renewal receipts). Round 10.
-    (/\bsub-?\s?total\b/i.test(text) && text.match(/^[\s|]*(?:visa|mastercard|master card|amex|american express|maestro|debit card|credit card|apple pay|google pay|paypal)\b[^\n£]{0,50}?(?:•{2,}|\*{2,}|x{3,}|ending(?: in)?)\s*\d{4}\b[^\n£]{0,30}?[\s|]*\n?[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im)) ||
+    (/\bsub-?\s?total\b/i.test(text) && text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:visa|mastercard|master card|amex|american express|maestro|debit card|credit card|apple pay|google pay|paypal)\b[^\n£]{0,50}?(?:•{2,}|\*{2,}|x{3,}|ending(?: in)?)\s*\d{4}\b[^\n£]{0,30}?[\s|]*\n?[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im)) ||
     // No total named, but the amount taken beside the card it was taken from ("MasterCard •••• 4242 (Apple Pay) | £10.99",
     // Apple's subscription invoices). Coverage round.
-    text.match(/^[\s|]*(?:visa|mastercard|master card|amex|american express|maestro)\s*(?:[•·*.]\s?){2,}\s*\d{4}\b[^\n£]{0,30}(?:\n[\s|]*)?£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im) ||
+    text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:visa|mastercard|master card|amex|american express|maestro)\s*(?:[•·*.]\s?){2,}\s*\d{4}\b[^\n£]{0,30}(?:\n[\s|]*)?£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im) ||
     // A payment receipt that names only the amount, "Amount: 11.2 GBP" (round 11).
-    text.match(/^[\s|]*amount\s*:[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im);
+    text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*amount\s*:[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -901,7 +903,7 @@ function receiptSignals(subject, text) {
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[\s|]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -1181,9 +1183,17 @@ const APPLE_DEVICE = /^(?:[\p{L}\p{N} .'’-]{1,40}['’]s\s+)?(?:iphone|ipad|ip
 // An app's store title often runs on after its name ("MobiPDF・PDF Editor・Reader・Sign", "Notes - Write & Plan"): the
 // name is the part before the first separator.
 const appShort = (s) => String(s).split(/\s*[・·|]\s*|\s+[-–—:]\s+|:\s+/)[0].trim() || String(s);
+// Whether a line ends with a price or "free" (after any spaces and column edges). Only such a line can be split into a name
+// and its price below; checking first keeps a very long line without one (an email's padding) from taking minutes.
+function endsInPrice(x) {
+  let e = x.length;
+  while (e > 0 && (x[e - 1] === "|" || /\s/.test(x[e - 1]))) e--;
+  const pound = e > 0 ? x.lastIndexOf("£", e - 1) : -1;
+  return /(?:£\s*[0-9][0-9,]*\.[0-9]{2}|free)$/i.test(x.slice(Math.max(0, Math.min(e - 4, pound < 0 ? e : pound)), e));
+}
 export function appleItems(text) {
   // ("Report a Problem | £1.59": a price in the cell beside the last row is that purchase's price, on a row of its own.)
-  const rows = String(text || "").split("\n").flatMap((x) => x.replace(/^(.+?)(?:\s*\|\s*|\t+|\s{2,})(£\s*[0-9][0-9,]*\.[0-9]{2}|free)\s*\|?\s*$/i, "$1\n$2").split("\n")).map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const rows = String(text || "").split("\n").flatMap((x) => (endsInPrice(x) ? x.replace(/^(.+?)(?:\s*\|\s*|\t+|\s{2,})(£\s*[0-9][0-9,]*\.[0-9]{2}|free)\s*\|?\s*$/i, "$1\n$2") : x).split("\n")).map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   const items = [];
   for (let i = 0; i < rows.length; i++) {
     if (/^(subtotal|total|vat|tax)\b|\b(inclusive of|includes|incl\.?) vat\b/i.test(rows[i])) break;
@@ -1265,7 +1275,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     // A payment platform's own receipt names the business that was paid ("Merchant: Example Lettings").
     // (Or on the line under the label, "Merchant |" over "CLIP MX*BAZAR |": a PayPal Debit Card purchase; or a card payment
     // page's subject, "APPROVED: Payment transaction for your order M589966 … at Embassy of Nepal". Round 13.)
-    merchantName: sentDomain && isVia(sentDomain) ? (((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) ||
+    merchantName: sentDomain && isVia(sentDomain) ? (((text.match(/^[#*|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) ||
       text.match(/^[ \t#*|]*merchant(?: name)?[ \t]*[:|]?[ \t|]*\n[ \t|]*([^\n|]{2,40}?)[ \t]*\|?[ \t]*$/im) ||
       text.match(/\byour PayPal Debit Card (?:ending in [•·*.\d ]{2,12} )?at ([^\n|]{2,40}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
       /\b[Pp]ayment transaction\b.*\sat\s+(\p{Lu}[\p{L}\d&'’. -]{2,40}?)\s*$/u.exec(subject) || [])[1] || "").replace(/\s+\S+@\S+$/, "") || null) : null,
@@ -1576,7 +1586,7 @@ function moreOrders(text, firstRef) {
   const out = [];
   for (let k = 1; k < firsts.length; k++) {
     const seg = lines.slice(firsts[k].i, k + 1 < firsts.length ? firsts[k + 1].i : lines.length).join("\n");
-    const tot = /^[\s|]*(?:order )?total\s*:?[\s|]*£\s?([\d,]+\.\d{2})[\s|]*$/im.exec(seg);
+    const tot = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:order )?total\s*:?[\s|]*£\s?([\d,]+\.\d{2})[\s|]*$/im.exec(seg);
     if (!tot) return [];
     const totalPence = money(tot[1]);
     const items = cleanItems(readItems(seg.slice(0, tot.index + tot[0].length)));
@@ -1742,7 +1752,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") && html) result.items = amazonItems(html);
   // (An App Store or Apple services receipt: from Apple, or pasted with Apple named and its App Store layout.)
-  const appleLayout = /^\s*\|?\s*(?:app store|apple services|itunes store|apple arcade)\s*\|?\s*$|\bin-app purchase\b|\brenews \d/im.test(text);
+  const appleLayout = /^[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:\|[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*)?(?:app store|apple services|itunes store|apple arcade)\s*\|?\s*$|\bin-app purchase\b|\brenews \d/im.test(text);
   const appleDigital = appleLayout && (/(^|\.)apple\.com$/i.test(result.retailer.domain || "") || /^apple$/i.test(result.retailer.name || "") || (!result.retailer.name && /\breport a problem\b/i.test(text)));
   if (!result.items.length && appleDigital) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // (Round 12: Apple's own layout names what was bought under its app, "Match Masters" over "Stack of Coins". When a
@@ -1836,7 +1846,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // (A digital railcard or another booking with no order number but its "Transaction ID:" over the number, the number the
   // shop asks for: the order's number. Round 13.)
-  if (!result.orderRef && !isFlight) { const tx = /^[\s|]*(?:your )?transaction id\s*:?[\s|]*\n?[\s|]*(\d{8,16})[\s|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
+  if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id\s*:?[\s|]*\n?[\s|]*(\d{8,16})[\s|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -2013,7 +2023,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // One thing, priced before tax, with the tax on its own line and the total after it ("Meta Quest+ £6.66", "Tax included:
   // £1.33", "Today's total: £7.99"): what it cost is the total. Round 12.
   if (result.items.length === 1 && result.totalPence != null && result.itemsCheck && result.itemsCheck.complete === false && result.items[0].pricePence != null) {
-    const tax = /^[\s|]*(?:tax|vat)(?: included| charged| \(\d{1,2}%\))?\s*:?\s*\|?\s*£\s?([\d,]+\.\d{2})/im.exec(text);
+    const tax = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:tax|vat)(?: included| charged| \(\d{1,2}%\))?\s*:?\s*\|?\s*£\s?([\d,]+\.\d{2})/im.exec(text);
     const it = result.items[0];
     if (tax && (it.qty || 1) === 1 && it.pricePence + money(tax[1]) === result.totalPence) {
       it.pricePence = result.totalPence;
@@ -2186,7 +2196,7 @@ export function parseDeliveryEmail(rawEmail) {
   if (/\bdue to be delivered\b|\barriving today\b|\bexpected (?:today|on)\b/i.test(subject)) status = "due";
   else if (/\b(has been|was|been|we(?:'|’)?ve)\s+delivered\b|\bwe delivered\b/i.test(both)) status = "delivered";
   // "Delivered: 1 item | Order # …", or a heading that just says "Delivered today".
-  else if (/^\s*delivered\s*:/i.test(subject) || /^[\s|]*delivered today[.!]?[\s|]*$/im.test(text.slice(0, 4000))) status = "delivered";
+  else if (/^\s*delivered\s*:/i.test(subject) || /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*delivered today[.!]?[\s|]*$/im.test(text.slice(0, 4000))) status = "delivered";
   else if (/\bout for delivery\b/i.test(both)) status = "out_for_delivery";
   else if (/\bdue to be delivered\b|\barriving today\b/i.test(both)) status = "due";
   else if (fromCarrier && /\b(on its way|dispatched|in transit|we(?:'|’)?ve got your parcel)\b/i.test(both)) status = "in_transit";
@@ -2356,7 +2366,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   const orig = /\byou originally paid (.{2,60}?) £\s?([\d,]+\.\d{2})(?: GBP)? on (\d{1,2} [A-Za-z]{3,9} \d{4})/i.exec(both.replace(/\s+/g, " "));
   const fwdVia = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
   const via = /(^|\.)paypal\./i.test((fwdVia && fwdVia.domain) || sender?.domain || "");
-  const viaShop = via ? ((/\brefund of £\s?[\d,]+\.\d{2}(?: GBP)? from ([^\n|]{2,60}?)\s*(?:\n|\||$)/i.exec(both) || [])[1] || (/^\s*([^\n|]{2,60}?) sent you a refund\b/im.exec(both) || [])[1] || (orig && orig[1]) || null) : null;
+  const viaShop = via ? ((/\brefund of £\s?[\d,]+\.\d{2}(?: GBP)? from ([^\n|]{2,60}?)\s*(?:\n|\||$)/i.exec(both) || [])[1] || (/^[\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*([^\n|]{2,60}?) sent you a refund\b/im.exec(both) || [])[1] || (orig && orig[1]) || null) : null;
   const rid = text.match(/return (?:id|number|reference)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   return {
     ok: true, kind: "return_update", stage,
@@ -2461,7 +2471,7 @@ export function parseDispatchEmail(rawEmail) {
 // is what the email says came back, when it says.
 // Which items a part-cancelled order lost, only where the email names them (round 8): under a "Cancelled items" heading, or in
 // a sentence ("We've had to cancel the Linen Shirt White from your order"). Never worked out from an amount.
-const CANCELLED_HEAD = /^[\s|]*(?:cancell?ed items?|items? (?:that )?(?:we(?:'|’)?ve |we have |have been |has been |were |was )?cancell?ed|the following items? (?:has|have) been cancell?ed|what(?:'|’)?s been cancell?ed|item\(s\) cancell?ed)\s*:?[\s|]*$/im;
+const CANCELLED_HEAD = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:cancell?ed items?|items? (?:that )?(?:we(?:'|’)?ve |we have |have been |has been |were |was )?cancell?ed|the following items? (?:has|have) been cancell?ed|what(?:'|’)?s been cancell?ed|item\(s\) cancell?ed)\s*:?[\s|]*$/im;
 function cancelledNames(text) {
   const t = String(text || "");
   const out = [];
