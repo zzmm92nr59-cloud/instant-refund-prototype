@@ -65,6 +65,11 @@ export default function holdout13a() {
     date: "Thu, 16 Jul 2026 17:11:00 +0000", text: ["Hi Sam,", "", "Thank you for shopping with us. Here is the receipt for your recent trip. View itemised receipt:", "  https://www.grabngo.example/store/order/204-5500321-1100220", "", "Thursday, 16 July, 2026",
       "Order # 204-5500321-1100220 (Items: 1)", "Trip time: 2m 10s", "", "Subtotal                                         £4.15", "Promotions applied                        -  £0.40", "Total                                            £3.75"].join("\n") },
     order([]), "Grabngo", "2026-07-16", { totalPence: 375, noItemList: true });
+  // ---- A holiday booked with a deposit: the confirmation gives the reference and links to its document (no price) --------------
+  add("holdout13a-holiday-booking-no-price", "Sunward Breaks", "'Your booking is confirmed', 'Booking reference: SWB…', the price only in the linked booking document", { from: "Sunward Breaks <noreply@sunwardbreaks.example>", subject: "Your booking is confirmed",
+    date: "Tue, 14 Oct 2026 20:44:00 +0000", html: mail("Sunward Breaks", "sunwardbreaks.example", ["Booking reference: SWB55120931K", `Hi ${SHOPPER.first},`, "Your holiday to Faro is confirmed - let the countdown begin!",
+      "You can find everything you need to know about your trip in your booking confirmation document.", "Happy travels,", "Sunward Breaks", "View booking confirmation View ATOL certificate", "Sunward Breaks Ltd, 1 Example Street, Leeds"]) },
+    order([]), "Sunward Breaks", "2026-10-14", { totalPence: null, currency: null });
   // ---- Money back: a supermarket's refund with its amount on the line under its label; a furniture shop's refund with a
   // full-width pound sign; a payment service's refund naming the shop's invoice; a takeaway app's support reply -----------
   const not = (id, sender, layout, m, notPurchase) => out.push(fixture(id, sender, layout, m, { notPurchase, items: [], shop: null, date: null, currency: null, totalPence: null }));

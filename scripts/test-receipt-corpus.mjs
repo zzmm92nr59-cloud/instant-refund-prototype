@@ -327,6 +327,14 @@ const joinWrong = [];
   const twice = [ride(4, 499, "2026-03-05"), ride(5, 499, "2026-03-05")];
   attachReturnProgress(twice, [], [pp]);
   if (twice.some((r) => r.returnProgress)) joinWrong.push("payment service's refund guessed between two rides for the same money");
+  // A holiday paid in parts: each "You've authorised £… to <the shop's company>" payment joins the booking, none is a purchase.
+  const trip = mergeOrderEmails([{ id: "h1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-holiday-booking-no-price.json"), "utf8")))) }]);
+  const auth = (amt, day, date) => classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've authorised a payment to Sunward Breaks Lim...", date,
+    `Hello, ${SHOPPER.name}\nYou've authorised ${amt} GBP to Sunward Breaks Lim...\nMerchant\nSunward Breaks Lim...\nTransaction date\n${day}\nOrder ID\n2610GBPAB12CD\n`)).details;
+  const pays = [auth("£40.00", "14 Oct 2026", "Tue, 14 Oct 2026 20:43:00 +0000"), auth("£150.25", "8 Nov 2026", "Sun, 08 Nov 2026 05:10:00 +0000")];
+  if (pays.some((p) => p.kind !== "order_update" || p.stage !== "payment")) joinWrong.push("a payment authorisation read as " + pays.map((p) => p.kind + ":" + p.stage).join());
+  attachCancellations(trip, pays);
+  if (trip.length !== 1 || trip[0].totalPence != null || trip[0].paidSoFarPence !== 19025 || (trip[0].payments || []).length !== 2 || trip[0].cancelled) joinWrong.push("a booking's payments not joined: " + JSON.stringify(trip.map((o) => [o.orderRef, o.totalPence, o.paidSoFarPence])));
   // One email confirming two orders: a card for each, each with its own number, total and items.
   const two = mergeOrderEmails([{ id: "t1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-two-orders-one-email.json"), "utf8")))) }]);
   if (two.length !== 2 || two[1].orderRef !== "301-5510022-4410002" || two[1].totalPence !== 3100 || (two[1].items || []).map((i) => i.name).join() !== "Eau de Parfum 50ml" || two[0].totalPence !== 2249)
@@ -337,7 +345,7 @@ const joinWrong = [];
   attachReturnProgress(wine, [], [{ kind: "return_update", ...inv }]);
   if (!(wine[0].returnProgress && wine[0].returnProgress.refundPence === 3000) || wine[1].returnProgress) joinWrong.push("refund naming the shop's invoice not joined to that order");
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, and money back joins its order"}`);
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };

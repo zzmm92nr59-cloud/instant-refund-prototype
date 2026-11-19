@@ -887,7 +887,7 @@ function classify(rawText, ref, lenient = false) {
     if (adj.ok) {
       // A takeaway app's changed total for an order it already charged (money back for part of it): never a purchase, joined
       // to that order by attachAdjustments. Round 10.
-      details = { kind: "order_update", ...ref, stage: "adjusted", at: adj.at, orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
+      details = { kind: "order_update", ...ref, stage: adj.stage || "adjusted", at: adj.at, ...(adj.paymentRef ? { paymentRef: adj.paymentRef } : {}), orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
         ...(adj.orderRefs ? { orderRefs: adj.orderRefs } : {}), ...(adj.creditPence ? { creditPence: adj.creditPence } : {}), ...(adj.bySupport ? { bySupport: true } : {}),
         previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
     } else if (can.ok) {
@@ -1794,7 +1794,29 @@ export function attachDeliveries(orders, deliveries) {
 // `cancelled` says so on the card: { at, partial, amountPence, currency }. A whole order cancelled has nothing to send back
 // (no return date) and is not money spent (wrapped.js spentOf, account.js); for part of one, the amount the shop says came
 // back is taken off, when it says.
+// Payments towards a purchase paid in parts (a holiday's deposit, then instalments), from a payment service's "You've
+// authorised £38.00 GBP to We Love Holidays Lim...": each joins the latest purchase from that shop made on or before its day
+// (within a year), when exactly one is. The card says what was paid and when; never a purchase of its own. Round 12.
+function attachPayments(orders, pays) {
+  const squash = (x) => String(x || "").toLowerCase().replace(/\b(?:ltd|limited|lim|plc|inc|llc|uk|the)\b|[^a-z0-9]+/g, "");
+  for (const p of pays) {
+    const m = squash(p.retailer && p.retailer.name);
+    if (m.length < 5 || !Number.isInteger(p.amountPence) || !p.at) continue;
+    const fits = orders.filter(o => o.kind !== "order_update" && o.orderDate && o.orderDate <= p.at && Date.parse(p.at) - Date.parse(o.orderDate) <= 366 * 864e5 &&
+      (() => { const s = squash(o.retailer && o.retailer.name); return s.length >= 5 && (m.includes(s) || s.includes(m)); })());
+    if (!fits.length) continue;
+    const last = fits.reduce((a, b) => (b.orderDate > a.orderDate ? b : a));
+    if (fits.filter(o => o.orderDate === last.orderDate).length !== 1) continue;
+    const list = last.payments || (last.payments = []);
+    if (!list.some(x => x.at === p.at && x.amountPence === p.amountPence)) list.push({ at: p.at, amountPence: p.amountPence, currency: p.currency || "GBP" });
+    list.sort((a, b) => a.at.localeCompare(b.at));
+    last.paidSoFarPence = list.reduce((n, x) => n + x.amountPence, 0);
+  }
+}
 export function attachCancellations(orders, cancels) {
+  // (Payments towards a purchase come with the order's other news: they are not cancellations.)
+  attachPayments(orders, cancels.filter(u => u.stage === "payment"));
+  cancels = cancels.filter(u => u.stage !== "payment");
   // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
   // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
   const byItems = new Map();

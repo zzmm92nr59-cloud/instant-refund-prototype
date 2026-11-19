@@ -127,6 +127,19 @@ export function supportRefund(subject, text) {
   return { refundPence, creditPence, refs };
 }
 
+// A payment service's "You've authorised £38.00 GBP to We Love Holidays Lim..." (money taken for a booking paid in parts:
+// a deposit, then instalments): one payment towards a purchase made with the shop, never a purchase of its own. What was
+// paid, to whom, on which day and the payment's own order number. Round 12.
+export function paymentAuthorised(subject, text) {
+  const t = String(text || "").slice(0, 6000);
+  const m = /\byou(?:'|’)?ve authori[sz]ed (£\s?[\d,]+\.\d{2})(?: GBP)? to ([^\n|]{2,60}?)(?:\.{3}|…)?\s*(?:\n|\||$)/i.exec(t);
+  if (!m) return null;
+  const list = rows(t);
+  const after = (re) => { const i = list.findIndex((x) => re.test(x)); return i >= 0 ? (list[i].replace(re, "").trim() || list[i + 1] || "") : ""; };
+  const ref = /^[A-Z0-9-]{6,30}$/i.exec(after(/^order id\s*:?/i));
+  return { amountPence: pence(MONEY.exec(m[1])), merchant: m[2].replace(/(?:\.{2,}|…)$/, "").trim(), orderRef: ref ? ref[0] : null, on: after(/^transaction date\s*:?/i) || null };
+}
+
 // ---- A game's web shop (Appcharge, Xsolla) --------------------------------------------------------------------------------
 // "Items" then each thing in the pack with how many ("Mixy Meow | 1", "Checkerboard | 10", "Coins | 4,500"), then the
 // subtotal: one purchase of the whole pack, named by what is in it ("Mixy Meow, 10 Checkerboard", "2,200 Coins").

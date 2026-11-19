@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -1084,6 +1084,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   let text = (plain && !(fromHtml && !receiptSignals(subject, plain).bodyHit && receiptSignals(subject, fromHtml).bodyHit) ? plain : fromHtml || plain).trim();
 
   const sig = receiptSignals(subject, text);
+  // (A booking confirmed with its reference, "Your booking is confirmed" and "Booking reference: LOV1242…", whose price is in
+  // the booking document it links to: still the purchase, with no total made up. Round 12.)
+  if (/\b(?:booking|reservation|holiday|trip) (?:is |has been )?confirmed\b/i.test(String(subject || "")) && /\bbooking (?:reference|ref\.?|number)\s*:?\s*[A-Z0-9]{6,14}\b/i.test(text.slice(0, 2000))) { sig.subjectHit = true; sig.bodyHit = true; }
   // A receipt that is only in its attachment ("Your receipt is attached", a PDF or a photo of the till receipt): it is
   // still the shop's receipt, read for what the email itself says (the shop, the day, a total if written), and it says
   // that the details are in the attachment. Nothing is read from the attachment, so nothing is made up.
@@ -1769,6 +1772,14 @@ export function parseOrderAdjustmentEmail(rawEmail) {
   // (A shop's support team writing that it refunded part of an order, or put credit on the account, for an order it names:
   // money back on that order, joined by its number (gmail.js attachAdjustments). Never from a payment service or the
   // shopper's own mailbox, whose emails are read as receipts or refunds of their own. Round 12.)
+  // (A payment service's "You've authorised £38.00 GBP to …": one payment towards a purchase with that shop, a deposit or an
+  // instalment, joined to it by gmail.js attachCancellations. Round 12.)
+  if (/(^|\.)paypal\./i.test((fw && fw.domain) || sender?.domain || "")) {
+    const pa = paymentAuthorised(u.subject, u.text);
+    if (pa && pa.amountPence) return { ok: true, kind: "order_update", stage: "payment", at: parseDate(pa.on || "", u.headers.date ? new Date(u.headers.date) : null) || u.at,
+      orderRef: null, paymentRef: pa.orderRef, merchant: null, amountPence: pa.amountPence, previousTotalPence: null, newTotalPence: null, currency: "GBP",
+      retailer: { name: pa.merchant, domain: null, via: (fw && fw.domain) || sender.domain } };
+  }
   const from = (fw && fw.domain) ? fw : sender;
   if ((!ub || ub.kind !== "adjusted") && from && from.domain && !PERSONAL_MAIL.test(from.domain) && !/(^|\.)(?:paypal|klarna|clearpay|laybuy)\./i.test(from.domain)) {
     const sr = supportRefund(String(u.subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, ""), u.text);
