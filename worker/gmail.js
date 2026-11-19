@@ -141,8 +141,9 @@ const GONE = Symbol("gone");
 // read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
 // 40 (coverage round): emails that were never read as purchases at all: Apple's "Your invoice from Apple." (billed to a card,
 // never saying "paid"), BA's plain-text e-ticket ("Depart: … - Charles de Gaulle (Paris)"), "Thank you for buying …
-// membership", "Amount paid" without a total, the full-width pound sign (￡), and a shop's "Invoice #…" that asks to be paid
-// is no longer a purchase.
+// membership", "Amount paid" without a total, the full-width pound sign (￡), a plain-text part with the item table left in
+// as HTML and "&#163;" for the pound sign, and "Total (inc. VAT)" over "Total (exc. VAT)". No longer purchases: a shop's
+// "Invoice #…" that asks to be paid, and a pay-later company's email about one instalment ("Payment received for …").
 export const PARSER_VERSION = 40;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.

@@ -1,0 +1,15 @@
+{
+ "id": "coverage-not-instalment-plan-done",
+ "sender": "Klarna",
+ "layout": "'We got your final <shop> payment': a pay-later plan finished, not a new purchase",
+ "headers": {
+  "from": "Klarna <noreply-uk@klarna.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "We got your final Fernleaf Trainers payment",
+  "date": "Sat, 25 Apr 2026 10:00:00 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td>Your payment plan is completed</td></tr><tr><td>Klarna</td></tr><tr><td>Hi Sam! Your payment for Fernleaf Trainers was successful. Your payment plan is now complete.</td></tr><tr><td>Amount paid £27.77</td></tr><tr><td>Total £111.08</td></tr></table></body></html>",
+ "expected": {
+  "kind": "not_receipt"
+ }
+}

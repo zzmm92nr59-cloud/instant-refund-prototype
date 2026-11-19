@@ -231,6 +231,16 @@ function walkShownParts(headers, body, out, depth) {
 const ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", pound: "£", euro: "€", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
   ndash: "–", mdash: "—", hellip: "…", middot: "·", bull: "•", times: "×", copy: "©", reg: "®", trade: "™", deg: "°", frac12: "½", eacute: "é",
   egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "", rarr: "→", larr: "←" };
+// A plain-text part that a shop's system filled with bits of its HTML: the item table left in as tags, the pound sign written
+// "&#163;" ("Total (inc. VAT): &#163;15.00", a pub chain's order-at-table email). Each table is read as a table and the
+// entities as the characters they stand for; the rest of the lines stay as they are (coverage round).
+function plainAsWritten(t) {
+  if (!/<(?:table|tr|td)\b[^>]*>|&(?:#163|#x[aA]3|pound|amp|nbsp);/.test(t)) return t;
+  return decodeEntities(t.replace(/<table\b[\s\S]*?<\/table>/gi, (tbl) => "\n" + htmlToTextAll(tbl) + "\n"));
+}
+// Pay-later companies, and what their emails about an instalment (not the purchase itself) say.
+const PAY_LATER_SENDER = /(^|\.)(klarna\.(?:com|co\.uk)|clearpay\.co\.uk|afterpay\.com|laybuy\.com|payzilch\.com|zilch\.com)$/i;
+const INSTALMENT = /\b(?:your next (?:automatic )?payment|next payment of|payment plan|instal?ments?|remaining (?:balance|amount)|scheduled payment|final\b[^\n]{0,40}\bpayment|payment (?:failed|didn(?:'|’)t go through)|pay(?:ment)? overdue)\b/i;
 // The full-width pound sign some shops print ("Grand Total:￡123.20", Homary) is the pound sign (coverage round).
 const fullWidthPounds = (t) => String(t).replace(/\uffe1/g, "£");
 function decodeEntities(text) {
@@ -512,7 +522,9 @@ function fromText(text, refDate) {
   // Not the items' own total ("Products total", "Goods total", "Items total"), and, when there is a subtotal, a total after it
   // (an email can print the total at the top too, or a "Total" for each line of its item list).
   const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
-  const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(before(m)) && !/\b(?:items?|products?|goods|line|item\(s\))[ \t]*$/i.test(before(m)));
+  // (Nor a total before VAT, "Total (exc. VAT): £12.50", when the email also gives the total with it: coverage round.)
+  const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(before(m)) && !/\b(?:items?|products?|goods|line|item\(s\))[ \t]*$/i.test(before(m)) &&
+    !(/^total\s*\((?:exc|excl|excluding|ex)\b/i.test(m[0]) && totals.some((o) => /^total\s*\((?:inc|incl|including)\b/i.test(o[0]))));
   const subAt = (/\bsub-?\s?total\b/i.exec(text) || {}).index;
   const afterSub = subAt == null ? [] : notSub.filter((m) => m.index > subAt);
   const pool = afterSub.length ? afterSub : notSub;
@@ -980,7 +992,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   collectParts(headers, body, parts);
   if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
   const html = parts.html.join("\n").slice(0, MAX_INPUT);
-  const plain = tillPounds(unquoted(fullWidthPounds(parts.text.join("\n").trim())));
+  const plain = tillPounds(unquoted(fullWidthPounds(plainAsWritten(parts.text.join("\n").trim()))));
   const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(html)))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
@@ -1003,6 +1015,15 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const flightArgs = { subject, senderDomain: sender?.domain || null, fromName, refDate: headers.date ? new Date(headers.date) : null };
   const flight = flightBooking({ ...flightArgs, text: plain || fromHtml }) || (plain && fromHtml ? flightBooking({ ...flightArgs, text: fromHtml }) : null);
   if (flight && flight.kind === "notice" && !opts.lenient) return { ok: false, reason: "travel_notice", source: "shopper_email" };
+  // One instalment of something already bought with a pay-later company ("Payment received for lululemon", "Your next
+  // payment of £27.77 is due on …"): the purchase is the shop's own order email, so this is never a second one (coverage
+  // round: a real inbox had an instalment read as a purchase from "lululemon was successful").
+  const payLaterFrom = PAY_LATER_SENDER.test(sender?.domain || "") ||
+    PAY_LATER_SENDER.test((forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) || {}).domain || "");
+  if (!opts.lenient && payLaterFrom && !/\b(?:your purchase|purchase (?:with|at|from)|thanks? (?:you )?for (?:choosing|shopping)|order)\b/i.test(subject || "") &&
+    INSTALMENT.test(subject + "\n" + text.slice(0, 3000))) {
+    return { ok: false, reason: "instalment", source: "shopper_email" };
+  }
   const isFlight = Boolean(flight && flight.kind === "booking");
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
   if (!isFlight && !(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {

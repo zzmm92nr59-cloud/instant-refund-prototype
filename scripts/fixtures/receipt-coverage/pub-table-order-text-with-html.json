@@ -1,0 +1,18 @@
+{
+ "id": "coverage-pub-table-order-text-with-html",
+ "sender": "Example Pubs",
+ "layout": "a pub chain's order-at-table 'Thanks for your order!' sent as plain text only, with the item table left in as HTML and the pound sign written '&#163;'",
+ "headers": {
+  "from": "The Red Lion <no-reply@info.example-pubs.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order!",
+  "date": "Sat, 07 Mar 2026 19:04:56 +0000"
+ },
+ "text": "Your order details | https://t.info.example-pubs.co.uk/r/?id=abc View online\n\t\n\t\n\nHi ,\n\nHere's a confirmation of your order:\n\t\n\nLocation:\nThe Red Lion\n12 Example Street\n\nLS1 4AB\n\t\n\nPhone Number: 0113 000 0000\nRef: 512233\nTable: 12\nOrder Date: 07/03/2026\nOrder Time: 19:04:52\n\t\n\n<table class=\"flex\" width=\"80%\" style=\"border-collapse:collapse;font-family:Verdana,sans-serif;font-size:14px\"><tr style=\"background-color:#C0C0C0\"><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\"><strong>Items</strong></p></td><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\"><strong>Qty</strong></p></td>\n<td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\"><strong>Price</strong></p></td></tr><tr><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">PALE ALE</p></td><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">2</p></td>\n<td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">&#163;12.40</p></td></tr><tr><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">CHIPS</p></td><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">1</p></td><td class=\"flex\" style=\"border:1px solid #C0C0C0;font-family:Verdana,sans-serif;font-size:14px\"><p class=\"medium\" style=\"Margin-top:1px;Margin-bottom:1px;font-size:14px;line-height:22px\">&#163;4.95</p></td></tr></table>\t\n\t\n\nPromotion: &#163;0.00\nDiscount: &#163;0.00\nTip: &#163;0.00\nTotal (exc. VAT): &#163;14.46\nVAT: &#163;2.89\nTotal (inc. VAT): &#163;17.35\n\nIf you would like to amend your order please speak to one of the team.\n\nAll the team\nThe Red Lion\n\nVAT Number 000 000 000\n",
+ "expected": {
+  "kind": "receipt",
+  "shop": "The Red Lion",
+  "totalPence": 1735,
+  "date": "2026-03-07"
+ }
+}
