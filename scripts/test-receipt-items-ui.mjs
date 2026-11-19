@@ -133,5 +133,29 @@ for (const b of await page.locator(".rl-miss .rl-btn").all()) { const hgt = awai
 assert.deepEqual(errors, [], "no page errors");
 await ctx.close();
 console.log("ok - a receipt only in its PDF says the items are in the attachment, with See the email and Fix it yourself");
+
+// 5. Round 10 (a real inbox): an app-delivery email with no item list, a later refund on it, and a delivery-day payment.
+const NOLIST = base("66666666-6666-4666-8666-666666666666", "Uber Eats", { merchant: "Lotus Grill", totalPence: 1740, items: [], orderDate: day(-1),
+  itemsCheck: { complete: false, itemsPence: 0, expectedPence: 1740, missingPence: null, noItemList: true }, adjusted: { refundPence: 876, newTotalPence: 864, currency: "GBP" } });
+const PAYDAY = base("77777777-7777-4777-8777-777777777777", "Fresh Basket", { totalPence: 9940, items: [], orderDate: day(-2), itemsCheck: { complete: false, itemsPence: 0, expectedPence: null, missingPence: null, orderUpdate: true } });
+st = { receipts: [NOLIST, PAYDAY], log: [], reread: (id, j) => j({ error: "x" }, 500) };
+({ ctx, page, errors } = await shopper());
+const lotus = await page.locator("#homePage .hl-sq", { hasText: "Lotus Grill" }).first().innerText();
+assert.match(lotus, /£8\.64/, "Home shows what it comes to after the refund\n" + lotus); assert.ok(!/Uber Eats/.test(lotus), "named after the restaurant\n" + lotus);
+await openFromHome(page, "Lotus Grill");
+txt = await sheetText(page);
+assert.match(txt, /Uber Eats' email doesn't list what you ordered/, txt); assert.match(txt, /It only gives the total, £17\.40\./);
+assert.ok(!/may have missed some items|less than the email says/.test(txt), "never says items were missed when the email lists none\n" + txt);
+assert.match(txt, /£8\.76 refunded\. It now comes to £8\.64\./);
+assert.equal(await page.locator(".rl-miss .rl-btn", { hasText: "Read it again" }).count(), 0, "nothing to read again");
+assert.equal(await page.locator(".rl-miss .rl-btn", { hasText: "See the email" }).count(), 1);
+await page.locator(".rl-back").last().click({ position: { x: 10, y: 10 } }); await page.locator(".rl-back").last().waitFor({ state: "detached" }).catch(() => {});
+await openFromHome(page, "Fresh Basket");
+txt = await sheetText(page);
+assert.match(txt, /This is the payment for an order/, txt); assert.match(txt, /hasn't found the email that lists what you ordered yet/);
+for (const b of await page.locator(".rl-miss .rl-btn").all()) { const hgt = await b.evaluate((e) => e.getBoundingClientRect().height); assert.ok(hgt >= 44, "button at least 44px: " + hgt); }
+assert.deepEqual(errors, [], "no page errors");
+await ctx.close();
+console.log("ok - an email with no item list says so with the total (never 'missed'); a later refund shows the new total; a payment-only email says so");
 await browser.close(); server.close();
 console.log("PASS receipt items: '+ N more', item counts, 'may have missed some items' with Read it again and See the email");

@@ -94,10 +94,9 @@ export default function holdout11() {
       "Unused time on Starter plan after 26 Oct 2026", "Qty 1", "-£10.00", "Subtotal", "£38.00", "Total excluding tax", "£38.00", "VAT - United Kingdom (20%)", "£7.60", "Total", "£45.60", "Amount paid", "£45.60"]) },
     order([{ name: "Studio plan - Team", qty: 1, unit: 4800 }]), "Northlight Labs", "2026-10-26", { totalPence: 4560, shopAlso: ["Northlight Labs Ireland", "Northlight"] });
   // ---- A shop's changed order (Shopify): the line taken off at × 0, the size swapped in --------------------------------------
-  add("holdout11-shopify-order-edit", "Stride Yard", "edited order: one line × 0 'Removed 1 of 1', the new size 'Added 1'", { from: "Stride Yard <store@strideyard.example>", subject: "Invoice #2041", date: "Tue, 10 Nov 2026 12:00:00 +0000",
+  not("holdout11-shopify-order-edit", "Stride Yard", "an edited order's invoice asking for the balance ('Payment of £12.00 is due', 'Pay now', 'Already paid £84.00'): the purchase is the original order, so this is not a second one", { from: "Stride Yard <store@strideyard.example>", subject: "Invoice #2041", date: "Tue, 10 Nov 2026 12:00:00 +0000",
     html: mail("Stride Yard", "strideyard.example", ["Stride Yard", "Invoice #2041", "Payment of £12.00 is due", "Pay now", "Order summary", "Trail Glide Runners × 0", "UK 8", "Removed 1 of 1", "£0.00", "Trail Glide Runners × 1", "UK 9", "Added 1", "£96.00",
-      "Subtotal", "£96.00", "Shipping", "£0.00", "Updated total", "£96.00", "Already paid", "£84.00", "Amount to pay", "£12.00 GBP"]) },
-    order([{ name: "Trail Glide Runners", qty: 1, unit: 9600, extras: ["UK 9"] }]), "Stride Yard", "2026-11-10", { totalPence: 9600 });
+      "Subtotal", "£96.00", "Shipping", "£0.00", "Updated total", "£96.00", "Already paid", "£84.00", "Amount to pay", "£12.00 GBP"]) }, { kind: "balance invoice" });
   // ---- A mobile network's eSIM order: the row named "SIM 1", the plan in a cell, no total named --------------------------------
   add("holdout11-esim-table", "Lumo Mobile", "a table row 'SIM 1 | order id | eSIM | -- | Plan | £5.00', headings stacked one per line, no total", { from: "Lumo Mobile <noreply@lumomobile.example>", subject: "Your Lumo Mobile order", date: "Fri, 25 Sep 2026 14:18:00 +0000",
     html: mail("Lumo Mobile", "lumomobile.example", ["Lumo Mobile", "Order.No", "RD0099000011", "Thank you for ordering your Lumo Mobile eSIM.", "ORDER ID: ORDB1000000000001", "Details", "S.", "No", "Order", "Id", "Sim", "type", "Bundle", "Name", "Amount",
