@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, classifyEmail } from "../worker/gmail.js";
+import { mergeOrderEmails, attachCancellations, attachAdjustments, attachReturnProgress, attachDeliveries, classifyEmail } from "../worker/gmail.js";
 import { rawEmail, forwarded, SHOPPER } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
@@ -339,6 +339,13 @@ const joinWrong = [];
   const ppr = parseReceiptEmail(mail("PayPal <service@paypal.co.uk>", "Receipt for your payment to Trailhaus Ltd", "Sun, 21 Dec 2026 10:00:00 +0000",
     ["You paid £52.48 GBP to Trailhaus Ltd", "Merchant", "Trailhaus Ltd", "Order ID", "556120044", "Subtotal", "£47.49", "Postage and packing", "£4.99", "Total", "£52.48 GBP", "Paid with", "Visa Debit", "£52.48 GBP"].join("\n")));
   if (!ppr.ok || ppr.totalPence !== 5248 || (ppr.items || []).length) joinWrong.push("payment receipt with postage read as " + JSON.stringify([ppr.totalPence, (ppr.items || []).map((i) => i.name)]));
+  // A shop's "delivered" email sent by the company that sends its parcel news ("Fellwear" <noreply@fellwear-intl.parcelnews.test>)
+  // joins the shop's own order with that number.
+  const shipped = { id: "s1", createdAt: 1, kind: "receipt", retailer: { name: "Fellwear", domain: "e.fellwear.test" }, orderRef: "FW55027025", orderDate: "2026-10-30", totalPence: 6900, items: [], shipment: { trackingNumber: "JK000000001GB", carrier: "Royal Mail", status: "shipped" } };
+  const dl = classifyEmail(mail("Fellwear <noreply@fellwear-intl.parcelnews.test>", "Your Fellwear order has been delivered", "Sat, 31 Oct 2026 11:07:00 +0000",
+    "ORDER ID: FW55027025\nSHOP WOMEN | SHOP MEN\nYour Fellwear order has been delivered.\nTime to get active! We hope you enjoy your purchase.")).details;
+  attachDeliveries([shipped], [dl]);
+  if (!(shipped.delivery && shipped.delivery.status === "delivered")) joinWrong.push("a delivered email from the shop's parcel-news company not joined: " + JSON.stringify([dl.kind, dl.orderRef, shipped.delivery && shipped.delivery.status]));
   // One email confirming two orders: a card for each, each with its own number, total and items.
   const two = mergeOrderEmails([{ id: "t1", createdAt: 1, kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout13a-two-orders-one-email.json"), "utf8")))) }]);
   if (two.length !== 2 || two[1].orderRef !== "301-5510022-4410002" || two[1].totalPence !== 3100 || (two[1].items || []).map((i) => i.name).join() !== "Eau de Parfum 50ml" || two[0].totalPence !== 2249)

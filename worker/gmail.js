@@ -1868,7 +1868,10 @@ const paidInPounds = (o) => !o || !o.currency || o.currency === "GBP";
 const refCore = (r) => String(r || "").toUpperCase().replace(/\s+/g, "").replace(/^#/, "").replace(/^(?:ORD(?:ER)?|NO)[-#.:]?(?=\d{4,}$)/, "");
 export function sameOrderRef(a, b) { return Boolean(a && b) && refCore(a) !== "" && refCore(a) === refCore(b); }
 // An update names this order's shop: by its address or name when it says, any shop when it doesn't say (a carrier's).
-const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o);
+// (Or the same shop's name, from the company that sends its parcel news, "lululemon" <noreply@lululemon-intl.narvar.com>, for
+// an order with the same number. Round 12.)
+const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o) ||
+  (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name));
 export function attachDeliveries(orders, deliveries) {
   for (const o of orders) {
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
