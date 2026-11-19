@@ -1,0 +1,35 @@
+{
+ "id": "holdout9-amazon-sns-text",
+ "sender": "Amazon",
+ "layout": "text: name, 'Quantity: 2', price on three lines; S&S discount; 'Grand Total'",
+ "headers": {
+  "from": "\"Amazon Subscribe & Save\" <no-reply@amazon.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Subscribe & Save order has been placed",
+  "date": "Tue, 17 Nov 2026 06:00:00 +0000"
+ },
+ "html": "",
+ "text": "Amazon.co.uk\nYour Subscribe & Save delivery\nOrder #203-9988776-1122334\nOrder date: 17 November 2026\n\nFinish Ultimate All in One Dishwasher Tablets, 80 Tablets\nQuantity: 1\n£19.99\nAndrex Gentle Clean Toilet Roll, 24 Rolls\nQuantity: 2\n£31.00\n\nItem(s) Subtotal: £50.99\nSubscribe & Save discount: -£2.55\nGrand Total: £48.44",
+ "expected": {
+  "shop": "Amazon",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Finish Ultimate All in One Dishwasher Tablets, 80 Tablets",
+    "qty": 1,
+    "linePence": 1999
+   },
+   {
+    "name": "Andrex Gentle Clean Toilet Roll, 24 Rolls",
+    "qty": 2,
+    "linePence": 3100
+   }
+  ],
+  "subtotalPence": 5099,
+  "feesPence": 0,
+  "discountsPence": 255,
+  "tipsPence": 0,
+  "totalPence": 4844
+ }
+}

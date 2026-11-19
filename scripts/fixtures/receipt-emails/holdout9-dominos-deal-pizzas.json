@@ -1,0 +1,44 @@
+{
+ "id": "holdout9-dominos-deal-pizzas",
+ "sender": "Domino's",
+ "layout": "deal row then its pizzas as rows with empty qty and price",
+ "headers": {
+  "from": "Domino's Pizza <orders@dominos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Domino's order confirmation",
+  "date": "Wed, 18 Nov 2026 18:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Domino's</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.dominos.co.uk/?utm_source=email\"><img src=\"https://www.dominos.co.uk/static/email/logo.png\" alt=\"Domino's\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Thanks for your order</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 245</p><p>Order date: 18/11/2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td><b>Two Large Pizzas Deal</b></td><td>1</td><td align=\"right\">£29.99</td></tr><tr><td>&nbsp;&nbsp;Large Pepperoni Passion (Classic Crust)</td><td></td><td></td></tr><tr><td>&nbsp;&nbsp;Large Mighty Meaty (Stuffed Crust)</td><td></td><td></td></tr><tr><td><b>Chicken Strippers</b></td><td>1</td><td align=\"right\">£5.99</td></tr><tr><td><b>Cookies (4)</b></td><td>1</td><td align=\"right\">£3.99</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£39.97</td></tr><tr><td>Delivery charge</td><td align=\"right\">FREE</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£39.97</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Domino's. All rights reserved.<br /><a href=\"https://www.dominos.co.uk/help\">Help</a> | <a href=\"https://www.dominos.co.uk/privacy\">Privacy</a> | <a href=\"https://www.dominos.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.dominos.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Domino's",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Two Large Pizzas Deal",
+    "qty": 1,
+    "linePence": 2999,
+    "extras": [
+     "Large Pepperoni Passion (Classic Crust)",
+     "Large Mighty Meaty (Stuffed Crust)"
+    ]
+   },
+   {
+    "name": "Chicken Strippers",
+    "qty": 1,
+    "linePence": 599
+   },
+   {
+    "name": "Cookies (4)",
+    "qty": 1,
+    "linePence": 399
+   }
+  ],
+  "subtotalPence": 3997,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3997
+ }
+}

@@ -1,0 +1,49 @@
+{
+ "id": "holdout9-zara-gbp-suffix-sizes",
+ "sender": "Zara",
+ "layout": "text: 'BLACK | SIZE M', '1 unit', '89.99 GBP'",
+ "headers": {
+  "from": "ZARA <noreply@zara.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your purchase",
+  "date": "Tue, 17 Nov 2026 16:00:00 +0000"
+ },
+ "html": "",
+ "text": "ZARA\nTHANK YOU FOR YOUR PURCHASE\nORDER NO. 52012345678\n17/11/2026\n\nWOOL BLEND COAT\nBLACK | SIZE M\n1 unit\n89.99 GBP\nRIBBED KNIT TOP\nBLACK | SIZE S\n1 unit\n17.99 GBP\nRIBBED KNIT TOP\nBLACK | SIZE M\n1 unit\n17.99 GBP\n\nSUBTOTAL 125.97 GBP\nSHIPPING 3.95 GBP\nTOTAL 129.92 GBP",
+ "expected": {
+  "shop": "Zara",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "WOOL BLEND COAT",
+    "qty": 1,
+    "linePence": 8999,
+    "extras": [
+     "SIZE M"
+    ]
+   },
+   {
+    "name": "RIBBED KNIT TOP",
+    "qty": 1,
+    "linePence": 1799,
+    "extras": [
+     "SIZE S"
+    ]
+   },
+   {
+    "name": "RIBBED KNIT TOP",
+    "qty": 1,
+    "linePence": 1799,
+    "extras": [
+     "SIZE M"
+    ]
+   }
+  ],
+  "subtotalPence": 12597,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 12992
+ }
+}

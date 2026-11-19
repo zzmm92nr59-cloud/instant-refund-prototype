@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-morrisons-aisles-qty",
+ "sender": "Morrisons",
+ "layout": "aisle headings, 'Qty 2' cell, 'My Morrisons Price ... (was ...)' under",
+ "headers": {
+  "from": "Morrisons <noreply@morrisons.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Morrisons order 88120044",
+  "date": "Fri, 13 Nov 2026 12:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Morrisons</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.morrisons.com/?utm_source=email\"><img src=\"https://www.morrisons.com/static/email/logo.png\" alt=\"Morrisons\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Your order</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 88120044</p><p>13 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Fruit &amp; Veg</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Morrisons Wonky Carrots 1kg</td><td>Qty 1</td><td>£0.59</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Meat</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Morrisons British Beef Mince 500g</td><td>Qty 2</td><td>£7.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><h3>Drinks</h3></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Yorkshire Tea 80 Bags<br/><span style=\"font-size:13px\">My Morrisons Price £3.00 (was £4.00)</span></td><td>Qty 1</td><td>£3.00</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£10.59</td></tr><tr><td>Delivery</td><td align=\"right\">£2.00</td></tr><tr><td>Bag charge</td><td align=\"right\">£0.40</td></tr><tr><td>My Morrisons savings</td><td align=\"right\">-£1.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£11.99</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Morrisons. All rights reserved.<br /><a href=\"https://www.morrisons.com/help\">Help</a> | <a href=\"https://www.morrisons.com/privacy\">Privacy</a> | <a href=\"https://www.morrisons.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.morrisons.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Morrisons",
+  "date": "2026-11-13",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Morrisons Wonky Carrots 1kg",
+    "qty": 1,
+    "linePence": 59
+   },
+   {
+    "name": "Morrisons British Beef Mince 500g",
+    "qty": 2,
+    "linePence": 700
+   },
+   {
+    "name": "Yorkshire Tea 80 Bags",
+    "qty": 1,
+    "linePence": 300
+   }
+  ],
+  "subtotalPence": 1059,
+  "feesPence": 240,
+  "discountsPence": 100,
+  "tipsPence": 0,
+  "totalPence": 1199
+ }
+}

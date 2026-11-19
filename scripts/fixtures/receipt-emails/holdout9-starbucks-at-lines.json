@@ -1,0 +1,38 @@
+{
+ "id": "holdout9-starbucks-at-lines",
+ "sender": "Starbucks",
+ "layout": "text: name, options, '2 @ £4.15   £8.30' line under",
+ "headers": {
+  "from": "Starbucks <starbucks@e.starbucks.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Starbucks receipt",
+  "date": "Thu, 12 Nov 2026 08:16:00 +0000"
+ },
+ "html": "",
+ "text": "Starbucks\nMobile Order & Pay receipt\nOrder: SB-882210\n12 November 2026 08:15\n\nGrande Caramel Macchiato\n  Extra shot\n  2 @ £4.15   £8.30\nBlueberry Muffin\n  1 @ £2.95   £2.95\n\nTotal £11.25",
+ "expected": {
+  "shop": "Starbucks",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Grande Caramel Macchiato",
+    "qty": 2,
+    "linePence": 830,
+    "extras": [
+     "Extra shot"
+    ]
+   },
+   {
+    "name": "Blueberry Muffin",
+    "qty": 1,
+    "linePence": 295
+   }
+  ],
+  "subtotalPence": 1125,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1125
+ }
+}

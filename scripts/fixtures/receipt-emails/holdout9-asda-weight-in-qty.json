@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-asda-weight-in-qty",
+ "sender": "Asda",
+ "layout": "weighed item's qty cell is a weight '0.45kg'",
+ "headers": {
+  "from": "ASDA <noreply@asda.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Asda receipt",
+  "date": "Mon, 9 Nov 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Asda</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.asda.com/?utm_source=email\"><img src=\"https://www.asda.com/static/email/logo.png\" alt=\"Asda\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Your receipt</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 300991300017</p><p>Delivered 9 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Qty</td><td>Item</td><td>Price</td></tr><tr><td>0.45kg</td><td>ASDA Loose Red Apples</td><td>£0.95</td></tr><tr><td>1</td><td>ASDA Chicken Thighs</td><td>£3.40</td></tr><tr><td>2</td><td>ASDA Garlic Bread 2 Pack</td><td>£1.80</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£6.15</td></tr><tr><td>Delivery</td><td align=\"right\">£1.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£7.15</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Asda. All rights reserved.<br /><a href=\"https://www.asda.com/help\">Help</a> | <a href=\"https://www.asda.com/privacy\">Privacy</a> | <a href=\"https://www.asda.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.asda.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Asda",
+  "date": "2026-11-09",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "ASDA Loose Red Apples",
+    "qty": 1,
+    "linePence": 95
+   },
+   {
+    "name": "ASDA Chicken Thighs",
+    "qty": 1,
+    "linePence": 340
+   },
+   {
+    "name": "ASDA Garlic Bread 2 Pack",
+    "qty": 2,
+    "linePence": 180
+   }
+  ],
+  "subtotalPence": 615,
+  "feesPence": 100,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 715
+ }
+}

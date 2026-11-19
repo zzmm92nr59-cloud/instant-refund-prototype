@@ -1,0 +1,44 @@
+{
+ "id": "holdout9-dr-text-name-x2-brackets",
+ "sender": "Deliveroo",
+ "layout": "text: 'name x2 £', modifiers in brackets on the next line, bag fee",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order from Siam Street",
+  "date": "Tue, 17 Nov 2026 19:10:00 +0000"
+ },
+ "html": "",
+ "text": "deliveroo\nThanks for your order from Siam Street\nOrder 9921-0045\n17 November 2026\n\nPad Thai Chicken x2   £19.00\n(Mild, No peanuts (allergy))\nThai Fish Cakes x1   £6.50\nJasmine Rice x1   £3.00\n\nSubtotal   £28.50\nDelivery fee   £3.49\nService fee   £0.99\nBag fee   £0.20\nTotal   £33.18",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Pad Thai Chicken",
+    "qty": 2,
+    "linePence": 1900,
+    "extras": [
+     "Mild",
+     "No peanuts (allergy)"
+    ]
+   },
+   {
+    "name": "Thai Fish Cakes",
+    "qty": 1,
+    "linePence": 650
+   },
+   {
+    "name": "Jasmine Rice",
+    "qty": 1,
+    "linePence": 300
+   }
+  ],
+  "subtotalPence": 2850,
+  "feesPence": 468,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3318
+ }
+}

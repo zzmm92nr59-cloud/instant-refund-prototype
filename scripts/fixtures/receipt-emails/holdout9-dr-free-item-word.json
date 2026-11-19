@@ -1,0 +1,44 @@
+{
+ "id": "holdout9-dr-free-item-word",
+ "sender": "Deliveroo",
+ "layout": "promo item priced 'FREE', priced extras inside, credit",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed",
+  "date": "Mon, 16 Nov 2026 13:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Deliveroo</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.deliveroo.co.uk/?utm_source=email\"><img src=\"https://www.deliveroo.co.uk/static/email/logo.png\" alt=\"Deliveroo\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order #4471 from Beirut Nights</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 4471-8820</p><p>16 Nov 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1 &times; Chicken Shawarma Plate<div style=\"font-size:13px;color:#585C5C\">Extra garlic sauce +&pound;0.50</div><div style=\"font-size:13px;color:#585C5C\">Add fries +&pound;1.50</div></td><td align=\"right\" valign=\"top\">£12.95</td></tr><tr><td>1 &times; Hummus &amp; Pitta</td><td align=\"right\" valign=\"top\">FREE</td></tr><tr><td>1 &times; Baklava (3 pieces)</td><td align=\"right\" valign=\"top\">£4.50</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£17.45</td></tr><tr><td>Delivery fee</td><td align=\"right\">£1.99</td></tr><tr><td>Service fee</td><td align=\"right\">£1.35</td></tr><tr><td>Small order fee</td><td align=\"right\">FREE</td></tr><tr><td>Deliveroo credit</td><td align=\"right\">-£4.00</td></tr><tr><td><strong>Total</strong></td><td align=\"right\"><strong>£16.79</strong></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Deliveroo. All rights reserved.<br /><a href=\"https://www.deliveroo.co.uk/help\">Help</a> | <a href=\"https://www.deliveroo.co.uk/privacy\">Privacy</a> | <a href=\"https://www.deliveroo.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.deliveroo.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Chicken Shawarma Plate",
+    "qty": 1,
+    "linePence": 1295,
+    "extras": [
+     "Extra garlic sauce +£0.50",
+     "Add fries +£1.50"
+    ]
+   },
+   {
+    "name": "Hummus & Pitta",
+    "qty": 1,
+    "linePence": 0
+   },
+   {
+    "name": "Baklava (3 pieces)",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 1745,
+  "feesPence": 334,
+  "discountsPence": 400,
+  "tipsPence": 0,
+  "totalPence": 1679
+ }
+}

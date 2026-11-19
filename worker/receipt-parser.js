@@ -440,6 +440,9 @@ export function parseDate(text, refDate) {
   const t = String(text || "");
   const late = (v) => Boolean(v) && refDate instanceof Date && !Number.isNaN(refDate.getTime()) && new Date(v + "T00:00:00Z").getTime() > refDate.getTime() + 2 * 86400000;
   for (const m of t.slice(0, 20000).matchAll(ORDER_DATE_LABEL)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
+  // ("Ordered on 18 November 2026", "Placed on Wed 18 Nov 2026" with no colon: still the order's date, before a delivery
+  // day written higher up. Round 8.)
+  for (const m of t.slice(0, 20000).matchAll(/\b(?:ordered|placed|order placed)\s+on\s+([^\n|]{6,40})/gi)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
   const v = dateFound(t, refDate);
   if (!late(v)) return v;
   for (const line of t.split("\n")) { const w = dateFound(line, refDate); if (w && !late(w)) return w; }
@@ -498,7 +501,7 @@ function fromText(text, refDate) {
   // (A note in brackets and a column edge can sit between the word and the amount: "Total (including VAT): | £10.96".)
   // "Sub Total" is the word "Total" too, so it is passed over while a real total follows, and a total that says it
   // includes delivery ("Total Including Delivery | £315.78") beats a plain one.
-  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay(?: in store)?|due|guide price))?(?:\s+(?:by|with|on|using) (?:card|cash|[a-z]+ card|apple pay|google pay|paypal))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
+  const totals = [...text.matchAll(/\b(?:order\s+|grand\s+)?total(?:\s+(?:including|incl\.?|inc\.?)\s+(?:delivery|postage|shipping|vat|p&p))?(?:\s+(?:paid|amount|charged|cost|price|to pay(?: in store)?|due|guide price))?(?:\s+(?:by|with|on|using) (?:card|cash|[a-z]+ card|apple pay|google pay|paypal))?(?:\s*\([^)\n]{1,40}\))?\s*(?:[:|]\s*|[-–]\s+(?=£)){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/gi)];
   // Not the items' own total ("Products total", "Goods total", "Items total"), and, when there is a subtotal, a total after it
   // (an email can print the total at the top too, or a "Total" for each line of its item list).
   const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
@@ -509,6 +512,8 @@ function fromText(text, refDate) {
   const totalMatch =
     pool.find((m) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(m[0]) || /^grand\s/i.test(m[0])) || pool[0] || totals[0] ||
     text.match(/\bamount\s+paid\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    // A supermarket's order before it is picked gives a guide price, not a total ("Guide price | £27.69"). Round 8.
+    text.match(/^[\s|]*(?:estimated |order )?guide price\s*(?:[:|]\s*){0,3}£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/im) ||
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
     [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
     // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
@@ -689,6 +694,8 @@ function receiptSignals(subject, text) {
     // "Your Friday evening trip with Uber", "Your Deliveroo order from Wagamama", "We're processing your order W123",
     // "Your Etsy Purchase from …", "Your purchase with lululemon", "Receipt for your payment to …", "Your LNER tickets for …".
     /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
+    // "Your order is on its way to the restaurant", "Your order has been sent to Golden Dragon" (a takeaway app). Round 8.
+    /\byour order\b[^!?]{0,20}\b(?:on its way|been sent|gone|sent) to the (?:restaurant|kitchen|takeaway)\b/.test(s) ||
     // "Ordered: 'Wall Filler Kit…'", "Your 25 September receipt for 1 item", "Example.co.uk order of Chernobyl."
     // "Reservation confirmed for Manchester", "Your booking is confirmed at …", "Your … order PK-338812", "Your order … has been placed".
     /\b(?:reservation|booking|order|purchase)\b[^!?]{0,30}\bconfirmed\b|\byour\b[^!?]{0,40}\border\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\s*$|\border\b[^!?]{0,30}\b(?:has been|was|is) placed\b|(?:^|[!.:]\s+)order\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9/-]*\d)[a-z0-9/-]{4,24}\s*$/.test(s) ||
@@ -847,6 +854,10 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   });
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
+  // "Tesco.com" as the sender's name, when the email calls the shop "Tesco" again and again (its own products, "Tesco Whole
+  // Milk"): the shop is Tesco. (A brand whose name is its address, "Booking.com", writes it that way throughout.) Round 8.
+  const dotCom = /^(\p{Lu}[\p{Ll}\d-]{2,30})\.com$/u.exec(ranked.name || "");
+  if (dotCom && (String(text).match(new RegExp("\\b" + dotCom[1] + "\\b(?!\\.com)", "g")) || []).length >= 2) ranked.name = dotCom[1];
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
   if (ranked.via) out.via = ranked.via;

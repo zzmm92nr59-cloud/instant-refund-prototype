@@ -1,0 +1,44 @@
+{
+ "id": "holdout9-greggs-mealdeal-with",
+ "sender": "Greggs",
+ "layout": "text: '1 Name £', 'with X' choices, a free reward",
+ "headers": {
+  "from": "Greggs <noreply@greggs.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Greggs order GR-77310",
+  "date": "Sun, 15 Nov 2026 08:10:00 +0000"
+ },
+ "html": "",
+ "text": "Greggs\nYour order is ready to collect\nOrder: GR-77310\nDate: 15/11/2026\n\n1 Breakfast Meal Deal £4.00\n   with Bacon Roll\n   with Regular Latte\n2 Sausage Roll £2.50\n1 Yum Yum (Reward) Free\n\nTotal paid £6.50",
+ "expected": {
+  "shop": "Greggs",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Breakfast Meal Deal",
+    "qty": 1,
+    "linePence": 400,
+    "extras": [
+     "Bacon Roll",
+     "Regular Latte"
+    ]
+   },
+   {
+    "name": "Sausage Roll",
+    "qty": 2,
+    "linePence": 250
+   },
+   {
+    "name": "Yum Yum (Reward)",
+    "qty": 1,
+    "linePence": 0
+   }
+  ],
+  "subtotalPence": 650,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 650
+ }
+}

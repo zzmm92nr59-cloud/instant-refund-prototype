@@ -1,0 +1,48 @@
+{
+ "id": "holdout9-je-extras-colon-note-text",
+ "sender": "Just Eat",
+ "layout": "text only: 'Extras: a, b' line, 'Note: no onions', allergy note, Just Eat+ free delivery",
+ "headers": {
+  "from": "Just Eat <noreply@t.just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Tue, 17 Nov 2026 20:15:00 +0000"
+ },
+ "html": "",
+ "text": "Thanks for your order!\nAnatolia Grill\nOrder number: 1860330218\nOrder date: 17/11/2026\n\nAllergy note: Customer has a sesame allergy\n\n1 x Doner Kebab Large £10.50\nExtras: Garlic Mayo, Chilli Sauce\nNote: no onions\n1 x Chicken Shish Wrap £8.99\nExtras: Extra Halloumi\n2 x Cheesy Chips £9.00\n\nSubtotal £28.49\nDelivery fee (Just Eat+) FREE\nService charge £0.99\nTotal £29.48\n\nJust Eat",
+ "expected": {
+  "shop": "Just Eat",
+  "date": "2026-11-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Doner Kebab Large",
+    "qty": 1,
+    "linePence": 1050,
+    "extras": [
+     "Garlic Mayo",
+     "Chilli Sauce",
+     "no onions"
+    ]
+   },
+   {
+    "name": "Chicken Shish Wrap",
+    "qty": 1,
+    "linePence": 899,
+    "extras": [
+     "Extra Halloumi"
+    ]
+   },
+   {
+    "name": "Cheesy Chips",
+    "qty": 2,
+    "linePence": 900
+   }
+  ],
+  "subtotalPence": 2849,
+  "feesPence": 99,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2948
+ }
+}

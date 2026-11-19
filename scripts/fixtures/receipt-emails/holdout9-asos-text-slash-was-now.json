@@ -1,0 +1,41 @@
+{
+ "id": "holdout9-asos-text-slash-was-now",
+ "sender": "ASOS",
+ "layout": "text: 'Colour / Size / Qty 2' line, 'Was £30.00 Now £20.00'",
+ "headers": {
+  "from": "ASOS <order_confirmation@asos.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order!",
+  "date": "Wed, 11 Nov 2026 13:00:00 +0000"
+ },
+ "html": "",
+ "text": "ASOS\nOrder No.: 998800011\nOrder date: 11 Nov 2026\n\nNike Club fleece hoodie in grey\nGrey / L / Qty 2\n£90.00\n\nadidas Originals Trefoil t-shirt in white\nWhite / M / Qty 1\nWas £30.00 Now £20.00\n\nSubtotal £110.00\nStandard Delivery £4.50\nTotal £114.50",
+ "expected": {
+  "shop": "ASOS",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Nike Club fleece hoodie in grey",
+    "qty": 2,
+    "linePence": 9000,
+    "extras": [
+     "L"
+    ]
+   },
+   {
+    "name": "adidas Originals Trefoil t-shirt in white",
+    "qty": 1,
+    "linePence": 2000,
+    "extras": [
+     "M"
+    ]
+   }
+  ],
+  "subtotalPence": 11000,
+  "feesPence": 450,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 11450
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-dr-plus-struck-delivery",
+ "sender": "Deliveroo",
+ "layout": "Plus: delivery '£2.99 struck £0.00 with Plus', 'Choose your side:' choices",
+ "headers": {
+  "from": "Deliveroo <noreply@t.deliveroo.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Deliveroo order from Honest Patty",
+  "date": "Wed, 18 Nov 2026 12:40:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Deliveroo</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.deliveroo.co.uk/?utm_source=email\"><img src=\"https://www.deliveroo.co.uk/static/email/logo.png\" alt=\"Deliveroo\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><h1>Your order's been placed</h1></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order from Honest Patty &mdash; #1123</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><p>Order number: 7780-1123</p><p>18 November 2026</p></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>1x</td><td><strong>Burger Meal Deal</strong></td><td align=\"right\">£12.99</td></tr><tr><td></td><td><span style=\"font-size:13px\">Choose your burger: Classic Cheeseburger</span></td><td></td></tr><tr><td></td><td><span style=\"font-size:13px\">Choose your side: Sweet Potato Fries</span></td><td></td></tr><tr><td></td><td><span style=\"font-size:13px\">Choose your drink: Diet Coke</span></td><td></td></tr><tr><td>1x</td><td><strong>Onion Rings</strong></td><td align=\"right\">£3.99</td></tr></table></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"4\" cellspacing=\"0\" border=\"0\"><tr><td>Subtotal</td><td align=\"right\">£16.98</td></tr><tr><td>Delivery fee</td><td align=\"right\"><s>£2.99</s> £0.00 with Plus</td></tr><tr><td>Service fee</td><td align=\"right\">£1.49</td></tr><tr><td>Rider tip</td><td align=\"right\">£1.50</td></tr><tr><td><b>Total</b></td><td align=\"right\"><b>£19.97</b></td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Deliveroo. All rights reserved.<br /><a href=\"https://www.deliveroo.co.uk/help\">Help</a> | <a href=\"https://www.deliveroo.co.uk/privacy\">Privacy</a> | <a href=\"https://www.deliveroo.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.deliveroo.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Deliveroo",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Burger Meal Deal",
+    "qty": 1,
+    "linePence": 1299,
+    "extras": [
+     "Choose your burger: Classic Cheeseburger",
+     "Choose your side: Sweet Potato Fries",
+     "Choose your drink: Diet Coke"
+    ]
+   },
+   {
+    "name": "Onion Rings",
+    "qty": 1,
+    "linePence": 399
+   }
+  ],
+  "subtotalPence": 1698,
+  "feesPence": 149,
+  "discountsPence": 0,
+  "tipsPence": 150,
+  "totalPence": 1997
+ }
+}

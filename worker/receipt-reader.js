@@ -12,7 +12,7 @@ export const isVia = (domain) => VIA_SENDER.test(String(domain || "").toLowerCas
 // ---- Shop names ---------------------------------------------------------------------------------------------------------
 // Words senders add after the shop's name: "Swarovski Customer Service GB", "Tempur UK Consumer Support", "The Buyagift Team".
 // (A tail is a word of its own: "Zapp" is not "Z" and "app".)
-const NAME_TAIL = /\s*(?:[-–|:,]\s*)?\b(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|transactions?|online\s+(?:store|shop)|digital\s+edition|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
+const NAME_TAIL = /\s*(?:[-–|:,]\s*)?\b(?:(?:uk|gb|eu|ie)\s+)?(?:customer\s+(?:service|services|care|support|team)|consumer\s+(?:support|services?)|client\s+services?|account\s+services?|order\s+(?:confirmations?|team|updates?)|transactions?|online\s+(?:store|shop)|digital\s+edition|subscribe\s*(?:&|and)\s*save|e-?receipts?|receipts?|notifications?|no-?reply|support|team|app|orders?)(?:\s+(?:uk|gb|eu|ie))?\s*$/i;
 const COUNTRY_TAIL = /\s+(?:uk|gb|eu|ie|united kingdom)$/i;
 const EMOJI = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}️‍]/gu;
 const GENERIC_NAME = /^(orders?|order confirmation|receipts?|your receipt|no-?reply|noreply|do not reply|donotreply|info|hello|hi|team|support|customer service|customer services|sales|shop|store|notifications?|alerts?|updates?|accounts?|billing|payments?|admin|mailer|newsletter)$/i;

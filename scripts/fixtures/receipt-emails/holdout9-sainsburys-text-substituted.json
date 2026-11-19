@@ -1,0 +1,40 @@
+{
+ "id": "holdout9-sainsburys-text-substituted",
+ "sender": "Sainsbury's",
+ "layout": "text: 'We substituted' (instead of ...), 'We couldn't get'",
+ "headers": {
+  "from": "Sainsbury's <groceries@sainsburys.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Sainsbury's delivery receipt",
+  "date": "Sun, 15 Nov 2026 18:00:00 +0000"
+ },
+ "html": "",
+ "text": "Sainsbury's\nYour groceries have been delivered\nOrder number: 1009977001\nDelivered 15 November 2026\n\nYour items\nSainsbury's Semi Skimmed Milk 2.27L  1  £1.65\nBirds Eye Fish Fingers x10  1  £3.00\n\nWe substituted\nNapolina Penne 500g  2  £2.00 (instead of Sainsbury's Penne Pasta 1kg)\n\nWe couldn't get\nSainsbury's Penne Pasta 1kg  1  (you haven't been charged)\n\nSubtotal £6.65\nDelivery charge £3.00\nTotal charged £9.65",
+ "expected": {
+  "shop": "Sainsbury's",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Sainsbury's Semi Skimmed Milk 2.27L",
+    "qty": 1,
+    "linePence": 165
+   },
+   {
+    "name": "Birds Eye Fish Fingers x10",
+    "qty": 1,
+    "linePence": 300
+   },
+   {
+    "name": "Napolina Penne 500g",
+    "qty": 2,
+    "linePence": 200
+   }
+  ],
+  "subtotalPence": 665,
+  "feesPence": 300,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 965
+ }
+}
