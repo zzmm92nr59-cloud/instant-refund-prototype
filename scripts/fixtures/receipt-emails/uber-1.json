@@ -16,15 +16,15 @@
   "currency": "GBP",
   "items": [
    {
-    "name": "Trip fare",
+    "name": "Uber ride",
     "qty": 1,
-    "linePence": 1240
+    "linePence": 1515
    }
   ],
-  "subtotalPence": 1240,
-  "feesPence": 175,
+  "subtotalPence": 1515,
+  "feesPence": 0,
   "discountsPence": 0,
-  "tipsPence": 100,
+  "tipsPence": 0,
   "totalPence": 1515
  }
 }

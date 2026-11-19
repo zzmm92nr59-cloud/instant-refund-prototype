@@ -92,7 +92,10 @@ const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|
 const GREETING = /^(?:hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
 const FULL_DATE = /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i;
 const HARD_END = /^(?:retail price\b|sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods )?total\b|total of items|item\(s\) subtotal|guide price|order value|items$|products$|payment|payments|paid\b|amount (?:paid|due)|total paid|includes vat|including vat|incl\.? vat|vat\b|tax\b)/i;
-const sentence = (c) => c.length > 80 || (c.split(/\s+/).length > 8 && /[.!?]$/.test(c)) || GREETING.test(c);
+// (A supermarket's own long product names, "Glade Twinkling Apple & Cinnamon Festive Bathroom Air Freshener Gel, Limited
+// Edition 180g", run past 80 letters without being sentences: only a long line that reads as one, or one far longer, is.
+// Round 10.)
+const sentence = (c) => c.length > 130 || (c.length > 80 && (/[.!?]$/.test(c) || /\b(?:you|your|we|our|please|will|can|is|are)\b/i.test(c))) || (c.split(/\s+/).length > 8 && /[.!?]$/.test(c)) || GREETING.test(c);
 
 const letters = (c) => (String(c).match(/\p{L}/gu) || []).length;
 const cleanName = (s) => String(s).replace(/\s*\u2502\s*/g, " | ").replace(/\s*\.{3,}\s*$/, "").replace(/\s+/g, " ").replace(/^[•·*–-]\s+/, "").replace(/[\s|:–-]+$/, "").trim();
@@ -125,7 +128,7 @@ function splitCell(raw) {
     }
   }
   // The price first, then the name ("£7.50   Oat Bars Chocolate Chip x3").
-  if (!out.prices.length && !out.negative && (m = new RegExp("^" + MONEY + "\\s+(?!(?:off|each|per|x|for|saved?|saving|discount|now|was|ea)\\b)(\\S.*\\p{L}.*)$", "iu").exec(c))) {
+  if (!out.prices.length && !out.negative && (m = new RegExp("^" + MONEY + "\\s+(?!(?:off|each|per|x|for|with|saved?|saving|discount|now|was|ea)\\b)(\\S.*\\p{L}.*)$", "iu").exec(c))) {
     out.prices.push(pence(m[1], m[2], m[3])); c = m[4];
   }
   // How many at what each in brackets in the name: "Braeburn Apples (6 @ £0.40)", "Carrots (2 x £1.35 each)".
@@ -553,14 +556,15 @@ function addExtras(item, extras) {
 }
 
 // ---- What the email says the items came to ---------------------------------------------------------------------------------
-const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|merchandise(?: total)?|guide price|item total|tickets?)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
+const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|trolley (?:cost|total)|merchandise(?: total)?|guide price|item total|tickets?)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
 const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor) tax\b|\b(?:levy|royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|courier|(?:1st|2nd|first|second) class|tracked(?: 24| 48)?|next[- ]day|named day|removal|disposal|recycling|delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
 export function moneyOf(text) {
-  const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, found: [] };
-  const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim());
+  const out = { subtotal: null, fees: 0, tips: 0, discounts: 0, vat: null, found: [] };
+  // (Blank lines between an HTML email's rows say nothing: "Subtotal" and its amount can have one between them. Round 10.)
+  const lines = prepText(text).replace(/\r\n?/g, "\n").split("\n").map((x) => x.replace(/\s+/g, " ").trim()).filter((x) => x && !/^[|\s]+$/.test(x));
   const amountOf = (s) => { const m = new RegExp("^([-−–])?\\s?" + MONEY + "\\s*\\*?$", "i").exec(s.trim()); return m ? { p: pence(m[2], m[3], m[4]), neg: Boolean(m[1]) } : /^(?:free|£0\.00)$/i.test(s.trim()) ? { p: 0, neg: false } : null; };
   const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
@@ -574,6 +578,9 @@ export function moneyOf(text) {
     }
     if (!label || !amt) continue;
     label = label.replace(/[:*]+$/, "").trim();
+    // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
+    // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
+    if (/^(?:vat|tax)\b(?!\s*(?:no|number|id|reg))[^|]{0,40}$/i.test(label) && !/\b(?:included|inclusive|incl)\b/i.test(label) && !amt.neg) { if (out.vat == null) out.vat = amt.p; continue; }
     if ((NOT_MONEY_LINE.test(label) && !/^(?:city|tourist|local|resort|accommodation) tax\b/i.test(label)) || label.length > 50) continue;
     const key = label.toLowerCase() + "=" + amt.p;
     if (seen.has(key)) continue;
@@ -602,18 +609,27 @@ export function checkItems(items, money, totalPence) {
   // (When the email gives its items' subtotal, the items must come to it, or to the total less what was added and plus what
   // was taken off: never to the bare total, which a fee read as an item can make up. Round 3, 19 Nov 2026.)
   if (T != null) targets.push(...(S != null ? [T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0)] : [T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0), T - (m.fees || 0) - (m.tips || 0), T]));
-  const expectedPence = S ?? (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
+  // A subtotal before VAT, with the VAT making up the total ("Subtotal £9.16", "VAT £1.83", "Total £10.99"): prices that
+  // include VAT come to the total; prices before VAT come to it less the VAT (and plus any credit taken off). Round 10.
+  const vatOnTop = S != null && T != null && m.vat != null && Math.abs(S + m.vat - T) <= 1;
+  if (vatOnTop) targets.push(T - (m.fees || 0) - (m.tips || 0), T - m.vat - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0));
+  const expectedPence = vatOnTop ? null : S ?? (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
   const unpriced = list.some((i) => i.pricePence == null);
   // A money line read as an item ("Retail price", "Item Subtotal") can make the items look complete: they aren't.
   const moneyNamed = list.some((i) => SUBTOTAL_LABEL.test(String(i.name || "")) || /^(?:[\p{L}()]+\s){0,2}(?:sub-?\s?total|total|price)\s*:?$/iu.test(String(i.name || "")) || FEE_NAME.test(String(i.name || "")));
   // An item whose unit price was printed beside its line price, and the two don't agree on how many (2 at £15.00 is not
   // £45.00): its quantity or its price was misread.
-  const mismatched = list.some((i) => i.unitPence != null && i.lineTotal !== false && i.unitPence * (i.qty || 1) !== i.pricePence);
+  // (A line that costs less than its unit price times how many, in an email that says money was saved, is an offer price:
+  // Sainsbury's prints "£2.25" then "£3.00/unit" for a Nectar price. Round 10.)
+  const offerPrice = (i) => (m.discounts || 0) > 0 && i.unitPence * (i.qty || 1) > i.pricePence;
+  const mismatched = list.some((i) => i.unitPence != null && i.lineTotal !== false && i.unitPence * (i.qty || 1) !== i.pricePence && !offerPrice(i));
   const itemsPence = list.reduce((n, i) => n + (lineOf(i) || 0), 0);
   if (!targets.length) return { complete: null, itemsPence, expectedPence: null, missingPence: null };
   if (!list.length) return { complete: false, itemsPence: 0, expectedPence, missingPence: expectedPence };
   const hit = !unpriced && !mismatched && !moneyNamed && targets.some((t) => Math.abs(t - itemsPence) <= 1);
-  return { complete: hit, itemsPence, expectedPence, missingPence: hit ? 0 : expectedPence == null ? null : expectedPence - itemsPence };
+  // (With VAT on top, what the items should come to depends on whether their prices include it: the nearer of the two.)
+  const want = expectedPence ?? (vatOnTop ? targets.slice(-2).sort((a, b) => Math.abs(a - itemsPence) - Math.abs(b - itemsPence))[0] : null);
+  return { complete: hit, itemsPence, expectedPence: hit && vatOnTop ? itemsPence : want, missingPence: hit ? 0 : want == null ? null : want - itemsPence };
 }
 
 // An item with a quantity over one and a single price could be priced for the line or for one: whichever reading makes

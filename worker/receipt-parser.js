@@ -497,6 +497,8 @@ function fromText(text, refDate) {
   text = text.replace(/(?<![£\d.,])(?<!£ )(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{2}))?[ \t]?GBP\b/g, (m, n, p) => "£" + n + "." + (p || "00"));
   const ref =
     text.match(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/i) ||
+    // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.)
+    text.match(/\border\s*(?:number|no\.?)\s*:?[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
     // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
     text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
@@ -523,7 +525,10 @@ function fromText(text, refDate) {
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
     [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
     // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
-    text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+    text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    // No total named, but what the card was charged after the subtotal and VAT ("Mastercard •••• 1234 (Apple Pay) | £10.99",
+    // Apple's renewal receipts). Round 10.
+    (/\bsub-?\s?total\b/i.test(text) && text.match(/^[\s|]*(?:visa|mastercard|master card|amex|american express|maestro|debit card|credit card|apple pay|google pay|paypal)\b[^\n£]{0,50}?(?:•{2,}|\*{2,}|x{3,}|ending(?: in)?)\s*\d{4}\b[^\n£]{0,30}?[\s|]*\n?[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im));
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -819,7 +824,9 @@ export function appleItems(text) {
     for (let j = i - 1; j >= 0 && j >= i - 6 && found.length < 2; j--) {
       const r = rows[j];
       if (/^£/.test(r) || APPLE_LABEL.test(r)) break;
-      if (APPLE_SECTION.test(r)) { if (!found.length) found.push(r); break; }
+      // (Apple's own service over its plan, "Apple Music" over "Individual (Monthly)": the service is what was bought. A store's
+      // heading, "App Store" over a game, is not. Round 10.)
+      if (APPLE_SECTION.test(r)) { if (!found.length || (found.length === 1 && /^(apple arcade|apple tv|apple music|apple one|icloud)$/i.test(r))) found.push(r); break; }
       if (APPLE_NOISE.test(r) || r.length > 90) continue;
       found.push(r);
     }
@@ -903,7 +910,8 @@ const ORDER_NOTICE_SUBJECT = new RegExp([
 const PRICE_ADJUSTMENT = /\bprice (?:adjustment|match(?:ed)?|difference|drop|protection|promise)\b|\brefunded the (?:price )?difference\b|\bmatched a lower price\b|\bprice of an item you bought has (?:dropped|gone down|fallen)\b/i;
 const NOT_A_PURCHASE_SUBJECT = /\b(?:refund(?:ed|s)?|cancell?(?:ed|ation)|price (?:adjustment|match(?:ed)?|difference)|credit note)\b/i;
 const NOT_A_PURCHASE_TOP = /\b(?:your|the|this) order (?:has been|was|is) cancell?ed\b|\bwe(?:'|’)?ve cancell?ed your order\b|\b(?:some )?items? (?:in|from|of) your order (?:has|have) been cancell?ed\b|\bpart of your order has been cancell?ed\b|\bwe(?:'|’)?ve (?:matched a lower price|refunded the (?:price )?difference)\b/i;
-const NO_ORDER = /\bthere (?:was|is) no order\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
+const MONEY_OFF_NOTE = /^(?:[\p{L}'’ -]{0,20}\s)?(?:discount|multi-?buy(?: discount| saving| offer)?|voucher|promo(?:tion)?(?: code)?|saving|you saved?|offer discount)\s*:?\s*(?:[-−–]?\s?£\s?[\d,.]+)?$/iu;
+const NO_ORDER =/\bthere (?:was|is) no order\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
 const ACCOUNT_DEPOSIT =/\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
@@ -989,7 +997,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const isFlight = Boolean(flight && flight.kind === "booking");
   // Uber's three kinds of email (receipt-senders.js, round 10): a changed total for an earlier Eats order is money back on
   // that order (parseOrderAdjustmentEmail), never a purchase; an Eats receipt and a ride are receipts.
-  const uber = uberEmail(sender?.domain, subject, text);
+  // (Forwarded from the shopper's own mailbox, the original sender says it is Uber.)
+  const fwdFrom = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
+  const uber = uberEmail((fwdFrom && fwdFrom.domain) || sender?.domain, String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, ""), text);
   if (uber && uber.kind === "adjusted") return { ok: false, reason: "order_adjusted", source: "shopper_email" };
   if (uber) { sig.subjectHit = true; sig.bodyHit = sig.bodyHit || /\btotal\b/i.test(text); }
   // A supermarket's delivery-day email for an order already confirmed ("Your order is ready for today", "Payment received").
@@ -1084,6 +1094,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
     // are left out of the item readings. Round 4.)
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];
+    // (Apple's own reading comes first for an App Store or subscription receipt: it names the app or service, "Apple Music",
+    // where the plain reading takes the plan under it, "Individual (Monthly)". Round 10.)
+    const isApple = /(^|\.)apple\.com$/i.test(result.retailer.domain || "") && /\b(?:app store|in-app purchase|renews \d|apple account:?)/i.test(text);
+    if (isApple) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
@@ -1109,6 +1123,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const chosen = older && older !== pick && older.check.complete && same(older.items, pick.items) ? older : pick;
     // (For one of something the price is the line's either way, so a new reading doesn't say which.)
     result.items = chosen.items.map(({ extras, ...i }) => { if (chosen !== older && (i.qty || 1) === 1 && i.lineTotal) delete i.lineTotal; return i; });
+    // (Money taken off under an item, "Multi-buy discount: -£3.10", is a discount, never what the item is. Round 10.)
+    for (const i of result.items) if (i.variant) { const v = String(i.variant).split(/,\s*/).filter((p) => !MONEY_OFF_NOTE.test(p.trim())).join(", "); if (v) i.variant = v; else delete i.variant; }
     result.itemsCheck = pick.check;
   } else {
     result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
