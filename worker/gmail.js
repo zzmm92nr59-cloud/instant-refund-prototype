@@ -130,7 +130,7 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
-export const PARSER_VERSION = 33;
+export const PARSER_VERSION = 34;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -1448,7 +1448,8 @@ export function mergeOrderEmails(orders) {
     if (!groups.has(k)) { groups.set(k, []); out.push(groups.get(k)); }
     groups.get(k).push(o);
   }
-  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
+  // (An email whose items add up to the order's money, its confirmation, leads over a shipment email that lists one parcel.)
+  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
   return out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
@@ -1464,6 +1465,20 @@ export function mergeOrderEmails(orders) {
         if (!twin) continue;
         if (it.pricePence == null && twin.pricePence != null) it.pricePence = twin.pricePence;
         if (!it.variant && twin.variant) it.variant = twin.variant;
+      }
+      // A split shipment (round 3): each parcel's email lists only what is in it. Unless the card's items are already all the
+      // order's (they add up), the items from the order's other emails that aren't on the card yet are added, once each, so
+      // nothing bought is dropped and nothing is shown twice. The card says the items are complete only when they then add up.
+      if (!(c.itemsCheck && c.itemsCheck.complete === true) && c.items.length) {
+        const named = new Set(c.items.map(i => String(i.name || "").toLowerCase().trim()));
+        const more = (o.items || []).filter(i => i && i.name && !named.has(String(i.name).toLowerCase().trim()));
+        if (more.length) {
+          for (const i of more) { c.items.push({ ...i }); named.add(String(i.name).toLowerCase().trim()); }
+          const sum = c.items.reduce((n, i) => n + (i.pricePence == null ? NaN : i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)), 0);
+          const want = [c.itemsCheck, o.itemsCheck].map(x => x && x.expectedPence).filter(x => Number.isInteger(x));
+          c.itemsCheck = { ...(c.itemsCheck || {}), itemsPence: Number.isNaN(sum) ? null : sum, complete: !Number.isNaN(sum) && want.some(x => Math.abs(x - sum) <= 1),
+            ...(want.length ? { expectedPence: want[0], missingPence: Number.isNaN(sum) ? null : want[0] - sum } : {}), merged: true };
+        }
       }
       if (o.shipment && o.shipment.trackingNumber && !(c.shipment && c.shipment.trackingNumber)) c.shipment = o.shipment;
       if (o.returns) {
