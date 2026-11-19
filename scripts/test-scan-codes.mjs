@@ -70,6 +70,21 @@ each(F.ticketOrder, (r, w) => {
   assert.ok(r.codes.every((c) => c.deadline === null && c.image.url === "https://lanternmail.test/im/" + c.value + ".png"), w);
 });
 F.ticketResends.forEach((f, k) => each(f, (r, w) => assert.deepEqual(r.codes.map((c) => [c.purpose, c.value]), [["ticket", F.TICKETS[k]]], w)));
+// Round 12 (Connor's real emails): the same codes laid out in table cells, far from their words, and in a tickets email that
+// is the order itself.
+each(F.fellDropOffCells, (r, w) => {
+  assert.deepEqual([r.codes.length, r.codes[0] && r.codes[0].purpose, r.codes[0] && r.codes[0].kind, r.details.orderRef], [1, "drop_off_return", "qr", "FW20402516"], w + ": a carrier named only in the subject, the return in the words");
+  assert.equal(r.codes[0].deadline, "2025-12-24", w);
+});
+each(F.racePackFar, (r, w) => {
+  assert.deepEqual([r.codes.length, r.codes[0] && r.codes[0].purpose, r.codes[0] && r.codes[0].value, r.details.orderRef], [1, "collection", "4417702", "4417702"], w + ": 'the QR code below' far above it");
+  assert.deepEqual(r.codes[0].words, [F.RACE_WORDS2], w);
+});
+each(F.ticketOrderOnly, (r, w) => {
+  assert.deepEqual([r.details.kind, r.details.orderRef, (r.details.items || []).length, r.details.totalPence], ["receipt", "160222", 2, null], w + ": the tickets email is the order, with no total made up");
+  assert.deepEqual(r.codes.map((c) => [c.purpose, c.value]), F.TICKETS2.map((n) => ["ticket", n]), w);
+});
+each(F.ticketResendOnly, (r, w) => { assert.equal(r.details.orderRef, "160222", w); assert.equal(r.details.totalPence, null, w + ": one ticket's price is not the order's total"); assert.deepEqual(r.codes.map((c) => c.value), [F.TICKETS2[0]], w); });
 // A code that is a picture inside the email (cid:): its bytes come from the email itself.
 const collectHtml = (cid) => `<html><body><h1>Your order is ready</h1><p>Order number: PB-55102</p><p>Bring this QR code to our collection desk to collect your order.</p><p><img src="cid:${cid}" alt="QR code" width="200"></p></body></html>`;
 const collectRaw = F.cidEmail({ from: "Pagebound Books <orders@pagebound.test>", subject: "Your order PB-55102 is ready to collect", date: "Mon, 16 Nov 2026 10:00:00 +0000", html: collectHtml("qr-55102@pagebound"), cid: "qr-55102@pagebound", png: png(220) });

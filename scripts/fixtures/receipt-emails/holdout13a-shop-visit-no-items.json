@@ -1,0 +1,25 @@
+{
+ "id": "holdout13a-shop-visit-no-items",
+ "sender": "Grabngo",
+ "layout": "'View itemised receipt' link, 'Subtotal', 'Promotions applied - £0.40', 'Total'; no items in the email",
+ "headers": {
+  "from": "Grabngo <receipts@grabngo.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your 16 July receipt for 1 item",
+  "date": "Thu, 16 Jul 2026 17:11:00 +0000"
+ },
+ "html": "",
+ "text": "Hi Sam,\n\nThank you for shopping with us. Here is the receipt for your recent trip. View itemised receipt:\n  https://www.grabngo.example/store/order/204-5500321-1100220\n\nThursday, 16 July, 2026\nOrder # 204-5500321-1100220 (Items: 1)\nTrip time: 2m 10s\n\nSubtotal                                         £4.15\nPromotions applied                        -  £0.40\nTotal                                            £3.75",
+ "expected": {
+  "shop": "Grabngo",
+  "date": "2026-07-16",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 375,
+  "noItemList": true
+ }
+}

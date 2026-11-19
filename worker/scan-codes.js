@@ -49,7 +49,7 @@ const PRINTED_ELSEWHERE = /\b(?:qr|bar) ?code (?:printed )?on (?:your|the) (?!ph
 const CODE_WORD = /\bbar\s?codes?\b|\bqr\b|\bcode (?:below|above)\b|\breturn code\b/i;
 // What it is for, as the email says.
 const RETURN_WORD = /\breturn(?:s|ed|ing)?\b|\brefund(?:s|ed)?\b|\bexchange(?:s|d)?\b|\bsend (?:it|them|your items?) back\b/i;
-const DROP_OFF = /\bdrop[- ]?(?:off|it off|them off)\b|\bparcel ?shops?\b|\bpost office\b|\blockers?\b|\bno printer\b|\bno label\b|\bprinter(?:-| )?less\b|\bprint in[- ]?(?:store|shop|parcel ?shop)\b|\blabel[- ]free\b|\bdrop[- ]?off point\b|\bcollection point\b|\bcourier\b/i;
+const DROP_OFF = /\bdrop[- ]?(?:off|it off|them off)\b|\b(?:evri|hermes|royal mail|inpost|dpd|parcelforce|yodel|collect\s?\+|ups|dhl)\b(?=[^.\n]{0,40}\b(?:qr|code|label|return|parcel)\b)|\bparcel ?shops?\b|\bpost office\b|\blockers?\b|\bno printer\b|\bno label\b|\bprinter(?:-| )?less\b|\bprint in[- ]?(?:store|shop|parcel ?shop)\b|\blabel[- ]free\b|\bdrop[- ]?off point\b|\bcollection point\b|\bcourier\b/i;
 const IN_STORE = /\bin[- ]?store\b|\b(?:to|at|into|in) (?:your|a|any|our|one of our|the) (?:nearest |local |participating )?(?:stores?|shops?|branch(?:es)?)\b/i;
 const RECEIPT_BARCODE_ALT = /\btrans(?:action)?\.? ?bar\s?code\b|\breceipt bar\s?code\b/i;
 const NEEDS_RECEIPT = /\b(?:original|this|your|e-?|proof of)\s*(?:receipt|purchase)\b/i;
@@ -151,11 +151,21 @@ export function findCodes(rawEmail, details = {}) {
     const tight = before.slice(-320) + "\n" + c.named + "\n" + after.slice(0, 220);
     if (APP_DOWNLOAD.test(tight) || SECRET_NEAR.test(tight) || ACCESS_PASS.test(before.slice(-500) + "\n" + after.slice(0, 300) + "\n" + subject) || PROMO_NEAR.test(tight) || PRINTED_ELSEWHERE.test(tight)) continue;
     // The lines that talk about this code: the nearest ones that name it, else the few around the picture.
-    const bl = before.split("\n").map((l) => l.trim()).filter(Boolean), al = after.split("\n").map((l) => l.trim()).filter(Boolean);
+    const bl = before.split("\n").map((l) => l.replace(/^[\s|]+|[\s|]+$/g, "").trim()).filter(Boolean), al = after.split("\n").map((l) => l.replace(/^[\s|]+|[\s|]+$/g, "").trim()).filter(Boolean);
     const nearB = bl.slice(-6), nearA = al.slice(0, 3);
     let focus = null;
     for (let i = nearB.length - 1; i >= 0 && !focus; i--) if (CODE_WORD.test(nearB[i])) focus = nearB[i];
     for (let i = 0; i < nearA.length && !focus; i++) if (CODE_WORD.test(nearA[i])) focus = nearA[i];
+    // (A line further up that points at it, "please bring the QR code below and photo ID to one of our information points",
+    // with lines about other things between: it is this code's. Round 12.)
+    // (Or further still, when no other code's picture comes between: the email's one "QR code below". Round 12.)
+    if (!focus) {
+      const upTo = text.slice(0, at), lines = upTo.split("\n");
+      for (let i = lines.length - 1; i >= 0 && !focus; i--) {
+        if (/\u0001\d+\u0001/.test(lines[i]) && cands.some((o) => o.k !== c.k && lines[i].includes(MARK(o.k)))) break;
+        if (/\b(?:qr |bar ?)?codes? (?:below|underneath)\b/i.test(lines[i])) focus = clean(lines[i]).replace(/^[\s|]+|[\s|]+$/g, "");
+      }
+    }
     const around = nearB.slice(-4).join("\n") + "\n" + c.named + "\n" + nearA.slice(0, 2).join("\n");
     const say = (focus || "") + "\n" + c.named;
     const wide = say + "\n" + around + "\n" + subject;

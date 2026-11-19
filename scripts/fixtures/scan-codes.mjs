@@ -71,6 +71,26 @@ export const ticketOrder = mail("ticket-order", "Lanternfield Festival <tickets@
 export const ticketResends = TICKETS.slice(0, 2).map((n, k) => mail("ticket-resend-" + (k + 1), "Lanternfield Festival <tickets@lanternfield.test>", "Your ticket for Lanternfield Festival (order #160104)", "Mon, 13 Jul 2026 0" + (8 + k) + ":00:00 +0000", page({ brand: "Lanternfield Festival", domain: "lanternfield.test", rows: [
   "<h1>See you on Saturday</h1>", "<p>Order number: 160104</p><p>Event date: Saturday 18 July 2026</p>", "<p>Show your ticket's barcode at the gate to be scanned.</p>", ticketBlock(n, k)] }), { attach: [{ type: "application/pdf", name: n + ".pdf" }] }));
 
+// ---- 5b. The same three, laid out as real emails are (round 12): every line its own table cell; the drop-off email naming the
+// carrier only in its subject and the return only in its words; the race email's "QR code below" far above the code with
+// travel news between; the tickets email being the order itself ("Order Number [#…]", each ticket's type and price) -------
+const cells = (lines) => "<table>" + lines.map((l) => (l.startsWith("<") ? "<tr><td>" + l + "</td></tr>" : "<tr><td>" + h(l) + "</td></tr>")).join("") + "</table>";
+export const FELL_DROP2 = "Use a Print In ParcelShop device to scan your QR code and print the return label.";
+export const fellDropOffCells = mail("fell-dropoff-cells", "Fellwear <fellwear@fellwear-intl.parcelback-mail.test>", "Your Evri QR code for your order FW20402516", "Fri, 21 Nov 2025 09:00:00 +0000", page({ brand: "Fellwear", domain: "fellwear.test", rows: [cells([
+  "SHOP WOMEN", "SHOP MEN", "Thanks for your return request.", "Please follow the instructions below to package and send it back no later than Wednesday, December 24.",
+  "Once we receive your return, we will process it within 3-5 business days.", "", '<img src="https://returns.parcelback.test/returns/fellwear-intl/viewPrinterlessLabel?return_id=QbXe2Ne" alt="QR Code" width="160" height="auto">', "",
+  "TRACK YOUR RETURN", "Return Instructions", FELL_DROP2, "Pack your items securely and drop them off at your nearest ParcelShop."])] }));
+export const RACE_WORDS2 = "However, if for any reason you don't receive yours by Saturday, please bring the QR code below and photo ID to one of our information points.";
+export const racePackFar = mail("race-pack-far", "Harbour Half <info@harbourhalf.test>", "Sam, we'll see you on Sunday", "Fri, 05 Sep 2025 07:00:00 +0000", page({ brand: "Harbour Half", domain: "harbourhalf.test", rows: [cells([
+  "Race Pack Collection", "UK Runners", "Race packs have all been sent out. " + RACE_WORDS2, "International Runners", "We do not post race packs internationally, your pack will need to be collected during event weekend.",
+  "Information Points", "Saturday 10am to 6pm, Quayside.", "Getting home", "Please avoid using sat navs and follow the exit road signs only.", "Full details of the road closures can be found online.", "ROAD CLOSURES",
+  "Your Order ID: 4417702", '<img src="https://api.qrmaker.test/v1/create-qr-code/?size=350x350&amp;data=4417702" alt="QR Code" width="232">', "Good luck on Sunday!"])] }));
+export const TICKETS2 = ["160105981628", "160106946845"];
+const ticketCells = (n) => ["Standard Entry Ticket", "Lanternfield Festival 2026 - Saturday Night", "Saturday 18 July 2026, 17:30 - 22:30", '<img src="https://lanternmail.test/im/b' + n + '.png" alt="Barcode: ' + n + '" width="150px">',
+  "For full event details and ticket terms and conditions, please visit our website.", "Ticket Number: " + n, "Ticket Holder: " + SHOPPER.name, "Ticket Type: Standard Entry General Sale", "Price: £ 64.50"];
+export const ticketOrderOnly = mail("ticket-order-only", "Lanternfield Festival <info@lanternfield.test>", "Your Lanternfield Festival Tickets - Order Number [#160222]", "Sun, 19 Apr 2026 17:43:00 +0000", page({ brand: "Lanternfield Festival", domain: "lanternfield.test", rows: [cells(TICKETS2.flatMap(ticketCells))] }));
+export const ticketResendOnly = mail("ticket-resend-only", "Lanternfield Festival <info@lanternfield.test>", "Your Lanternfield Festival Tickets - Order Number [#160222]", "Mon, 13 Jul 2026 09:35:00 +0000", page({ brand: "Lanternfield Festival", domain: "lanternfield.test", rows: [cells(ticketCells(TICKETS2[0]))] }));
+
 // ---- 6. Emails with something that looks like a code and must never be shown -----------------------------------------
 const qr = (host, alt, w = 160) => '<p><img src="https://' + host + '/qr.png" alt="' + alt + '" width="' + w + '"></p>';
 export const never = {

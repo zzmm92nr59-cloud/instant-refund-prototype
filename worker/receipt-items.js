@@ -89,7 +89,7 @@ const SKIP_START = /^(?:unavailable(?: items)?|missing items?|items? (?:not avai
 const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your items|items delivered|shipment \d+)\b/i;
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
 // (Round 3: barcodes and part numbers, "EAN: 4977961000000", "MPN: …"; a pre-order's release date; stock notes.)
-const DETAIL = /^(?:(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
+const DETAIL = /^(?:ticket (?:number|no\.?|holder|id)\s*:|(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
 // (Or the size, the fit and how many set apart by slashes, "Waist 36"/91.5cm 30" Leg Trouser / Slim fit / Qty 1",
 // "16 1/2 Col 35 Sleeve Single Cuff / Slim fit / Qty 1": a size line, never the item's name. Round 12.)
 const VARIANT = /^[^|£]{2,70}\s\/\s[^|£/]{0,30}\bfit\s*(?:\/\s*(?:(?:qty|quantity)\s*:?\s*\d{1,3}\s*)?)?$|^(?:colou?r|(?:pack )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
@@ -202,7 +202,7 @@ function readLine(raw) {
     const got = /^(?:you received|received|you got|delivered|substituted (?:with|by)|replaced (?:with|by)|sent instead)\s*:\s*(\S.*)$/i.exec(c);
     if (got && letters(got[1]) >= 3 && !/£/.test(got[1])) { line.names.push(cleanName(got[1])); continue; }
     // ("Name: Afternoon Tea for Two": a voucher's name, labelled. Round 12.)
-    const nl = /^(?:plan|product|item|description|subscription|box|name|product name|item name)\s*:\s*(\S.*)$/i.exec(c);
+    const nl = /^(?:plan|product|item|description|subscription|box|name|product name|item name|ticket type)\s*:\s*(\S.*)$/i.exec(c);
     if (nl && letters(nl[1]) >= 3 && !/£/.test(nl[1]) && !HEADING.test(nl[1])) { line.names.push(cleanName(nl[1])); line.namedByLabel = true; continue; }
     if (FREE_CELL.test(c) && LABEL_PRICE.test(c)) { line.free = true; line.priceLabelled = true; continue; }
     if (COLOUR_LINE.test(c) && (i === 0 || cells.slice(0, i).every((x) => /^(?:x{0,3}s|m|x{0,3}l|\d{1,2}(?:\.\d)?|uk \d{1,2}|one size)$/i.test(x)))) { line.variant.push(c); continue; }
@@ -483,6 +483,10 @@ export function readItems(text, opts = {}) {
     }
     if (!hasName && l.unitLabelled != null) { if (pend && pend.name) pend.unitLabelled = l.unitLabelled; continue; }
     if (!hasName && (l.qty != null || l.unit != null)) {
+      // (A bare number under a name that already said how many with a times sign, Shopify's "Swift Flights 3 × 1" over "25":
+      // the item's size or weight, never how many. A pack size glued to the name, "Toilet Rolls x9" over "1", is the pack,
+      // and the number under it is how many. Round 12.)
+      if (pend && pend.name && pend.nameRaw && /\s×\s\d{1,3}$/.test(pend.nameRaw) && pend.qty != null && l.unit == null && l.cells.length === 1 && /^\d{1,3}$/.test(l.cells[0])) continue;
       if (pend && pend.name) {
         // "Tempered Glass Screen Protector x2" over "Quantity: 2": the name's "x2" is part of its name (a 2-pack).
         if (l.qty != null && pend.nameRaw) { pend.name = pend.nameRaw; pend.nameRaw = null; pend.keepName = true; }

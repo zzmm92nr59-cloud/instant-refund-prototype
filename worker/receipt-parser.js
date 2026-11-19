@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -863,7 +863,7 @@ const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:a
 // A money line read as an item ("Invoice total", "Order total", "Amount due"): never something bought (round 4).
 // (Round 12: "Today's total", "Your total".)
 const MONEY_LABEL = /^(?:(?:invoice|order|grand|basket|bag|payment|final|overall|today(?:'|’)?s|your)\s+total|total\s+(?:paid|due|amount|to pay|charged)|amount\s+(?:due|paid|payable|charged)|balance\s+(?:due|paid))\s*:?$/i;
-const PRICE_WORDS = /^(you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
+const PRICE_WORDS = /^(?:(?:gbp|usd|eur|aud|cad|chf|sek|nok|dkk)|(?:promotions?|offers?|discounts?|vouchers?|coupons?|savings?)\s+applied|you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
 // Amazon's order emails put each thing bought in its own little boxes, so the usual line reading finds nothing. Two layouts:
 //  * things to be delivered: the item's name (Amazon cuts long ones short with "..."), "Sold by …", maybe "Colour: …" and
 //    "Size: …", "Condition: New", "Quantity: 2", then the price split into "£", "4" and "99" (pounds big, pence small);
@@ -1240,6 +1240,28 @@ function withoutRecommendations(t) {
   return out.join("\n");
 }
 
+function moreOrders(text, firstRef) {
+  const lines = String(text || "").split("\n");
+  const heads = [];
+  lines.forEach((l, i) => { const m = /^[\s|]*order\s*(?:#|number\s*:?|no\.?\s*:?)\s*([A-Z0-9][A-Z0-9-]{6,30})[\s|]*$/i.exec(l); if (m && /\d{5}/.test(m[1])) heads.push({ i, ref: m[1] }); });
+  const refs = [...new Set(heads.map((h) => h.ref.toUpperCase()))];
+  if (refs.length < 2 || refs.length > 6 || !firstRef || refs[0] !== String(firstRef).toUpperCase()) return [];
+  const firsts = refs.map((r) => heads.find((h) => h.ref.toUpperCase() === r));
+  const out = [];
+  for (let k = 1; k < firsts.length; k++) {
+    const seg = lines.slice(firsts[k].i, k + 1 < firsts.length ? firsts[k + 1].i : lines.length).join("\n");
+    const tot = /^[\s|]*(?:order )?total\s*:?[\s|]*£\s?([\d,]+\.\d{2})[\s|]*$/im.exec(seg);
+    if (!tot) return [];
+    const totalPence = money(tot[1]);
+    const items = cleanItems(readItems(seg.slice(0, tot.index + tot[0].length)));
+    const check = checkItems(items, moneyOf(seg), totalPence);
+    // (Only when this order's own items add up to its own total: a second order number elsewhere in an email is not proof.)
+    if (!items.length || !check || check.complete !== true) return [];
+    out.push({ orderRef: firsts[k].ref, totalPence, currency: "GBP", items, itemsCheck: { ...check, ...namesCheck(items, {}) } });
+  }
+  return out;
+}
+
 export function parseReceiptEmail(rawEmail, opts = {}) {
   const raw = String(rawEmail || "").slice(0, MAX_RAW);
   const { headers, body } = splitMessage(raw);
@@ -1258,6 +1280,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   let text = (plain && !(fromHtml && !receiptSignals(subject, plain).bodyHit && receiptSignals(subject, fromHtml).bodyHit) ? plain : fromHtml || plain).trim();
 
   const sig = receiptSignals(subject, text);
+  // (Tickets sent as the order, "Your … Festival Tickets - Order Number [#160104]", each ticket with its number and price:
+  // the purchase itself. Round 12.)
+  const ticketOrder = /\btickets?\b[^!?\n]{0,30}\border (?:number|no\.?|#)\s*:?\s*\[?#?\s*\d{4,}/i.test(String(subject || "")) && /\bticket (?:number|no\.?|id)\s*:/i.test(text) && /\bprice\s*:\s*£\s?\d/i.test(text);
+  if (ticketOrder) { sig.subjectHit = true; sig.bodyHit = true; }
+  // (A booking confirmed with its reference, "Your booking is confirmed" and "Booking reference: LOV1242…", whose price is in
+  // the booking document it links to: still the purchase, with no total made up. Round 12.)
+  if (/\b(?:booking|reservation|holiday|trip) (?:is |has been )?confirmed\b/i.test(String(subject || "")) && /\bbooking (?:reference|ref\.?|number)\s*:?\s*[A-Z0-9]{6,14}\b/i.test(text.slice(0, 2000))) { sig.subjectHit = true; sig.bodyHit = true; }
   // A receipt that is only in its attachment ("Your receipt is attached", a PDF or a photo of the till receipt): it is
   // still the shop's receipt, read for what the email itself says (the shop, the day, a total if written), and it says
   // that the details are in the attachment. Nothing is read from the attachment, so nothing is made up.
@@ -1290,6 +1319,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A supermarket's delivery-day email for an order already confirmed ("Your order is ready for today", "Payment received").
   const dayOf = groceryDayOf(text);
   if (dayOf) { sig.subjectHit = true; sig.bodyHit = true; }
+  // (A changed order, "We got your changes - 1350718495", with the whole new list: the order as it now is. Round 12.)
+  const amended = !dayOf && orderAmended(subject, text);
+  if (amended && sig.bodyHit) sig.subjectHit = true;
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
   if (!isFlight && !(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
@@ -1351,6 +1383,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   };
   // (The order number only in the subject, "Order Info - DET-7vxlt1dlf1s": Detale. Round 11.)
   if (!result.orderRef) { const sr = /\border\b[^!?\n]{0,20}?\s[-–:#]\s*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9-]{5,24})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
+  // ("… Tickets - Order Number [#160104]": the number in brackets. Round 12.)
+  if (!result.orderRef) { const sr = /\border (?:number|no\.?)\s*:?\s*\[\s*#?\s*([A-Za-z0-9-]*\d[A-Za-z0-9-]*)\s*\]/i.exec(String(subject || "")); if (sr && sr[1].length >= 4) result.orderRef = sr[1]; }
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
@@ -1387,6 +1421,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // The delivery-day email of a supermarket order: what was paid, for the order it names. Its few listed lines (substitutions,
   // short-life items) are not the order's items, which are on the confirmation and in the attached receipt.
   if (dayOf) { result.items = []; result.orderUpdate = "paid"; if (dayOf.orderRef) result.orderRef = dayOf.orderRef; result.totalPence = dayOf.paidPence; result.currency = "GBP"; }
+  // (What it swapped on the day, "Substituted with": the order's card shows what came instead. Round 12.)
+  const subs = dayOf ? (grocerySubstitutions(text).length ? grocerySubstitutions(text) : grocerySubstitutions(text === fromHtml ? plain : fromHtml)) : [];
+  if (subs.length) result.substitutions = subs;
+  // (A changed order's new list is the order as it now is; when it was sent says which change is the latest. Round 12.)
+  if (amended) { result.orderUpdate = "amended"; const d = headers.date ? new Date(headers.date) : null; if (d && !Number.isNaN(d.getTime())) result.amendedAt = d.toISOString(); }
   // A company's legal name as the sender ("Anthropic Ireland, Limited"): the shop is the brand, not the country it bills
   // from ("Anthropic"). Round 10.
   // (Forwarded, the original sender's name says it.)
@@ -1488,7 +1527,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // No total written, one thing bought, and its price the only amount anywhere in the email: that is what was paid.
   if (result.totalPence == null && result.items.length === 1 && Number.isInteger(result.items[0].pricePence) && (result.items[0].qty || 1) === 1) {
     const amounts = [...new Set([...text.matchAll(/£\s?(\d[\d,]*\.\d{2})/g)].map((m) => money(m[1])))];
-    if (amounts.length === 1 && amounts[0] === result.items[0].pricePence) { result.totalPence = amounts[0]; result.currency = "GBP"; result.totalFrom = "only_amount"; result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: amounts[0], expectedPence: amounts[0], missingPence: 0 }; }
+    // (Not a ticket sent again on its own: its price is that ticket's, not what the order came to. Round 12.)
+    if (amounts.length === 1 && amounts[0] === result.items[0].pricePence && !ticketOrder) { result.totalPence = amounts[0]; result.currency = "GBP"; result.totalFrom = "only_amount"; result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: amounts[0], expectedPence: amounts[0], missingPence: 0 }; }
   }
   const stated = statedItemCount(text) ?? (otherPart ? statedItemCount(otherPart) : null) ?? statedItemCount(String(subject || ""));
   if (stated) result.itemCount = stated;
@@ -1507,6 +1547,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // No items read is never "complete", even when there is no total to compare with.
   if (!result.items.length && result.itemsCheck && result.itemsCheck.complete !== false) result.itemsCheck = { ...result.itemsCheck, complete: false };
+  // (A shop visit's receipt that only links to its itemised receipt, "View itemised receipt", with the money and no list: it
+  // lists no items, and says so, rather than taking a money line for one. Round 12.)
+  if (!result.items.length && !noList && result.itemsCheck && /\bview (?:your |the )?(?:itemi[sz]ed|full|detailed) receipt\b/i.test(text.slice(0, 3000))) result.itemsCheck = { ...result.itemsCheck, noItemList: true };
   // Gmail cut the email short ("[Message clipped]  View entire message"): what came after the cut isn't in it, so the items
   // can never be called complete, even when what is there adds up.
   if (CLIPPED.test(text) || (otherPart && CLIPPED.test(otherPart))) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, clipped: true };
@@ -1604,6 +1647,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // in 14th Feb 2022" under an invoice sent in 2025. The email's own date is. Round 11.)
   if (result.orderDate && refDate && !Number.isNaN(refDate.getTime()) && Date.parse(result.orderDate) < refDate.getTime() - 400 * 864e5) result.orderDate = null;
   if (!result.orderDate && refDate && !Number.isNaN(refDate.getTime())) { result.orderDate = isoDate(refDate); result.orderDateFrom = "email"; }
+  // (One email confirming two orders, "Order # 202-…" then its items and "Total", then "Order # 202-…" again: each order is
+  // a purchase of its own. The first is this email's reading; the others go with it as orders of their own, each with its
+  // number, its items and its total, and gmail.js mergeOrderEmails makes a card of each. Round 12.)
+  const others = isFlight || dayOf || amended ? [] : moreOrders(text, result.orderRef).length ? moreOrders(text, result.orderRef) : moreOrders(otherPart, result.orderRef);
+  if (others.length) result.moreOrders = others;
   return result;
 }
 
@@ -1698,7 +1746,9 @@ export function parseReturnEmail(rawEmail) {
   const plainText = parts.text.join("\n").trim();
   const htmlText = html ? htmlToText(html).trim() : "";
   const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t);
-  const text = plainText && (hasReturn(plainText) || !hasReturn(htmlText)) ? plainText : htmlText || plainText;
+  // (A text part that lost its pound signs, "for the value of L118.00", while the HTML has them: the HTML is read. Round 12.)
+  const lostPounds = Boolean(plainText && htmlText && !/£/.test(plainText) && /\bL\d[\d,]*\.\d{2}\b/.test(plainText) && /£/.test(htmlText));
+  const text = plainText && !lostPounds && (hasReturn(plainText) || !hasReturn(htmlText)) ? plainText : htmlText || plainText;
   const subject = headers.subject || "";
   const sender = retailerFromFrom(headers.from);
   const refDate = headers.date ? new Date(headers.date) : null;
@@ -1708,7 +1758,7 @@ export function parseReturnEmail(rawEmail) {
 
   // A real return ID has at least one digit and ends at a space or line break ("RETURN ID: nuk0400251601"),
   // so words like "https" from a link, or the first word of a sentence, are never taken for one.
-  const idm = text.match(/return id\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
+  const idm = text.match(/return id\s*[:#\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
   const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#\s]*([A-Z0-9-]{4,24})/i);
 
@@ -1743,7 +1793,9 @@ export function parseReturnEmail(rawEmail) {
     if (line.length >= 25 && line.length <= 220 && /pack|label|send|drop|take|scan|post|courier|collect/i.test(line)) steps.push(line);
   }
 
-  const refund = text.match(/estimated refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i);
+  // (Or the return's own total, "TOTAL REFUND" over "£118.00", or "crediting you back … for the value of £118.00". Round 12.)
+  const refund = text.match(/estimated refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i) || text.match(/\btotal refund(?: amount)?\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+    text.match(/\bcredit(?:ing)? you back\b[^£]{0,60}\bvalue of £\s*([0-9][0-9,]*\.[0-9]{2})/i);
   let trackUrl = null;
   if (html) {
     for (const a of html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -1789,7 +1841,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
-  const both = subject + "\n" + text.slice(0, 6000);
+  const both = (subject + "\n" + text.slice(0, 6000)).replace(/￡/g, "£");
   // Money back for a price drop, or for an order the shop cancelled, is not a return: nothing was sent back, so Relay must
   // not show a return as refunded (round 3, 19 Nov 2026). The order's own card already says what was bought.
   const subj = subject.replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
@@ -1800,7 +1852,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   if (ub && ub.kind === "adjusted") return { ok: false, reason: "order_adjusted" };
   if (/\bcancell?(?:ed|ation)\b/i.test(subj) || NOT_A_PURCHASE_TOP.test(top) && !/\breturn(?:ed|s)?\b/i.test(subj)) return { ok: false, reason: "cancellation" };
   let stage = null;
-  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b/i.test(both)) stage = "refunded";
+  if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b/i.test(both)) stage = "refunded";
   else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
   if (!stage) return { ok: false, reason: "not_a_return_update" };
   const sender = retailerFromFrom(headers.from);
@@ -1811,15 +1863,25 @@ export function parseReturnUpdateEmail(rawEmail) {
   if (shop.domain && PERSONAL_MAIL.test(shop.domain)) shop.domain = null;
   if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
   const refDate = headers.date ? new Date(headers.date) : null;
-  const amt = stage === "refunded" ? (both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
+  // (A labelled amount with the money on the line under its label, "Refunded total: |" over "£6.90", is the refund. Round 12.)
+  const amt = stage === "refunded" ? (both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+    both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
   const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
+  // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
+  const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) : null;
+  // (And what was first paid, to whom and when: "You originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026".)
+  const orig = /\byou originally paid (.{2,60}?) £\s?([\d,]+\.\d{2})(?: GBP)? on (\d{1,2} [A-Za-z]{3,9} \d{4})/i.exec(both.replace(/\s+/g, " "));
+  const fwdVia = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
+  const via = /(^|\.)paypal\./i.test((fwdVia && fwdVia.domain) || sender?.domain || "");
+  const viaShop = via ? ((/\brefund of £\s?[\d,]+\.\d{2}(?: GBP)? from ([^\n|]{2,60}?)\s*(?:\n|\||$)/i.exec(both) || [])[1] || (/^\s*([^\n|]{2,60}?) sent you a refund\b/im.exec(both) || [])[1] || (orig && orig[1]) || null) : null;
   const rid = text.match(/return (?:id|number|reference)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   return {
     ok: true, kind: "return_update", stage,
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
     amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
-    orderRef: ref ? ref[1] : null, returnId: rid ? rid[1] : null,
-    retailer: { name: shop.name || null, domain: shop.domain || null },
+    orderRef: ref ? ref[1] : inv ? inv[1] : null, returnId: rid ? rid[1] : null,
+    ...(orig ? { paidPence: money(orig[2]), paidOn: parseDate(orig[3], refDate) } : {}),
+    retailer: viaShop ? { name: viaShop.trim().replace(/\.{2,}$/, ""), domain: null, via: (fwdVia && fwdVia.domain) || sender.domain } : { name: shop.name || null, domain: shop.domain || null },
   };
 }
 
@@ -1994,6 +2056,24 @@ export function parseOrderAdjustmentEmail(rawEmail) {
   // (Forwarded from the shopper's own mailbox, the original sender says it is Uber.)
   const fw = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(u.text, { subject: u.headers.subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
   const ub = uberEmail((fw && fw.domain) || sender?.domain, u.subject, u.text);
+  // (A shop's support team writing that it refunded part of an order, or put credit on the account, for an order it names:
+  // money back on that order, joined by its number (gmail.js attachAdjustments). Never from a payment service or the
+  // shopper's own mailbox, whose emails are read as receipts or refunds of their own. Round 12.)
+  // (A payment service's "You've authorised £38.00 GBP to …": one payment towards a purchase with that shop, a deposit or an
+  // instalment, joined to it by gmail.js attachCancellations. Round 12.)
+  if (/(^|\.)paypal\./i.test((fw && fw.domain) || sender?.domain || "")) {
+    const pa = paymentAuthorised(u.subject, u.text);
+    if (pa && pa.amountPence) return { ok: true, kind: "order_update", stage: "payment", at: parseDate(pa.on || "", u.headers.date ? new Date(u.headers.date) : null) || u.at,
+      orderRef: null, paymentRef: pa.orderRef, merchant: null, amountPence: pa.amountPence, previousTotalPence: null, newTotalPence: null, currency: "GBP",
+      retailer: { name: pa.merchant, domain: null, via: (fw && fw.domain) || sender.domain } };
+  }
+  const from = (fw && fw.domain) ? fw : sender;
+  if ((!ub || ub.kind !== "adjusted") && from && from.domain && !PERSONAL_MAIL.test(from.domain) && !/(^|\.)(?:paypal|klarna|clearpay|laybuy)\./i.test(from.domain)) {
+    const sr = supportRefund(String(u.subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, ""), u.text);
+    if (sr && sr.refs.length) return { ok: true, kind: "order_update", stage: "adjusted", at: u.at, orderRef: sr.refs[0], orderRefs: sr.refs, merchant: null,
+      amountPence: sr.refundPence || 0, ...(sr.creditPence ? { creditPence: sr.creditPence } : {}), previousTotalPence: null, newTotalPence: null, currency: "GBP", bySupport: true,
+      retailer: { name: from.name || null, domain: from.domain } };
+  }
   if (!ub || ub.kind !== "adjusted" || ub.refundPence == null) return no;
   return { ok: true, kind: "order_update", stage: "adjusted", at: u.at, orderRef: u.orderRef || null, merchant: ub.merchant || null,
     amountPence: ub.refundPence, previousTotalPence: ub.previousPence, newTotalPence: ub.newPence, currency: "GBP",
