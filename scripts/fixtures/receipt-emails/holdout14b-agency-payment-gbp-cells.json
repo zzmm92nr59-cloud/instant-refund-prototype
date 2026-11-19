@@ -1,0 +1,30 @@
+{
+ "id": "holdout14b-agency-payment-gbp-cells",
+ "sender": "Examtest",
+ "layout": "'TLA Confirmation of Payment' from the agency's address with no name; an invoice table with '31.00 |' over 'GBP |'",
+ "headers": {
+  "from": "ExamtestConfirmation@examtest.example",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "TLA Confirmation of Payment",
+  "date": "Thu, 12 Nov 2026 09:00:00 +0000"
+ },
+ "html": "<html><body><p><b>This is an invoice for your order and should be kept as your receipt.</b></p><table border=\"1\"><tr><th>Quantity</th><th>Description</th><th>Unit Price</th><th colspan=\"2\">Amount</th></tr>\n<tr><td>1</td><td>Theory test<br/>Appointment: 3 December 2026 10:30 AM</td><td>31.00</td><td>31.00</td><td>GBP</td></tr>\n<tr><td colspan=\"2\">Subtotal</td><td>31.00</td><td>GBP</td></tr><tr><td colspan=\"2\">Tax</td><td>0.00</td><td>GBP</td></tr><tr><td colspan=\"2\">Total</td><td>31.00</td><td>GBP</td></tr></table>\n<p>Payment Number: 550012345</p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "TLA",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Theory test",
+    "qty": 1,
+    "linePence": 3100
+   }
+  ],
+  "subtotalPence": 3100,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3100
+ }
+}

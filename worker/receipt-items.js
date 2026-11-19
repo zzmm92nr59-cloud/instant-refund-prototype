@@ -344,7 +344,7 @@ export function readItems(text, opts = {}) {
         last = prev; pend = null; return;
       }
       const it = finish(pend);
-      if (it) { items.push(it); last = { item: it, mode: "block", at: cur, qtyFree: pend.qty == null && !pend.head, counted: pend.qty != null || Boolean(pend.head) }; }
+      if (it) { items.push(it); last = { item: it, mode: "block", at: cur, qtyFree: pend.qty == null && !pend.head, counted: pend.qty != null || Boolean(pend.head), qtyAbove: Boolean(pend.qtyAbove) }; }
     }
     pend = null;
   };
@@ -354,7 +354,7 @@ export function readItems(text, opts = {}) {
     if (pend && pend.afterRow && !pend.prices.length && !pend.free && pend.qty == null && !pend.head && pend.unit == null && pend.unitLabelled == null && !pend.variant.length && !pend.detail && !pend.labelled && !pend.plus)
       addExtras(pend.afterRow.item, [pend.name, ...pend.extras]);
   };
-  const newBlock = (l, name) => { const q = qtyBefore; qtyBefore = null; const b = block(l, name); if (q != null && b.qty == null) { b.qty = q; b.head = true; } return b; };
+  const newBlock = (l, name) => { const q = qtyBefore; qtyBefore = null; const b = block(l, name); if (q != null && b.qty == null) { b.qty = q; b.head = true; b.qtyAbove = true; } return b; };
   // (An item's name never carries an option's price: "Add bacon +£1.00" as a name is "Add bacon".)
   const block = (l, name) => ({ lines: 1, keepName: Boolean(l.keepName), labelled: Boolean(l.namedByLabel), name: String(name).replace(/\s*\+\s?£\s?[\d,]+(?:\.\d{2})?$/, ""), nameRaw: l.nameRaw || null, qty: l.qty, unit: l.unit, prices: [], extras: [...l.extras, ...l.names.slice(1)], variant: [...l.variant], head: Boolean(l.head) });
   // (Round 8: which lines come straight after a table row ended, so the first line of a cell that runs over several lines,
@@ -409,9 +409,17 @@ export function readItems(text, opts = {}) {
     cur = n;
     if (l.removed && !l.names.length) { if (pend) pend.dropped = true; else if (last && last.at >= n - 3) { const k = items.indexOf(last.item); if (k >= 0) items.splice(k, 1); last = null; } continue; }
     // "1 Egg Fried Rice" with its price on the next line: the number is how many.
-    if (l.names.length === 1 && !l.prices.length && l.qty == null && priceOnly(read[n + 1])) {
+    // (Not when how many was the line above, "1" over "20 Chicken McNuggets® Sharebox" over "£4.49": the number is the
+    // product's own, part of its name. Round 13.)
+    if (l.names.length === 1 && !l.prices.length && l.qty == null && qtyBefore == null && priceOnly(read[n + 1])) {
+      const above = n > 0 ? read[n - 1] : null;
+      if (above && above.qty != null && !above.names.length && !above.prices.length && above.cells.length === 1 && /^\d{1,2}\s+\p{Lu}/u.test(l.names[0])) {
+        // (The number above is how many; the product's own number stays in its name.)
+        l.qty = above.qty; l.head = true; if (pend && !pend.prices.length) { pend.qty = null; pend = null; }
+      } else {
       const q = /^(\d{1,2})\s+(\p{Lu}.*)$/u.exec(l.names[0]);
       if (q && !/^(?:adults?|child(?:ren)?|items?|for|pack|people|nights?|days?|months?)\b/i.test(q[2])) { l.qty = Number(q[1]); l.names[0] = q[2]; l.head = true; }
+      }
     }
     const hasName = l.names.length > 0;
     // A price straight after an item's price, or its labelled line total ("Total | £53.00" under "Price | £5.30").
@@ -487,6 +495,10 @@ export function readItems(text, opts = {}) {
       // the item's size or weight, never how many. A pack size glued to the name, "Toilet Rolls x9" over "1", is the pack,
       // and the number under it is how many. Round 12.)
       if (pend && pend.name && pend.nameRaw && /\s×\s\d{1,3}$/.test(pend.nameRaw) && pend.qty != null && l.unit == null && l.cells.length === 1 && /^\d{1,3}$/.test(l.cells[0])) continue;
+      // (In a list that puts how many above each name, "1" / "3 Omega-3 Fish Fingers" / "£3.49", a bare number after an item's
+      // price is how many of the next line, never a new count for that item. Round 13.)
+      if (l.unit == null && l.cells.length === 1 && /^\d{1,2}$/.test(String(l.cells[0]).trim()) && !l.extras.length &&
+        (pend ? pend.name && pend.qtyAbove && pend.prices.length : last && last.qtyAbove && last.at >= n - 4)) { qtyBefore = l.qty; continue; }
       if (pend && pend.name) {
         // "Tempered Glass Screen Protector x2" over "Quantity: 2": the name's "x2" is part of its name (a 2-pack).
         if (l.qty != null && pend.nameRaw) { pend.name = pend.nameRaw; pend.nameRaw = null; pend.keepName = true; }
@@ -512,6 +524,12 @@ export function readItems(text, opts = {}) {
     // A line with a name and no price.
     // "1 x 074897 / Size US 8 (UK 12-14)" under "Trail Jacket": how many, and the code and size, of the item above.
     if (l.head && pend && pend.name && !pend.prices.length && pend.qty == null && /^\d{3,}\b|\bsize\b|^[^/]{1,30}\s\/\s/i.test(l.names[0])) { pend.qty = l.qty; pend.variant.push(l.names[0]); continue; }
+    // (In that list, a name with how many above it and no price of its own under it, "1" / "PC Chips" / "1" / "Veg Sticks",
+    // is an option chosen for the item above, "3 Omega-3 Fish Fingers" / "£3.49": never an item. Round 13.)
+    if (qtyBefore != null && (pend ? pend.qtyAbove && pend.prices.length : last && last.qtyAbove) && l.names.length === 1 && !l.prices.length && !l.head && !priceOnly(read[n + 1]) && !(read[n + 1] && read[n + 1].names.length && priceOnly(read[n + 2]))) {
+      if (pend) pend.extras.push(l.names[0]); else { addExtras(last.item, [l.names[0]]); last.extraAt = n; last.at = n; }
+      qtyBefore = null; continue;
+    }
     if (l.head) { pend = newBlock(l, l.names[0]); continue; }
     // A line set in from the item above (an empty first cell, spaces, a "+") is part of it: its extras, or a meal deal's
     // parts. Unless it starts an item of its own: a quantity, size or code follows it before any price (Amazon's rows start
@@ -529,6 +547,10 @@ export function readItems(text, opts = {}) {
     if (pend && !pend.cell && !pend.labelled && !pend.prices.length && !pend.head && pend.qty == null && !pend.extras.length && !pend.variant.length && pend.lines === 1 &&
         l.names.length === 1 && /^\p{Lu}[\p{Ll}]{2,15}$/u.test(l.names[0]) && !l.plus && !l.lead && !l.indent) { pend.name += " " + l.names[0]; pend.lines++; continue; }
     if (pend && !pend.prices.length && pend.unit != null && !l.lead && !l.indent && !l.plus) { emit(); pend = newBlock(l, l.names[0]); last = null; continue; }
+    // (A row's name cell, "green tea |" over "x1 |" and "£0.00 |", under loose lines that are no row at all, a bill's
+    // "restaurant", "canary wharf", "table", "#1221": the row is the first item, never an extra of those lines. Round 13.)
+    if (pend && !pend.prices.length && pend.qty == null && !pend.head && !pend.cell && pend.startAt != null && /\|\s*$/.test(raw[n]) && !/\|\s*$/.test(raw[pend.startAt] || "|") &&
+        !l.lead && !l.indent && !l.plus && startsItem(n)) { const prev = last; pend = newBlock(l, l.names[0]); pend.startAt = n; pend.prev = prev; last = null; continue; }
     if (pend && !pend.prices.length) { pend.extras.push(...l.names); pend.variant.push(...l.variant); if (l.qty != null) pend.qty = l.qty; if (l.details) pend.detail = true; if (l.plus) pend.plus = true; pend.lines++; continue; }
     const afterRow = last && last.mode === "row" && last.at === n - 1 ? last : null;
     const prev = last;

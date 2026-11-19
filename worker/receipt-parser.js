@@ -358,9 +358,10 @@ function money(str) {
 const F_LABEL = "(?:(?:order\\s+|grand\\s+)?total(?:\\s+(?:including|incl\\.?|inc\\.?)\\s+(?:delivery|postage|shipping|vat|tax|p&p))?(?:\\s+(?:paid|amount|charged|cost|price|to pay|due))?|amount\\s+(?:paid|charged|due)|you\\s+paid)";
 const F_NUM = "((?:\\d{1,3}(?:[.,]\\d{3})+|\\d+)(?:[.,]\\d{2})?)(?![\\d.,]*\\d)";
 const F_GAP = "(?:\\s*\\([^)\\n]{1,40}\\))?\\s*(?:[:|]\\s*){0,3}";
-const F_BEFORE = new RegExp("\\b" + F_LABEL + F_GAP + "(€|EUR|US ?\\$|USD|CA\\$|CAD|AU?\\$|AUD|\\$)[ \\t]?" + F_NUM, "gi");
-const F_AFTER = new RegExp("\\b" + F_LABEL + F_GAP + F_NUM + "[ \\t]?(€|EUR\\b|USD\\b|CAD\\b|AUD\\b)", "gi");
-const DOLLARS = [["USD", /\bUSD\b|US ?\$|\bU\.?S\.? dollars?\b/i], ["CAD", /\bCAD\b|CA\$|\bCanadian dollars?\b/i], ["AUD", /\bAUD\b|(?<![A-Za-z])AU?\$|\bAustralian dollars?\b/i]];
+// (Polish złoty, "34.53 zł", and Mexican pesos, "MX$99.00" or "$99.00 MXN", too: a ride or a flight's wifi abroad. Round 13.)
+const F_BEFORE = new RegExp("\\b" + F_LABEL + F_GAP + "(€|EUR|US ?\\$|USD|CA\\$|CAD|AU?\\$|AUD|MX\\$|MXN|PLN|\\$)[ \\t]?" + F_NUM, "gi");
+const F_AFTER = new RegExp("\\b" + F_LABEL + F_GAP + F_NUM + "[ \\t]?(€|EUR\\b|USD\\b|CAD\\b|AUD\\b|MXN\\b|PLN\\b|zł)", "gi");
+const DOLLARS = [["USD", /\bUSD\b|US ?\$|\bU\.?S\.? dollars?\b/i], ["CAD", /\bCAD\b|CA\$|\bCanadian dollars?\b/i], ["AUD", /\bAUD\b|(?<![A-Za-z])AU?\$|\bAustralian dollars?\b/i], ["MXN", /\bMXN\b|MX\$|\bMexican pesos?\b/i]];
 // "80.00", "80,00", "1,234.56" and "1.234,56" all read; anything else (three decimals, mixed-up separators) doesn't.
 export function foreignMinor(raw) {
   const m = /^(\d{1,3}(?:[.,]\d{3})+|\d+)(?:([.,])(\d{2}))?$/.exec(String(raw == null ? "" : raw));
@@ -385,7 +386,7 @@ function foreignTotal(text, opts = {}) {
   const pick = notSub.find((f) => /^(?:grand\s+)?total\s+(?:including|incl\.?|inc\.?)\s/i.test(f.label) || /^grand\s/i.test(f.label)) || notSub[0];
   if (!pick) return null;
   const sign = pick.sign.toUpperCase();
-  let currency = sign === "€" || sign === "EUR" ? "EUR" : sign === "US$" || sign === "US $" || sign === "USD" ? "USD" : sign === "CA$" || sign === "CAD" ? "CAD" : /^(AU?\$|AUD)$/.test(sign) ? "AUD" : null;
+  let currency = sign === "€" || sign === "EUR" ? "EUR" : sign === "US$" || sign === "US $" || sign === "USD" ? "USD" : sign === "CA$" || sign === "CAD" ? "CAD" : /^(AU?\$|AUD)$/.test(sign) ? "AUD" : sign === "MX$" || sign === "MXN" ? "MXN" : sign === "PLN" || sign === "ZŁ" ? "PLN" : null;
   // A bare "$": only when the email names exactly one kind of dollar.
   if (!currency && sign === "$") { const named = DOLLARS.filter(([, re]) => re.test(text)).map(([c]) => c); if (named.length === 1) currency = named[0];
     // (A software company's card receipt through Stripe that names no kind of dollar, "Receipt from Eleven Labs Inc.",
@@ -568,7 +569,10 @@ function fromText(text, refDate, ctx = {}) {
   const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
   // (Nor a total before VAT, "Total (exc. VAT): £12.50", when the email also gives the total with it: coverage round.)
   const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(before(m)) && !/\b(?:items?|products?|goods|line|item\(s\)|basket|trolley|cart|bag)[ \t]*$/i.test(before(m)) &&
-    !(/^total\s*\((?:exc|excl|excluding|ex)\b/i.test(m[0]) && totals.some((o) => /^total\s*\((?:inc|incl|including)\b/i.test(o[0]))));
+    !(/^total\s*\((?:exc|excl|excluding|ex)\b/i.test(m[0]) && totals.some((o) => /^total\s*\((?:inc|incl|including)\b/i.test(o[0]))) &&
+    // (Nor a "net total" before VAT, when the bill's own total follows it: "net total £42.42", "v.a.t £8.48", "bill total
+    // £50.90". Round 13.)
+    !(/\bnet[ \t]*$/i.test(before(m)) && totals.some((o) => o.index > m.index)));
   const subAt = (/\bsub-?\s?total\b/i.exec(text) || {}).index;
   const afterSub = subAt == null ? [] : notSub.filter((m) => m.index > subAt);
   const pool = afterSub.length ? afterSub : notSub;
@@ -620,6 +624,9 @@ function fromText(text, refDate, ctx = {}) {
       const head = rows[i].match(/^(\d{1,2})\s*[x×]?\s+(\p{L}[^£]{2,120})$/u);
       const price = rows[i + 1].match(/^£\s*([0-9][0-9,]*\.[0-9]{2})(?:\s*£\s*[0-9.]+)?$/);
       if (head && price && !/^[x×]\s/i.test(head[2]) && !/\s\/\s/.test(head[2]) && !/total|subtotal|delivery|service|discount|fee|tip|vat/i.test(head[2])) {
+        // (How many on the line above, "1" over "20 Chicken McNuggets® Sharebox": the number is part of the name. Round 13.)
+        const above = /^(\d{1,2})$/.exec(rows[i - 1] || "");
+        if (above) { items.push({ name: rows[i].trim(), qty: Number(above[1]), pricePence: money(price[1]), lineTotal: true }); continue; }
         items.push({ name: head[2].trim(), qty: Number(head[1]), pricePence: money(price[1]), lineTotal: true });
       }
     }
@@ -823,7 +830,11 @@ function receiptSignals(subject, text) {
     // Coverage round (emails in a real inbox that were never read as purchases): "Thank you for buying Gold membership",
     // "Thank you for joining Ana's fan club membership", "We've received your payment and your order is under processing",
     // "Your digital railcard purchase is complete".
-    /\bthank(?:s| you) for (?:buying|purchasing)\b|\bthank(?:s| you) for joining\b[^!?]{0,60}\b(?:membership|subscription)\b|\breceived your payment\b[^!?]{0,40}\byour order\b|\bpurchase\s+(?:is|was|has been)\s+(?:complete|completed|successful)\b/.test(s);
+    /\bthank(?:s| you) for (?:buying|purchasing)\b|\bthank(?:s| you) for joining\b[^!?]{0,60}\b(?:membership|subscription)\b|\breceived your payment\b[^!?]{0,40}\byour order\b|\bpurchase\s+(?:is|was|has been)\s+(?:complete|completed|successful)\b/.test(s) ||
+    // Round 13: "Los Pollos Bravos has your order!" (a takeaway app's order), "Your bill has been paid: #14541694" (a pub's
+    // order-and-pay app), "wagamama receipt" (a shop's name and "receipt"), "APPROVED: Payment transaction for your order
+    // M589966 … at Embassy of Nepal" (a card payment page's receipt). The body must still show a total, below.
+    /\bhas (?:got )?your order\b|\byour order(?:'|’)?s (?:in the kitchen|being prepared|being made)\b|\byour bill (?:has been|was|is) paid\b|\bpayment transaction for your order\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?[\w&'’.-]+(?:\s+[\w&'’.-]+){0,2}\s+(?:e-?)?receipt\s*$/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
@@ -999,7 +1010,9 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     // (Not the forward's own header lines: its "Subject:" would count the subject twice.)
     bodyNames: shopNamesInText(asSent ? text.replace(/^[ \t>*]*(?:from|subject|date|to|sent|cc)[ \t*]*:.*$/gim, "") : text, subject),
     // A payment platform's own receipt names the business that was paid ("Merchant: Example Lettings").
-    merchantName: sentDomain && isVia(sentDomain) ? ((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) || [])[1] || null) : null,
+    // (Or a card payment page's subject, "APPROVED: Payment transaction for your order M589966 … at Embassy of Nepal". Round 13.)
+    merchantName: sentDomain && isVia(sentDomain) ? ((text.match(/^[\s#*|]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) || [])[1] ||
+      (/\b[Pp]ayment transaction\b.*\sat\s+(\p{Lu}[\p{L}\d&'’. -]{2,40}?)\s*$/u.exec(subject) || [])[1] || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
     titleName: GAME_SHOP.test(sentDomain || "") ? (html && gameTitle(htmlToText(html))) || gameTitle(text) : null,
@@ -1014,6 +1027,10 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   // the name its address gives, so the same shop is one shop in Relay whichever of its emails named it. Round 8.
   const brand = /^(.+?)\s+(?:&\s*partners|coffee|pizza|pizzas|restaurants?|uk|group|stores?|foods?|burgers?|grill|express|online)$/i.exec(ranked.name || "");
   if (brand && sentDomain && brand[1].toLowerCase().replace(/[^a-z0-9]/g, "") === domainBase(sentDomain).replace(/-/g, "")) ranked.name = brand[1];
+  // "DVSA Confirmation of Payment" from an agency's address with no name of its own (a test booked through the company that
+  // runs the bookings): the subject names who was paid. Round 13.
+  const paidTo = !sentName && /^(\p{Lu}[\p{L}\d&'’.-]{1,30}(?:\s+\p{Lu}[\p{L}\d&'’.-]{1,30}){0,2})\s+(?:[Cc]onfirmation of [Pp]ayment|[Pp]ayment [Cc]onfirmation)\s*$/u.exec(subject);
+  if (paidTo) { ranked.name = paidTo[1]; ranked.domain = null; }
   // A receipt forwarded from a personal mailbox keeps that mailbox's address when the original shop isn't found.
   const out = { name: ranked.name || null, domain: ranked.domain || (personal ? domain : null) };
   if (ranked.via) out.via = ranked.via;
@@ -1119,6 +1136,8 @@ function tillPounds(t) {
   const twoPlaces = (n, p) => n + "." + String(p || "").padEnd(2, "0");
   // (Only when every "GBP" follows an amount: a till receipt's "GBP" over its price column is read below.)
   if (t && !/£/.test(t) && /(?<![\d.,])\d[\d,]*\.\d[ \t]GBP\b/.test(t) && (t.match(/\bGBP\b/g) || []).length === (t.match(/\d[ \t]GBP\b/g) || []).length) return t.replace(/(?<![\d.,])(\d[\d,]*)(?:\.(\d{1,2}))?[ \t]GBP\b/g, (m, n, p) => "£" + twoPlaces(n, p));
+  // ("23.00 |" with "GBP |" in the cell beside it, an invoice's table read row by row: pounds. Round 13.)
+  if (t && !/£/.test(t) && /(?<![\d.,])\d[\d,]*\.\d{2}[ \t]*\|[ \t]*\n?[ \t|]*GBP[ \t]*\|?[ \t]*$/m.test(t)) t = t.replace(/(?<![\d.,])(\d[\d,]*\.\d{2})[ \t]*\|[ \t]*\n?[ \t|]*GBP[ \t]*(\|?)[ \t]*$/gm, "£$1 $2");
   if (!t || /£/.test(t) || !/(?:^|[\s|])GBP(?:$|[\s|/])/m.test(t)) return t;
   return t.replace(/(\d{1,5}\.\d{2}) ?GBP\b/g, "£$1").replace(/(\S[ \t]{2,})(-?)(\d{1,5}\.\d{2})(?:[ \t]+[A-Z])?[ \t]*$/gm, "$1$2£$3");
 }
@@ -1280,6 +1299,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   let text = (plain && !(fromHtml && !receiptSignals(subject, plain).bodyHit && receiptSignals(subject, fromHtml).bodyHit) ? plain : fromHtml || plain).trim();
 
   const sig = receiptSignals(subject, text);
+  // (A total in złoty, pesos or another currency Relay keeps as written, "Total (incl. VAT) | 34.53 zł": the body shows a
+  // total. Round 13.)
+  if (sig.subjectHit && !sig.bodyHit && foreignTotal(text)) sig.bodyHit = true;
   // (Tickets sent as the order, "Your … Festival Tickets - Order Number [#160104]", each ticket with its number and price:
   // the purchase itself. Round 12.)
   const ticketOrder = /\btickets?\b[^!?\n]{0,30}\border (?:number|no\.?|#)\s*:?\s*\[?#?\s*\d{4,}/i.test(String(subject || "")) && /\bticket (?:number|no\.?|id)\s*:/i.test(text) && /\bprice\s*:\s*£\s?\d/i.test(text);

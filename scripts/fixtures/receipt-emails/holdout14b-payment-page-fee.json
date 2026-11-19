@@ -1,0 +1,24 @@
+{
+ "id": "holdout14b-payment-page-fee",
+ "sender": "Consulate of Examplia",
+ "layout": "a card payment page's 'APPROVED: Payment transaction for your order … at <organisation>'; 'Amount: GBP 60.00'",
+ "headers": {
+  "from": "do-not-reply@ipg-online.com",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "APPROVED: Payment transaction for your order Q771204 Sam Taylor at Consulate of Examplia",
+  "date": "Wed, 11 Nov 2026 10:00:00 +0000"
+ },
+ "html": "<html><body><pre>Dear applicant,\nWe just wanted to let you know about your recent payment status.</pre><p><b>Consulate of Examplia</b><br/>London W1 1AA</p><pre>Order : <b>Q771204 Sam Taylor</b>\nPayment Transaction Result: <b>APPROVED</b>\nDate and Time: 11-Nov-2026 10:00:01\nAmount: GBP <b>60.00</b>\nTotal amount to Cardholder: <b>60.00 GBP</b>\nTransaction type: Sale</pre></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Consulate of Examplia",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6000
+ }
+}
