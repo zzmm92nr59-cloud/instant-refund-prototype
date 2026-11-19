@@ -113,6 +113,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-photo-ui.mjs
       - name: Receipt items (+ N more on Home, item counts, "may have missed some items" with Read it again once per tap and See the email)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-items-ui.mjs
+      - name: Receipt words (real reader over corpus emails; every item, quantity, price, total and currency as the receipt says; flags, cancelled, refunds, return dates)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-words-ui.mjs
       - name: Smooth corners (iPhone-style; pills, circles and shadows left alone; borders drawn along the edge)
         run: node scripts/test-corners-ui.mjs
       - name: Test Swap & resell without a tab (Discover, Profile and old receipts lead to it; plain words, once per tap, polished)

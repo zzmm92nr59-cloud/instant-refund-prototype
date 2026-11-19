@@ -1152,7 +1152,7 @@
     ".rl-po .rl-po-img.rl-has-logo,.rl-dt-head .rl-po-img.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}" +
     ".rl-dt-facts{margin:16px 0 0;border-radius:16px;background:var(--rl-card);padding:0 16px}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
-    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}" +
+    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}.rl-dt-fact.rl-dt-items{flex-direction:column;align-items:stretch;gap:2px}.rl-dt-items .rl-rr-list{margin:0}" +
     ".rl-dt-fact span{color:var(--rl-text2);flex:none}.rl-dt-fact b{font-weight:500;text-align:right;overflow-wrap:anywhere;color:var(--rl-text)}" +
     // Grouped lists like the phone's Settings: no outline, and the line between rows starts after the icon.
     ".rl-acard{border:0}.rl-arow{position:relative}.rl-arow+.rl-arow{border-top:0}" +
@@ -3364,6 +3364,15 @@
   }
   function moneySign(cur) { return !cur ? "£" : MONEY_SIGN[cur] || cur + " "; }
   function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + moneySign(cur) + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
+  // What a receipt's item line cost, in its own currency (a line total as the email gave it, or its price times how many).
+  function lineMoney(i, cur) { return Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), cur || "GBP") : null; }
+  // One item on its own line: how many ("2 × "), its name and size or colour, and what the line cost (round 7: a receipt's
+  // page listed names only, with no quantities or prices).
+  function itemLine(i, cur) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; var p = lineMoney(i, cur);
+    return el("li", {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }), p ? el("b", { text: p }) : null].filter(Boolean)); }
+  // Money a shop's email says it refunded on a receipt, in pounds. Shown beside what was spent, never silently taken off it
+  // (round 7: Relay's totals are what was paid; refunds are said next to them).
+  function refundOf(r) { var p = r && r.returnProgress; return p && p.refundedAt && Number.isInteger(p.refundPence) && (!p.currency || p.currency === "GBP") && !notPounds(r) ? p.refundPence : 0; }
   function consentView(sheet, email, c) {
     var msg = el("div", { className: "rl-msg" });
     var agree = el("button", { className: "rl-btn", text: "I agree and continue" });
@@ -3403,8 +3412,8 @@
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
     var names = (x.items || []).map(function (i) { return i.qty + " × " + i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", ");
-    var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? " · " + x.orderRef : "") }),
-      el("span", { text: (names ? names + " · " : "") + (x.totalPence == null ? "total not found" : money(x.totalPence, x.currency)) + (/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? " · " + shortDate(x.orderDate + "T12:00:00Z") : "") })]);
+    var card = el("div", { className: "rl-order" }, [el("b", { text: who + (x.orderRef ? ", order " + String(x.orderRef).replace(/^#/, "") : "") }),
+      el("span", { text: [names, x.totalPence == null ? "No total in the email" : money(x.totalPence, x.currency), /^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "") ? shortDate(x.orderDate + "T12:00:00Z") : null].filter(Boolean).join(". ") })]);
     if (slim) { card.removeChild(card.firstChild); card.removeChild(card.firstChild); card.style.margin = "0"; card.style.padding = "0"; card.style.border = "0"; card.style.boxShadow = "none"; card.style.background = "none"; }
     if (!slim && x.hasImage && x.id) {
       var ph = el("img", { alt: "", style: "float:right;width:64px;height:64px;object-fit:cover;border-radius:12px;margin:0 0 8px 10px;background:var(--rl-fill)" });
@@ -3489,7 +3498,7 @@
       // With return tracking, the receipt's page shows the steps above this card (returnBox), so they aren't repeated here.
       if (prog && !retOf(x)) {
         // Where the return has got to, step by step. Each step comes from an email; Relay can't confirm the refund itself.
-        var shortDay = function (d) { return d ? " · " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; };
+        var shortDay = function (d) { return d ? ", " + new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; };
         var pc = prog.parcel, arrived = Boolean(prog.receivedAt || prog.refundedAt || (pc && pc.status === "delivered"));
         var steps = [
           ["Sent back", Boolean(pc || arrived), pc && pc.status !== "delivered" ? shortDay(pc.at) : ""],
@@ -3526,7 +3535,7 @@
     // Your own photo of it (Connor, 15 Nov: an in-store receipt has no picture, and a shop's picture can be the wrong colour).
     if (x.id && x.kind === "receipt") pill(x.ownPhoto ? "Change photo" : x.hasImage ? "Not the right photo?" : "Add a photo", function () { ownPhotoSheet(x, function () { refresh("photo"); }); });
     if (left !== null && left >= 0 && x.id && x.reminder && !(x.returnBy && deadlineOf(x) === x.returnBy.date)) {
-      var rem = pill(x.reminder === "on" ? "Reminder on · turn off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before", function () {
+      var rem = pill(x.reminder === "on" ? "Turn the reminder off" : x.reminder === "sent" ? "Reminder sent" : "Remind me 3 days before", function () {
         rem.disabled = true; api("/relay/my/receipts/" + x.id + "/remind", { method: "POST", body: { on: x.reminder === "off" } }).then(function () { refresh("remind"); }); });
       rem.disabled = x.reminder === "sent";
     }
@@ -3815,10 +3824,9 @@
       function receiptRow(row) {
         var who = (row.retailer && (row.retailer.name || row.retailer.domain)) || "Unknown store";
         var named = (row.items || []).filter(function (i) { return i.name; });
-        var names = named.map(function (i) { return i.name + (i.variant && named.length === 1 ? " · " + i.variant : ""); }).join(", ");
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
-        var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
-        var subOf = function () { return [named.length ? who : ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
+        var title = named.length ? (named.length === 1 && Number(named[0].qty) > 1 ? named[0].qty + " × " : "") + headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
+        var subOf = function () { return [named.length ? who : ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, refundOf(row) ? "Refunded " + money(refundOf(row), "GBP") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
           row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
         var wrap = el("div", { className: "rl-rr" });
@@ -3850,10 +3858,9 @@
           detail = el("div", { className: "rl-rr-detail" });
           // Every item on its own line, with its price when the receipt gave one (Connor, 15 Nov: a long shop was one block of
           // text). A long order shows its first eight, then the rest on a tap.
-          if (named.length > 1) {
+          if (named.length > 1 || (named.length === 1 && Number(named[0].qty) > 1)) {
             var ul = el("ul", { className: "rl-rr-list" }), cut = named.length > 10 ? 8 : named.length;
-            var li = function (i) { var q = Number(i.qty) > 1 ? i.qty + " × " : ""; return el("li", {}, [el("span", { text: q + i.name + (i.variant ? ", " + i.variant : "") }),
-              Number.isInteger(i.pricePence) ? el("b", { text: money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), row.currency || "GBP") }) : null].filter(Boolean)); };
+            var li = function (i) { return itemLine(i, row.currency); };
             named.slice(0, cut).forEach(function (i) { ul.appendChild(li(i)); });
             detail.appendChild(ul);
             if (cut < named.length) { var more = el("button", { type: "button", className: "rl-rr-more", text: "Show all " + named.length + " items" });
@@ -3919,7 +3926,7 @@
         };
         // What the search box matches: the shop, the order number, what was bought, and who a gift was for.
         var find = function () {
-          wrap.setAttribute("data-find", [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, names,
+          wrap.setAttribute("data-find", [row.retailer && row.retailer.name, row.retailer && row.retailer.domain, row.orderRef, named.map(function (i) { return i.name + (i.variant ? " " + i.variant : ""); }).join(", "),
             row.gift ? "gift " + (row.gift.for || "") : null].filter(Boolean).join(" ").toLowerCase());
         };
         find();
@@ -3981,6 +3988,7 @@
       // One group's page: a header in the group's colour with what's in it, filters, then receipts by month (newest first)
       // with each month's total. Long groups show 40 at a time.
       var GBP = function (rs) { return rs.reduce(function (n, r) { return n + spentOf(r); }, 0); };
+      var REFUNDED = function (rs) { return rs.reduce(function (n, r) { return n + refundOf(r); }, 0); };
       function drawCategory(k, rowsIn) {
         var rows = rowsIn.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); });
         var today = new Date().toISOString().slice(0, 10);
@@ -3991,11 +3999,11 @@
         // One search box: in a group, the group's own (the page's search steps aside until you're back).
         if (list.parentNode) list.parentNode.classList.add("rl-in-cat");
         var oldest = rows.filter(function (r) { return r.orderDate; }).slice(-1)[0];
-        var spent = GBP(rows);
+        var spent = GBP(rows), spentBack = REFUNDED(rows);
         var isGifts = k === "gifts", ink = isGifts ? "#101828" : "#fff", noun = function (n) { return n + (isGifts ? (n === 1 ? " gift" : " gifts") : (n === 1 ? " receipt" : " receipts")); };
         var hero = el("div", { className: "rl-cat-hero", style: "background:" + (TILE_COLOURS[k] || TILE_COLOURS.other) + ";color:" + ink }, [catIcon(k, 52),
           el("div", { className: "rl-cat-hero-t" }, [el("h3", { text: groupNames[k] }),
-            el("span", { text: (spent ? money(spent, "GBP") + " across " : "") + noun(rows.length) + (oldest ? " since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "") })])]);
+            el("span", { text: (spent ? money(spent, "GBP") + " across " : "") + noun(rows.length) + (oldest ? " since " + new Date(oldest.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "") + (spentBack ? ". " + money(spentBack, "GBP") + " of it was refunded" : "") })])]);
         hero.firstChild.style.background = isGifts ? "rgba(16,24,40,.1)" : "rgba(255,255,255,.2)"; hero.firstChild.style.color = ink;
         list.appendChild(hero);
         if (!isGifts && rows[0] && rows[0].returnable === false && rows[0].notReturnableReason) list.appendChild(el("p", { className: "rl-cat-note", text: rows[0].notReturnableReason }));
@@ -4137,9 +4145,9 @@
             var m = r.orderDate ? r.orderDate.slice(0, 7) : "none";
             if (m !== month) {
               month = m;
-              var inMonth = newest.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth);
+              var inMonth = newest.filter(function (x) { return (x.orderDate ? x.orderDate.slice(0, 7) : "none") === m; }), tot = GBP(inMonth), back = REFUNDED(inMonth);
               months.appendChild(el("div", { className: "rl-cat-month" }, [el("b", { text: m === "none" ? "No date" : new Date(m + "-01T12:00:00Z").toLocaleDateString("en-GB", { month: "long", year: "numeric" }) }),
-                el("span", { text: tot ? money(tot, "GBP") : counted(inMonth.length) })]));
+                el("span", { text: tot ? money(tot, "GBP") + (back ? ", " + money(back, "GBP") + " refunded" : "") : counted(inMonth.length) })]));
               card = el("div", { className: "rl-cat-list" }); months.appendChild(card);
             }
             card.appendChild(receiptRow(r));
@@ -4451,7 +4459,7 @@
     var ini = el("span", { className: "rl-ar-ini", text: who.charAt(0).toUpperCase(), style: "background:" + colours[who.charCodeAt(0) % colours.length] });
     ini.setAttribute("aria-hidden", "true");
     return el("div", { className: "rl-ar-row" }, [ini,
-      el("span", { className: "rl-ar-t" }, [el("b", { text: x.subject || "(no subject)" }), el("span", { text: [who, shortDay(x.date)].filter(Boolean).join(" · ") }),
+      el("span", { className: "rl-ar-t" }, [el("b", { text: x.subject || "(no subject)" }), el("span", { text: [who, shortDay(x.date)].filter(Boolean).join(", ") }),
         many && x.inbox ? el("span", { text: "In " + x.inbox }) : null, note].filter(Boolean)), add]);
   }
   // Paste: one tap reads what was copied (the phone asks first), and the receipt goes straight into Receipts.
@@ -4498,7 +4506,7 @@
   }
   function addedCard(b) {
     var card = el("div", { className: "rl-ar-done" }, [el("b", { text: (b.again ? "Already in your receipts: " : "Added: ") + (b.store || "your receipt") }),
-      el("span", { text: [b.orderRef ? "Order " + b.orderRef : null, shortDay(b.orderDate), b.totalPence != null ? money(b.totalPence, b.currency) : null].filter(Boolean).join(" · ") || "Check its details in Receipts." })]);
+      el("span", { text: [b.orderRef ? "Order " + b.orderRef : null, shortDay(b.orderDate), b.totalPence != null ? money(b.totalPence, b.currency) : null].filter(Boolean).join(", ") || "Check its details in Receipts." })]);
     (b.items || []).slice(0, 3).forEach(function (i) { if (i && i.name) card.appendChild(el("span", { text: (i.qty > 1 ? i.qty + " × " : "") + i.name })); });
     if (window.go) card.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "See it in Receipts", style: "margin-top:8px", onclick: function () { close(); window.go("receipts"); } }));
     return card;
@@ -6909,6 +6917,7 @@
         // Said once and plainly (no facts joined with dots): what was spent over how many receipts, then the story's parts.
         var nCh = (w.chapters || []).length, nGift = w.gifts && w.gifts.count;
         card.appendChild(el("p", { text: (w.coverage.withTotal ? money(w.spentPence, "GBP") + " over " : "") + w.receipts + (w.receipts === 1 ? " receipt." : " receipts.") +
+          (w.coverage.withTotal && w.refundedPence > 0 ? " " + money(w.refundedPence, "GBP") + " of it was refunded." : "") +
           (nCh || nGift ? " " + [nCh ? nCh + (nCh === 1 ? " chapter" : " chapters") : null, nGift ? nGift + (nGift === 1 ? " gift" : " gifts") : null].filter(Boolean).join(" and ") + " in your story." : "") }));
         var dots = el("div", { className: "rl-wr-dots" });
         var tot = (w.industries || []).reduce(function (n, k) { return n + (k.spentPence || 0); }, 0);
@@ -7205,6 +7214,8 @@
       b.appendChild(el("p", { className: "lead", text: "In " + w.year + " you spent" }));
       var n = el("div", { className: "big" }); b.appendChild(n); countUp(n, w.spentPence, gbp, 1400);
       b.appendChild(el("p", { text: "across " + w.shops + (w.shops === 1 ? " shop" : " shops") + (w.activeMonths ? " in " + w.activeMonths + (w.activeMonths === 1 ? " month" : " months") : "") + "." }));
+      // Money the shops sent back is said beside the total, never silently left in it (round 7).
+      if (w.refundedPence > 0) b.appendChild(el("p", { text: money(w.refundedPence, "GBP") + " of it came back to you in refunds." }));
       // What isn't in the figure, said plainly: receipts with no amount read, and receipts that weren't in pounds.
       var unread = w.coverage.noTotal || 0, abroad = w.coverage.otherCurrency || 0;
       if (unread || abroad) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts." +
@@ -8974,7 +8985,7 @@
   function dueFrom(x) { return x.returnBy && x.returnBy.from === "delivery" && x.delivery && x.delivery.at ? x.delivery.at : x.orderDate; }
   function deadlineChip(dl, lead) {
     var d = daysLeft(dl), day = new Date(dl + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-    var txt = (lead || "Return by ") + day + (d === null ? "" : d === 0 ? " · last day" : d === 1 ? " · 1 day left" : " · " + d + " days left");
+    var txt = (lead || "Return by ") + day + (d === null ? "" : d === 0 ? ", the last day" : d === 1 ? ", 1 day left" : ", " + d + " days left");
     return el("div", { className: "rl-po-status " + (d !== null && d <= 3 ? "urgent" : "wait"), text: txt });
   }
   var label = function (t) { return String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, ""); };
@@ -9261,7 +9272,14 @@
         // Not in pounds: shown as it was charged, and left out of anything Relay adds up.
         if (price && notPounds(x)) { var cn = moneyName(x.currency); fact("Currency", cn.charAt(0).toUpperCase() + cn.slice(1) + " (not added to your totals in pounds)"); }
         if (first.variant) fact("Size or colour", first.variant);
-        if (!one && named.length > 1) fact("In this order", named.map(function (i) { return i.name + (i.variant ? " (" + i.variant + ")" : ""); }).join(", "));
+        // Every item on its own line, with how many and what each line cost, as the receipt says (round 7).
+        if (!one && (named.length > 1 || (named.length === 1 && Number(named[0].qty) > 1))) {
+          var iul = el("ul", { className: "rl-rr-list" }); named.forEach(function (i) { iul.appendChild(itemLine(i, x.currency)); });
+          facts.appendChild(el("div", { className: "rl-dt-fact rl-dt-items" }, [el("span", { text: "In this order" }), iul]));
+        }
+        if (one && Number(one.qty) > 1) fact("How many", String(one.qty));
+        if (x.cancelled) fact("Cancelled", x.cancelled.partial ? "Part of this order" + (Number.isInteger(x.cancelled.amountPence) ? ", " + money(x.cancelled.amountPence, x.cancelled.currency || x.currency || "GBP") + " back" : "") : "By the shop");
+        if (refundOf(x)) fact("Refunded", money(refundOf(x), "GBP") + ", as " + possessive(who) + " email says");
         fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);
         fact("Order number", x.orderRef ? String(x.orderRef).replace(/^#/, "") : null);
         if (facts.childNodes.length) sheet.appendChild(facts);
@@ -10825,7 +10843,7 @@
       var box = el("input", { type: "checkbox", style: "width:20px;height:20px;accent-color:var(--rl-text)" });
       box.onchange = function () { picks[q.index] = box.checked; save.disabled = !Object.keys(picks).some(function (k) { return picks[k]; }); };
       card.appendChild(el("label", { style: "display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--rl-line);cursor:pointer;font-size:15px" }, [box,
-        el("span", { text: it.name + (it.variant ? " · " + it.variant : ""), style: "flex:1" }), el("span", { text: Number.isInteger(it.pricePence) ? money(it.pricePence, x.currency) : "", style: "color:var(--rl-text2)" })]));
+        el("span", { text: (Number(it.qty) > 1 ? it.qty + " × " : "") + it.name + (it.variant ? ", " + it.variant : ""), style: "flex:1" }), el("span", { text: lineMoney(it, x.currency) || "", style: "color:var(--rl-text2)" })]));
     });
     var save = el("button", { className: "rl-po-primary", text: "Save", disabled: true, style: "margin-top:10px", onclick: function () {
       save.disabled = true; save.textContent = "Saving…";
