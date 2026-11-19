@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, parseOrderAdjustmentEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -25,6 +25,7 @@ import { buildOriginal, buildOriginalOutlook } from "./original.js";
 import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSummary, namesToHide, sealShared, SHARE_DAYS, SHARES_PER_DAY, SHARES_KEPT } from "./shared-emails.js";
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
 import { namesCheck } from "./item-names.js";
+import { lineOf } from "./receipt-items.js";
 import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
@@ -144,7 +145,12 @@ const GONE = Symbol("gone");
 // membership", "Amount paid" without a total, the full-width pound sign (￡), a plain-text part with the item table left in
 // as HTML and "&#163;" for the pound sign, and "Total (inc. VAT)" over "Total (exc. VAT)". No longer purchases: a shop's
 // "Invoice #…" that asks to be paid, and a pay-later company's email about one instalment ("Payment received for …").
-export const PARSER_VERSION = 40;
+// 40 (round 10, Connor's real inbox): Uber Eats receipts with no item list (merchant, itemsCheck.noItemList), Uber rides
+// as one ride, Uber Eats total adjustments (order_update "adjusted"), the takeaway restaurant (merchant), Sainsbury's
+// delivery-day payment (orderUpdate "paid", joined to its order), game packs, Apple service names and card-line totals, VAT on
+// top of a subtotal, changed Shopify orders, credits, Domino's total after its deal, and "there was no order" apologies.
+// 41: both of those together (the coverage round and round 10 were read as 40 on their own branches).
+export const PARSER_VERSION = 41;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -853,6 +859,10 @@ function classify(rawText, ref, lenient = false) {
       kind: "receipt", ...ref,
       retailer: receipt.retailer, orderRef: receipt.orderRef, orderDate: receipt.orderDate, orderDateFrom: receipt.orderDateFrom || null, currency: receipt.currency,
       totalPence: receipt.totalPence, items: receipt.items, confidence: receipt.confidence, sentTo: receipt.sentTo || null,
+      // The restaurant a takeaway app's order came from ("East Ocean" on a Just Eat order): the app shows it beside the app's
+      // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
+      // order's confirmation (mergeOrderEmails). Round 10.
+      ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
@@ -867,9 +877,15 @@ function classify(rawText, ref, lenient = false) {
     // Not a purchase. Two kinds of the shop's own news about an order are still kept, so they can join the order they name
     // (round 6): a cancellation (all or part of the order), and a dispatch email with no items (its parcel's tracking number
     // lets the carrier's later emails find the order). Checked only now, so an email that is a receipt stays one.
-    const can = parseCancellationEmail(rawText);
-    const dis = can.ok ? { ok: false } : parseDispatchEmail(rawText);
-    if (can.ok) {
+    const adj = parseOrderAdjustmentEmail(rawText);
+    const can = adj.ok ? { ok: false } : parseCancellationEmail(rawText);
+    const dis = adj.ok || can.ok ? { ok: false } : parseDispatchEmail(rawText);
+    if (adj.ok) {
+      // A takeaway app's changed total for an order it already charged (money back for part of it): never a purchase, joined
+      // to that order by attachAdjustments. Round 10.
+      details = { kind: "order_update", ...ref, stage: "adjusted", at: adj.at, orderRef: adj.orderRef, merchant: adj.merchant, amountPence: adj.amountPence,
+        previousTotalPence: adj.previousTotalPence, newTotalPence: adj.newTotalPence, currency: adj.currency, retailer: adj.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+    } else if (can.ok) {
       details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency,
         ...(Array.isArray(can.cancelledItems) && can.cancelledItems.length ? { cancelledItems: can.cancelledItems } : {}),
         retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
@@ -1542,6 +1558,17 @@ export function mergeOrderEmails(orders) {
             ...namesCheck(c.items, { shop: (c.retailer && c.retailer.name) || "" }) };
         }
       }
+      // The shop's own word on what was finally paid (a supermarket's delivery-day email, "Payment received: £99.40") is the
+      // order's total. When it isn't what the order's items came to (the order was changed, or weighed items cost more), the
+      // card says some items may be missing: the full receipt is the shop's attachment, which Relay doesn't read. Round 10.
+      if (o.orderUpdate === "paid" && o.totalPence != null && c.orderUpdate !== "paid") {
+        if (c.totalPence != null && c.totalPence !== o.totalPence) c.estimatedTotalPence = c.totalPence;
+        c.totalPence = o.totalPence; c.currency = o.currency || c.currency; c.paidFrom = "shop";
+        const sum = (c.items || []).reduce((n, i) => n + (lineOf(i) ?? NaN), 0);
+        const fees = c.estimatedTotalPence != null && c.itemsCheck && Number.isInteger(c.itemsCheck.itemsPence) ? c.estimatedTotalPence - c.itemsCheck.itemsPence : 0;
+        if (!(c.items || []).length || Number.isNaN(sum) || Math.abs(sum + fees - o.totalPence) > 1) c.itemsCheck = { ...(c.itemsCheck || {}), complete: false, paidDiffers: true, expectedPence: o.totalPence - fees, missingPence: Number.isNaN(sum) ? null : o.totalPence - fees - sum, ...(o.detailsInAttachment ? { inAttachment: o.detailsInAttachment } : {}) };
+        if (o.detailsInAttachment && !c.detailsInAttachment) c.detailsInAttachment = o.detailsInAttachment;
+      }
       if (o.shipment && o.shipment.trackingNumber && !(c.shipment && c.shipment.trackingNumber)) c.shipment = o.shipment;
       if (o.returns) {
         const r = c.returns || (c.returns = {});
@@ -1710,6 +1737,22 @@ export function attachCancellations(orders, cancels) {
       // (Every item named and none left: that is the whole order, but the shop said part, so nothing is marked.)
       if (marked.length && marked.length === o.items.length) o.items = o.items.map(({ cancelled, ...it }) => it);
     }
+  }
+}
+// A takeaway app's changed total ("We adjusted the total for your recent order from Grill & Do": Refund -£8.76, New Total
+// £7.02) joins the order it changed: the same app, the same restaurant, the order's total was the previous total, and the
+// order was placed in the week before. The order keeps what was bought and gains `adjusted` (the refund and the new total);
+// nothing is guessed when no order fits exactly one way. Round 10.
+export function attachAdjustments(orders, adjusts) {
+  const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  for (const a of adjusts) {
+    if (!Number.isInteger(a.amountPence)) continue;
+    const fits = orders.filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
+      (!a.merchant || low(o.merchant) === low(a.merchant)) && (a.previousTotalPence == null || o.totalPence === a.previousTotalPence) &&
+      (!a.at || !o.orderDate || (o.orderDate <= a.at && Date.parse(a.at) - Date.parse(o.orderDate) <= 7 * 864e5)));
+    if (fits.length !== 1) continue;
+    const o = fits[0];
+    o.adjusted = { at: a.at || null, refundPence: (o.adjusted ? o.adjusted.refundPence : 0) + a.amountPence, newTotalPence: a.newTotalPence ?? null, currency: a.currency || o.currency || "GBP" };
   }
 }
 const cancelKey = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -1883,7 +1926,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   attachDeliveries(orders, deliveries);
-  attachCancellations(orders, cancels);
+  attachCancellations(orders, cancels.filter(u => u.stage !== "adjusted"));
+  attachAdjustments(orders, cancels.filter(u => u.stage === "adjusted"));
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
   applyTracked(orders, tracked);
   for (const p of plans) {

@@ -1,0 +1,40 @@
+{
+ "id": "holdout11-dominos-total-after-deal",
+ "sender": "Domino's",
+ "layout": "'Total: £45.96' then '£25.47' after the deal; '£-20.49' with the minus after the pound sign",
+ "headers": {
+  "from": "Domino's Pizza <noreply@dominos.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Dominos Pizza Order Confirmation",
+  "date": "Thu, 27 Aug 2026 18:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Domino's</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.dominos.co.uk/?utm_source=email\"><img src=\"https://www.dominos.co.uk/static/email/logo.png\" alt=\"Domino's\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Dominos Pizza Order Confirmation</td></tr>\n<tr><td>Hey Sam,</td></tr>\n<tr><td>Your details</td></tr>\n<tr><td>Order number: 1028000111</td></tr>\n<tr><td>On: Thu 27/08/26</td></tr>\n<tr><td>Your order</td></tr>\n<tr><td>For full ingredients, nutritional and allergen information, see</td></tr>\n<tr><td>our nutritional page.</td></tr>\n<tr><td>Cheesy Garlic Dip - 100g</td></tr>\n<tr><td>&pound;1.99</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Vegi Supreme&trade;</td></tr>\n<tr><td>Medium 11.5\" Classic Crust</td></tr>\n<tr><td>&pound;19.99</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>Pepperoni Passion&trade;</td></tr>\n<tr><td>Medium 11.5\" Italian Style Crust</td></tr>\n<tr><td>&pound;20.99</td></tr>\n<tr><td>Qty: 1</td></tr>\n<tr><td>50% OFF PIZZAS WHEN YOU SPEND &pound;30</td></tr>\n<tr><td>&pound;-20.49</td></tr>\n<tr><td>Delivery:</td></tr>\n<tr><td>&pound;2.99</td></tr>\n<tr><td>Total:</td></tr>\n<tr><td>&pound;45.96</td></tr>\n<tr><td>&pound;25.47</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Domino's. All rights reserved.<br /><a href=\"https://www.dominos.co.uk/help\">Help</a> | <a href=\"https://www.dominos.co.uk/privacy\">Privacy</a> | <a href=\"https://www.dominos.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.dominos.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Domino's",
+  "date": "2026-08-27",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Cheesy Garlic Dip - 100g",
+    "qty": 1,
+    "linePence": 199
+   },
+   {
+    "name": "Vegi Supreme™",
+    "qty": 1,
+    "linePence": 1999
+   },
+   {
+    "name": "Pepperoni Passion™",
+    "qty": 1,
+    "linePence": 2099
+   }
+  ],
+  "subtotalPence": 4297,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2547
+ }
+}
