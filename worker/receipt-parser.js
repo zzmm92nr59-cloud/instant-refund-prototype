@@ -923,7 +923,8 @@ const PRICE_ADJUSTMENT = /\bprice (?:adjustment|match(?:ed)?|difference|drop|pro
 const NOT_A_PURCHASE_SUBJECT = /\b(?:refund(?:ed|s)?|cancell?(?:ed|ation)|price (?:adjustment|match(?:ed)?|difference)|credit note)\b/i;
 const NOT_A_PURCHASE_TOP = /\b(?:your|the|this) order (?:has been|was|is) cancell?ed\b|\bwe(?:'|’)?ve cancell?ed your order\b|\b(?:some )?items? (?:in|from|of) your order (?:has|have) been cancell?ed\b|\bpart of your order has been cancell?ed\b|\bwe(?:'|’)?ve (?:matched a lower price|refunded the (?:price )?difference)\b/i;
 const MONEY_OFF_NOTE = /^(?:[\p{L}'’ -]{0,20}\s)?(?:discount|multi-?buy(?: discount| saving| offer)?|voucher|promo(?:tion)?(?: code)?|saving|you saved?|offer discount)\s*:?\s*(?:[-−–]?\s?£\s?[\d,.]+)?$/iu;
-const NO_ORDER =/\bthere (?:was|is) no order\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
+// (Also the marketing email itself, dressed as a confirmation: "Order #58204 confirmed" … "Oops… there's no order here (yet)".)
+const NO_ORDER = /\bthere (?:was|is) no order\b|\bthere(?:'|’)s no order here\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
 const ACCOUNT_DEPOSIT =/\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
