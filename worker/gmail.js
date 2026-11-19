@@ -183,7 +183,70 @@ function b64(bytes) { return btoa(String.fromCharCode(...bytes)); }
 function unb64(text) { return Uint8Array.from(atob(text), c => c.charCodeAt(0)); }
 function unb64url(text) {
   const s = text.replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(s + "=".repeat((4 - (s.length % 4)) % 4)), c => c.charCodeAt(0));
+  // (Filled byte by byte: Uint8Array.from(text, fn) first builds a list with one entry per byte, which for an email with
+  // big attachments is many times the email's size.)
+  const bin = atob(s + "=".repeat((4 - (s.length % 4)) % 4)), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+// ---- An email is read only up to a size (19 Nov 2026) ----
+// Connor's 2020 could not be read at all: that year has emails with 7 MB and 30 MB of attachments whose subjects match the
+// search. Each was downloaded whole (Gmail sends it as base64 inside JSON, a third bigger again), copied several times
+// while being turned into text, and up to six were held at once, which is more memory than a Worker has (128 MB). Cloudflare
+// then ends the request with its own error page, which nothing in this code can catch and which has no CORS headers, so the
+// app saw only "Failed to fetch", on every retry, and the year never got past them.
+// Now only the first MAX_EMAIL_BYTES of an email are downloaded (the connection is closed there). An email's text and HTML
+// come before its attachments, and attachments are never read as text, so a receipt reads the same from the start of the
+// email as from the whole of it; every real receipt is far smaller than this and is read whole exactly as before.
+export const MAX_EMAIL_BYTES = 3_000_000;
+// The emails of one round, as text, are held together until the window is saved: once they come to this much, the rest of
+// the window is left for the next round (the round says there is more).
+const ROUND_TEXT_CHARS = 12_000_000;
+// A response's body up to max bytes: { bytes, cut } (cut: there was more, and it was not downloaded).
+async function bodyUpTo(res, max) {
+  const reader = res.body && typeof res.body.getReader === "function" ? res.body.getReader() : null;
+  if (!reader) {
+    const all = new Uint8Array(await res.arrayBuffer());
+    return all.length > max ? { bytes: all.subarray(0, max), cut: true } : { bytes: all, cut: false };
+  }
+  const chunks = [];
+  let n = 0, cut = false;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value || !value.length) continue;
+    if (n + value.length > max) { chunks.push(value.subarray(0, max - n)); n = max; cut = true; break; }
+    chunks.push(value); n += value.length;
+  }
+  if (cut) { try { await reader.cancel(); } catch { /* already closed */ } }
+  const bytes = new Uint8Array(n);
+  let at = 0;
+  for (const c of chunks) { bytes.set(c, at); at += c.length; }
+  return { bytes, cut };
+}
+// Gmail's answer for one email ({ ..., "raw": "<the email, base64url>" }) as the email's text, or null if it has none.
+// A longer answer than the limit is cut inside "raw": what arrived of it is the start of the email.
+const GMAIL_ANSWER_MAX = Math.ceil(MAX_EMAIL_BYTES / 3) * 4 + 20000;
+async function gmailEmailText(res) {
+  if (!res.body && typeof res.arrayBuffer !== "function") {
+    const raw = (await res.json().catch(() => ({}))).raw;
+    return typeof raw === "string" ? mailText(unb64url(raw)) : null;
+  }
+  const got = await bodyUpTo(res, GMAIL_ANSWER_MAX);
+  const answer = new TextDecoder().decode(got.bytes);
+  if (!got.cut) {
+    let raw;
+    try { raw = JSON.parse(answer).raw; } catch { raw = null; }
+    return typeof raw === "string" ? mailText(unb64url(raw)) : null;
+  }
+  const m = /"raw"\s*:\s*"([A-Za-z0-9_-]+)/.exec(answer);
+  if (!m) return null;
+  return mailText(unb64url(m[1].slice(0, m[1].length - (m[1].length % 4))));
+}
+// Outlook's answer for one email (the email itself, as sent) as text.
+async function outlookEmailText(res) {
+  if (!res.body && typeof res.arrayBuffer !== "function") return res.text();
+  return mailText((await bodyUpTo(res, MAX_EMAIL_BYTES)).bytes);
 }
 async function tokenKey(env) {
   const raw = await crypto.subtle.digest("SHA-256", encoder.encode("relay-gmail-token:" + env.AUTH_SECRET));
@@ -689,8 +752,9 @@ async function fetchProductImage(fetchImpl, urls) {
     try {
       const res = await fetchImpl(u, { headers: { Accept: "image/*" }, redirect: "follow" });
       if (!res.ok || (res.url && !String(res.url).startsWith("https://"))) continue;
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      if (bytes.length < IMAGE_MIN_BYTES || bytes.length > IMAGE_MAX_BYTES) continue;
+      // (Never more of a file than a photo may be: a link to something huge is dropped without downloading it.)
+      const got = await bodyUpTo(res, IMAGE_MAX_BYTES + 1), bytes = got.bytes;
+      if (got.cut || bytes.length < IMAGE_MIN_BYTES || bytes.length > IMAGE_MAX_BYTES) continue;
       const type = imageTypeOf(bytes);
       if (type) return { type, data: b64Chunked(bytes) };
     } catch { /* try the next one */ }
@@ -928,8 +992,7 @@ function gmailMailbox(fetchImpl, token) {
     async read(id) {
       const r = await fetchImpl(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=raw`, { headers: auth });
       if (r.status === 404) return GONE;
-      const raw = r.ok ? (await r.json().catch(() => ({}))).raw : null;
-      return typeof raw === "string" ? mailText(unb64url(raw)) : null;
+      return r.ok ? gmailEmailText(r) : null;
     },
     parallel: FETCH_PARALLEL,
     ref: e => ({ gmailId: e.id })
@@ -996,7 +1059,7 @@ function outlookMailbox(fetchImpl, token) {
       const r = await graphGet(fetchImpl, GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", auth);
       if (r.status === 404) return GONE;
       // (The email's bytes as sent, read the same way as Gmail's: an 8bit windows-1252 part keeps its "£".)
-      return r.ok ? (typeof r.arrayBuffer === "function" ? mailText(new Uint8Array(await r.arrayBuffer())) : r.text()) : null;
+      return r.ok ? outlookEmailText(r) : null;
     },
     parallel: OUTLOOK_PARALLEL,
     ref: e => ({ outlookId: e.id })
@@ -1063,9 +1126,10 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       if (!sn || JSON.parse(sn.details).parserVersion !== PARSER_VERSION) toRead.push(ids[i]);
     }
     const rawById = new Map(), writes = [], fresh = [], par = box.parallel || FETCH_PARALLEL;
-    for (let i = 0; i < toRead.length; i += par) {
+    let held = 0;
+    for (let i = 0; i < toRead.length && held < ROUND_TEXT_CHARS; i += par) {
       await Promise.all(toRead.slice(i, i + par).map(async (mid) => {
-        try { rawById.set(mid, await box.read(mid)); } catch (e) { rawById.set(mid, null); }
+        try { const t = await box.read(mid); rawById.set(mid, t); if (typeof t === "string") held += t.length; } catch (e) { rawById.set(mid, null); }
       }));
     }
     for (let i = 0; i < ids.length; i++) {
@@ -1078,7 +1142,14 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
       fetched++;
       const rawText = rawById.get(id);
       if (rawText === GONE) continue;   // deleted or moved since it was listed
-      if (typeof rawText !== "string") {
+      // One email the reader trips over must not stop the round (and with it the whole year, every time it is tried): it is
+      // remembered as not read, the same way as an email the mailbox couldn't give, and the rest are read.
+      let cls = null;
+      if (typeof rawText === "string") {
+        try { cls = classify(rawText, box.ref(listed.entries[i])); }
+        catch (e) { console.error("an email could not be read", String(e && e.message || e).slice(0, 160)); }
+      }
+      if (!cls) {
         // The mailbox couldn't give this email just now. It used to be skipped for good (that is how Outlook receipts went
         // missing); now it is remembered and read again in a later round, up to MAX_READ_TRIES times.
         const prevDetails = seen ? JSON.parse(seen.details) : null;
@@ -1097,7 +1168,6 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         if (!giveUp) incomplete = true;   // this window is read again next round
         continue;
       }
-      const cls = classify(rawText, box.ref(listed.entries[i]));
       const details = slot ? { ...cls.details, mailbox: slot } : cls.details, status = cls.status;
       let imageToStore = null;
       if (status === "not_receipt") ignored++;
@@ -1111,8 +1181,10 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
         if (prev.ownPhoto) { details.ownPhoto = true; details.hasImage = true; details.imageTried = true; }
         if (!details.imageTried && imagesTried < MAX_IMAGES_PER_SCAN && calls + 2 < budget) {
           imagesTried++;
-          const urls = extractProductImageUrls(rawText, details);
-          const img = urls.length ? await fetchProductImage(fetchImpl, urls) : null;
+          // (A photo is an extra: if finding it goes wrong, the receipt is kept without one.)
+          let img = null;
+          try { const urls = extractProductImageUrls(rawText, details); img = urls.length ? await fetchProductImage(fetchImpl, urls) : null; }
+          catch (e) { console.error("a receipt's photo could not be looked for", String(e && e.message || e).slice(0, 160)); }
           details.imageTried = true;
           if (img) {
             details.hasImage = true;
@@ -1120,7 +1192,10 @@ async function scan(env, boxId, fetchImplIn, now, cursorIn, full, o = {}) {
           }
         }
         // Only an email that has a photo needs checking that the photo is of the item (reading it again costs time).
-        if (details.hasImage) details.photoIsItem = details.ownPhoto ? true : photoShowsItem(rawText, details);
+        if (details.hasImage) {
+          try { details.photoIsItem = details.ownPhoto ? true : photoShowsItem(rawText, details); }
+          catch (e) { details.photoIsItem = false; }
+        }
       }
       if (seen) {
         // The shopper's confirm/dismiss choice lives in the status column and is kept.
@@ -1443,11 +1518,10 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
   if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
   if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
   let rawText;
-  if (outlook) rawText = typeof res.arrayBuffer === "function" ? mailText(new Uint8Array(await res.arrayBuffer())) : await res.text();
+  if (outlook) rawText = await outlookEmailText(res);
   else {
-    const raw = (await res.json().catch(() => ({}))).raw;
-    if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
-    rawText = mailText(unb64url(raw));
+    rawText = await gmailEmailText(res);
+    if (typeof rawText !== "string") return { status: 502, body: { error: "gmail_unavailable" } };
   }
   const { details, status } = classify(rawText, outlook ? { outlookId: messageId, ...mark } : { gmailId: messageId, ...mark }, true);
   if (status === "not_receipt") {
@@ -1835,13 +1909,13 @@ function isRelayEmail(c, env) {
 const COMPANION_FOOD = /coffee|espresso|nespresso|capsule|\bpods?\b|lungo|ristretto|\btea\b|teabag|\bwine\b|prosecco|champagne/i;
 // Each receipt's shop, date and total, for matching bank and card payments to receipts (bank.js).
 export async function receiptTotals(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   return cards.filter((c) => c.kind !== "return_instructions" && ((c.photoReceipt && c.bankPaymentId) || (Number.isInteger(c.totalPence) && c.totalPence > 0 && c.orderDate)))
     .map((c) => ({ id: c.id, shop: (c.retailer && (c.retailer.name || c.retailer.domain)) || "", domain: (c.retailer && c.retailer.domain) || "",
       date: String(c.orderDate).slice(0, 10), totalPence: c.totalPence, currency: c.currency || "GBP", bankPaymentId: c.photoReceipt && c.bankPaymentId ? String(c.bankPaymentId) : null }));
 }
 export async function styleThings(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   const things = [];
     // Each item by what it is: a jacket from a supermarket counts, the bread in the same order doesn't.
     const NOT_THINGS = ["travel", "digital"];
@@ -1861,7 +1935,7 @@ export async function styleThings(env, shopperId) {
 // picks, item-kinds.js; only for shoppers who switched it on). Names and shops only: no prices, dates or order numbers.
 // Forwarded receipts' senders are people, so no shop is given for those.
 export async function boughtNames(env, shopperId) {
-  const cards = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const cards = await listReceipts(env, shopperId, null, ALL);
   const out = [];
   for (const c of cards) {
     if (c.kind === "return_instructions") continue;
@@ -1872,16 +1946,23 @@ export async function boughtNames(env, shopperId) {
   return out;
 }
 
+// Every receipt a shopper has, for the whole list, Wrapped, bank matching and finding one by its id. It used to be 3,000
+// rows read newest-READ first: after Relay read earlier years (2016 onwards) those thousands of rows came first and pushed
+// out receipts read before them, so most of December 2025 to August 2026 vanished from the list (Connor, 19 Nov 2026).
+export const ALL_ROWS = 20000;
+const ALL = { rows: ALL_ROWS, cards: ALL_ROWS };
+// Newest by the date the email is about (the order's date, a parcel update's date), not by when Relay happened to read it.
+const BY_ORDER_DATE = "ORDER BY COALESCE(json_extract(details, '$.orderDate'), substr(json_extract(details, '$.at'), 1, 10), strftime('%Y-%m-%d', created_at / 1000, 'unixepoch')) DESC, created_at DESC";
 async function listReceipts(env, shopperId, timing, opts = {}) {
   const maxRows = opts.rows || 500, maxCards = opts.cards || 100;
   const T0 = Date.now(), lap = (n) => { if (timing) timing[n] = Date.now() - T0; };
   const rows = await env.RELAY_DB.prepare(
-    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') ORDER BY created_at DESC LIMIT " + maxRows)
+    "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') " + BY_ORDER_DATE + " LIMIT " + maxRows)
     .bind(shopperId).all();
   // Recent orders always come too, even when lots of newer emails were read after them (otherwise an order still inside
   // its return window could miss the wallet just because many receipts arrived since).
   let recentRows = [];
-  if (!opts.rows || opts.rows < 3000) {
+  if (!opts.rows || opts.rows < ALL_ROWS) {
     const since = new Date(Date.now() - RECENT_ORDER_DAYS * DAY_MS).toISOString().slice(0, 10);
     recentRows = (await env.RELAY_DB.prepare(
       "SELECT id, status, details, created_at AS createdAt FROM captured_receipts WHERE shopper_id = ? AND status NOT IN ('dismissed','not_receipt') AND json_extract(details, '$.orderDate') >= ? ORDER BY created_at DESC LIMIT 1000")
@@ -2022,7 +2103,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
 // shopper's own word. null when the receipt isn't theirs. See return-tracking.js returnFacts and docs/SECURITY.md.
 export async function returnFactsFor(env, shopperId, receiptId) {
   if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
-  const c = (await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 })).find((r) => r.id === receiptId);
+  const c = (await listReceipts(env, shopperId, null, ALL)).find((r) => r.id === receiptId);
   return c ? returnFacts(c) : null;
 }
 
@@ -2032,7 +2113,7 @@ export async function returnFactsFor(env, shopperId, receiptId) {
 const HELP_BASIS = { uk_law: "Relay's estimate from UK law's 14 days", window: "from the return window in the shop's email", policy: "from the shop's published returns policy" };
 export async function receiptForHelp(env, shopperId, receiptId) {
   if (!/^[0-9a-f-]{36}$/.test(String(receiptId || ""))) return null;
-  const list = await listReceipts(env, shopperId, null, { rows: 3000, cards: 3000 });
+  const list = await listReceipts(env, shopperId, null, ALL);
   const c = list.find((r) => r.id === receiptId);
   if (!c) return null;
   const clip = (v, n) => String(v || "").replace(/https?:\/\/\S+/gi, "").replace(/[<>{}\[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
@@ -2273,9 +2354,9 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     return json({ connected: Boolean(c), ...(c || {}), ...(scanJob ? { scan: scanJob } : {}), others, maxInboxes: MAX_INBOXES }, 200, cors);
   }
   if (path === "/relay/my/gmail/scan" && m === "POST") {
-    if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
-    const sb = await request.json().catch(() => ({}));
     try {
+      if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
+      const sb = await request.json().catch(() => ({}));
       // A retry after a round that ran out of time asks for a small round (2 emails), so the same heavy emails get through.
       const thisYear = new Date(opts.now).getUTCFullYear(), want = Number(sb && sb.year);
       if (sb && sb.year !== undefined && !(Number.isInteger(want) && want >= thisYear - HISTORY_YEARS && want < thisYear))
@@ -2341,7 +2422,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
     // what it is. Off, or with no AI key: Relay's own rules only.
     // Wrapped never waits for the AI (Connor, 18 Nov 2026: it stopped loading while it did): it's built from what's known
     // now, and things and shops not read yet are read after the response, for next time.
-    const cards = await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000 });
+    const cards = await listReceipts(env, shopper.id, null, ALL);
     if (opts.later) opts.later((async () => {
       await learnItemKinds(env, shopper, { now: opts.now, fetchImpl: opts.fetchImpl }).catch(() => null);
       await learnShopKinds(env, cards, { fetchImpl: opts.fetchImpl, now: opts.now }).catch(() => 0);
@@ -2354,7 +2435,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (path === "/relay/my/receipts" && m === "GET") {
     // The Receipts page asks for everything (?all=1); Home and the wallet only need the newest, so they stay quick.
     const all = url.searchParams.get("all") === "1";
-    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? { rows: 3000, cards: 3000 } : {});
+    const timing = {}, t0 = Date.now(), list = await listReceipts(env, shopper.id, timing, all ? ALL : {});
     await markTestShopReceipts(env, list);
     // Shop payments from a connected bank or card with no receipt yet (bank.js), so Home can say so without asking again.
     const needReceipt = await receiptsToAdd(env, shopper.id, opts.now || Date.now());
@@ -2365,7 +2446,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   const parcel = /^\/relay\/my\/receipts\/([0-9a-f-]{36})\/parcel$/.exec(path);
   if (parcel && m === "GET") {
     if (!(await hasConsent(env.RELAY_DB, shopper.id))) return json({ error: "consent_required" }, 403, cors);
-    const mine = (await listReceipts(env, shopper.id, {})).find((r) => r.id === parcel[1]);
+    const mine = (await listReceipts(env, shopper.id, null, ALL)).find((r) => r.id === parcel[1]);
     if (!mine) return json({ error: "not_found" }, 404, cors);
     return json(await liveParcel(env, shopper.id, mine, opts), 200, cors);
   }
@@ -2376,7 +2457,7 @@ export async function handleGmailRoute(request, env, url, cors, shopper, opts) {
   if (rtn && ((rtn[2] === "return-sent" && m === "POST") || (rtn[2] === "return-parcel" && m === "GET"))) {
     await ensureGmailTables(env.RELAY_DB);
     const now = opts.now || Date.now();
-    const find = async () => (await listReceipts(env, shopper.id, null, { rows: 3000, cards: 3000, now })).find((r) => r.id === rtn[1]);
+    const find = async () => (await listReceipts(env, shopper.id, null, { ...ALL, now })).find((r) => r.id === rtn[1]);
     const mine = await find();
     if (!mine) return json({ error: "not_found" }, 404, cors);
     if (rtn[2] === "return-sent") {
