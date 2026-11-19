@@ -130,18 +130,19 @@
     for (let i = 0; i < all.length; i++) visit(all[i]);
   }
 
-  // New things on screen: checked together once per frame. Class or style changes can round something new, so those
-  // are looked at again too (only elements not already smoothed).
+  // New things on screen: checked together once per frame, just after that frame is shown (so a new screen appears
+  // first and its corners are smoothed a moment later, instead of the tap waiting for them). Class or style changes can
+  // round something new, so those are looked at again too (only elements not already smoothed).
   let queue = new Set(), planned = false;
   function plan(node) {
     queue.add(node);
     if (planned) return;
     planned = true;
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => setTimeout(() => {
       planned = false;
       const q = queue; queue = new Set();
       q.forEach((node) => scan(node));
-    });
+    }, 0));
   }
   const mo = new MutationObserver((list) => {
     for (const m of list) {
