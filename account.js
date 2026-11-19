@@ -9446,7 +9446,7 @@
       var head = purpose === "ticket" && group.length === 1 ? "Your ticket" : CODE_HEADS[purpose];
       box.appendChild(el("h3", { className: "rl-sc-h" }, [jIc(group[0].kind === "qr" ? "qr" : "barcode", 20), el("span", { text: head })]));
       var live = group.filter(function (c) { return !codeWhen(c, x).passed; });
-      var said = [];
+      var said = [], whenSaid = [];
       var sayWords = function (c) { (c.words || []).forEach(function (w) { if (said.indexOf(w) < 0) { said.push(w); box.appendChild(el("p", { text: "“" + w + "”" })); } }); };
       // Passed: said plainly, once, and the code isn't offered.
       var gone = group.filter(function (c) { return codeWhen(c, x).passed; }), goneSaid = [];
@@ -9465,13 +9465,15 @@
           var slot = el("div"); box.appendChild(slot);
           apiBlob(codePath(x, c)).then(function (u) {
             tile.classList.remove("rl-skel");
-            if (u) { pic.src = u; pic.hidden = false; slot.appendChild(fullBtn); }
+            if (u) { pic.src = u; pic.hidden = false; if (live.length === 1) slot.appendChild(fullBtn); }
             else { tile.remove(); slot.appendChild(codeMissing(x, c, who, opts)); }
           });
         } else box.appendChild(codeMissing(x, c, who, opts));
-        if (when.line) box.appendChild(el("p", { className: "rl-sc-by", text: when.line }));
+        // (The day and the shop's words are said once, however many codes share them.)
+        if (when.line && whenSaid.indexOf(when.line) < 0) { whenSaid.push(when.line); box.appendChild(el("p", { className: "rl-sc-by", text: when.line })); }
         sayWords(c);
       });
+      if (live.length > 1 && live.some(function (c) { return c.hasImage; })) box.appendChild(el("p", { className: "rl-sc-from", text: "Tap a " + (purpose === "ticket" ? "ticket" : "code") + " to show it full screen." }));
       if (said.length) box.appendChild(el("p", { className: "rl-sc-from", text: "As " + possessive(who) + " email says." }));
       wrap.appendChild(box);
     });

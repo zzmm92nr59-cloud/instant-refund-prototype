@@ -272,6 +272,7 @@ let list = await alice.receipts();
   // More mail about the same order doesn't move the codes already there.
   const was = JSON.stringify(order[0].codes);
   const late = { ...F.ticketResends[0], id: "ticket-resend-late", headers: { ...F.ticketResends[0].headers, date: "Fri, 17 Jul 2026 08:00:00 +0000" } };
+  clock += 3600e3;   // (an hour later, as it would be)
   carol.deliver([{ f: late, daysAgo: 1 }]); await carol.scan();
   assert.equal(JSON.stringify((await carol.receipts()).find((r) => r.orderRef === "160104").codes), was, "sent again once more: still three, in the same places");
   // Disconnecting the inbox takes its codes away.

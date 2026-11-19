@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module"; import { createServer } from "node:http"; import { readFile, mkdir } from "node:fs/promises"; import { resolve, extname } from "node:path";
 import { deflateSync } from "node:zlib";
-import { skipInterests, homeReady, bigCards, openHomeCard, closeSheet, waitOutDoubleTap } from "./relay-places.mjs";
+import { skipInterests, homeReady, bigCards, homeCard, closeSheet, waitOutDoubleTap } from "./relay-places.mjs";
 const require = createRequire(import.meta.url); const { chromium } = require("playwright");
 const root = resolve(".");
 const types = { ".js": "text/javascript", ".png": "image/png", ".svg": "image/svg+xml", ".webmanifest": "application/manifest+json" };
@@ -115,11 +115,21 @@ const measure = (scope) => page.evaluate((scope) => {
   return out;
 }, scope);
 const polished = async (scope, where) => { const m = await measure(scope); for (const k of Object.keys(m)) assert.deepEqual(m[k], [], where + ": " + k); };
+// Opens a receipt's page from its card on Home, as a person would: not within the double-tap guard of the tap before, and
+// again if the tap landed while Home was still settling after a sheet closed.
+async function openCard(text) {
+  for (let i = 0; ; i++) {
+    await waitOutDoubleTap(page);
+    await homeCard(page, text).first().scrollIntoViewIfNeeded(); await page.waitForTimeout(250);
+    await homeCard(page, text).first().click();
+    try { await page.locator(".rl-back .rl-sheet").last().waitFor({ timeout: 6000 }); return page.locator(".rl-back .rl-sheet").last(); } catch (e) { if (i === 2) throw e; }
+  }
+}
 const loaded = (img) => img.evaluate(i => i.complete && i.naturalWidth > 0 && !i.hidden);
 
 // ---- 1. The receipt's page ---------------------------------------------------------------------------------------------
 assert.deepEqual(codeAsks(), [], "no code's picture is asked for until its receipt is opened");
-let sheet = await openHomeCard(page, "Ridge Running Jacket");
+let sheet = await openCard("Ridge Running Jacket");
 const sec = sheet.locator('.rl-sc[data-purpose="in_store_return"]');
 await sec.waitFor();
 assert.equal((await sec.locator(".rl-sc-h").innerText()).trim(), "Return in store", "headed by what to do");
@@ -167,7 +177,7 @@ await closeSheet(page);
 console.log("ok - the receipt's page shows the code on a white tile under what to do, with the shop's words; full screen fills the phone on white and Back returns");
 
 // ---- 3. A drop-off QR code with its date; tickets ------------------------------------------------------------------------
-sheet = await openHomeCard(page, "Studio Tights");
+sheet = await openCard("Studio Tights");
 const drop = sheet.locator('.rl-sc[data-purpose="drop_off_return"]'); await drop.waitFor();
 assert.equal((await drop.locator(".rl-sc-h").innerText()).trim(), "Drop off your return");
 assert.equal((await drop.locator(".rl-sc-by").innerText()).trim(), "Drop off by " + long(day(12)), "the date the email stated");
@@ -179,7 +189,7 @@ await polished(".rl-back .rl-sheet", "a drop-off code's page");
 await page.screenshot({ path: SHOTS + "/codes-3-drop-off-qr.png" });
 await closeSheet(page);
 
-sheet = await openHomeCard(page, "Standard Entry");
+sheet = await openCard("Standard Entry");
 const tk = sheet.locator('.rl-sc[data-purpose="ticket"]'); await tk.waitFor();
 assert.equal((await tk.locator(".rl-sc-h").innerText()).trim(), "Your tickets");
 assert.equal(await tk.locator(".rl-sc-tile").count(), 3, "each ticket's barcode");
