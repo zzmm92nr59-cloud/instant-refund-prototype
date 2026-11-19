@@ -1076,6 +1076,21 @@
     ".rl-rp-add{display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;font-size:17px}.rl-rp-ic{display:inline-flex}" +
     ".rl-rp-how{margin:14px 0 4px;font-size:14px;line-height:1.45;color:var(--rl-text2)}.rl-rp .rl-msg:empty{display:none}" +
     ".rl-rp-tag{display:inline-block;margin:0 0 10px;padding:4px 10px;border-radius:999px;background:var(--rl-fill);color:var(--rl-text);font-size:13px;font-weight:700}" +
+    // Codes to show or scan (a return barcode, a drop-off QR code, a ticket): the code sits on a white tile whatever the
+    // colours around it, because scanners need black on white. Full screen is a sheet that fills the phone, white too.
+    ".rl-sc{display:flex;flex-direction:column;gap:10px;margin:0 0 18px;padding:16px;border-radius:20px;background:var(--rl-card)}.rl-rr-detail .rl-sc{margin:4px 0 14px}" +
+    ".rl-sc-h{display:flex;align-items:center;gap:8px;margin:0;font-size:17px;font-weight:700;line-height:1.3;color:var(--rl-text)}.rl-sc-h .rl-jic{margin:0;flex:none}" +
+    ".rl-sc-tile{all:unset;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;min-height:132px;padding:18px 12px;border-radius:16px;background:#fff;color:#101828;cursor:pointer;transition:transform .12s;-webkit-tap-highlight-color:transparent}" +
+    ".rl-sc-tile,.rl-sc-stage{-webkit-user-select:none;user-select:none}.rl-sc-tile:active{transform:scale(.98)}.rl-sc-tile:focus-visible{outline:2px solid var(--rl-text);outline-offset:2px}.rl-sc-tile.rl-skel{border:0}" +
+    ".rl-sc-tile img{display:block;max-width:100%;max-height:220px;min-height:64px;object-fit:contain;image-rendering:pixelated}.rl-sc-tile.qr img{width:200px;height:200px;max-height:none}.rl-sc-tile.bar img{width:100%;height:96px}" +
+    ".rl-sc-num{font-size:15px;font-weight:600;letter-spacing:.04em;font-variant-numeric:tabular-nums;color:#101828;overflow-wrap:anywhere;text-align:center}.rl-sc-cap{font-size:14px;font-weight:600;color:var(--rl-text2);margin:2px 0 -4px}" +
+    ".rl-sc p{margin:0;font-size:15px;line-height:1.45;color:var(--rl-text)}.rl-sc p.rl-sc-by{font-weight:700}.rl-sc p.rl-sc-from,.rl-sc p.rl-sc-gone{color:var(--rl-text2);font-size:14px}.rl-sc p.rl-sc-past{font-weight:600}" +
+    ".rl-sc .rl-po-secondary{flex:none;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;font-size:15px;box-sizing:border-box;background:var(--rl-bg);border-color:transparent}.rl-sc .rl-po-secondary .rl-jic{margin:0}" +
+    ".rl-sheet.rl-sc-full{background:#fff;color:#101828;max-width:520px;height:100vh;height:100dvh;max-height:none;border-radius:0;box-sizing:border-box;display:flex;flex-direction:column;padding:calc(12px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom))}" +
+    ".rl-sc-full .rl-navback{align-self:flex-start;margin-left:-6px}.rl-sc-full h2{margin:6px 0 2px;color:#101828}.rl-sc-stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:8px 0}" +
+    ".rl-sc-stage img{display:block;width:100%;max-width:440px;max-height:100%;min-height:0;object-fit:contain;image-rendering:pixelated}.rl-sc-stage.qr img{max-width:min(100%,60vh)}.rl-sc-stage .rl-sc-num{font-size:19px}" +
+    ".rl-sc-full p{margin:0 0 6px;font-size:15px;line-height:1.45;color:#101828}.rl-sc-full p.rl-sc-by{font-weight:700}.rl-sc-nav{display:flex;gap:10px;margin-top:10px}.rl-sc-nav .rl-po-secondary{background:#f2f2f7;color:#101828;border-color:transparent;min-height:48px}" +
+    ".rl-po-ship.code{color:var(--rl-text)}" +
     ".rl-rp-items{margin:4px 0 6px}.rl-rp-total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-top:1px solid var(--rl-line);font-size:16px;color:var(--rl-text)}.rl-rp-total b{font-weight:700}" +
     ".rl-rp-warn{margin:6px 0 8px;padding:10px 12px;border-radius:12px;background:#fdecc8;color:#5c3b00;font-size:15px;line-height:1.4;font-weight:600}" +
     ".rl-rp-note{margin:6px 0 8px;font-size:14px;line-height:1.45;color:var(--rl-text2)}" +
@@ -1928,6 +1943,9 @@
     send: '<path d="M4.5 12h14M13 6l6 6-6 6"/>',
     pin: '<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/>',
     gavel: '<path d="M13.5 4.5 19.5 10.5 16.5 13.5 10.5 7.5Z"/><path d="m13.5 10.5-8.5 8.5"/><path d="M13 20.5h8"/>',
+    barcode: '<path d="M4 6v12M7.2 6v12M10.6 6v12M13 6v12M16.6 6v12M20 6v12"/>',
+    qr: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><path d="M13.5 13.5h2.6v2.6h-2.6zM20 13.5v.01M20 17.4V20h-2.6M13.5 20v.01"/>',
+    full: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
     gift: GIFT_PATH
   };
   function jIc(n, px) {
@@ -3939,6 +3957,8 @@
         btn.onclick = function () {
           if (detail) { delete memo.openIds[row.id]; detail.remove(); detail = null; btn.setAttribute("aria-expanded", "false"); wrap.classList.remove("open"); return; }
           detail = el("div", { className: "rl-rr-detail" });
+          // A code to show or scan for this order (a return barcode, a ticket) comes first.
+          var rowCodes = codesSection(row, {}); if (rowCodes) detail.appendChild(rowCodes);
           // Every item on its own line, with its price when the receipt gave one (Connor, 15 Nov: a long shop was one block of
           // text). A long order shows its first eight, then the rest on a tap.
           if (named.length > 1 || (named.length === 1 && Number(named[0].qty) > 1)) {
@@ -9352,6 +9372,119 @@
   // A purchase found in an email receipt: the shop handles the return, so Relay links to it and shows the deadline and parcel.
   // The card says what it is, where it's from, the price and the time left to send it back; tapping it opens its page
   // (a sheet) with what you can do: start the return, say you're sending it back, see the receipt.
+  // ---- Codes to show or scan (worker/scan-codes.js) ----------------------------------------------------------------
+  // A barcode or QR code an email gave the shopper to show: to return something in a shop or at a drop-off point, to collect
+  // an order, or a ticket. It shows on its receipt's page, big on a white tile so it scans, with the shop's own words (as
+  // the shop wrote them) and any date the email stated. Its picture is asked for only when that page is opened, once a
+  // visit (apiBlob). Once its date has passed it says so and the code isn't offered.
+  var CODE_HEADS = { in_store_return: "Return in store", drop_off_return: "Drop off your return", collection: "Collect your order", ticket: "Your tickets" };
+  var CODE_ORDER = ["drop_off_return", "in_store_return", "collection", "ticket"];
+  function codeDay(d) { var t = new Date(d + "T00:00:00Z"), f = function (o) { return t.toLocaleDateString("en-GB", Object.assign({ timeZone: "UTC" }, o)); }; return f({ weekday: "short" }) + " " + f({ day: "numeric", month: "long", year: "numeric" }); }
+  function codeName(c) { return c.kind === "qr" ? "QR code" : c.kind === "barcode" ? "barcode" : "code"; }
+  // What the dates say about one code: { line, passed }. Only dates the shop's own emails gave.
+  function codeWhen(c, x) {
+    var today = new Date().toISOString().slice(0, 10), who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
+    if (c.purpose === "ticket") return c.day ? (c.day < today ? { passed: true, line: "This was for " + codeDay(c.day) + "." } : { passed: false, line: "For " + codeDay(c.day) }) : { passed: false, line: "" };
+    var by = c.purpose === "drop_off_return" ? "Drop off by " : c.purpose === "collection" ? "Collect by " : "Return by ";
+    if (c.deadline) return c.deadline < today ? { passed: true, line: by + codeDay(c.deadline) + ". That date has passed." } : { passed: false, line: by + codeDay(c.deadline) };
+    // A return code with no date of its own: the return date the shop's email gave for the order, when it gave one.
+    var dl = c.purpose === "in_store_return" || c.purpose === "drop_off_return" ? statedDeadline(x) : null;
+    if (dl && dl < today) return { passed: true, line: "The return date from " + possessive(who) + " email, " + codeDay(dl) + ", has passed." };
+    return { passed: false, line: "" };
+  }
+  function liveCodes(x) { return ((x && x.codes) || []).filter(function (c) { return c && CODE_HEADS[c.purpose] && !codeWhen(c, x).passed; }); }
+  // One line for the receipt's card while a code can still be used ("Barcode to return in store").
+  function codeLine(x) {
+    var live = liveCodes(x); if (!live.length) return null;
+    var c = CODE_ORDER.map(function (p) { return live.filter(function (k) { return k.purpose === p; })[0]; }).filter(Boolean)[0];
+    var n = live.filter(function (k) { return k.purpose === c.purpose; }).length, name = codeName(c), Name = name.charAt(0).toUpperCase() + name.slice(1);
+    var text = c.purpose === "ticket" ? (n > 1 ? n + " tickets to show" : "Ticket to show") : c.purpose === "in_store_return" ? Name + " to return in store" : c.purpose === "drop_off_return" ? Name + " to drop off your return" : Name + " to collect your order";
+    return el("div", { className: "rl-po-ship code" }, [jIc(c.kind === "qr" ? "qr" : "barcode", 17), el("span", { text: text })]);
+  }
+  function codePath(x, c) { return "/relay/my/receipts/" + x.id + "/codes/" + c.n; }
+  // The code on its own, filling the phone, on white. Back returns to the receipt.
+  function codeFull(x, list, at, back) {
+    open(function (sheet) {
+      sheet.classList.add("rl-sc-full"); sheet.setAttribute("aria-label", "Code to scan");
+      var c = list[at], many = list.length > 1, when = codeWhen(c, x);
+      sheet.appendChild(el("button", { type: "button", className: "rl-navback", "data-back": "", ariaLabel: "Back to the receipt", onclick: function () { if (back) back(); else close(); } }, [jIc("back", 22), el("span", { text: "Receipt" })]));
+      sheet.appendChild(el("h2", { text: c.purpose === "ticket" ? (many ? "Ticket " + (at + 1) + " of " + list.length : "Your ticket") : CODE_HEADS[c.purpose] }));
+      var stage = el("div", { className: "rl-sc-stage " + (c.kind === "qr" ? "qr" : "bar") });
+      var pic = el("img", { alt: c.kind === "qr" ? "QR code to scan" : "Barcode to scan" }); pic.hidden = true;
+      var wait = el("div", { className: "rl-skel", style: "width:100%;max-width:440px;height:160px;min-height:0;border-radius:12px" });
+      stage.appendChild(wait); stage.appendChild(pic);
+      if (c.value) stage.appendChild(el("div", { className: "rl-sc-num", text: c.value }));
+      sheet.appendChild(stage);
+      apiBlob(codePath(x, c)).then(function (u) {
+        if (u) { pic.src = u; pic.hidden = false; wait.remove(); }
+        else { wait.remove(); stage.insertBefore(el("p", { text: "This code didn't load. Check your connection, go back and open it again." }), stage.firstChild); }
+      });
+      if (when.line) sheet.appendChild(el("p", { className: "rl-sc-by", text: when.line }));
+      (c.words || []).forEach(function (w) { sheet.appendChild(el("p", { text: "“" + w + "”" })); });
+      if (many) {
+        var go = function (to) { return tapOnceCode(function () { codeFull(x, list, to, back); }); };
+        var nav = el("div", { className: "rl-sc-nav" });
+        if (at > 0) nav.appendChild(el("button", { type: "button", className: "rl-po-secondary", text: "Previous ticket", onclick: go(at - 1) }));
+        if (at < list.length - 1) nav.appendChild(el("button", { type: "button", className: "rl-po-secondary", text: "Next ticket", onclick: go(at + 1) }));
+        sheet.appendChild(nav);
+      }
+    });
+  }
+  function tapOnceCode(fn) { var busy = false; return function () { if (busy) return; busy = true; fn(); setTimeout(function () { busy = false; }, 600); }; }
+  // The section for a receipt's page. opts.back reopens that page from full screen (a sheet replaces the one before it).
+  function codesSection(x, opts) {
+    opts = opts || {};
+    var all = ((x && x.codes) || []).filter(function (c) { return c && CODE_HEADS[c.purpose] && Number.isInteger(c.n); });
+    if (!x || !x.id || !all.length) return null;
+    var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "the shop";
+    var wrap = el("div", { className: "rl-scs" });
+    CODE_ORDER.forEach(function (purpose) {
+      var group = all.filter(function (c) { return c.purpose === purpose; });
+      if (!group.length) return;
+      var box = el("div", { className: "rl-sc" });
+      box.setAttribute("data-purpose", purpose);
+      var head = purpose === "ticket" && group.length === 1 ? "Your ticket" : CODE_HEADS[purpose];
+      box.appendChild(el("h3", { className: "rl-sc-h" }, [jIc(group[0].kind === "qr" ? "qr" : "barcode", 20), el("span", { text: head })]));
+      var live = group.filter(function (c) { return !codeWhen(c, x).passed; });
+      var said = [];
+      var sayWords = function (c) { (c.words || []).forEach(function (w) { if (said.indexOf(w) < 0) { said.push(w); box.appendChild(el("p", { text: "“" + w + "”" })); } }); };
+      // Passed: said plainly, once, and the code isn't offered.
+      var gone = group.filter(function (c) { return codeWhen(c, x).passed; }), goneSaid = [];
+      gone.forEach(function (c) { var l = codeWhen(c, x).line; if (goneSaid.indexOf(l) < 0) { goneSaid.push(l); box.appendChild(el("p", { className: "rl-sc-past", text: l })); } });
+      if (gone.length && !live.length) box.appendChild(el("p", { className: "rl-sc-gone", text: (gone.length > 1 ? "These codes are" : "This " + codeName(gone[0]) + " is") + " no longer shown, because " + (purpose === "ticket" ? "the day has gone." : "the date has passed.") }));
+      live.forEach(function (c, i) {
+        var when = codeWhen(c, x);
+        if (live.length > 1) box.appendChild(el("p", { className: "rl-sc-cap", text: (purpose === "ticket" ? "Ticket " : "Code ") + (i + 1) + " of " + live.length }));
+        if (c.hasImage) {
+          var show = tapOnceCode(function () { codeFull(x, live.filter(function (k) { return k.hasImage; }), live.filter(function (k) { return k.hasImage; }).indexOf(c), opts.back); });
+          var tile = el("button", { type: "button", className: "rl-sc-tile rl-skel " + (c.kind === "qr" ? "qr" : "bar"), ariaLabel: "Show this " + codeName(c) + " full screen", onclick: show });
+          var pic = el("img", { alt: "" }); pic.hidden = true; tile.appendChild(pic);
+          if (c.value) tile.appendChild(el("span", { className: "rl-sc-num", text: c.value }));
+          box.appendChild(tile);
+          var fullBtn = el("button", { type: "button", className: "rl-po-secondary", onclick: show }, [jIc("full", 18), el("span", { text: "Show full screen to scan" })]);
+          var slot = el("div"); box.appendChild(slot);
+          apiBlob(codePath(x, c)).then(function (u) {
+            tile.classList.remove("rl-skel");
+            if (u) { pic.src = u; pic.hidden = false; slot.appendChild(fullBtn); }
+            else { tile.remove(); slot.appendChild(codeMissing(x, c, who, opts)); }
+          });
+        } else box.appendChild(codeMissing(x, c, who, opts));
+        if (when.line) box.appendChild(el("p", { className: "rl-sc-by", text: when.line }));
+        sayWords(c);
+      });
+      if (said.length) box.appendChild(el("p", { className: "rl-sc-from", text: "As " + possessive(who) + " email says." }));
+      wrap.appendChild(box);
+    });
+    return wrap.childNodes.length ? wrap : null;
+  }
+  // No copy of the picture (its address had stopped working when Relay read the email, or it didn't arrive just now).
+  function codeMissing(x, c, who, opts) {
+    var box = el("div"), can = c.emailId && /^[0-9a-f-]{36}$/.test(c.emailId) && hasMailbox();
+    box.appendChild(el("p", { className: "rl-sc-gone", text: "Relay doesn't have a copy of this " + codeName(c) + ". " + (can ? "Open the email from " + who + " to show it." : "Open the email from " + who + " in your inbox to show it.") }));
+    if (can) box.appendChild(el("button", { type: "button", className: "rl-po-secondary", style: "margin-top:10px", onclick: tapOnceCode(function () {
+      open(function (sh) { originalView(sh, c.emailId, function () { if (opts.back) opts.back(); else close(); }, "The email with your " + codeName(c)); }); }) }, [jIc("mail", 18), el("span", { text: "Open the email" })]));
+    return box;
+  }
   function emailCard(x, opts) {
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
@@ -9376,6 +9509,8 @@
     var dv = x.delivery, showShip = Boolean(dv && dv.status && (dv.status === "delivered" || freshDelivery(x)));
     // A return under way says where it has got to instead of the parcel that came.
     if (retOf(x)) info.appendChild(el("div", { className: "rl-po-ship" + (retOf(x).state === "refunded" ? " done" : "") }, [jIc(retOf(x).state === "refunded" ? "check" : "ret", 17), el("span", { text: retLine(x) })]));
+    // A code that can still be used (a return barcode, a ticket) says so, once the parcel has come (or there is none).
+    else if (codeLine(x) && !(showShip && dv.status !== "delivered")) info.appendChild(codeLine(x));
     else if (showShip) info.appendChild(shipLine(dv));
     card.appendChild(el("div", { className: "rl-po-top" }, [img, info]));
     var dl = statedDeadline(x);
@@ -9400,7 +9535,12 @@
         var acts = el("div", { className: "rl-dt-acts" });
         // Once the shop's return email has arrived, its QR code (or label) is one tap away. Before that, Start return walks
         // through the shop's own returns page with the order number and email ready to copy.
-        if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
+        var codeShown = liveCodes(x).some(function (c) { return c.purpose === "drop_off_return" && c.hasImage; });
+        var codes = codesSection(x, { back: details });
+        if (codes) sheet.appendChild(codes);
+        // (Not when the drop-off code itself is on this page, above.)
+        if (codeShown) { /* the code is shown above */ }
+        else if (opts.actions !== false && rp && rp.id && mailRef(rp) && (rp.qrMentioned || rp.carrier || rp.returnId))
           acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: rp.qrMentioned ? "Show return QR code" : "Show return email", onclick: function () {
             open(function (sh) { originalView(sh, rp.id, close, rp.qrMentioned ? "Your return QR code" : "Your return email"); }); } }));
         else if (opts.actions !== false && portal && !(retOf(x) && retOf(x).state !== "started"))
