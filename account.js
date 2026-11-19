@@ -3349,6 +3349,19 @@
   function moneyName(cur) { return MONEY_NAME[cur] || cur; }
   // A receipt whose amount isn't in pounds (and has one).
   function notPounds(x) { return Boolean(x && x.totalPence != null && x.currency && x.currency !== "GBP"); }
+  // What a receipt adds to a total in pounds: nothing when it isn't in pounds or the shop cancelled the whole order; for an
+  // order the shop cancelled part of, what it says came back is taken off (the same rule as Wrapped, worker/wrapped.js).
+  function spentOf(r) {
+    if (!r || !Number.isInteger(r.totalPence) || notPounds(r)) return 0;
+    var c = r.cancelled;
+    if (c && !c.partial) return 0;
+    return c && c.partial && Number.isInteger(c.amountPence) && (!c.currency || c.currency === "GBP") && c.amountPence <= r.totalPence ? r.totalPence - c.amountPence : r.totalPence;
+  }
+  function cancelWords(r) {
+    var c = r && r.cancelled;
+    if (!c) return null;
+    return c.partial ? "Part of this order was cancelled" + (Number.isInteger(c.amountPence) ? ", " + money(c.amountPence, c.currency || r.currency || "GBP") + " back" : "") : "Cancelled by the shop";
+  }
   function moneySign(cur) { return !cur ? "£" : MONEY_SIGN[cur] || cur + " "; }
   function money(minor, cur) { var n = (minor / 100).toFixed(2).split("."); return (minor < 0 ? "−" : "") + moneySign(cur) + n[0].replace("-", "").replace(/\B(?=(\d{3})+(?!\d))/g, ",") + "." + n[1]; }
   function consentView(sheet, email, c) {
@@ -3805,7 +3818,7 @@
         var names = named.map(function (i) { return i.name + (i.variant && named.length === 1 ? " · " + i.variant : ""); }).join(", ");
         var ref = row.orderRef && /^[#A-Za-z0-9-]{3,14}$/.test(row.orderRef) ? "Order " + (row.orderRef.charAt(0) === "#" ? "" : "#") + row.orderRef : null;
         var title = named.length ? headlineItem(row).name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : who;
-        var subOf = function () { return [named.length ? who : ref, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
+        var subOf = function () { return [named.length ? who : ref, row.cancelled ? (row.cancelled.partial ? "Part cancelled" : "Cancelled") : null, row.gift ? (row.gift.for ? "Gift for " + row.gift.for : "Gift") : null,
           row.orderDate ? shortDate(row.orderDate + "T12:00:00Z") : null].filter(Boolean).join(", ") || "Receipt"; };
         var sub = subOf();
         var wrap = el("div", { className: "rl-rr" });
@@ -3967,7 +3980,7 @@
       var groupNames = { fashion: "Fashion", electronics: "Electronics", food: "Food & drink", home: "Home & garden", beauty: "Beauty & health", travel: "Travel & transport", digital: "Digital & subscriptions", experiences: "Tickets & experiences", other: "Other", gifts: "Gifts" };
       // One group's page: a header in the group's colour with what's in it, filters, then receipts by month (newest first)
       // with each month's total. Long groups show 40 at a time.
-      var GBP = function (rs) { return rs.reduce(function (n, r) { return n + (Number.isInteger(r.totalPence) && (!r.currency || r.currency === "GBP") ? r.totalPence : 0); }, 0); };
+      var GBP = function (rs) { return rs.reduce(function (n, r) { return n + spentOf(r); }, 0); };
       function drawCategory(k, rowsIn) {
         var rows = rowsIn.slice().sort(function (a, b) { return String(b.orderDate || "").localeCompare(String(a.orderDate || "")); });
         var today = new Date().toISOString().slice(0, 10);
@@ -7195,7 +7208,9 @@
       // What isn't in the figure, said plainly: receipts with no amount read, and receipts that weren't in pounds.
       var unread = w.coverage.noTotal || 0, abroad = w.coverage.otherCurrency || 0;
       if (unread || abroad) b.appendChild(el("p", { className: "fine", text: "Added up from " + w.coverage.withTotal + " of " + w.receipts + " receipts." +
-        (unread ? " " + unread + " had no amount Relay could read." : "") + (abroad ? " " + abroad + (abroad === 1 ? " wasn't in pounds, so it isn't" : " weren't in pounds, so they aren't") + " added in." : "") }));
+        (unread ? " " + unread + " had no amount Relay could read." : "") + (abroad ? " " + abroad + (abroad === 1 ? " wasn't in pounds, so it isn't" : " weren't in pounds, so they aren't") + " added in" +
+        // Each other currency's own total, listed apart (never added to pounds).
+        ((w.otherCurrencies || []).length ? " (" + w.otherCurrencies.map(function (o) { return money(o.spentPence, o.currency); }).join(" and ") + ")." : ".") : "") }));
       // The year's things dropping into a bag: their own photos first, then a drawn icon for each other kind bought.
       var drops = photos.slice(0, 3).map(function (p) { return { id: p.id, alt: p.item || p.shop, kind: "other" }; });
       (w.industries || []).forEach(function (k) { if (drops.length < 6 && k.category !== "other" && KIND[k.category]) drops.push({ kind: k.category, alt: "" }); });
@@ -10300,8 +10315,10 @@
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
         : [{ name: named.length ? named[0].name : noItemsTitle(x), price: x.totalPence == null ? "" : money(x.totalPence, x.currency), draw: function (box) { receiptPic(box, x, 96, 104); } }];
+      // The shop cancelled it (all of it: nothing to send back), said before anything else.
+      if (x.cancelled && !x.cancelled.partial) e.line = cancelWords(x);
       // A return Relay is following (return tracking): where it has got to, and "Refund not seen yet" when it's due.
-      if (rt) {
+      else if (rt) {
         e.line = retLine(x); e.returning = rt.state !== "refunded"; e.swaps = e.returning; e.rank = e.returning ? 1 : 2; e.nudge = Boolean(rt.refundNotSeen);
         e.tag = rt.refundNotSeen ? "Refund not seen yet" : rt.state === "refunded" ? "Refunded" : rt.state === "received" ? "At the shop" : rt.state === "sent" ? "Sent back" : "Return started";
       }

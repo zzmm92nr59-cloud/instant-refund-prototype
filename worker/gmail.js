@@ -16,7 +16,7 @@
 import { decodePhoto, RECEIPT_PHOTOS_SQL } from "./photos.js";
 import { receiptsToAdd } from "./bank.js";
 import { recordReceiptShops } from "./shop-directory.js";
-import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
+import { mailText, parseReceiptEmail, parseReturnEmail, parseReturnUpdateEmail, parseReturnParcelEmail, parseDeliveryEmail, parseDispatchEmail, parseCancellationEmail, trackingLink, extractProductImageUrls, photoShowsItem } from "./receipt-parser.js";
 import { ensureOnce, runAll } from "./once.js";
 import { buildWrapped } from "./wrapped.js";
 import { readShopKinds, learnShopKinds } from "./shop-kind-ai.js";
@@ -132,7 +132,7 @@ const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
 // 35 (round 4): emails as they arrive: 8bit windows-1252 parts, forwards attached whole, attachments never read as text,
 // hidden and Outlook-only copies left out, replies quoted with "> ", recommendations, clipped emails, receipts only in a PDF.
-export const PARSER_VERSION = 35;
+export const PARSER_VERSION = 36;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped
@@ -822,9 +822,22 @@ function classify(rawText, ref, lenient = false) {
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   } else {
-    // Remember that this email is not one of ours so it is never fetched again.
-    details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
-    status = "not_receipt";
+    // Not a purchase. Two kinds of the shop's own news about an order are still kept, so they can join the order they name
+    // (round 6): a cancellation (all or part of the order), and a dispatch email with no items (its parcel's tracking number
+    // lets the carrier's later emails find the order). Checked only now, so an email that is a receipt stays one.
+    const can = parseCancellationEmail(rawText);
+    const dis = can.ok ? { ok: false } : parseDispatchEmail(rawText);
+    if (can.ok) {
+      details = { kind: "order_update", ...ref, stage: "cancelled", partial: can.partial, at: can.at, orderRef: can.orderRef, amountPence: can.amountPence, currency: can.currency,
+        retailer: can.retailer, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+    } else if (dis.ok) {
+      details = { kind: "delivery_update", ...ref, status: dis.status, at: dis.at, carrier: dis.carrier, trackingNumber: dis.trackingNumber,
+        merchant: null, retailer: dis.retailer, orderRef: dis.orderRef, source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION };
+    } else {
+      // Remember that this email is not one of ours so it is never fetched again.
+      details = { kind: "not_receipt", parserVersion: PARSER_VERSION };
+      status = "not_receipt";
+    }
   }
   return { details, status };
 }
@@ -1575,12 +1588,23 @@ const letters = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 // dollars may not have been sold under UK law at all, so no date is worked out for it from the law: only one its own
 // email gives.
 const paidInPounds = (o) => !o || !o.currency || o.currency === "GBP";
+// The same order number written another way ("#55012", "55012", "ORD-55012", "Order no. 55012"): only a number's own
+// marks are dropped, so "KO-1001" and "1001" stay different numbers (they can be two shops' numbering schemes).
+const refCore = (r) => String(r || "").toUpperCase().replace(/\s+/g, "").replace(/^#/, "").replace(/^(?:ORD(?:ER)?|NO)[-#.:]?(?=\d{4,}$)/, "");
+export function sameOrderRef(a, b) { return Boolean(a && b) && refCore(a) !== "" && refCore(a) === refCore(b); }
+// An update names this order's shop: by its address or name when it says, any shop when it doesn't say (a carrier's).
+const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o);
 export function attachDeliveries(orders, deliveries) {
   for (const o of orders) {
-    const t = o.shipment && o.shipment.trackingNumber;
+    // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
+    // (a dispatch email with no items, round 6), so the carrier's own "delivered" email, which names no order, finds it.
+    const nums = new Set([o.shipment && o.shipment.trackingNumber].filter(Boolean));
+    const byRef = (d) => d.orderRef && o.orderRef && sameOrderRef(d.orderRef, o.orderRef) && sameShop(d, o);
+    for (const d of deliveries) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
+    const t = (o.shipment && o.shipment.trackingNumber) || [...nums][0] || null;
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
     for (const d of deliveries) {
-      let hit = (t && d.trackingNumber && d.trackingNumber === t) || (d.orderRef && o.orderRef && String(d.orderRef).toUpperCase() === String(o.orderRef).toUpperCase() && (!d.retailer || storeKey(d) === storeKey(o)));
+      let hit = (d.trackingNumber && nums.has(d.trackingNumber)) || byRef(d);
       if (!hit && !d.trackingNumber && d.merchant && o.orderDate && d.at) {
         const word = letters(d.merchant.split(/\s+/)[0]);
         const days = (Date.parse(d.at) - Date.parse(o.orderDate)) / 86400000;
@@ -1605,6 +1629,29 @@ export function attachDeliveries(orders, deliveries) {
       const d = new Date(Date.parse(best.at) + r.windowDays * 86400000);
       if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "window", from: "delivery" };
     }
+  }
+}
+
+// The shop cancelled the order, or part of it (round 6): matched by the order number and the shop only, never guessed.
+// `cancelled` says so on the card: { at, partial, amountPence, currency }. A whole order cancelled has nothing to send back
+// (no return date) and is not money spent (wrapped.js spentOf, account.js); for part of one, the amount the shop says came
+// back is taken off, when it says.
+export function attachCancellations(orders, cancels) {
+  for (const o of orders) {
+    if (!o.orderRef) continue;
+    const mine = cancels.filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
+    if (!mine.length) continue;
+    const whole = mine.find(u => !u.partial);
+    const at = mine.map(u => u.at).filter(Boolean).sort()[0] || null;
+    if (whole) {
+      o.cancelled = { at: whole.at || at, partial: false, amountPence: Number.isInteger(whole.amountPence) ? whole.amountPence : null, currency: whole.currency || null };
+      delete o.returnBy;
+      continue;
+    }
+    const cur = o.currency || "GBP";
+    const sums = mine.filter(u => Number.isInteger(u.amountPence) && (u.currency || "GBP") === cur);
+    const amount = sums.length === mine.length ? sums.reduce((n, u) => n + u.amountPence, 0) : null;
+    o.cancelled = { at, partial: true, amountPence: amount != null && (o.totalPence == null || amount <= o.totalPence) ? amount : null, currency: amount != null ? cur : null };
   }
 }
 
@@ -1746,7 +1793,8 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   const plans = all.filter(x => x.kind === "return_instructions");
   const deliveries = all.filter(x => x.kind === "delivery_update");
   const updates = all.filter(x => x.kind === "return_update");
-  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update"));
+  const cancels = all.filter(x => x.kind === "order_update");
+  const orders = mergeOrderEmails(all.filter(x => x.kind !== "return_instructions" && x.kind !== "delivery_update" && x.kind !== "return_update" && x.kind !== "order_update"));
   const byOrder = new Map(orders.filter(o => o.orderRef).map(o => [o.orderRef, o]));
   // The remaining lookups do not depend on each other, so they run together instead of one after another.
   const keys = [...new Set(orders.flatMap(o => [storeKey(o), legacyStoreKey(o)]).filter(Boolean))];
@@ -1776,6 +1824,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
   lap("lookupsMs"); if (timing) timing.dismissedCount = (gone.results || []).length;
   const dismissedRefs = new Set((gone.results || []).map(r => JSON.parse(r.details).orderRef).filter(Boolean));
   attachDeliveries(orders, deliveries);
+  attachCancellations(orders, cancels);
   // What the carrier itself said, where the shopper opened a parcel Relay could track live (parcel-tracking.js).
   applyTracked(orders, tracked);
   for (const p of plans) {
@@ -1853,6 +1902,9 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // When the emails give no return date or window at all: the shop's own published returns policy, if Relay has read it
     // (return-policies.js). It gives the least the shopper can count on for most items, and replaces UK law's 14 days.
     const said = c.returns && (c.returns.deadline || c.returns.windowDays);
+    // A whole order the shop cancelled was never sent, so there is nothing to send back (round 6).
+    if (c.cancelled && !c.cancelled.partial) return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
+      returnable: false, returns: c.returns ? { ...c.returns, deadline: null, windowDays: null } : null };
     const policy = (group.returnable || keep.length) && !said ? policyFor(retailer, c.currency) : null;
     const byPolicy = policy ? policyReturnBy(c, policy, today) : null;
     const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy(c, today) : null);

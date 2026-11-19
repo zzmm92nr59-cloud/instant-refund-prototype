@@ -65,6 +65,7 @@ jobs:
         run: |
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-corpus.mjs
+          node scripts/test-inbox-simulation.mjs
           node scripts/test-receipt-reread.mjs
           node scripts/test-receipt-reader.mjs
           node scripts/test-receipt-category.mjs
