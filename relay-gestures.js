@@ -51,7 +51,7 @@
   }
   // The sheet on top, if one is open.
   function topLayer() {
-    var ls = D.querySelectorAll(".rl-back");
+    var ls = D.querySelectorAll(".rl-back, .rl-story");
     for (var i = ls.length - 1; i >= 0; i--) if (shown(ls[i])) return ls[i];
     return null;
   }
