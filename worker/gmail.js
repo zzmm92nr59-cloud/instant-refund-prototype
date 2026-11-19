@@ -921,7 +921,8 @@ function outlookMailbox(fetchImpl, token) {
     async read(id) {
       const r = await graphGet(fetchImpl, GRAPH + "/me/messages/" + encodeURIComponent(id) + "/$value", auth);
       if (r.status === 404) return GONE;
-      return r.ok ? r.text() : null;
+      // (The email's bytes as sent, read the same way as Gmail's: an 8bit windows-1252 part keeps its "£".)
+      return r.ok ? (typeof r.arrayBuffer === "function" ? mailText(new Uint8Array(await r.arrayBuffer())) : r.text()) : null;
     },
     parallel: OUTLOOK_PARALLEL,
     ref: e => ({ outlookId: e.id })
@@ -1368,7 +1369,7 @@ async function addEmail(env, boxId, fetchImpl, now, messageId) {
   if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
   if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
   let rawText;
-  if (outlook) rawText = await res.text();
+  if (outlook) rawText = typeof res.arrayBuffer === "function" ? mailText(new Uint8Array(await res.arrayBuffer())) : await res.text();
   else {
     const raw = (await res.json().catch(() => ({}))).raw;
     if (typeof raw !== "string") return { status: 502, body: { error: "gmail_unavailable" } };

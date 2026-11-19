@@ -1,7 +1,7 @@
 // "View original receipt": fetches ONE email live from the shopper's Gmail or Outlook, cleans it and returns
 // display-ready HTML. Nothing is stored. The app shows the result in a sandboxed frame with no scripts,
 // so cleaning here is defence in depth, not the only barrier.
-import { mimeParts } from "./receipt-parser.js";
+import { mimeParts, mailText } from "./receipt-parser.js";
 const MAX_HTML = 400_000;
 const MAX_INLINE_IMAGE = 600_000; // bytes per embedded picture
 const MAX_INLINE_TOTAL = 2_500_000;
@@ -16,8 +16,13 @@ function bytesToB64(bytes) {
   for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return btoa(s);
 }
-const utf8 = bytes => new TextDecoder("utf-8", { fatal: false }).decode(bytes);
 const header = (part, name) => ((part.headers || []).find(h => String(h.name).toLowerCase() === name) || {}).value || "";
+// A part's text in the character set it says it is in (a windows-1252 email's "£" is one byte that UTF-8 would garble);
+// UTF-8 when it says none or one this can't read.
+const textOf = (part, bytes) => {
+  const cs = (/charset="?([^";\s]+)"?/i.exec(header(part, "content-type")) || [])[1] || "utf-8";
+  try { return new TextDecoder(cs, { fatal: false }).decode(bytes); } catch { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
+};
 
 function walk(part, out, depth = 0) {
   if (!part || depth > 8) return;
@@ -26,8 +31,8 @@ function walk(part, out, depth = 0) {
     for (const p of part.parts || []) walk(p, out, depth + 1);
     return;
   }
-  if (type === "text/html" && part.body && part.body.data) out.html.push(utf8(unb64url(part.body.data)));
-  else if (type === "text/plain" && part.body && part.body.data) out.text.push(utf8(unb64url(part.body.data)));
+  if (type === "text/html" && part.body && part.body.data) out.html.push(textOf(part, unb64url(part.body.data)));
+  else if (type === "text/plain" && part.body && part.body.data) out.text.push(textOf(part, unb64url(part.body.data)));
   else if (type.startsWith("image/") && /^image\/(png|jpe?g|gif|webp)$/.test(type) && part.body && (part.body.attachmentId || part.body.data)) {
     const cid = header(part, "content-id").replace(/^<|>$/g, "");
     out.images.push({ type, cid, name: part.filename || "", attachmentId: part.body.attachmentId || null, data: part.body.data || null, size: part.body.size || 0 });
@@ -146,7 +151,7 @@ export async function buildOriginalOutlook(fetchImpl, token, messageId) {
   const res = await fetchImpl("https://graph.microsoft.com/v1.0/me/messages/" + encodeURIComponent(messageId) + "/$value", { headers: { Authorization: "Bearer " + token } });
   if (res.status === 404) return { status: 404, body: { error: "email_not_found" } };
   if (!res.ok) return { status: 502, body: { error: "gmail_unavailable" } };
-  const out = mimeParts(await res.text());
+  const out = mimeParts(typeof res.arrayBuffer === "function" ? mailText(new Uint8Array(await res.arrayBuffer())) : await res.text());
   return { status: 200, body: shown(out.html, out.text, out.images.slice(0, MAX_INLINE_COUNT * 2)) };
 }
 
