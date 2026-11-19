@@ -121,7 +121,7 @@ function splitCell(raw) {
   if (m) { out.unit = m[2] != null ? pence(m[2], m[3], m[4]) : pence(m[5], m[6], m[7]); out.prices.push(pence(m[8], m[9], m[10])); c = m[1]; }
   else {
     // A price at the end of a name ("Prawn Crackers  £1.80", "Large Margherita ........ £11.99", "Wool jumper - Qty 1 - £59.00").
-    m = new RegExp("^(.*?\\p{L}.*?)(?:\\s*(?:\\.{2,}|[-–—:])\\s*|\\s+)([-−–])?" + MONEY + "$", "u").exec(c);
+    m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)(?:\\s*(?:\\.{2,}|[-–—:])\\s*|\\s+)([-−–])?" + MONEY + "$", "u").exec(c);
     // (Not a deal's own name that ends with its price, "Any 2 Pre Mixed Cans for £8.00": the price is part of the name.
     // Round 11.)
     if (m && !/[(+]\s*$/.test(m[1]) && !/\b(?:for|of|at|from|only|just|under|over)$/i.test(m[1].trim())) {
@@ -134,7 +134,7 @@ function splitCell(raw) {
       const qo = !neg && /^(?:qty|quantity|units?)\s*[:.]?\s*(\d{1,3})$/i.exec(c);
       if (qo) { out.qty = Number(qo[1]); c = ""; }
       // A unit price before the line's price in the same column of text ("Timber 2.4m    £4.25    £12.75").
-      const u = !neg && new RegExp("^(.*?\\p{L}.*?)\\s+" + MONEY + "(?:\\s*(?:each|ea\\.?))?$", "u").exec(c);
+      const u = !neg && new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)\\s+" + MONEY + "(?:\\s*(?:each|ea\\.?))?$", "u").exec(c);
       if (u && /\p{L}{2}/u.test(u[1])) { out.unit = pence(u[2], u[3], u[4]); c = u[1]; }
     }
   }
@@ -146,18 +146,18 @@ function splitCell(raw) {
   m = new RegExp("^(.*?\\S)\\s*\\((\\d{1,3})\\s*[@x×]\\s*" + MONEY + "(?:\\s*each)?\\)\\s*(.*)$", "i").exec(c);
   if (m) { out.qty = Number(m[2]); out.unit = pence(m[3], m[4], m[5]); c = (m[1] + " " + m[6]).trim(); out.head = true; }
   // A weighed or measured amount after the name, or on its own: a detail ("Unleaded  38.42 L @ 142.9p/L").
-  m = new RegExp("^(?:(.*?\\p{L}.*?)\\s+)?(" + MEASURE + ")$", "iu").exec(c);
+  m = new RegExp("^(?:([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)\\s+)?(" + MEASURE + ")$", "iu").exec(c);
   if (m) { out.measure = m[2]; c = m[1] || ""; }
   // "Dash Cam Fitting - FREE": an item at no charge.
-  if (!out.prices.length && !out.negative && (m = /^(.*?\p{L}.*?)(?:\s*[-–:]\s*|\s{2,})(?:free|no charge|£0\.00)$/iu.exec(c)) && !END.test(m[1])) { out.free = true; c = m[1]; }
+  if (!out.prices.length && !out.negative && (m = /^([^\p{L}\n\r\u2028\u2029]*\p{L}.*?)(?:\s*[-–:]\s*|\s{2,})(?:free|no charge|£0\.00)$/iu.exec(c)) && !END.test(m[1])) { out.free = true; c = m[1]; }
   // "1 Yum Yum (Reward) Free": how many, the name, and that it cost nothing, on a line that starts with how many (round 8).
   // ("1 Diet Coke Sugar Free" is a name: what it is free of comes before the word.)
-  if (!out.prices.length && !out.negative && !out.free && (m = /^(\d{1,2})\s+(?:[x×]\s+)?(\p{Lu}.*?\p{L}.*?)\s+free$/iu.exec(c)) &&
+  if (!out.prices.length && !out.negative && !out.free && (m = /^(\d{1,2})\s+(?:[x×]\s+)?(\p{Lu}[^\p{L}\n\r\u2028\u2029]*\p{L}.*?)\s+free$/iu.exec(c)) &&
       !/\b(?:gluten|sugar|dairy|fat|caffeine|alcohol|lactose|nut|meat|wheat|egg|soy|soya|salt|fragrance|cruelty|plastic|duty|tax|vat|interest|hands|milk|grain|palm oil|paraben|sulphate|bpa|scent|allergen|stress|hassle|risk|commission|range|rent|tax-?)\s*-?$/i.test(m[2]) && !END.test(m[2])) {
     out.free = true; out.qty = Number(m[1]); out.head = true; c = m[2];
   }
   // An option's own price after it, "Oat milk +£0.45" (not one in brackets, which the item's price already includes).
-  m = new RegExp("^(.*?\\p{L}.*?)\\s*\\+\\s?" + MONEY + "$", "u").exec(c);
+  m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)\\s*\\+\\s?" + MONEY + "$", "u").exec(c);
   // (The option keeps its price in what it says, "Extra cheese +£1.00", as the email shows it. Round 8.)
   if (m && !out.prices.length) { out.addPrice = pence(m[2], m[3], m[4]); out.addText = c.replace(/\s+/g, " ").trim(); c = m[1]; }
   // Quantity at the start: "1 x Name", "2x Name", "2 × Name"; a bare "1 Big Mac Meal" only on a line with its price.
@@ -648,7 +648,7 @@ export function moneyOf(text) {
     let label = null, amt = null;
     if (cells.length === 2 && !amountOf(cells[0])) { label = cells[0]; amt = amountOf(cells[1]); }
     else if (cells.length === 1) {
-      const m = new RegExp("^(.*?\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
+      const m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
       if (m) { label = m[1]; amt = amountOf(m[2]); }
       else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && lines[i + 1] && amountOf(lines[i + 1].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 1].replace(/\|/g, "").trim()); }
       // (A credit set out like an item, "Unused time on Claude Pro after 26 Oct 2026" / "Qty 1" / "-£11.10": money off. Round 10.)
