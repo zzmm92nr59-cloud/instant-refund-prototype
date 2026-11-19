@@ -36,7 +36,8 @@ function decodeQuotedPrintable(text, charset = "utf-8") {
 // "£" is one byte that would come out garbled if read as UTF-8).
 function decodeBase64(text, charset = "utf-8") {
   let bytes;
-  try { bytes = Uint8Array.from(atob(text.replace(/\s+/g, "")), (c) => c.charCodeAt(0)); } catch { return ""; }
+  // (Filled byte by byte: Uint8Array.from(text, fn) builds a list with an entry per byte first, many times a long part's size.)
+  try { const bin = atob(text.replace(/\s+/g, "")); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); } catch { return ""; }
   try { return new TextDecoder(charset, { fatal: false }).decode(bytes); }
   catch { return new TextDecoder("utf-8", { fatal: false }).decode(bytes); }
 }
