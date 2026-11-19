@@ -3425,7 +3425,8 @@
     if (!slim && dv && dv.status && (dv.status === "delivered" || freshDelivery(x))) card.appendChild(shipLine(dv));
     // The totals check (worker/receipt-items.js): when the items Relay read don't add up to what the email says they came to,
     // the receipt says so plainly, never shows a short list as if it were all, and offers the email and "Read it again".
-    if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && x.itemsCheck.complete === false && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
+    // (Round 9: or an item's name doesn't look like a thing bought, itemsCheck.namesOk === false: a gentler box.)
+    if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && (x.itemsCheck.complete === false || x.itemsCheck.namesOk === false) && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
       style: "margin:8px 0 0;padding:10px 12px;border-radius:12px;background:var(--rl-accent-bg);color:var(--rl-text);font-size:14px;font-weight:600;line-height:1.4" }));
@@ -3574,10 +3575,13 @@
     // email short, so what came after the cut isn't in it.)
     var inFile = none && (x.detailsInAttachment || x.itemsCheck.inAttachment);
     var box = el("div", { className: "rl-ret rl-miss" });
-    box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : "Relay may have missed some items on this receipt" }));
+    // (Round 9: the money adds up but a name looks like a note, a size or a code, worker/item-names.js. Never an accusation.)
+    var namesOnly = !none && x.itemsCheck.complete !== false && x.itemsCheck.namesOk === false;
+    box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : namesOnly ? "Some item names on this receipt may not be right" : "Relay may have missed some items on this receipt" }));
     var short = x.itemsCheck.missingPence;
     if (inFile) box.appendChild(el("span", { className: "rl-ret-why", text: (inFile === "image" ? "The shop sent the receipt as a picture" : "The shop sent the receipt as a PDF") + ". Open the email to see what you bought, or add the items yourself." }));
     else if (x.itemsCheck.unsure) box.appendChild(el("span", { className: "rl-ret-why", text: "Your photo was hard to read, so Relay didn't guess what's on it. Add the items yourself if you like." }));
+    else if (namesOnly) box.appendChild(el("span", { className: "rl-ret-why", text: "The prices add up, but a name may be a note or a size from the email. Check them against the email, or Relay can read it again." }));
     else if (x.itemsCheck.namesDoubtful) box.appendChild(el("span", { className: "rl-ret-why", text: "Copying the email can mix up its lines, so check the items below are right, or fix them yourself." }));
     else if (x.itemsCheck.clipped) box.appendChild(el("span", { className: "rl-ret-why", text: "Gmail cut this email short, so some of it may not have reached Relay." }));
     else if (!none && Number.isInteger(short) && short > 0) box.appendChild(el("span", { className: "rl-ret-why", text: "The items here come to " + money(short, x.currency) + " less than the email says." }));
@@ -3612,6 +3616,7 @@
             return;
           }
           say(note, r.body && r.body.reason === "busy" ? "Relay couldn't finish reading it just now. Try again in a moment."
+            : namesOnly ? "Relay still isn't sure of every name on this one. See the email, or fix the names yourself."
             : "Relay still can't read every item on this one. See the email for the full list, or fix it yourself.", true);
           if (!row.querySelector(".rl-miss-fix")) { var f = fixBtn(); f.classList.add("rl-miss-fix"); row.appendChild(f); }
         }, function () { again.disabled = false; again.textContent = "Read it again"; say(note, "Couldn't reach Relay. Check your connection.", true); });

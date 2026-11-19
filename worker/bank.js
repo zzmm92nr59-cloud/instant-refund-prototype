@@ -21,6 +21,7 @@ import { isAdmin, isTester } from "./resale-admin.js";
 import { decodePhoto, MAX_RECEIPT_PHOTO_BYTES } from "./photos.js";
 import { readReceiptPhoto } from "./receipt-photo.js";
 import { checkItems } from "./receipt-items.js";
+import { namesCheck } from "./item-names.js";
 import { aiAvailable } from "./ai-reader.js";
 import { seedShops, classificationSays, classificationToKeep, loadShopDirectory, learnedShop, EXCLUDED_KINDS } from "./shop-directory.js";
 
@@ -497,7 +498,7 @@ export function photoItemsOf(read, confidence, photoTotal) {
   if (!read) return { items: [], itemsCheck: null };
   const unsure = confidence !== "high" && confidence !== "medium";
   const items = !unsure && Array.isArray(read.items) ? read.items : [];
-  return { items, itemsCheck: { ...checkItems(items, {}, photoTotal), ...(unsure ? { unsure: true } : {}) } };
+  return { items, itemsCheck: { ...checkItems(items, {}, photoTotal), ...(items.length ? namesCheck(items) : {}), ...(unsure ? { unsure: true } : {}) } };
 }
 async function addReceiptPhoto(env, request, cors, shopper, o) {
   const db = env.RELAY_DB, now = o.now || Date.now();
