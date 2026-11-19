@@ -318,7 +318,10 @@ export function readItems(text, opts = {}) {
   const emit = () => {
     // A name on one line and a price on another is only an item when something says so: how many, a size or colour, its
     // code, a labelled price, or a "+" extra. ("Some Shop" over "£5.00" is a heading and a total, not a purchase.)
-    const sure = pend && (!paused || pend.head || pend.qty != null || pend.cell) && (pend.head || pend.cell || pend.qty != null || pend.unit != null || pend.lineFromLabel != null || pend.variant.length || pend.detail || pend.labelled || pend.plus);
+    // (Or it comes straight after an item read the same way, a name over its price, that said how many: the next one of
+    // the list, "Prize Booster" over "£5.00" under "Weekly Draw", "100 Entries x 1", "£5.00". Round 11.)
+    const listed = pend && pend.prev && pend.prev.mode === "block" && pend.prev.counted && pend.prev.at >= pend.startAt - 1 && pend.prev.at <= pend.startAt && pend.lines === 1 && !pend.extras.length;
+    const sure = pend && (!paused || pend.head || pend.qty != null || pend.cell) && (pend.head || pend.cell || pend.qty != null || pend.unit != null || pend.lineFromLabel != null || pend.variant.length || pend.detail || pend.labelled || pend.plus || listed);
     if (pend && sure && pend.prices.length + (pend.unit != null ? 1 : 0) + (pend.lineFromLabel != null ? 1 : 0) + (pend.free ? 1 : 0) > 0 && !pend.dropped) {
       // (A deal's parts straight under it, with an extra and the extra's price, "2's Special £29.99" then "BBQ Chicken Pizza",
       // "+ Deep Pan", "Pepperoni Hot Pizza", "+ Stuffed Edge", "£3.99": in a list whose items each say how many, a name that
