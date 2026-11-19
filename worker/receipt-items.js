@@ -69,7 +69,8 @@ const NOT_CHARGED = /\bnot charged\b|\bno charge\b|\bunavailable\b|\bout of stoc
 // Quantities on their own: "2", "x2", "2 x", "Qty: 2", "Quantity 2", "Units: 2", "2 units", "5 sleeves (50 capsules)".
 const QTY_CELL = /^(?:(?:qty|quantity|units?|x|×)\s*[:.]?\s*(\d{1,3})|(\d{1,3})\s*(?:x|×)?|(\d{1,3})\s+(?:units?|sleeves?|pcs|pieces|packs?)\b[^£]{0,30})$/i;
 // A unit price, with or without how many: "£68.00 each", "1 x £1.65", "2 × £50.00", "@ £24.00", "Unit price: £5.30".
-const UNIT_CELL = new RegExp("^(?:(\\d{1,3})\\s?[x×]\\s?" + MONEY + "|" + MONEY + "\\s*(?:each|ea\\.?|per item|/\\s?unit)|@\\s?" + MONEY + "|unit\\s+price\\s*:?\\s*" + MONEY + ")$", "i");
+// ("PPU: £ 14.66", price per unit, round 11.)
+const UNIT_CELL = new RegExp("^(?:(\\d{1,3})\\s?[x×]\\s?" + MONEY + "|" + MONEY + "\\s*(?:each|ea\\.?|per item|/\\s?unit)|@\\s?" + MONEY + "|(?:unit\\s+price|ppu|price per unit)\\s*:?\\s*" + MONEY + ")$", "i");
 // "£14.99 x 2": what each cost, then how many, and no line price (round 8).
 const UNIT_TIMES = new RegExp("^" + MONEY + "\\s?[x×]\\s?(\\d{1,3})$", "i");
 // Labels that name the value in the next cell.
@@ -116,7 +117,9 @@ function splitCell(raw) {
   else {
     // A price at the end of a name ("Prawn Crackers  £1.80", "Large Margherita ........ £11.99", "Wool jumper - Qty 1 - £59.00").
     m = new RegExp("^(.*?\\p{L}.*?)(?:\\s*(?:\\.{2,}|[-–—:])\\s*|\\s+)([-−–])?" + MONEY + "$", "u").exec(c);
-    if (m && !/[(+]\s*$/.test(m[1])) {
+    // (Not a deal's own name that ends with its price, "Any 2 Pre Mixed Cans for £8.00": the price is part of the name.
+    // Round 11.)
+    if (m && !/[(+]\s*$/.test(m[1]) && !/\b(?:for|of|at|from|only|just|under|over)$/i.test(m[1].trim())) {
       // ("Sparks offer -£2.00": the dash against the pound sign is money off, even where a dash could also separate.)
       const neg = Boolean(m[2]) || /[-−–]\s?£\s?[\d,.\s]+$/.test(c) && !/\s[-–]\s+£/.test(c);
       if (!neg) out.prices.push(pence(m[3], m[4], m[5])); else out.negative = true; c = m[1];
@@ -253,6 +256,9 @@ function readLine(raw) {
     if (/^removed(?:\s+\d+\s+of\s+\d+)?$/i.test(t)) { line.removed = true; continue; }
     if (/^added(?:\s+\d+)?$/i.test(t)) { line.details = true; continue; }
     if (letters(t) < 3) continue;           // a size column ("M", "UK 9"), a stray symbol
+    // (A product code in a cell of its own, "cusion.col272", "FREDEL.SK11337.801.DT75266.101": one word with points between
+    // letters and digits. Round 11.)
+    if (/^(?=[\w.-]*\d)[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/.test(t) && t.length >= 7 && !/^\d+(?:\.\d+)?$/.test(t)) { line.details = true; continue; }
     if (/@|https?:|www\./i.test(t)) { line.noise = true; continue; }
     if (i === 0 && (LABELLED.test(t) || DATE_LINE.test(t) || sentence(t) || /:\s*$/.test(c) || /^(?:placed|ordered|order placed|booked)\s+on\b/i.test(t))) { line.noise = true; continue; }
     if (i === 0 && FULL_DATE.test(t) && t.length <= 60) { line.noise = true; continue; }

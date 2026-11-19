@@ -1521,7 +1521,21 @@ export function mergeOrderEmails(orders) {
   const refsOf = new Map();
   for (const o of orders) if (o.orderRef) { const k = joinStore(o); if (!refsOf.has(k)) refsOf.set(k, new Set()); refsOf.get(k).add(String(o.orderRef).toUpperCase()); }
   const baseRef = (o, ref) => { const m = /^(.{5,})-\d{1,2}$/.exec(ref); return m && (refsOf.get(joinStore(o)) || new Set()).has(m[1]) ? m[1] : ref; };
+  // (A payment service's receipt for an order, PayPal's "Receipt for your payment to Cama-Gruppen AB", "Order ID 2416172",
+  // joins the shop's own email for that order, "Order Number: WGR2416172", when the numbers are the same but for the
+  // letters the shop puts first, the money is the same and the days are close: one purchase, never two. Round 11.)
+  const paidVia = new Map();
+  for (const p of orders) {
+    if (!(p.retailer && p.retailer.via) || !p.orderRef || isForwarded(p)) continue;
+    const r = refCore(p.orderRef);
+    if (!/^\d{5,}$/.test(r) && !/\d/.test(r)) continue;
+    const fits = orders.filter((o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && (refCore(o.orderRef) === r || new RegExp("^[A-Z]{1,4}[-#]?" + r.replace(/[^A-Z0-9]/g, "") + "$").test(refCore(o.orderRef))) &&
+      (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1) &&
+      (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
+    if (fits.length === 1) paidVia.set(p, fits[0]);
+  }
   const keyOf = (o) => {
+    if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
     if (!o.orderRef) return null;
     const ref = baseRef(o, String(o.orderRef).toUpperCase());
     if (isForwarded(o)) {
@@ -1558,7 +1572,9 @@ export function mergeOrderEmails(orders) {
     groups.get(k).push(o);
   }
   // (An email whose items add up to the order's money, its confirmation, leads over a shipment email that lists one parcel.)
-  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0);
+  const score = (o) => (isForwarded(o) ? 0 : 32) + (o.itemsCheck && o.itemsCheck.complete === true ? 16 : 0) + (o.status === "confirmed" ? 8 : 0) + (o.totalPence != null ? 4 : 0) + (o.items || []).filter(i => i.pricePence != null).length * 2 + (o.hasImage ? 1 : 0) +
+    // (The shop's own email leads over a payment service's receipt for the same order: its names are whole. Round 11.)
+    (o.retailer && o.retailer.via ? 0 : 3);
   return out.map(g => {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];

@@ -246,7 +246,13 @@ const INSTALMENT = /\b(?:your next (?:automatic )?payment|next payment of|paymen
 // is the link): the lines are read as written, without the brackets and the address. Round 11.
 const linksOverLines = (t) => String(t).replace(/\[([^\[\]]{1,600}?\n[^\[\]]{0,600}?)\]\((?:https?:|mailto:)[^)\s]{0,2000}\)/g, "$1");
 // The full-width pound sign some shops print ("Grand Total:￡123.20", Homary) is the pound sign (coverage round).
-const fullWidthPounds = (t) => String(t).replace(/\uffe1/g, "£");
+const fullWidthPounds = (t) => commaPence(String(t).replace(/\uffe1/g, "£"));
+// Pence after a comma, "£ 14,66", "£ 162,97" (a shop from mainland Europe), in an email that never writes pence after a
+// point: read as £14.66 (any point in the pounds sets thousands apart, "£ 1.299,00"). Round 11.
+function commaPence(t) {
+  if (!/£\s?\d{1,3}(?:\.\d{3})*,\d{2}(?![\d,])/.test(t) || /£\s?\d[\d,]*\.\d{2}(?!\d)/.test(t)) return t;
+  return t.replace(/£(\s?)(\d{1,3}(?:\.\d{3})+|\d+),(\d{2})(?![\d,])/g, (m, sp, n, p) => "£" + sp + n.replace(/\./g, "") + "." + p);
+}
 function decodeEntities(text) {
   // One pass, so "&amp;lt;" becomes "&lt;" (what the shop wrote), not "<".
   return text.replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{1,7});/gi, (m, e) => {
@@ -528,7 +534,7 @@ function fromText(text, refDate) {
     [...text.matchAll(/\border\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*([A-Z0-9][A-Z0-9-]{3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
-    text.match(/\border\s*(?:number|no\.?)\s*(?:is\s*)?:?[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
+    text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
     // ("Order:" alone on its line, the number on the next: Homary. Round 11.)
     text.match(/^[\s|]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
