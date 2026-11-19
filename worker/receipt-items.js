@@ -81,18 +81,18 @@ const NAME_LABEL = /^(?:plan|product|item|description|subscription)\s*:?$/i;
 
 // Where the item list ends: subtotals, fees, discounts, tips, payment. (Only once an item has been read: some emails put
 // their total at the top.)
-const END = /^(?:retail price\b|sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
+const END = /^(?:retail price\b|sub-?\s?total|subtotal|order sub-?\s?total|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |today(?:'|’)?s |your )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items|products|delivery\b|delivery\/shipping|shipping\b|postage\b|p\s?&\s?p\b|service\b|bag\b|bag (?:fee|charge|levy)|carrier bags?\b|small order|basket charge|minimum basket|booking fee|vat\b|tax\b|discount|voucher|promo|promotion|offers?\b|offer savings|multi-?buy|savings?\b|you(?:'|’)?ve saved|you saved|credit\b|credit applied|(?:rider |driver |courier )?tip\b|gratuity|payment\b|payments\b|paid\b|amount (?:paid|due)|total paid|nectar|clubcard|more card|mywaitrose|rollback|member offer|adiclub|subscribe\s?&\s?save|3 for 2|deal\b|buyer protection|click\s?&\s?collect|fast track|installation|collect in store|store delivery|delivery to store|standard delivery|express delivery|airport surcharge|shop discount|includes vat|including vat|incl\.? vat|tickets?\s*:?(?=\s*(?:£|$))|royal mail\b|parcelforce\b|evri\b|(?:1st|2nd|first|second) class\b|tracked (?:24|48)\b|removal of\b|(?:city|visitor|tourist) (?:levy|tax)\b)/i;
 // Lines that are never part of an item: greetings, sentences, order details, dates, column and section headings.
 const LABELLED = /^(?:from|to|sent|subject|cc)\s*:|^(?:order|date|placed|ordered|booking|booked|transaction|receipt|invoice|deliver(?:y|ing)? (?:to|address|on|by)|delivering|collect(?:ion)? (?:from|on)|payment method|paid (?:with|by|using)|billed|apple (?:account|id)|account|document|reference|confirmation|merchant|seller|tracking|reservation|your (?:order|basket) (?:number|no))\b[^|]{0,60}?[:#]|^(?:order|booking|transaction|receipt) (?:no\.?|number|id|ref(?:erence)?)\b|^order #|^#\d|^(?:order|transaction|receipt|invoice|booking|ref(?:erence)?)\s+(?:no\.?\s*|number\s*)?#?\d[\d -]{2,}$/i;
-const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|items? ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details|order|receipt|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
+const HEADING = /^(?:shipping now|now shipping|on its way|shipped|items? shipped|in your parcel|track (?:package|parcel|order|delivery|your (?:order|parcel|package))|view (?:order|details|item|your order)|view or edit (?:your )?order|shop now|manage (?:your )?order|start a return|leave a review|buy again|your order|your items|order summary|order details|items? ordered|items? in (?:your|this) order|delivered items|substitutions?|substituted items|(?:shipment|delivery|parcel|package) \d+ of \d+[^|]*|in this (?:shipment|parcel|delivery)|summary|basket|bundle|app store|apple services|itunes store|apple books|apple arcade|description|items?|products?|qty|quantity|price|unit price|amount|each|cost|total|line total|item details|order|receipt|other costs|fare details|\d{1,3} items?|product details|size|colou?r|style|sku|article|options?|variant|total price|item price|qty\.?|units?|(?:shipping|billing|delivery|invoice|postal) (?:address|details)|deliver(?:ed|ing)? to|ship(?:ped|ping)? to)$/i;
 const SKIP_START = /^(?:unavailable(?: items)?|missing items?|items? (?:not available|unavailable|we couldn(?:'|’)?t (?:find|deliver))|out of stock|sorry,? we couldn(?:'|’)?t|not (?:available|delivered))\b/i;
 const SKIP_END = /^(?:substitutions?|substituted items|delivered items|your items|items delivered|shipment \d+)\b/i;
 // Details under an item that are not extras: codes, sellers, delivery notes, links, a substitution's note.
 // (Round 3: barcodes and part numbers, "EAN: 4977961000000", "MPN: …"; a pre-order's release date; stock notes.)
-const DETAIL = /^(?:ticket (?:number|no\.?|holder|id)\s*:|(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
+const DETAIL = /^(?:ticket (?:number|no\.?|holder|id)\s*:|(?:monthly|yearly|annual(?:ly)?|weekly|daily|one-off|lifetime)$|(?:ean|upc|gtin|isbn(?:-1[03])?|mpn|barcode|part (?:no\.?|number)|model (?:no\.?|number)|item code|code)\s*[:#]|\d{8,14}$|release(?:s|d)?\b|releasing\b|available (?:from|on)\b|pre-?order\b|in stock\b|back in stock\b|out on\b|expected (?:dispatch|delivery|on|by)\b|ships? (?:on|by|from|in)\b|art\.?\s?no\b\.?|article(?: no\.?| number)?\b|item no\b\.?|item number\b|cat\.?\s?no\b\.?|catalogue number\b|product code\b|sku\b|style (?:no\.?|code)\b|style\s*#|ref\.|ref:|seller\s*:|sold by|condition\s*:|edition\s*:|format\s*:|dispatch(?:es|ed)?\b|delivered\b|arriving\b|arrives\b|estimated\b|in-app purchase|report a problem|write a review|buy again|view item|renews\b|auto-renew|instead of\b|(?:no )?substitutions? (?:allowed|not allowed)\b|substitute|\(substitut|\(substitute\)|was £|save £|you save|price per\b|(?:clubcard|nectar|my morrisons|mywaitrose|member|rollback|lower)\s+price\b|rollback$|age[- ]restricted\b|over 18s?\b|(?:id|proof of age) (?:may|will|might) be (?:checked|required|asked for)|picked weight\b|estimated weight\b|replac(?:ed|es|ing)\b(?!\s*(?:with|by)\b)|£[\d.,]+\s*\/\s*(?:kg|100g|100ml|l|each|unit))/i;
 // (Or the size, the fit and how many set apart by slashes, "Waist 36"/91.5cm 30" Leg Trouser / Slim fit / Qty 1",
 // "16 1/2 Col 35 Sleeve Single Cuff / Slim fit / Qty 1": a size line, never the item's name. Round 12.)
-const VARIANT = /^[^|£]{2,70}\s\/\s[^|£/]{0,30}\bfit\s*(?:\/\s*(?:(?:qty|quantity)\s*:?\s*\d{1,3}\s*)?)?$|^(?:colou?r|(?:pack )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
+const VARIANT = /^[^|£]{2,70}\s\/\s[^|£/]{0,30}\bfit\s*(?:\/\s*(?:(?:qty|quantity)\s*:?\s*\d{1,3}\s*)?)?$|^(?:colou?r|(?:pack |uk |eu |us )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
 // (Month first too, "Jul 30, 2025 10:36 pm": an order's date, never an item's name. Round 11.)
 const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|nd|rd|th)?[\s/.-]+(?:\d{1,2}|[a-z]{3,9})[\s/.,-]+\d{2,4}\b[^|]{0,20}$|^\d{4}-\d{2}-\d{2}$|^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b[^|]{0,20}$/i;
 const GREETING = /^(?:for (?:full|more) (?:ingredients|information|details|nutritional)|hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
@@ -297,7 +297,11 @@ function readLine(raw) {
   return line;
 }
 
+// A drink's measure in brackets on the line under its name, "Stella Artois" over "(Pint)", "Gordon’s" over "(Double
+// Mixer)": part of what was bought, so part of its name. Round 13.
+const DRINK_MEASURE = /^\((?:pint|half(?: pint)?|single|double|treble|triple|(?:single |double )?mixer|single mixer|double mixer|small|medium|large|regular|bottle|can|glass|(?:small |medium |large )glass|jug|pitcher|shot|\d{2,4}\s?ml)\)$/i;
 const finish = (b) => {
+  if (b.extras.length && DRINK_MEASURE.test(String(b.extras[0]).trim()) && !/\)$/.test(b.name)) { b = { ...b, name: b.name + " " + String(b.extras[0]).trim(), extras: b.extras.slice(1), variant: b.variant.filter((v) => v !== b.extras[0]) }; }
   const name = b.name;
   // ("Cloud Runner Trainers × 0": none of it, a line taken off a changed order. Round 10.)
   if (!name || b.dropped || b.qty === 0) return null;
@@ -379,7 +383,7 @@ export function readItems(text, opts = {}) {
   // (A label on its line and its value on the next, "size:" over "150x200 cm [King]", "Product code:" over "UKI83120652": one
   // line, so the value is the item's size or code, never a name. Round 11.)
   for (let k = raw.length - 2; k >= 0; k--) {
-    if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
+    if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|style\s*(?:#|no\.?|code)|model(?: no\.?)?|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
       raw.splice(k, 2, raw[k].replace(/[\s|]+$/, "") + " " + raw[k + 1].replace(/^[\s|]+/, ""));
       afterRow.splice(k + 1, 1);
     }
@@ -416,7 +420,9 @@ export function readItems(text, opts = {}) {
       if (above && above.qty != null && !above.names.length && !above.prices.length && above.cells.length === 1 && /^\d{1,2}\s+\p{Lu}/u.test(l.names[0])) {
         // (The number above is how many; the product's own number stays in its name.)
         l.qty = above.qty; l.head = true; if (pend && !pend.prices.length) { pend.qty = null; pend = null; }
-      } else {
+      } else if (!(read[n + 2] && read[n + 2].qty != null && !read[n + 2].names.length && !read[n + 2].prices.length)) {
+      // (Unless how many is written under the price, "21 Chicken Kickers™" / "£10.99" / "Qty: 1": then the number is the
+      // product's own. Round 13.)
       const q = /^(\d{1,2})\s+(\p{Lu}.*)$/u.exec(l.names[0]);
       if (q && !/^(?:adults?|child(?:ren)?|items?|for|pack|people|nights?|days?|months?)\b/i.test(q[2])) { l.qty = Number(q[1]); l.names[0] = q[2]; l.head = true; }
       }
@@ -577,6 +583,9 @@ export function readItems(text, opts = {}) {
     for (let k = n + 1; k < Math.min(read.length, n + 8); k++) {
       const x = read[k];
       if (x.endWord || x.noise || x.head || (x.names.length && x.prices.length)) return false;
+      // (A bare "1 |" over a name of its own is how many of that next item, not of this line: "| On Its Own |", "| |", "1 |",
+      // "OG Kebab |". Round 13.)
+      if (x.qty != null && !x.names.length && !x.prices.length && x.cells.length === 1 && read[k + 1] && read[k + 1].names.length && !read[k + 1].lead && !read[k + 1].indent && !read[k + 1].plus) return false;
       if (x.qty != null || x.unit != null || x.variant.length || x.details) return true;
       if (x.prices.length) return false;
     }
@@ -669,10 +678,14 @@ export function moneyOf(text) {
     const cells = lines[i].split("|").map((x) => x.trim()).filter(Boolean);
     let label = null, amt = null;
     if (cells.length === 2 && !amountOf(cells[0])) { label = cells[0]; amt = amountOf(cells[1]); }
+    // ("1 | Promotion Applied | -£1.99": money off set out as a row of the item list, with how many first. Round 13.)
+    else if (cells.length === 3 && /^\d{1,2}$/.test(cells[0]) && !amountOf(cells[1]) && /\p{L}/u.test(cells[1]) && amountOf(cells[2]) && amountOf(cells[2]).neg) { label = cells[1]; amt = amountOf(cells[2]); }
     else if (cells.length === 1) {
       const m = new RegExp("^(.*?\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
       if (m) { label = m[1]; amt = amountOf(m[2]); }
       else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && lines[i + 1] && amountOf(lines[i + 1].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 1].replace(/\|/g, "").trim()); }
+      // ("DELIVERY" over "(Standard)" over "£4.99": the label, a note in brackets, then the amount. Round 13.)
+      else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && /^\([^()]{1,30}\)$/.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2] && amountOf(lines[i + 2].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 2].replace(/\|/g, "").trim()); }
       // (A credit set out like an item, "Unused time on Claude Pro after 26 Oct 2026" / "Qty 1" / "-£11.10": money off. Round 10.)
       else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 80 && /^qty\s*:?\s*\d{1,3}$/i.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2]) {
         const a = amountOf(lines[i + 2].replace(/\|/g, "").trim());

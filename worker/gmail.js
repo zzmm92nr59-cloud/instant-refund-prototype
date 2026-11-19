@@ -940,7 +940,7 @@ function classify(rawText, ref, lenient = false) {
       // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
       // order's confirmation (mergeOrderEmails). Round 10.
       ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
-      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}),
+      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}), ...(receipt.discounts ? { discounts: receipt.discounts } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),

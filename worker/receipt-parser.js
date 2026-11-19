@@ -305,8 +305,21 @@ function withoutHidden(html) {
   out += t.slice(from);
   return out;
 }
+// A price the email shows struck through (an old price, "£19.99" with a line through it beside "£10.99", "£49.55" over the
+// "£29.56" paid): left out, so the price paid is read. Round 13.
+function struckPrices(html) {
+  // (Only beside the price that replaced it, within a few cells: a struck line on its own, an item that couldn't be
+  // supplied, is read as the email shows it.)
+  const html0 = String(html);
+  const MON = /(?:£|&pound;|&#163;|&#xa3;)\s?\d/gi;
+  return html0.replace(/(<(?:s|del|strike)\b[^>]{0,400}>|<[a-z][a-z0-9]{0,9}\b[^>]{0,400}?text-decoration\s*:\s*line-through[^>]{0,400}>)((?:\s|<[^>]{0,300}>){0,6})(?:£|&pound;|&#163;|&#xa3;)\s?\d[\d,]{0,9}(?:\.\d{2})?(?=\s{0,20}<\/)/gi, (m, a, b, at) => {
+    const before = html0.slice(Math.max(0, at - 700), at), after = html0.slice(at + m.length, at + m.length + 700);
+    const other = (before.match(MON) || []).length > 0 && /(?:£|&pound;|&#163;|&#xa3;)\s?\d[\d,]*\.\d{2}\s*<\/[a-z]+>\s*(?:<\/?[a-z][^>]{0,300}>\s*){0,8}$/i.test(before) || /^\s*(?:<\/?[a-z][^>]{0,300}>\s*){0,8}(?:£|&pound;|&#163;|&#xa3;)\s?\d/i.test(after);
+    return other ? a + b : m;
+  });
+}
 function htmlToText(html) {
-  const shown = withoutHidden(html);
+  const shown = struckPrices(withoutHidden(html));
   return htmlToTextAll(/£|&pound;|&#163;|&#xa3;/i.test(shown) || !/£|&pound;|&#163;|&#xa3;/i.test(html) ? shown : html);
 }
 function htmlToTextAll(html) {
@@ -773,7 +786,14 @@ function extractReturns(text, html, orderDate) {
   if (/\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat)) {
     Object.assign(out, { windowDays: null, windowFrom: null, deadline: null, portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false, nonRefundable: true });
   }
-  const any = out.windowDays || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned || out.nonRefundable;
+  // A booking that can be cancelled for free until a day it names ("You can cancel for FREE until 6 June 2025 23:59",
+  // "Free cancellation until 12 March 2026"): that day, as the booking says it. Round 13.
+  if (!out.nonRefundable) {
+    const fc = /\b(?:cancel(?:lation)?\s+(?:is\s+)?(?:for\s+)?free(?:\s+of\s+charge)?|free\s+cancell?ation)\s+(?:until|up to|before|by)\s+(?:\d{1,2}:\d{2}\s+(?:on\s+)?)?(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4})/i.exec(flat);
+    const day = fc ? parseDate(fc[1]) : null;
+    if (day) out.freeCancellationUntil = day;
+  }
+  const any = out.windowDays || out.deadline || out.address || out.portalUrl || out.instructions.length || out.qrMentioned || out.labelMentioned || out.nonRefundable || out.freeCancellationUntil;
   return any ? out : null;
 }
 
@@ -1056,14 +1076,26 @@ function railTickets(text) {
   return out;
 }
 // Which leg a ticket is for: its type over the leg, "Anytime Day Single" then "Seaford Sussex to Brighton".
-function legOf(text, type) {
+function legOf(text, type, nth = 0) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const legs = [];
   for (let i = 0; i < rows.length - 1; i++) {
     if (rows[i].toLowerCase() !== type.toLowerCase()) continue;
     const leg = /^(\p{Lu}[\p{L}\d .'’&-]{1,40}?) to (\p{Lu}[\p{L}\d .'’&-]{1,40})$/u.exec(rows[i + 1]);
-    if (leg) return rows[i + 1];
+    if (leg) legs.push(rows[i + 1]);
   }
-  return null;
+  return legs[nth] || legs[0] || null;
+}
+// A rail booking's fees under "Other costs": "Booking Fee" over "£1.39" (never "No booking fee").
+function railFees(text) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < rows.length - 1; i++) {
+    if (!/^(?:booking|card|payment|transaction|service|seat reservation) (?:fee|charge)s?$/i.test(rows[i])) continue;
+    const m = /^£\s?([\d,]+\.\d{2})$/.exec(rows[i + 1]);
+    if (m && money(m[1]) > 0) out.push({ name: rows[i].charAt(0).toUpperCase() + rows[i].slice(1).toLowerCase(), pricePence: money(m[1]) });
+  }
+  return out;
 }
 // A station the subject shortens ("London") that the email's own lines name in full ("London Bridge"): the full name,
 // when exactly one line starts with it and is a place name a word or two longer.
@@ -1129,6 +1161,8 @@ export function orderNewsOf(rawEmail) {
 // ("Whole Milk 2 Pints      1.15 A"): the amounts at the end of its lines are pounds. Only for an email with no pound
 // sign anywhere, and only amounts in a column (two spaces or more before them), with the VAT letter after them dropped.
 function tillPounds(t) {
+  // (A line that is only an amount and "GBP", "58.00 GBP", in an email that writes pounds with "£" elsewhere: pounds. Round 13.)
+  if (t && /£/.test(t)) t = t.replace(/^([ \t|]*)(\d[\d,]*\.\d{2})[ \t]?GBP([ \t|]*)$/gm, "$1£$2$3");
   // ("GBP 15.00" and "15.00 GBP", written that way throughout an email with no pound sign: pounds.)
   if (t && !/£/.test(t) && /\bGBP\s?\d[\d,]*\.\d{2}\b/.test(t)) return t.replace(/\bGBP\s?(\d[\d,]*\.\d{2})\b/g, "£$1").replace(/\b(\d[\d,]*\.\d{2})\s?GBP\b/g, "£$1");
   // ("137.5 GBP", "17 GBP", "0 GBP": a shop that drops the pence it doesn't need, Detale; only in an email that writes an
@@ -1224,14 +1258,17 @@ function withoutGiftNotes(lines) {
 function soleItemOverPrice(text, m, total) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   // (Only against a stated basket or subtotal: a name over the bare total may be a heading over it.)
-  const basket = m && m.subtotal != null ? m.subtotal : null;
+  // (Or the total, under its fare's heading, "Fare details" then "26-30 Railcard" then "£35.00": a railcard. Round 13.)
+  const fare = rows.findIndex((r) => /^fare details$/i.test(r));
+  const basket = m && m.subtotal != null ? m.subtotal : fare >= 0 && total != null ? total : null;
   if (basket == null) return null;
   const hits = [];
   for (let i = 0; i + 1 < rows.length; i++) {
     const pm = /^£\s?([\d,]+\.\d{2})$/.exec(rows[i + 1]);
     if (!pm || money(pm[1]) !== basket) continue;
+    if (!(m && m.subtotal != null) && i !== fare + 1) continue;
     const name = rows[i];
-    if (!/^\p{Lu}[\p{L}\d '’&+.,()-]{4,80}$/u.test(name) || /[:!?]$|\b(?:total|subtotal|basket|paid|payment|delivery|voucher|discount|vat|tax)\b/i.test(name)) continue;
+    if (!/^[\p{Lu}\d][\p{L}\d '’&+.,()-]{4,80}$/u.test(name) || !/\p{L}{3}/u.test(name) || /[:!?]$|\b(?:total|subtotal|basket|paid|payment|delivery|voucher|discount|vat|tax)\b/i.test(name)) continue;
     hits.push({ name, qty: 1, pricePence: basket });
   }
   return hits.length === 1 ? hits[0] : null;
@@ -1478,13 +1515,22 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const sum = tickets.reduce((a, t) => a + t.pricePence * t.qty, 0);
     const detail = (t) => [t.type, t.card].filter(Boolean).join(", ");
     // Two or more tickets that add up to what was paid: each ticket, named by its leg. One ticket: the trip, with the ticket.
-    if (tickets.length > 1 && result.totalPence != null && sum === result.totalPence) {
-      result.items = tickets.map((t) => ({ name: legOf(body, t.type) || trip, variant: detail(t), qty: t.qty, pricePence: t.pricePence }));
+    // (The booking fee is its own line, never part of a ticket's price: "Other costs", "Booking Fee", "£1.39". Round 13.)
+    const fees = railFees(body);
+    const feeSum = fees.reduce((a, f) => a + f.pricePence, 0);
+    if (tickets.length && result.totalPence != null && (tickets.length > 1 || fees.length) && sum + feeSum === result.totalPence) {
+      // (Two tickets of the same type, "Advance Single" twice: each is named by its own leg, the first by the first leg.)
+      const seen = {};
+      result.items = tickets.map((t) => { const k = t.type.toLowerCase(); seen[k] = (seen[k] || 0) + 1; return { name: legOf(body, t.type, seen[k] - 1) || trip, variant: detail(t), qty: t.qty, pricePence: t.pricePence }; })
+        .concat(fees.map((f) => ({ name: f.name, qty: 1, pricePence: f.pricePence })));
     } else result.items = [{ name: trip, ...(tickets.length === 1 ? { variant: detail(tickets[0]) } : {}), qty: 1, pricePence: result.totalPence ?? null }];
     // (The booking's number is its "Transaction ID", on the line under its label.)
     const tx = /\btransaction id\s*:?\s*\|?\s*\n?\s*\|?\s*([A-Z0-9][A-Z0-9-]{5,24})\b/i.exec(body);
     if (!result.orderRef && tx) result.orderRef = tx[1];
   }
+  // (A digital railcard or another booking with no order number but its "Transaction ID:" over the number, the number the
+  // shop asks for: the order's number. Round 13.)
+  if (!result.orderRef && !isFlight) { const tx = /^[\s|]*(?:your )?transaction id\s*:?[\s|]*\n?[\s|]*(\d{8,16})[\s|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -1537,7 +1583,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const i of result.items) if (i.variant) { const v = String(i.variant).split(", ").filter((p) => !MONEY_OFF_NOTE.test(p.trim())).join(", "); if (v) i.variant = v; else delete i.variant; }
     result.itemsCheck = pick.check;
   } else {
-    result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence);
+    // (A rail booking's fee read as its own line is checked with the tickets: they and it come to what was paid. Round 13.)
+    const feeLines = journey ? result.items.filter((i) => /^(?:booking|card|payment|transaction|service|seat reservation) (?:fee|charge)s?$/i.test(String(i.name || ""))) : [];
+    result.itemsCheck = feeLines.length ? checkItems(result.items.filter((i) => !feeLines.includes(i)), moneyOf(text), result.totalPence) : checkItems(result.items, moneyOf(text), result.totalPence);
+    if (feeLines.length) result.itemsCheck = { ...result.itemsCheck, itemsPence: result.itemsCheck.itemsPence + feeLines.reduce((a, i) => a + i.pricePence, 0), expectedPence: result.totalPence };
   }
   // A row named only by its place in a table ("SIM 1 | ORDA… | eSIM | -- | National Plus | National | £5.00", Lycamobile):
   // the thing bought is the row's name-like cell, the plan, not "SIM 1". Round 10.
@@ -1599,6 +1648,20 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // A membership or trial bought through a billing company for a website it names ("You've just bought 2-day trial Example
   // membership", "Website | example.com", "Receipt 291429567"): the membership is the item, the website the shop, the
   // receipt's number the reference. Any biller, any site. Round 12.
+  // A list of what was ordered with no prices ("1x Large 13.5" Texas BBQ®", "+ Classic Crust", "1x Strippers Combo"), the
+  // prices only in the total: the things bought, each with how many and its extras, and no price made up. Round 13.
+  if (!result.items.length && !isFlight && !journey) {
+    const rows = String(text).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+    const got = [];
+    for (const r of rows) {
+      const m = /^(\d{1,2})\s?[x×]\s+(\p{Lu}[^£|]{2,80})$/u.exec(r);
+      if (m && !/%\s*off\b|\bspend\b|\bfree\b|\bdeal\b|\bvoucher\b/i.test(m[2])) { got.push({ name: m[2].trim(), qty: Number(m[1]), pricePence: null }); continue; }
+      if (got.length && /^\+\s?\p{L}[^£|]{1,60}$/u.test(r)) { const it = got[got.length - 1]; it.variant = [it.variant, r.replace(/^\+\s?/, "").trim()].filter(Boolean).join(", "); continue; }
+      if (got.length >= 2) break;
+    }
+    // (The email gives no prices, so nothing can be added up: the check says so, never that something is missing.)
+    if (got.length >= 2) { result.items = got; result.itemsCheck = { complete: null, itemsPence: 0, expectedPence: result.totalPence ?? null, missingPence: null, noPrices: true }; }
+  }
   if (!result.items.length && result.totalPence != null) {
     const flatT = String(fromHtml || text).replace(/[\s|]+/g, " ");
     const bought = /\byou(?:'|’)?ve just bought (.{3,80}?)\s?\.(?:\s|$)/i.exec(flatT) || /\bthank you for buying (.{3,80}?)(?:\s(?:receipt|dear|hi|hello)\b|[.!])/i.exec(flatT);
@@ -1674,6 +1737,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // number, its items and its total, and gmail.js mergeOrderEmails makes a card of each. Round 12.)
   const others = isFlight || dayOf || amended ? [] : moreOrders(text, result.orderRef).length ? moreOrders(text, result.orderRef) : moreOrders(otherPart, result.orderRef);
   if (others.length) result.moreOrders = others;
+  // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
+  // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
+  if (result.items.length && (result.currency || "GBP") === "GBP") {
+    const off = (moneyOf(text).found || []).filter((f) => f[0] === "discount" && f[2] > 0).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    if (off.length) result.discounts = off;
+  }
   return result;
 }
 

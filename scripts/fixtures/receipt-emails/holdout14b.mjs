@@ -89,5 +89,62 @@ export default function holdout14b() {
         nested(["Qty", "Item Detail", "Item Cost"]), nested(["1", "Get 20% Off! Make it a good day.", ""]), nested(["1", "9 Chicken Bites Box", "£3.99"]), nested(["1", "Small Lemonade", "£1.49"]),
         nested(["", "Discount:", "-£0.80"]), nested(["", "Total (including VAT):", "£4.68"])] }) }, o, "Bunhouse", "2026-11-15");
   }
+  // ---- A pub chain's app: each drink's measure in brackets under its name, a promotion taken off --------------------------
+  {
+    const o = order([{ name: "Harbour Lager (Pint)", qty: 1, unit: 345 }, { name: "Smoky Bean Burrito", qty: 1, unit: 425 }, { name: "Spiced Rum (Double Mixer)", qty: 1, unit: 390 }], { discounts: [["Promotion Applied", 150]] });
+    add("holdout14b-pub-app-measures", "The Tankard Group", "'Qty | Description | Amount'; '1 | <b>Harbour Lager</b> (Pint) | £3.45'; 'Promotion Applied | -£1.50'", {
+      from: "The Tankard Group <orders@tankardgroup.example>", subject: "The Tankard Group Order Confirmation: 4410", date: "Mon, 16 Nov 2026 19:00:00 +0000",
+      html: page({ brand: "The Tankard Group", domain: "tankardgroup.example", rows: ["<p>Thank you for your order...</p><p>Order Id: <b>612004411</b><br/>Order Date: Monday, November 16, 2026<br/>Table Number: 12</p>",
+        `<table border="1"><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td><strong>Harbour Lager</strong>\n(Pint)</td><td align="right">£3.45</td></tr><tr><td>1</td><td><strong>Smoky Bean Burrito</strong></td><td align="right">£4.25</td></tr><tr><td>1</td><td><strong>Promotion Applied</strong></td><td align="right">-£1.50</td></tr><tr><td>1</td><td><strong>Spiced Rum</strong>\n(Double Mixer)</td><td align="right">£3.90</td></tr><tr><td colspan="2">Payment Type</td><td>Apple Pay</td></tr><tr><td colspan="2"><strong>Order Total</strong></td><td><strong>£10.10</strong></td></tr></table>`] }) }, o, "The Tankard Group", "2026-11-16");
+  }
+  // ---- A rail booking: two tickets of the same type, each named by its own leg, and the booking fee its own line ------------
+  {
+    const o = order([{ name: "Hilltown to Midvale", qty: 1, unit: 1210 }, { name: "Midvale to Riverside Quay", qty: 1, unit: 640 }, { name: "Booking fee", qty: 1, unit: 150 }]);
+    add("holdout14b-rail-same-type-legs-fee", "RailHop", "'Advance Single' over each leg; two 'Adult - Advance Single - [Railcard]' lines; 'Other costs', 'Booking Fee', '£1.50'", {
+      from: "RailHop <auto-confirm@railhop.example>", subject: "Your booking confirmation for Hilltown to Riverside Quay (2 December at 08:10)", date: "Mon, 16 Nov 2026 08:00:00 +0000",
+      html: mail("RailHop", "railhop.example", ["Your trip to Riverside Quay departing Wednesday 2 December 2026 is confirmed", "Advance Single", "Hilltown to Midvale", "Stay on the same train", "Advance Single", "Midvale to Riverside Quay",
+        "2x Advance Single", "Specified train only. No refunds.", "Payment information", "Transaction ID:", "700112233445", "Fare details |", "Adult - Advance Single - [Coach Railcard]", "£12.10", "Adult - Advance Single - [Coach Railcard]", "£6.40",
+        "Other costs |", "Booking Fee", "£1.50", "Total amount: | £20.00 |"]) }, o, "RailHop", "2026-11-16");
+  }
+  // ---- A digital railcard bought from a rail site: the railcard under "Fare details", "No booking fee" --------------------
+  {
+    const o = order([{ name: "16-25 Railcard", qty: 1, unit: 3500 }]);
+    add("holdout14b-digital-railcard", "RailHop", "'Fare details |' over '16-25 Railcard' over '£35.00'; 'Other costs |', 'Booking Fee', 'No booking fee'", {
+      from: "RailHop <auto-confirm@railhop.example>", subject: "Your digital railcard purchase is complete. Transaction Id 700998877665", date: "Tue, 17 Nov 2026 08:00:00 +0000",
+      html: mail("RailHop", "railhop.example", ["Your digital 16-25 Railcard is ready to use in the app", "Sam Taylor", "Payment information", "Transaction ID:", "700998877665", "Fare details |", "16-25 Railcard", "£35.00",
+        "Other costs |", "Booking Fee", "No booking fee", "Total amount: | £35.00 |"]) }, o, "RailHop", "2026-11-17");
+  }
+  // ---- A sports shop: the product's name over its code, prices written "58.00 GBP", "1 ITEMS" ------------------------------
+  {
+    const o = order([{ name: "Ridgeline Daypack 28L Navy One Size", qty: 1, unit: 4200 }], { fees: [["Delivery", 399]] });
+    add("holdout14b-sports-code-gbp", "Fieldsport Direct", "'Item | Qty | Price'; the name over 'Product Code: 112233/18/000'; '1'; '42.00 GBP'; '1 ITEMS'", {
+      from: "Fieldsport Direct <noreply@fieldsportdirect.example>", subject: "Your Fieldsport Direct order confirmation FS4000099887766", date: "Tue, 17 Nov 2026 12:00:00 +0000",
+      html: mail("Fieldsport Direct", "fieldsportdirect.example", ["Thank you for your order", "Order number: FS4000099887766", "Item", "Qty", "Price", "Ridgeline Daypack 28L Navy One Size", "Product Code: 112233/18/000", "1", "42.00 GBP",
+        "1 ITEMS", "42.00 GBP", "DELIVERY", "(Standard)", "3.99 GBP", "TOTAL", "45.99 GBP", "Prices in £ include VAT"]) }, o, "Fieldsport Direct", "2026-11-17");
+  }
+  // ---- A takeaway app: options under each item, then "1 |" and the next item of the same name -------------------------------
+  {
+    const o = order([{ name: "Chilli Sauce Pot", qty: 2, unit: 70 }, { name: "Mixed Grill Wrap", qty: 1, unit: 1150, extras: ["Large", "On Its Own", "Extra Chilli"] }, { name: "Mixed Grill Wrap", qty: 1, unit: 1150, extras: ["Large", "On Its Own"] }]);
+    add("holdout14b-takeaway-same-item-twice", "Just Eat", "'1 |' over 'Mixed Grill Wrap |' over '| £9.50 |'; '| Large |', '| £2.00 |'; '| On Its Own |'; '| + | Extra Chilli |'; then the same item again", {
+      from: "Just Eat <noreply@t.just-eat.co.uk>", subject: "Your order's been received", date: "Wed, 18 Nov 2026 20:00:00 +0000",
+      html: mail("Just Eat", "just-eat.co.uk", ["Great news! Kebab Corner - Riverside has received your order.", "Order number: | 990011223 |", "Kebab Corner - Riverside", "2 | Chilli Sauce Pot", " | £1.40", "1", "Mixed Grill Wrap", " | £9.50", " | Large", " | £2.00", " | On Its Own", " | ", " | + | Extra Chilli",
+        "1", "Mixed Grill Wrap", " | £9.50", " | Large", " | £2.00", " | On Its Own", " | ", "Subtotal: | £24.40", "Total: | £24.40"]) }, o, "Just Eat", "2026-11-18", { merchant: "Kebab Corner - Riverside" });
+  }
+  // ---- A pizza chain: an old price struck through beside the price paid, "Qty: 1" under it, a product's own number -------------
+  {
+    const o = order([{ name: "16 Chicken Bites", qty: 1, unit: 899 }, { name: "Garlic Dip", qty: 1, unit: 79 }], { fees: [["Delivery", 249]] });
+    add("holdout14b-pizza-struck-prices", "Pizzapoint", "'16 Chicken Bites' over '£8.99' and a struck '£14.99', 'Qty: 1'; 'Total:' over a struck '£22.27' and '£12.27'", {
+      from: "Pizzapoint <orders@pizzapoint.example>", subject: "Pizzapoint Order Confirmation", date: "Wed, 18 Nov 2026 18:00:00 +0000",
+      html: page({ brand: "Pizzapoint", domain: "pizzapoint.example", rows: ["<p>Order number: 2203344556</p>", "<p>16 Chicken Bites</p><p>£8.99</p><p><span style=\"text-decoration: line-through\">£14.99</span></p><p>Qty: 1</p>",
+        "<p>Garlic Dip</p><p>£0.79</p><p>Qty: 1</p>", "<p>Delivery:</p><p>£2.49</p>", "<p>Total:</p><p><span style=\"text-decoration: line-through\">£22.27</span></p><p>£12.27</p>"] }) }, o, "Pizzapoint", "2026-11-18");
+  }
+  // ---- A pizza chain's older layout: what was ordered with no prices, only the total ------------------------------------------
+  {
+    const o = order([{ name: "Large Smoky Ranch", qty: 1, unit: null, extras: ["Thin Crust"] }, { name: "Potato Wedges", qty: 1, unit: null }]);
+    o.total = 2398; for (const i of o.bought) i.line = null;
+    add("holdout14b-pizza-unpriced-list", "Pizzapoint", "'1x Large Smoky Ranch', '+ Thin Crust', '1x Potato Wedges', a deal line, 'Delivery: £1.99', '£23.98 (Including VAT)'", {
+      from: "Pizzapoint <orders@pizzapoint.example>", subject: "Pizzapoint Order Confirmation", date: "Wed, 18 Nov 2026 19:00:00 +0000",
+      html: mail("Pizzapoint", "pizzapoint.example", ["Order number: 2203344557", "Get excited for your", "1x Large Smoky Ranch", "+ Thin Crust", "1x Potato Wedges", "1x 30% off when you spend £30 or more online", "Delivery: £1.99", "£23.98 (Including VAT)"]) }, o, "Pizzapoint", "2026-11-18");
+  }
   return out;
 }
