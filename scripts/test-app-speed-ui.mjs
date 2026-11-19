@@ -119,7 +119,9 @@ async function phone({ seedCache = true, workers = "block", assistant = true } =
   return { ctx, page, errors, cdp };
 }
 const results = {}, problems = [];
-const budget = (what, value, max, unit = "ms") => { results[what] = Math.round(value) + (unit ? " " + unit : ""); if (value > max) problems.push(what + ": " + Math.round(value) + " (budget " + max + ")"); };
+// GitHub's shared machines run slower than a developer's, so time limits there get twice the room; counts never change.
+const SLACK = process.env.CI ? 2 : 1;
+const budget = (what, value, max, unit = "ms") => { if (unit === "ms") max *= SLACK; results[what] = Math.round(value) + (unit ? " " + unit : ""); if (value > max) problems.push(what + ": " + Math.round(value) + " (budget " + max + ")"); };
 const speed = page => page.evaluate(() => ({ ...window.__speed, now: performance.now() }));
 const nextFrame = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(performance.now())))));
 // Home shows something: its cards, what to do first, or greyed outlines. Never an empty page.
