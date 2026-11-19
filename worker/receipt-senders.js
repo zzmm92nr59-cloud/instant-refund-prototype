@@ -1,0 +1,103 @@
+// What a few senders' emails say in their own way, read from their own wording (round 10, 19 Nov 2026: Connor's real
+// inbox). Every rule here is a pattern the sender uses for everyone (Uber's "Here's your receipt for", "Thanks for riding",
+// Just Eat's "Your East Ocean order will be with you soon", Sainsbury's "Payment received" on the delivery-day email), never
+// one person's order numbers or items. Pure functions: no network, no storage.
+
+const MONEY = /£\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})/;
+const pence = (m) => (m ? Number(m[1].replace(/,/g, "")) * 100 + Number(m[2]) : null);
+const rows = (text) => String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "").replace(/\s*\|\s*/g, " | ").trim()).filter(Boolean);
+// The amount on a labelled row, "Refund | -£8.76", or on the row under the label.
+function labelled(list, re) {
+  for (let i = 0; i < list.length; i++) {
+    const m = new RegExp("^(?:" + re.source + ")\\s*:?\\s*(?:\\|\\s*)?([-−–]?)\\s*(£\\s?[\\d,]+\\.\\d{2})$", "i").exec(list[i]);
+    if (m) return pence(MONEY.exec(m[2]));
+    if (new RegExp("^(?:" + re.source + ")\\s*:?$", "i").test(list[i]) && list[i + 1] && /^[-−–]?\s*£\s?[\d,]+\.\d{2}$/.test(list[i + 1])) return pence(MONEY.exec(list[i + 1]));
+  }
+  return null;
+}
+const tidyName = (s) => String(s || "").replace(/\s+/g, " ").replace(/[\s.,|]+$/, "").trim();
+
+// ---- Uber and Uber Eats -------------------------------------------------------------------------------------------------
+// Uber sends three kinds of email from the same address:
+//  * an Uber Eats receipt that doesn't list what was ordered ("Here's your receipt for Popeyes." ... "To view your full
+//    receipt go to Uber Eats, or download this PDF"), with "£Y / Uber One savings and other promotions applied" under the
+//    total: a saving, never an item;
+//  * a ride ("Thanks for riding", "We hope you enjoyed your ride", "Trip fare"): travel, one ride for what was paid. Its fare
+//    lines, fees and credits ("Uber pet fee", "Wait Time", "Uber One credits earned") are not things bought;
+//  * a changed total for an earlier Eats order ("We adjusted the total for your recent order from Grill & Do", "Previous
+//    total", "Refund -£8.76", "New Total"): money back on that order, never a new purchase.
+export function uberEmail(domain, subject, text) {
+  if (!/(^|\.)uber\.com$/i.test(domain || "")) return null;
+  const t = String(text || "").slice(0, 20000), list = rows(t);
+  const top = t.slice(0, 3000);
+  const adj = /\bwe (?:adjusted|have adjusted|(?:'|’)ve adjusted) the total for your (?:recent )?order from ([^\n|]{2,80}?)\s*[.|\n]/i.exec(top);
+  if (adj || (/\bprevious total\b/i.test(t) && /\bnew total\b/i.test(t))) {
+    return { kind: "adjusted", merchant: adj ? tidyName(adj[1]) : null, refundPence: labelled(list, /refund/), previousPence: labelled(list, /previous total/), newPence: labelled(list, /new total/) };
+  }
+  if (/\bthanks for riding\b|\bwe hope you enjoyed your (?:ride|trip)\b|\byour [^\n]{0,30}\btrip with uber\b/i.test(top + "\n" + (subject || "")) && /\btrip fare\b|\bfare\b/i.test(t)) {
+    const pet = /\buber pet\b|\bpet fee\b/i.test(t);
+    return { kind: "ride", item: pet ? "Uber Pet ride" : "Uber ride" };
+  }
+  const rest = /\bhere(?:'|’)s your receipt for ([^\n|]{2,80}?)\s*\.?\s*(?:\||\n|$)/i.exec(top);
+  if (rest || /\bto view your full receipt go to uber eats\b/i.test(t)) {
+    return { kind: "eats", merchant: rest ? tidyName(rest[1]) : null, noItemList: /\bto view your full receipt\b/i.test(t) };
+  }
+  return null;
+}
+// Amounts Uber prints with a line that says what they are, under the total: savings and credits, never items.
+export const UBER_MONEY_NOTE = /^(?:uber one (?:savings|credits?)|savings and other promotions|[^|]{0,30}\bpromotions? applied\b|uber one credits earned|credits? earned)/i;
+
+// ---- The restaurant on a takeaway app's order --------------------------------------------------------------------------
+// Just Eat: "Your East Ocean order will be with you soon.", "Great news! East Ocean has received your order.", "Your PFC
+// Poplar order will be ready soon."; Deliveroo: "Your order from Wagamama"; Uber Eats: "Here's your receipt for Popeyes."
+export function takeawayMerchant(shopName, domain, subject, text) {
+  const shop = String(shopName || "").toLowerCase(), t = String(text || "").slice(0, 4000);
+  const app = /just ?eat/.test(shop) || /(^|\.)just-eat\.(co\.uk|com|ie)$/i.test(domain || "") ? "je"
+    : /deliveroo/.test(shop) || /(^|\.)deliveroo\.(co\.uk|com|ie)$/i.test(domain || "") ? "dr"
+    : /uber eats/.test(shop) ? "ue" : null;
+  if (!app) return null;
+  const pats = app === "je" ? [/\byour ([^\n|]{2,60}?) order (?:will be (?:with you|ready)|is being (?:prepped|prepared|made)|has been (?:accepted|received|sent|confirmed)|is on its way|is confirmed)\b/i,
+    /\bgreat news!?\s+([^\n|]{2,60}?) has (?:received|accepted) your order\b/i]
+    : app === "dr" ? [/\byour order from ([^\n|]{2,60}?)(?:\s+(?:is|has|was)\b|[.!|\n]|$)/im, /\b([^\n|]{2,60}?) (?:has accepted|is preparing) your order\b/i]
+    : [/\bhere(?:'|’)s your receipt for ([^\n|]{2,80}?)\s*\.?\s*(?:\||\n|$)/i];
+  for (const re of pats) {
+    const m = re.exec(t) || (app === "dr" ? re.exec(String(subject || "")) : null);
+    const name = m && tidyName(m[1]);
+    if (name && name.length >= 2 && !/^(?:your|the|this|an?)$/i.test(name) && !/\b(?:order|delivery|courier|driver)\b/i.test(name)) return name;
+  }
+  return null;
+}
+
+// ---- A supermarket's delivery-day email ---------------------------------------------------------------------------------
+// Sainsbury's sends the order confirmation first (the items, an estimated total), then on the day "Your order is ready for
+// today" with "Payment received: £99.40", only the substitutions and short-life items, and the full receipt as a PDF. That
+// second email is the same order, with what was actually paid: it joins the confirmation (gmail.js mergeOrderEmails), and is
+// never a second purchase whose items are only its substitutions.
+export function groceryDayOf(text) {
+  const t = String(text || "").slice(0, 20000);
+  if (!/\byour order is ready for today\b|\bwe(?:'|’)ve picked your items\b/i.test(t)) return null;
+  const paid = /\bpayment (?:received|taken)\s*:?\s*\|?\s*(£\s?[\d,]+\.\d{2})/i.exec(t);
+  if (!paid) return null;
+  const ref = /\border (?:number|no\.?)\s*:?\s*\|?\s*(\d{6,14})\b/i.exec(t);
+  return { paidPence: pence(MONEY.exec(paid[1])), orderRef: ref ? ref[1] : null };
+}
+
+// ---- A game's web shop (Appcharge, Xsolla) --------------------------------------------------------------------------------
+// "Items" then each thing in the pack with how many ("Mixy Meow | 1", "Checkerboard | 10", "Coins | 4,500"), then the
+// subtotal: one purchase of the whole pack, named by what is in it ("Mixy Meow, 10 Checkerboard", "2,200 Coins").
+export function gameBundle(text) {
+  const list = rows(text);
+  const i = list.findIndex((c) => /^items?$/i.test(c));
+  if (i < 0) return null;
+  const parts = [];
+  for (let k = i + 1; k < list.length && k < i + 40; k++) {
+    const r = list[k];
+    if (/^(?:sub-?\s?total|total|tax|vat)\b/i.test(r)) break;
+    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
+    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && /^(\d{1,3}(?:,\d{3})*|\d{1,7})$/.test(list[k + 1] || "")) { m = [null, r, list[k + 1]]; k++; }
+    if (!m) return parts.length ? parts : null;
+    parts.push({ name: m[1].trim(), amount: m[2] });
+  }
+  if (!parts.length) return null;
+  return parts.map((p) => (p.amount === "1" ? p.name : p.amount + " " + p.name)).join(", ");
+}

@@ -14,6 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -902,7 +903,8 @@ const ORDER_NOTICE_SUBJECT = new RegExp([
 const PRICE_ADJUSTMENT = /\bprice (?:adjustment|match(?:ed)?|difference|drop|protection|promise)\b|\brefunded the (?:price )?difference\b|\bmatched a lower price\b|\bprice of an item you bought has (?:dropped|gone down|fallen)\b/i;
 const NOT_A_PURCHASE_SUBJECT = /\b(?:refund(?:ed|s)?|cancell?(?:ed|ation)|price (?:adjustment|match(?:ed)?|difference)|credit note)\b/i;
 const NOT_A_PURCHASE_TOP = /\b(?:your|the|this) order (?:has been|was|is) cancell?ed\b|\bwe(?:'|’)?ve cancell?ed your order\b|\b(?:some )?items? (?:in|from|of) your order (?:has|have) been cancell?ed\b|\bpart of your order has been cancell?ed\b|\bwe(?:'|’)?ve (?:matched a lower price|refunded the (?:price )?difference)\b/i;
-const ACCOUNT_DEPOSIT = /\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
+const NO_ORDER = /\bthere (?:was|is) no order\b|\bnothing (?:was|has been) (?:ordered|charged)\b|\bnothing has been charged\b|\byou (?:haven(?:'|’)t|have not) been charged (?:a penny|anything)\b|\bthere wasn(?:'|’)t one\b[^\n]{0,40}\bsorry\b/i;
+const ACCOUNT_DEPOSIT =/\bthank you for (?:making|your) (?:a )?deposit\b|\bdeposit of [^\n.]{1,30}? has (?:now )?been (?:credited|added) to your (?:account|balance|wallet)\b/i;
 const PAYMENT_PROBLEM = /\b(?:(?:couldn(?:'|’)?t|could not|were unable to|we(?:'|’)re unable to|unable to) (?:charge|take (?:the )?payment|process (?:your |the )?payment|authori[sz]e (?:your |the )?payment)|payment (?:was |has been )?declined|payment (?:has )?failed|problem with (?:the|your) payment method)\b/i;
 
 // An email as the reader sees it: its subject, sender and date, its plain-text part, and its HTML part turned into text the
@@ -985,6 +987,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const flight = flightBooking({ ...flightArgs, text: plain || fromHtml }) || (plain && fromHtml ? flightBooking({ ...flightArgs, text: fromHtml }) : null);
   if (flight && flight.kind === "notice" && !opts.lenient) return { ok: false, reason: "travel_notice", source: "shopper_email" };
   const isFlight = Boolean(flight && flight.kind === "booking");
+  // Uber's three kinds of email (receipt-senders.js, round 10): a changed total for an earlier Eats order is money back on
+  // that order (parseOrderAdjustmentEmail), never a purchase; an Eats receipt and a ride are receipts.
+  const uber = uberEmail(sender?.domain, subject, text);
+  if (uber && uber.kind === "adjusted") return { ok: false, reason: "order_adjusted", source: "shopper_email" };
+  if (uber) { sig.subjectHit = true; sig.bodyHit = sig.bodyHit || /\btotal\b/i.test(text); }
+  // A supermarket's delivery-day email for an order already confirmed ("Your order is ready for today", "Payment received").
+  const dayOf = groceryDayOf(text);
+  if (dayOf) { sig.subjectHit = true; sig.bodyHit = true; }
   // When the shopper picked this very email themselves, one signal is enough (the fields are still checked below).
   if (!isFlight && !(opts.lenient ? sig.subjectHit || sig.bodyHit : sig.subjectHit && sig.bodyHit)) {
     return { ok: false, reason: "not_an_order_confirmation", source: "shopper_email", signals: { subject: sig.subjectHit, body: sig.bodyHit, textLength: text.length } };
@@ -995,6 +1005,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " "))) {
     return { ok: false, reason: "refund_or_cancellation", source: "shopper_email" };
   }
+  // A shop owning up that an earlier "order confirmation" was a marketing email ("There was no order. Nothing has been
+  // charged"): nothing was bought (round 10).
+  if (NO_ORDER.test(String(subject || "") + "\n" + text.slice(0, 3000).replace(/\s+/g, " "))) return { ok: false, reason: "no_order", source: "shopper_email" };
   // A notice that the payment didn't go through is not a receipt ("we couldn't charge your account for your order").
   if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
     return { ok: false, reason: "payment_problem", source: "shopper_email" };
@@ -1031,7 +1044,23 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
   const gameShop = GAME_SHOP.test(sender?.domain || "");
+  // (A pack of several things, "Mixy Meow | 1", "Checkerboard | 10", is one purchase named by all of them. Round 10.)
+  const bundle = gameShop ? gameBundle(fromHtml) || gameBundle(text) : null;
+  if (bundle) result.items = [{ name: bundle, qty: 1, pricePence: result.totalPence ?? null }];
   if (!result.items.length && gameShop) result.items = (gameItems(fromHtml).length ? gameItems(fromHtml) : gameItems(text)).map((i) => ({ ...i, pricePence: result.totalPence ?? null }));
+  // An Uber ride is travel: one ride, for what was paid (its fare, fees and credits are not things). An Uber Eats receipt that
+  // only links to the full one lists nothing: no items are made up, and the check says the email has no item list. Round 10.
+  const ride = Boolean(uber && uber.kind === "ride");
+  const noList = Boolean(uber && uber.kind === "eats" && uber.noItemList);
+  if (ride) { result.retailer = { ...result.retailer, name: "Uber" }; result.items = [{ name: uber.item, qty: 1, pricePence: result.totalPence ?? null }]; }
+  if (uber && uber.kind === "eats") result.retailer = { ...result.retailer, name: "Uber Eats" };
+  if (noList) result.items = [];
+  // The delivery-day email of a supermarket order: what was paid, for the order it names. Its few listed lines (substitutions,
+  // short-life items) are not the order's items, which are on the confirmation and in the attached receipt.
+  if (dayOf) { result.items = []; result.orderUpdate = "paid"; if (dayOf.orderRef) result.orderRef = dayOf.orderRef; result.totalPence = dayOf.paidPence; result.currency = "GBP"; }
+  // The restaurant a takeaway app's order came from ("Your East Ocean order will be with you soon"), beside the app's name.
+  const merchant = (uber && uber.kind === "eats" && uber.merchant) || takeawayMerchant(result.retailer.name, sender?.domain, subject, text);
+  if (merchant) result.merchant = merchant;
   // Flights: each one (from, to, day, flight number, out or back), the booking reference, and what was paid. The flights
   // are what was bought, so they are the one item (a fare's lines, "Adult 1", "Hold bag", aren't things).
   if (isFlight) {
@@ -1047,7 +1076,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
-  if (!isFlight && !journey && !gameShop) {
+  if (noList || dayOf) {
+    result.itemsCheck = { complete: false, itemsPence: 0, expectedPence: dayOf ? null : result.totalPence ?? null, missingPence: null, ...(noList ? { noItemList: true } : { orderUpdate: true }) };
+  } else if (!isFlight && !journey && !gameShop && !ride) {
     const cands = [];
     const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
@@ -1334,6 +1365,9 @@ export function parseReturnUpdateEmail(rawEmail) {
   const subj = subject.replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "");
   const top = text.slice(0, 1500).replace(/\s+/g, " ");
   if (PRICE_ADJUSTMENT.test(subj) || PRICE_ADJUSTMENT.test(top)) return { ok: false, reason: "price_adjustment" };
+  // (A takeaway app's changed total is money back on the order, not a return: parseOrderAdjustmentEmail. Round 10.)
+  const ub = uberEmail(retailerFromFrom(headers.from)?.domain, subject, text);
+  if (ub && ub.kind === "adjusted") return { ok: false, reason: "order_adjusted" };
   if (/\bcancell?(?:ed|ation)\b/i.test(subj) || NOT_A_PURCHASE_TOP.test(top) && !/\breturn(?:ed|s)?\b/i.test(subj)) return { ok: false, reason: "cancellation" };
   let stage = null;
   if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b/i.test(both)) stage = "refunded";
@@ -1493,6 +1527,21 @@ export function parseCancellationEmail(rawEmail) {
     ...(partial ? { cancelledItems: cancelledNames(u.text) } : {}),
     amountPence: amt ? money(amt[2]) : null, currency: amt ? (amt[1] === "€" ? "EUR" : "GBP") : null,
     retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
+}
+
+// A takeaway app's changed total for an order it already charged (Uber Eats: "We adjusted the total for your recent order
+// from Grill & Do", "Previous total £15.78", "Refund -£8.76", "New Total £7.02"). Money back on that order, never a purchase
+// and never a return: kept as the order's news (gmail.js attachAdjustments joins it to the order by its restaurant, its
+// previous total and its day). Round 10.
+export function parseOrderAdjustmentEmail(rawEmail) {
+  const no = { ok: false, reason: "not_an_adjustment" };
+  const u = updateParts(rawEmail);
+  const sender = retailerFromFrom(u.headers.from);
+  const ub = uberEmail(sender?.domain, u.subject, u.text);
+  if (!ub || ub.kind !== "adjusted" || ub.refundPence == null) return no;
+  return { ok: true, kind: "order_update", stage: "adjusted", at: u.at, orderRef: u.orderRef || null, merchant: ub.merchant || null,
+    amountPence: ub.refundPence, previousTotalPence: ub.previousPence, newTotalPence: ub.newPence, currency: "GBP",
+    retailer: { name: "Uber Eats", domain: sender.domain } };
 }
 
 // ---- Product photos ---------------------------------------------------------------
