@@ -130,6 +130,8 @@ async function graphGet(fetchImpl, url, headers) {
 // What a mailbox says about an email that has gone since it was listed (deleted or moved): nothing to read, nothing to retry.
 const GONE = Symbol("gone");
 // Bump when the receipt reader improves: older captures are re-read once with the new reader.
+// 35 (round 4): emails as they arrive: 8bit windows-1252 parts, forwards attached whole, attachments never read as text,
+// hidden and Outlook-only copies left out, replies quoted with "> ", recommendations, clipped emails, receipts only in a PDF.
 export const PARSER_VERSION = 35;
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.

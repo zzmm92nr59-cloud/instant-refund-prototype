@@ -725,6 +725,8 @@ export function looksPromotional(subject, headers, hasOrderRef) {
 const APPLE_SECTION = /^(app store|apple services|itunes store|apple books|apple arcade|apple tv|apple music|apple one|icloud)$/i;
 const APPLE_NOISE = /report a problem|write a review|in-app purchase|^(iphone|ipad|ipod|ipod touch|mac|apple watch|apple vision pro|apple tv)(\s?\w+)?$|^renews\b|^(monthly|yearly|annual|weekly|1 month|1 year|7 days)\b|^device\b|^family sharing|^purchased by|^cancel|^manage|^subscription|^\(|^free trial/i;
 const APPLE_LABEL = /^(order id|document(?: no\.?)?|invoice date|date|apple (?:account|id)|billed to|billing|sequence|payment|paid with|receipt|tax invoice)\b|:\s*$|@|^\d{1,2} [a-z]{3,9} \d{4}$|^[A-Z0-9]{8,14}$/i;
+// A money line read as an item ("Invoice total", "Order total", "Amount due"): never something bought (round 4).
+const MONEY_LABEL = /^(?:(?:invoice|order|grand|basket|bag|payment|final|overall)\s+total|total\s+(?:paid|due|amount|to pay|charged)|amount\s+(?:due|paid|payable|charged)|balance\s+(?:due|paid))\s*:?$/i;
 const PRICE_WORDS = /^(you\s+saved?|you\s+save|saved?|savings?|was|now|rrp|price|item\s+price|unit\s+price|special\s+price|sale\s+price|discount|reduced|deposit|balance|amount|paid)\b[\s:.!]*$/i;
 // Amazon's order emails put each thing bought in its own little boxes, so the usual line reading finds nothing. Two layouts:
 //  * things to be delivered: the item's name (Amazon cuts long ones short with "..."), "Sold by …", maybe "Colour: …" and
@@ -984,7 +986,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     items: chosen.items.length ? chosen.items : txt.items,
   };
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
-  result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
+  result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(sender?.domain || result.retailer.domain || "") && html) result.items = amazonItems(html);
   if (!result.items.length && /(^|\.)apple\.com$/i.test(result.retailer.domain || "")) result.items = appleItems(text).length ? appleItems(text) : fromHtml ? appleItems(fromHtml) : [];
   // Game currency bought through a game's web shop ("2,200 Coins"): one item, the whole order.
@@ -1007,7 +1009,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const otherPart = text === fromHtml ? plain : fromHtml;
   if (!isFlight && !journey && !gameShop) {
     const cands = [];
-    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim())));
+    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
     // are left out of the item readings. Round 4.)
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];

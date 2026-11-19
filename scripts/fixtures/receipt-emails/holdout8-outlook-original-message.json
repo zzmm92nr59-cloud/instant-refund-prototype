@@ -1,0 +1,35 @@
+{
+ "id": "holdout8-outlook-original-message",
+ "sender": "Ergo Works",
+ "layout": "Outlook reply, '-----Original Message-----', note with money",
+ "headers": {
+  "from": "Sam Taylor <sam.taylor@outlook.com>",
+  "to": "receipts@example.com",
+  "subject": "RE: Your Ergo Works order EW-88310",
+  "date": "Sat, 7 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Can you check this? The frame was meant to be £199 in the sale.\n\nSam\n\n-----Original Message-----\nFrom: Ergo Works <orders@ergoworks.co.uk>\nSent: 07 November 2026 14:02\nTo: Sam Taylor <sam.taylor@example.co.uk>\nSubject: Your Ergo Works order EW-88310\n\nErgo Works\nThanks for your order, Sam.\nOrder number: EW-88310\nOrder date: 7 November 2026\n\nStanding Desk Frame | Qty 1 | £229.00\nDesk Top Oak 140cm | Qty 1 | £129.00\n\nSubtotal £358.00\nTwo-person delivery £25.00\nTotal £383.00",
+ "expected": {
+  "shop": "Ergo Works",
+  "date": "2026-11-07",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Standing Desk Frame",
+    "qty": 1,
+    "linePence": 22900
+   },
+   {
+    "name": "Desk Top Oak 140cm",
+    "qty": 1,
+    "linePence": 12900
+   }
+  ],
+  "subtotalPence": 35800,
+  "feesPence": 2500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 38300
+ }
+}

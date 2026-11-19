@@ -353,3 +353,4 @@ export default function holdout7() {
   }
   return out;
 }
+export { CRLF, utf8, cp1252, b64, qp, head, part, multi, FAKE_PDF, itemsTable, shopPage, shopText };

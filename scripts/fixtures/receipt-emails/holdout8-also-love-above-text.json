@@ -1,0 +1,30 @@
+{
+ "id": "holdout8-also-love-above-text",
+ "sender": "Sleep Studio",
+ "layout": "'You may also love' with prices above the order (text)",
+ "headers": {
+  "from": "Sleep Studio <orders@sleepstudio.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order SS-11902 confirmed",
+  "date": "Sun, 8 Nov 2026 21:00:00 +0000"
+ },
+ "html": "",
+ "text": "Sleep Studio\nHi Sam, your order is confirmed.\n\nYou may also love\nSilk Eye Mask | £22.00\nSilk Scrunchies Set | £15.00\n\nYour order\nOrder number: SS-11902\nOrder date: 8 November 2026\nSilk Pillowcase Blush | Qty 1 | £39.00\n\nSubtotal £39.00\nDelivery £3.95\nTotal £42.95",
+ "expected": {
+  "shop": "Sleep Studio",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Silk Pillowcase Blush",
+    "qty": 1,
+    "linePence": 3900
+   }
+  ],
+  "subtotalPence": 3900,
+  "feesPence": 395,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4295
+ }
+}
