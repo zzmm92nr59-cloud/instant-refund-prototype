@@ -1,0 +1,17 @@
+{
+ "id": "coverage-membership-joining",
+ "sender": "PayBillHub",
+ "layout": "'Thank you for joining …'s fan club membership' receipt from the same billing company",
+ "headers": {
+  "from": "PayBillHub Info <info@paybillhub.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for joining RiverSong's trial fanclub membership",
+  "date": "Mon, 09 Mar 2026 16:20:03 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td>Thank you for joining RiverSong's fanclub</td></tr><tr><td>Receipt 300400500</td></tr><tr><td>Dear MoonlitHarbour42,</td></tr><tr><td>You've just bought RiverSong's trial fanclub membership. Find the details of your purchase below.</td></tr><tr><td><table><tr><td>Amount paid</td></tr><tr><td>£12.99</td></tr></table></td></tr><tr><td><table><tr><td>Date</td></tr><tr><td>March 9, 2026</td></tr></table></td></tr><tr><td><table><tr><td>Payment method</td></tr><tr><td>Card</td></tr></table></td></tr><tr><td>You will be securely billed every month. Manage subscription anytime on paybillhub.example. The next rebill date is on 2026-04-09 for 12.99 GBP</td></tr><tr><td>Payment problems? Contact us at support@paybillhub.example</td></tr><tr><td>Thank you for using our service.<br>Best regards,<br>PayBillHub team</td></tr></table></body></html>",
+ "expected": {
+  "kind": "receipt",
+  "totalPence": 1299,
+  "date": "2026-03-09"
+ }
+}

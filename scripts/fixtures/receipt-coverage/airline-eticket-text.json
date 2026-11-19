@@ -1,0 +1,23 @@
+{
+ "id": "coverage-airline-eticket-text",
+ "sender": "British Airways",
+ "layout": "BA's plain-text 'Your e-ticket receipt': 'Depart: <day> <time> - <airport> (<city>)' lines, 'Payment Total: GBP …', baggage price lists",
+ "headers": {
+  "from": "British Airways e-ticket <BA.e-ticket@email.ba.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your e-ticket receipt Q7TEST: 21 Mar 2026 09:40",
+  "date": "Mon, 02 Mar 2026 13:58:54 +0000"
+ },
+ "text": "Dear Mr Taylor,\n\nBritish Airways booking reference: Q7TEST\n\n---------------------\nYour e-ticket receipt\n---------------------\nThank you for booking with British Airways.\n\nTicket Type: e-ticket\nThis is your e-ticket receipt. Your ticket is held in our systems, you will not receive a paper ticket for your booking.\n\n---------------\nWHAT TO DO NEXT\n---------------\nVisit Manage My Booking and print \"Your Itinerary\", a customer friendly up-to-date summary of your booking.\n\nPay to take extra checked bags\nSave on extra baggage charges by pre-paying on ba.com before check in.\n\n--------------\nYour Itinerary\n--------------\n----------------------------------------------------\nBA0327: British Airways | Euro Traveller | Confirmed\n----------------------------------------------------\nDepart: 21 Mar 2026 09:40 - Charles de Gaulle (Paris) - Terminal 2A\nArrive: 21 Mar 2026 10:05 - Heathrow (London) - Terminal 5\n\n--------------\nPassenger list\n--------------\nMR SAM TAYLOR\n\n-----------------------------------------------------------------\nExtra baggage charges for flight BA0327\nCharles de Gaulle (Paris) to Heathrow (London) 21 Mar 2026 09:40\n-----------------------------------------------------------------\nAirport Price**\n1st item of luggage (max 23kg): GBP 75.00\n2nd item of luggage (max 23kg): GBP 95.00\n\nPre-airport price*\n1st item of luggage (max 23kg): GBP 65.00\n\n-------------------\nPayment Information\n-------------------\nTicket Number(s): 125-0000000000(MR SAM TAYLOR)\nCard Type: Visa Debit\nCard Holder: MR SAM TAYLOR\nCard Number: ************4242\nPayment Total: GBP 86.40\nPayment Date : 02 Mar 2026\nFlight tickets issued by: British Airways, UK\nFare Details: GBP62.00 + Tax/Fee/Charge GBP24.40 = GBP 86.40\n\nPlease note that air travel is not subject to VAT therefore we do not issue VAT receipts.\n\nYours sincerely,\nBritish Airways Customer Services\n",
+ "expected": {
+  "kind": "receipt",
+  "totalPence": 8640,
+  "flights": [
+   {
+    "from": "CDG",
+    "to": "LHR",
+    "date": "2026-03-21"
+   }
+  ]
+ }
+}

@@ -15,6 +15,7 @@ on:
       - 'scripts/test-flights.mjs'
       - 'scripts/fixtures/flight-emails.mjs'
       - 'scripts/fixtures/receipt-emails/**'
+      - 'scripts/fixtures/receipt-coverage/**'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/test-item-kinds-corpus.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
@@ -41,6 +42,7 @@ on:
       - 'scripts/test-flights.mjs'
       - 'scripts/fixtures/flight-emails.mjs'
       - 'scripts/fixtures/receipt-emails/**'
+      - 'scripts/fixtures/receipt-coverage/**'
       - 'scripts/test-item-kinds-accuracy.mjs'
       - 'scripts/test-item-kinds-corpus.mjs'
       - 'scripts/fixtures/uk-receipt-lines.json'
@@ -69,6 +71,7 @@ jobs:
         run: |
           node scripts/test-receipt-parser.mjs
           node scripts/test-receipt-corpus.mjs
+          node scripts/test-receipt-coverage.mjs
           node scripts/test-item-names.mjs
           node scripts/test-inbox-simulation.mjs
           node scripts/test-receipt-reread.mjs

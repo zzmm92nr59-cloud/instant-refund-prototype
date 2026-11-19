@@ -231,6 +231,8 @@ function walkShownParts(headers, body, out, depth) {
 const ENTITIES = { nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", pound: "£", euro: "€", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“",
   ndash: "–", mdash: "—", hellip: "…", middot: "·", bull: "•", times: "×", copy: "©", reg: "®", trade: "™", deg: "°", frac12: "½", eacute: "é",
   egrave: "è", ecirc: "ê", aacute: "á", agrave: "à", acirc: "â", iacute: "í", oacute: "ó", ouml: "ö", uuml: "ü", auml: "ä", ccedil: "ç", ntilde: "ñ", szlig: "ß", shy: "", zwnj: "", zwj: "", rarr: "→", larr: "←" };
+// The full-width pound sign some shops print ("Grand Total:￡123.20", Homary) is the pound sign (coverage round).
+const fullWidthPounds = (t) => String(t).replace(/\uffe1/g, "£");
 function decodeEntities(text) {
   // One pass, so "&amp;lt;" becomes "&lt;" (what the shop wrote), not "<".
   return text.replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z][a-z0-9]{1,7});/gi, (m, e) => {
@@ -522,7 +524,10 @@ function fromText(text, refDate) {
     // No total named: the last line that is only an amount "(Including VAT)" ("£33.76 (Including VAT)" under the delivery charge).
     [...text.matchAll(/^[\s|]*£\s*([0-9][0-9,]*\.[0-9]{2})\s*\((?:including|incl\.?|inc\.?)\s+vat\)[\s|]*$/gim)].pop() ||
     // A total written as a sentence: "Your order of 3 items comes to £120.00 including delivery" (round 4).
-    text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i);
+    text.match(/\b(?:your\s+)?(?:order|basket|total)\b[^.\n£]{0,40}\bcomes?\s+to\s+(?:a\s+total\s+of\s+)?£\s*([0-9][0-9,]*(?:\.[0-9]{2})?)/i) ||
+    // No total named, but the amount taken beside the card it was taken from ("MasterCard •••• 4242 (Apple Pay) | £10.99",
+    // Apple's subscription invoices). Coverage round.
+    text.match(/^[\s|]*(?:visa|mastercard|master card|amex|american express|maestro)\s*(?:[•·*.]\s?){2,}\s*\d{4}\b[^\n£]{0,30}(?:\n[\s|]*)?£\s*([0-9][0-9,]*\.[0-9]{2})[\s|]*$/im);
 
   // Line items: "Name ... Qty 1 ... £29.99" on one line or table row.
   const items = [];
@@ -696,7 +701,12 @@ const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?
 // asks for money still to come ("Amount due £160.80", "Please pay by …", "Due date: …"). Round 8.
 function paidInvoice(text) {
   const t = String(text || "").slice(0, 8000).replace(/\b(?:balance|amount)\s+(?:due|outstanding|to pay)\s*[:|]?\s*\|?\s*£\s?0(?:\.00)?\b/gi, " ");
-  return /\b(?:thank you for your payment|payment received|we(?:'|’)?ve received your payment|amount paid|total paid|paid in full|paid with|paid by|paid on)\b/i.test(t) &&
+  // (An invoice "billed to" a card or wallet, or naming the card it was taken from by its last four digits, was paid when it
+  // was sent: Apple's "Your invoice from Apple." puts "BILLED TO Visa .... 1234 (Apple Pay)" over the total, or
+  // "MasterCard •••• 1234 (Apple Pay)" under "Billing and Payment", and never says "paid". Coverage round.)
+  return (/\b(?:thank you for your payment|payment received|we(?:'|’)?ve received your payment|amount paid|total paid|paid in full|paid with|paid by|paid on)\b/i.test(t) ||
+    /\b(?:billed|charged) to\b[\s:|]{0,6}(?:[^\n]{0,40}\n\s*)?(?:visa|mastercard|master card|amex|american express|maestro|debit card|credit card|apple\s?pay|google\s?pay|paypal)\b/i.test(t) ||
+    /\b(?:visa|mastercard|master card|amex|american express|maestro)\s*(?:[•·*.]\s?){2,}\s*\d{4}\b/i.test(t)) &&
     !/\b(?:amount due|balance due|total due|payment due|due date|due by|due on|please pay|pay by|pay now|pay online|overdue|outstanding|payment terms|to be paid|awaiting payment)\b/i.test(t);
 }
 function receiptSignals(subject, text) {
@@ -723,9 +733,18 @@ function receiptSignals(subject, text) {
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?ordered\s*:|\byour\b[^.!?]{0,40}\b(?:e-?receipt|receipt) (?:for|from)\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?(?:[\w.&'’-]{2,30}\s+){1,3}order of\b(?!.*\b(?:dispatched|shipped|on its way|out for delivery|delivered|cancell?ed)\b)/.test(s) ||
     // "Your tickets: The Winter's Tale, booking RT-55101", "Invoice INV-2290 for window cleaning" (round 6): a booking or an
     // invoice named by its number. (The body must still show a total, below.)
-    /\btickets?\b[^!?]{0,60}\bbooking\s+(?:ref(?:erence)?\s*|no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?invoice\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{3,24}\b(?![^!?]*\b(?:overdue|reminder|due|unpaid|outstanding)\b)/.test(s);
+    /\btickets?\b[^!?]{0,60}\bbooking\s+(?:ref(?:erence)?\s*|no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{4,24}\b/.test(s) ||
+    // (An invoice named by its number is a purchase only when the email isn't asking for the money: a shop's "Invoice #1004"
+    // that says "Payment of £15.00 is due" and "Pay now" is a request to pay, not a receipt. Coverage round.)
+    (/^\s*(?:(?:fwd?|fw)\s*:\s*)?(?:your\s+)?invoice\s+(?:no\.?\s*|number\s*)?#?(?=[a-z0-9-]*\d)[a-z0-9-]{3,24}\b(?![^!?]*\b(?:overdue|reminder|due|unpaid|outstanding)\b)/.test(s) &&
+      !/\b(?:payment of\s+[£€$]\s?[\d,.]+\s+is due|is due (?:on|by)|amount due|balance due|pay now|please pay|awaiting payment)\b/i.test(String(text || "").slice(0, 8000))) ||
+    // Coverage round (emails in a real inbox that were never read as purchases): "Thank you for buying Gold membership",
+    // "Thank you for joining Ana's fan club membership", "We've received your payment and your order is under processing",
+    // "Your digital railcard purchase is complete".
+    /\bthank(?:s| you) for (?:buying|purchasing)\b|\bthank(?:s| you) for joining\b[^!?]{0,60}\b(?:membership|subscription)\b|\breceived your payment\b[^!?]{0,40}\byour order\b|\bpurchase\s+(?:is|was|has been)\s+(?:complete|completed|successful)\b/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b/i.test(text);
+  // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
+  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}[£€]|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}[£€]|[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}[£€]/i.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -961,8 +980,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   collectParts(headers, body, parts);
   if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
   const html = parts.html.join("\n").slice(0, MAX_INPUT);
-  const plain = tillPounds(unquoted(parts.text.join("\n").trim()));
-  const fromHtml = html ? tillPounds(unquoted(htmlToText(html))) : "";
+  const plain = tillPounds(unquoted(fullWidthPounds(parts.text.join("\n").trim())));
+  const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(html)))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
   // The sender's display name exactly as written (retailerFromFrom drops generic ones such as "Orders").

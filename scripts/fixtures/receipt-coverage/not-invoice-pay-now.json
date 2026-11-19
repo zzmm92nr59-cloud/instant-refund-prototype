@@ -1,0 +1,15 @@
+{
+ "id": "coverage-not-invoice-pay-now",
+ "sender": "Fernleaf Trainers",
+ "layout": "a web shop's draft-order 'Invoice #1004': 'Payment of £15.00 is due', 'Pay now', order summary",
+ "headers": {
+  "from": "Fernleaf Trainers <store+11112222@g.shopifyemail.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Invoice #1004",
+  "date": "Sat, 31 Oct 2026 12:00:00 +0000"
+ },
+ "html": "<html><body><h2>Fernleaf Trainers</h2><p>Invoice #1004</p><p>Payment of £15.00 is due</p><p><a href='https://fernleaf.example/pay'>Pay now</a></p><h3>Order summary</h3><table><tr><td>Trail Runner Trainers × 1</td><td>£15.00</td></tr><tr><td>Subtotal</td><td>£15.00</td></tr><tr><td>Total</td><td>£15.00 GBP</td></tr></table></body></html>",
+ "expected": {
+  "kind": "not_receipt"
+ }
+}

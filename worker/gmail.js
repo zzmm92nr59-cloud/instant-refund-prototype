@@ -139,7 +139,11 @@ const GONE = Symbol("gone");
 // at £0.00, sizes under a row, guide prices, "Ordered on" dates, cells copied with tabs, fares without a journey flagged.
 // 39 (round 9): the name check (item-names.js): itemsCheck.namesOk and suspectNames, so a note, a label, a size or a code
 // read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
-export const PARSER_VERSION = 39;
+// 40 (coverage round): emails that were never read as purchases at all: Apple's "Your invoice from Apple." (billed to a card,
+// never saying "paid"), BA's plain-text e-ticket ("Depart: … - Charles de Gaulle (Paris)"), "Thank you for buying …
+// membership", "Amount paid" without a total, the full-width pound sign (￡), and a shop's "Invoice #…" that asks to be paid
+// is no longer a purchase.
+export const PARSER_VERSION = 40;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -806,6 +810,9 @@ const NOT_A_NAME = [
 ];
 export function pastedNamesDoubtful(items) { return (items || []).some((i) => i && typeof i.name === "string" && NOT_A_NAME.some((re) => re.test(i.name.trim()))); }
 
+// What one email is to Relay (a receipt, a return or delivery update, an order update, or not a purchase), exactly as a scan
+// decides it. Exported for the coverage tests (scripts/test-receipt-coverage.mjs).
+export function classifyEmail(rawText, ref = {}, lenient = false) { return classify(rawText, ref, lenient); }
 function classify(rawText, ref, lenient = false) {
   let details, status = "pending";
   // Return emails are recognised by specific wording ("Return ID", "your return request"), so they are checked first:

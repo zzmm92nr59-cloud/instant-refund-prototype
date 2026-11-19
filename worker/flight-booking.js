@@ -81,6 +81,23 @@ function nearby(lines, i, fn) {
 }
 const flightNo = (s) => { const m = FLIGHT_NO.exec(s); return m ? m[1] + m[2] : null; };
 const codeIn = (s) => { const m = s.match(/\(([A-Z]{3})\)/) || s.match(/\b([A-Z]{3})\b/); return m && airportByCode(m[1]) ? m[1] : null; };
+// An airport on a "Depart:" or "Arrive:" line by its code or, failing that, by its name: BA's plain-text e-ticket writes
+// "Depart: 14 Mar 2026 08:10 - Charles de Gaulle (Paris) - Terminal 2C" (coverage round). Each part between dashes is tried,
+// as written, without its bracket and as "city name" ("Heathrow (London)" is London Heathrow). Never guessed: a name that
+// isn't in the table is no airport.
+const placeIn = (s) => {
+  const code = codeIn(s);
+  if (code) return code;
+  for (const part of s.split(/\s[-–|]\s|,\s/)) {
+    const p = part.trim(), m = /^(.+?)\s*\(([^)]{2,30})\)$/.exec(p);
+    for (const name of m ? [m[1], m[2] + " " + m[1]] : [p]) {
+      if (!/^\p{L}[\p{L} .'’-]{2,40}$/u.test(name) || /^terminal\b/i.test(name)) continue;
+      const a = airportByName(name);
+      if (a) return a.code;
+    }
+  }
+  return null;
+};
 
 // The flights an email names, in the order it names them (each once).
 export function flightLegs(text, refDate) {
@@ -103,10 +120,10 @@ export function flightLegs(text, refDate) {
       if (pair.end > l.length) i += pair.end > l.length + 1 + (lines[i + 1] || "").length ? 2 : 1;
       continue;
     }
-    // "From: London Gatwick (LGW)" … "To: Malaga (AGP)".
-    if (FROM_LABEL.test(l) && codeIn(l.replace(FROM_LABEL, ""))) {
+    // "From: London Gatwick (LGW)" … "To: Malaga (AGP)"; "Depart: … - Charles de Gaulle (Paris)" … "Arrive: … - Heathrow (London)".
+    if (FROM_LABEL.test(l) && placeIn(l.replace(FROM_LABEL, ""))) {
       for (let k = i + 1; k <= i + 4 && k < lines.length; k++) {
-        if (TO_LABEL.test(lines[k]) && codeIn(lines[k].replace(TO_LABEL, ""))) { add(codeIn(l.replace(FROM_LABEL, "")), codeIn(lines[k].replace(TO_LABEL, "")), i); i = k; break; }
+        if (TO_LABEL.test(lines[k]) && placeIn(lines[k].replace(TO_LABEL, ""))) { add(placeIn(l.replace(FROM_LABEL, "")), placeIn(lines[k].replace(TO_LABEL, "")), i); i = k; break; }
       }
       continue;
     }
