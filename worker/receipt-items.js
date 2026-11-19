@@ -453,7 +453,9 @@ function priceAbove(lines) {
   for (let k = 0; k < lines.length; k++) {
     const a = readLine(lines[k]), b = lines[k + 1] != null ? readLine(lines[k + 1]) : null;
     if (b && !a.names.length && a.prices.length === 1 && a.cells.length === 1 && !a.endWord && !a.negative && a.qty == null &&
-        b.names.length && !b.prices.length && !b.noise && !b.heading && !b.endWord && b.unit == null) {
+        b.names.length && !b.prices.length && !b.noise && !b.heading && !b.endWord && b.unit == null &&
+        // (Never a money line's label: "£1.59" over "Inclusive of VAT at 20%" is a total and its VAT, not an item.)
+        !END.test(b.cells[0] || "") && !FEE_NAME.test(b.cells[0] || "") && !/\b(?:vat|tax|total|subtotal|paid|balance|payment)\b/i.test(b.cells[0] || "")) {
       out.push(lines[k + 1].replace(/[\s|]+$/, "") + " | " + a.cells[0] + " |"); k++; continue;
     }
     out.push(lines[k]);
