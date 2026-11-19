@@ -27,6 +27,8 @@ on:
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
       - 'scripts/test-mail-push.mjs'
+      - 'scripts/test-scan-codes.mjs'
+      - 'scripts/fixtures/scan-codes.mjs'
       - '.github/workflows/mail-tests.yml'
   push:
     branches: [main]
@@ -54,6 +56,8 @@ on:
       - 'scripts/test-return-policies.mjs'
       - 'scripts/test-gifts.mjs'
       - 'scripts/test-mail-push.mjs'
+      - 'scripts/test-scan-codes.mjs'
+      - 'scripts/fixtures/scan-codes.mjs'
       - '.github/workflows/mail-tests.yml'
   workflow_dispatch:
 permissions:
@@ -106,5 +110,7 @@ jobs:
         run: node scripts/test-return-policies.mjs
       - name: Gifts (tagging receipts, who for, Wrapped, own receipts only)
         run: node scripts/test-gifts.mjs
+      - name: Codes to show or scan (a return barcode, a drop-off QR code, a collection, tickets; look-alikes never; as sent and forwarded)
+        run: node scripts/test-scan-codes.mjs
       - name: Fix this receipt (shop, total, date, items; own receipts only; counted for Relay health)
         run: node scripts/test-receipt-fixes.mjs

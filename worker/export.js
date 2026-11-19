@@ -70,6 +70,11 @@ export async function exportShopperData(env, shopper, now = Date.now()) {
       connectedAt: iso(m.connectedAt), lastCheckedAt: iso(m.lastScanAt) })),
     receipts: captured.map((r) => ({ id: r.id, status: r.status, capturedAt: iso(r.createdAt), ...(parse(r.details) || {}) })),
     emailsLookedAtButNotKept: notReceipts ? notReceipts.n : 0,
+    // Codes to show or scan that Relay kept from your emails (a return barcode, a drop-off QR code, a ticket): what each is
+    // for, the shop's words, any date the email gave, and the picture itself when Relay could keep it.
+    codesToShow: (await rows("SELECT receipt_id AS fromEmail, purpose, kind, value, words, deadline, day, type, data, created_at AS at FROM receipt_codes WHERE shopper_id = ? ORDER BY created_at, receipt_id, idx", id))
+      .map((c) => ({ fromEmail: c.fromEmail, purpose: c.purpose, kind: c.kind || null, number: c.value || null, shopsWords: parse(c.words) || [], deadline: c.deadline || null, eventDay: c.day || null,
+        picture: c.data ? "data:" + c.type + ";base64," + c.data : null, keptAt: iso(c.at) })),
     yourChoices: {
       storeCategories: (await rows("SELECT store_key AS store, category, promo FROM receipt_learning WHERE shopper_id = ?", id))
         .map((l) => ({ store: l.store, category: l.category || null, justPromotions: Boolean(l.promo) })),
