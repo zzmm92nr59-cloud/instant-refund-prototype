@@ -150,7 +150,7 @@ const GONE = Symbol("gone");
 // delivery-day payment (orderUpdate "paid", joined to its order), game packs, Apple service names and card-line totals, VAT on
 // top of a subtotal, changed Shopify orders, credits, Domino's total after its deal, and "there was no order" apologies.
 // 41: both of those together (the coverage round and round 10 were read as 40 on their own branches).
-export const PARSER_VERSION = 41;
+export const PARSER_VERSION = 42;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);

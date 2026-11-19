@@ -1,0 +1,33 @@
+{
+ "id": "holdout12-stripe-dollars",
+ "sender": "Quillbase",
+ "layout": "'$60.00', 'VAT - United Kingdom (20%) $10.00 (£7.38)'; no kind of dollar named",
+ "headers": {
+  "from": "\"Quillbase Inc.\" <invoice+statements+acct_9@stripe.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your receipt from Quillbase Inc. #4102-2433-0153",
+  "date": "Wed, 09 Sep 2026 14:29:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Quillbase Inc.</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.stripe.com/?utm_source=email\"><img src=\"https://www.stripe.com/static/email/logo.png\" alt=\"Quillbase Inc.\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Receipt from Quillbase Inc.</td></tr>\n<tr><td>$60.00</td></tr>\n<tr><td>Paid September 9, 2026</td></tr>\n<tr><td>Receipt number</td></tr>\n<tr><td>4102-2433-0153</td></tr>\n<tr><td>Receipt #4102-2433-0153</td></tr>\n<tr><td>Sep 9, 2026 – Sep 9, 2027</td></tr>\n<tr><td>Writer plan</td></tr>\n<tr><td>Qty 1</td></tr>\n<tr><td>$50.00</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>$50.00</td></tr>\n<tr><td>Total excluding tax</td></tr>\n<tr><td>$50.00</td></tr>\n<tr><td>VAT - United Kingdom (20%)</td></tr>\n<tr><td>$10.00</td></tr>\n<tr><td>(&pound;7.38)</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>$60.00</td></tr>\n<tr><td>Amount paid</td></tr>\n<tr><td>$60.00</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Quillbase Inc.. All rights reserved.<br /><a href=\"https://www.stripe.com/help\">Help</a> | <a href=\"https://www.stripe.com/privacy\">Privacy</a> | <a href=\"https://www.stripe.com/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.stripe.com/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Quillbase",
+  "date": "2026-09-09",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "Writer plan",
+    "qty": 1,
+    "linePence": 5000
+   }
+  ],
+  "subtotalPence": 5000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6000,
+  "shopAlso": [
+   "Quillbase Inc"
+  ]
+ }
+}

@@ -70,6 +70,9 @@ function why(name, opts, all) {
   if (LABEL.test(n) || CODE_LABEL.test(n)) return "label";
   if (NOTE.some((re) => re.test(n))) return "note";
   if (MODIFIER.test(n) && !/^no\.\s?\d/i.test(n)) return "modifier";
+  // (A shop's line to the shopper, "There's no better way to buy wine!": a sentence that says something, never a thing.
+  // Round 11.)
+  if (/!$/.test(n) && words(n).length >= 4 && /^(?:there|it|we|you|i|this|that|here|what|now|thanks?|enjoy|welcome|nothing|no)\b/i.test(n)) return "note";
   if (CUT.test(n)) return "cut";
   // (A deal named by its price, "Any 2 Pre Mixed Cans for £8.00", "3 for £10": the price is the deal's name. Round 11.)
   if (PRICE_IN.test(n) && !VALUE_NAMED.test(n) && !/\b(?:any\s+)?\d{1,2}\b[^£]{0,40}\bfor\s+£\s?\d[\d.,]*$/i.test(n)) return "price";

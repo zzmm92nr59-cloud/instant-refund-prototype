@@ -1,0 +1,41 @@
+{
+ "id": "holdout12-paints-no-pence",
+ "sender": "Nordvik Paints",
+ "layout": "'Order Info - NVP-…' subject; '89.5 GBP', '32 GBP' (no pence where they're nought)",
+ "headers": {
+  "from": "Nordvik Paints <web@order.nordvik-paints.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order Info - NVP-4kq8m2xt",
+  "date": "Thu, 30 Jul 2026 10:10:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Nordvik Paints</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.nordvik-paints.example/?utm_source=email\"><img src=\"https://www.nordvik-paints.example/static/email/logo.png\" alt=\"Nordvik Paints\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>ORDER NVP-4kq8m2xt</td></tr>\n<tr><td>Thank you for your purchase!</td></tr>\n<tr><td>We confirm we have received your order.</td></tr>\n<tr><td>Order summary</td></tr>\n<tr><td>LINVA Sea Mist</td></tr>\n<tr><td>5L, x 1</td></tr>\n<tr><td>89.5 GBP</td></tr>\n<tr><td>LINVA Fern Hollow</td></tr>\n<tr><td>2L, x 1</td></tr>\n<tr><td>32 GBP</td></tr>\n<tr><td>Subtotal incl. VAT</td><td>121.5 GBP</td></tr>\n<tr><td>Shipping</td><td>15 GBP</td></tr>\n<tr><td>VAT</td><td>0 GBP</td></tr>\n<tr><td>Total</td><td>136.5 GBP</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Nordvik Paints. All rights reserved.<br /><a href=\"https://www.nordvik-paints.example/help\">Help</a> | <a href=\"https://www.nordvik-paints.example/privacy\">Privacy</a> | <a href=\"https://www.nordvik-paints.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.nordvik-paints.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "[Studio]\tORDER NVP-4kq8m2xt\n\nThank you for your purchase!\n\nOrder summary\n\nLINVA Sea Mist 5L, x 1\t89.5 GBP LINVA Fern Hollow 2L, x 1\t32 GBP\nSubtotal incl. VAT\t121.5 GBP Shipping\t15 GBP\nVAT\t0 GBP\nTotal\t136.5 GBP",
+ "expected": {
+  "shop": "Nordvik Paints",
+  "date": "2026-07-30",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "LINVA Sea Mist",
+    "qty": 1,
+    "linePence": 8950,
+    "extras": [
+     "5L"
+    ]
+   },
+   {
+    "name": "LINVA Fern Hollow",
+    "qty": 1,
+    "linePence": 3200,
+    "extras": [
+     "2L"
+    ]
+   }
+  ],
+  "subtotalPence": 12150,
+  "feesPence": 1500,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 13650
+ }
+}

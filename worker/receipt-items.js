@@ -185,6 +185,9 @@ function readLine(raw) {
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i], next = cells[i + 1];
     if (QTY_LABEL.test(c) && next && /^\d{1,3}$/.test(next)) { line.qty = Number(next); i++; continue; }
+    // ("9L, x 1": the size and how many, under the name. Round 11.)
+    const sq = /^(\d+(?:[.,]\d+)?\s?(?:ml|cl|l|ltr|litres?|g|kg|oz|m|cm|mm))\s*,\s*[x×]\s?(\d{1,3})$/i.exec(c);
+    if (sq) { line.variant.push(sq[1]); line.qty = Number(sq[2]); continue; }
     if (PRICE_LABEL.test(c) && next && PRICE_CELL.test(next)) { const m = PRICE_CELL.exec(next); line.unitLabelled = pence(m[2], m[3], m[4]); i++; continue; }
     if (TOTAL_LABEL.test(c) && next && PRICE_CELL.test(next)) { const m = PRICE_CELL.exec(next); line.labelledTotal = pence(m[2], m[3], m[4]); line.endWord = true; i++; continue; }
     if (NAME_LABEL.test(c) && next && letters(next) >= 3 && !PRICE_CELL.test(next) && !HEADING.test(next)) { line.names.push(cleanName(next)); line.namedByLabel = true; i++; continue; }
@@ -365,7 +368,7 @@ export function readItems(text, opts = {}) {
   // (A label on its line and its value on the next, "size:" over "150x200 cm [King]", "Product code:" over "UKI83120652": one
   // line, so the value is the item's size or code, never a name. Round 11.)
   for (let k = raw.length - 2; k >= 0; k--) {
-    if (/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
+    if ((/^[\s|]*(?:size|colou?r|style|fit|length|width|product code|item code|sku|code|ref(?:erence)?|article(?: no\.?)?|art\. ?no\.?)\s*:[\s|]*$/i.test(raw[k]) || /^[\s|]*(?:order|transaction|payment|invoice|receipt)\s+(?:id|number|no\.?)\s*:?[\s|]*$/i.test(raw[k])) && !/£|:\s*$/.test(raw[k + 1]) && raw[k + 1].trim().length <= 60) {
       raw.splice(k, 2, raw[k].replace(/[\s|]+$/, "") + " " + raw[k + 1].replace(/^[\s|]+/, ""));
       afterRow.splice(k + 1, 1);
     }

@@ -1,0 +1,40 @@
+{
+ "id": "holdout12-coffee-sections",
+ "sender": "Brewhaus",
+ "layout": "'Your order on www.brewhaus.example'; 'Capsules' over the first, '10 x £0.79' then the line",
+ "headers": {
+  "from": "Brewhaus <club@brewhaus.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "BREWHAUS Club: Your order on www.brewhaus.example",
+  "date": "Wed, 14 Oct 2026 16:51:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Brewhaus</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.brewhaus.example/?utm_source=email\"><img src=\"https://www.brewhaus.example/static/email/logo.png\" alt=\"Brewhaus\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Order Confirmation</td></tr>\n<tr><td>Dear Sam Taylor ,</td></tr>\n<tr><td>We are pleased to confirm that we've received your order and it is now being processed.</td></tr>\n<tr><td>Delivery address</td></tr>\n<tr><td>Standard Delivery</td></tr>\n<tr><td>Payment method</td></tr>\n<tr><td>Credit Card</td></tr>\n<tr><td>&pound;22.70</td></tr>\n<tr><td>Order details</td></tr>\n<tr><td>Capsules</td></tr>\n<tr><td>Toasted Pecan</td></tr>\n<tr><td>10 x &pound;0.79</td></tr>\n<tr><td>&pound;7.90</td></tr>\n<tr><td>Dark Cocoa</td></tr>\n<tr><td>10 x &pound;0.79</td></tr>\n<tr><td>&pound;7.90</td></tr>\n<tr><td>Morning Lungo</td></tr>\n<tr><td>10 x &pound;0.69</td></tr>\n<tr><td>&pound;6.90</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;22.70</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;22.70</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Brewhaus. All rights reserved.<br /><a href=\"https://www.brewhaus.example/help\">Help</a> | <a href=\"https://www.brewhaus.example/privacy\">Privacy</a> | <a href=\"https://www.brewhaus.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.brewhaus.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Brewhaus",
+  "date": "2026-10-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Toasted Pecan",
+    "qty": 10,
+    "linePence": 790
+   },
+   {
+    "name": "Dark Cocoa",
+    "qty": 10,
+    "linePence": 790
+   },
+   {
+    "name": "Morning Lungo",
+    "qty": 10,
+    "linePence": 690
+   }
+  ],
+  "subtotalPence": 2270,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2270
+ }
+}

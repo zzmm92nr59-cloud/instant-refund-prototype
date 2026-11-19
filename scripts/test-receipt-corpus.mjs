@@ -239,7 +239,54 @@ const joinWrong = [];
   if (!(meal.adjusted && meal.adjusted.refundPence === 625 && meal.adjusted.newTotalPence === 1511)) joinWrong.push("adjustment not joined to its order: " + JSON.stringify(meal.adjusted));
   if (other.adjusted) joinWrong.push("adjustment joined to another restaurant's order");
 }
-console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders"}`);
+// Round 11 (Connor's real inbox, four blind checks): emails of one order that must end as one card, or none.
+{
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const card = (id, n) => ({ id: "c" + n, createdAt: n, kind: "receipt", status: "pending", ...parseReceiptEmail(rawEmail(fx(id))) });
+  const cancel = (id) => ({ kind: "order_update", stage: "cancelled", ...parseCancellationEmail(rawEmail(fx(id))) });
+  // A takeaway order and its cancellation, by the number under "Your order number is:".
+  const je = mergeOrderEmails([card("holdout12-je-order-number-under-label", 1)]);
+  attachCancellations(je, [cancel("holdout12-je-cancelled")]);
+  if (!(je[0].cancelled && je[0].cancelled.partial === false)) joinWrong.push("takeaway cancellation not joined by its number");
+  // A cancellation with no number that shows the item joins the one order of that shop with that item, and no other.
+  const tableOrder = card("holdout12-furniture-order-label", 2);
+  const other = { ...card("holdout12-furniture-order-label", 3), orderRef: "LWH-OTHER-1", items: [{ name: "Velvet Accent Chair", qty: 1, pricePence: 19999 }] };
+  const furn = mergeOrderEmails([tableOrder, other]);
+  const c = cancel("holdout12-furniture-cancelled-no-number");
+  if (!c.ok || c.orderRef !== null || !c.byItems) joinWrong.push("item-named cancellation not read: " + JSON.stringify(c.reason || c.orderRef));
+  attachCancellations(furn, [c]);
+  if (!(furn[0].cancelled && !furn[0].cancelled.partial) || furn[1].cancelled) joinWrong.push("item-named cancellation joined the wrong order");
+  const twice = mergeOrderEmails([card("holdout12-furniture-order-label", 4), { ...card("holdout12-furniture-order-label", 5), orderRef: "LWH-OTHER-2" }]);
+  attachCancellations(twice, [c]);
+  if (twice.some((o) => o.cancelled)) joinWrong.push("item-named cancellation guessed between two orders with the same item");
+  // A payment service's receipt for the shop's order (same number but the shop's letters, same money, same day): one card,
+  // led by the shop's own email.
+  const shop = card("holdout12-rugs-comma-pence", 6);
+  const paypal = { id: "p1", createdAt: 7, kind: "receipt", retailer: { name: "Rugsmith AB", domain: null, via: "paypal.co.uk" }, orderRef: "5502714", orderDate: shop.orderDate, totalPence: shop.totalPence, currency: "GBP",
+    items: [{ name: "Linen cushion cover 4...", qty: 2, pricePence: 1350 }], itemsCheck: { complete: false } };
+  const one = mergeOrderEmails([shop, paypal]);
+  if (one.length !== 1 || one[0].retailer.name !== "Rugsmith") joinWrong.push(`a PayPal receipt and the shop's order made ${one.length} cards`);
+  if (mergeOrderEmails([shop, { ...paypal, totalPence: shop.totalPence + 500 }]).length !== 2) joinWrong.push("a PayPal receipt for other money joined the order");
+  // A PDF-only invoice of the shop days after its itemised order email is that order's; a parcel "-1" of an order joins it.
+  const coffee = card("holdout12-coffee-sections", 8);
+  const inv = { id: "i1", createdAt: 9, kind: "receipt", retailer: { name: "Brewhaus", domain: "brewhaus.example" }, orderRef: "88120044", orderDate: coffee.orderDate, totalPence: null, items: [], detailsInAttachment: "pdf" };
+  const c1 = mergeOrderEmails([coffee, inv]);
+  if (c1.length !== 1 || c1[0].orderRef !== "88120044") joinWrong.push(`a PDF-only invoice made ${c1.length} cards`);
+  const paints = card("holdout12-paints-no-pence", 10);
+  const parcel = { id: "s1", createdAt: 11, kind: "receipt", retailer: { name: "Nordvik Paints", domain: "nordvik-paints.example" }, orderRef: paints.orderRef + "-1", orderDate: paints.orderDate, totalPence: null, items: [] };
+  if (mergeOrderEmails([paints, parcel]).length !== 1) joinWrong.push("a parcel numbered '-1' of an order made a card of its own");
+  // A shop's reply quoting the order, and a booking someone else forwarded to the shopper, are never purchases.
+  const reply = ["From: Bedcraft <hello@bedcraft.example>", "To: Sam Taylor <sam.taylor@example.co.uk>", "Subject: RE: Order #1806 confirmed", "Date: Mon, 6 Jul 2026 10:30:55 +0000", "In-Reply-To: <abc@mail.example>",
+    "Content-Type: text/plain; charset=utf-8", "", "Hi Sam, thanks for your message. Your delivery is booked.", "", "Order #1806 confirmed", "Ottoman Bed Frame | £899.00", "Total | £899.00"].join("\r\n");
+  if (parseReceiptEmail(reply).ok) joinWrong.push("a shop's reply read as a purchase");
+  const fwd = ["From: Alex Morgan <alex.morgan@outlook.com>", "To: Sam Taylor <sam.taylor@example.co.uk>", "Subject: Fw: Flight Booking Confirmed: London - Faro", "Date: Thu, 5 Feb 2026 18:13:21 +0000", "Content-Type: text/plain; charset=utf-8", "",
+    "________________________________", "From: SkyTrips <flights@skytrips.example>", "Sent: 4 February 2026 20:00", "To: alex.morgan@outlook.com <alex.morgan@outlook.com>", "Subject: Flight Booking Confirmed: London - Faro", "",
+    "Dear ALEX MORGAN,", "Your booking is confirmed. Booking number 5531877201", "Total | £412.30"].join("\r\n");
+  if (parseReceiptEmail(fwd).ok) joinWrong.push("someone else's forwarded booking read as the shopper's purchase");
+  const mine = fwd.replace("From: Alex Morgan <alex.morgan@outlook.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace(/alex\.morgan@outlook\.com/g, "sam.taylor@outlook.com").replace("ALEX MORGAN", "SAM TAYLOR");
+  if (!parseReceiptEmail(mine).ok) joinWrong.push("the shopper's own forwarded booking not read");
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases"}`);
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
