@@ -1152,7 +1152,7 @@
     ".rl-po .rl-po-img.rl-has-logo,.rl-dt-head .rl-po-img.rl-has-logo{background:#fff!important;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.1)}" +
     ".rl-dt-facts{margin:16px 0 0;border-radius:16px;background:var(--rl-card);padding:0 16px}" +
     "@media (prefers-color-scheme: dark) and (min-resolution: 9999dppx){.rl-dt-facts{background:rgba(255,255,255,.07)}}" +
-    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}.rl-dt-fact.rl-dt-items{flex-direction:column;align-items:stretch;gap:2px}.rl-dt-items .rl-rr-list{margin:0;min-width:0}.rl-dt-items .rl-rr-list li span{min-width:0;overflow-wrap:anywhere}" +
+    ".rl-dt-fact{display:flex;justify-content:space-between;align-items:baseline;gap:16px;padding:12px 0;border-top:.5px solid var(--rl-line);font-size:15px;line-height:1.35}.rl-dt-fact:first-child{border-top:0}.rl-dt-fact.rl-dt-items{flex-direction:column;align-items:stretch;gap:2px}.rl-dt-items .rl-rr-list{margin:0;min-width:0}.rl-dt-items .rl-rr-list li span{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;color:var(--rl-text)}.rl-dt-items .rl-rr-list li b{flex:none;text-align:right;white-space:nowrap}" +
     ".rl-dt-fact span{color:var(--rl-text2);flex:none}.rl-dt-fact b{font-weight:500;text-align:right;overflow-wrap:anywhere;color:var(--rl-text)}" +
     // Grouped lists like the phone's Settings: no outline, and the line between rows starts after the icon.
     ".rl-acard{border:0}.rl-arow{position:relative}.rl-arow+.rl-arow{border-top:0}" +
@@ -9269,7 +9269,8 @@
           acts.appendChild(el("button", { type: "button", className: "rl-po-primary", text: "Start return", onclick: function () { open(function (sh) { returnGuide(sh, x, who, portal); }); } }));
         // Tell Relay what's going back, so it moves to Returns & swaps and the rest of the order stays in the wallet.
         // (Not once Relay is following the return: its page then says where the return has got to, below.)
-        if (opts.markable && x.id && !(retOf(x) && retOf(x).state !== "started")) {
+        // Not offered for an order that usually can't be returned (food, downloads, tickets), unless it's already marked.
+        if (opts.markable && x.id && !(retOf(x) && retOf(x).state !== "started") && (x.returnable !== false || opts.markable === "undo")) {
           var idxs = opts.item != null ? [opts.item] : (x.items || []).map(function (_, i) { return i; });
           if (!idxs.length) idxs = [0];
           var undo = opts.markable === "undo", words = el("span", { text: undo ? "Not sending this back" : "I'm sending this back" });
