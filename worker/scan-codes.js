@@ -44,7 +44,7 @@ const APP_DOWNLOAD = /\b(?:download|get|install|try)\b[^.\n]{0,40}\bapp\b|\bapp\
 const CREDENTIAL = /\be-?sims?\b|\bPUK\b|\bICCID\b|\bSM-DP\+|\bLPA:|\bactivation code\b/i;
 const SECRET_NEAR = /\bPIN\b|\bpass(?:word|code)\b|\bconfidential\b|\bdo not share\b|\bdon(?:'|’)t share\b|\bsecurity code\b|\bverification code\b|\bone[- ]time\b/i;
 const ACCESS_PASS = /\bvisitor\b|\bturnstiles?\b|\b(?:access|entry) to the building\b|\bgain access\b|\bappointment\b|\bconcierge\b|\bfront desk\b|\bmeeting\b|\byour host\b/i;
-const PROMO_NEAR = /\b\d{1,3}\s?% off\b|£\s?\d+(?:\.\d\d)? off\b|\bdiscounts?\b|\bvouchers?\b|\bcoupons?\b|\bpromo(?:tion|tional)? ?codes?\b|\brewards?\b|\bloyalty\b|\bpoints\b|\bspecial offer\b|\bredeem\b|\bfree (?:gift|drink|coffee|delivery)\b|\bsurvey\b|\bfeedback\b|\brefer a friend\b/i;
+const PROMO_NEAR = /\b\d{1,3}\s?% off\b|£\s?\d+(?:\.\d\d)? off\b|\bdiscounts?\b|\bvouchers?\b|\bcoupons?\b|\bpromo(?:tion|tional)? ?codes?\b|\brewards?\b|\bloyalty\b|\b(?:reward|bonus|club) points\b|\bpoints (?:balance|earned)\b|\bspecial offer\b|\bredeem\b|\bfree (?:gift|drink|coffee|delivery)\b|\bsurvey\b|\bfeedback\b|\brefer a friend\b/i;
 const PRINTED_ELSEWHERE = /\b(?:qr|bar) ?code (?:printed )?on (?:your|the) (?!phone|screen|mobile|device)[^.\n]{0,40}\b(?:number|bib|label|parcel|package|box|wristband|card|letter|envelope|bag|tag|receipt you)\b|\bon your (?:run|race|bib) number\b/i;
 const CODE_WORD = /\bbar\s?codes?\b|\bqr\b|\bcode (?:below|above)\b|\breturn code\b/i;
 // What it is for, as the email says.
@@ -111,7 +111,7 @@ export function codeImageUrl(src) {
   try { u = new URL(unamp(src).replace(/^http:\/\//i, "https://")); } catch { return null; }
   if (u.protocol !== "https:" || u.username || u.password || (u.port && u.port !== "443") || u.href.length > 2500) return null;
   const h = u.hostname.toLowerCase();
-  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || /(^|\.)(localhost|local|internal|lan|home|corp|test|invalid|example)$/.test(h)) return null;
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(h) || /^[0-9.]+$/.test(h) || /(^|\.)(localhost|local|internal|lan|home|corp)$/.test(h)) return null;
   return u.href;
 }
 
@@ -174,7 +174,7 @@ export function findCodes(rawEmail, details = {}) {
     // A shop receipt's own barcode, where the receipt says returns need the receipt.
     let receiptSays = null;
     if (!purpose && isReceipt && (RECEIPT_BARCODE_ALT.test(c.named) || /\breceipt\b/i.test(subject))) {
-      receiptSays = sentences(all.replace(/\n+/g, " ")).find((s) => NEEDS_RECEIPT.test(s) && RETURN_WORD.test(s) && goodWords(tidyWords(s))) || null;
+      receiptSays = all.split("\n").flatMap(sentences).find((s) => NEEDS_RECEIPT.test(s) && RETURN_WORD.test(s) && goodWords(tidyWords(s))) || null;
       if (receiptSays) purpose = "in_store_return";
     }
     if (!purpose) continue;
@@ -185,9 +185,13 @@ export function findCodes(rawEmail, details = {}) {
     const focusS = focus ? sentences(focus) : [];
     const lead = focusS.find((s) => CODE_WORD.test(s));
     if (lead) add(lead);
-    if (!words.length) { const line = [...nearB.slice(-4).reverse(), ...nearA.slice(0, 2)].find((l) => pick(l + "\n" + c.named) === purpose && goodWords(tidyWords(l)) && l.length <= 200); if (line) add(sentences(line)[0] === line ? line : line); }
+    // (A short line that names how it goes back, "Evri Drop Off - No Printer Required", comes first.)
+    const label = (l) => /:\s*[A-Z0-9-]{4,}\s*$/i.test(l) || (l.length <= 60 && /^[^:.]{0,24}:\s/.test(l));
+    if (purpose === "drop_off_return") { const how = nearB.slice(-5).reverse().find((l) => l.length <= 80 && !/[.!?]$/.test(l) && !label(l) && DROP_OFF.test(l)); if (how) { words.length = 0; add(how); if (lead) add(lead); } }
+    if (!words.length) { const line = [...nearB.slice(-4).reverse(), ...nearA.slice(0, 2)].flatMap(sentences).find((l) => !label(l) && pick(l + "\n" + c.named) === purpose && goodWords(tidyWords(l))); if (line) add(line); }
+    if (!words.length) { const line = all.split("\n").flatMap(sentences).find((l) => !label(l) && CODE_WORD.test(l) && pick(l) === purpose && goodWords(tidyWords(l))); if (line) add(line); }
     const pool = [...focusS, ...nearA.slice(0, 2).flatMap(sentences), ...nearB.slice(-2).flatMap(sentences)];
-    const rule = pool.find((s) => s !== lead && RESTRICTION.test(s) && goodWords(tidyWords(s)) && !words.includes(tidyWords(s)));
+    const rule = pool.find((s) => s !== lead && !/\bneed to print\b/i.test(s) && RESTRICTION.test(s) && goodWords(tidyWords(s)) && !words.includes(tidyWords(s)));
     if (rule) add(rule);
     // Its number, when the email gives it: in the picture's description, in the address that draws it, or labelled beside it.
     let value = (/\bbar\s?code\s*[:#]\s*([A-Z0-9-]{6,40})\b/i.exec(c.alt) || [])[1] || null;
