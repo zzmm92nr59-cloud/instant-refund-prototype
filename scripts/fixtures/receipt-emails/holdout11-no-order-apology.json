@@ -1,0 +1,23 @@
+{
+ "id": "holdout11-no-order-apology",
+ "sender": "Velvetine",
+ "layout": "'There was no order. Nothing has been charged'",
+ "headers": {
+  "from": "Velvetine <team@e.velvetine.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "About that \"order confirmation\". There wasn't one. Sorry.",
+  "date": "Fri, 28 Aug 2026 16:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Velvetine</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.velvetine.example/?utm_source=email\"><img src=\"https://www.velvetine.example/static/email/logo.png\" alt=\"Velvetine\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>About that \"order confirmation\". There wasn't one. Sorry.</td></tr>\n<tr><td>Nothing was ordered, nothing was charged. Just us, owning up.</td></tr>\n<tr><td>Hi Sam,</td></tr>\n<tr><td>Earlier today we sent you an email with the subject line \"Order #40112 confirmed\".</td></tr>\n<tr><td>There was no order. Nothing has been charged, your details are safe.</td></tr>\n<tr><td>It was a marketing email for our sale, dressed up as something it wasn't.</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Velvetine. All rights reserved.<br /><a href=\"https://www.velvetine.example/help\">Help</a> | <a href=\"https://www.velvetine.example/privacy\">Privacy</a> | <a href=\"https://www.velvetine.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.velvetine.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "notPurchase": {
+   "kind": "no order"
+  },
+  "items": [],
+  "shop": null,
+  "date": null,
+  "currency": null,
+  "totalPence": null
+ }
+}

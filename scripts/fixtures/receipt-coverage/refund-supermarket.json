@@ -1,0 +1,15 @@
+{
+ "id": "coverage-refund-supermarket",
+ "sender": "Greenfields",
+ "layout": "a supermarket's 'Refund for your … order N' for items returned to the driver: refund to the card, order number, items, refund total",
+ "headers": {
+  "from": "Greenfields <service@greenfields-groceries.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Refund for your Greenfields order 1300456789",
+  "date": "Sun, 08 Mar 2026 10:00:00 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td>We've processed the refund for your returned items</td></tr><tr><td>Your refund will be credited to your original payment card in 3-5 business days</td></tr><tr><td>Order number: 1300456789</td></tr><tr><td>Delivery date: Saturday 7 March</td></tr><tr><td>Returned items</td></tr><tr><td>Semi Skimmed Milk 2.27L x1 £1.65</td></tr><tr><td>Free Range Eggs x6 x1 £2.10</td></tr><tr><td>Refund total £3.75</td></tr><tr><td>Thanks for shopping with Greenfields</td></tr></table></body></html>",
+ "expected": {
+  "kind": "refund"
+ }
+}

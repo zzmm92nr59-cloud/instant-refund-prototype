@@ -1,0 +1,15 @@
+{
+ "id": "coverage-not-joining-newsletter",
+ "sender": "Lumora Home",
+ "layout": "a welcome email ('Thanks for joining us!') with a money-off code: never a purchase",
+ "headers": {
+  "from": "Lumora Home <hello@lumorahome.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for joining us! Here's 10% off",
+  "date": "Mon, 09 Mar 2026 09:00:00 +0000"
+ },
+ "html": "<html><body><p>Welcome to Lumora Home.</p><p>Use code HELLO10 for 10% off your first order. Orders over £50 ship free.</p><p>Total savings up to £25.</p></body></html>",
+ "expected": {
+  "kind": "not_receipt"
+ }
+}

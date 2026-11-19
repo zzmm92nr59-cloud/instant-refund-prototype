@@ -1,0 +1,15 @@
+{
+ "id": "coverage-refund-item-returned",
+ "sender": "Example Market",
+ "layout": "a marketplace's 'Your refund for <item>….': 'We've issued your refund for the item below. Your return is now complete', refund total",
+ "headers": {
+  "from": "Example Market <return@examplemarket.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your refund for Bamboo Toilet Seat with....",
+  "date": "Thu, 05 Mar 2026 10:00:00 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td>Hello Sam,</td></tr><tr><td>We've issued your refund for the item below. Your return is now complete*.</td></tr><tr><td>View return & refund status</td></tr><tr><td>Return summary</td></tr><tr><td>Order #204-0000000-1111111</td></tr><tr><td>Bamboo Toilet Seat with Soft Close</td></tr><tr><td>Refund subtotal £24.99</td></tr><tr><td>Refund total £24.99</td></tr><tr><td>*Your refund will appear on your statement within 3-5 days.</td></tr></table></body></html>",
+ "expected": {
+  "kind": "refund"
+ }
+}

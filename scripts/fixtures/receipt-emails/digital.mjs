@@ -57,17 +57,18 @@ export default function digital() {
   }
 
   // ---- Uber rides ----------------------------------------------------------------------------------------------------
+  // (Round 10: a ride is one thing bought, the ride, for what was paid; its fare, fees and tip are not things. Connor, 19 Nov.)
   {
     const o = order([{ name: "Trip fare", qty: 1, unit: 1240 }], { fees: [["Booking fee", 175]], tips: [["Tip", 100]] });
     add("uber-1", "Uber", "ride receipt, fare + booking fee + tip", { from: "Uber Receipts <noreply@uber.com>", subject: "Your Friday evening trip with Uber", date: "Fri, 06 Nov 2026 22:00:00 +0000",
       html: page({ brand: "Uber", domain: "uber.com", rows: [`<p>Thanks for riding, ${SHOPPER.first}</p>`, `<p>6 November 2026</p>`, `<p style="font-size:28px">Total ${gbp(o.total)}</p>`, table([["Trip fare", gbp(1240)], ["Booking fee", gbp(175)], ["Tip", gbp(100)]]),
-        `<p>Payments: Visa ••••1234</p>`] }) }, o, "Uber", "2026-11-06");
+        `<p>Payments: Visa ••••1234</p>`] }) }, order([{ name: "Uber ride", qty: 1, unit: o.total }]), "Uber", "2026-11-06");
   }
   {
     const o = order([{ name: "Trip fare", qty: 1, unit: 2210 }], { fees: [["Booking fee", 175], ["Airport surcharge", 600]], discounts: [["Promotion", 500]] });
     add("uber-2", "Uber", "text, airport surcharge, promotion", { from: "Uber Receipts <noreply@uber.com>", subject: "Your Thursday morning trip with Uber", date: "Thu, 05 Nov 2026 08:00:00 +0000",
       text: ["Uber", "Thanks for riding, Sam", "5 November 2026", `Total ${gbp(o.total)}`, "", "Trip fare " + gbp(2210), "Booking fee " + gbp(175), "Airport surcharge " + gbp(600), "Promotion -" + gbp(500).slice(0), "", "Payments", "Visa ••••1234 " + gbp(o.total)].join("\n") },
-      o, "Uber", "2026-11-05");
+      order([{ name: "Uber ride", qty: 1, unit: o.total }]), "Uber", "2026-11-05");
   }
 
   // ---- Subscriptions -------------------------------------------------------------------------------------------------

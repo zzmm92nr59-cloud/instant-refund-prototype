@@ -1,0 +1,18 @@
+{
+ "id": "coverage-paypal-debit-card",
+ "sender": "PayPal",
+ "layout": "'Receipt for your PayPal Debit Card purchase': Merchant, 'Total amount' with '£… GBP' in the cell under it, converted from another currency",
+ "headers": {
+  "from": "PayPal <service@paypal.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Receipt for your PayPal Debit Card purchase",
+  "date": "Tue, 03 Mar 2026 00:34:12 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td><h2>Receipt for your PayPal Debit Card purchase</h2></td></tr><tr><td><table width='100%'><tr><td>Hello, Sam Taylor</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Here's your receipt for your PayPal Debit Card purchase</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>You used your PayPal Debit Card ending in ••••4242 at CORNER MART LISBOA on 3 March 2026.</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Transaction details</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Transaction ID</td></tr><tr><td>9ZZ00000AA1234567</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Transaction date</td></tr><tr><td>3 March 2026</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Merchant</td></tr><tr><td>CORNER MART LISBOA</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Total amount</td></tr><tr><td>£8.40 GBP</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Paid with PayPal balance</td></tr><tr><td>£8.40 GBP</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Converted from</td></tr><tr><td>€9.80 EUR</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Currency Conversion Rate</td></tr><tr><td>€1.00 EUR = £0.86 GBP</td></tr></table></td></tr><tr><td><table width='100%'><tr><td>Converted to</td></tr><tr><td>£8.40 GBP</td></tr></table></td></tr><tr><td>Help &amp; Contact | Security | Apps</td></tr><tr><td>Copyright © 1999-2026 PayPal. All rights reserved.</td></tr></table></body></html>",
+ "expected": {
+  "kind": "receipt",
+  "shop": "CORNER MART LISBOA",
+  "totalPence": 840,
+  "date": "2026-03-03"
+ }
+}

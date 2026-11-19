@@ -1,0 +1,18 @@
+{
+ "id": "coverage-fullwidth-pound",
+ "sender": "Lumora Home",
+ "layout": "'We've received your payment and your order is under processing.': order number, item with ￡ price, 'Grand Total:￡…' (full-width pound sign)",
+ "headers": {
+  "from": "Lumora Home <service@lumorahome.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "We've received your payment and your order is under processing.",
+  "date": "Wed, 11 Mar 2026 12:06:01 +0000"
+ },
+ "html": "<html><body><table width=\"600\" align=\"center\"><tr><td>\n<p><a href=\"https://uk.lumorahome.example/?pos=Top\">Visit in your browsers</a></p>\n<p><a href=\"https://uk.lumorahome.example/new\">New</a> <a href=\"https://uk.lumorahome.example/furniture\">Furniture</a> <a href=\"https://uk.lumorahome.example/sales\">Sales</a></p>\n<p>Free Shipping On All Orders</p><p>30-Day Return Within 30-Day Of Delivery</p>\n<h2>Thanks for your order!</h2>\n<p>Dear sam taylor,</p><p>Thank you for shopping with Lumora Home.</p>\n<p>Your payment has been received. Your order will be under processing soon and we will keep you updated of the latest order status.</p>\n<p><a href=\"https://uk.lumorahome.example/tracking-order/detail?order_no=UKA2603111203130000001\">Track Order Details</a></p>\n<table><tr><td>Order:</td></tr><tr><td>UKA2603111203130000001</td></tr><tr><td>Order Date:</td></tr><tr><td>Mar 11, 2026 12:05 pm</td></tr>\n<tr><td>Shipping Address:</td></tr><tr><td>sam taylor 07700900123</td></tr><tr><td>LS1 4AB, 12 Example Road, Leeds, England, GB</td></tr></table>\n<table><tr><td><a href=\"https://uk.lumorahome.example/item/rattan-floor-lamp-1234.html\"><p>Rattan Floor Lamp with Linen Shade</p><p>&#xFFE1;89.99</p><p>Color:Natural</p><p>Qty:1</p></a></td></tr></table>\n<p>Subtotal:&#xFFE1;89.99<br>Coupon Discount:-&#xFFE1;9.00<br>Promotion:-&#xFFE1;0.00<br>Grand Total:&#xFFE1;80.99</p>\n<p>If you need any further assistance, please feel free to <a href=\"https://uk.lumorahome.example/help\">Contact Us.</a></p>\n<p>To manage your email preferences, <a href=\"https://manage.example-lists.com/subscriptions/update\">click here</a></p>\n</td></tr></table></body></html>",
+ "expected": {
+  "kind": "receipt",
+  "shop": "Lumora Home",
+  "totalPence": 8099,
+  "date": "2026-03-11"
+ }
+}

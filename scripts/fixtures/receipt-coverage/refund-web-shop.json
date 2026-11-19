@@ -1,0 +1,15 @@
+{
+ "id": "coverage-refund-web-shop",
+ "sender": "Lumora Home",
+ "layout": "a web shop's 'Here comes the refund about your order': refund amount, order number",
+ "headers": {
+  "from": "Lumora Home <service@lumorahome.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Here comes the refund about your order",
+  "date": "Fri, 13 Mar 2026 10:00:00 +0000"
+ },
+ "html": "<html><body><table width='600' align='center'><tr><td>Dear Customer,</td></tr><tr><td>Hope this mail finds you well. Here comes the refund about your order UKA2603111203130000001.</td></tr><tr><td>Refund amount: &#xFFE1;80.99</td></tr><tr><td>The refund has been issued to your original payment method. Please allow 5-10 business days for it to arrive.</td></tr><tr><td>Best regards, Lumora Home</td></tr></table></body></html>",
+ "expected": {
+  "kind": "refund"
+ }
+}

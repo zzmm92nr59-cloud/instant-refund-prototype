@@ -1,0 +1,15 @@
+{
+ "id": "coverage-not-invoice-to-pay",
+ "sender": "Brightwave Energy",
+ "layout": "'Your invoice from Brightwave Energy' that will be taken from a card later ('Amount due', 'will be charged to Visa •••• 4242 on')",
+ "headers": {
+  "from": "Brightwave Energy <billing@brightwave.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your invoice from Brightwave Energy",
+  "date": "Mon, 02 Mar 2026 09:00:00 +0000"
+ },
+ "html": "<html><body><h1>Invoice</h1><p>Invoice number: BW-55102</p><p>Electricity, February</p><p>Amount due: £64.20</p><p>This will be charged to Visa •••• 4242 on 15 March 2026.</p><p>Total £64.20</p></body></html>",
+ "expected": {
+  "kind": "not_receipt"
+ }
+}

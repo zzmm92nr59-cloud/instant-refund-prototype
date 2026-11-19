@@ -3477,6 +3477,9 @@
     // The totals check (worker/receipt-items.js): when the items Relay read don't add up to what the email says they came to,
     // the receipt says so plainly, never shows a short list as if it were all, and offers the email and "Read it again".
     // (Round 9: or an item's name doesn't look like a thing bought, itemsCheck.namesOk === false: a gentler box.)
+    // Money back on this order later (Uber Eats "We adjusted the total", worker/gmail.js attachAdjustments).
+    if (x.adjusted && Number.isInteger(x.adjusted.refundPence) && x.adjusted.refundPence > 0)
+      card.appendChild(el("p", { className: "rl-po-now", text: money(x.adjusted.refundPence, x.adjusted.currency || x.currency) + " refunded" + (Number.isInteger(x.adjusted.newTotalPence) ? ". It now comes to " + money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) + "." : ".") }));
     if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && (x.itemsCheck.complete === false || x.itemsCheck.namesOk === false) && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
@@ -3625,7 +3628,27 @@
     // (Round 4: the items are only in the email's attachment, a PDF or a photo, which Relay doesn't read; or Gmail cut the
     // email short, so what came after the cut isn't in it.)
     var inFile = none && (x.detailsInAttachment || x.itemsCheck.inAttachment);
+    // (Round 10, Connor's real inbox.) The shop's email has no list of what was bought (Uber Eats: "To view your full
+    // receipt go to Uber Eats"): nothing was missed, so it says that, with the total, and nothing is read again.
+    var noList = none && x.itemsCheck.noItemList === true;
+    // A supermarket's delivery-day payment for an order Relay hasn't found the confirmation of yet.
+    var payOnly = none && x.itemsCheck.orderUpdate === true;
+    // The order changed after it was confirmed: what was paid isn't what the confirmation's items come to.
+    var changed = !none && x.itemsCheck.paidDiffers === true;
+    var whose = (x.retailer && x.retailer.name) || "The shop";
     var box = el("div", { className: "rl-ret rl-miss" });
+    if (noList || payOnly || changed) {
+      box.appendChild(el("b", { className: "rl-ret-h", text: noList ? possessive(whose) + " email doesn't list what you ordered" : payOnly ? "This is the payment for an order" : "This order changed after you placed it" }));
+      box.appendChild(el("span", { className: "rl-ret-why", text: noList ? "It only gives the total" + (x.totalPence != null ? ", " + money(x.totalPence, x.currency) : "") + ". You can add the items yourself."
+        : payOnly ? "Relay hasn't found the email that lists what you ordered yet. You can add the items yourself."
+        : "You paid " + money(x.totalPence, x.currency) + ". The items here are from the order confirmation" + (x.itemsCheck.inAttachment ? ", and the final receipt is the PDF on " + possessive(whose) + " email." : ".") }));
+      var acts0 = el("div", { className: "rl-miss-acts" });
+      if (mailRef(x)) acts0.appendChild(el("button", { type: "button", className: "rl-btn", text: "See the email", onclick: function () {
+        if (openOriginal) openOriginal(x.id); else open(function (sh) { originalView(sh, x.id, close); }); } }));
+      acts0.appendChild(el("button", { type: "button", className: "rl-btn ghost", text: "Fix it yourself", onclick: function () { fixSheet(x, function () { refresh("fix"); }); } }));
+      box.appendChild(acts0);
+      return box;
+    }
     // (Round 9: the money adds up but a name looks like a note, a size or a code, worker/item-names.js. Never an accusation.)
     var namesOnly = !none && x.itemsCheck.complete !== false && x.itemsCheck.namesOk === false;
     box.appendChild(el("b", { className: "rl-ret-h", text: inFile ? "The items on this receipt are in its attachment" : none ? "Relay couldn't read the items on this receipt" : namesOnly ? "Some item names on this receipt may not be right" : "Relay may have missed some items on this receipt" }));
@@ -3683,7 +3706,8 @@
   // What a receipt with no item names is called: how many things the email says it has, or the order from the shop.
   function noItemsTitle(x) {
     var n = Number(x && x.itemCount);
-    return n > 1 ? n + " items" : n === 1 ? "1 item" : "Order from " + ((x && x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop");
+    // A takeaway through an app is "Order from Chapati Man", the restaurant (x.merchant), not the app.
+    return n > 1 ? n + " items" : n === 1 ? "1 item" : "Order from " + ((x && typeof x.merchant === "string" && x.merchant.trim()) || (x && x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop");
   }
   // A parcel's latest news, in a line with a small drawing: on its way (with whom), due, or delivered.
   function shipWords(dv, short) {
@@ -10469,7 +10493,7 @@
         title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x),
         // What the whole receipt came to, and how many things: a card shows these, never the first item's own price
         // (Connor, 19 Nov 2026: a £28.13 takeaway of 7 dishes showed as "Sweet and Sour Chicken… £6.99").
-        price: x.totalPence == null ? "" : money(x.totalPence, x.currency), count: named.length };
+        price: x.adjusted && Number.isInteger(x.adjusted.newTotalPence) ? money(x.adjusted.newTotalPence, x.adjusted.currency || x.currency) : x.totalPence == null ? "" : money(x.totalPence, x.currency), count: named.length };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })

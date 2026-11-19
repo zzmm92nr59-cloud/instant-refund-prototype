@@ -1,0 +1,40 @@
+{
+ "id": "holdout11-je-deal-parts-extra-price",
+ "sender": "Just Eat",
+ "layout": "a deal's two pizzas under it, the second's extra priced on the last line",
+ "headers": {
+  "from": "Just Eat <no-reply@order.just-eat.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Sam, order confirmed",
+  "date": "Fri, 11 Sep 2026 19:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Just Eat</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.just-eat.co.uk/?utm_source=email\"><img src=\"https://www.just-eat.co.uk/static/email/logo.png\" alt=\"Just Eat\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Slice Street order will be with you soon.</td></tr>\n<tr><td>Great news! Slice Street has received your order.</td></tr>\n<tr><td>Slice Street</td></tr>\n<tr><td>1</td><td>Garlic Bread</td></tr>\n<tr><td>&pound;1.50</td></tr>\n<tr><td>1</td><td>Pizza Pair Deal</td></tr>\n<tr><td>&pound;28.99</td></tr>\n<tr><td>Hawaiian Pizza</td></tr>\n<tr><td>+</td></tr>\n<tr><td>Deep Pan</td></tr>\n<tr><td>Spicy Beef Pizza</td></tr>\n<tr><td>+</td><td>Cheese Stuffed Crust</td></tr>\n<tr><td>&pound;3.50</td></tr>\n<tr><td>Subtotal:</td><td>&pound;33.99</td></tr>\n<tr><td>Offer discount:</td><td>-&pound;17.00</td></tr>\n<tr><td>Delivery:</td><td>&pound;1.99</td></tr>\n<tr><td>Total:</td></tr>\n<tr><td>&pound;18.98</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Just Eat. All rights reserved.<br /><a href=\"https://www.just-eat.co.uk/help\">Help</a> | <a href=\"https://www.just-eat.co.uk/privacy\">Privacy</a> | <a href=\"https://www.just-eat.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.just-eat.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Just Eat",
+  "date": "2026-09-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Garlic Bread",
+    "qty": 1,
+    "linePence": 150
+   },
+   {
+    "name": "Pizza Pair Deal",
+    "qty": 1,
+    "linePence": 3249,
+    "extras": [
+     "Hawaiian Pizza",
+     "Spicy Beef Pizza"
+    ]
+   }
+  ],
+  "subtotalPence": 3399,
+  "feesPence": 199,
+  "discountsPence": 1700,
+  "tipsPence": 0,
+  "totalPence": 1898,
+  "merchant": "Slice Street"
+ }
+}
