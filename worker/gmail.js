@@ -113,8 +113,9 @@ const OUTLOOK_FULL_REV = 1;
 // 14: every item on an order email (receipt-items.js): items whose extras sit between the name and the price (a takeaway's
 // "+ Egg Fried Rice") are no longer skipped, and each receipt carries a totals check (itemsCheck) saying whether its items
 // add up to what the email says; forwarded receipts read as the original; line ends as sent ("\r\n") no longer hide shops.
-const READER_FULL_REV = 14;
-const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
+// 15 onwards: every new reader version (PARSER_VERSION below) reads every mailbox again in the background. Rounds 1 to 9 of
+// receipt reading (reader versions 34 to 39) raised only the reader's version, so emails older than the last check stayed
+// read by version 33 and none of those fixes reached them (Connor, 19 Nov 2026: 115 of his 148 receipts). See below.
 // Orders this recent are always listed, however many newer emails there are (long enough for any usual return window).
 const RECENT_ORDER_DAYS = 120;
 const sleep = ms => new Promise(res => setTimeout(res, ms));
@@ -140,6 +141,10 @@ const GONE = Symbol("gone");
 // 39 (round 9): the name check (item-names.js): itemsCheck.namesOk and suspectNames, so a note, a label, a size or a code
 // read as an item's name is flagged even when the money adds up; of the readings that add up, one with good names wins.
 export const PARSER_VERSION = 39;
+// Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
+// more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
+export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
+export const FULL_REV = Math.max(OUTLOOK_FULL_REV, READER_FULL_REV);
 // The mailbox is read one date window at a time, newest first, so old receipts are reached
 // however busy the inbox is. The app passes back the cursor it is given.
 const HISTORY_YEARS = 10; // how far back a shopper can ask Relay to read, for Wrapped

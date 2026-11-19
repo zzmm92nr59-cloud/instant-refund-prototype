@@ -63,10 +63,13 @@ const openFromHome = async (page, shop) => { await page.locator("#homePage .hl-s
 st = { receipts: [TAKEAWAY, PODS, SHORT, PASTED], log: [], reread: (id, j) => j({ error: "x" }, 500) };
 let { ctx, page, errors } = await shopper();
 const home = await page.locator("#homePage").innerText();
-assert.match(home, /Sweet and Sour Chicken Balls \+ 5 more/, "a six-item order is named by an item and + 5 more\n" + home);
+// A multi-item order: how many things and what the whole order came to, never the first item's own price (Connor, 19 Nov 2026).
+const take = await page.locator("#homePage .hl-sq", { hasText: "Just Eat" }).first().innerText();
+assert.match(take, /6 items/, "a six-item order says how many\n" + take); assert.match(take, /£42\.57/, "and the order's total\n" + take);
+assert.ok(!/£6\.99/.test(take), "not the first item's price\n" + take);
 const pods = await page.locator("#homePage .hl-sq", { hasText: "Nespresso" }).first().innerText();
 assert.match(pods, /3 items/, "no item list: how many the email says\n" + pods); assert.match(pods, /£63\.00/, "and its total");
-console.log("ok - Home: '+ 5 more' for a multi-item order; '3 items' and the total when the email lists none");
+console.log("ok - Home: '6 items' and the total for a multi-item order; '3 items' and the total when the email lists none");
 
 // 2. The receipt's page says items may be missing, with the email and Read it again.
 await openFromHome(page, "Lucky Star");

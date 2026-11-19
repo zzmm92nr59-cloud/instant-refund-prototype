@@ -91,7 +91,7 @@ const read = (raw) => parseReceiptEmail(raw);
   const terms = /const SEARCH_TERMS =([\s\S]*?);\n/.exec(src)[1];
   for (const w of ['"e-ticket"', "eticket", '"travel confirmation"', '"flight confirmation"', "itinerary", "booking", "category:reservations"]) assert.ok(terms.includes(w), "Gmail is asked for " + w);
   for (const w of ["from:(ryanair", "boarding pass", "check-in", "check in"]) assert.ok(!terms.toLowerCase().includes(w), "never asked for an airline's other emails: " + w);
-  assert.match(src, /const READER_FULL_REV = 14;/, "every mailbox is read once more in the background with the new reader");
+  assert.match(src, /export const READER_FULL_REV = 14 \+ Math\.max\(0, PARSER_VERSION - 33\);/, "every mailbox is read once more in the background with each new reader");
   console.log("ok - the search asks for booking confirmations and e-tickets only; the reader's version moved on");
 }
 

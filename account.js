@@ -5539,9 +5539,13 @@
     }
     // Screens that bring their own heading and Back button.
     function screen(view) { sheet.textContent = ""; try { sheet.scrollTop = 0; } catch (e) {} view(sheet); }
-    openFind = function () { page("Add a receipt", function (b) { addReceiptView(b, null, { inPage: true }); }); };
-    openOriginal = function (id) { screen(function (sh) { originalView(sh, id, home); }); };
-    openResale = function (rid) { screen(function (sh) { resaleView(sh, home, rid); }); };
+    // Only while this Profile is the screen in front: once it's closed (back on Home, say), these open as their own sheet,
+    // as they do from Receipts. Otherwise "View receipt" on a card opened from Home drew into the closed Profile and
+    // nothing happened (Connor, 19 Nov 2026).
+    var here = function () { return document.body.contains(sheet) && sheet.getClientRects().length > 0 && !sheet.hidden; };
+    openFind = function () { if (!here()) return open(function (sh) { addReceiptView(sh, function () { close(); }); }); page("Add a receipt", function (b) { addReceiptView(b, null, { inPage: true }); }); };
+    openOriginal = function (id) { if (!here()) return open(function (sh) { originalView(sh, id, close); }); screen(function (sh) { originalView(sh, id, home); }); };
+    openResale = function (rid) { if (!here()) return open(function (sh) { resaleView(sh, close, rid); }); screen(function (sh) { resaleView(sh, home, rid); }); };
     function editHere() { screen(function (sh) { profileView(sh, home); }); }
 
     accBar(sheet, "Account");
@@ -10426,7 +10430,8 @@
       var back = items.filter(function (it) { return it.returnInfo; })[0], swapped = items.filter(function (it) { return it.exchange; })[0];
       var dates = items.map(function (it) { return (it.returnable || it.exchangeable) && !it.returnInfo && it.returnBy && it.returnBy.date ? it.returnBy.date : null; }).filter(function (d) { return d && d >= today; }).sort();
       var dl = dates[0] || null;
-      var e = { key: "o" + o.id, order: o, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2, title: items[0].title + (items.length > 1 ? " + " + (items.length - 1) + " more" : "") };
+      var e = { key: "o" + o.id, order: o, shop: shop, at: at, cat: "shop", when: dl || "", toReturn: Boolean(dl), rank: 2, title: items[0].title + (items.length > 1 ? " + " + (items.length - 1) + " more" : ""),
+        price: Number.isInteger(o.amountNowMinor) ? money(o.amountNowMinor, o.currency) : Number.isInteger(o.amountMinor) ? money(o.amountMinor, o.currency) : "", count: items.length };
       e.tiles = items.slice(0, 6).map(function (it) { return { name: it.title, price: Number.isInteger(it.priceMinor) ? money(it.priceMinor, it.currency) : "", draw: function (box) {
         var drawIt = function () { illustrate(box, { items: [{ name: it.title }], retailer: { name: o.store }, category: "other" }, 96); };
         // The shop's own photo of the item gets the tall picture area; a drawing gets the short one.
@@ -10451,7 +10456,8 @@
     });
     orderRows(receipts).filter(notConfirmed(purchases)).forEach(function (x) {
       if (isCarrier(x) || !/^\d{4}-\d{2}-\d{2}$/.test(x.orderDate || "")) return;
-      var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
+      // A takeaway ordered through an app (Just Eat, Uber Eats, Deliveroo) is named after the restaurant (x.merchant).
+      var who = (typeof x.merchant === "string" && x.merchant.trim()) || (x.retailer && (x.retailer.name || x.retailer.domain)) || "Shop";
       var named = (x.items || []).filter(function (i) { return i && i.name; });
       // An order where only some things can go back (a kettle in a food shop): those lead the card, and its line names them.
       var keep = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i]; }).filter(function (i) { return i && i.name; }) : [];
@@ -10460,7 +10466,10 @@
       var canGoBack = (x.returnable !== false || Boolean((x.returnableItems || []).length)) && Boolean(dl) && dl >= today && !p && !rt;
       var e = { key: "r" + x.id, shop: who, at: x.orderDate, cat: x.category || "other", dom: logoDom(x), when: (canGoBack && stated) || "", toReturn: canGoBack, rank: 2,
         noReturn: x.returnable === false && !(x.returnableItems || []).length, digital: x.category === "digital",
-        title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x) };
+        title: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : noItemsTitle(x),
+        // What the whole receipt came to, and how many things: a card shows these, never the first item's own price
+        // (Connor, 19 Nov 2026: a £28.13 takeaway of 7 dishes showed as "Sweet and Sour Chicken… £6.99").
+        price: x.totalPence == null ? "" : money(x.totalPence, x.currency), count: named.length };
       e.tiles = named.length > 1 ? named.slice(0, 6).map(function (i) { return { name: i.name,
           price: Number.isInteger(i.pricePence) ? money(i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1), x.currency) : "",
           draw: function (box) { illustrate(box, { items: [{ name: i.name }], retailer: x.retailer || {}, category: x.category }, 96); } }; })
@@ -10532,10 +10541,10 @@
   }
   window.relayCleanName = cleanName;
   function walletSquare(e) {
-    var t = e.tiles && e.tiles[0], what = cleanName(e.title || (t && t.name) || "", e.shop), tag = e.tag || e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
+    var t = e.tiles && e.tiles[0], what = e.count > 1 ? e.count + " items" : cleanName(e.title || (t && t.name) || "", e.shop), price = e.price || (t && t.price) || "", tag = e.tag || e.strip || (e.onWay ? "On its way" : e.toReturn && e.when ? "Return by " + dayWords(e.when) : e.swaps ? e.line : "");
     var pic = hlPic(e, "hl-sqpic"); if (tag) pic.appendChild(el("span", { className: "hl-tag " + (e.strip ? e.stripKind || "" : ""), text: tag }));
-    var sq = el("button", { type: "button", className: "hl-sq" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : ""), ariaLabel: [e.shop, what, t && t.price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
-      pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, t && t.price ? el("span", { className: "hl-sqp", text: t.price }) : null].filter(Boolean));
+    var sq = el("button", { type: "button", className: "hl-sq" + (e.cat && TILE_COLOURS[e.cat] ? " has-c" : ""), ariaLabel: [e.shop, what, price, tag].filter(Boolean).join(". "), onclick: tapOnce(e.open) }, [
+      pic, el("span", { className: "hl-sqs", text: e.shop || "" }), what ? el("span", { className: "hl-sqn", text: what }) : null, price ? el("span", { className: "hl-sqp", text: price }) : null].filter(Boolean));
     // Each purchase in its own coloured box, its kind of shopping's colour, as on the big cards (Connor, 17 Nov 2026).
     if (e.cat && TILE_COLOURS[e.cat]) { sq.style.setProperty("--h2-b", lightBase(e.cat)); sq.style.setProperty("--h2-c", cardColour(e.cat)); }
     return sq;

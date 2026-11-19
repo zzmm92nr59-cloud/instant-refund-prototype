@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION, sendReturnReminders, needsFullRead } from "../worker/gmail.js";
+import { CONSENT_VERSION, sendReturnReminders, needsFullRead, READER_FULL_REV, FULL_REV } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -715,10 +715,12 @@ for (const t of ["captured_receipts", "receipt_learning", "gmail_connections", "
   console.log("ok - recent returnable orders always reach Home; old receipts are tidied when listed");
   // Mailboxes read by the older reader are read once more in the background, Gmail and Outlook alike; then never again.
   assert.equal(needsFullRead(Date.now(), "google", null), true); assert.equal(needsFullRead(Date.now(), null, 1), true);
-  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 13), true); assert.equal(needsFullRead(Date.now(), "google", 14), false);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 1), true); assert.equal(needsFullRead(Date.now(), "google", 13), true); assert.equal(needsFullRead(Date.now(), "google", READER_FULL_REV), false);
+  // Every reader version since 33 reads every mailbox again (19 Nov 2026: rounds 1 to 9 never reached old receipts).
+  assert.equal(needsFullRead(Date.now(), "google", 14), true, "read by reader 33: read again"); assert.ok(READER_FULL_REV >= 20);
   // Reader 4 (the address each order was sent to): Gmail and Outlook mailboxes are both read again.
   assert.equal(needsFullRead(Date.now(), "google", 3), true); assert.equal(needsFullRead(Date.now(), "microsoft", 3), true);
-  assert.equal(needsFullRead(Date.now(), "microsoft", 13), true); assert.equal(needsFullRead(Date.now(), "microsoft", 14), false);
+  assert.equal(needsFullRead(Date.now(), "microsoft", 13), true); assert.equal(needsFullRead(Date.now(), "microsoft", FULL_REV), false);
   // Reader 11 (sub-totals, offers, "Delivered:" notices, email companies): both are read again.
   assert.equal(needsFullRead(Date.now(), "google", 10), true); assert.equal(needsFullRead(Date.now(), "microsoft", 10), true);
   // Reader 12 (notices about an order left out, totals that aren't in pounds): both are read again.
