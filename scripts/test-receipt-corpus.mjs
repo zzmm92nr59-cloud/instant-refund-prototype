@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { parseReceiptEmail, parseReturnUpdateEmail, parseReturnEmail, parseReturnParcelEmail, parseCancellationEmail, parseOrderAdjustmentEmail } from "../worker/receipt-parser.js";
 import { matchReturnNews } from "../worker/return-tracking.js";
 import { storeKey } from "../worker/receipt-category.js";
-import { mergeOrderEmails, attachCancellations } from "../worker/gmail.js";
+import { mergeOrderEmails, attachCancellations, attachAdjustments } from "../worker/gmail.js";
 import { rawEmail, forwarded } from "./fixtures/receipt-emails/lib.mjs";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "fixtures", "receipt-emails");
@@ -218,8 +218,32 @@ for (const [label, raw, want] of cancelCases) {
 }
 console.log(`  Part-cancelled orders: ${cancelWrong.length ? cancelWrong.join("; ") : "the item the email names is marked cancelled; nothing when it names none or only an amount"}`);
 
+// Round 10 (Connor's real inbox): a supermarket's delivery-day email joins its order's confirmation by the order number, and
+// its "Payment received" becomes the order's total; the items, which came to the estimated total, are then said to be maybe
+// incomplete (the full receipt is the shop's attachment). A takeaway app's changed total joins the order it changed.
+const joinWrong = [];
+{
+  const card = (id, n) => ({ id: "r" + n, createdAt: n, kind: "receipt", status: "pending", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, id + ".json"), "utf8")))) });
+  const merged = mergeOrderEmails([card("holdout11-sainsburys-confirmation", 1), card("holdout11-sainsburys-day-of", 2)]);
+  const o = merged[0];
+  if (merged.length !== 1) joinWrong.push(`delivery-day email made ${merged.length} cards`);
+  else {
+    if (o.totalPence !== 2310 || o.estimatedTotalPence !== 2220) joinWrong.push(`total ${o.totalPence} (estimated ${o.estimatedTotalPence}) for 2310 (2220)`);
+    if ((o.items || []).length !== 7) joinWrong.push(`${(o.items || []).length} items for 7`);
+    if (!(o.itemsCheck && o.itemsCheck.complete === false && o.itemsCheck.paidDiffers)) joinWrong.push("not said that items may be missing");
+  }
+  const meal = { id: "m1", kind: "receipt", ...parseReceiptEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout11-ue-no-item-list.json"), "utf8")))) };
+  const other = { ...meal, id: "m2", merchant: "Somewhere Else" };
+  const adj = parseOrderAdjustmentEmail(rawEmail(JSON.parse(readFileSync(join(dir, "holdout11-ue-adjusted-total.json"), "utf8"))));
+  attachAdjustments([meal, other], [{ kind: "order_update", stage: "adjusted", ...adj }]);
+  if (!(meal.adjusted && meal.adjusted.refundPence === 625 && meal.adjusted.newTotalPence === 1511)) joinWrong.push("adjustment not joined to its order: " + JSON.stringify(meal.adjusted));
+  if (other.adjusted) joinWrong.push("adjustment joined to another restaurant's order");
+}
+console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders"}`);
+
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
+need(joinWrong.length === 0, "a delivery-day payment and a changed total join the order they belong to (round 10)");
 need(!moreWrong.length, "the restaurant, the 'lists no items' state and a delivery-day payment read right (round 10)");
 need(cancelWrong.length === 0, "a part-cancelled order marks the item its email names as cancelled, and only that");
 need(a.items === a.n && b.items === b.n, "items exactly right on every email, as sent and forwarded");
