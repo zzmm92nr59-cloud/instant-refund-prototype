@@ -1335,6 +1335,32 @@ function legOf(text, type, nth = 0) {
   }
   return legs[nth] || legs[0] || null;
 }
+// A booking's own list of what was paid for, set out under "Order Details" (each thing over its price) then "Other costs"
+// (each fee or extra over its price, or "No booking fee"), down to "Total amount": a rail booking, a railcard, a ticket
+// change ("Pay The Difference: Adult - Advance Single" with no price of its own, then "Admin Fee" over "£7.50"). Null when
+// the email has no such list. Round 15.
+const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
+function detailsList(text) {
+  const rows = String(text || "").split("\n").map((x) => x.replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const start = rows.findIndex((r) => DETAILS_HEAD.test(r));
+  if (start < 0) return null;
+  const lines = [], costs = [];
+  let inCosts = false;
+  const priceOf = (r) => { const m = /^£\s?([\d,]{1,7}\.\d{2})$/.exec(r || ""); return m ? money(m[1]) : null; };
+  for (let i = start + 1; i < rows.length && i < start + 60; i++) {
+    const r = rows[i];
+    if (DETAILS_END.test(r)) return lines.length ? { lines, costs } : null;
+    if (COSTS_HEAD.test(r)) { inCosts = true; continue; }
+    if (priceOf(r) != null || r.length > 90 || !/\p{L}/u.test(r)) { if (priceOf(r) == null) return null; continue; }
+    // ("No booking fee": nothing was charged for it.)
+    if (/^no\b/i.test(r)) continue;
+    if (/^(?:no\b|free$|none$|n\/a$)/i.test(rows[i + 1] || "")) { i++; continue; }
+    const p = priceOf(rows[i + 1]);
+    (inCosts ? costs : lines).push({ name: r, pricePence: p });
+    if (p != null) i++;
+  }
+  return null;
+}
 // A rail booking's fees under "Other costs": "Booking Fee" over "£1.39" (never "No booking fee").
 function railFees(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
@@ -1832,7 +1858,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const detail = (t) => [t.type, t.card].filter(Boolean).join(", ");
     // Two or more tickets that add up to what was paid: each ticket, named by its leg. One ticket: the trip, with the ticket.
     // (The booking fee is its own line, never part of a ticket's price: "Other costs", "Booking Fee", "£1.39". Round 13.)
-    const fees = railFees(body);
+    // (Every extra under "Other costs" is its own line, "Insurance" over "£0.90" as much as a booking fee. Round 15.)
+    const listed = detailsList(body);
+    const fees = listed && listed.costs.length && listed.costs.every((c) => c.pricePence != null) ? listed.costs.map((c) => ({ name: c.name, pricePence: c.pricePence })) : railFees(body);
     const feeSum = fees.reduce((a, f) => a + f.pricePence, 0);
     if (tickets.length && result.totalPence != null && (tickets.length > 1 || fees.length) && sum + feeSum === result.totalPence) {
       // (Two tickets of the same type, "Advance Single" twice: each is named by its own leg, the first by the first leg.)
@@ -1844,6 +1872,35 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const tx = /\btransaction id\s*:?\s*\|?\s*\n?\s*\|?\s*([A-Z0-9][A-Z0-9-]{5,24})\b/i.exec(body);
     if (!result.orderRef && tx) result.orderRef = tx[1];
   }
+  // A booking whose subject names no journey but which lists what was paid for under "Order Details" and "Other costs" (a
+  // railcard, a ticket change): those lines are the items, each cost its own line. One line with no price of its own (a
+  // change's "Pay The Difference") is what the total leaves once the costs are taken off. A rail ticket is named by its
+  // trip, "Newark Northgate to London Kings Cross", with the ticket beside it. Round 15.
+  let listedOrder = null;
+  if (!journey && !isFlight && !gameShop && result.totalPence != null) {
+    const body = fromHtml || text;
+    const listed = detailsList(body);
+    if (listed && listed.costs.every((c) => c.pricePence != null)) {
+      const all = listed.lines.concat(listed.costs);
+      const unpriced = all.filter((l) => l.pricePence == null);
+      const known = all.reduce((a, l) => a + (l.pricePence || 0), 0);
+      if (unpriced.length === 1 && listed.lines.includes(unpriced[0]) && result.totalPence - known >= 0) unpriced[0] = Object.assign(unpriced[0], { pricePence: result.totalPence - known });
+      if (all.every((l) => l.pricePence != null) && all.reduce((a, l) => a + l.pricePence, 0) === result.totalPence) {
+        const rows = body.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+        const times = rows.map((r) => /^\d{1,2}:\d{2} (\p{Lu}[\p{L}\d .'’&-]{1,40})$/u.exec(r)).filter(Boolean).map((m) => m[1]);
+        const toM = /\byour (?:trip|journey) to (\p{Lu}[\p{L}\d .'’&-]{1,40}?) (?:departing|leaving|on)\b/u.exec(body);
+        const trip = times.length >= 2 ? `${times[0]} to ${toM ? toM[1] : times[times.length - 1]}` : null;
+        const asItem = (l) => {
+          const m = RAIL_TICKET.exec(l.name.replace(/^pay the difference\s*:\s*/i, ""));
+          if (!m || !trip) return { name: l.name, qty: 1, pricePence: l.pricePence };
+          const change = /^pay the difference\b/i.test(l.name);
+          return { name: trip, variant: [change ? "Ticket change" : null, m[3].trim(), m[4] || null].filter(Boolean).join(", "), qty: 1, pricePence: l.pricePence };
+        };
+        result.items = all.map(asItem);
+        listedOrder = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 };
+      }
+    }
+  }
   // (A digital railcard or another booking with no order number but its "Transaction ID:" over the number, the number the
   // shop asks for: the order's number. Round 13.)
   if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id\s*:?[\s|]*\n?[\s|]*(\d{8,16})[\s|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
@@ -1852,6 +1909,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const otherPart = text === fromHtml ? plain : fromHtml;
   if (noList || dayOf) {
     result.itemsCheck = { complete: false, itemsPence: 0, expectedPence: dayOf ? null : result.totalPence ?? null, missingPence: null, ...(noList ? { noItemList: true } : { orderUpdate: true }) };
+  } else if (listedOrder) {
+    result.itemsCheck = listedOrder;
   } else if (!isFlight && !journey && !gameShop && !ride) {
     const cands = [];
     // (A currency's code on its own, "GBP" from "£20.47 GBP", is never a thing. Round 12.)
@@ -2343,7 +2402,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   // (A request for money back, Apple's "A refund request has been received" and "Decision on refund request" that only says
   // to look at Report a Problem: nothing says money came back, so it is never a refund. Only one that says the request was
   // approved, or the refund issued, is. Round 13.)
-  if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b/i.test(both)) return { ok: false, reason: "refund_request" };
+  if (/\brefund request\b|\brequest(?:ed)? (?:for )?a refund\b/i.test(subj) && !/\brefund(?: request)? (?:has been|was|is) (?:approved|granted|issued|processed|completed)\b|\bwe(?:'|’)?ve (?:approved|issued|processed) (?:your|a|the) refund\b|\bwe(?:'|’)?re refunding (?:your|the|this)\b|\byour refund is being (?:credited|paid|sent)\b/i.test(both)) return { ok: false, reason: "refund_request" };
   let stage = null;
   if (/\brefund(?:ed)?\b[^.\n]{0,40}\b(?:has been|have been|was|is being|been)?\s*(?:processed|issued|approved|completed|sent|on (?:its|the) way)\b|\bwe(?:'|’)?ve (?:processed|issued|sent|completed) (?:your|a) refund|\bwe(?:'|’)?ve refunded\b|\brefund confirmation\b|\byour refund\b|\b(?:has|have) been (?:successfully )?refunded\b|\bhere comes the refund\b|\bsent you a refund\b|\brefund complete\b/i.test(both)) stage = "refunded";
   else if (/\b(?:we(?:'|’)?ve|we have) received your return|\byour return (?:has been received|has arrived|is with us)|\breturn (?:received|arrived)\b/i.test(both)) stage = "received";
@@ -2361,7 +2420,9 @@ export function parseReturnUpdateEmail(rawEmail) {
     both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
   const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
-  const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) : null;
+  const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) ||
+    // (A booking refunded by its "Transaction ID:" over the number, the number its booking email gave. Round 15.)
+    /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id\s*:?[\s|]*\n?[\s|]*(\d{8,16})[\s|]*$/im.exec(text) : null;
   // (And what was first paid, to whom and when: "You originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026".)
   const orig = /\byou originally paid (.{2,60}?) £\s?([\d,]+\.\d{2})(?: GBP)? on (\d{1,2} [A-Za-z]{3,9} \d{4})/i.exec(both.replace(/\s+/g, " "));
   const fwdVia = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
