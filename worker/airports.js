@@ -173,6 +173,7 @@ SYD;Sydney;Sydney;AU;-33.940;151.175;Sydney Kingsford Smith
 MEL;Melbourne;Melbourne;AU;-37.669;144.841;Melbourne Tullamarine
 CPT;Cape Town;Cape Town;ZA;-33.965;18.602;Cape Town International
 JNB;Johannesburg;Johannesburg;ZA;-26.134;28.242;OR Tambo|O.R. Tambo
+WDH;Windhoek;Windhoek;NA;-22.480;17.471;Hosea Kutako|Windhoek Hosea Kutako|Windhoek Intl Apt|Windhoek International
 `;
 
 const key = (s) => String(s || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[’'`]/g, "")

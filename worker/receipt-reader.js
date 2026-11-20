@@ -230,6 +230,7 @@ const CARD_DIGITS = /\d{4,}[*•xX]{3,}|[*•]{3,}\s?\d{2,}|\b(?:x{3,}|\*{3,})\d
 // Partner offers some shops list with the order ("10% off sitewide at Ninja!", "Free SimplyCook box",
 // "Amazon Music Unlimited – Get 3 months free"): not things that were bought.
 const OFFER_LINE = /^(?:\d{1,3}\s?% off\b|free\s+(?:[\p{L}'’-]+\s+){1,3}(?:box|trial|months?)\b)|\b(?:get|claim|enjoy)\s+\d+\s+months?\b[^£]*\bfree\b|\bfree for \d+ months?\b/iu;
+export const isOfferLine = (s) => OFFER_LINE.test(String(s || ""));
 
 // Returns the item tidied ({ name, qty, ... }) or null when the line isn't an item.
 // (`stored`: items Relay already read and saved. Their names were tidied when they were read, so a name that still ends in
@@ -253,7 +254,7 @@ export function cleanItem(item, stored = false) {
   name = name.replace(/^gift ?wrap(?:ped)?:\s*(?:yes|no)\s+(?=\S{2})/i, "");
   if (letters(name).replace(/[0-9]/g, "").length < 2) return null;
   if (/:\s*$/.test(item.name.trim()) || /:$/.test(name)) return null;
-  if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || OFFER_LINE.test(name)) return null;
+  if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || (OFFER_LINE.test(name) && !(item.free && item.pricePence === 0))) return null;
   // "Mastercard", "Paid with Apple Pay": how it was paid. ("Credit card holder" is a thing you can buy.)
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
