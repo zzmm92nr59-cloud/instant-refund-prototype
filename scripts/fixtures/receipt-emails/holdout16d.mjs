@@ -102,5 +102,14 @@ export default function holdout16d() {
     { from: "Booking.com <noreply@booking.com>", subject: "Booking cancelled for Palm Reef Lodge", date: "Sat, 20 Sep 2025 10:00:00 +0000",
       html: htmlPage("Booking.com", ["Booking cancelled for Palm Reef Lodge", "Confirmation number: 5550001111", "PIN code: 1234", "Your booking has been successfully cancelled for free",
         "We can confirm that your reservation at Palm Reef Lodge has been cancelled.", "Booking number | 5550001111", "Cancellation cost | US$ 0"]) }, "cancelled", { orderRef: "5550001111" });
+  // ---- Expedia: a hotel priced in dollars, "Rate quotes in GBP" only in words, the total "(£…)" only as a guide, paid there -----
+  own("holdout16d-expedia-dollars-at-property", "Expedia", "'Itinerary # …', 'You booked 1 room.' over the room, 'Price summary' (name over amount), 'Total' over 'US$1,560.00 (£1,240.00)', 'Collected at the property', 'Rate quotes in GBP …'",
+    { from: '"Expedia.co.uk" <expedia@eg.expedia.com>', subject: "Expedia travel confirmation - Sun, 20 Jul - (Itinerary # 73000000000001)", date: "Sun, 12 Jan 2025 18:00:00 +0000",
+      html: htmlPage("Expedia", ["Thank you, Sam! Your booking is confirmed.", "Itinerary # 73000000000001", "View full itinerary", "Traveller details", "Adults, 2", "The Linden Hotel", "Check-in", "Check-out", "Sun, 20 Jul", "Sun, 27 Jul",
+        "Free cancellation until 19 Jul 2025 at 15:00 (property local time)", "Accommodation details", "You booked 1 room .", "Deluxe Room, 1 King Bed", "Price summary", "Accommodation 1", "US$1,400.00",
+        "Nights: 7 (avg./night)", "US$180.00", "Taxes", "US$140.00", "Locally collected mandatory fees/taxes*", "US$160.00", "Total", "US$1,560.00 (£1,240.00)", "Collected at the property",
+        "Unless specified otherwise, rates are quoted in British pounds sterling.", "Rate quotes in GBP are based on current exchange rates, which may vary at time of travel. Final payment will be settled in local currency directly with the property.",
+        "© 2025 Expedia, Inc., an Expedia Group company. All rights reserved."]) },
+    { shop: "Expedia", date: "2025-01-12", currency: "USD", totalPence: 156000, items: [{ name: "Deluxe Room, 1 King Bed", qty: 1, linePence: 140000, extras: ["7 nights"] }] });
   return out;
 }

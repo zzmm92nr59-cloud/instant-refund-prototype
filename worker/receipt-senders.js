@@ -208,3 +208,29 @@ export function bookingStay(text) {
   const payAtProperty = /\byou(?:'|’)ll pay (?:when you stay|the property|at the property)\b|\bpayment will be (?:made|taken) (?:at|by) the property\b|\byou(?:'|’)ll pay at the property\b/i.test(list.join(" ").slice(0, 20000));
   return { rooms, roomName, roomPence, nights: n ? Number(n[1]) : null, fees, payAtProperty };
 }
+
+// ---- Expedia's hotel booking confirmation -------------------------------------------------------------------------------
+// "Itinerary # 73006597247609", "You booked 1 room." over the room's name, "Price summary" with each line's name over its
+// amount ("Accommodation 1" over the rooms' price with their taxes, "Nights: 7 (avg./night)" and "Taxes" breaking it down,
+// "Locally collected mandatory fees/taxes*"), then "Total", and "Collected at the property" when nothing is taken up front.
+// Round 15.
+export function expediaStay(text) {
+  const list = rows(String(text || "").slice(0, 60000));
+  const head = list.findIndex((r) => /^price summary$/i.test(r));
+  if (head < 0) return null;
+  const end = list.findIndex((r, i) => i > head && /^total$/i.test(r));
+  if (end < 0 || end - head > 30) return null;
+  const lines = [];
+  for (let i = head + 1; i < end - 1; i++) { const p = stayPence(list[i + 1]); if (p != null && stayPence(list[i]) == null) { lines.push({ label: list[i], pence: p }); i++; } }
+  const room = lines.find((l) => /^accommodation\b/i.test(l.label));
+  if (!room) return null;
+  const breakdown = (l) => /^(?:nights?\b|taxes$|taxes and fees$)/i.test(l.label);
+  const fees = lines.filter((l) => l !== room && !breakdown(l));
+  const booked = list.findIndex((r) => /^you booked \d{1,2} rooms?\s*\.?$/i.test(r));
+  const roomName = booked >= 0 && /^\p{Lu}[\p{L}\d &'’,–-]{2,80}$/u.test(list[booked + 1] || "") ? list[booked + 1] : null;
+  const rooms = booked >= 0 ? Number(/\d{1,2}/.exec(list[booked])[0]) : 1;
+  const n = /^nights?:\s*(\d{1,2})\b/i.exec((lines.find((l) => /^nights?:/i.test(l.label)) || {}).label || "");
+  const ref = /\bitinerary\s*#\s*(\d{8,16})\b/i.exec(list.slice(0, 40).join("\n"));
+  const payAtProperty = /^collected at the property$/i.test(list[end + 2] || "") || /^collected at the property$/i.test(list[end + 1] || "");
+  return { rooms, roomName, roomPence: room.pence, nights: n ? Number(n[1]) : null, fees, payAtProperty, orderRef: ref ? ref[1] : null };
+}

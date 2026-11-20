@@ -443,6 +443,8 @@ const joinWrong = [];
   attachCancellations(stayCard, [gone]);
   if (!stayCard[0].payAtProperty || !stayCard[0].cancelled || stayCard[0].cancelled.partial || gone.orderRef !== "5550001111" || !gone.free)
     joinWrong.push("a Booking.com stay paid at the property and its cancellation read as " + JSON.stringify([stayCard[0].payAtProperty, stayCard[0].cancelled, gone.orderRef, gone.free]));
+  const exp = classifyEmail(rawEmail(fx("holdout16d-expedia-dollars-at-property"))).details;
+  if (exp.orderRef !== "73000000000001" || !exp.payAtProperty) joinWrong.push("Expedia's itinerary read as " + JSON.stringify([exp.orderRef, exp.payAtProperty]));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

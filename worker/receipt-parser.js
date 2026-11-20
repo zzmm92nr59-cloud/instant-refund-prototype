@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, bookingStay } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, bookingStay, expediaStay } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -396,7 +396,9 @@ function foreignTotal(text, opts = {}) {
   // under "Total | $5.39 USD", when it says it converted the money: "PayPal's conversion rate". Round 13.)
   const converted = /\bconversion rate\b|\bcurrency conversion\b/i.test(text);
   const poundsAside = (converted ? String(text).replace(/£\s?[\d,]+(?:\.\d{2})?(?:\s*GBP)?|\b\d[\d.,]*\s*GBP\b|\bGBP\b/g, "") : String(text)).replace(/\(\s*£\s?[\d,]+(?:\.\d{2})?\s*\)/g, "").replace(/\bfrom\s*\|?\s*£\s?[\d,]+(?:\.\d{2})?/gi, "");
-  if (/£|\bGBP\b/.test(poundsAside)) return null;
+  // (Pounds named only in words, "rates are quoted in British pounds sterling", "Rate quotes in GBP are based on current
+  // exchange rates", beside a total in dollars: no money in pounds was given. Round 15.)
+  if (/£|\b\d[\d,.]*\s?GBP\b|\bGBP\s?\d/.test(poundsAside)) return null;
   const found = [];
   for (const m of text.matchAll(F_BEFORE)) found.push({ index: m.index, label: m[0], sign: m[1], amount: m[2] });
   for (const m of text.matchAll(F_AFTER)) found.push({ index: m.index, label: m[0], sign: m[2], amount: m[1] });
@@ -2161,7 +2163,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Booking.com: the stay, read from its price details: the room or rooms for the nights booked, at the rooms' price, the
   // taxes and charges apart from it, never its terms as things bought; and whether it is paid at the property. Round 15.)
   const bookingCom = /(^|\.)booking\.com$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
-  const stay = bookingCom ? bookingStay(fromHtml || text) || bookingStay(text) : null;
+  const expedia = /(^|\.)expedia\.(?:com|co\.uk)$/i.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
+  const stay = bookingCom ? bookingStay(fromHtml || text) || bookingStay(text) : expedia ? expediaStay(fromHtml || text) || expediaStay(text) : null;
+  if (stay && stay.orderRef && !result.orderRef) result.orderRef = stay.orderRef;
   if (stay && stay.rooms) {
     const feesPence = stay.fees.reduce((n, f) => n + f.pence, 0);
     const roomPence = stay.roomPence ?? (result.totalPence != null && !stay.fees.length ? result.totalPence : null);
