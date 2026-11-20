@@ -97,6 +97,7 @@ const DETAIL = /^(?:when ordering (?:on|via|through|in|with) (?:the )?[^|£\n]{2
 // (Or the size, the fit and how many set apart by slashes, "Waist 36"/91.5cm 30" Leg Trouser / Slim fit / Qty 1",
 // "16 1/2 Col 35 Sleeve Single Cuff / Slim fit / Qty 1": a size line, never the item's name. Round 12.)
 const VARIANT = /^[^|£]{2,70}\s\/\s[^|£/]{0,30}\bfit\s*(?:\/\s*(?:(?:qty|quantity)\s*:?\s*\d{1,3}\s*)?)?$|^(?:colou?r|(?:pack |uk |eu |us )?size|style|fit|length|width|waist|leg|flavou?r|scent|shade|strength|option|edition|storage|capacity|platform|format|pack|dosage|region|language|dimensions|finish|material|frame|lens(?:es)?|ticket type|seat(?:ing)?|block|row|area|section)\s*:\s*\S/i;
+const WHO_FOR = /^\d{1,3}\s*[x×]\s*(?:adults?|child(?:ren)?|kids?|games?|people|persons?|guests?|players?|seniors?|students?|infants?)$/i;
 // (Month first too, "Jul 30, 2025 10:36 pm": an order's date, never an item's name. Round 11.)
 const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|nd|rd|th)?[\s/.-]+(?:\d{1,2}|[a-z]{3,9})[\s/.,-]+\d{2,4}\b[^|]{0,20}$|^\d{4}-\d{2}-\d{2}$|^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b[^|]{0,20}$/i;
 const GREETING = /^(?:for (?:full|more) (?:ingredients|information|details|nutritional)|hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
@@ -200,6 +201,8 @@ function readLine(raw) {
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i], next = cells[i + 1];
     if (QTY_LABEL.test(c) && next && /^\d{1,3}$/.test(next)) { line.qty = Number(next); i++; continue; }
+    // ("2 x Adults", "2 x Games" on a line of their own under a booking: who it was for, never a thing bought. Round 15e.)
+    if (cells.length === 1 && WHO_FOR.test(c.trim())) { line.variant.push(c.trim()); continue; }
     // ("9L, x 1": the size and how many, under the name. Round 11.)
     const sq = /^(\d+(?:[.,]\d+)?\s?(?:ml|cl|l|ltr|litres?|g|kg|oz|m|cm|mm))\s*,\s*[x×]\s?(\d{1,3})$/i.exec(c);
     if (sq) { line.variant.push(sq[1]); line.qty = Number(sq[2]); continue; }

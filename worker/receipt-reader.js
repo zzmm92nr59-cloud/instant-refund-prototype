@@ -51,7 +51,7 @@ export function cleanShopName(raw) {
 const MAIL_PART = /^(e|em|email|emails|mail|mailer|mailing|news|newsletter|info|hello|noreply|no-reply|orders?|order|shop|store|click|links?|g|t|m|r|tx\d*|reply|notify|notifications?|updates?|service|customerservice|clientservices|support|accounts?|account|send|delivery|deliveries|app|my|online|insideapple|marketing|crm|go|hi|txn|transactional|receipts?)$/i;
 export function domainBase(domain) {
   const parts = String(domain || "").toLowerCase().replace(/["'<>\s]/g, "").replace(/^www\./, "").split(".").filter(Boolean);
-  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store|dk|se|nl|tech|online|ai|me|biz|info|london|site|xyz|test)$/.test(parts[parts.length - 1])) parts.pop();
+  while (parts.length > 1 && /^(com|co|uk|net|org|io|eu|ie|de|fr|us|app|shop|store|dk|se|nl|tech|online|ai|me|biz|info|london|site|xyz|test|example)$/.test(parts[parts.length - 1])) parts.pop();
   const kept = parts.filter((p) => !MAIL_PART.test(p));
   return (kept.length ? kept[kept.length - 1] : parts[parts.length - 1] || "").replace(/[^a-z0-9-]/g, "");
 }
@@ -180,6 +180,15 @@ const FW_MARK = /forwarded message|begin forwarded message|original message|^[ \
 // (Outlook writes its forward header in the shopper's own language: "De : … Envoyé : …", "Von: … Gesendet: …", "Van: …
 // Verzonden: …", "Da: … Inviato: …", "De: … Enviado: …". Round 4, 19 Nov 2026.)
 const FW_FROM = /(?:^|\n)[ \t>*]*(?:from|de|von|van|da|fra|från|od)[ \t*]*:[ \t*]*"?([^"<>[\]\n@]{0,60}?)"?[ \t]*(?:<[ \t]*(?:mailto:)?|\[mailto:|\()?[ \t]*([^\s<>[\]()"'@]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+))/gi;
+// Apple's Hide My Email writes the shop's own address into the one it forwards from,
+// "noreply_at_paybyphone_com_ff7rwfjnyk_bd0c0537@privaterelay.appleid.com": the shop's web address is paybyphone.com.
+// Round 15e.
+export function hiddenSenderDomain(address) {
+  const a = String(address || "").toLowerCase().trim();
+  if (a.length > 160 || !a.endsWith("@privaterelay.appleid.com")) return null;
+  const hid = /^[a-z0-9._+-]{1,64}_at_([a-z0-9-]{1,63}(?:_[a-z0-9-]{1,63}){1,4}?)_[a-z0-9]{8,12}_[0-9a-f]{6,10}@/.exec(a);
+  return hid ? hid[1].replace(/_/g, ".") : null;
+}
 export function forwardedSender(text, opts = {}) {
   const t = String(text || "").slice(0, 200000).replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&quot;|&#0*34;/gi, '"');
   const forwardedSubject = /^\s*(?:fwd?|fw|tr|wg|doorst|rv|enc)\s*:/i.test(String(opts.subject || ""));
@@ -190,7 +199,7 @@ export function forwardedSender(text, opts = {}) {
     const above = FW_MARK.test(t.slice(Math.max(0, at - 300), at));
     const below = /^[ \t>*]*(?:sent|date|envoy[ée]|gesendet|datum|verzonden|enviado|fecha|inviato|data|skickat|sendt|wysłano)[ \t*]*:/im.test(t.slice(at, at + 400).split("\n").slice(1, 5).join("\n"));
     if (!above && !below && !forwardedSubject) continue;
-    const domain = m[3].toLowerCase().replace(/\.+$/, "");
+    const domain = hiddenSenderDomain(m[2]) || m[3].toLowerCase().replace(/\.+$/, "");
     if (personal(domain)) continue;
     const name = m[1].replace(/\s+/g, " ").trim();
     return { name: name || null, domain };
