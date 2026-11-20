@@ -177,5 +177,33 @@ export default function holdout16e() {
         "Trip start time: Thursday, 12 Nov 2026, 2:06 PM", "Receipt Summary", "Receipt number: 99120261112011223", "Amount charged: £2.16", "Payment type: Apple Pay", "Total: £2.16 (inclusive of 20% VAT)"]) },
       o, "Zapride", "2026-11-12", { orderRef: "99120261112011223" });
   }
+  // ---- A fashion shop's order: each item's row with two empty cells before its name (its picture), its sale price beside
+  // the old one, then "Brown / No Size / Qty 1" with slashes --------------------------------------------------------------
+  {
+    const o = order([{ name: "Square sunglasses in tort with smoke lens", qty: 1, unit: 550 }, { name: "Skinny chino shorts in navy", qty: 1, unit: 1700 }, { name: "Logo t-shirt in mid grey marl", qty: 1, unit: 1400 }],
+      { fees: [["Delivery", 495]] });
+    const rowsHtml = `<table width="100%"><tr><td><img src="https://www.threadly.example/a.jpg" alt=""></td><td></td><td>Square sunglasses in tort with smoke lens</td></tr><tr><td colspan="3">&pound;5.50 &pound;8.00</td></tr><tr><td colspan="3">Brown / No Size / Qty 1</td></tr>` +
+      `<tr><td><img src="https://www.threadly.example/b.jpg" alt=""></td><td></td><td>Skinny chino shorts in navy</td></tr><tr><td colspan="3">&pound;17.00</td></tr><tr><td colspan="3">Navy / W34 / Qty 1</td></tr>` +
+      `<tr><td><img src="https://www.threadly.example/c.jpg" alt=""></td><td></td><td>Logo t-shirt in mid grey marl</td></tr><tr><td colspan="3">&pound;14.00 &pound;30.00</td></tr><tr><td colspan="3">Mid grey heather / L / Qty 1</td></tr></table>`;
+    add("holdout16e-empty-cells-slash-facts-qty", "Threadly", "each item a row of two empty cells (its picture) then its name; '£5.50 £8.00' (sale, then the old price); 'Brown / No Size / Qty 1'; 'Subtotal', 'Delivery', 'Total'", {
+      from: "Threadly <order@threadly.example>", subject: "Thanks for your order!", date: "Fri, 13 Nov 2026 12:00:00 +0000",
+      html: page({ brand: "Threadly", domain: "threadly.example", rows: [rows(["Order No.: 648812345", "Delivery method: Next Day Delivery"]), rowsHtml, rows(["Subtotal || £36.50", "Delivery || £4.95", "Total || £41.45"])] }) },
+      o, "Threadly", "2026-11-13", { orderRef: "648812345" });
+  }
+  // ---- A fashion shop's order whose text part sets the number in bold and runs the money lines into one, then its
+  // despatch email with the same items and total (not in the corpus as a purchase of its own: it joins the order) -----------
+  {
+    const o = order([{ name: "Tan suede chelsea boots", qty: 1, unit: 4500 }], { fees: [["Next day delivery", 500]] });
+    const body = (head) => ({
+      text: `${head}\n\nOrder number: *55120378* Estimated delivery: *Tuesday, 17 Nov*\nDelivery address\nSam Taylor, 12 Example Road, Leeds, LS1 4AB Delivery type Next day\nYour items in this order\nTan suede chelsea boots\nSize: 9 (UK) £45.00\nSubtotal (excl. promo) £45.00 Next day delivery £5.00 Total paid £50.00\nPayment methods ****1234 Visa £50.00\n`,
+      html: mail("Rivermode", "rivermode.example", [head, "Order number: 55120378", "Estimated delivery: Tuesday, 17 Nov", "Delivery type", "Next day", "Your items in this order", "Tan suede chelsea boots", "Size: 9 (UK)", "Qty: 1", "£45.00",
+        "Subtotal (excl. promo)", "£45.00", "Next day delivery", "£5.00", "Total paid", "£50.00"]) });
+    add("holdout16e-bold-number-runon-money", "Rivermode", "text part 'Order number: *55120378*' (bold) and 'Subtotal (excl. promo) £45.00 Next day delivery £5.00 Total paid £50.00' on one line; the HTML part one line each", {
+      from: "Rivermode <noreply@rivermode.example>", subject: "Order Confirmation", date: "Mon, 16 Nov 2026 19:00:00 +0000", ...body("Thanks for your order! We'll let you know when it's on its way to you.") },
+      o, "Rivermode", "2026-11-16", { orderRef: "55120378" });
+    out.push(fixture("holdout16e-bold-number-despatch", "Rivermode", "subject 'Despatch Confirmation'; the order's own layout again with 'your order has been despatched'", {
+      from: "Rivermode <noreply@rivermode.example>", subject: "Despatch Confirmation", date: "Tue, 17 Nov 2026 08:00:00 +0000", ...body("Get excited because your order has been despatched.") },
+      expected("Rivermode", "2026-11-17", o, { orderRef: "55120378" })));
+  }
   return out;
 }

@@ -462,6 +462,9 @@ const joinWrong = [];
   const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
   const cards = mergeOrderEmails([det("holdout16b-shop-order-one-figure-pence"), det("holdout16b-shop-order-completed-resend")]);
   if (cards.length !== 1 || cards[0].orderRef !== "61822" || cards[0].totalPence !== 2100) joinWrong.push("a shop's order email re-sent with a new status made " + cards.length + " cards");
+  // (Round 15e: a despatch email that repeats the order's whole layout, items and total joins the order by its number.)
+  { const c2 = mergeOrderEmails([det("holdout16e-bold-number-runon-money"), det("holdout16e-bold-number-despatch")]);
+    if (c2.length !== 1 || c2[0].orderRef !== "55120378" || c2[0].totalPence !== 5000 || !(c2[0].fees || []).some((f) => f.pence === 500)) joinWrong.push("a despatch email repeating its order made " + c2.length + " cards (" + JSON.stringify(c2.map((c) => [c.orderRef, c.totalPence, c.fees])) + ")"); }
   for (const [order, refund, pence] of [["holdout16b-shop-order-one-figure-pence", "holdout16b-shop-refund-initiated", 300], ["holdout16b-rail-change-admin-fee", "holdout16b-rail-refund-by-transaction", 640]]) {
     const m = mergeOrderEmails([det(order)]); attachReturnProgress(m, [], [det(refund)]);
     const p = m[0] && m[0].returnProgress;

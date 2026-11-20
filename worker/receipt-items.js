@@ -310,7 +310,7 @@ function readLine(raw) {
   return line;
 }
 
-const finish = (b) => {
+const finish = (b, opts = {}) => {
   // (A brand on its own line over the product's whole name, "Fila" over "Fila Teratach": the product is the whole name,
   // never the brand with its name as a detail. Round 15e.)
   if (b.name && b.extras.length && b.name.length <= 30 && String(b.extras[0]).toLowerCase().startsWith(String(b.name).toLowerCase() + " ") && b.extras[0].length <= 120) {
@@ -323,12 +323,16 @@ const finish = (b) => {
   const prices = b.prices.slice();
   let pricePence = null, lineTotal = true, ambiguous = false;
   if (b.lineFromLabel != null) pricePence = b.lineFromLabel;
+  // (Read again with the lower of one thing's two prices, "£5.50 £8.00": a sale price beside the old one, struck through in
+  // the email. The totals check says which reading the email meant. Round 15e.)
+  else if (opts.lowerOfTwo && prices.length === 2 && qty === 1 && prices[0] !== prices[1]) pricePence = Math.min(prices[0], prices[1]);
   else if (prices.length >= 2) pricePence = prices[prices.length - 1];
   else if (prices.length === 1) { pricePence = prices[0]; if (qty > 1 && b.unit == null) ambiguous = true; }
   else if (b.unit != null) pricePence = b.unit * qty;
   else if (b.free) pricePence = 0;
   if (pricePence == null) return null;
-  const variant = [...b.variant, ...b.extras].filter((x, i, a) => x && a.indexOf(x) === i).join(", ").slice(0, 160);
+  // (An option's own label is not what it is: "Option: Brown, No Size" is "Brown, No Size". Round 15e.)
+  const variant = [...b.variant.map((v) => String(v).replace(/^option\s*:\s*/i, "")), ...b.extras].filter((x, i, a) => x && a.indexOf(x) === i).join(", ").slice(0, 160);
   // (The unit price, when the email gave one beside the line's price, is kept for the totals check: how many times the
   // unit price must come to the line's price. receipt-parser.js takes it off again.)
   const unitPence = b.unit != null && b.lineFromLabel == null && prices.length ? b.unit : null;
@@ -361,7 +365,7 @@ export function readItems(text, opts = {}) {
         if (opts.extraPrices && pend.prices.length) prev.item.pricePence += pend.prices[pend.prices.length - 1];
         last = prev; pend = null; return;
       }
-      const it = finish(pend);
+      const it = finish(pend, opts);
       if (it) { items.push(it); last = { item: it, mode: "block", at: cur, qtyFree: pend.qty == null && !pend.head, counted: pend.qty != null || Boolean(pend.head), qtyAbove: Boolean(pend.qtyAbove) }; }
     }
     pend = null;
@@ -386,6 +390,12 @@ export function readItems(text, opts = {}) {
       // (A label on its own line over its value in a cell of its own, "Quantity" / "1 |", "Price" / "£2.80 |", under each
       // item's name: read as the label's cell and the value's. Round 15.)
       .replace(/^([ \t]*)(quantity|qty|price)[ \t|]*\n(?=[ \t]*(?:\d{1,3}|£ ?\d[\d,]*\.\d{2})(?:[ \t]*\|)+[ \t]*$)/gim, "$1$2 | ")
+      // (Empty cells before a line's one cell, "| | ASOS DESIGN skinny chino shorts in navy |" (an image's cell): just that
+      // cell. Round 15e.)
+      .replace(/^[ \t]*(?:\|[ \t]*){2,4}(?=[^|\s][^|\n]*\|?[ \t]*$)/gm, "")
+      // (The colour and size set apart by slashes before how many, "Brown / No Size / Qty 1", under an item's price: what it
+      // is and how many, never a name. Round 15e.)
+      .replace(/^([ \t|]*)((?:[^|£/\n]{1,30}[ \t]\/[ \t]){1,3})(?:qty|quantity)[ \t]*:?[ \t]*(\d{1,3})([ \t|]*)$/gim, (m, a, facts, q, b) => `${a}Option: ${facts.split(/[ \t]\/[ \t]/).map((f) => f.trim()).filter(Boolean).join(", ")}${b}\n${a}Qty: ${q}${b}`)
       // (A label and its value set apart by a dash, "Qty - 1", "Size - 12": read as "Qty: 1", "Size: 12". Round 15e.)
       .replace(/^([ \t|]*)(qty|quantity|size|colou?r)[ \t]+[-–][ \t]+(?=[\p{L}\d])/gimu, "$1$2: ").split("\n"); k < all.length && raw.length < 6000; k++) {
     // (Text copied from a page a browser showed sets its cells apart with tabs: read as cells, as an email's table is. Only a

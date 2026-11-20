@@ -580,7 +580,8 @@ function fromText(text, refDate, ctx = {}) {
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
     // capitals ("QWERTZ"). Round 11.) (The number in the next cell, "Order number: | 851791895 |": round 15.)
-    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => (/\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) && !(m[0].includes("|") && /[A-Z0-9-]/i.test(text[m.index + m[0].length] || ""))) ||
+    // (Or set in bold in a text part, "Order number: *73970624*". Round 15e.)
+    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?\*{0,2}([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => (/\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) && !(m[0].includes("|") && /[A-Z0-9-]/i.test(text[m.index + m[0].length] || ""))) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
@@ -2312,6 +2313,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t)), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
+    for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { lowerOfTwo: true })), money: moneyOf(t) });
     cands.push({ items: result.items, money: moneyOf(text) });
     for (const t of [text, otherPart]) if (t && /^[ \t|]*Transaction ID:/im.test(t)) cands.push({ items: readable(transactionBlockItems(t)), money: moneyOf(t) });
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
@@ -2705,14 +2707,19 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
   if (result.items.length && (result.currency || "GBP") === "GBP") {
-    const mon = moneyOf(text);
+    // (A text part that runs its money lines into one, "Subtotal (excl. promo) £35.00 Next day delivery £5.00 Total paid
+    // £40.00", says nothing line by line: the other part's lines are read. Round 15e.)
+    const mon0 = moneyOf(text), other0 = text === fromHtml ? plain : fromHtml;
+    const mon = !(mon0.found || []).length && other0 ? moneyOf(other0) : mon0;
     // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
     const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && f[1] !== zeroedGift && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (percentOff && !off.some((d) => d.pence === percentOff.pence)) off.push(percentOff);
     if (off.length) result.discounts = off;
     // (And what it added for delivery, service and the like, "Service fee £0.82", "Delivery £5.00", as each is labelled, so the
     // receipt can show every line of what was paid. Round 15.)
-    const fees = (mon.found || []).filter((f) => f[0] === "fee" && f[2] > 0 && !result.items.some((i) => String(i.name || "").toLowerCase() === String(f[1]).toLowerCase())).slice(0, 6).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    // (A label run on from the line before it, "Subtotal £39.50 Delivery": only what follows the last amount. Round 15e.)
+    const feeLabel = (l) => String(l).replace(/^.*[£€$]\s?\d[\d,]*(?:\.\d{2})?\s+(?=\p{L})/u, "").replace(/[:\s]+$/, "").slice(0, 60);
+    const fees = (mon.found || []).filter((f) => f[0] === "fee" && f[2] > 0 && !result.items.some((i) => String(i.name || "").toLowerCase() === String(f[1]).toLowerCase())).slice(0, 6).map((f) => ({ label: feeLabel(f[1]), pence: f[2] }));
     if (columnFee && columnFee.fee > 0 && !fees.length) fees.push({ label: columnFee.label, pence: columnFee.fee });
     if (fees.length) result.fees = fees;
     // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
