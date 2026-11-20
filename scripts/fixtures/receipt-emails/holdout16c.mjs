@@ -134,5 +134,14 @@ export default function holdout16c() {
         "The Starlight Express Revival", "Seats in Stalls", "2", "£90.00", "Vouchers", "1", "£-50.00", "Venue Dispatch", "£0.00", "Order total – Paid", "£40.00"]) },
       o, "Stagedoor Tickets", "2026-11-03", { orderRef: "KLM48211" });
   }
+  // ---- A sports-nutrition shop: "Quantity" over "1", "Price" over "£20.00" under each name; free gifts priced and taken off --
+  {
+    const o = order([{ name: "Whey Isolate - 1kg - Vanilla", qty: 1, unit: 2000 }, { name: "Protein Bar - 12 x 60g - Salted Caramel", qty: 1, unit: 1500 }], { discounts: [["You've saved up to 60%", 200]] });
+    add("holdout16c-gifts-priced-and-taken-off", "Liftwell", "each item's name over 'Quantity' / '1' and 'Price' / '£20.00'; 'Free Recipe Box' priced '£5.00' (a promotion, never an item); 'Offers Used:' 'You've saved up to 60%' '- £2.00', 'Up to 60% off almost everything, plus FREE delivery!' '- £3.99', '3 FREE gifts on all orders' '- £5.00'; 'Delivery:' '£0.00'; 'Total Cost:' '£33.00'", {
+      from: "Liftwell <orders@liftwell.example>", subject: "Your Liftwell order confirmation", date: "Sat, 31 Oct 2026 07:40:00 +0000",
+      html: mail("Liftwell", "liftwell.example", ["Thanks for your order", "Order number: 491223376", "Whey Isolate - 1kg - Vanilla", "Quantity", "1", "Price", "£20.00", "Protein Bar - 12 x 60g - Salted Caramel", "Quantity", "1", "Price", "£15.00",
+        "Free Recipe Box", "Quantity", "1", "Price", "£5.00", "Offers Used:", "You've saved up to 60%", "- £2.00", "Up to 60% off almost everything, plus FREE delivery!", "- £3.99", "3 FREE gifts on all orders", "- £5.00", "Delivery:", "£0.00", "Total Cost:", "£33.00"]) },
+      o, "Liftwell", "2026-10-31", { orderRef: "491223376" });
+  }
   return out;
 }

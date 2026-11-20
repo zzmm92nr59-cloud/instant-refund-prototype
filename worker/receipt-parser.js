@@ -2034,9 +2034,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const shopName = (result.retailer && result.retailer.name) || "";
     // (And of those, one whose items come to what they should with the discounts the email shows: a reading that misses a
     // £5.00 item can add up to the total when the email took £5.00 off. Round 11.)
+    const moneyAsName = (c) => c.items.length === 1 && /£\s?\d|\b(?:total|delivery|subtotal)\b[^\n]{0,20}£/i.test(String(c.items[0].name || "")) && !namesCheck(c.items, { shop: shopName }).namesOk;
     const exact = (c) => c.check.expectedPence != null && Math.abs(c.check.itemsPence - c.check.expectedPence) <= 1 && (c.money.discounts || 0) > 0;
     const pick = settled.find((c) => c.items.length && c.check.complete && exact(c) && namesCheck(c.items, { shop: shopName }).namesOk) ||
       settled.find((c) => c.items.length && c.check.complete && namesCheck(c.items, { shop: shopName }).namesOk) ||
+      // (Never one line made of the money lines themselves, "£10.00 Delivery: £0.00 Total Cost", that adds up only because it
+      // is the total, while another reading lists the things bought by name. Round 15.)
+      settled.find((c) => c.items.length && c.check.complete && !moneyAsName(c)) ||
+      settled.filter((c) => c.items.length >= 2 && namesCheck(c.items, { shop: shopName }).namesOk).sort((a, b) => gap(a) - gap(b))[0] ||
       settled.find((c) => c.items.length && c.check.complete) ||
       settled.filter((c) => c.items.length).sort((a, b) => gap(a) - gap(b))[0] || settled[settled.length - 1 - (settled.length > 3 ? settled.length - 3 : 0)] || settled[0];
     // When the older readings found the very same items, their copy is kept (the same fields as before for everything they
@@ -2054,6 +2059,26 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const feeLines = journey ? result.items.filter((i) => /^(?:booking|card|payment|transaction|service|seat reservation) (?:fee|charge)s?$/i.test(String(i.name || ""))) : [];
     result.itemsCheck = feeLines.length ? checkItems(result.items.filter((i) => !feeLines.includes(i)), moneyOf(text), result.totalPence) : checkItems(result.items, moneyOf(text), result.totalPence);
     if (feeLines.length) result.itemsCheck = { ...result.itemsCheck, itemsPence: result.itemsCheck.itemsPence + feeLines.reduce((a, i) => a + i.pricePence, 0), expectedPence: result.totalPence };
+  }
+  // (Free gifts priced at what they are worth and taken off again as "3 FREE gifts on all orders - £10.00": the gifts cost
+  // nothing, so they are £0.00 and that offer is not money off what was bought. When the email's gift lines weren't read
+  // as items, the offer is what they would have come to. Round 15.)
+  let zeroedGift = null, zeroedGiftPence = 0;
+  if (result.items.length && result.totalPence != null && result.itemsCheck && !result.itemsCheck.foreignItems) {
+    const money = moneyOf(text);
+    const gifts = (money.found || []).filter((f) => f[0] === "discount" && /\bfree gifts?\b|\bgifts? (?:on|with) (?:all |every |your )?orders?\b/i.test(f[1]));
+    const D = gifts.reduce((n, f) => n + f[2], 0);
+    if (D > 0 && gifts.length === 1) {
+      const giftLines = result.items.filter((i) => /\bfree\b|\bgift\b/i.test(String(i.name || "")) && lineOf(i) > 0);
+      if (giftLines.length && giftLines.reduce((n, i) => n + lineOf(i), 0) === D) {
+        for (const i of giftLines) { i.pricePence = 0; i.lineTotal = true; i.free = true; }
+        zeroedGift = gifts[0][1]; zeroedGiftPence = D;
+        result.itemsCheck = checkItems(result.items, { ...money, discounts: money.discounts - D, found: money.found.filter((f) => f !== gifts[0]) }, result.totalPence);
+      } else if (!result.itemsCheck.complete && checkItems(result.items, { ...money, discounts: money.discounts - D, found: money.found.filter((f) => f !== gifts[0]) }, result.totalPence).complete) {
+        result.itemsCheck = { ...result.itemsCheck, complete: true, expectedPence: result.itemsCheck.itemsPence, missingPence: 0, giftsNotListed: true };
+        zeroedGift = gifts[0][1]; zeroedGiftPence = D;
+      }
+    }
   }
   // (A ticket seller's "Payment Summary": the tickets under the event's name, each per-ticket fee and the order's handling fee,
   // as the summary lists them, when they come to the total. Round 15.)
@@ -2303,13 +2328,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (result.items.length && (result.currency || "GBP") === "GBP") {
     const mon = moneyOf(text);
     // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
-    const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && f[1] !== zeroedGift && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (off.length) result.discounts = off;
     // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
     // adds up with money off the receipt doesn't show is not complete. Round 15.
     const shownOff = off.reduce((a, d) => a + d.pence, 0);
     const ck = result.itemsCheck;
-    if (ck && ck.complete === true && result.totalPence != null && (mon.discounts || 0) > shownOff && mon.subtotal == null &&
+    if (ck && ck.complete === true && result.totalPence != null && (mon.discounts || 0) - zeroedGiftPence > shownOff && mon.subtotal == null &&
         Math.abs(ck.itemsPence - shownOff + (mon.fees || 0) + (mon.tips || 0) - result.totalPence) > 1 && Math.abs(ck.itemsPence - result.totalPence) > 1)
       result.itemsCheck = { ...ck, complete: false, offNotShown: mon.discounts - shownOff };
     if (shownOff && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, discountsPence: shownOff };

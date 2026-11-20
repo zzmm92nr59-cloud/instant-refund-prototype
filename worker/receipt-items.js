@@ -372,7 +372,10 @@ export function readItems(text, opts = {}) {
   for (let k = 0, rowEnded = false, all = prepText(text).replace(/\r\n?/g, "\n")
       // (Two items run into one line of a text part, "Sea Mist 5L, x 1<tab>£89.50 Fern Hollow 2L, x 1<tab>£32.00": each on its own.
       // Round 11.)
-      .replace(/(\t£\s?\d[\d,]*\.\d{2}) (?=\p{Lu}[^£\t\n]{2,80}\t£)/gu, "$1\n").split("\n"); k < all.length && raw.length < 6000; k++) {
+      .replace(/(\t£\s?\d[\d,]*\.\d{2}) (?=\p{Lu}[^£\t\n]{2,80}\t£)/gu, "$1\n")
+      // (A label on its own line over its value in a cell of its own, "Quantity" / "1 |", "Price" / "£2.80 |", under each
+      // item's name: read as the label's cell and the value's. Round 15.)
+      .replace(/^([ \t]*)(quantity|qty|price)[ \t|]*\n(?=[ \t]*(?:\d{1,3}|£ ?\d[\d,]*\.\d{2})(?:[ \t]*\|)+[ \t]*$)/gim, "$1$2 | ").split("\n"); k < all.length && raw.length < 6000; k++) {
     // (Text copied from a page a browser showed sets its cells apart with tabs: read as cells, as an email's table is. Only a
     // row that ends with its price is a row that ended.)
     // (A "|" inside such a cell is part of what it says, "… 140 MB/s | A1 | Class 10", unless it sets facts apart.)
@@ -690,7 +693,7 @@ export function moneyOf(text) {
     else if (cells.length === 1) {
       const m = new RegExp("^([^\\p{L}\\n\\r\\u2028\\u2029]*\\p{L}.*?)[\\s:]+((?:[-−–]\\s?)?" + MONEY + "|free)$", "iu").exec(cells[0]);
       if (m) { label = m[1]; amt = amountOf(m[2]); }
-      else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && lines[i + 1] && amountOf(lines[i + 1].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 1].replace(/\|/g, "").trim()); }
+      else if (/\p{L}/u.test(cells[0]) && (cells[0].length <= 40 || (cells[0].length <= 90 && (amountOf((lines[i + 1] || "").replace(/\|/g, "").trim()) || {}).neg)) && lines[i + 1] && amountOf(lines[i + 1].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 1].replace(/\|/g, "").trim()); }
       // ("DELIVERY" over "(Standard)" over "£4.99": the label, a note in brackets, then the amount. Round 13.)
       else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && /^\([^()]{1,30}\)$/.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2] && amountOf(lines[i + 2].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 2].replace(/\|/g, "").trim()); }
       // (A credit set out like an item, "Unused time on Claude Pro after 26 Oct 2026" / "Qty 1" / "-£11.10": money off. Round 10.)
@@ -706,7 +709,8 @@ export function moneyOf(text) {
     // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
     if (/^(?:vat|tax)\b(?!\s*(?:no|number|id|reg))[^|]{0,40}$/i.test(label) && !/\b(?:included|inclusive|incl)\b/i.test(label) && !amt.neg) { if (out.vat == null) out.vat = amt.p; continue; }
-    if ((NOT_MONEY_LINE.test(label) && !/^(?:city|tourist|local|resort|accommodation) tax\b/i.test(label)) || label.length > 50) continue;
+    // (An offer's name can be long, "Up to 80% off almost everything, plus FREE delivery!" over "- £3.48": money off. Round 15.)
+    if ((NOT_MONEY_LINE.test(label) && !/^(?:city|tourist|local|resort|accommodation) tax\b/i.test(label)) || label.length > (amt.neg ? 90 : 50)) continue;
     // (The same money off twice in an item list, "1 | Promotion Applied | -£1.00" under two items, is taken off twice. Round 15.)
     const key = label.toLowerCase() + "=" + amt.p + (itemRow ? "@" + i : "");
     if (seen.has(key)) continue;
@@ -749,6 +753,12 @@ export function checkItems(items, money, totalPence) {
   // "VAT € 9.73", "City tax € 8.13", "Total price € 115.13". Round 12.)
   const vatAdded = S == null && T != null && m.vat != null && m.vat > 0;
   if (vatAdded) targets.push(T - m.vat - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0));
+  // (An offer that made delivery free, "… plus FREE delivery!" over "- £3.99", when the delivery line says "£0.00": the
+  // delivery it took off was never added, so the items come to the total with that one offer left out. Round 15.)
+  const freeDelivery = (m.found || []).some((f) => f[0] === "fee" && f[2] === 0 && /\b(?:delivery|shipping|postage)\b/i.test(f[1]));
+  const waived = [];
+  if (freeDelivery && T != null && S == null) for (const f of (m.found || [])) if (f[0] === "discount" && /\bfree\b[^|]{0,20}\b(?:delivery|shipping|postage)\b/i.test(f[1])) waived.push(T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) - f[2]);
+  targets.push(...waived);
   const expectedPence = vatOnTop ? null : S != null ? S + above : (T != null ? T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) : null);
   const unpriced = list.some((i) => i.pricePence == null);
   // A money line read as an item ("Retail price", "Item Subtotal") can make the items look complete: they aren't.
@@ -765,7 +775,7 @@ export function checkItems(items, money, totalPence) {
   const hit = !unpriced && !mismatched && !moneyNamed && targets.some((t) => Math.abs(t - itemsPence) <= 1);
   // (With VAT on top, what the items should come to depends on whether their prices include it: the nearer of the two.)
   const want = expectedPence ?? (vatOnTop ? targets.slice(-2).sort((a, b) => Math.abs(a - itemsPence) - Math.abs(b - itemsPence))[0] : null);
-  return { complete: hit, itemsPence, expectedPence: hit && vatOnTop ? itemsPence : want, missingPence: hit ? 0 : want == null ? null : want - itemsPence };
+  return { complete: hit, itemsPence, expectedPence: hit && (vatOnTop || waived.some((t) => Math.abs(t - itemsPence) <= 1)) ? itemsPence : want, missingPence: hit ? 0 : want == null ? null : want - itemsPence };
 }
 
 // An item with a quantity over one and a single price could be priced for the line or for one: whichever reading makes
