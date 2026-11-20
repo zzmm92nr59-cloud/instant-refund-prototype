@@ -1043,6 +1043,12 @@
     ".rl-rc-giftfor input{flex:1;min-width:0;box-sizing:border-box;min-height:44px;margin:0;padding:0 14px;border:0;border-radius:12px;background:var(--rl-fill);color:var(--rl-text);font:inherit;font-size:16px}" +
     ".rl-rc-giftfor input::placeholder{color:var(--rl-text2)}.rl-rc-giftfor input:focus-visible{outline:2px solid var(--rl-accent);outline-offset:1px}" +
     ".rl-rc-gift-note{margin:2px 0 6px;font-size:13px;line-height:1.4;color:var(--rl-text2)}.rl-rc-gift-note:empty{display:none}" +
+    // "Same order" / "different orders" (joinBox, sameOrderSheet): the emails a receipt is made from, the rows, the short list.
+    ".rl-jn-h{margin:14px 0 4px;font-size:15px;font-weight:700;color:var(--rl-text)}.rl-jn-list{margin:0 0 4px}.rl-jn .rl-msg:empty{display:none}" +
+    ".rl-jn-cands{margin:0 -4px 10px;border-radius:16px;overflow:hidden;background:var(--rl-fill)}.rl-jn-cands .rl-rr{background:var(--rl-card)}.rl-jn-cands .rl-rr-main:disabled{opacity:.6;cursor:default}" +
+    ".rl-jn-sk{display:flex;align-items:center;gap:12px;min-height:68px;padding:10px 14px;box-sizing:border-box;background:var(--rl-card)}.rl-jn-sk+.rl-jn-sk{border-top:1px solid var(--rl-line)}" +
+    ".rl-jn-sk .rl-skel{min-height:0}.rl-jn-sk>i{flex:none;width:48px;height:48px;border-radius:14px}.rl-jn-sk>span{flex:1;display:flex;flex-direction:column;gap:8px}.rl-jn-sk>span i{display:block;height:14px;border-radius:7px;width:70%}.rl-jn-sk>span i+i{width:45%}" +
+    ".rl-jn-none{margin:0;padding:16px;font-size:15px;line-height:1.45;color:var(--rl-text2);background:var(--rl-card)}" +
     // "Fix this receipt": the row under the gift switch, and the sheet itself.
     ".rl-rc-fix{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin-top:4px;border-top:1px solid var(--rl-line);font-size:15px;color:var(--rl-text2)}.rl-rc-fix .rl-pill{flex:none;padding:0 16px}" +
     ".rl-fix h2{margin:0 0 6px;font-size:22px;font-weight:800;letter-spacing:-.01em;color:var(--rl-text)}.rl-fix-lead{margin:0 0 14px;font-size:15px;line-height:1.45;color:var(--rl-text2)}" +
@@ -3478,6 +3484,101 @@
   // the days left, so they aren't repeated. refresh(kind) hears what changed: "confirm" or "dismiss".
   // Laid out simply: when to return it and why that date, the shop's returns page, then a row of small buttons, then (until
   // you've checked it) one question, "Is this right?".
+  // "£24.00 of items, £4.99 added and £2.00 off: £26.99, what you paid." Only when the receipt's own lines come to its total
+  // exactly (every item priced, nothing cancelled), so it never says something adds up that doesn't.
+  function addsUpLine(x, fees, offs) {
+    if ((!fees.length && !offs.length) || !Number.isInteger(x.totalPence) || x.cancelled) return null;
+    var named = (x.items || []).filter(function (i) { return i && i.name; });
+    if (!named.length || named.some(function (i) { return !Number.isInteger(i.pricePence) || i.cancelled === true; })) return null;
+    var items = named.reduce(function (n, i) { return n + i.pricePence * (Number(i.qty) > 1 && !i.lineTotal ? Number(i.qty) : 1); }, 0);
+    var added = fees.reduce(function (n, f) { return n + f.pence; }, 0), off = offs.reduce(function (n, p) { return n + p; }, 0);
+    if (Math.abs(items + added - off - x.totalPence) > 1) return null;
+    var parts = [money(items, x.currency) + " of items"].concat(added ? [money(added, x.currency) + " added"] : []).concat(off ? [money(off, x.currency) + " off"] : []);
+    return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1] + ": " + money(x.totalPence, x.currency) + ", what you paid.";
+  }
+  // "Same order as another receipt" and "These are different orders" (worker/order-joins.js), on a receipt's page. The
+  // reader joins an order's emails into one receipt; where it got that wrong, the shopper says so here, and can undo it.
+  // done(kind) runs after a change ("joined", "split", "undone"), for the page to close and the list to load again.
+  function joinBox(x, done) {
+    var box = el("div", { className: "rl-jn" });
+    if (!x || !x.id || !/^[0-9a-f-]{36}$/.test(x.id) || x.photoReceipt || (x.kind && x.kind !== "receipt")) return box;
+    var also = (x.alsoEmails || []).filter(function (e) { return e; });
+    var note = el("p", { className: "rl-msg", role: "status" });
+    // The other emails this receipt is made from, each with its shop, day and amount.
+    if (also.length) {
+      box.appendChild(el("p", { className: "rl-jn-h", text: "Made from " + (also.length + 1) + " emails" }));
+      var ul = el("ul", { className: "rl-rr-list rl-jn-list" });
+      also.forEach(function (e) {
+        var d = /^\d{4}-\d{2}-\d{2}$/.test(e.orderDate || "") ? new Date(e.orderDate + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : null;
+        ul.appendChild(el("li", {}, [el("span", { text: (e.shop || "Another email") + (d ? ", " + d : "") }), Number.isInteger(e.totalPence) ? el("b", { text: money(e.totalPence, e.currency || "GBP") }) : null].filter(Boolean)));
+      });
+      box.appendChild(ul);
+    }
+    var busy = false;
+    function send(body, kind) {
+      if (busy) return;
+      busy = true; Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = true; }); say(note, "");
+      api("/relay/my/receipts/" + x.id + "/join", { method: "POST", body: body }).then(function (r) {
+        busy = false; Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; });
+        if (!r.ok) return say(note, r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : "Couldn't save that. Try again in a moment.", true);
+        if (done) done(kind);
+      }, function () { busy = false; Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; }); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+    }
+    var line = function (text, label, onclick) { box.appendChild(el("div", { className: "rl-rc-fix rl-jn-row" }, [el("span", { text: text }), el("button", { type: "button", className: "rl-pill", text: label, onclick: onclick })])); };
+    if (x.joinedByYou) line("You said these are one order.", "Undo", function () { send({ action: "undo", kind: "same" }, "undone"); });
+    else if (also.length) line("Not all one order?", "Split it", function () {
+      ask("Split this receipt into " + (also.length + 1) + " receipts, one for each email?", "Split it", function () { send({ action: "apart" }, "split"); }); });
+    if (x.splitByYou) line("You said this is a separate order.", "Undo", function () { send({ action: "undo", kind: "apart" }, "undone"); });
+    line("Same order as another receipt?", "Choose it", function () { if (!busy) sameOrderSheet(x, function () { if (done) done("joined"); }); });
+    box.appendChild(note);
+    return box;
+  }
+  // The short list of the shopper's receipts most likely to be the same order (the same or a similar shop, close days, a
+  // close total), to pick one. Greyed-out rows while it loads; one tap joins them.
+  function sameOrderSheet(x, done) {
+    var card = el("div", { className: "rl-sheet rl-fix rl-jn-pick", role: "dialog", ariaModal: "true", ariaLabel: "Same order as another receipt" });
+    var layer = el("div", { className: "rl-back", style: "z-index:10000" }, [card]);
+    function shut() { layer.remove(); document.removeEventListener("keydown", onKey); }
+    function onKey(e) { if (e.key === "Escape") shut(); }
+    var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "this shop";
+    card.appendChild(el("h2", { text: "Which receipt is the same order?" }));
+    card.appendChild(el("p", { className: "rl-fix-lead", text: "Pick the other receipt and Relay shows them as one, with the fuller one's items and total." }));
+    var list = el("div", { className: "rl-jn-cands" });
+    for (var i = 0; i < 3; i++) list.appendChild(el("div", { className: "rl-jn-sk" }, [el("i", { className: "rl-skel" }), el("span", {}, [el("i", { className: "rl-skel" }), el("i", { className: "rl-skel" })])]));
+    list.setAttribute("aria-busy", "true");
+    var note = el("p", { className: "rl-msg", role: "status" });
+    card.appendChild(list); card.appendChild(note);
+    card.appendChild(el("button", { type: "button", className: "rl-btn ghost rl-plain", text: "Cancel", onclick: shut }));
+    layer.addEventListener("click", function (e) { if (e.target === layer) shut(); });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(layer);
+    var busy = false;
+    api("/relay/my/receipts/" + x.id + "/join").then(function (r) {
+      list.textContent = ""; list.removeAttribute("aria-busy");
+      if (!r.ok) return say(note, r.status === 404 ? "This receipt isn't on your list any more. Pull down to refresh." : "Couldn't load your receipts just now. Try again in a moment.", true);
+      var cands = (r.body && r.body.candidates) || [];
+      if (!cands.length) { list.appendChild(el("p", { className: "rl-jn-none", text: "Relay couldn't find another receipt from " + who + " or for the same money around then. If the other email hasn't arrived yet, try again once it has." })); return; }
+      cands.forEach(function (c) {
+        var named = (c.items || []).filter(function (it) { return it && it.name; });
+        var shop = (c.retailer && (c.retailer.name || c.retailer.domain)) || "Shop";
+        var d = /^\d{4}-\d{2}-\d{2}$/.test(c.orderDate || "") ? shortDate(c.orderDate + "T12:00:00Z") : null;
+        var pic = el("span", { className: "rl-rr-pic" }); pic.setAttribute("aria-hidden", "true"); receiptPic(pic, c, 28, 32);
+        var b = el("button", { type: "button", className: "rl-rr-main rl-jn-cand" }, [pic,
+          el("span", { className: "rl-rr-mid" }, [el("b", { text: named.length ? named[0].name + (named.length > 1 ? " + " + (named.length - 1) + " more" : "") : shop }), el("span", { text: (named.length ? shop + (d ? ", " : "") : "") + (d || "") })]),
+          el("span", { className: "rl-rr-end" }, [el("b", { text: c.totalPence == null ? "" : money(c.totalPence, c.currency) })])]);
+        b.onclick = function () {
+          if (busy) return;
+          busy = true; Array.prototype.forEach.call(list.querySelectorAll("button"), function (n) { n.disabled = true; }); say(note, "");
+          api("/relay/my/receipts/" + x.id + "/join", { method: "POST", body: { action: "same", with: c.id } }).then(function (res) {
+            busy = false; Array.prototype.forEach.call(list.querySelectorAll("button"), function (n) { n.disabled = false; });
+            if (!res.ok) return say(note, res.status === 404 ? "That receipt isn't on your list any more. Pull down to refresh." : "Couldn't join them. Try again in a moment.", true);
+            shut(); if (done) done();
+          }, function () { busy = false; Array.prototype.forEach.call(list.querySelectorAll("button"), function (n) { n.disabled = false; }); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+        };
+        list.appendChild(el("div", { className: "rl-rr" }, [b]));
+      });
+    }, function () { list.textContent = ""; list.removeAttribute("aria-busy"); say(note, "Couldn't reach Relay. Check your connection and try again.", true); });
+  }
   function receiptCard(x, refresh, slim, opts) {
     opts = opts || {};
     var who = (x.retailer && (x.retailer.name || x.retailer.domain)) || "Unknown store";
@@ -3516,9 +3617,17 @@
     if (x.subscriptionEnds && x.subscriptionEnds.on) card.appendChild(el("p", { className: "rl-po-now", text: "This subscription ends on " + longDate(x.subscriptionEnds.on) + " " + String(x.subscriptionEnds.on).slice(0, 4) + (x.subscriptionEnds.refund === false ? ", with no refund." : ".") }));
     // Paid with a gift card (Amazon): the total is what was left to pay.
     if (Number.isInteger(x.giftCardPence) && x.giftCardPence > 0) card.appendChild(el("p", { className: "rl-po-now", text: money(x.giftCardPence, "GBP") + " was paid with a gift card." }));
+    // What the email added for delivery, shipping or service ("Service fee £0.82"), each as the shop labelled it, beside the
+    // money it took off, so the lines add up: the items, plus what was added, less what was taken off, is what was paid.
+    // Only what the receipt has (worker/receipt-parser.js "fees"); nothing is worked out or guessed.
+    var feeList = (Array.isArray(x.fees) ? x.fees : []).slice(0, 6).filter(function (f) { return f && Number.isInteger(f.pence) && f.pence > 0; });
+    feeList.forEach(function (f) { card.appendChild(el("p", { className: "rl-po-now rl-po-fee", text: money(f.pence, x.currency) + " added" + (f.label ? ": " + String(f.label).replace(/[:\s]+$/, "") : "") + "." })); });
     // Money the email took off (promotions, discounts, credit), each as the shop labelled it: why the items come to more than was paid.
+    var offList = [];
     (Array.isArray(x.discounts) ? x.discounts : []).slice(0, 4).forEach(function (d) { var pence = Array.isArray(d) ? d[2] : d && d.pence, label = Array.isArray(d) ? d[1] : d && d.label;
-      if (Number.isInteger(pence) && pence > 0) card.appendChild(el("p", { className: "rl-po-now", text: money(pence, x.currency) + " off" + (label ? ": " + String(label).replace(/[:\s]+$/, "") : "") + "." })); });
+      if (Number.isInteger(pence) && pence > 0) { offList.push(pence); card.appendChild(el("p", { className: "rl-po-now", text: money(pence, x.currency) + " off" + (label ? ": " + String(label).replace(/[:\s]+$/, "") : "") + "." })); } });
+    var sumLine = addsUpLine(x, feeList, offList);
+    if (sumLine) card.appendChild(el("p", { className: "rl-po-now rl-po-sum", text: sumLine }));
     if (x.id && (x.kind || "receipt") === "receipt" && x.itemsCheck && (x.itemsCheck.complete === false || x.itemsCheck.namesOk === false) && !(x.fixed && x.fixed.items)) card.appendChild(missedBox(x, refresh));
     var keepNames = x.returnable === false ? (x.returnableItems || []).map(function (i) { return (x.items || [])[i] && x.items[i].name; }).filter(Boolean) : [];
     if (keepNames.length) card.appendChild(el("p", { className: "rl-keep", text: "The food can't go back, but you can usually return the " + keepNames.join(", the ") + "." ,
@@ -4019,6 +4128,8 @@
           var fixText = fixedParts.length ? "You corrected the " + (fixedParts.length > 1 ? fixedParts.slice(0, -1).join(", ") + " and " + fixedParts[fixedParts.length - 1] : fixedParts[0]) + "." : "Something read wrong?";
           detail.appendChild(el("div", { className: "rl-rc-fix" }, [el("span", { text: fixText }),
             el("button", { type: "button", className: "rl-pill", text: fixedParts.length ? "Change" : "Fix details", onclick: function () { fixSheet(row, function (what) { if (what !== "shared") say(status, "Fixed. Thanks, this helps Relay read emails like this better."); loadList(); }); } })]));
+          // Same order as another receipt, or different orders (worker/order-joins.js).
+          detail.appendChild(joinBox(row, function (kind) { say(status, kind === "joined" ? "Done. They're one receipt now." : kind === "split" ? "Done. Each email is its own receipt now." : "Done. It's back as Relay read it."); loadList(); }));
           // Questions about it: Relay's assistant, shown this receipt only when the shopper says so (support-chat.js).
           var askRow = el("div", { className: "rl-rc-fix", style: "display:none" }, [el("span", { text: "Questions about it?" }),
             el("button", { type: "button", className: "rl-pill", text: "Ask the assistant", onclick: function () { askAssistantAbout(row); } })]);
@@ -6461,6 +6572,35 @@
             row("Reader version", String(rd.readerVersion), N(current) + " emails read by this version" + (older ? ", " + N(older) + " by older ones" : ""))])]));
         box.appendChild(group("Shops read wrong most often", h.shops.length ? [shopList(h.shops, true)]
           : [el("p", { className: "rl-hp-sub", text: "Shops appear here once " + h.minShoppersPerShop + " or more people have receipts from them. While you're testing, your own receipts are below." })]));
+        // Likely reading problems by shop (worker/health.js readingProblems): counts only, most problems first.
+        var rp = h.readingProblems;
+        if (rp) {
+          var pchips = function (s, own) {
+            var c = el("div", { className: "rl-hp-chips" }), any = false;
+            [[s.duplicates, "likely duplicate", "likely duplicates"], [s.notAddingUp, "with items that don't add up", "with items that don't add up"], [s.noNumber, "with no order number", "with no order number"],
+              [s.noTotal, "with no total", "with no total"], [s.saidSame, own ? "time you said same order" : "shopper said same order", own ? "times you said same order" : "shoppers said same order"],
+              [s.saidApart, own ? "time you said different orders" : "shopper said different orders", own ? "times you said different orders" : "shoppers said different orders"]].forEach(function (x) {
+              if (x[0]) { any = true; c.appendChild(el("i", { text: N(x[0]) + " " + (x[0] === 1 ? x[1] : x[2]) })); }
+            });
+            if (!any) c.appendChild(el("i", { className: "ok", text: "Nothing to fix" }));
+            return c;
+          };
+          var plist = function (list, own) {
+            var l = el("div", { className: "rl-hp-shops rl-hp-problems" });
+            list.forEach(function (s) { l.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: s.domain }),
+              el("span", { text: plural(s.receipts, "receipt", "receipts") + (own ? "" : " from " + plural(s.people, "person", "people")) }), pchips(s, own)])); });
+            return l;
+          };
+          var ot = rp.others || { shops: 0 }, pkids = [], named = plist(rp.shops, false);
+          if (!rp.shops.length) pkids.push(el("p", { className: "rl-hp-sub", text: "No shop that " + h.minShoppersPerShop + " or more people buy from has any yet." }));
+          // Shops too few people buy from to be named, counted together, in the same list.
+          if (ot.shops) named.appendChild(el("div", { className: "rl-hp-shop" }, [el("b", { text: "Shops fewer than " + h.minShoppersPerShop + " people buy from" }),
+            el("span", { text: plural(ot.shops, "shop", "shops") + " with " + plural(ot.receipts, "receipt", "receipts") + " between them" }), pchips(ot, false)]));
+          if (named.childNodes.length) pkids.push(named);
+          if (rp.moreShops) pkids.push(el("p", { className: "rl-hp-sub", text: "And " + plural(rp.moreShops, "more shop", "more shops") + " with fewer problems." }));
+          if ((rp.mine || []).length) { pkids.push(el("p", { className: "rl-hp-sub", text: "In your own receipts:" })); pkids.push(plist(rp.mine, true)); }
+          box.appendChild(group("Likely reading problems", pkids));
+        }
         var mine = h.mine || { shops: [] };
         box.appendChild(group("Your own receipts", [el("p", { className: "rl-hp-sub", text: plural(mine.receipts, "purchase", "purchases") + ", by shop, problems first" +
           (mine.personalMail ? ". " + plural(mine.personalMail, "receipt was", "receipts were") + " forwarded from a personal address" : "") + "." })].concat(mine.shops.length ? [shopList(mine.shops, false)] : [])));
@@ -9610,6 +9750,8 @@
         fact("Ordered", x.orderDate ? new Date(x.orderDate + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : null);
         fact("Order number", x.orderRef ? String(x.orderRef).replace(/^#/, "") : null);
         if (facts.childNodes.length) sheet.appendChild(facts);
+        // Same order as another receipt, or different orders (not for one item's own card, or a second order inside one email).
+        if (!one && x.id) sheet.appendChild(joinBox(x, function () { close(); if (opts.changed) opts.changed(); }));
         sheet.appendChild(el("button", { className: "rl-btn ghost", text: "Close", style: "margin-top:14px", onclick: close }));
       });
     };
