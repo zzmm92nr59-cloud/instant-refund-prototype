@@ -1,0 +1,41 @@
+{
+ "id": "holdout16b-shop-order-one-figure-pence",
+ "sender": "Puff Depot",
+ "layout": "'Order Confirmation: #61822 | Puff Depot'; 'Your order (61822) has been received and we are currently Processing it.'; 'Product | Quantity | Price' with '£ 6', '£ 13.5', '£ 1.5'; 'Subtotal', 'Total'",
+ "headers": {
+  "from": "Puff Depot <site@puffdepot.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order Confirmation: #61822 | Puff Depot",
+  "date": "Thu, 12 Nov 2026 15:57:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Puff Depot</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.puffdepot.example/?utm_source=email\"><img src=\"https://www.puffdepot.example/static/email/logo.png\" alt=\"Puff Depot\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Order placed successfully.</td></tr><tr><td>Thank you for choosing us</td></tr><tr><td>Hi Sam Taylor,</td></tr><tr><td>Your order (61822) has been received and</td></tr><tr><td>we are currently Processing it.</td></tr><tr><td>Customer Information</td></tr><tr><td>Product</td><td>Quantity</td><td>Price</td></tr><tr><td>Cloudpuff Pod - Mango - 10mg</td><td>4</td><td>&pound; 6</td></tr><tr><td>Cloudpuff Pod - Cola - 10mg</td><td>9</td><td>&pound; 13.5</td></tr><tr><td>Cloudpuff Pod - Lime - 10mg</td><td>1</td><td>&pound; 1.5</td></tr><tr><td>Subtotal</td><td>&pound; 21.00</td></tr><tr><td>Royal Mail Tracked 48 Shipping</td><td>&pound; 0.00</td></tr><tr><td>Total</td><td>&pound; 21.00</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Puff Depot. All rights reserved.<br /><a href=\"https://www.puffdepot.example/help\">Help</a> | <a href=\"https://www.puffdepot.example/privacy\">Privacy</a> | <a href=\"https://www.puffdepot.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.puffdepot.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Puff Depot",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Cloudpuff Pod - Mango - 10mg",
+    "qty": 4,
+    "linePence": 600
+   },
+   {
+    "name": "Cloudpuff Pod - Cola - 10mg",
+    "qty": 9,
+    "linePence": 1350
+   },
+   {
+    "name": "Cloudpuff Pod - Lime - 10mg",
+    "qty": 1,
+    "linePence": 150
+   }
+  ],
+  "subtotalPence": 2100,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2100,
+  "orderRef": "61822"
+ }
+}

@@ -454,6 +454,20 @@ const joinWrong = [];
       joinWrong.push(`Amazon's return with a pickup booked${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([r.ok, r.orderRef, r.estimatedRefundPence, u.ok && u.stage, r.retailer]));
   }
 }
+{
+  // Round 15: a shop's order email sent again when its status changes ("we are currently Completed it") joins the order it
+  // re-sends, never a second receipt; the shop's refund ("Refund Initiated : #61822") and a booking's refund by its
+  // transaction number join their orders.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
+  const cards = mergeOrderEmails([det("holdout16b-shop-order-one-figure-pence"), det("holdout16b-shop-order-completed-resend")]);
+  if (cards.length !== 1 || cards[0].orderRef !== "61822" || cards[0].totalPence !== 2100) joinWrong.push("a shop's order email re-sent with a new status made " + cards.length + " cards");
+  for (const [order, refund, pence] of [["holdout16b-shop-order-one-figure-pence", "holdout16b-shop-refund-initiated", 300], ["holdout16b-rail-change-admin-fee", "holdout16b-rail-refund-by-transaction", 640]]) {
+    const m = mergeOrderEmails([det(order)]); attachReturnProgress(m, [], [det(refund)]);
+    const p = m[0] && m[0].returnProgress;
+    if (!p || p.refundPence !== pence) joinWrong.push(refund + " not joined to its order (" + JSON.stringify(p || null) + ")");
+  }
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

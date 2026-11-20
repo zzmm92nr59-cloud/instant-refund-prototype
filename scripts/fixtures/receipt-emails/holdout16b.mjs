@@ -1,0 +1,141 @@
+// An eighteenth set of made-up emails (see lib.mjs), round 15 (20 Nov 2026): layouts of receipts in Connor's own inbox that
+// blind checks found Relay still reading wrong (a rail ticket change paid as an admin fee, a railcard, split tickets with
+// insurance, a booking's refund by its transaction number, a pub app's promotions, a bill's check number, a vape shop's
+// newer order email), written again with everything in them made up (shops, stations, items, prices, people, numbers).
+import { order, expected, page, fixture, h } from "./lib.mjs";
+
+const rows = (lines) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${lines.map((l) => `<tr>${l.split(" | ").map((c) => `<td>${h(c)}</td>`).join("")}</tr>`).join("")}</table>`;
+const mail = (brand, domain, lines) => page({ brand, domain, rows: [rows(lines)] });
+
+export default function holdout16b() {
+  const out = [];
+  const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };
+  const not = (id, sender, layout, m, kind, extra = {}) => { const f = fixture(id, sender, layout, m, { notPurchase: { kind, ...extra } }); out.push(f); return f; };
+  const rail = "Railwise <auto-confirm@info.railwise.example>";
+
+  // ---- A rail ticket change: the new ticket under "Order Details" with no price, the admin fee under "Other costs" ---------
+  {
+    const o = order([{ name: "Oakford Parkway to Marston Central", qty: 1, unit: 415 }, { name: "Admin Fee", qty: 1, unit: 700 }]);
+    add("holdout16b-rail-change-admin-fee", "Railwise", "subject 'Your change confirmation'; '1x Advance Single' and '1x Adult' in the journey; 'Order Details' then 'Pay The Difference: Adult - Advance Single - [16-25 Railcard]' with no price; 'Other costs' 'Admin Fee' '£7.00'; 'No booking fee'; 'Total amount: | £11.15'", {
+      from: rail, subject: "Your change confirmation", date: "Mon, 09 Nov 2026 18:02:00 +0000",
+      html: mail("Railwise", "railwise.example", ["You have successfully changed your journey", "Your trip to Marston Central departing Thursday, 12 November 2026 is confirmed",
+        "Oakford Parkway", "Marston Central", "Outbound Thursday, 12 November", "01h 12m, 0 changes", "09:41 Oakford Parkway", "Northern Lines Rail", "10:53 Marston Central",
+        "1x Advance Single", "Specified train only. No refunds.", "1x Adult", "Payment information", "Transaction ID:", "730118264590", "Card Type:", "Visa Debit",
+        "Order Details |", "Pay The Difference: Adult - Advance Single - [16-25 Railcard]", "Other costs |", "Admin Fee", "£7.00", "Booking Fee", "No booking fee", "Total amount: | £11.15 |",
+        "Your Transaction ID:", "730118264590"]) }, o, "Railwise", "2026-11-09", { orderRef: "730118264590" });
+  }
+  // ---- A digital railcard: the card under "Order Details" over its price ---------------------------------------------------
+  {
+    const o = order([{ name: "16-25 Railcard", qty: 1, unit: 3500 }]);
+    add("holdout16b-railcard", "Railwise", "subject 'Your digital railcard purchase is complete. Transaction Id …'; 'Order Details' then '16-25 Railcard' over '£35.00'; 'Other costs' 'Booking Fee' 'No booking fee'", {
+      from: rail, subject: "Your digital railcard purchase is complete. Transaction Id 730118299102", date: "Tue, 10 Nov 2026 08:15:00 +0000",
+      html: mail("Railwise", "railwise.example", ["Your digital 16-25 Railcard is ready to use in the app", "16-25", "Railcard", "Valid from", "Tue, 10 Nov 2026", "Valid to", "Wed, 10 Nov 2027",
+        "Payment information", "Transaction ID:", "730118299102", "Transaction Date:", "10 November 2026", "Payment Type:", "Apple Pay",
+        "Order Details |", "16-25 Railcard", "£35.00", "Other costs |", "Booking Fee", "No booking fee", "Total amount: | £35.00 |"]) }, o, "Railwise", "2026-11-10", { orderRef: "730118299102" });
+  }
+  // ---- Split tickets for one journey plus travel insurance: each ticket and the insurance their own lines -----------------
+  {
+    const o = order([{ name: "Marston Central to Hollins Junction", qty: 1, unit: 480 }, { name: "Hollins Junction to Oakford Parkway", qty: 1, unit: 1290 }, { name: "Insurance", qty: 1, unit: 110 }]);
+    add("holdout16b-rail-split-insurance", "Railwise", "journey in the subject; 'you just have multiple tickets'; '2x Advance Single'; two 'Adult - Advance Single - [16-25 Railcard]' rows each over a price; 'Other costs' 'Insurance' '£1.10'", {
+      from: rail, subject: "Your booking confirmation for Marston to Oakford (14 November, 18:20)", date: "Wed, 11 Nov 2026 12:30:00 +0000",
+      html: mail("Railwise", "railwise.example", ["There’s no difference to your journey, you just have multiple tickets", "Outbound Saturday, 14 November", "01h 15m, 0 changes",
+        "18:20 Marston Central", "Advance Single", "Marston Central to Hollins Junction", "Advance Single", "Hollins Junction to Oakford Parkway", "19:35 Oakford Parkway", "2x Advance Single", "1x Adult", "You’re covered by Insurance",
+        "Transaction ID:", "730118301877", "Order Details |", "Adult - Advance Single - [16-25 Railcard]", "£4.80", "Adult - Advance Single - [16-25 Railcard]", "£12.90",
+        "Other costs |", "Insurance", "£1.10", "Booking Fee", "No booking fee", "Total amount: | £18.80 |"]) }, o, "Railwise", "2026-11-11", { orderRef: "730118301877" });
+  }
+  // ---- A booking's refund, subject "Refund request", by its transaction number -------------------------------------------
+  not("holdout16b-rail-refund-by-transaction", "Railwise", "subject 'Refund request'; 'We're refunding your booking'; 'Refund processing'; 'Transaction ID:' over the booking's number; 'Total to refund: | £6.40'", {
+    from: rail, subject: "Refund request", date: "Fri, 13 Nov 2026 09:00:00 +0000",
+    html: mail("Railwise", "railwise.example", ["We're refunding your booking", "Sit back and wait for the money to arrive", "Refund processing", "Oakford Parkway to", "Marston Central", "Outbound Sat, 14 Nov 2026", "1 adult",
+      "Your refund is being credited back to the account used to make the purchase. This transfer is normally completed within 5 working days.",
+      "Refund information", "Transaction ID:", "730118264590", "Transaction Date:", "9 November 2026", "Oakford Parkway - Marston Central", "£6.40", "Total to refund: | £6.40 |"]) },
+    "refund", { refundPence: 640, orderRef: "730118264590" });
+
+  // ---- A pub app's order: a promotion set out as an item row with a minus price ------------------------------------------
+  {
+    const o = order([{ name: "Spiced Rum (Double)", qty: 1, unit: 455 }, { name: "Cola", qty: 1, unit: 0 }, { name: "Big Breakfast", qty: 1, unit: 925 }], { discounts: [["Promotion Applied", 195]] });
+    add("holdout16b-pub-app-promotion", "Tapster Inns", "'Qty | Description | Amount' table; '1 | Promotion Applied | -£1.95' between items; 'VAT (20.00%)'; 'Order Total'", {
+      from: "Tapster Inns <orders@tapsterinns.example>", subject: "Tapster Inns Order Confirmation: 3120", date: "Sun, 15 Nov 2026 12:46:00 +0000",
+      html: mail("Tapster Inns", "tapsterinns.example", ["Thank you for your order...", "The Weavers Arms", "18 Mill Street", "Hebden", "HX7 1AA", "Order Id: 2207731145", "Order Date: Sunday, November 15, 2026", "Table Number: 21",
+        "Qty | Description | Amount", "1 | Spiced Rum (Double) | £4.55", "1 | Cola | £0.00", "1 | Promotion Applied | -£1.95", "1 | Big Breakfast | £9.25", "VAT (20.00%) | £2.14", "Payment Type | Apple Pay", "Order Total | £11.85"]) },
+      o, "Tapster Inns", "2026-11-15", { orderRef: "2207731145" });
+  }
+  // ---- A restaurant's bill paid at the table: "check number" over "#4412" beside "table" over "#18" -----------------------
+  {
+    const o = order([{ name: "house red (btl)", qty: 1, unit: 2400 }, { name: "chicken katsu", qty: 1, unit: 1350 }, { name: "edamame", qty: 1, unit: 550 }]);
+    add("holdout16b-bill-check-number", "Noodle Yard", "lower-case till receipt; 'table' over '#18' and 'check number' over '#4412' as headings; items 'name | x1 | £..'; 'bill total', 'amount paid'", {
+      from: "Noodle Yard <noreply@noodleyard.example>", subject: "Noodle Yard receipt", date: "Mon, 16 Nov 2026 20:06:00 +0000",
+      html: mail("Noodle Yard", "noodleyard.example", ["your receipt", "thanks for visiting noodle yard soho and paying online", "restaurant", "soho", "table", "#18", "check number", "#4412", "items",
+        "house red (btl) | x1 | £24.00", "chicken katsu | x1 | £13.50", "edamame | x1 | £5.50", "total items | x3", "net total | £35.83", "v.a.t | £7.17", "bill total | £43.00", "amount paid | £43.00"]) },
+      o, "Noodle Yard", "2026-11-16", { orderRef: "4412" });
+  }
+  // ---- A shop's order email: number in the subject after "Order Confirmation: #", prices with one figure of pence --------
+  const vapeOrder = (id, status, date) => {
+    const o = order([{ name: "Cloudpuff Pod - Mango - 10mg", qty: 4, unit: 150 }, { name: "Cloudpuff Pod - Cola - 10mg", qty: 9, unit: 150 }, { name: "Cloudpuff Pod - Lime - 10mg", qty: 1, unit: 150 }]);
+    return add(id, "Puff Depot", "'Order Confirmation: #61822 | Puff Depot'; 'Your order (61822) has been received and we are currently " + status + " it.'; 'Product | Quantity | Price' with '£ 6', '£ 13.5', '£ 1.5'; 'Subtotal', 'Total'", {
+      from: "Puff Depot <site@puffdepot.example>", subject: "Order Confirmation: #61822 | Puff Depot", date,
+      html: mail("Puff Depot", "puffdepot.example", ["Order placed successfully.", "Thank you for choosing us", "Hi Sam Taylor,", "Your order (61822) has been received and", "we are currently " + status + " it.",
+        "Customer Information", "Product | Quantity | Price", "Cloudpuff Pod - Mango - 10mg | 4 | £ 6", "Cloudpuff Pod - Cola - 10mg | 9 | £ 13.5", "Cloudpuff Pod - Lime - 10mg | 1 | £ 1.5",
+        "Subtotal | £ 21.00", "Royal Mail Tracked 48 Shipping | £ 0.00", "Total | £ 21.00"]) }, o, "Puff Depot", date.includes("12 Nov") ? "2026-11-12" : "2026-11-14", { orderRef: "61822" });
+  };
+  vapeOrder("holdout16b-shop-order-one-figure-pence", "Processing", "Thu, 12 Nov 2026 15:57:00 +0000");
+  vapeOrder("holdout16b-shop-order-completed-resend", "Completed", "Sat, 14 Nov 2026 08:14:00 +0000");
+  not("holdout16b-shop-refund-initiated", "Puff Depot", "subject 'Refund Initiated : #61822 | Puff Depot'; 'A refund of £3 has been initiated for your order 61822 .'; plain part only 'Hello Sam Taylor, #'", {
+    from: "Puff Depot <site@puffdepot.example>", subject: "Refund Initiated : #61822 | Puff Depot", date: "Mon, 16 Nov 2026 11:33:00 +0000", text: "Hello Sam Taylor, #",
+    html: mail("Puff Depot", "puffdepot.example", ["Refund Initiated!", "A refund of £3 has been initiated for your order 61822 .", "Hi Sam Taylor, your refund for Order 61822 has been successfully initiated and is currently being processed. It will take 1-3 business days for the refund to reflect in your account."]) },
+    "refund", { refundPence: 300, orderRef: "61822" });
+  // ---- A pub app's receipt: the chain's name over the pub's own name, and an address with no street word ---------------
+  {
+    const o = order([{ name: "Stout (Pint)", qty: 1, unit: 462 }]);
+    add("holdout16b-pub-app-chain-then-venue", "Tapster Inns", "the chain's name 'Tapsters' over 'Harbour Station Bar', 'North Concourse', town, postcode, 'Telephone:'", {
+      from: "Tapster Inns <orders@tapsterinns.example>", subject: "Tapster Inns Order Confirmation: 7886", date: "Sat, 14 Nov 2026 12:29:00 +0000",
+      html: mail("Tapster Inns", "tapsterinns.example", ["Thank you for your order...", "Tapsters", "Harbour Station Bar", "North Concourse", "Portview", "PV1 4DY", "Telephone: 0113 496 0000",
+        "Order Id: 2508590001", "Order Date: Saturday, November 14, 2026", "Table Number: 41", "Qty | Description | Amount", "1 | Stout (Pint) | £4.62", "VAT (20%) | £0.77", "Payment Type | Apple Pay", "Order Total | £4.62"]) },
+      o, "Tapster Inns", "2026-11-14", { orderRef: "2508590001", merchant: "Harbour Station Bar" });
+  }
+  // ---- A pizza order listing what was ordered with no prices, a pizza's choices with and without "+" -------------------
+  {
+    const o = order([{ name: "Garlic Dip - 100g", qty: 1, unit: 0, extras: [] }, { name: "Medium Pepperoni Feast", qty: 1, unit: 0, extras: ["Thin Crust", "No Onions", "Extra Cheese"] }, { name: "BBQ Dip - 40g", qty: 1, unit: 0 }, { name: "14 Chicken Wings", qty: 1, unit: 0 }]);
+    const f = add("holdout16b-pizza-no-prices-choices", "Crust Club", "'1x Name' lines with no prices; '+ Thin Crust' then 'No Onions', 'Extra Cheese' with no '+'; '1x 14 Chicken Wings'; a '1x 40% off … when you spend £30' deal line; 'Delivery: £2.49'; '£28.40 (Including VAT)'", {
+      from: "Crust Club <orders@crustclub.example>", subject: "Your Crust Club order 551209384 is confirmed", date: "Sat, 14 Nov 2026 19:10:00 +0000",
+      html: mail("Crust Club", "crustclub.example", ["Thanks for your order", "Order number: 551209384", "Get excited for your |", "1x Garlic Dip - 100g", "1x Medium Pepperoni Feast", "+ Thin Crust", "No Onions", "Extra Cheese",
+        "1x BBQ Dip - 40g", "1x 14 Chicken Wings", "1x 40% off Pizza and Sides when you spend £30", "Delivery: £2.49", "£28.40 (Including VAT)", "Your order will be delivered to |"]) }, o, "Crust Club", "2026-11-14", { orderRef: "551209384" });
+    f.expected.items = f.expected.items.map((i) => ({ ...i, linePence: null }));
+    f.expected.totalPence = 2840; f.expected.noPrices = true;
+  }
+  // ---- A pub's receipt where each item's empty choice is set out as its own line, "No Choice" over "1" with no price ----
+  {
+    const o = order([{ name: "Steak & Ale Pie", qty: 1, unit: 1850 }, { name: "Fish & Chips (Large)", qty: 1, unit: 2150 }]);
+    add("holdout16b-pub-no-choice-rows", "Kingsgate Inns", "'Item | Qty | Price'; under each item 'No Choice' over '1' with no price", {
+      from: "Kingsgate Inns <noreply@kingsgateinns.example>", subject: "Your receipt from The Old Bell", date: "Sat, 14 Nov 2026 14:00:00 +0000",
+      html: mail("Kingsgate Inns", "kingsgateinns.example", ["Thanks for visiting", "Receipt number: 771203", "Item", "Qty", "Price", "Steak & Ale Pie", "1", "£18.50", "No Choice", "1", "No Choice", "1",
+        "Fish & Chips (Large)", "1", "£21.50", "No Choice", "1", "Promotion: £0.00", "Total: £40.00"]) }, o, "Kingsgate Inns", "2026-11-14", { orderRef: "771203" });
+  }
+  // ---- A card processor's receipt for a water bill: a bill, never a purchase -------------------------------------------
+  not("holdout16b-utility-bill-payment", "PayGate", "'Your transaction has been processed by PayGate, on behalf of Riverside Water Utilities Limited'; 'Amount: GBP 54.00'; 'Description: Riverside Water Payment'", {
+    from: "Riverside Water <do-not-reply@paygate.example>", subject: "PayGate card transaction receipt", date: "Mon, 16 Nov 2026 07:00:00 +0000",
+    html: mail("PayGate", "paygate.example", ["Thank You", "Your transaction has been processed by PayGate, on behalf of Riverside Water Utilities Limited.", "Payment details:", "Amount: GBP 54.00", "Description: Riverside Water Payment",
+      "From: Riverside Water Utilities Limited", "Merchant’s cart ID: 2703229800000", "Please note, this is not a tax receipt.", "Thank you for your payment to Riverside Water Utilities Limited."]) }, "bill");
+  // ---- A return rail booking: each way's legs under its heading, its tickets under "Outbound |" and "Return |" ------------
+  {
+    const o = order([{ name: "Marston Central to Oakford Parkway", qty: 1, unit: 3195 }, { name: "Oakford Parkway to Hollins Junction", qty: 1, unit: 480 }, { name: "Hollins Junction to Marston Terminals", qty: 1, unit: 1540 }, { name: "Booking Fee", qty: 1, unit: 199 }]);
+    const f = add("holdout16b-rail-return-split-legs", "Railwise", "return trip in the subject; 'Outbound Thursday 19 November' with one leg line; 'Return Thursday 19 November' with two 'Advance Single' legs; 'Order Details' 'Outbound |' one ticket, 'Return |' two; 'Specified train only. No refunds.'", {
+      from: rail, subject: "Your booking confirmation for return trip Marston to Oakford (19 November, 06:05)", date: "Tue, 17 Nov 2026 09:00:00 +0000",
+      html: mail("Railwise", "railwise.example", ["Your trip to Oakford Parkway departing Thursday, 19 November 2026 is confirmed", "There’s no difference to your journey, you just have multiple tickets",
+        "Outbound Thursday 19 November", "06:05 Marston Central", "Marston Central to Oakford Parkway", "07:50 Oakford Parkway", "1x Advance Single", "Specified train only. No refunds.", "1x Adult",
+        "Return Thursday 19 November", "14:50 Oakford Parkway", "Advance Single", "Oakford Parkway to Hollins Junction", "Advance Single", "Hollins Junction to Marston Terminals", "16:27 Marston Central", "2x Advance Single", "Specified train only. No refunds.", "1x Adult",
+        "Transaction ID:", "730118355120", "Transaction Date:", "17 November 2026", "Order Details |", "Outbound |", "Adult - Advance Single - [26-30 Railcard]", "£31.95", "Return |", "Adult - Advance Single - [26-30 Railcard]", "£4.80", "Adult - Advance Single - [26-30 Railcard]", "£15.40",
+        "Other costs |", "Booking Fee", "£1.99", "Total amount: | £54.14 |"]) }, o, "Railwise", "2026-11-17", { orderRef: "730118355120" });
+    f.expected.nonRefundable = true;
+  }
+  // ---- A takeaway platform's order: "1 | Name" with the price on the row under it, money off above the subtotal --------
+  {
+    const o = order([{ name: "Crispy Duck Rolls", qty: 1, unit: 650 }, { name: "House Special Noodles", qty: 1, unit: 825 }, { name: "Egg Fried Rice", qty: 1, unit: 350 }, { name: "Prawn Toast", qty: 1, unit: 420 }],
+      { discounts: [["Multi-buy discount", 420], ["Voucher", 500]], fees: [["Service fee", 99], ["Delivery", 249]] });
+    add("holdout16b-takeaway-price-under-name-off-above-subtotal", "Dish Dash", "'1 | Name |' then '| £6.50 |' under it; 'Multi-buy discount: | -£4.20' above 'Subtotal: | £18.25' (the subtotal is after it); voucher, service fee and delivery after", {
+      from: "Dish Dash <noreply@dishdash.example>", subject: "Sam, order confirmed", date: "Wed, 18 Nov 2026 20:15:00 +0000",
+      html: mail("Dish Dash", "dishdash.example", ["Order number: 990412233", "Golden Lotus", "1 | Crispy Duck Rolls |", "| £6.50 |", "1 | House Special Noodles |", "| £8.25 |", "1 | Egg Fried Rice |", "| £3.50 |", "1 | Prawn Toast |", "| £4.20 |",
+        "Multi-buy discount: | -£4.20 |", "Subtotal: | £18.25 |", "Voucher: | -£5.00 |", "Service fee: | £0.99 |", "Delivery: | £2.49 |", "Total: | £16.73 |"]) }, o, "Dish Dash", "2026-11-18", { orderRef: "990412233" });
+  }
+  return out;
+}

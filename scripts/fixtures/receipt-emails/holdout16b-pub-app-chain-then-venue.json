@@ -1,0 +1,32 @@
+{
+ "id": "holdout16b-pub-app-chain-then-venue",
+ "sender": "Tapster Inns",
+ "layout": "the chain's name 'Tapsters' over 'Harbour Station Bar', 'North Concourse', town, postcode, 'Telephone:'",
+ "headers": {
+  "from": "Tapster Inns <orders@tapsterinns.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Tapster Inns Order Confirmation: 7886",
+  "date": "Sat, 14 Nov 2026 12:29:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Tapster Inns</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tapsterinns.example/?utm_source=email\"><img src=\"https://www.tapsterinns.example/static/email/logo.png\" alt=\"Tapster Inns\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for your order...</td></tr><tr><td>Tapsters</td></tr><tr><td>Harbour Station Bar</td></tr><tr><td>North Concourse</td></tr><tr><td>Portview</td></tr><tr><td>PV1 4DY</td></tr><tr><td>Telephone: 0113 496 0000</td></tr><tr><td>Order Id: 2508590001</td></tr><tr><td>Order Date: Saturday, November 14, 2026</td></tr><tr><td>Table Number: 41</td></tr><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td>Stout (Pint)</td><td>&pound;4.62</td></tr><tr><td>VAT (20%)</td><td>&pound;0.77</td></tr><tr><td>Payment Type</td><td>Apple Pay</td></tr><tr><td>Order Total</td><td>&pound;4.62</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Tapster Inns. All rights reserved.<br /><a href=\"https://www.tapsterinns.example/help\">Help</a> | <a href=\"https://www.tapsterinns.example/privacy\">Privacy</a> | <a href=\"https://www.tapsterinns.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tapsterinns.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Tapster Inns",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Stout (Pint)",
+    "qty": 1,
+    "linePence": 462
+   }
+  ],
+  "subtotalPence": 462,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 462,
+  "orderRef": "2508590001",
+  "merchant": "Harbour Station Bar"
+ }
+}
