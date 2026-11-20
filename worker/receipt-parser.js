@@ -3221,6 +3221,16 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const feeLabel = (l) => String(l).replace(/^(?:sub-?\s?total|total|items?)\b[^£€$\n]{0,30}[£€$]\s?\d[\d,]*(?:\.\d{2})?\s+(?=\p{L})/iu, "").replace(/[:\s]+$/, "").slice(0, 60);
     const fees = (mon.found || []).filter((f) => f[0] === "fee" && f[2] > 0 && !result.items.some((i) => String(i.name || "").toLowerCase() === String(f[1]).toLowerCase())).slice(0, 6).map((f) => ({ label: feeLabel(f[1]).replace(/^[#*\s]+/, ""), pence: f[2] }));
     if (columnFee && columnFee.fee > 0 && !fees.length) fees.push({ label: columnFee.label, pence: columnFee.fee });
+    // (Never a fee from what the shop recommends, "Customers who bought this also bought" then a film whose name ends in
+    // "Service" over "£3.49"; and never fees that come to more than was paid with the money off, a flight's taxes on a fare
+    // paid with points: what the email added can't be more than the bill. Round 16b.)
+    const recFees = new Set(((withoutRecommendations(text) === text ? mon : moneyOf(withoutRecommendations(text))).found || []).filter((f) => f[0] === "fee").map((f) => f[1] + "=" + f[2]));
+    for (let k = fees.length - 1; k >= 0; k--) {
+      const f = (mon.found || []).find((x) => x[0] === "fee" && x[2] === fees[k].pence && feeLabel(x[1]).replace(/^[#*\s]+/, "") === fees[k].label);
+      if (f && !recFees.has(f[1] + "=" + f[2]) && !(columnFee && fees[k].label === columnFee.label)) fees.splice(k, 1);
+    }
+    const offP = off.reduce((a, d) => a + d.pence, 0);
+    if (Number.isInteger(result.totalPence) && fees.reduce((a, f) => a + f.pence, 0) > result.totalPence + offP) fees.length = 0;
     if (fees.length) result.fees = fees;
     // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
     // adds up with money off the receipt doesn't show is not complete. Round 15.
