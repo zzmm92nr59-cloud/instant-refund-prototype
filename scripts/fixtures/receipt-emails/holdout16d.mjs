@@ -123,13 +123,15 @@ export default function holdout16d() {
       { ...expected("Ryanair", "2022-05-05", order([])), items: [], totalPence: 16898 });
     out.push(f);
   }
-  // An airline's booking details with the total after its currency's code, "Total Price for all Passengers | GBP 1201.72".
+  // An airline's booking details with the total after its currency's code, "Total Price for all Passengers | GBP 1184.36".
   {
-    const f = fixture("holdout16d-airline-total-code-first", "Lufthansa", "'Booking details | Departure: …' subject, 'booking code: | ABCDEF', 'Total Price for all Passengers | GBP 1201.72' (no thousands comma)",
-      { from: "lufthansa.com <online@booking.lufthansa.com>", subject: "Booking details | Departure: 14 December 2021 | LHR-WDH", date: "Wed, 10 Nov 2021 13:02:53 +0000",
-        html: htmlPage("Lufthansa", ["Ticket details & travel information", "Lufthansa booking code: | ABCDEF", "Passenger information", "TAYLOR/SAM MR", "Tue. 14 December 2021: London – Frankfurt", "LH 909",
-          "Total Price of your Ticket", "Passenger Type | Price | Taxes, fees & surcharges | Passengers | Total Price of your Ticket", "Adult | GBP 771.00 | GBP 430.72 | 1 | GBP 1201.72", "Total Price for all Passengers | GBP 1201.72"]) },
-      { ...expected("Lufthansa", "2021-11-10", order([])), items: [{ name: "Adult", qty: 1, linePence: 120172 }], totalPence: 120172, shopAlso: ["lufthansa.com"] });
+    const f = fixture("holdout16d-airline-total-code-first", "Lufthansa", "'Booking details | Departure: …' subject, 'booking code: | ABCDEF', 'Total Price for all Passengers | GBP 1184.36' (no thousands comma)",
+      { from: "lufthansa.com <online@booking.lufthansa.com>", subject: "Booking details | Departure: 9 March 2022 | LHR-WDH", date: "Mon, 7 Feb 2022 11:20:05 +0000",
+        html: htmlPage("Lufthansa", ["Ticket details & travel information", "Lufthansa booking code: | ABCDEF", "Passenger information", "TAYLOR/SAM MR", "Wed. 9 March 2022: London – Frankfurt", "LH 909",
+          "Total Price of your Ticket", "Passenger Type | Price | Taxes, fees & surcharges | Passengers | Total Price of your Ticket", "Adult | GBP 760.00 | GBP 424.36 | 1 | GBP 1184.36", "Total Price for all Passengers | GBP 1184.36"]) },
+      { ...expected("Lufthansa", "2022-02-07", order([])), items: [{ name: "Flight London Heathrow to Windhoek", qty: 1, linePence: 118436 }], totalPence: 118436, shopAlso: ["lufthansa.com"] });
+    // (Round 18: the flights are what was bought, never the fare's passenger type "Adult"; the airports here are only in the
+    // subject, so the trip as it names it.)
     out.push(f);
   }
   // Ticket Tailor: "Order complete: …", an order summary with its columns named and bare amounts.

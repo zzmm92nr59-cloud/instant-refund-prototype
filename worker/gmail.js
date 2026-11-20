@@ -185,7 +185,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 53;
+export const PARSER_VERSION = 54;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -205,6 +205,10 @@ const SEARCH_TERMS =
   // (Amazon's "Ordered: 'Wireless Earbuds…'" and "Ordered: 3 items": Gmail matches whole words, so "order" never finds
   // "Ordered", and these were missed whenever Gmail didn't file them under Purchases. Round 13.)
   ' OR ordered' +
+  // (A subscription that won't renew, Google Play's "Your … subscription will be cancelled", and a shop's "Order cancelled":
+  // never fetched, as no word of theirs was asked for, so the card never said when a subscription ends. Outlook's own
+  // list already takes subscriptions. Round 18.)
+  ' OR subscription OR cancelled OR canceled' +
   // (An entry, a membership or a draw "Entry Confirmation", a bar's "Your payment #39814759": round 11. The reader decides.)
   ' OR confirmation OR "your payment" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).

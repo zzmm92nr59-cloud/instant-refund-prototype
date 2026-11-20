@@ -15,8 +15,9 @@ const TRAVEL_NAME = /\b(british airways|ryanair|easyjet|jet2(?:\.com|holidays)?|
 const RAIL_DOMAIN = /(^|\.)(thetrainline\.com|trainline\.com|lner\.co\.uk|avantiwestcoast\.co\.uk|gwr\.com|southeasternrailway\.co\.uk|southernrailway\.com|thameslinkrailway\.com|northernrailway\.co\.uk|tpexpress\.co\.uk|crosscountrytrains\.co\.uk|scotrail\.co\.uk|c2c-online\.co\.uk|greateranglia\.co\.uk|chilternrailways\.co\.uk|lumo\.co\.uk|grandcentralrail\.com|hulltrains\.co\.uk|eurostar\.com|nationalrail\.co\.uk|megabus\.com|nationalexpress\.com|flixbus\.co\.uk|splitmyfare\.co\.uk|raileasy\.co\.uk)$/i;
 // Flight numbers of the airlines UK flights are usually with ("BA2490", "FR 8352", "U2 8031", "EZY8031", "LS123"). Not a
 // postcode: "LS1 4AB", "W6 9HR" and "BA1 1AA" have a number and two letters after them.
-const FLIGHT_NO = /\b(BA|FR|RK|U2|EZY|EJU|EC|DS|LS|EXS|W6|W9|W4|BY|TOM|LM|EI|VS|KL|EK|AF|LH|IB|VY|DY|D8|TK|QR|EY|AA|UA|DL|SK|TP|AZ|LX|OS|SN|BE|T3)\s?(\d{1,4})\b(?!\s?\d[A-Z]{2}\b)/;
+const FLIGHT_NO = /\b(BA|FR|EW|4Y|RK|U2|EZY|EJU|EC|DS|LS|EXS|W6|W9|W4|BY|TOM|LM|EI|VS|KL|EK|AF|LH|IB|VY|DY|D8|TK|QR|EY|AA|UA|DL|SK|TP|AZ|LX|OS|SN|BE|T3)\s?(\d{1,4})\b(?!\s?\d[A-Z]{2}\b)/;
 const FLIGHT_NO_G = new RegExp(FLIGHT_NO.source, "g");
+export const hasFlightNumber = (s) => FLIGHT_NO.test(String(s || "").slice(0, 200000));
 // Two airport codes in a row with a way between them: "London Gatwick (LGW) to Malaga (AGP)", "LGW → AGP", "LHR 07:10 - BCN".
 const BETWEEN = /\bto\b|→|->|–|—|✈|›|⇒|>|-|\barriv/i;
 function codePair(win, firstLen) {
@@ -39,8 +40,10 @@ const TO_LABEL = /^\s*(?:to|arriv(?:e|es|al|ing)|destination|flying to)\b\s*[:|]
 const OUT_HEAD = /^\s*(?:your\s+)?(?:outbound|outward|going out|flight out|departing flight)\b/i;
 const BACK_HEAD = /^\s*(?:your\s+)?(?:return|inbound|returning|coming back|flight back)(?:\s+(?:flights?|journey))?\b/i;
 // What a booking email says about the money: "Total paid £245.98", "Total price: GBP 312.40", "Amount paid 189,00 EUR".
-const PAID = /\b(?:total(?:\s+(?:price|paid|cost|amount|fare|charged|to pay|booking cost))?|amount\s+(?:paid|charged)|grand\s+total|price\s+paid|you\s+paid|total\s+for\s+(?:all|your)\s+[\w ]{0,20})\b[^\n0-9£€$]{0,24}?(£|€|\$|GBP|EUR|USD)?\s?(\d{1,3}(?:,\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)\s?(GBP|EUR|USD)?/i;
-const REF = /\b(?:booking\s+(?:reference|ref\.?|number|code|id)|reservation\s+(?:code|number|reference)|confirmation\s+(?:code|number)|airline\s+(?:booking\s+)?reference|pnr|itinerary\s+(?:number|no\.?|#)|trip\s+(?:id|number))(?![a-z])\s*(?:is\s*)?[:#-]?\s*([A-Z0-9]{5,14})\b/i;
+const PAID = /\b(?:total(?:\s+(?:price|paid|cost|amount|fare|charged|to pay|booking cost))?|amount\s+(?:paid|charged)|grand\s+total|price\s+paid|you\s+paid|total\s+for\s+(?:all|your)\s+[\w ]{0,20})\b[^\n0-9£€$]{0,24}?(£|€|\$|GBP|EUR|USD)?\s?(\d{1,3}(?:,\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)\s?(GBP|EUR|USD)?/i;
+const REF = /\b(?:booking\s+(?:reference|ref\.?|number|code|id)|reservation\s+(?:code|number|reference)|confirmation\s+(?:code|number)|airline\s+(?:booking\s+)?reference|pnr|itinerary\s+(?:number|no\.?|#)|trip\s+(?:id|number))(?![a-z])\s*(?:is\s*)?[:#-]?[\s|]*([A-Z0-9]{5,14})\b/i;
+// (A bare "Reservation:" over its code on the next line, Ryanair's "Reservation:" "K7QXPD": a six-character code only. Round 18.)
+const BARE_REF = /^[ \t|]*reservation[ \t]*:[ \t|]*(?:\n[ \t|]*){0,3}([A-Z0-9]{6})[ \t|]*$/im;
 const NOTICE = /\b(check[- ]?in|boarding pass(?:es)?|flight (?:status|update|delay|delayed|cancell?ation|cancell?ed)|gate (?:change|update)|(?:is|has been|have been) (?:delayed|cancell?ed)|schedule change|time change|your (?:trip|holiday|flight) is (?:coming|almost)|get ready for|days to go|countdown|reminder|don'?t forget|manage your booking|add (?:bags|luggage|extras)|upgrade your|choose your seat|seat selection|how was your (?:flight|trip)|rate your)\b/i;
 const CONFIRMED = /\b(booking (?:confirmation|confirmed|is confirmed)|(?:is|are|now) confirmed|confirmation|e-?ticket|itinerary|travel (?:confirmation|documents?)|receipt|invoice|thank(?:s| you) for (?:booking|your booking|choosing|flying)|you(?:'|’)re (?:booked|going)|your (?:[\w.&'’-]+\s+){0,2}(?:booking|flights?|trip|reservation)\b)/i;
 const PROMO = /\b(sale|deals?|offers?|% off|from £|from €|cheap|lowest fares?|save (?:up to )?£|win\b|competition|newsletter|inspiration|destinations? (?:for|to)|where to next)\b/i;
@@ -112,6 +115,14 @@ function nearestFlight(lines, i, prevAt) {
   }
   return best || nearby(lines, i, flightNo);
 }
+// An airport alone on its line, by its code, maybe after its time: "London London Heathrow (LHR)", "15:30 h London London
+// Heathrow (LHR)".
+const OWN_AIRPORT = /^(?:(\d{1,2}[:.]\d{2})(?:\s?h)?(?:\s?\+\d)?\s+)?(?:\p{L}[\p{L} .'’-]{1,60}\s)?\(([A-Z]{3})\)[\s|]*$/u;
+// The day of a flight from the heading above it, "Sat. 6 March 2027: London – Frankfurt", never above the flight before.
+function dayAbove(lines, i, prevAt, refDate, back = 12) {
+  for (let k = i; k >= Math.max(prevAt + 1, i - back); k--) { if (NOT_FLIGHT_DAY.test(lines[k])) continue; const d = legDay(lines[k], refDate); if (d) return d; }
+  return null;
+}
 // The flights an email names, in the order it names them (each once).
 export function flightLegs(text, refDate) {
   const lines = String(text || "").split(/\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -119,7 +130,7 @@ export function flightLegs(text, refDate) {
   let dir = null;
   const add = (from, to, i) => {
     if (!from || !to || from === to) return;
-    legs.push({ from, to, date: nearby(lines, i, (l) => legDay(l, refDate)), flight: nearestFlight(lines, i, legs.length ? legs[legs.length - 1].at : -1), dir, at: i });
+    legs.push({ from, to, date: nearby(lines, i, (l) => legDay(l, refDate)) || dayAbove(lines, i, legs.length ? legs[legs.length - 1].at : -1, refDate, 6), flight: nearestFlight(lines, i, legs.length ? legs[legs.length - 1].at : -1), dir, at: i });
   };
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
@@ -132,6 +143,29 @@ export function flightLegs(text, refDate) {
       add(pair.from, pair.to, i);
       if (pair.end > l.length) i += pair.end > l.length + 1 + (lines[i + 1] || "").length ? 2 : 1;
       continue;
+    }
+    // (Each airport on a line of its own with its time and terminal between, Lufthansa's "London London Heathrow (LHR)",
+    // "Terminal 2", "18:05 h", "Frankfurt Frankfurt (FRA)": a flight when a time is among them and a flight number is near.
+    // Round 18.)
+    const own = OWN_AIRPORT.exec(l);
+    if (own && airportByCode(own[2])) {
+      let to = null, timed = Boolean(own[1]);
+      for (let k = i + 1; k <= i + 6 && k < lines.length; k++) {
+        const o2 = OWN_AIRPORT.exec(lines[k]);
+        if (o2) { if (airportByCode(o2[2]) && o2[2] !== own[2]) { to = { c: o2[2], k }; timed = timed || Boolean(o2[1]); } break; }
+        if (/^[\s|]*\d{1,2}[:.]\d{2}(?:\s?h)?(?:\s?\+\d)?[\s|]*$/i.test(lines[k])) { timed = true; continue; }
+        if (/^[\s|]*(?:terminal\s+\w{1,3})?[\s|]*$/i.test(lines[k])) continue;
+        break;
+      }
+      const prevAt = legs.length ? legs[legs.length - 1].at : -1;
+      let fno = null;
+      if (to && timed) for (let k = to.k + 1; k <= to.k + 8 && k < lines.length && !fno; k++) { if (/\([A-Z]{3}\)[\s|]*$/.test(lines[k])) break; fno = flightNo(lines[k]); }
+      if (to && timed && !fno) for (let k = i - 1; k > prevAt && k >= i - 12 && !fno; k--) fno = flightNo(lines[k]);
+      if (to && timed && fno) {
+        legs.push({ from: own[2], to: to.c, date: dayAbove(lines, i, prevAt, refDate), flight: fno, dir, at: i });
+        i = to.k;
+        continue;
+      }
     }
     // "From: London Gatwick (LGW)" … "To: Malaga (AGP)"; "Depart: … - Charles de Gaulle (Paris)" … "Arrive: … - Heathrow (London)".
     if (FROM_LABEL.test(l) && placeIn(l.replace(FROM_LABEL, ""))) {
@@ -154,6 +188,19 @@ export function flightLegs(text, refDate) {
     if (same) { same.date = same.date || g.date; same.flight = same.flight || g.flight; same.dir = same.dir || g.dir; continue; }
     out.push({ ...g });
   }
+  // (A summary of the trip, "LHR-WDH" in the subject, with no flight number of its own, when flights that have one go from
+  // the one airport to the other one after another: it is not a flight. Round 18.)
+  for (let k = out.length - 1; k >= 0; k--) {
+    const g = out[k];
+    if (g.flight) continue;
+    const numbered = out.filter((o) => o.flight);
+    const start = numbered.findIndex((o) => o.from === g.from);
+    if (start < 0) continue;
+    for (let e = start; e < numbered.length; e++) {
+      if (e > start && numbered[e].from !== numbered[e - 1].to) break;
+      if (numbered[e].to === g.to) { if (e > start) out.splice(k, 1); break; }
+    }
+  }
   // Out or back: as the email's headings say; otherwise a flight towards somewhere the trip already left from is on the
   // way back (and so is everything after a break in the chain: an open jaw, Gatwick to Barcelona, Madrid to Gatwick).
   const city = (c) => (airportByCode(c) || {}).city || c;
@@ -169,8 +216,26 @@ export function flightLegs(text, refDate) {
   return out.map(({ from, to, date, flight, dir }) => ({ from, to, date: date || null, flight: flight || null, leg: dir }));
 }
 
+// (The label on a line of its own and the amount a few lines below, past how it was paid: Ryanair's "Total paid via",
+// "MasterCard", "ending in", "1234", "120.00 GBP"; Lufthansa's "Total Price for all Passengers" over "GBP 1450.20". Round 18.)
+const PAID_LABEL = /^[\s|]*(?:total(?:\s+(?:price|paid|cost|amount|charged))?(?:\s+(?:for all passengers|via))?|amount\s+(?:paid|charged)|grand\s+total|price\s+paid|you\s+paid)[\s|:]*$/i;
+const PAID_SKIP = /^[\s|]*(?:(?:visa|mastercard|master card|amex|american express|maestro|paypal|apple pay|google pay|debit card|credit card|card)(?:\s+(?:debit|credit))?|ending in|\d{4}|\*{2,}\d{4})?[\s|:]*$/i;
+const AMOUNT_ONLY = /^[\s|]*(£|€|\$|GBP|EUR|USD)?\s?(\d{1,3}(?:,\d{3})*(?:[.,]\d{2})|\d+(?:[.,]\d{2}))\s?(GBP|EUR|USD)?[\s|]*$/;
+function paidBelow(lines, i) {
+  for (let k = i + 1, seen = 0; k < lines.length && seen < 6; k++) {
+    if (/^[\s|]*$/.test(lines[k])) continue;
+    seen++;
+    const m = AMOUNT_ONLY.exec(lines[k]);
+    if (m && (m[1] || m[3])) return lines[k].replace(/^[\s|]+|[\s|]+$/g, "");
+    if (!PAID_SKIP.test(lines[k])) return null;
+  }
+  return null;
+}
 function paidOf(text) {
-  for (const line of String(text || "").split(/\n/)) {
+  const lines = String(text || "").split(/\n/);
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (PAID_LABEL.test(line) && !/\d/.test(line)) { const below = paidBelow(lines, i); if (below) line = "Total paid " + below; }
     const m = PAID.exec(line);
     if (!m || !(m[1] || m[3])) continue;
     const cur = m[1] === "£" || m[1] === "GBP" || m[3] === "GBP" ? "GBP" : m[1] === "€" || m[1] === "EUR" || m[3] === "EUR" ? "EUR" : m[1] === "USD" || m[3] === "USD" ? "USD" : null;
@@ -184,7 +249,7 @@ function paidOf(text) {
   return null;
 }
 function refOf(text) {
-  const m = REF.exec(String(text || ""));
+  const m = REF.exec(String(text || "")) || BARE_REF.exec(String(text || "").slice(0, 20000));
   if (!m) return null;
   const r = m[1];
   return r === r.toUpperCase() && /[A-Z]/.test(r) || /^\d{6,14}$/.test(r) ? r : null;
@@ -197,7 +262,10 @@ export function flightBooking({ subject, text, senderDomain, fromName, refDate }
   const travelSender = TRAVEL_DOMAIN.test(senderDomain || "") || TRAVEL_NAME.test(fromName || "");
   const numbers = (body.match(FLIGHT_NO_G) || []).length;
   if (!travelSender && !numbers) return null;
-  const legs = flightLegs(body, refDate);
+  // (With flight numbers in the body but its airports only in the subject, "Booking details | … | LHR-WDH": the trip as the
+  // subject names it, as it is read when the email is forwarded with its subject in the body. Round 18.)
+  let legs = flightLegs(body, refDate);
+  if (!legs.length && numbers && sub) legs = flightLegs(sub, refDate);
   if (!legs.length) return null;
   const ref = refOf(body) || refOf(sub), paid = paidOf(body);
   if (PROMO.test(sub) && !ref) return null;
