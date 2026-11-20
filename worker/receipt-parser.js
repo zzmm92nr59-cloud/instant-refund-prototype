@@ -893,6 +893,10 @@ function receiptSignals(subject, text) {
     /\byour\b[^!?]{0,30}\b(?:trip|ride|order)\b[^!?]{0,20}\bwith\b|\byour\b[^!?]{0,30}\border from\b|\bprocessing your order\b|\byour\b[^!?]{0,30}\bpurchase (?:from|with|at)\b|\breceipt for your payment\b|\byour\b[^!?]{0,20}\btickets? for\b/.test(s) ||
     // "Your Sainsbury's order summary" (round 8).
     /\byour\b[^!?]{0,40}\border summary\b/.test(s) ||
+    // Stripe's "Your Capricorn Wealth Management Limited receipt [#1890-4978]" (round 15).
+    /\byour\b[^!?\n]{0,60}\breceipt\s*\[#[\d-]{4,20}\]\s*$/.test(s) ||
+    // Ticket Tailor's "Order complete: Colour Ball 2025 - …" (round 15).
+    /^\s*(?:(?:fwd?|fw)\s*:\s*)?order complete\s*:/.test(s) ||
     // PayPal's "You've submitted an order in the amount of £25.00 GBP to …": an order paid through PayPal (round 15).
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?you(?:'|’)?ve submitted an order\b/.test(s) ||
     // "Your payment #39814759" (a bar's order-and-pay app), "Payment receipt for …" (round 11).
@@ -930,7 +934,7 @@ function receiptSignals(subject, text) {
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
   // ("Amount paid | £20.62" with no word "total" counts too: coverage round.)
   // (A total in dollars counts too, "Total | $60.00": round 11.)
-  const bodyHit = /\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
+  const bodyHit = /\byour payment of £\s?\d[\d,]{0,9}(?:\.\d{2})? has been (?:successfully )?(?:processed|received|taken)\b|\border\s*(number|no|id|ref|#)|\btotal\b[ \t|:]{0,40}(?:[£€]|US ?\$|\$\s?\d)|\btotal\b(?:\s*\([^)\n]{1,40}\))?[\s\S]{0,12}(?:[£€]|\$\s?\d)|^[^£€\n\r\u2028\u2029]*[£€].*\btotal\b|\bamount\s+paid\b[\s|:]{0,20}(?:[£€]|\$\s?\d)|^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:amount|total paid)\s*:[\s|]*£\s?\d/im.test(text);
   return { subjectHit, bodyHit };
 }
 function looksLikeReceipt(subject, text) {
@@ -2187,6 +2191,26 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       missingPence: sum == null || result.totalPence == null ? null : result.totalPence - sum };
     if (stay.payAtProperty) result.payAtProperty = true;
   }
+  // (A ticket seller's order summary with its columns named, "Item Price Fee Quantity Subtotal", then each ticket's row with
+  // bare amounts, "Individual Ticket 75.00 0.00 1 75.00" (Ticket Tailor): the ticket, how many, and what the row came to with
+  // its fee. Round 15.)
+  if (!result.items.length) {
+    const hd = /^[ \t|]*item[ \t|]+price[ \t|]+fee[ \t|]+quantity[ \t|]+subtotal[ \t|]*$/im.exec(text);
+    if (hd) {
+      const rowsAfter = text.slice(hd.index + hd[0].length, hd.index + hd[0].length + 3000).split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+      const got = [];
+      for (const r of rowsAfter) {
+        const m = /^(\S.{0,100}?) (\d{1,5}\.\d{2}) (\d{1,4}\.\d{2}) (\d{1,3}) (\d{1,6}\.\d{2})$/.exec(r);
+        if (!m) break;
+        got.push({ name: m[1], qty: Number(m[4]), pricePence: money(m[5]), lineTotal: true });
+      }
+      if (got.length) { result.items = got; result.itemsCheck = checkItems(got, moneyOf(text), result.totalPence); }
+    }
+  }
+  // (A shop's "Payment received" email, "Your payment of £54.40 has been successfully processed", subject "Payment receipt
+  // confirmation 3173033": that money, for that order. Round 15.)
+  if (result.totalPence == null) { const pd = /\byour payment of £\s?(\d[\d,]{0,9}(?:\.\d{2})?) has been (?:successfully )?(?:processed|received|taken)\b/i.exec(text.slice(0, 5000)); if (pd) { result.totalPence = money(pd[1]); result.currency = "GBP"; result.itemsCheck = checkItems(result.items, moneyOf(text), result.totalPence); } }
+  if (!result.orderRef) { const sr = /\b(?:payment receipt|payment|receipt|order) confirmation\s*[:#]?\s*(\d{5,12})\s*$/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // (PayPal's own labels are never the thing bought: "Funding sources used (total)", "Sent to …", "Seller". Round 15.)
   if (viaPayPal && result.items.some((i) => PAYPAL_LABEL.test(String(i.name || "")))) {
     result.items = result.items.filter((i) => !PAYPAL_LABEL.test(String(i.name || "")));
