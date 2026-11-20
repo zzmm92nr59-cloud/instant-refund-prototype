@@ -694,7 +694,8 @@ export function moneyOf(text) {
       // ("DELIVERY" over "(Standard)" over "£4.99": the label, a note in brackets, then the amount. Round 13.)
       else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 40 && /^\([^()]{1,30}\)$/.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2] && amountOf(lines[i + 2].replace(/\|/g, "").trim())) { label = cells[0]; amt = amountOf(lines[i + 2].replace(/\|/g, "").trim()); }
       // (A credit set out like an item, "Unused time on Claude Pro after 26 Oct 2026" / "Qty 1" / "-£11.10": money off. Round 10.)
-      else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 80 && /^qty\s*:?\s*\d{1,3}$/i.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2]) {
+      // (Or with a bare count between, "Vouchers" / "1" / "£-100.00", a ticket seller's voucher row. Round 15.)
+      else if (/\p{L}/u.test(cells[0]) && cells[0].length <= 80 && /^(?:qty\s*:?\s*)?\d{1,3}$/i.test((lines[i + 1] || "").replace(/\|/g, "").trim()) && lines[i + 2]) {
         const a = amountOf(lines[i + 2].replace(/\|/g, "").trim());
         if (a && a.neg) { label = cells[0]; amt = a; }
       }

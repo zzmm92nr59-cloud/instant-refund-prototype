@@ -125,5 +125,14 @@ export default function holdout16c() {
       html: mail("Hartwell Shirts", "hartwellshirts.example", ["Order number: WUK20044123", "Navy Leather Trainer | In Stock | £79.95", "Slim Fit Stone Chinos | In Stock | £63.96", "Order Total", "Sub-total | £143.91", "Delivery charge | £4.95", "VAT | £24.81", "Order total [Incl. VAT] | £148.86"]) },
       o, "Hartwell Shirts", "2026-11-05", { orderRef: "WUK20044123" });
   }
+  // ---- A theatre ticket site: "Order total – Paid", a voucher row "Vouchers | 1 | £-50.00", "Venue Dispatch" at £0.00 ------
+  {
+    const o = order([{ name: "The Starlight Express Revival", qty: 2, unit: 4500 }], { discounts: [["Vouchers", 5000]] });
+    add("holdout16c-theatre-total-paid-dash", "Stagedoor Tickets", "'Tickets are non-refundable per our terms and conditions.'; 'Order summary', 'Item | Quantity | Total', the show over 'Seats in Stalls', '2 |', '£90.00 |'; 'Vouchers |' '1 |' '£-50.00 |'; 'Venue Dispatch' '£0.00'; 'Order total – Paid |' '£40.00'", {
+      from: "Stagedoor Tickets <noreply@stagedoortickets.example>", subject: "Booking confirmation - Order KLM48211", date: "Tue, 03 Nov 2026 20:00:00 +0000",
+      html: mail("Stagedoor Tickets", "stagedoortickets.example", ["Booking reference KLM48211", "IMPORTANT INFORMATION", "Tickets are non-refundable per our terms and conditions.", "Order summary", "Item | Quantity | Total",
+        "The Starlight Express Revival", "Seats in Stalls", "2", "£90.00", "Vouchers", "1", "£-50.00", "Venue Dispatch", "£0.00", "Order total – Paid", "£40.00"]) },
+      o, "Stagedoor Tickets", "2026-11-03", { orderRef: "KLM48211" });
+  }
   return out;
 }
