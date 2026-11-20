@@ -444,6 +444,15 @@ const joinWrong = [];
     if (!pers.returns || pers.returns.windowDays != null || pers.returns.deadline != null || (pers.returns.instructions || []).length || g.returnable !== false || !/personalised/i.test(g.notReturnableReason || ""))
       joinWrong.push(`a personalised order the seller won't take back${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([pers.returns, g.returnable]));
   }
+  // (Amazon's "Your return is confirmed", a collection booked: the return started on its order, the refund only expected,
+  // never a refund.)
+  for (const app of [null, "gmail"]) {
+    const { RETURN_PICKUP } = await import("./fixtures/receipt-emails/holdout16a.mjs");
+    const raw = rawEmail(app ? forwarded(RETURN_PICKUP, app) : RETURN_PICKUP);
+    const r = parseReturnEmail(raw), u = parseReturnUpdateEmail(raw);
+    if (!r.ok || r.orderRef !== "206-5556667-7778889" || r.estimatedRefundPence !== 44900 || u.ok || /@/.test(String(r.retailer && r.retailer.name || "")))
+      joinWrong.push(`Amazon's return with a pickup booked${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([r.ok, r.orderRef, r.estimatedRefundPence, u.ok && u.stage, r.retailer]));
+  }
 }
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 

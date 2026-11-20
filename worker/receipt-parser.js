@@ -993,24 +993,26 @@ export function amazonItems(html, given) {
   for (let i = 0; i < rows.length; i++) {
     const q = /^(?:Quantity|Qty):\s*(\d{1,3})$/i.exec(rows[i]);
     if (q) {
-      let name = null; const bits = [];
+      let name = null, author = null; const bits = [];
       for (let j = i - 1; j >= Math.max(0, i - 7); j--) {
         const b = /^(colou?r|size|style):\s*(.{1,40})$/i.exec(rows[j]);
         if (b) { bits.unshift(b[2]); continue; }
         if (AMZ_SKIP.test(rows[j]) || /^amazon(\.co\.uk)?$/i.test(rows[j]) || /^Sold by\s*:?$/i.test(rows[j - 1] || "") || (/^:$/.test(rows[j - 1] || "") && /^Sold by$/i.test(rows[j - 2] || "")) || /^[:|]$/.test(rows[j])) continue;   // the seller, under "Sold by:"
         if (rows[j].length >= 3 && rows[j].length <= 220 && !/^£|^\d+$/.test(rows[j])) {
           name = rows[j];
-          // (A book's author on the row under its title Amazon cut short, "Genki 1: An Integrated..." over "Eri Banno": the
-          // title, taken whole from the text part's "Title of Author". Round 15.)
+          // (A book's author on the row under its title and over "Condition: New", "Genki 1: An Integrated..." over "Eri
+          // Banno": the title is the row above, and the book is named as Amazon's text part names it, "Title of Author". Round 15.)
           const over = rows[j - 1] || "";
-          if (j > 0 && /(?:\.\.\.|…)$/.test(over) && over.length >= 12 && !/(?:\.\.\.|…)$/.test(name) && name.length <= 60 && !AMZ_SKIP.test(over)) name = over;
+          if (j > 0 && over.length >= 20 && over.length <= 220 && !AMZ_SKIP.test(over) && !/^view (?:or edit )?order/i.test(over) && !/^£|^\d+$/.test(over) &&
+              /^\p{Lu}[\p{L}.'’-]{0,20}(?: \p{Lu}[\p{L}.'’-]{0,20}){1,3}$/u.test(name) && name.length <= 40 && !/(?:\.\.\.|…)$/.test(name) &&
+              /^condition\s*:/i.test(rows[j + 1] || "")) { author = name; name = over; }
           break;
         }
       }
       if (!name) continue;
       let price = null;
       for (let k = i + 1; k <= i + 3 && price == null; k++) price = priceAt(k);
-      items.push({ name: tidy(name), ...cut(name), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: Number(q[1]), pricePence: price });
+      items.push({ name: tidy(name), ...cut(name), ...(author ? { author } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty: Number(q[1]), pricePence: price });
       continue;
     }
     if (/^Sold by\s*:?(?:\s+\S.{0,60})?$/i.test(rows[i]) && !rows.slice(i + 1, i + 8).some((t) => /^(?:Quantity|Qty):/i.test(t))) {   // digital: title, "Sold by:", seller, price
@@ -1033,7 +1035,32 @@ export function amazonItems(html, given) {
       items.push({ name: tidy(name), ...cut(name), ...(at > 0 && !qOver ? { above: rows[at - 1] } : {}), ...(bits.length ? { variant: bits.join(", ") } : {}), qty, pricePence: price });
     }
   }
-  return given ? items : items.map(({ above, cut, ...i }) => i);
+  return given ? items : items.map(({ above, cut, author, ...i }) => (author && !i.name.endsWith(" of " + author) ? { ...i, name: i.name + " of " + author } : i));
+}
+
+// A marketplace's item block (Etsy's HTML): the thing's name over "Transaction ID: 3521722269", its options ("Colour: Pink"),
+// "Quantity: 1" and "Price:" over "£ 7.95" (the price of one). Round 15.
+function transactionBlockItems(text) {
+  const lines = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 4000);
+  const out = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!/^Transaction ID:\s*\d{5,15}$/i.test(lines[i])) continue;
+    const name = lines[i - 1];
+    if (!name || name.length < 3 || name.length > 200 || /£|:$/.test(name)) continue;
+    const opts = []; let qty = null, price = null;
+    for (let k = i + 1; k < Math.min(lines.length, i + 10) && price == null; k++) {
+      const q = /^Quantity:\s*(\d{1,3})$/i.exec(lines[k]);
+      if (q) { qty = Number(q[1]); continue; }
+      const p = /^(?:Item )?Price:\s*(?:£\s?(\d{1,5}(?:,\d{3})*\.\d{2}))?$/i.exec(lines[k]);
+      if (p) { const v = p[1] || ((/^£\s?(\d{1,5}(?:,\d{3})*\.\d{2})$/.exec(lines[k + 1] || "") || [])[1]); if (v) price = money(v); continue; }
+      const o = /^([\p{L} ]{2,30}):\s*(.{1,60})$/u.exec(lines[k]);
+      if (o && qty == null) { opts.push(o[2]); continue; }
+      if (/^Transaction ID:/i.test(lines[k])) break;
+    }
+    if (price == null) continue;
+    out.push({ name, qty: qty || 1, pricePence: price, ...(opts.length ? { variant: opts.join(", ") } : {}) });
+  }
+  return out;
 }
 
 // A PayPal receipt lists each thing as its name, "Qty: 2", an optional "Product ID: …" line and its price in the payment's
@@ -1171,9 +1198,12 @@ export function amazonOrders(html, plain) {
     }
     // (A book's author on the row under its title: the text part says "Title of Author". Round 13.)
     if (it.above && flat.includes(it.above + " of " + name)) name = it.above + " of " + name;
-    const { cut, above, ...rest } = it;
+    const stillCut = Boolean(it.cut && name === it.name);
+    // (A book's author, as the text part writes it: "Title of Author".)
+    if (it.author && !name.endsWith(" of " + it.author)) name = name + " of " + it.author;
+    const { cut, above, author, ...rest } = it;
     // (A title still cut short, when the email has no text part to take it whole from: flagged, never passed off as whole.)
-    return { ...rest, name, ...(cut && name === it.name ? { stillCut: true } : {}) };
+    return { ...rest, name, ...(stillCut ? { stillCut: true } : {}) };
   };
   const orders = new Map();
   heads.forEach((h, k) => {
@@ -1704,7 +1734,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
 
   // A refund, a cancellation or a price adjustment is never a new purchase (a refund is read by parseReturnUpdateEmail, and
   // attaches to the order it belongs to). Said in the subject, or at the top of the email ("Your order has been cancelled").
-  if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " "))) {
+  if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " ")) ||
+      // (Amazon's "we have processed your refund for £2.49 for the above-referenced order" under a subject naming the order. Round 15.)
+      /\bwe (?:have|(?:'|’)ve) processed your refund (?:for|of) £\s?\d/i.test(text.slice(0, 1200).replace(/\s+/g, " "))) {
     return { ok: false, reason: "refund_or_cancellation", source: "shopper_email" };
   }
   // (A table booked at a restaurant, "Table for 2 on Friday, 29 July 2022 at 17:30", with the menu it was booked for and its
@@ -1903,6 +1935,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { extraPrices: true })), money: moneyOf(t) });
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { laterPrice: true })), money: moneyOf(t) });
     cands.push({ items: result.items, money: moneyOf(text) });
+    for (const t of [text, otherPart]) if (t && /^[ \t|]*Transaction ID:/im.test(t)) cands.push({ items: readable(transactionBlockItems(t)), money: moneyOf(t) });
     if (html && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "")) cands.push({ items: amazonItems(html), money: moneyOf(fromHtml || text) });
     if (/(^|\.)apple\.com$/i.test(result.retailer.domain || "")) for (const t of [text, otherPart]) if (t) cands.push({ items: appleItems(t), money: moneyOf(t) });
     // Prices printed above their names (round 3): tried after every other reading, so it is taken only when nothing else adds up.
@@ -1958,7 +1991,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef && viaPayPal) { const oid = /^[ \t|]*(?:order id|order number|invoice id)[ \t]*[:|]?[ \t|]*\n?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,63})[ \t]*\|?[ \t]*$/im.exec(text); if (oid) result.orderRef = oid[1]; }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)
-  const isAmazon = /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "");
+  // (Pasted with no address at all: an email that calls itself Amazon's near its top and names an order in Amazon's shape.
+  // Round 15.)
+  const amazonRefs = new Set([...text.slice(0, 60000).matchAll(/\b((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/g)].map((m) => m[1]));
+  const amazonPasted = !(result.retailer.domain || sender?.domain) && (amazonRefs.size > 0 && /\bamazon(?:\.co\.uk)?\b/i.test(text.slice(0, 2000)) || /^[ \t]*Ordered item\(s\):/m.test(text.slice(0, 20000)));
+  const isAmazon = /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") || amazonPasted;
   // (From the HTML when it shows the orders; else from the text part alone.)
   const amazonSplit = isAmazon ? (html && amazonOrders(html, plain)) || amazonPlainOrders(plain || text) : null;
   if (amazonSplit) {
@@ -2184,13 +2221,31 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // (Amazon's digital receipt, a film paid by gift card: "Total: £1.99" "Gift Card Amount: -£1.99" "Order Grand Total: £0.00".
   // What it cost is the total before the gift card, the gift card's part kept beside it. Round 15.)
-  if (!result.giftCardPence && Number.isInteger(result.totalPence) && /(^|\.)(?:amazon\.(?:co\.uk|com)|primevideo\.com)$/i.test(result.retailer.domain || sender?.domain || "")) {
+  // (Pasted, with no sender's address: Amazon by the name the email gives itself.)
+  const amazonFamily = /(^|\.)(?:amazon\.(?:co\.uk|com)|primevideo\.com)$/i.test(result.retailer.domain || sender?.domain || "") || amazonPasted ||
+    (!(result.retailer.domain || sender?.domain) && /^amazon(?:\.co\.uk)?(?: prime video)?$/i.test(String(result.retailer.name || "")));
+  if (!result.giftCardPence && Number.isInteger(result.totalPence) && amazonFamily) {
     const g = /^[ \t|]*Gift Card(?: Amount)?[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,2}[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
     const before = /^[ \t|]*Total[ \t]*:[ \t|]*(?:\n[ \t|]*){0,2}£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/im.exec(text);
+    // (Or the payment methods under "Order Total:", "Gift Card (£28.64)" "Visa (£0.00)", as a pasted page shows them; the
+    // summary repeated over each parcel gives the gift card once.)
+    let paidBy = 0;
+    for (const m of text.slice(0, 60000).matchAll(/^[ \t|]*Gift Card[ \t]*\(£\s?(\d{1,5}(?:,\d{3})*\.\d{2})\)[ \t|]*$/gim)) paidBy = Math.max(paidBy, money(m[1]));
     if (g && before && money(before[1]) - money(g[1]) === result.totalPence) {
       result.giftCardPence = money(g[1]); result.totalPence = money(before[1]);
       if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
+    } else if (!g && paidBy > 0 && amazonRefs.size <= 1) {
+      result.giftCardPence = paidBy; result.totalPence += paidBy;
+      if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
     }
+  }
+  // (Amazon's "Order Total: £0.00" over things bought, with nothing in the email saying what paid for them, a text part that
+  // leaves out the gift card: what the order cost isn't known from it, and it is never shown as £0.00. Round 15.)
+  const boughtSomething = result.items.some((i) => Number.isInteger(i.pricePence) && i.pricePence > 0) || /£\s?(?!0\.00\b)\d/.test(text.slice(0, 20000));
+  if (amazonFamily && result.totalPence === 0 && !result.giftCardPence && !(result.discounts && result.discounts.length) && boughtSomething) {
+    result.totalPence = null; result.totalFrom = "unknown_gift_card";
+    // (Items not read at all are still flagged as missing.)
+    result.itemsCheck = { ...(result.itemsCheck || {}), expectedPence: null, missingPence: null, complete: result.items.length ? null : false };
   }
   // (A summary written before VAT, "Item Subtotal: £4.16" "Promotions: -£4.16" "Total Before VAT: £0.00" "VAT: £0.00"
   // "Order Grand Total: £0.00", under a film listed at £4.99 with its VAT: the promotion paid for all of it, so what it took
@@ -2296,7 +2351,8 @@ export function parseReturnEmail(rawEmail) {
   // Some senders ship an empty or skimpy text part beside the full HTML one: use whichever actually has the return details.
   const plainText = parts.text.join("\n").trim();
   const htmlText = html ? htmlToText(html).trim() : "";
-  const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t);
+  // (Or Amazon's "Your return is confirmed" with its pickup or drop-off booked and the refund it expects. Round 15.)
+  const hasReturn = (t) => /\breturn id\b/i.test(t) || /(?:thanks for your|your) return request/i.test(t) || /\byour return is confirmed\b/i.test(t);
   // (A text part that lost its pound signs, "for the value of L118.00", while the HTML has them: the HTML is read. Round 12.)
   const lostPounds = Boolean(plainText && htmlText && !/£/.test(plainText) && /\bL\d[\d,]*\.\d{2}\b/.test(plainText) && /£/.test(htmlText));
   const text = plainText && !lostPounds && (hasReturn(plainText) || !hasReturn(htmlText)) ? plainText : htmlText || plainText;
@@ -2304,7 +2360,7 @@ export function parseReturnEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   const refDate = headers.date ? new Date(headers.date) : null;
 
-  const isReturn = /\breturn id\b/i.test(text) || /(?:thanks for your|your) return request/i.test(text);
+  const isReturn = hasReturn(text);
   if (!isReturn) return { ok: false, reason: "not_a_return_email", source: "shopper_email" };
 
   // A real return ID has at least one digit and ends at a space or line break ("RETURN ID: nuk0400251601"),
@@ -2312,6 +2368,8 @@ export function parseReturnEmail(rawEmail) {
   const idm = text.match(/return id\s*[:#\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,30})(?![A-Za-z0-9\/:.])/i);
   const orderFromSubject = subject.match(/\border\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{3,24})/i);
   const orderFromBody = text.match(/\border\s*(?:number|no\.?|id)\s*[:#\s]*([A-Z0-9-]{4,24})/i);
+  // (Amazon names the order only in its links, "returns/prep?…&orderId=206-…": taken when it is in Amazon's own shape.)
+  const orderFromLink = !orderFromSubject && !orderFromBody ? /(?:[?&]|%26|%3F)(?:amp;)?orderId(?:=|%3D|=3D)((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/i.exec(text.slice(0, 20000) + "\n" + html.slice(0, 200000)) : null;
 
   // Deadline: "send it back no later than Wednesday, December 24". The year, if absent,
   // comes from the email's own date and is never in the past relative to it.
@@ -2345,7 +2403,7 @@ export function parseReturnEmail(rawEmail) {
   }
 
   // (Or the return's own total, "TOTAL REFUND" over "£118.00", or "crediting you back … for the value of £118.00". Round 12.)
-  const refund = text.match(/estimated refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i) || text.match(/\btotal refund(?: amount)?\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
+  const refund = text.match(/(?:estimated|total expected) refund[\s\S]{0,20}?£\s*([0-9][0-9,]*\.[0-9]{2})/i) || text.match(/\btotal refund(?: amount)?\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
     text.match(/\bcredit(?:ing)? you back\b[^£]{0,60}\bvalue of £\s*([0-9][0-9,]*\.[0-9]{2})/i);
   let trackUrl = null;
   if (html) {
@@ -2362,9 +2420,9 @@ export function parseReturnEmail(rawEmail) {
     ok: true, kind: "return_instructions", source: "shopper_email", refundEligible: false,
     // The day the shop sent it: when the return was started, on the receipt's return timeline.
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
-    retailer: { name: sender?.name || null, domain: sender?.domain || null },
+    retailer: { name: sender?.name && !/@/.test(sender.name) ? sender.name : null, domain: sender?.domain || null },
     returnId: idm ? idm[1] : null,
-    orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : null,
+    orderRef: orderFromSubject ? orderFromSubject[1] : orderFromBody ? orderFromBody[1] : orderFromLink ? orderFromLink[1] : null,
     orderDate: od ? parseDate(od[1], refDate) : null,
     deadline, carrier, steps,
     qrMentioned: /\bqr\b/i.test(text) || /<img[^>]+(?:alt|src)=["'][^"']*qr/i.test(html || ""),
@@ -2386,12 +2444,16 @@ export function parseReturnUpdateEmail(rawEmail) {
   const subject = headers.subject || "";
   // A carrier's "we've received your return" means the carrier has it, not the shop: parseReturnParcelEmail reads those.
   if (returnCarrierOf(headers.from)) return { ok: false, reason: "not_a_return_update" };
-  if (!/\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject) ||
-      /\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  if (/\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  const subjectSays = /\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject);
+  // (A subject that only names the order, Amazon's "Your Amazon.co.uk Order #D01-…", over "We're writing to confirm that we
+  // have processed your refund for £2.49 for the above-referenced order": the email's opening says it. Round 15.)
+  if (!subjectSays && !/\border\b/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
   const parts = { text: [], html: [] };
   collectParts(headers, body, parts);
   const html = parts.html.join("\n");
   const text = ((parts.text.join("\n").trim()) || (html ? htmlToText(html) : "")).trim();
+  if (!subjectSays && !/\b(?:we(?:'|’)?re writing to confirm that )?we (?:have|(?:'|’)ve) (?:processed|issued) (?:your|a) refund (?:for|of) £\s?\d/i.test(text.slice(0, 1500).replace(/\s+/g, " "))) return { ok: false, reason: "not_a_return_update" };
   const both = (subject + "\n" + text.slice(0, 6000)).replace(/￡/g, "£");
   // Money back for a price drop, or for an order the shop cancelled, is not a return: nothing was sent back, so Relay must
   // not show a return as refunded (round 3, 19 Nov 2026). The order's own card already says what was bought.
@@ -2413,7 +2475,8 @@ export function parseReturnUpdateEmail(rawEmail) {
   const sender = retailerFromFrom(headers.from);
   // A refund email the shopper forwarded from their own mailbox is the shop's: the shop is read from the forwarded
   // message, as for a receipt, so it still attaches to the order by its number. The shopper's own address is never the shop.
-  const fromName = ((headers.from || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || null;
+  // (A name that is only an address, "return@amazon.co.uk" <return@amazon.co.uk>, is never the shop's name. Round 15.)
+  const fromName = ((headers.from || "").match(/^\s*"?([^"<@]+?)"?\s*</) || [])[1] || null;
   const shop = shopOf({ ld: null, sender, fromName, subject, text, html, otherText: html && parts.text.length ? htmlToText(html) : "" });
   if (shop.domain && PERSONAL_MAIL.test(shop.domain)) shop.domain = null;
   if (PERSONAL_MAIL.test(sender?.domain || "") && shop.name && !shop.domain && looksLikePerson(shop.name, null)) shop.name = null;
@@ -2422,6 +2485,9 @@ export function parseReturnUpdateEmail(rawEmail) {
   const amt = stage === "refunded" ? (both.match(/\b(?:refund(?:ed)? (?:total|amount|value)|total (?:refund(?:ed)?|amount refunded)|amount refunded|refund due)\s*:?[\s|]{0,12}£\s*([0-9][0-9,]*\.[0-9]{2})/i) ||
     both.match(/refund(?:ed)?[^£\n]{0,60}£\s*([0-9][0-9,]*\.[0-9]{2})/i) || both.match(/£\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\brefund/i)) : null;
   const ref = subject.match(/\border\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})/i);
+  // (Amazon's "Your return is now complete" names its order only in the link to it, "order-details?orderID=206-…", in the
+  // text part or URL-encoded in the HTML's. Only an order number in Amazon's own shape is taken from a link. Round 15.)
+  const linkRef = !ref ? /[?&](?:%26)?orderID(?:=|%3D)((?:\d{3}|D\d{2})-\d{7}-\d{7})\b/i.exec(text.slice(0, 20000) + "\n" + html.slice(0, 200000)) : null;
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
   const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) : null;
   // (And what was first paid, to whom and when: "You originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026".)
@@ -2434,7 +2500,7 @@ export function parseReturnUpdateEmail(rawEmail) {
     ok: true, kind: "return_update", stage,
     at: refDate && !Number.isNaN(refDate.getTime()) ? isoDate(refDate) : null,
     amountPence: amt ? money(amt[1]) : null, currency: amt ? "GBP" : null,
-    orderRef: ref ? ref[1] : inv ? inv[1] : null, returnId: rid ? rid[1] : null,
+    orderRef: ref ? ref[1] : inv ? inv[1] : linkRef ? linkRef[1] : null, returnId: rid ? rid[1] : null,
     ...(orig ? { paidPence: money(orig[2]), paidOn: parseDate(orig[3], refDate) } : {}),
     retailer: viaShop ? { name: viaShop.trim().replace(/\.{2,}$/, ""), domain: null, via: (fwdVia && fwdVia.domain) || sender.domain } : { name: shop.name || null, domain: shop.domain || null },
   };
