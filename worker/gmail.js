@@ -183,7 +183,7 @@ async function gmailGet(fetchImpl, url, headers) {
 // 42: codes to show or scan (scan-codes.js): a return barcode in a shipping email, a receipt's own barcode, a drop-off QR code,
 // a collection QR code and tickets' barcodes are kept with the order's receipt; an email that is only such a code for an order
 // it names is kept for it (kind "order_codes").
-export const PARSER_VERSION = 47;
+export const PARSER_VERSION = 48;
 // Which full read of every mailbox is due: version 33 of the reader was full read 14, and each reader version since is one
 // more, so a better reader always reaches old receipts too, without anyone having to remember to raise this.
 export const READER_FULL_REV = 14 + Math.max(0, PARSER_VERSION - 33);
@@ -612,6 +612,85 @@ export async function catchUpFullReads(env, now = Date.now(), fetchImpl = (...a)
   return { checked: out.length, results: out };
 }
 
+// ---- Receipts made from the shopper's own sent mail are retired (round 15, 20 Nov 2026) ----
+// Since round 14 the scan never lists the shopper's sent mail ("-in:sent", see windowQuery): a receipt they forwarded or
+// replied about is a copy of one already in their inbox. But the cards older readers had made from such emails stayed, read
+// by that older reader for good (Connor: a pub pre-order he forwarded, a ticket he sent on, his own replies), because the
+// re-read only reaches emails the scan lists. Once a Gmail mailbox has been read again with this reader (its look-back period
+// and every year the shopper added), each receipt from it still left with an older reader is looked up at Gmail, a few a
+// minute: only one Gmail itself labels SENT (which the scan leaves out) is removed, with what hangs off it. Anything else
+// stays exactly as it is (an email that is gone, Gmail being busy, or one left for another reason), a receipt someone has
+// put up for sale is never touched, and if Gmail ever labelled an email wrongly the next read of the mailbox finds it again.
+// Each mailbox is gone through once per reader (retire_rev), in order of receipt id (retire_after).
+const RETIRE_PER_ROUND = 20, RETIRE_MAILBOXES = 2;
+function ensureRetireColumns(db) {
+  return ensureOnce(db, "mail-retire-sent", async () => {
+    for (const col of ["retire_rev INTEGER", "retire_after TEXT"]) {
+      try { await db.prepare("ALTER TABLE gmail_connections ADD COLUMN " + col).run(); } catch { /* already there */ }
+    }
+  });
+}
+// What one receipt has hanging off it, and the receipt itself (as inboxReceiptDeletes, for one receipt).
+function oneReceiptDeletes(db, shopperId, receiptId) {
+  const of = (table, col = "receipt_id") => db.prepare(`DELETE FROM ${table} WHERE shopper_id = ? AND ${col} = ?`).bind(shopperId, receiptId);
+  return [of("receipt_images"), of("receipt_codes"), of("return_reminders"), of("receipt_item_marks"), of("receipt_gifts"), of("receipt_fixes"),
+    of("shared_emails"), of("receipt_ai_reads"), of("receipt_rereads"), of("return_tracks"),
+    db.prepare("DELETE FROM captured_receipts WHERE shopper_id = ? AND id = ?").bind(shopperId, receiptId)];
+}
+export async function retireSkippedMail(env, now = Date.now(), fetchImpl = (...a) => fetch(...a)) {
+  if (!env.RELAY_DB) return { checked: 0 };
+  await ensureGmailTables(env.RELAY_DB);
+  await ensureRetireColumns(env.RELAY_DB);
+  const db = env.RELAY_DB;
+  const staleYear = `SELECT 1 FROM gmail_history_years h WHERE h.shopper_id = g.shopper_id AND h.done_at IS NOT NULL AND COALESCE(h.rev, 0) < ?`;
+  const boxes = ((await db.prepare(
+    `SELECT g.shopper_id AS id, g.token_iv, g.token_data, g.provider, g.retire_after AS after FROM gmail_connections g
+     WHERE COALESCE(g.provider, 'google') <> 'microsoft' AND g.last_scan_at IS NOT NULL AND COALESCE(g.full_rev, 0) >= ?
+       AND COALESCE(g.retire_rev, 0) < ? AND NOT EXISTS (${staleYear})
+       AND EXISTS (SELECT 1 FROM shopper_consents c WHERE c.shopper_id = ${OWNER_SQL("g.shopper_id")} AND c.version = ? AND c.withdrawn_at IS NULL)
+       AND NOT EXISTS (SELECT 1 FROM mail_scan_jobs j WHERE j.shopper_id = g.shopper_id AND j.state = 'running')
+     ORDER BY COALESCE(g.auto_at, 0) LIMIT ?`).bind(READER_FULL_REV, READER_FULL_REV, READER_FULL_REV, CONSENT_VERSION, RETIRE_MAILBOXES).all()).results) || [];
+  const out = [];
+  for (const b of boxes) {
+    const shopperId = ownerOf(b.id), slot = slotOf(b.id);
+    const mine = slot ? "json_extract(details, '$.mailbox') = ?" : "json_extract(details, '$.mailbox') IS NULL";
+    const rows = ((await db.prepare(
+      `SELECT id, json_extract(details, '$.gmailId') AS gmailId FROM captured_receipts WHERE shopper_id = ? AND ${mine}
+         AND id > ? AND json_extract(details, '$.gmailId') IS NOT NULL AND COALESCE(json_extract(details, '$.parserVersion'), 0) <> ?
+         AND status <> 'dismissed' ORDER BY id LIMIT ?`)
+      .bind(...[shopperId, ...(slot ? [slot] : []), b.after || "", PARSER_VERSION, RETIRE_PER_ROUND]).all()).results) || [];
+    let retired = 0, last = b.after || "", stopped = false;
+    if (rows.length) {
+      const access = await mailAccess(env, b.id, b, fetchImpl);
+      if (!access.token) { out.push({ status: "no_access" }); continue; }
+      const auth = { Authorization: "Bearer " + access.token };
+      for (const r of rows) {
+        if (!GMAIL_ID.test(String(r.gmailId))) { last = r.id; continue; }
+        const got = await gmailGet(fetchImpl, `https://gmail.googleapis.com/gmail/v1/users/me/messages/${r.gmailId}?format=minimal`, auth);
+        // (Gmail busy, or not answering: carried on from this receipt next minute.)
+        if (got.busy || (!got.res.ok && got.res.status !== 404)) { stopped = true; break; }
+        last = r.id;
+        if (!got.res.ok) continue;
+        const labels = ((await got.res.json().catch(() => ({}))) || {}).labelIds;
+        if (!Array.isArray(labels) || !labels.includes("SENT")) continue;
+        // (Never a receipt someone has put up for sale or that a buyer has asked about.)
+        const listed = await db.prepare("SELECT 1 AS x FROM resale_listings WHERE seller_id = ? AND receipt_id = ? AND status IN ('active','matched') LIMIT 1").bind(shopperId, r.id).first().catch(() => null);
+        if (listed) continue;
+        // (One at a time: a table that was never made in this database has nothing in it for this receipt.)
+        const dels = oneReceiptDeletes(db, shopperId, r.id), main = dels.pop();
+        for (const d of dels) await d.run().catch(() => {});
+        await main.run();
+        retired++;
+      }
+    }
+    const done = !stopped && rows.length < RETIRE_PER_ROUND;
+    await db.prepare("UPDATE gmail_connections SET retire_after = ?, retire_rev = ? WHERE shopper_id = ?")
+      .bind(done ? null : last || null, done ? READER_FULL_REV : null, b.id).run();
+    out.push({ status: "ok", looked: rows.length, retired, done });
+  }
+  return { checked: out.length, results: out };
+}
+
 // The place a background read of the whole look-back period has got to is saved with the read it belongs to ("5@2025/07/20").
 // A place saved during an older read is not used: a new reader always starts again from the newest mail, otherwise the
 // mail between the newest and that place would be left as the older reader saw it.
@@ -1033,7 +1112,7 @@ function classify(rawText, ref, lenient = false) {
       // name. A supermarket's delivery-day email says what was finally paid for an order (orderUpdate "paid"): it joins the
       // order's confirmation (mergeOrderEmails). Round 10.
       ...(receipt.merchant ? { merchant: receipt.merchant } : {}), ...(receipt.orderUpdate ? { orderUpdate: receipt.orderUpdate } : {}),
-      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}), ...(receipt.discounts ? { discounts: receipt.discounts } : {}),
+      ...(receipt.amendedAt ? { amendedAt: receipt.amendedAt } : {}), ...(receipt.moreOrders ? { moreOrders: receipt.moreOrders } : {}), ...(receipt.substitutions ? { substitutions: receipt.substitutions } : {}), ...(receipt.discounts ? { discounts: receipt.discounts } : {}), ...(receipt.fees ? { fees: receipt.fees } : {}),
       // Whether the items add up to what the email says they came to (receipt-items.js checkItems), and how many items the
       // email itself says the order has, when it says. The app says plainly when items may be missing.
       itemsCheck: receipt.itemsCheck || null, ...(receipt.itemCount ? { itemCount: receipt.itemCount } : {}),
@@ -1870,8 +1949,23 @@ export function mergeOrderEmails(orders) {
     const fits = orders.filter((o) => shopFits(p, o));
     if (fits.length === 1 && loose.filter((q) => shopFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
   }
+  // (An email with an order's number and nothing else to it, no money and no items, Pearson's "Theory Test - Appointment
+  // Confirmation", "Order Number: 0053-1725-3254", sent with the DVSA's invoice for that very number (£23.00): the same order,
+  // whatever name each gives the shop. Only for a long number, exactly one other order with it, and within three days.
+  // Round 15.)
+  const emptyTo = new Map();
+  const emptyOne = (o) => o.orderRef && o.totalPence == null && !(o.items || []).length && o.kind !== "order_update" && !isForwarded(o) && !paidVia.has(o);
+  for (const o of orders) {
+    if (!emptyOne(o)) continue;
+    const ref = String(o.orderRef).toUpperCase();
+    if (ref.length < 8 || !/\d/.test(ref)) continue;
+    const fits = orders.filter((p) => p !== o && !emptyOne(p) && p.orderRef && String(p.orderRef).toUpperCase() === ref && p.totalPence != null &&
+      (!p.orderDate || !o.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
+    if (fits.length === 1 && joinStore(fits[0]) !== joinStore(o)) emptyTo.set(o, fits[0]);
+  }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
+    if (emptyTo.has(o)) { const t = emptyTo.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
     if (!o.orderRef) return null;
     const ref = baseRef(o, String(o.orderRef).toUpperCase());
     if (isForwarded(o)) {

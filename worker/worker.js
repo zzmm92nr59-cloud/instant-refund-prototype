@@ -10,7 +10,7 @@ import { handleAuthRoute } from "./auth.js";
 import { tidyTexts } from "./phone.js";
 import { tidySharedEmails } from "./shared-emails.js";
 import { runAiReads } from "./ai-runner.js";
-import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads } from "./gmail.js";
+import { sendReturnReminders, autoScanGmail, runScanJobs, catchUpFullReads, retireSkippedMail } from "./gmail.js";
 import { handleMailPushRoute, renewMailPush, runPendingPush } from "./mail-push.js";
 import { runPriceAlerts } from "./push.js";
 import { handleSquareConnect, ensureSquareMerchantSchema } from "./square-connect.js";
@@ -69,7 +69,10 @@ const relayWorker = {
     if (event && event.cron === SCAN_JOBS_CRON) { ctx.waitUntil(runScanJobs(env).then(r => { if (r.jobs) console.log("background scans", JSON.stringify(r)); })
       .catch(e => console.error("background scans failed", String(e && e.message || e).slice(0, 120)))
       .then(() => new Date().getUTCMinutes() % 15 === 7 ? null : catchUpFullReads(env).then(r => { if (r.checked) console.log("catching up", JSON.stringify(r)); }))
-      .catch(e => console.error("catching up failed", String(e && e.message || e).slice(0, 120))));
+      .catch(e => console.error("catching up failed", String(e && e.message || e).slice(0, 120)))
+      // Then receipts older readers made from the shopper's own sent mail, which the scan no longer lists, are retired.
+      .then(() => new Date().getUTCMinutes() % 15 === 7 ? null : retireSkippedMail(env).then(r => { if (r.checked) console.log("retiring sent mail", JSON.stringify(r)); }))
+      .catch(e => console.error("retiring sent mail failed", String(e && e.message || e).slice(0, 120))));
       // Auctions (auctions.js): end those that are due, make winners' orders at the shop, notice payments, move unpaid ones on.
       ctx.waitUntil(runAuctions(env).then(r => { if (r.ended || r.paid || r.expired) console.log("auctions", JSON.stringify(r)); })
         .catch(e => console.error("auctions failed", String(e && e.message || e).slice(0, 120))));

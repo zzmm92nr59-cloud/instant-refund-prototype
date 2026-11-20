@@ -1,0 +1,20 @@
+{
+ "id": "holdout16c-refund-total-amount-refunded",
+ "sender": "SwapShop",
+ "layout": "subject 'Refund for your SwapShop order 20440312'; 'We have now sent you a refund for item(s)'; 'Your refund order number is: 20440312'; 'Refund Value: £120.00', 'Item Delivery Charge Refund Amount:£2.95', 'Total Amount Refunded: £122.95'",
+ "headers": {
+  "from": "SwapShop <no_reply@swapshop.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Refund for your SwapShop order 20440312",
+  "date": "Sun, 08 Nov 2026 10:00:00 +0000"
+ },
+ "html": "",
+ "text": "Hi Sam Taylor\nWe have now sent you a refund for item(s) you had ordered from us.\n=========================================\nYour refund order number is: 20440312\nRefund payment method: Apple Pay\n============== Item(s) Refunded =============\nItem Name: Games Console, 1TB, Black, Unboxed\nRefund Value: £120.00\nItem Delivery Charge Refund Amount:£2.95\n\nTotal Amount Refunded: £122.95\nThe refund will be returned to your original payment method.\n",
+ "expected": {
+  "notPurchase": {
+   "kind": "refund",
+   "refundPence": 12295,
+   "orderRef": "20440312"
+  }
+ }
+}

@@ -1,0 +1,31 @@
+{
+ "id": "holdout16c-booking-at-price-no-total",
+ "sender": "Clayworks Studio",
+ "layout": "plain text: 'Your booking reference is: KQWZT'; 'Booking details:'; '4 x Throw a pot like a pro @ £40.00' and four names; no total",
+ "headers": {
+  "from": "Clayworks Studio <mail@bookings.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Booking confirmation. Ref: KQWZT",
+  "date": "Sat, 14 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "Your booking reference is: KQWZT\n\nYou can access your booking using the link below.\n\nBooking details:\n\nADULT CLASS - Throw a pot like a pro\nClayworks, Mill Lane, Leeds, LS1 4AB\n  Sat 21 Nov, 10:00am - 1:00pm\n    4 x Throw a pot like a pro @ £40.00\n    sam taylor\n    alex taylor\n    jo taylor\n    kim taylor\n",
+ "expected": {
+  "shop": "Clayworks Studio",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Throw a pot like a pro",
+    "qty": 4,
+    "linePence": 16000
+   }
+  ],
+  "subtotalPence": 16000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": null,
+  "orderRef": "KQWZT"
+ }
+}

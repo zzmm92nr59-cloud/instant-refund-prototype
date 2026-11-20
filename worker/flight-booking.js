@@ -28,6 +28,8 @@ function codePair(win, firstLen) {
     if (a.s >= firstLen) break;
     const between = win.slice(a.e, b.s);
     if (a.c !== b.c && between.length <= 60 && BETWEEN.test(between)) return { from: a.c, to: b.c, end: b.e };
+    // (Or the two codes alone in a row of their own, one cell each, under the two airports' names: "| LGW | BCN |". Round 15.)
+    if (a.c !== b.c && /^[\s|]*$/.test(between) && /^[\s|]*[A-Z]{3}[\s|]+[A-Z]{3}[\s|]*$/.test(win.slice(0, firstLen))) return { from: a.c, to: b.c, end: b.e };
   }
   return null;
 }

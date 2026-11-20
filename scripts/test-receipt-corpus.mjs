@@ -552,6 +552,50 @@ const joinWrong = [];
     if (!p || p.refundPence !== pence) joinWrong.push(refund + " not joined to its order (" + JSON.stringify(p || null) + ")");
   }
 }
+{
+  // Round 15c: a grocer's order confirmation ("Order number: | 772104518 |", estimated total), its final receipt and its
+  // cancellation (the number only at the end of the subject) are one order, the final receipt's total winning; a refund's
+  // timing ("we'll send you a refund within 5 working days") is never the window for returning, which is the 14 days from
+  // the day after delivery the email states, with its 30-day goodwill returns; a shop's U+0092 apostrophe reads as one.
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
+  for (const app of [null, "gmail", "outlook", "apple"]) {
+    const read = (id) => ({ ...classifyEmail(rawEmail(app ? forwarded(fx(id), app) : fx(id))).details, id });
+    const cards = mergeOrderEmails([read("holdout16c-grocer-thanks-number-cell"), read("holdout16c-grocer-final-receipt")]);
+    if (cards.length !== 1 || cards[0].orderRef !== "772104518" || cards[0].totalPence !== 1142 || (cards[0].items || []).length !== 3)
+      joinWrong.push(`a grocer's confirmation and final receipt${app ? " (" + app + ")" : ""} made ${JSON.stringify(cards.map((c) => [c.orderRef, c.totalPence, (c.items || []).length]))}`);
+    const t = read("holdout16c-grocer-thanks-number-cell");
+    const said = ((t.returns && t.returns.instructions) || []).join(" ");
+    if (!t.returns || t.returns.windowDays !== 14 || t.returns.windowFrom !== "delivery" || !/30 day goodwill/i.test(said) || /5 working days/.test(said))
+      joinWrong.push(`a grocer's return window${app ? " (" + app + ")" : ""} read as ${JSON.stringify(t.returns)}`);
+  }
+  const both = mergeOrderEmails([det("holdout16c-grocer-thanks-number-cell")]);
+  const can = det("holdout16c-grocer-cancelled-subject-number");
+  attachCancellations(both, [can]);
+  if (can.kind !== "order_update" || can.stage !== "cancelled" || !both[0].cancelled) joinWrong.push("a grocer's cancellation by the number in its subject not joined: " + JSON.stringify([can.kind, can.stage, can.orderRef]));
+  // An exam board's appointment email with only the order's number joins its invoice (another name for the shop).
+  const { EXAM_APPOINTMENT } = await import("./fixtures/receipt-emails/holdout16c.mjs");
+  const exam = mergeOrderEmails([det("holdout16c-exam-invoice-number-cell"), { ...classifyEmail(rawEmail(EXAM_APPOINTMENT)).details, id: "appt" }]);
+  if (exam.length !== 1 || exam[0].totalPence !== 2300) joinWrong.push("an appointment email with only the order's number made " + exam.length + " cards");
+  // A ticket seller's tickets come under the event's name and its "no refunds after purchase" is kept; a shop's "Order
+  // ATM40112 confirmed" gives its number; a burger app's restaurant is the one its label names.
+  const tk = det("holdout16c-tickets-payment-summary"), tx = det("holdout16c-tickets-order-details-text"), set = det("holdout16c-shop-set-of-three"), bw = det("holdout16c-burger-app-deal-title");
+  if (!(tk.returns && tk.returns.nonRefundable) || (tk.items || [])[0]?.variant !== "Full Price Ticket" || (tx.items || [])[0]?.variant !== "Seats, Full Price Ticket")
+    joinWrong.push("ticket orders read as " + JSON.stringify([tk.returns, (tk.items || [])[0], (tx.items || [])[0]]));
+  { const th = det("holdout16c-theatre-total-paid-dash"); if (!(th.returns && th.returns.nonRefundable)) joinWrong.push("'Tickets are non-refundable' not kept: " + JSON.stringify(th.returns)); }
+  { const g = det("holdout16c-gifts-priced-and-taken-off"); if (!g.itemsCheck.complete || (g.discounts || []).some((d) => /gift/i.test(d.label || d.name || "")) || (g.items || []).length !== 2)
+      joinWrong.push("free gifts priced and taken off read as " + JSON.stringify([g.itemsCheck, g.discounts, (g.items || []).map((i) => i.name)])); }
+  { const d = det("holdout16c-delivery-dash-prices"); if ((d.discounts || []).length !== 1 || !(d.fees || []).some((f) => f.label === "Service fee" && f.pence === 82))
+      joinWrong.push("a delivery app's dash-priced items read as " + JSON.stringify([d.discounts, d.fees])); }
+  { const p = det("holdout16c-percent-code-no-amount"); if (!p.itemsCheck.complete || !(p.discounts || []).some((x) => x.pence === 299)) joinWrong.push("a percentage code with no amount read as " + JSON.stringify([p.itemsCheck, p.discounts])); }
+  { const a = det("holdout16c-right-to-cancel-from-receipt"), b = det("holdout16c-window-start-apart"), c = det("holdout16c-merchant-reference");
+    if (!(a.returns && a.returns.windowDays === 14 && a.returns.windowFrom === "delivery") || !(b.returns && b.returns.windowDays === 30 && b.returns.windowFrom === "delivery") || c.orderRef !== "9f2d1340-3ad7-4d8d-9352-1c48ea195b11")
+      joinWrong.push("windows and merchant reference read as " + JSON.stringify([a.returns && [a.returns.windowDays, a.returns.windowFrom], b.returns && [b.returns.windowDays, b.returns.windowFrom], c.orderRef])); }
+  if (set.orderRef !== "ATM40112") joinWrong.push("'Order ATM40112 confirmed' read as order " + set.orderRef);
+  if (bw.merchant !== "Riverside - Mill Lane" || bw.orderRef !== "034") joinWrong.push("a burger app's restaurant read as " + JSON.stringify([bw.merchant, bw.orderRef]));
+  const c1 = det("holdout16c-grocer-c1-apostrophe");
+  if (!(c1.items || []).some((i) => i.name === "By Hartley’s Ripe Avocado")) joinWrong.push("a U+0092 apostrophe read as " + JSON.stringify((c1.items || []).map((i) => i.name)));
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

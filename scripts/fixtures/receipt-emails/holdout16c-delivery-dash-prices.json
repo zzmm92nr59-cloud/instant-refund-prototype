@@ -1,0 +1,36 @@
+{
+ "id": "holdout16c-delivery-dash-prices",
+ "sender": "Rooride",
+ "layout": "plain text only: 'Order #5821'; '1x    The Club Wrap  - £10.95', '1x    Truffle Fries  - £4.50'; 'Subtotal £15.45', 'Delivery fee Free', 'Service fee £0.82', 'Credit -£4.00', 'Total £12.27'",
+ "headers": {
+  "from": "Rooride <noreply@rooride.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order's in the kitchen",
+  "date": "Thu, 12 Nov 2026 19:00:00 +0000"
+ },
+ "html": "",
+ "text": "Here's your receipt\nOrder #5821\n  ---------------------\n\n  1x    The Club Wrap  - £10.95\n  1x    Truffle Fries  - £4.50\n\n  Subtotal               £15.45\n  Delivery fee           Free\n  Service fee            £0.82\n  Credit                 -£4.00\n  Total                  £12.27\n",
+ "expected": {
+  "shop": "Rooride",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "The Club Wrap",
+    "qty": 1,
+    "linePence": 1095
+   },
+   {
+    "name": "Truffle Fries",
+    "qty": 1,
+    "linePence": 450
+   }
+  ],
+  "subtotalPence": 1545,
+  "feesPence": 82,
+  "discountsPence": 400,
+  "tipsPence": 0,
+  "totalPence": 1227,
+  "orderRef": "5821"
+ }
+}

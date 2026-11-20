@@ -234,3 +234,82 @@ export function expediaStay(text) {
   const payAtProperty = /^collected at the property$/i.test(list[end + 2] || "") || /^collected at the property$/i.test(list[end + 1] || "");
   return { rooms, roomName, roomPence: room.pence, nights: n ? Number(n[1]) : null, fees, payAtProperty, orderRef: ref ? ref[1] : null };
 }
+
+// ---- A ticket seller's payment summary (round 15) ------------------------------------------------------------------------
+// "Payment Summary", "2 Full Price Ticket" over "£40.00 x2" and the line's "£80.00", then "Per Item Fees" with
+// "£4.40 (Service Charge Full Price Ticket) x2", then "Order Processing Fees" with "Handling Fee (£2.95)", then "Total":
+// the tickets (named by the event the email is for, the ticket type their detail), each fee per ticket, and the order's
+// own fee. The event is the line under the order's number ("Order #15-25252/UK1" / "Comedy Night: The Tour"). Used only
+// when it all adds up to the total; otherwise nothing.
+// (Or, in a plain-text part, "ORDER DETAILS", the event's name, "Date:", "Venue:", then "Seats, Full Price Ticket: 2 x £ 30.00 =
+// £ 60.00", "Booking fee: 2 x £ 3.75 = £ 7.50", "Processing fee: £ 1.50" down to "Total incl. VAT".)
+const PER = /^(\p{L}[^:£]{2,60}?):\s*(\d{1,2})\s*[x×]\s*£\s?([\d,]+\.\d{2})\s*=\s*£\s?([\d,]+\.\d{2})$/u;
+const ONCE = /^(\p{L}[^:£]{2,60}?):\s*£\s?([\d,]+\.\d{2})$/u;
+function ticketDetails(list, totalPence) {
+  const at = list.findIndex((l) => /^order details$/i.test(l));
+  if (at < 0) return null;
+  const event = list[at + 1] && !/£/.test(list[at + 1]) && !/^(?:date|time|venue|promoter|location|address|seats?|entrance)\s*:/i.test(list[at + 1]) && /\p{L}{3}/u.test(list[at + 1]) && list[at + 1].length <= 90 ? list[at + 1] : null;
+  const items = [];
+  for (let k = at + 1; k < list.length && k < at + 40; k++) {
+    const l = list[k];
+    if (/^total\b[^:]*:/i.test(l)) break;
+    const per = PER.exec(l);
+    if (per) {
+      if (Number(per[2]) * pence(MONEY.exec("£" + per[3])) !== pence(MONEY.exec("£" + per[4]))) return null;
+      const ticket = /\btickets?\b/i.test(per[1]);
+      items.push({ name: ticket && event ? event : per[1].trim(), ...(ticket && event ? { variant: per[1].trim() } : {}), qty: Number(per[2]), pricePence: pence(MONEY.exec("£" + per[3])) });
+      continue;
+    }
+    const once = ONCE.exec(l);
+    if (once && !/^(?:sub-?\s?total|total|order total|vat|date|venue|promoter)\b/i.test(once[1])) items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])) });
+  }
+  const sum = items.reduce((n, i) => n + i.qty * i.pricePence, 0);
+  return items.some((i) => i.variant || /ticket/i.test(i.name)) && sum === totalPence ? items : null;
+}
+export function ticketSummary(text, totalPence) {
+  const list = rows(String(text || "").slice(0, 40000));
+  if (totalPence == null) return null;
+  const at = list.findIndex((l) => /^payment summary$/i.test(l));
+  if (at < 0) return ticketDetails(list, totalPence);
+  const ord = list.findIndex((l) => /^order\s*#\s*[A-Z0-9][A-Z0-9/-]{3,30}$/i.test(l));
+  const event = ord >= 0 && ord + 1 < at && /\p{L}{3}/u.test(list[ord + 1]) && !/£/.test(list[ord + 1]) && list[ord + 1].length <= 90 ? list[ord + 1] : null;
+  const items = [];
+  for (let k = at + 1; k < list.length && k < at + 40; k++) {
+    const l = list[k];
+    if (/^total\b/i.test(l)) break;
+    const tix = /^(\d{1,2})\s+(\p{L}[^£|]{2,60})$/u.exec(l), each = /^£\s?([\d,]+\.\d{2})\s*x\s?(\d{1,2})$/i.exec(list[k + 1] || "");
+    if (tix && each && Number(tix[1]) === Number(each[2])) {
+      items.push({ name: event || tix[2].trim(), ...(event ? { variant: tix[2].trim() } : {}), qty: Number(tix[1]), pricePence: pence(MONEY.exec("£" + each[1])) });
+      k++; continue;
+    }
+    const fee = /^£\s?([\d,]+\.\d{2})\s*\(([^()£]{3,60})\)\s*x\s?(\d{1,2})$/i.exec(l);
+    if (fee) { items.push({ name: fee[2].trim(), qty: Number(fee[3]), pricePence: pence(MONEY.exec("£" + fee[1])) }); continue; }
+    const once = /^(\p{L}[^()£]{2,60}?)\s*\(£\s?([\d,]+\.\d{2})\)$/u.exec(l);
+    if (once) { items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])) }); continue; }
+  }
+  const sum = items.reduce((n, i) => n + i.qty * i.pricePence, 0);
+  return items.length && items.some((i) => i.variant || /ticket/i.test(i.name)) && sum === totalPence ? items : null;
+}
+
+// ---- Items set out as labelled fields, and "N x Name @ £P" lines (round 15) ---------------------------------------------
+// "Item: Xbox One S Console, 1TB", "Category: …", "Quantity: 1", "Unit Price: £135.00" (a plain-text order email), each item
+// its own block; and a booking's "4 x Make a pot like Grayson Perry @ £40.00". Only what the email says, nothing worked out.
+export function labelledItems(text) {
+  const list = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/\s*\|\s*/g, " ").trim());
+  const out = [];
+  for (let k = 0; k < list.length && out.length < 30; k++) {
+    const at = /^(\d{1,3})\s*x\s+(\p{L}[^@£]{1,80}?)\s*@\s*£\s?([\d,]+\.\d{2})(?:\s*(?:each|per person|pp))?$/iu.exec(list[k]);
+    if (at) { out.push({ name: at[2].trim(), qty: Number(at[1]), pricePence: pence(MONEY.exec("£" + at[3])), lineTotal: false }); continue; }
+    const item = /^item\s*:\s*(\p{L}.{2,120})$/iu.exec(list[k]);
+    if (!item) continue;
+    let qty = null, unit = null;
+    for (let j = k + 1; j < Math.min(list.length, k + 7) && !/^item\s*:/i.test(list[j]); j++) {
+      const q = /^(?:quantity|qty)\s*:\s*(\d{1,3})$/i.exec(list[j]);
+      if (q) qty = Number(q[1]);
+      const u = /^(?:unit price|price|item price)\s*:\s*£\s?(\d[\d,]*)(?:\.(\d{2}))?$/i.exec(list[j]);
+      if (u) unit = Number(u[1].replace(/,/g, "")) * 100 + Number(u[2] || 0);
+    }
+    if (unit != null) out.push({ name: item[1].trim(), qty: qty || 1, pricePence: unit, lineTotal: false });
+  }
+  return out;
+}
