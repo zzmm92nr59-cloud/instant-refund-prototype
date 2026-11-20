@@ -62,8 +62,8 @@ export default function holdout14b() {
   }
   // ---- A scooter ride abroad, in złoty: the total kept as written, never turned into pounds ---------------------------------
   {
-    const o = order([]);
-    o.total = 2214;
+    // (Round 15e: the ride's fares are what was bought, so they are its items, as Connor's checks asked; before, none.)
+    const o = order([{ name: "Unlock fee", qty: 1, unit: 300 }, { name: "Per minute fare (24 min)", qty: 1, unit: 1914 }]);
     add("holdout14b-scooter-ride-zloty", "Zoomr", "'Receipt for your Zoomr ride'; unlock and per-minute fares in zł; 'Total (excl. VAT)' then 'Total (incl. VAT)'", {
       from: "Zoomr <no-reply@zoomr.example>", subject: "Receipt for your Zoomr ride", date: "Fri, 13 Nov 2026 21:00:00 +0000",
       html: mail("Zoomr", "zoomr.example", ["Thanks for riding with Zoomr", "Unlock fee", "3.00 zł", "Per minute fare (24 min)", "19.14 zł", "Total (excl. VAT)", "18.00 zł", "VAT", "4.14 zł", "Total (incl. VAT)", "22.14 zł", "Charged to Visa •••• 4242", "22.14 zł"]) },

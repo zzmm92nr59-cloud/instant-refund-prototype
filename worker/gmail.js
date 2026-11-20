@@ -1108,7 +1108,9 @@ function classify(rawText, ref, lenient = false) {
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   // (A restaurant table booked but not paid for is never a purchase in the inbox: the bill is. Round 14.)
-  } else if (receipt.ok && !(receipt.tableBooking && !lenient)) {
+  // (A shop's despatch email read as a receipt with nothing in it, no items and no total, "Despatch Confirmation - Ref: …":
+  // its parcel's news, so the order it names shows it is on its way. Round 15e.)
+  } else if (receipt.ok && !(receipt.tableBooking && !lenient) && !(!(receipt.items || []).length && receipt.totalPence == null && parseDispatchEmail(rawText).ok)) {
     // Keep only extracted fields. The email text is dropped here.
     details = {
       kind: "receipt", ...ref,
@@ -1884,7 +1886,8 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
 // The shop an order email is from, for joining one order's emails: its address without the part a shop sends a kind of
 // email from ("order.detalecph.com" is detalecph.com). Round 11.
-const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m)\./i;
+// ("comms.skyhop.example", "updates.…", "alerts.…": the same. Round 15e.)
+const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m|comms?|communications?|updates?|alerts?|messages?|mailer|transactional|txn)\./i;
 function joinStore(o) {
   const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
   return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
@@ -2207,7 +2210,9 @@ export function attachDeliveries(orders, deliveries) {
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
     // (a dispatch email with no items, round 6), so the carrier's own "delivered" email, which names no order, finds it.
     const nums = new Set([o.shipment && o.shipment.trackingNumber].filter(Boolean));
-    const byRef = (d) => d.orderRef && o.orderRef && sameOrderRef(d.orderRef, o.orderRef) && sameShop(d, o);
+    // (Or a parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1". Round 15e.)
+    const parcelOf = (d) => String(o.orderRef).length >= 5 && String(d.orderRef).toUpperCase().replace(/-\d{1,2}$/, "") === String(o.orderRef).toUpperCase();
+    const byRef = (d) => d.orderRef && o.orderRef && (sameOrderRef(d.orderRef, o.orderRef) || parcelOf(d)) && sameShop(d, o);
     for (const d of deliveries) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
     const t = (o.shipment && o.shipment.trackingNumber) || [...nums][0] || null;
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
@@ -2425,6 +2430,25 @@ function refundFits(u, o, orders) {
   if (!fit(o)) return false;
   return orders.filter(fit).length === 1;
 }
+// A return the shop has accepted that gives no order number, only what it will refund ("we will be crediting you … for the
+// value of £118.00"): it goes on the one order from that shop, bought in the 120 days before, that cost exactly that
+// (in all, or one of its lines). Two such orders, or none, and it goes nowhere: never a guess. Round 15e.
+export function attachUnnumberedPlans(orders, plans) {
+  for (const p of plans) {
+    if (!Number.isInteger(p.estimatedRefundPence) || p.estimatedRefundPence <= 0 || !p.at) continue;
+    let key; try { key = storeKey(p); } catch { continue; }
+    const at = Date.parse(p.at);
+    const fits = orders.filter((o) => {
+      if (o.returnPlan || !o.orderDate) return false;
+      let k; try { k = storeKey(o); } catch { return false; }
+      const d = Date.parse(o.orderDate);
+      if (k !== key || !(d <= at) || at - d > 120 * 864e5) return false;
+      return o.totalPence === p.estimatedRefundPence || (o.items || []).some((i) => lineOf(i) === p.estimatedRefundPence);
+    });
+    if (fits.length === 1) fits[0].returnPlan = { ...p, joinedBy: "amount" };
+  }
+}
+
 export function attachReturnProgress(orders, deliveries, updates) {
   for (const o of orders) {
     const plan = o.returnPlan || null;
@@ -2607,6 +2631,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     // Only purchase emails get a card. A return email just adds its return details to the purchase it belongs to.
     if (o) o.returnPlan = p;
   }
+  attachUnnumberedPlans(orders, plans.filter((p) => !p.orderRef));
   attachReturnProgress(orders, deliveries, updates);
   // Where each return has got to, step by step, and who said so (return-tracking.js).
   attachReturnTracking(orders, { updates, deliveries, typed: typedReturns, tracked, marks: (marks && marks.results) || [], today: new Date(opts.now || Date.now()).toISOString().slice(0, 10) });

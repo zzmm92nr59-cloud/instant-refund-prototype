@@ -297,7 +297,14 @@ export function ticketSummary(text, totalPence) {
 // "Item: Xbox One S Console, 1TB", "Category: …", "Quantity: 1", "Unit Price: £135.00" (a plain-text order email), each item
 // its own block; and a booking's "4 x Make a pot like Grayson Perry @ £40.00". Only what the email says, nothing worked out.
 export function labelledItems(text) {
-  const list = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/\s*\|\s*/g, " ").trim());
+  const list0 = rows(String(text || "").slice(0, 40000)).map((l) => l.replace(/\s*\|\s*/g, " ").trim()).filter(Boolean);
+  // (Each label on its own line over its value, "Item:" over "Especially For You Letterbox", "Price:" over "£24.0": one line
+  // each. Round 15e.)
+  const list = [];
+  for (let k = 0; k < list0.length; k++) {
+    if (/^(?:item|quantity|qty|unit price|price|item price|discount)\s*:$/i.test(list0[k]) && list0[k + 1] && !/:$/.test(list0[k + 1])) { list.push(list0[k] + " " + list0[k + 1]); k++; }
+    else list.push(list0[k]);
+  }
   const out = [];
   for (let k = 0; k < list.length && out.length < 30; k++) {
     const at = /^(\d{1,3})\s*x\s+(\p{L}[^@£]{1,80}?)\s*@\s*£\s?([\d,]+\.\d{2})(?:\s*(?:each|per person|pp))?$/iu.exec(list[k]);
@@ -305,11 +312,12 @@ export function labelledItems(text) {
     const item = /^item\s*:\s*(\p{L}.{2,120})$/iu.exec(list[k]);
     if (!item) continue;
     let qty = null, unit = null;
-    for (let j = k + 1; j < Math.min(list.length, k + 7) && !/^item\s*:/i.test(list[j]); j++) {
+    for (let j = k + 1; j < Math.min(list.length, k + 12) && !/^item\s*:/i.test(list[j]); j++) {
       const q = /^(?:quantity|qty)\s*:\s*(\d{1,3})$/i.exec(list[j]);
       if (q) qty = Number(q[1]);
-      const u = /^(?:unit price|price|item price)\s*:\s*£\s?(\d[\d,]*)(?:\.(\d{2}))?$/i.exec(list[j]);
-      if (u) unit = Number(u[1].replace(/,/g, "")) * 100 + Number(u[2] || 0);
+      // ("£24.0": a price written with one figure after the point is £24.00.)
+      const u = /^(?:unit price|price|item price)\s*:\s*£\s?(\d[\d,]*)(?:\.(\d{1,2}))?$/i.exec(list[j]);
+      if (u && unit == null) unit = Number(u[1].replace(/,/g, "")) * 100 + Number((u[2] || "0").padEnd(2, "0"));
     }
     if (unit != null) out.push({ name: item[1].trim(), qty: qty || 1, pricePence: unit, lineTotal: false });
   }

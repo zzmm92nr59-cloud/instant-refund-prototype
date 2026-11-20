@@ -1,0 +1,54 @@
+{
+ "id": "holdout16e-burger-app-add-extras-meal",
+ "sender": "Burgerworks",
+ "layout": "'Qty' / 'Item Detail' / 'Item Cost'; '1' over '5 Crispy Strips®' over '£5.79'; '1' over 'Smoky BBQ Dip' (no price, an option); '2' over 'Spicy Chicken Burger' over '£2.98'; 'EXTRA Mayonnaise'; 'ADD' / '2' / 'Dill Pickle Slice'; 'ADD' / '1' / 'Tomato Slice' / '£0.40'; '£2.49 Extra Value Meal Burger and Medium Fries' over 'When ordering on the app'; its parts 'Fish Burger®' '£2.00' and 'Medium Fries' '£0.49'",
+ "headers": {
+  "from": "Burgerworks <noreply@burgerworks.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thanks for your order",
+  "date": "Sun, 08 Nov 2026 02:58:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Burgerworks</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.burgerworks.example/?utm_source=email\"><img src=\"https://www.burgerworks.example/static/email/logo.png\" alt=\"Burgerworks\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td>We got your order, here's your receipt.</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Order Number:</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>014</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Restaurant Name:</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>High Street</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Qty</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Item Detail</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Item Cost</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>5 Crispy Strips&reg;</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;5.79</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Smoky BBQ Dip</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>2</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Spicy Chicken Burger</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;2.98</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>EXTRA Mayonnaise</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>ADD</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>2</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Dill Pickle Slice</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>ADD</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Tomato Slice</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;0.40</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;2.49 Extra Value Meal Burger and Medium Fries</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>When ordering on the app</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Fish Burger&reg;</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;2.00</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Medium Fries</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;0.49</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>VAT:</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;1.94</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Total (including VAT):</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;11.66</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Burgerworks. All rights reserved.<br /><a href=\"https://www.burgerworks.example/help\">Help</a> | <a href=\"https://www.burgerworks.example/privacy\">Privacy</a> | <a href=\"https://www.burgerworks.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.burgerworks.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Burgerworks",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "5 Crispy Strips®",
+    "qty": 1,
+    "linePence": 579,
+    "extras": [
+     "Smoky BBQ Dip"
+    ]
+   },
+   {
+    "name": "Spicy Chicken Burger",
+    "qty": 2,
+    "linePence": 338,
+    "extras": [
+     "Mayonnaise",
+     "Dill Pickle Slice",
+     "Tomato Slice"
+    ]
+   },
+   {
+    "name": "Fish Burger®",
+    "qty": 1,
+    "linePence": 200
+   },
+   {
+    "name": "Medium Fries",
+    "qty": 1,
+    "linePence": 49
+   }
+  ],
+  "subtotalPence": 1166,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1166,
+  "orderRef": "014"
+ }
+}

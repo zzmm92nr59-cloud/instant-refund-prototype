@@ -1,0 +1,31 @@
+{
+ "id": "holdout16e-event-order-for-label-over-number",
+ "sender": "Gigline",
+ "layout": "subject 'Your order for Night Shift: Room Two (live)'; '1 x Early Group ticket (admits 4)'; 'Total' over '£44.00'; 'Order' over 'GL31207733-118'",
+ "headers": {
+  "from": "Gigline Tickets <noreply@gigline.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order for Night Shift: Room Two (live)",
+  "date": "Mon, 16 Nov 2026 21:45:03 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Gigline</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.gigline.example/?utm_source=email\"><img src=\"https://www.gigline.example/static/email/logo.png\" alt=\"Gigline\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\"><tr><td>Sam, you're going to Night Shift: Room Two (live)</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>View tickets in app</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Sat, 21 Nov - Sun, 22 Nov 2026</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>23:00 - 05:00</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>The Warehouse</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>1 x Early Group ticket (admits 4)</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Total</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>&pound;44.00</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>View tickets in app</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Order</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>GL31207733-118</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Name on order</td></tr></table><table role=\"presentation\" width=\"100%\"><tr><td>Sam Taylor</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Gigline. All rights reserved.<br /><a href=\"https://www.gigline.example/help\">Help</a> | <a href=\"https://www.gigline.example/privacy\">Privacy</a> | <a href=\"https://www.gigline.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.gigline.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Gigline",
+  "date": "2026-11-16",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Early Group ticket (admits 4)",
+    "qty": 1,
+    "linePence": 4400
+   }
+  ],
+  "subtotalPence": 4400,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 4400,
+  "orderRef": "GL31207733-118"
+ }
+}
