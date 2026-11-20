@@ -14,7 +14,7 @@ import { domainBase, cleanItems, rankShop, shopNamesInText, forwardedSender, mai
 import { PERSONAL_MAIL } from "./receipt-category.js";
 import { readItems, moneyOf, settleItems, checkItems, statedItemCount, lineOf } from "./receipt-items.js";
 import { namesCheck } from "./item-names.js";
-import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised } from "./receipt-senders.js";
+import { uberEmail, takeawayMerchant, groceryDayOf, gameBundle, grocerySubstitutions, orderAmended, supportRefund, paymentAuthorised, ticketSummary } from "./receipt-senders.js";
 
 function decodeQuotedPrintable(text, charset = "utf-8") {
   const joined = text.replace(/=\r?\n/g, "");
@@ -850,7 +850,9 @@ function extractReturns(text, html, orderDate) {
   // (So does a rail booking whose every ticket says "Specified train only. No refunds.": an Advance ticket. Round 15.)
   const fareLines = [...String(text || "").matchAll(/^[ \t|]*\d{1,2}x[ \t]+(?:advance|anytime|off-peak|super off-peak|flexi|standard|first)[^\n]{0,40}$/gim)];
   const allNoRefund = fareLines.length > 0 && fareLines.every((m) => /^(?:[^\n]*\n){0,2}?[^\n]*\bno refunds?\b/i.test(String(text).slice(m.index + m[0].length, m.index + m[0].length + 200)));
-  if (allNoRefund || /\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat)) {
+  // (And a ticket seller that "does not issue refunds after purchase". Round 15.)
+  const ticketsNoRefund = /\b(?:does|do) not (?:issue|give|offer) refunds? after (?:the )?purchase\b/i.test(flat) && /\btickets?\b/i.test(flat);
+  if (allNoRefund || ticketsNoRefund || /\b(?:this|your)\s+(?:booking|reservation|rate|stay|room|ticket|order|purchase)\s+(?:is|are)\s+(?:non-?\s?refundable|not refundable)\b/i.test(flat)) {
     Object.assign(out, { windowDays: null, windowFrom: null, deadline: null, portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false, nonRefundable: true });
   }
   // A booking that can be cancelled for free until a day it names ("You can cancel for FREE until 6 June 2025 23:59",
@@ -1490,6 +1492,10 @@ function sameShopName(n, shop) {
 }
 function venueOf(text, shop) {
   const t = String(text || "").slice(0, 6000);
+  // (A fast-food app's receipt that names its restaurant under a label, "Restaurant Name:" over "Edwalton - Landmere Lane".
+  // Round 15.)
+  const named = /^[ \t|]*(?:restaurant|store|branch) name[ \t]*:[ \t|]*(?:\n[ \t|]*){0,4}(\p{Lu}[^\n|£@]{2,59}?)[ \t|]*$/imu.exec(t);
+  if (named && !sameShopName(named[1].trim(), shop) && !/\d{3}/.test(named[1])) return named[1].trim();
   if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
   const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|table|thank|total|paid|date|time)\b/i.test(n) && !sameShopName(n, shop) ? n : null;
   const vis = /\bthanks?\s+for\s+visiting\s+(\p{Lu}[^\n|.!,]{1,40}?)\s+and\b/iu.exec(t.replace(/\s*\n\s*/g, " ").replace(/\s/g, " "));
@@ -1842,6 +1848,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // ("Order Confirmation: #32297 | Vape and Go", or the body's "Your order (32297) has been received": the order's number,
   // with the shop's name after it in the subject. Round 15.)
   if (!result.orderRef) { const sr = /\border\s+(?:confirmation|confirmed|received|placed|update|status)\s*:?\s*#\s?(\d{3,12})\b/i.exec(String(subject || "")) || /\byour order \(#?(\d{3,12})\) (?:has been|is|was)\b/i.exec(text); if (sr) result.orderRef = sr[1]; }
+  // ("Order TSR89717 confirmed": a number of letters and digits right after "Order", with what happened to it after. Round 15.)
+  if (!result.orderRef) { const sr = /^\s*(?:(?:fwd?|fw)\s*:\s*)*(?:your\s+)?order\s+#?((?=[A-Za-z0-9-]*\d)(?=[A-Za-z0-9-]*[A-Za-z])[A-Za-z0-9-]{5,20}|\d{5,14})\s+(?:is\s+|has\s+been\s+)?(?:confirmed|received|placed|shipped|dispatched|despatched|on its way)\b/i.exec(String(subject || "")); if (sr) result.orderRef = sr[1]; }
   // Price wording ("Was £2,200", "You saved £330") sits on its own line in some shops' emails: it is never an item.
   result.items = cleanItems(result.items.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim())));
   if (!result.items.length && /(^|\.)amazon\.(co\.uk|com)$/i.test(result.retailer.domain || sender?.domain || "") && html) result.items = amazonItems(html);
@@ -1990,7 +1998,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   } else if (!isFlight && !journey && !gameShop && !ride) {
     const cands = [];
     // (A currency's code on its own, "GBP" from "£20.47 GBP", is never a thing. Round 12.)
-    const readable = (list) => cleanItems(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim()) && !/^(?:gbp|eur|usd|cad|aud|chf|sek|nok|dkk|pln)$/i.test(String(i.name || "").trim())));
+    // (A meal deal's title with its price before it, "£1.19 6 Chicken McNuggets® or 4 Veggie Dippers", then the choice made
+    // with that same price, "6 Chicken McNuggets® | £1.19": one thing, the choice, never both. Round 15.)
+    const words = (n) => String(n || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
+    const oneDeal = (list) => list.filter((i, k) => { const n = list[k + 1]; if (!n || n.pricePence == null || n.pricePence !== i.pricePence || (n.qty || 1) !== (i.qty || 1) || !/\bor\b/i.test(String(i.name || ""))) return true;
+      const mine = new Set(words(i.name)), theirs = words(n.name); return !(theirs.length && theirs.every((w) => mine.has(w))); });
+    const readable = (list) => cleanItems(oneDeal(list.filter((i) => !PRICE_WORDS.test(String(i.name || "").trim()) && !MONEY_LABEL.test(String(i.name || "").trim()) && !/^(?:gbp|eur|usd|cad|aud|chf|sek|nok|dkk|pln)$/i.test(String(i.name || "").trim()))));
     // (Products the shop recommends, "You might also like", "Customers also bought", are not what was bought: those sections
     // are left out of the item readings. Round 4.)
     const [textR, otherR] = [withoutRecommendations(text), otherPart ? withoutRecommendations(otherPart) : otherPart];
@@ -2039,6 +2052,10 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     result.itemsCheck = feeLines.length ? checkItems(result.items.filter((i) => !feeLines.includes(i)), moneyOf(text), result.totalPence) : checkItems(result.items, moneyOf(text), result.totalPence);
     if (feeLines.length) result.itemsCheck = { ...result.itemsCheck, itemsPence: result.itemsCheck.itemsPence + feeLines.reduce((a, i) => a + i.pricePence, 0), expectedPence: result.totalPence };
   }
+  // (A ticket seller's "Payment Summary": the tickets under the event's name, each per-ticket fee and the order's handling fee,
+  // as the summary lists them, when they come to the total. Round 15.)
+  const tixItems = ticketSummary(fromHtml || text, result.totalPence) || (plain ? ticketSummary(plain, result.totalPence) : null);
+  if (tixItems) { result.items = tixItems; result.itemsCheck = { ...checkItems(tixItems, moneyOf(text), result.totalPence), complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; }
   // (Google Play's receipt: the thing bought over "Item Price", its name wrapped over lines and its developer after it,
   // "Office 365 personal with trial (…) (by Microsoft Corporation) £5.99/month", a plan's price per month. Round 13.)
   if (!result.items.length && /(^|\.)google\.com$/i.test(result.retailer.domain || sender?.domain || "") && /\bgoogle play\b/i.test(text.slice(0, 3000))) {

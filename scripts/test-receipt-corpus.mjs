@@ -468,6 +468,13 @@ const joinWrong = [];
   const { EXAM_APPOINTMENT } = await import("./fixtures/receipt-emails/holdout16c.mjs");
   const exam = mergeOrderEmails([det("holdout16c-exam-invoice-number-cell"), { ...classifyEmail(rawEmail(EXAM_APPOINTMENT)).details, id: "appt" }]);
   if (exam.length !== 1 || exam[0].totalPence !== 2300) joinWrong.push("an appointment email with only the order's number made " + exam.length + " cards");
+  // A ticket seller's tickets come under the event's name and its "no refunds after purchase" is kept; a shop's "Order
+  // ATM40112 confirmed" gives its number; a burger app's restaurant is the one its label names.
+  const tk = det("holdout16c-tickets-payment-summary"), tx = det("holdout16c-tickets-order-details-text"), set = det("holdout16c-shop-set-of-three"), bw = det("holdout16c-burger-app-deal-title");
+  if (!(tk.returns && tk.returns.nonRefundable) || (tk.items || [])[0]?.variant !== "Full Price Ticket" || (tx.items || [])[0]?.variant !== "Seats, Full Price Ticket")
+    joinWrong.push("ticket orders read as " + JSON.stringify([tk.returns, (tk.items || [])[0], (tx.items || [])[0]]));
+  if (set.orderRef !== "ATM40112") joinWrong.push("'Order ATM40112 confirmed' read as order " + set.orderRef);
+  if (bw.merchant !== "Riverside - Mill Lane" || bw.orderRef !== "034") joinWrong.push("a burger app's restaurant read as " + JSON.stringify([bw.merchant, bw.orderRef]));
   const c1 = det("holdout16c-grocer-c1-apostrophe");
   if (!(c1.items || []).some((i) => i.name === "By Hartley’s Ripe Avocado")) joinWrong.push("a U+0092 apostrophe read as " + JSON.stringify((c1.items || []).map((i) => i.name)));
 }

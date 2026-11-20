@@ -81,5 +81,41 @@ export default function holdout16c() {
   not("holdout16c-ballot-pre-authorised", "Racedays", "subject 'Your Payment Receipt'; '1x Ballot Entry (Pre-authorised) £40.00', '1x Booking Fee (Pre-authorised) £2.00', 'Total Pre-authorised £42.00', 'Total paid today £0.00'", {
     from: "Racedays <hello@info.racedays.example>", subject: "Your Payment Receipt", date: "Thu, 05 Nov 2026 21:03:39 +0000",
     text: "Your\nreceipt\n\n1x Ballot Entry - November Ballot Entry (Pre-authorised)\n£40.00\n\n1x Booking Fee (Pre-authorised)\n£2.00\n\nTotal Pre-authorised\n£42.00\n\nCity Half Marathon 2027 Ballot - 1x Training Plan Free Trial\n£0.00\n\nTotal paid today\n£0.00\n\nPayment\nReference 6a7ee826c31fc5c2239742aa\n" }, "pre_authorised");
+  // ---- A ticket seller's payment summary: tickets, per-ticket fees "£4.40 (Service Charge …) x2", a handling fee ---------
+  {
+    const o = order([{ name: "Comedy Night: The Big Tour", qty: 2, unit: 3500 }, { name: "Service Charge Full Price Ticket", qty: 2, unit: 410 }, { name: "Facility Charge Full Price Ticket", qty: 2, unit: 200 }, { name: "Handling Fee", qty: 1, unit: 275 }]);
+    add("holdout16c-tickets-payment-summary", "Ticketline", "'Order #44-10293/UK1' over the event's name; '2x' 'Print-at-Home' 'View Tickets'; 'Payment Summary', '2 Full Price Ticket' over '£35.00 x2', '£70.00', 'Per Item Fees', '£4.10 (Service Charge Full Price Ticket) x2', '£2.00 (Facility Charge Full Price Ticket) x2', 'Order Processing Fees', 'Handling Fee (£2.75)', 'Total | £84.95'; 'does not issue refunds after purchase'", {
+      from: "Ticketline <customer_support@email.ticketline.example>", subject: "You're in! Your Ticketline Order Confirmation", date: "Mon, 02 Nov 2026 18:00:00 +0000",
+      html: mail("Ticketline", "ticketline.example", ["Sam, You're In!", "Order #44-10293/UK1", "Comedy Night: The Big Tour", "City Arena, Leeds", "Fri 8 Jan 2027 @ 8:00 pm", "Your Order", "2x", "Print-at-Home", "View Tickets", "Full Price Ticket",
+        "Payment Summary", "2 Full Price Ticket", "£35.00 x2", "£70.00", "Per Item Fees", "£4.10 (Service Charge Full Price Ticket) x2", "£2.00 (Facility Charge Full Price Ticket) x2", "£12.20", "Order Processing Fees", "Handling Fee (£2.75)", "£2.75", "Total", "£84.95",
+        "Ticketline does not issue refunds after purchase as set out in our Purchase Policy."]) },
+      o, "Ticketline", "2026-11-02", { orderRef: "44-10293" });
+  }
+  // ---- A ticket seller's plain text: "ORDER DETAILS", the event, "Seats, Full Price Ticket: 2 x £ 30.00 = £ 60.00" --------
+  {
+    const o = order([{ name: "Brass Night: Live", qty: 2, unit: 2800 }, { name: "Booking fee", qty: 2, unit: 350 }, { name: "Venue Levy", qty: 2, unit: 100 }, { name: "Processing fee", qty: 1, unit: 150 }, { name: "Delivery/transaction costs", qty: 1, unit: 250 }]);
+    add("holdout16c-tickets-order-details-text", "Eventix", "plain text only: 'ORDER DETAILS', the event's name, 'Date:', 'Venue:', 'Seats, Full Price Ticket: 2 x £ 28.00 = £ 56.00', 'Booking fee: 2 x £ 3.50 = £ 7.00', 'Venue Levy: 2 x £ 1.00 = £ 2.00', 'Subtotal: £ 65.00', 'Processing fee: £ 1.50', 'Delivery/transaction costs: £ 2.50', 'Total incl. VAT: £ 69.00'", {
+      from: "Eventix <noreply@eventix.example>", subject: "Your order 1061999123", date: "Sat, 07 Nov 2026 10:00:00 +0000",
+      text: "Thank you for your order\nOrder number: 1061999123\nOrder total: £ 69.00\nORDER DETAILS\nBrass Night: Live\nDate: Thu., 04/03/2027, 19:30\nVenue: Town Hall, Leeds\nSeats, Full Price Ticket: 2 x £ 28.00 = £ 56.00\nEntrance STALLS, Row J, Seat 33\nBooking fee: 2 x £ 3.50 = £ 7.00\nVenue Levy: 2 x £ 1.00 = £ 2.00\n------------------\nSubtotal: £ 65.00\n==================\nTOTAL\nProcessing fee: £ 1.50\nDelivery/transaction costs: £ 2.50\n------------------\nTotal incl. VAT: £ 69.00\n" },
+      o, "Eventix", "2026-11-07", { orderRef: "1061999123" });
+  }
+  // ---- A shop's set of three sold as one, "3 x 100ml Travel Bottles × 1", and "Order ABC12345 confirmed" -------------------
+  {
+    const o = order([{ name: "3 x 100ml Travel Bottles", qty: 1, unit: 1995 }], { fees: [["Shipping", 299]] });
+    add("holdout16c-shop-set-of-three", "Atomise", "subject 'Order ATM40112 confirmed'; 'Order summary'; '3 x 100ml Travel Bottles × 1' then '£19.95'; 'Shipping | £2.99'; 'Total | £22.94 GBP'", {
+      from: "Atomise <store@atomise.example>", subject: "Order ATM40112 confirmed", date: "Wed, 04 Nov 2026 12:00:00 +0000",
+      html: mail("Atomise", "atomise.example", ["Thank you for your purchase!", "Order ATM40112", "Order summary", "3 x 100ml Travel Bottles × 1 | £19.95", "Subtotal | £19.95", "Shipping | £2.99", "Total | £22.94 GBP"]) },
+      o, "Atomise", "2026-11-04", { orderRef: "ATM40112" });
+  }
+  // ---- A burger app's receipt: a meal deal's title with its price first, the choice under it; the restaurant by label -----
+  {
+    const o = order([{ name: "Crispy Chicken Wrap", qty: 1, unit: 199 }, { name: "Small Fries", qty: 1, unit: 129 }, { name: "9 Chicken Bites", qty: 1, unit: 149 }]);
+    add("holdout16c-burger-app-deal-title", "Burgerworks", "'Order Number:' over '034'; 'Restaurant Name:' over 'Riverside - Mill Lane'; 'Qty | Item Detail | Item Cost'; '1 | £1.49 9 Chicken Bites or 4 Veggie Bites' over 'When ordering on the Burgerworks app' with no price, then '1 | 9 Chicken Bites | £1.49' and '1 | Dip Pot' with none; 'Total (including VAT): | £4.77'", {
+      from: "Burgerworks App <noreply@burgerworks.example>", subject: "Thanks for your order!", date: "Sun, 08 Nov 2026 14:32:00 +0000",
+      html: mail("Burgerworks", "burgerworks.example", ["Here's the receipt for your order, Sam", "Order Date:", "08/11/26 14:32", "Order Number:", "034", "Restaurant Name:", "Riverside - Mill Lane",
+        "Qty | Item Detail | Item Cost", "1 | Crispy Chicken Wrap | £1.99", "1 | Small Fries | £1.29", "1 | £1.49 9 Chicken Bites or 4 Veggie Bites", "When ordering on the Burgerworks app", "1 | 9 Chicken Bites | £1.49", "1 | Dip Pot |",
+        "VAT: | £0.80", "Total (including VAT): | £4.77"]) },
+      o, "Burgerworks", "2026-11-08", { orderRef: "034", merchant: "Riverside - Mill Lane" });
+  }
   return out;
 }
