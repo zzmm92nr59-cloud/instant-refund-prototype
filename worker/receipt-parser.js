@@ -411,7 +411,7 @@ function foreignTotal(text, opts = {}) {
   if (!currency && sign === "$") { const named = DOLLARS.filter(([, re]) => re.test(text)).map(([c]) => c); if (named.length === 1) currency = named[0];
     // (A software company's card receipt through Stripe that names no kind of dollar, "Receipt from Eleven Labs Inc.",
     // "$60.00": Stripe writes every other dollar with its country, "CA$", "A$", so a bare "$" there is the US dollar. Round 11.)
-    else if (!named.length && opts.stripe) currency = "USD";
+    else if (!named.length && (opts.stripe || opts.gameDollar)) currency = "USD";
     // (A receipt that says it was bought in the United States, "Country United States, TX", with "$5.39": US dollars. Round 13.)
     else if (!named.length && /\bcountry\b[\s:|]{0,6}(?:united states(?: of america)?|usa)\b/i.test(text)) currency = "USD"; }
   const minor = foreignMinor(pick.amount);
@@ -1857,10 +1857,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const ld = html ? fromJsonLd(html) : null;
   const refDate = headers.date ? new Date(headers.date) : null;
   const stripe = /(^|\.)stripe\.com$/i.test(sender?.domain || "") || (PERSONAL_MAIL.test(sender?.domain || "") && /(^|\.)stripe\.com$/i.test((forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) || {}).domain || ""));
-  let txt = fromText(text, refDate, { stripe });
+  // (A game's web shop through Appcharge or Xsolla writes its other dollars with their country, "MX$", "CA$": a bare "$"
+  // there is the US dollar, whatever country it was bought in, "Country Tunisia", "Total $2,00". Round 15.)
+  const gameDollar = GAME_SHOP.test(sender?.domain || "") || (PERSONAL_MAIL.test(sender?.domain || "") && GAME_SHOP.test((forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) || {}).domain || ""));
+  let txt = fromText(text, refDate, { stripe, gameDollar });
   // Many senders include a skimpy plain-text part next to the full HTML one: use whichever reads richer.
   if (plain && fromHtml) {
-    const alt = fromText(fromHtml, refDate, { stripe });
+    const alt = fromText(fromHtml, refDate, { stripe, gameDollar });
     const richness = (r) => (r.items.length ? 2 : 0) + (r.items.some((i) => i.pricePence != null) ? 1 : 0) + (r.items.some((i) => i.variant) ? 1 : 0) + (r.orderDate ? 1 : 0) + (r.totalPence != null ? 1 : 0) + (r.orderRef ? 1 : 0);
     if (richness(alt) > richness(txt)) { txt = alt; text = fromHtml; }
   }
@@ -1913,10 +1916,17 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   const gameShop = GAME_SHOP.test((fwdFrom && fwdFrom.domain) || sender?.domain || "");
   // (A pack of several things, "Mixy Meow | 1", "Checkerboard | 10", is one purchase named by all of them. Round 10.)
   const bundle = gameShop ? gameBundle(fromHtml) || gameBundle(text) : null;
-  if (bundle) result.items = [{ name: bundle, qty: 1, pricePence: result.totalPence ?? null }];
+  if (bundle && bundle.length === 1) result.items = [{ ...bundle[0], pricePence: result.totalPence ?? null, ...(bundle[0].qty > 1 ? { lineTotal: true } : {}) }];
+  else if (bundle) result.items = bundle.map((b) => ({ ...b, pricePence: null }));
   // (A game web shop's receipt has a receipt number, which its subject and its support form use, and a long hex "Order ID"
   // for its own system: the receipt number is the one the shopper is asked for. Round 12.)
+  // (Its own "Order ID", 24 letters and digits, is the order's number when the email gives it; the receipt number is kept
+  // only when there is none. Round 15.)
   if (gameShop) {
+    const oid = /\border id\s*[:#]?\s*\|?\s*([0-9a-f]{20,32})\b/i.exec(fromHtml || text) || /\border id\s*[:#]?\s*\|?\s*([0-9a-f]{20,32})\b/i.exec(text);
+    if (oid) result.orderRef = oid[1];
+  }
+  if (gameShop && !/^[0-9a-f]{20,32}$/i.test(String(result.orderRef || ""))) {
     const rn = /\breceipt (?:number|no\.?)\s*[:#]?\s*\|?\s*(\d{3}-\d{3}-\d{3,4}|\d{6,12})\b/i.exec(fromHtml || text) || /\breceipt #?(\d{3}-\d{3}-\d{3,4})\b/i.exec(subject);
     if (rn) result.orderRef = rn[1];
   }
@@ -2099,12 +2109,21 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const gp = googlePlayItems(plain || text);
     if (gp.length) { result.items = gp; result.itemsCheck = checkItems(gp, moneyOf(text), result.totalPence); }
   }
+  // (A game shop's pack of several things has one price, the whole receipt's: its lines are all of it. Round 15.)
+  if (bundle && bundle.length > 1 && result.totalPence != null && result.items.length === bundle.length && result.items.every((i) => i.pricePence == null))
+    result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0, pack: true };
   // (A PayPal receipt's own list: the name, "Qty: 1", sometimes "Product ID: home_screen_offer_3", then the price in the
   // payment's currency, "US$5.00" or "£3.99". The name as PayPal gives it, cut short or not: nothing is added. Round 13.)
   const viaPayPal = /(^|\.)paypal\.[a-z.]+$/i.test(sender?.domain || "") || /(^|\.)paypal\./i.test(result.retailer.via || "");
   // (PayPal's own list comes first: a general reading can take a label for the thing bought, "Merchant" over "£25.00".)
   if (viaPayPal) {
     const pp = payPalItems(text);
+    // (One thing bought, its price before the tax PayPal adds under it, "Special Offer £3.99", "Tax £0.80", "Total £4.79":
+    // what that one thing cost is what was paid for it. Round 15.)
+    if (pp.length === 1 && (pp[0].qty || 1) === 1 && result.totalPence != null) {
+      const m = moneyOf(text);
+      if (m.vat > 0 && m.subtotal === pp[0].pricePence && Math.abs(m.subtotal + m.vat + (m.fees || 0) - (m.discounts || 0) - result.totalPence) <= 1 && !m.fees && !m.discounts) pp[0] = { ...pp[0], pricePence: result.totalPence };
+    }
     if (pp.length) { result.items = pp; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)

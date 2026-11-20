@@ -8,7 +8,7 @@
   "subject": "Your LANTERN ISLES-BRIGHTFOX receipt #481-516-342",
   "date": "Sat, 30 May 2026 22:39:50 +0000"
  },
- "html": "<html><head><title>Purchase Confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>LANTERN ISLES-BRIGHTFOX</td></tr>\n<tr><td>Receipt Number</td><td>481-516-342</td></tr>\n<tr><td>Payment Method</td><td>PayPal</td></tr>\n<tr><td>Payment Date</td><td>May 30, 2026 10:39 PM UTC</td></tr>\n<tr><td>Country</td><td>Mexico</td></tr>\n<tr><td>Order ID</td><td>6b0c1d2e3f405162738495a6</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Pearls</td><td>1,800</td></tr>\n<tr><td>Compass Tokens</td><td>10</td></tr>\n<tr><td>Subtotal</td><td>MX$ 38.79</td></tr>\n<tr><td>Tax (16%)</td><td>MX$ 6.21</td></tr>\n<tr><td>Total</td><td>MX$ 45.00</td></tr></table><p>Powered by <img alt=\"Appcharge\" src=\"https://cdn.appcharge.com/logo.png\"> For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new\">Appcharge support</a></p></body></html>",
+ "html": "<html><head><title>Purchase Confirmation</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>LANTERN ISLES-BRIGHTFOX</td></tr>\n<tr><td>Receipt Number</td><td>481-516-342</td></tr>\n<tr><td>Payment Method</td><td>PayPal</td></tr>\n<tr><td>Payment Date</td><td>May 30, 2026 10:39 PM UTC</td></tr>\n<tr><td>Country</td><td>Mexico</td></tr>\n<tr><td>Order ID</td><td>6b0c1d2e3f405162738495a7</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Pearls</td><td>1,800</td></tr>\n<tr><td>Compass Tokens</td><td>10</td></tr>\n<tr><td>Subtotal</td><td>MX$ 38.79</td></tr>\n<tr><td>Tax (16%)</td><td>MX$ 6.21</td></tr>\n<tr><td>Total</td><td>MX$ 45.00</td></tr></table><p>Powered by <img alt=\"Appcharge\" src=\"https://cdn.appcharge.com/logo.png\"> For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new\">Appcharge support</a></p></body></html>",
  "text": "",
  "expected": {
   "shop": "Lantern Isles",
@@ -16,12 +16,17 @@
   "currency": "MXN",
   "items": [
    {
-    "name": "1,800 Pearls, 10 Compass Tokens",
+    "name": "1,800 Pearls",
     "qty": 1,
-    "linePence": 4500
+    "linePence": null
+   },
+   {
+    "name": "10 Compass Tokens",
+    "qty": 1,
+    "linePence": null
    }
   ],
-  "subtotalPence": 4500,
+  "subtotalPence": 0,
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,

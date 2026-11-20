@@ -1839,9 +1839,17 @@ export function mergeOrderEmails(orders) {
   const paidFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && o.retailer.domain && p.retailer.name &&
     nameFitsDomain(p.retailer.name, o.retailer.domain) && o.totalPence != null && o.totalPence === p.totalPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o, p);
   const unref = orders.filter((p) => p.retailer && p.retailer.via && !p.orderRef && p.totalPence != null && p.sentAt && !isForwarded(p));
+  // (Several purchases of the same money minutes apart, "Special Offer £2.39" bought twice four minutes apart, each with its
+  // PayPal receipt seconds after the shop's: each receipt goes with the shop's receipt nearest to it in time, when each is
+  // the other's nearest, within two minutes, and no other is as near. Round 15.)
+  const gap = (a, b) => Math.abs(Date.parse(a.sentAt) - Date.parse(b.sentAt));
+  const nearest = (x, list) => { const s = list.slice().sort((a, b) => gap(x, a) - gap(x, b)); return s.length && (s.length === 1 || gap(x, s[0]) < gap(x, s[1])) ? s[0] : null; };
   for (const p of unref) {
     const fits = orders.filter((o) => paidFits(p, o));
-    if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
+    if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) { paidVia.set(p, fits[0]); continue; }
+    const o = fits.length ? nearest(p, fits) : null;
+    if (!o || gap(p, o) > 2 * 60000) continue;
+    if (nearest(o, unref.filter((q) => paidFits(q, o))) === p) paidVia.set(p, o);
   }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
@@ -1918,7 +1926,14 @@ export function mergeOrderEmails(orders) {
         if (!Number.isNaN(sum)) c.itemsCheck = { ...c.itemsCheck, itemsPence: sum, substituted: true, ...(Number.isInteger(c.itemsCheck.expectedPence) ? { missingPence: c.itemsCheck.expectedPence - sum } : {}) };
       }
     }
+    // (A payment service's receipt that leads, its own list being the fuller one, still shows the shop's name and order
+    // number from the shop's own email of the same purchase. Round 15.)
+    if (c.retailer && c.retailer.via) {
+      const own = rest.find((o) => o.retailer && !o.retailer.via && !isForwarded(o));
+      if (own) { c.retailer = { ...own.retailer }; if (!c.orderRef && own.orderRef) c.orderRef = own.orderRef; }
+    }
     for (const o of rest) {
+      if (!c.orderRef && o.orderRef) c.orderRef = o.orderRef;
       // The currency goes with the amount: a total taken from another email of the order is in that email's currency.
       if (c.totalPence == null && o.totalPence != null) { c.totalPence = o.totalPence; c.currency = o.currency || c.currency; }
       if (!c.orderDate && o.orderDate) c.orderDate = o.orderDate;

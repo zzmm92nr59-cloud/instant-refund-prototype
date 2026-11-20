@@ -152,14 +152,16 @@ export function gameBundle(text) {
     const r = list[k];
     if (/^(?:sub-?\s?total|total|tax|vat)\b/i.test(r)) break;
     // (How many, as "6,000" or "x 15". Round 12.)
-    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
-    const next = /^(?:x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
-    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1]]; k++; }
+    let m = /^(\p{L}[\p{L}\d '’&.-]{1,40}?) \| (x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/u.exec(r);
+    const next = /^(x\s?)?(\d{1,3}(?:,\d{3})*|\d{1,7})$/i.exec(list[k + 1] || "");
+    if (!m && /^\p{L}[\p{L}\d '’&.-]{1,40}$/u.test(r) && next) { m = [null, r, next[1], next[2]]; k++; }
     // (Whatever follows the list ends it: the pack is what was read so far. A list of objects was once returned here, and
     // read as an item named "[object Object]". Round 12.)
     if (!m) break;
-    parts.push({ name: m[1].trim(), amount: m[2] });
+    parts.push({ name: m[1].trim(), amount: m[3], times: Boolean(m[2]) && Number(m[3].replace(/,/g, "")) <= 99 });
   }
   if (!parts.length) return null;
-  return parts.map((p) => (p.amount === "1" ? p.name : p.amount + " " + p.name)).join(", ");
+  // (Each thing in the pack is a line of its own: "Coins | 2,200" is 2,200 Coins, game money counted out; "Big SE box | x 2"
+  // is two boxes; "Mixy Meow | 1" is one. The pack has one price, so no line is priced on its own. Round 15.)
+  return parts.map((p) => (p.times ? { name: p.name, qty: Number(p.amount.replace(/,/g, "")) } : p.amount === "1" ? { name: p.name, qty: 1 } : { name: p.amount + " " + p.name, qty: 1 }));
 }

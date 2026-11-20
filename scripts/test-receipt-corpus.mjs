@@ -393,7 +393,26 @@ const joinWrong = [];
   attachCancellations(sub, [det("holdout14a-google-play-sub-ending")]);
   if (!sub[0].subscriptionEnds || sub[0].subscriptionEnds.on !== "2019-08-13" || sub[0].subscriptionEnds.refund !== false || sub[0].cancelled) joinWrong.push("a subscription ending read on its payment as " + JSON.stringify([sub[0].subscriptionEnds, sub[0].cancelled]));
   const paid = mergeOrderEmails([det("holdout14a-game-shop-usd"), det("holdout14a-paypal-to-game-shop"), det("holdout14a-game-shop-mxn")]);
-  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "612-904-337" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+  if (paid.length !== 2 || !paid.some((c) => c.orderRef === "6b0c1d2e3f405162738495a6" && c.totalPence === 647 && c.currency === "USD")) joinWrong.push("PayPal's receipt for a game shop purchase made " + JSON.stringify(paid.map((c) => [c.retailer && c.retailer.name, c.orderRef, c.totalPence])));
+}
+{
+  // Round 15d (made-up copies of Connor's real layouts): the same game-shop offer bought twice four minutes apart, each with
+  // PayPal's receipt seconds after the shop's: two cards, each the shop's receipt with its own PayPal receipt, never four,
+  // and the shop's own name and Order ID on each.
+  const { gameReceipt, payPalToAppcharge } = await import("./fixtures/receipt-emails/holdout16d.mjs");
+  const read = (m, id) => ({ ...classifyEmail(rawEmail(fixture16(id, m))).details, id, createdAt: 0 });
+  const fixture16 = (id, m) => ({ id, headers: { from: m.from, to: SHOPPER.email, subject: m.subject, date: m.date }, html: m.html, text: "" });
+  const g1 = read(gameReceipt("100-200-301", "6aaa00000000000000000001", "United Kingdom", ["Coins | 2,200", "Minigame token | x 15"], ["Subtotal | £2.66", "VAT (20%) | £0.53"], "£3.19", "Thu, 30 Apr 2026 02:21:03 +0000", "April 30, 2026 2:21 AM UTC", "PayPal"), "g1");
+  const p1 = read(payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:21:31 +0000", "1AA11111AA1111111"), "p1");
+  const g2 = read(gameReceipt("100-200-302", "6aaa00000000000000000002", "United Kingdom", ["Coins | 2,200", "Minigame token | x 15"], ["Subtotal | £2.66", "VAT (20%) | £0.53"], "£3.19", "Thu, 30 Apr 2026 02:24:40 +0000", "April 30, 2026 2:24 AM UTC", "PayPal"), "g2");
+  const p2 = read(payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:24:58 +0000", "2BB22222BB2222222"), "p2");
+  const cards = mergeOrderEmails([g1, p1, g2, p2]);
+  const ids = cards.map((c) => (c.emailIds || [c.id]).slice().sort().join("+")).sort();
+  if (ids.join(" ") !== "g1+p1 g2+p2" || !cards.every((c) => /^6aaa0+\d$/.test(c.orderRef) && c.totalPence === 319 && c.retailer && !c.retailer.via))
+    joinWrong.push("two same-money game purchases minutes apart, each with PayPal's receipt, made " + JSON.stringify(cards.map((c) => [c.emailIds, c.orderRef, c.retailer && c.retailer.name])));
+  // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
+  const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
+  if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");
 }
 {
   // Round 14: a reference only the bill or the counter gives ("Order Number:" over "042", "Bill ID: 71200455") is the order's
@@ -472,6 +491,7 @@ console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.joi
 
 let failed = 0;
 const need = (cond, msg) => { if (!cond) { failed++; console.log("FAIL - " + msg); } };
+if (joinWrong.length) console.log(joinWrong.join("\n"));
 need(joinWrong.length === 0, "a delivery-day payment and a changed total join the order they belong to (round 10)");
 need(!moreWrong.length, "the restaurant, the 'lists no items' state and a delivery-day payment read right (round 10)");
 need(cancelWrong.length === 0, "a part-cancelled order marks the item its email names as cancelled, and only that");
