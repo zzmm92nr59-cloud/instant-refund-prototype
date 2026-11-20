@@ -2246,7 +2246,9 @@ export function attachAdjustments(orders, adjusts) {
     // (Money back a shop's support team wrote about an order it names, "order #966874418": that order of that shop, when
     // exactly one of the numbers it names is one of the shop's orders. A card refund and account credit are said apart. Round 12.)
     if (a.bySupport) {
-      const refs = (a.orderRefs || [a.orderRef]).filter(Boolean).map((r) => String(r).toUpperCase());
+      // (The order the email is about, "about your recent order 652658294", is the only one: a number quoted lower down, from
+      // another order, is never where the money goes. Round 15.)
+      const refs = (a.orderRef ? [a.orderRef] : a.orderRefs || []).filter(Boolean).map((r) => String(r).toUpperCase());
       const base = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]+\.(?:(?:co|org|ac)\.uk|[a-z]{2,6}))$/, "$1");
       const sameShop = (o) => (base(o.retailer && o.retailer.domain) && base(o.retailer && o.retailer.domain) === base(a.retailer && a.retailer.domain)) || low(o.retailer && o.retailer.name).startsWith(low(a.retailer && a.retailer.name).split(" ")[0] || "-");
       const hit = refs.map((r) => orders.filter((o) => o.kind !== "order_update" && o.orderRef && String(o.orderRef).toUpperCase() === r && sameShop(o))).find((l) => l.length);
@@ -2254,6 +2256,13 @@ export function attachAdjustments(orders, adjusts) {
       const o = hit[0], was = o.adjusted || {};
       o.adjusted = { at: a.at || was.at || null, refundPence: (was.refundPence || 0) + a.amountPence, newTotalPence: was.newTotalPence ?? null, currency: a.currency || o.currency || "GBP",
         ...((was.creditPence || 0) + (a.creditPence || 0) ? { creditPence: (was.creditPence || 0) + (a.creditPence || 0) } : {}) };
+      continue;
+    }
+    // (Money back for an order it names by number, "your recent order 652658294": that order only, never another order of the
+    // same shop that happens to be near in time; nothing when Relay doesn't have it. Round 15.)
+    if (a.orderRef && !a.bySupport) {
+      const named = orders.filter((o) => o.kind !== "order_update" && o.orderRef && sameOrderRef(o.orderRef, a.orderRef) && sameShop(a, o));
+      if (named.length === 1) { const o = named[0]; o.adjusted = { at: a.at || null, refundPence: (o.adjusted ? o.adjusted.refundPence : 0) + a.amountPence, newTotalPence: a.newTotalPence ?? null, currency: a.currency || o.currency || "GBP" }; }
       continue;
     }
     const fits = orders.filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&

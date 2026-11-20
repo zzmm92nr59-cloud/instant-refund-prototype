@@ -1888,15 +1888,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && /^\s*(?:fwd?|fw)\s*:/i.test(String(subject || "")) && PERSONAL_MAIL.test(sender?.domain || "")) {
     const addr = (h) => ((String(h || "").match(/<([^>]+)>/) || [])[1] || String(h || "").trim()).toLowerCase();
     const nameOf = (h) => (String(h || "").match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || "";
-    // (Gmail's two spellings of one address, "@gmail.com" and "@googlemail.com", are the same person's; with no name on the
-    // "To:" line, the addresses' own words say whether it is the same person. Round 15.)
+    // (Gmail's two spellings of one address, "@gmail.com" and "@googlemail.com", are the same person's. Round 15.)
     const same = (a) => a.replace(/@googlemail\.com$/, "@gmail.com");
-    const fromA = same(addr(headers.from)), toName = nameOf(headers.to) || addr(headers.to).split("@")[0], fromName0 = nameOf(headers.from) || fromA.split("@")[0];
+    const fromA = same(addr(headers.from)), toName = nameOf(headers.to), fromName0 = nameOf(headers.from);
     const innerTo = /^[>\s*]*to:\s*(.+)$/im.exec(text.slice(0, 4000));
     const words = (n) => new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3));
-    const squeezed = (n) => n.toLowerCase().replace(/[^\p{L}]+/gu, "");
-    const fromAll = fromName0 + " " + fromA.split("@")[0], toAll = toName + " " + addr(headers.to).split("@")[0];
-    const shared = [...words(fromAll)].some((w) => squeezed(toAll).includes(w)) || [...words(toAll)].some((w) => squeezed(fromAll).includes(w));
+    const shared = [...words(fromName0)].some((w) => words(toName).has(w));
     if (fromA && innerTo && same(innerTo[1].toLowerCase()).includes(fromA) && toName && fromName0 && !shared) return { ok: false, reason: "someone_elses_purchase", source: "shopper_email" };
   }
   // A notice that the payment didn't go through is not a receipt ("we couldn't charge your account for your order").

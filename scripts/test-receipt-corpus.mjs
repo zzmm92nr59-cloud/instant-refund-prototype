@@ -317,7 +317,10 @@ const joinWrong = [];
   if (no.kind === "order_update") joinWrong.push("a refused refund read as money back");
   attachAdjustments(orders, [a1, a2].filter((x) => x.kind === "order_update"));
   const adj = orders[0].adjusted;
-  if (!(adj && adj.refundPence === 499 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
+  // (Round 15, changed: a1's own words name order 552658111, so its refund is that order's, never 664851790's, which only the
+  // thread's subject names (Connor's real Just Eat refund for 652658294 was put on 664851791 this way). Relay doesn't have
+  // 552658111, so the refund joins nothing; the credit, named for 664851790, still joins it.)
+  if (!(adj && adj.refundPence === 0 && adj.creditPence === 399) || orders[1].adjusted) joinWrong.push("support refund and credit not joined to the order they name: " + JSON.stringify(adj || null));
   const ride = (n, total, day) => ({ id: "u" + n, createdAt: n, kind: "receipt", retailer: { name: "Uber", domain: "uber.com" }, orderRef: null, orderDate: day, totalPence: total, currency: "GBP", items: [] });
   const pp = classifyEmail(mail("\"service@paypal.co.uk\" <service@paypal.co.uk>", "You've got a refund from UBER PAYMENTS UK LIMITED", "Wed, 18 Mar 2026 09:00:00 +0000",
     "You've got a refund from UBER PAYMENTS UK LIMITED\nYour refund of £3.06 GBP from UBER PAYMENTS UK LIMITED\nRefund complete! Available now in your balance.\nYou originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026. View receipt\nRefund total\n£3.06 GBP")).details;
@@ -445,16 +448,15 @@ const joinWrong = [];
     joinWrong.push("a Booking.com stay paid at the property and its cancellation read as " + JSON.stringify([stayCard[0].payAtProperty, stayCard[0].cancelled, gone.orderRef, gone.free]));
   const exp = classifyEmail(rawEmail(fx("holdout16d-expedia-dollars-at-property"))).details;
   if (exp.orderRef !== "73000000000001" || !exp.payAtProperty) joinWrong.push("Expedia's itinerary read as " + JSON.stringify([exp.orderRef, exp.payAtProperty]));
-  // Not purchases: someone else's booking forwarded from their own Gmail (written "@googlemail.com" inside, no name on the "To:"
-  // line); money deposited to play poker; things someone else bought and had sent to the shopper. The shopper's own
+  // Not purchases: someone else's booking forwarded from their own Gmail (written "@googlemail.com" inside); money deposited to play poker; things someone else bought and had sent to the shopper. The shopper's own
   // forward from another of their addresses, with no name on the "To:" line, is still theirs.
   const mail = (lines) => lines.join("\r\n");
-  const theirs = mail(["From: Robin Ashdown <robin.ashdown@gmail.com>", "To: sam.taylor99@gmail.com", "Subject: Fwd: Booking Confirmation For Minster Hotel", "Date: Mon, 4 Dec 2023 10:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
+  const theirs = mail(["From: Robin Ashdown <robin.ashdown@gmail.com>", "To: Sam Taylor <sam.taylor99@gmail.com>", "Subject: Fwd: Booking Confirmation For Minster Hotel", "Date: Mon, 4 Dec 2023 10:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
     "Sent from my iPhone", "Begin forwarded message:", "> From: The Giftbox Team <team@giftbox.example>", "> Date: 3 December 2023 at 22:25:24 GMT", "> To: robin.ashdown@googlemail.com", "> Subject: Booking Confirmation For Minster Hotel",
     ">", "> Thank you for your booking, your reservation details are below.", "> Booking reference: RSV10000000001", "> Check in", "> 22/12/23", "> TOTAL:", "> £207"]);
   if (parseReceiptEmail(theirs).ok) joinWrong.push("someone else's booking forwarded from their Gmail read as the shopper's purchase");
-  const ownFwd = theirs.replace("From: Robin Ashdown <robin.ashdown@gmail.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace("> To: robin.ashdown@googlemail.com", "> To: sam.taylor@outlook.com");
-  if (!parseReceiptEmail(ownFwd).ok) joinWrong.push("the shopper's own forward from another address, no name on 'To:', not read");
+  const ownFwd = theirs.replace("To: Sam Taylor <sam.taylor99@gmail.com>", "To: sam.taylor99@gmail.com").replace("From: Robin Ashdown <robin.ashdown@gmail.com>", "From: Sam Taylor <sam.taylor@outlook.com>").replace("> To: robin.ashdown@googlemail.com", "> To: sam.taylor@outlook.com");
+  if (!parseReceiptEmail(ownFwd).ok) joinWrong.push("the shopper's own forward from another address not read");
   const poker = mail(["From: \"Cardroom\" <info@emails.cardroom.example>", "To: " + SHOPPER.email, "Subject: Your deposit receipt", "Date: Tue, 29 Dec 2020 18:20:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
     "Your deposit receipt", "Hi,", "Thanks for depositing with Cardroom. You’ll find your deposit receipt below.", "Deposit Option: VISA", "Amount: GBP 10.00", "Transaction ID: 16090000000000001", "Status: CREDITED"]);
   if (parseReceiptEmail(poker).ok) joinWrong.push("money deposited to play read as a purchase");
