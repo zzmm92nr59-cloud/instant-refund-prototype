@@ -145,5 +145,17 @@ export default function holdout16e() {
         "Total (excl. VAT)", "£2.74", "VAT 20.0%", "£0.55", "Total (incl. VAT)", "£3.09", "Apple Pay", "£3.09"]) },
       o, "Zipscoot", "2026-11-07", {});
   }
+  // ---- A trainer shop's order: the delivery address straight over "YOUR ORDER SUMMARY", the brand over the product's whole
+  // name, "Qty - 1" and "Size - 9" with dashes, empty placeholder rows ("Qty -", "Size -", "£"), "Order Delivery" -----------
+  {
+    const o = order([{ name: "Kappa Runway Lite", qty: 1, unit: 2850 }], { fees: [["Order Delivery", 399]] });
+    const empty = []; for (let k = 0; k < 4; k++) empty.push("Qty -", "Size -", "£");
+    add("holdout16e-brand-over-name-dash-labels", "Kickhouse", "address lines straight over 'YOUR ORDER SUMMARY'; 'Kappa' over 'Kappa Runway Lite' over 'Qty - 1' over 'Size - 9' over '£28.50' (shown twice, for phones and computers); empty 'Qty -' / 'Size -' / '£' rows; 'Order Delivery' over '£3.99'; 'Order Total Price' over '£32.49'", {
+      from: "Kickhouse <orders@kickhouse.example>", subject: "Your Kickhouse order confirmation", date: "Wed, 18 Nov 2026 19:51:00 +0000",
+      html: nested("Kickhouse", "kickhouse.example", ["YOUR ORDER CONFIRMATION", "YOUR ORDER NUMBER: 990123456", "Hey Sam", "Thanks for shopping with us, your order has been confirmed!", "When?", "Standard Delivery", "Ordered: 18 November 2026 19:51 GMT",
+        "Delivery Address", "12 Example Road", "Leeds", "LS1 4AB", "Payment Method", "APPLE PAY", "YOUR ORDER SUMMARY", "Kappa", "Kappa Runway Lite", "Qty - 1", "Size - 9", "£28.50",
+        "Kappa", "Kappa Runway Lite", "Qty - 1", "Size - 9", "£28.50", ...empty, "Order Delivery", "£3.99", "Order Total Price", "£32.49"]) },
+      o, "Kickhouse", "2026-11-18", { orderRef: "990123456" });
+  }
   return out;
 }

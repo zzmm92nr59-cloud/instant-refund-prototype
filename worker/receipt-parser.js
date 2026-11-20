@@ -2311,6 +2311,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
     // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
+    // (The same list twice over, once for phones and once for computers: each reading's first half is also tried, and the
+    // totals check says which the email meant. Round 15e.)
+    const halves = [];
+    for (const c of cands) {
+      const n = c.items.length;
+      if (n >= 2 && n % 2 === 0 && c.items.slice(0, n / 2).every((x, k) => { const y = c.items[k + n / 2]; return String(x.name) === String(y.name) && (x.qty || 1) === (y.qty || 1) && x.pricePence === y.pricePence; })) halves.push({ items: c.items.slice(0, n / 2), money: c.money });
+    }
+    cands.push(...halves);
     const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money }));
     const gap = (c) => (c.check.missingPence == null ? Infinity : Math.abs(c.check.missingPence));
     // (Of the readings that add up, one whose names all look like things bought comes first: a note or a size read as the
