@@ -2561,6 +2561,20 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // shop asks for: the order's number. Round 13. The number can sit a cell or two under its label, "Transaction ID:" then
   // an empty cell then the number, as on a rail ticket change. Round 17.)
   if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,4}(\d{8,16})[ \t|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
+  // (An order number with no label, in a cell of its own beside the order's dates at the top of an invoice, McAfee's
+  // "08 October 2027 expires on 07 November 2028 | AB1234567890 |": letters then digits, the only such code in the email,
+  // and only with a day just beside it. Round 18.)
+  if (!result.orderRef && !isFlight && /\b(?:order|receipt|invoice|purchase)\b/i.test(subject || "")) {
+    const ls = String(fromHtml || text).split("\n").map((x) => x.trim()).filter((x) => x && x !== "|").slice(0, 40);
+    const CELL = /(?:^|\|)[ \t]*([A-Z]{2,3}\d{8,12})[ \t]*(?:\||$)/;
+    const hits = ls.map((l, k) => [k, CELL.exec(l)]).filter((h) => h[1]);
+    const all = String(fromHtml || text).match(/\b[A-Z]{2,3}\d{8,12}\b/g) || [];
+    if (hits.length === 1 && new Set(all).size === 1) {
+      const [k, m] = hits[0], near = ls.slice(Math.max(0, k - 6), k + 1);
+      const dated = near.some((l) => /\b\d{1,2}(?:st|nd|rd|th)? (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]* \d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i.test(l));
+      if (dated && !/\b(?:tel|phone|mobile|vat|account|customer|member|reg(?:istration)?|company|licen[cs]e|serial|tracking)\b/i.test(ls[k]) && !/\b(?:vat|company|reg(?:istration)?|account|customer|member)\b[^\n]{0,20}$/i.test(ls[k - 1] || "")) result.orderRef = m[1];
+    }
+  }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -3431,6 +3445,35 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (sub && money(sub[1]) === result.discounts[0].pence && money(sub[1]) > 0 && itemsPence > 0 && Math.abs(itemsPence - Math.round(money(sub[1]) * 1.2)) <= 1) {
       result.discounts = [{ ...result.discounts[0], pence: itemsPence }];
       result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence, expectedPence: itemsPence, missingPence: 0, coveredBy: "promotion" };
+    }
+  }
+  // (A shop's tax line named only by its rate, "Standard Rate £1.14" under "Shipping £5.70" in the order summary, is the VAT,
+  // never an item; and a trial set that costs nothing, "Burnout Buster Trio", "×", "1", "Trial Set / Daily", … "Free", over
+  // "Subtotal £0.00", is the thing bought, at £0.00. Round 18.)
+  if (result.items.length === 1 && /^(?:standard|reduced|zero)[- ]rated?(?: vat)?$/i.test(String(result.items[0].name || "").trim()) && Number.isInteger(result.items[0].pricePence)) {
+    const ls = String(fromHtml || text).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 3000);
+    const at = ls.findIndex((x) => x.toLowerCase() === String(result.items[0].name).trim().toLowerCase());
+    const above = at > 0 ? ls.slice(Math.max(0, at - 6), at) : [];
+    if (above.some((x) => /^(?:shipping|delivery|postage)\b/i.test(x)) && above.some((x) => /^sub-?\s?total\b/i.test(x))) {
+      const vat = result.items[0];
+      result.items = [];
+      result.fees = [...(result.fees || []), { label: "VAT", pence: vat.pricePence }];
+      const sub = ls.slice(0, at).findIndex((x) => /^sub-?\s?total\b/i.test(x));
+      const subAmt = sub >= 0 ? (/£\s?(\d+\.\d{2})/.exec(ls[sub]) || /^£\s?(\d+\.\d{2})$/.exec(ls[sub + 1] || "") || [])[1] : null;
+      if (subAmt === "0.00") {
+        for (let k = 0; k + 2 < sub; k++) {
+          if (ls[k + 1] !== "×" && ls[k + 1] !== "x") continue;
+          if (!/^\d{1,2}$/.test(ls[k + 2]) || !/\p{L}{3}/u.test(ls[k]) || /£|:/.test(ls[k]) || ls[k].length > 80) continue;
+          let free = false;
+          for (let j = k + 3; j < Math.min(sub, k + 10); j++) { if (ls[j + 1] === "×") break; if (/^free$/i.test(ls[j])) { free = true; break; } }
+          if (!free) continue;
+          const v = ls[k + 3] && !/£|\d\.\d{2}|^(?:free|subscription price)$/i.test(ls[k + 3]) && ls[k + 3].length <= 60 ? ls[k + 3] : null;
+          result.items.push({ name: ls[k], qty: Number(ls[k + 2]), pricePence: 0, ...(v ? { variant: v } : {}) });
+        }
+      }
+      const fp = result.fees.reduce((n, f) => n + (f.pence || 0), 0);
+      result.itemsCheck = result.items.length ? { complete: fp === result.totalPence, itemsPence: 0, expectedPence: Math.max(0, (result.totalPence ?? 0) - fp), missingPence: 0, ...namesCheck(result.items, { shop: result.retailer.name || "" }) }
+        : { complete: false, itemsPence: 0, expectedPence: null, missingPence: null };
     }
   }
   // (Prices before VAT with the VAT added under them, "Plus: 1-month subscription £10.99/month", "VAT 20% - £2.20", "Total:

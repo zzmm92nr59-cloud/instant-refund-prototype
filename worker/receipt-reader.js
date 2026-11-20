@@ -252,12 +252,15 @@ export function cleanItem(item, stored = false) {
   name = name.replace(/^(?:[-–•·*]\s+)+(?=\S)/, "");
   // (Amazon's "Gift wrap: No" note run into the next item's title, "Gift wrap: No 12packs Bath Bombs…": not part of it.)
   name = name.replace(/^gift ?wrap(?:ped)?:\s*(?:yes|no)\s+(?=\S{2})/i, "");
-  if (letters(name).replace(/[0-9]/g, "").length < 2) return null;
+  // (A product named by its model number above its style code, "608", kept whole: its code, size and colour are its details.
+  // Round 18.)
+  const model = item.namedBy === "model" && /^\d{2,6}[A-Za-z]?$/.test(name) && Boolean(item.variant);
+  if (letters(name).replace(/[0-9]/g, "").length < 2 && !model) return null;
   if (/:\s*$/.test(item.name.trim()) || /:$/.test(name)) return null;
   if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || (OFFER_LINE.test(name) && !(item.free && item.pricePence === 0))) return null;
   // "Mastercard", "Paid with Apple Pay": how it was paid. ("Credit card holder" is a thing you can buy.)
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
-  if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name)) return null;
+  if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name) && !model) return null;
   if (/@|https?:|www\./i.test(name)) return null;
   // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
   if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;

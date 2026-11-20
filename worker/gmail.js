@@ -205,6 +205,10 @@ const SEARCH_TERMS =
   // (Amazon's "Ordered: 'Wireless Earbuds…'" and "Ordered: 3 items": Gmail matches whole words, so "order" never finds
   // "Ordered", and these were missed whenever Gmail didn't file them under Purchases. Round 13.)
   ' OR ordered' +
+  // (A subscription that won't renew, Google Play's "Your … subscription will be cancelled", and a shop's "Order cancelled":
+  // never fetched, as no word of theirs was asked for, so the card never said when a subscription ends. Outlook's own
+  // list already takes subscriptions. Round 18.)
+  ' OR subscription OR cancelled OR canceled' +
   // (An entry, a membership or a draw "Entry Confirmation", a bar's "Your payment #39814759": round 11. The reader decides.)
   ' OR confirmation OR "your payment" OR eticket OR "travel confirmation" OR "flight confirmation" OR "ticket confirmation" OR "your trip" OR "your ride" OR invoice OR "payment to" OR "payment received" OR "ready to collect" OR "ready for collection"))' +
   // Parcel updates, so a purchase can show "delivered" (only the carrier, tracking number and date are kept).
