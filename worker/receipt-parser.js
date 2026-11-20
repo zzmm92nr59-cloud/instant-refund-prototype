@@ -716,7 +716,7 @@ const UK_POSTCODE = /\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
 
-function extractReturns(text, html, orderDate) {
+function extractReturns(text, html, orderDate, other = "") {
   const out = {
     windowDays: null, windowFrom: null, deadline: null, address: null,
     portalUrl: null, instructions: [], qrMentioned: false, labelMentioned: false,
@@ -765,6 +765,20 @@ function extractReturns(text, html, orderDate) {
       break;
     }
   }
+  // (A seller's own policy, "I gladly accept returns, exchanges, and cancellations" "Just contact me within: 7 days of
+  // delivery" "Ship returns back to me within: 30 days of delivery": the days to get in touch are the window that counts, over
+  // a marketplace's line under the item, "Returns accepted within 14 days of delivery". Round 15.)
+  const both = (flat.slice(0, 60000) + "\n" + String(other || "").slice(0, 60000)).replace(/[ \t\u00a0\u202f]+/g, " ");
+  const contact = !out.cancelWithin && /\bcontact (?:me|us)(?: within)?[ \t]*:?[ \t]*(\d{1,3}) days? (?:of|from|after) (delivery|purchase|receiving)/i.exec(both);
+  if (contact) {
+    out.windowDays = Number(contact[1]); out.windowFrom = /^purchase/i.test(contact[2]) ? "order" : "delivery";
+    out.instructions.unshift(("Contact the seller within " + contact[1] + " days of " + contact[2].toLowerCase() + " to return or exchange.").replace("of receiving", "of receiving it"));
+    out.sellerPolicy = true;
+  }
+  // (What the seller says can't go back, "The following items can't be returned" "- Custom or personalized orders": kept, so
+  // a personalised thing gets no return window. Round 15.)
+  const cant = /\b(?:items?|following)[^.\n]{0,40}\bcan(?:'|’|no)?t be returned\b[\s\S]{0,300}?^[ \t]*[-•*][ \t]*(custom (?:or|and) personali[sz]ed (?:orders|items)|personali[sz]ed (?:orders|items))/im.exec(both);
+  if (cant) out.excludes = ["personalised"];
   // Explicit date: "return by 14 November 2026".
   const byDate = flat.match(/return\w*[^.\n]{0,60}?\bby\s+(\d{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]{3,9}\.?,?\s+\d{4}|\d{4}-\d{2}-\d{2})/i);
   if (byDate) out.deadline = parseDate(byDate[1]);
@@ -812,6 +826,8 @@ function extractReturns(text, html, orderDate) {
     if (!seen.has(key)) { seen.add(key); out.instructions.push(sent); }
   }
 
+  // (The seller's own days to get in touch, never a different window beside them. Round 15.)
+  if (out.sellerPolicy) out.instructions = out.instructions.filter((x, k) => k === 0 || !/\bwithin\s+\d{1,3}\s+days?\b/i.test(x));
   // A QR code for a return. Not one to download the shop's app, a ticket's or an eSIM's code, or the letters "qr" inside
   // a tracking link's picture address (round 12: a hotel booking, a train ticket, a phone plan and a gift receipt were all
   // flagged "QR code" for that).
@@ -2119,7 +2135,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const to = /\b(?:payment (?:of [^\n]{1,30} )?to|sent (?:[^\n]{1,30} )?to|you paid [^\n]{1,30} to)\s+([^\n|.]{2,60}?)\s*(?:\||\.|\n|$)/i.exec(String(subject || "") + "\n" + text.slice(0, 3000));
     if (to && looksLikePerson(to[1].trim(), null)) return { ok: false, reason: "payment_to_person", source: "shopper_email" };
   }
-  result.returns = extractReturns(text, html, result.orderDate);
+  result.returns = extractReturns(text, html, result.orderDate, otherPart);
+  // (Every item personalised, and the seller says personalised orders can't be returned: no window, and why. Round 15.)
+  if (result.returns && result.returns.excludes && result.items.length && result.items.every((i) => /\b(?:personali[sz]ed|custom(?:i[sz]ed)?|engraved|monogrammed|bespoke|made to order)\b/i.test(String(i.name || "") + " " + String(i.variant || "")))) {
+    result.returns = { ...result.returns, windowDays: null, windowFrom: null, deadline: null, instructions: [], portalUrl: null, sellerNoReturn: "The seller says personalised orders can't be returned unless they arrive damaged or faulty." };
+  }
+  if (result.returns) delete result.returns.excludes;
   result.sentTo = sentToOf(headers, sender);
   result.shipment = shipmentOf(subject, text);
 

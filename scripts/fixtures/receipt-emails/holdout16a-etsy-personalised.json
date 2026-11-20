@@ -1,0 +1,34 @@
+{
+ "id": "holdout16a-etsy-personalised",
+ "sender": "Etsy",
+ "layout": "a personalised item; the seller's policy says personalised orders can't be returned",
+ "headers": {
+  "from": "\"Etsy Transactions\" <transaction@etsy.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your Etsy Purchase from Brindlewick Crafts (2718281828)",
+  "date": "Mon, 17 Apr 2023 09:27:57 +0000"
+ },
+ "html": "<html><head><title>Your Etsy Purchase</title></head><body><div><h1>Your order is confirmed</h1><p>Order number: 2718281828</p><p>Order date: 17 Apr, 2023</p><dl><div><div><a href=\"https://www.etsy.com/transaction/3141592653\">Personalised Name Bookmark - Pressed Flower Gift for Readers</a><div>Transaction ID: 3141592653</div><div><span>Colour: </span><span>Sage</span></div><div>Quantity: 1</div><div>Price: <span class=\"price\"><span class='currency-symbol'>£</span><span class='currency-value'>8.95</span></span> </div><div>Returns accepted within 14 days of delivery</div></div></div></dl><table><tr><td>Order total</td><td><span class='currency-symbol'>£</span><span class='currency-value'>8.95</span></td></tr></table></div></body></html>",
+ "text": "Your order is confirmed\n\nOrder number: 2718281828\n\nShop: Brindlewick Crafts\n\n--------------------------------------\n\nTransaction ID:     3141592653\nItem:               Personalised Name Bookmark - Pressed Flower Gift for Readers\nColour: Sage\nQuantity:           1\nItem price:         £8.95\n--------------------------------------\nItem total:         £8.95\nOrder total:        £8.95\n\nSHOP POLICIES FOR BRINDLEWICK CRAFTS\n\nReturns & Exchanges\n\nI GLADLY ACCEPT RETURNS, EXCHANGES, AND CANCELLATIONS\nJust contact me within: 7 days of delivery\nShip returns back to me within: 30 days of delivery\nRequest a cancellation within: 24 hours of purchase\n\nTHE FOLLOWING ITEMS CAN'T BE RETURNED\nBecause of the nature of these items, unless they arrive damaged or defective, I can't accept returns for:\n- Custom or personalized orders\n- Perishable products (like food or flowers)\n- Digital downloads\n\nCONDITIONS OF RETURN\nBuyers are responsible for return shipping costs.",
+ "expected": {
+  "shop": "Etsy",
+  "date": "2023-04-17",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Personalised Name Bookmark - Pressed Flower Gift for Readers",
+    "qty": 1,
+    "linePence": 895
+   }
+  ],
+  "subtotalPence": 895,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 895,
+  "shopAlso": [
+   "Etsy - Brindlewick Crafts",
+   "Brindlewick Crafts"
+  ]
+ }
+}

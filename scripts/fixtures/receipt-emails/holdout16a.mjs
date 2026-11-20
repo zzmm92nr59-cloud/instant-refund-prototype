@@ -64,5 +64,26 @@ export default function holdout16a() {
     add("holdout16a-amazon-free-film", "Amazon", "a film listed at £3.99 with VAT, the summary before VAT: 'Item Subtotal: £3.33', 'Promotions: -£3.33', 'Order Grand Total: £0.00'",
       { from: '"Amazon.co.uk" <digital-no-reply@amazon.co.uk>', subject: "Amazon.co.uk order of Midsummer on Hollow Lane", date: "Sun, 4 Jun 2023 21:02:00 +0100", html }, o, "Amazon", "2023-06-04", { totalPence: 0 });
   }
+  // ---- Etsy, 2023: the item's own line says "Returns accepted within 14 days of delivery"; the text part has the seller's
+  // policy, "Just contact me within: 7 days of delivery", and what can't be returned, "- Custom or personalized orders" -------
+  const etsy = (id, name, variant, unit, ref, layout) => {
+    const o = order([{ name, qty: 1, unit }]);
+    const money = (p) => `<span class='currency-symbol'>£</span><span class='currency-value'>${(p / 100).toFixed(2)}</span>`;
+    const html = `<html><head><title>Your Etsy Purchase</title></head><body><div><h1>Your order is confirmed</h1><p>Order number: ${ref}</p><p>Order date: 17 Apr, 2023</p>` +
+      `<dl><div><div><a href="https://www.etsy.com/transaction/3141592653">${h(name)}</a><div>Transaction ID: 3141592653</div><div><span>${h(variant.split(": ")[0])}: </span><span>${h(variant.split(": ")[1])}</span></div>` +
+      `<div>Quantity: 1</div><div>Price: <span class="price">${money(unit)}</span> </div><div>Returns accepted within 14 days of delivery</div></div></div></dl>` +
+      `<table><tr><td>Order total</td><td>${money(unit)}</td></tr></table></div></body></html>`;
+    const p = "£" + (unit / 100).toFixed(2);
+    const text = ["Your order is confirmed", "", "Order number: " + ref, "", "Shop: Brindlewick Crafts", "", "--------------------------------------", "", "Transaction ID:     3141592653",
+      "Item:               " + name, variant, "Quantity:           1", "Item price:         " + p, "--------------------------------------", "Item total:         " + p, "Order total:        " + p, "",
+      "SHOP POLICIES FOR BRINDLEWICK CRAFTS", "", "Returns & Exchanges", "", "I GLADLY ACCEPT RETURNS, EXCHANGES, AND CANCELLATIONS", "Just contact me within: 7 days of delivery",
+      "Ship returns back to me within: 30 days of delivery", "Request a cancellation within: 24 hours of purchase", "",
+      "THE FOLLOWING ITEMS CAN'T BE RETURNED", "Because of the nature of these items, unless they arrive damaged or defective, I can't accept returns for:",
+      "- Custom or personalized orders", "- Perishable products (like food or flowers)", "- Digital downloads", "", "CONDITIONS OF RETURN", "Buyers are responsible for return shipping costs."].join("\n");
+    return add(id, "Etsy", layout, { from: '"Etsy Transactions" <transaction@etsy.com>', subject: "Your Etsy Purchase from Brindlewick Crafts (" + ref + ")", date: "Mon, 17 Apr 2023 09:27:57 +0000", html, text },
+      o, "Etsy", "2023-04-17", { shopAlso: ["Etsy - Brindlewick Crafts", "Brindlewick Crafts"] });
+  };
+  etsy("holdout16a-etsy-personalised", "Personalised Name Bookmark - Pressed Flower Gift for Readers", "Colour: Sage", 895, "2718281828", "a personalised item; the seller's policy says personalised orders can't be returned");
+  etsy("holdout16a-etsy-seller-days", "Pressed Flower Bookmark Set of 3 - Meadow Mix", "Colour: Meadow", 1250, "1618033988", "the seller's 'contact me within: 7 days of delivery' over the item line's 14 days");
   return out;
 }

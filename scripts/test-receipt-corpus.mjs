@@ -429,6 +429,22 @@ const joinWrong = [];
     if (!r.ok || r.orderRef !== "4410098812" || !r.tableBooking || k === "receipt") joinWrong.push(`table booking${app ? " (" + app + ")" : ""} read as ${k} ${r.orderRef} ${r.tableBooking}`);
   }
 }
+// Round 15 (Connor's real inbox, made-up copies): a seller's own return policy beats a marketplace's line under the item, and a
+// personalised thing the seller says can't go back gets no return window at all, never one Relay made up.
+{
+  const { categorise } = await import("../worker/receipt-category.js");
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
+  for (const app of [null, "gmail"]) {
+    const days = parseReceiptEmail(rawEmail(app ? forwarded(fx("holdout16a-etsy-seller-days"), app) : fx("holdout16a-etsy-seller-days")));
+    const said = (days.returns && days.returns.instructions || []).join(" ");
+    if (!(days.returns && days.returns.windowDays === 7 && days.returns.windowFrom === "delivery") || /14 days/.test(said) || categorise(days).returnable !== true)
+      joinWrong.push(`a seller's 7 days${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([days.returns && days.returns.windowDays, said]));
+    const pers = parseReceiptEmail(rawEmail(app ? forwarded(fx("holdout16a-etsy-personalised"), app) : fx("holdout16a-etsy-personalised")));
+    const g = categorise(pers);
+    if (!pers.returns || pers.returns.windowDays != null || pers.returns.deadline != null || (pers.returns.instructions || []).length || g.returnable !== false || !/personalised/i.test(g.notReturnableReason || ""))
+      joinWrong.push(`a personalised order the seller won't take back${app ? " (" + app + ")" : ""} read as ` + JSON.stringify([pers.returns, g.returnable]));
+  }
+}
 console.log(`  Orders joined by later emails: ${joinWrong.length ? joinWrong.join("; ") : "a delivery-day payment and an Uber Eats adjustment join their orders; round 11: cancellations by number or by the items named, a PayPal receipt, a PDF-only invoice and a numbered parcel join their order; replies and someone else's forwarded booking are not purchases; round 12: a changed order shows its latest list and the day's substitutions, money back joins its order, and a booking's deposit and instalments join it; round 13: two Amazon orders in one email are two cards, cancel and withdrawal windows are read, a subscription's end shows on its payment, a PayPal receipt joins the game shop's"}`);
 
 let failed = 0;

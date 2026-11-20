@@ -241,6 +241,9 @@ export function cleanItem(item) {
   if (/@|https?:|www\./i.test(name)) return null;
   // (A sign-off or a link's words where an item would be, "We hope to see you again soon.", "View order details". Round 13.)
   if (/^(?:we hope to see you (?:again|soon)\b|thank(?:s| you) for (?:shopping|your order)\b|we(?:'|’)ll let you know\b|view (?:or edit )?order(?: details)?$|view or edit order$)/i.test(name)) return null;
+  // (A returns sentence under the item, "Returns accepted within 14 days of delivery", "Returns & exchanges not accepted".
+  // Round 15.)
+  if (/^(?:returns?|exchanges?)(?:\s*(?:&|and)\s*(?:exchanges?|returns?))?\s+(?:(?:are\s+)?(?:not\s+)?accepted|within\s+\d)/i.test(name)) return null;
   const { keepName, ...rest } = item;
   return { ...rest, name, qty: qty || 1 };
 }
