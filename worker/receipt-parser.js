@@ -584,6 +584,8 @@ function fromText(text, refDate, ctx = {}) {
     // (A receipt's own number, "Receipt #2937-1380-5587" (Stripe's receipts, which name it in the subject too). Round 11.)
     text.match(/\breceipt\s*(?:number|no\.?|#)\s*[:#\s]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
+    // (A restaurant bill's own number, "check number" over "#7093" (or "Bill No: 7093"): the number its till prints. Round 15.)
+    text.match(/\b(?:check|cheque|bill)\s*(?:number|no\.?|#)\s*:?[ \t|]*(?:\n[ \t|]*)?#?(\d{3,12})\b/i) ||
     // ("Ref: 419694" on a line of its own, a pub's order. Round 12.)
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*ref(?:erence)?\s*:\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im);
 
