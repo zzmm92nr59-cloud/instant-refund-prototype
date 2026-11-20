@@ -1,0 +1,38 @@
+{
+ "id": "holdout18-takeaway-pieces",
+ "sender": "Dinedash",
+ "layout": "'1x' then the dish, '8 Pcs' under it, then its price; the pieces are the dish's size",
+ "headers": {
+  "from": "Dinedash <noreply@dinedash.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order's in the kitchen",
+  "date": "Sat, 21 Nov 2026 19:05:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Dinedash</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.dinedash.example/?utm_source=email\"><img src=\"https://www.dinedash.example/static/email/logo.png\" alt=\"Dinedash\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Here's your receipt</td></tr>\n<tr><td>Order ID #5121</td></tr>\n<tr><td>1x</td></tr>\n<tr><td>Crispy Wings Box</td></tr>\n<tr><td>8 Pcs</td></tr>\n<tr><td>&pound;10.95</td></tr>\n<tr><td>1x</td></tr>\n<tr><td>Halloumi Wrap</td></tr>\n<tr><td>&pound;7.50</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>&pound;18.45</td></tr>\n<tr><td>Delivery fee</td></tr>\n<tr><td>&pound;1.99</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>&pound;20.44</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Dinedash. All rights reserved.<br /><a href=\"https://www.dinedash.example/help\">Help</a> | <a href=\"https://www.dinedash.example/privacy\">Privacy</a> | <a href=\"https://www.dinedash.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.dinedash.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Dinedash",
+  "date": "2026-11-21",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Crispy Wings Box",
+    "qty": 1,
+    "linePence": 1095,
+    "extras": [
+     "8 Pcs"
+    ]
+   },
+   {
+    "name": "Halloumi Wrap",
+    "qty": 1,
+    "linePence": 750
+   }
+  ],
+  "subtotalPence": 1845,
+  "feesPence": 199,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 2044
+ }
+}

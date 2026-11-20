@@ -2526,7 +2526,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (A digital railcard or another booking with no order number but its "Transaction ID:" over the number, the number the
   // shop asks for: the order's number. Round 13. The number can sit a cell or two under its label, "Transaction ID:" then
   // an empty cell then the number, as on a rail ticket change. Round 17.)
-  if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,3}(\d{8,16})[ \t|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
+  if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,4}(\d{8,16})[ \t|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -3336,6 +3336,12 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const m of text.slice(0, 60000).matchAll(/^[ \t|]*Gift Card[ \t]*\(£\s?(\d{1,5}(?:,\d{3})*\.\d{2})\)[ \t|]*$/gim)) paidBy = Math.max(paidBy, money(m[1]));
     if (g && before && money(before[1]) - money(g[1]) === result.totalPence) {
       result.giftCardPence = money(g[1]); result.totalPence = money(before[1]);
+      // (The text receipt's one title over "Sold by :Amazon Digital UK Limited", with no price beside it: the one thing bought,
+      // at what the order cost. Round 17.)
+      if (!result.items.length) {
+        const titles = [...text.slice(0, 20000).matchAll(/^[ \t]*(\S[^\n]{1,150}?)[ \t]*\n[ \t]*sold by\s*:/gim)].map((m) => m[1].trim()).filter((n) => !/£|^(?:order|placed|item)\b|:$/i.test(n));
+        if (titles.length === 1) { result.items = [{ name: titles[0], qty: 1, pricePence: result.totalPence }]; result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0, giftCardPence: result.giftCardPence }; }
+      }
       if (result.itemsCheck) { const ip = result.itemsCheck.itemsPence; result.itemsCheck = { ...result.itemsCheck, expectedPence: result.totalPence, ...(Number.isInteger(ip) ? { complete: Math.abs(ip - result.totalPence) <= 1, missingPence: result.totalPence - ip } : {}), giftCardPence: result.giftCardPence }; }
     } else if (!g && paidBy > 0 && amazonRefs.size <= 1) {
       result.giftCardPence = paidBy; result.totalPence += paidBy;
@@ -3653,7 +3659,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
   const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) ||
     // (A booking refunded by its "Transaction ID:" over the number, the number its booking email gave. Round 15.)
-    /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,3}(\d{8,16})[ \t|]*$/im.exec(text) : null;
+    /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,4}(\d{8,16})[ \t|]*$/im.exec(text) : null;
   // (And what was first paid, to whom and when: "You originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026".)
   const orig = /\byou originally paid (.{2,60}?) £\s?([\d,]+\.\d{2})(?: GBP)? on (\d{1,2} [A-Za-z]{3,9} \d{4})/i.exec(both.replace(/\s+/g, " "));
   const fwdVia = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;
