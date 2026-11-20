@@ -400,6 +400,7 @@ const joinWrong = [];
   // PayPal's receipt seconds after the shop's: two cards, each the shop's receipt with its own PayPal receipt, never four,
   // and the shop's own name and Order ID on each.
   const { gameReceipt, payPalToAppcharge } = await import("./fixtures/receipt-emails/holdout16d.mjs");
+  const fx = (id) => JSON.parse(readFileSync(join(dir, id + ".json"), "utf8"));
   const read = (m, id) => ({ ...classifyEmail(rawEmail(fixture16(id, m))).details, id, createdAt: 0 });
   const fixture16 = (id, m) => ({ id, headers: { from: m.from, to: SHOPPER.email, subject: m.subject, date: m.date }, html: m.html, text: "" });
   const g1 = read(gameReceipt("100-200-301", "6aaa00000000000000000001", "United Kingdom", ["Coins | 2,200", "Minigame token | x 15"], ["Subtotal | £2.66", "VAT (20%) | £0.53"], "£3.19", "Thu, 30 Apr 2026 02:21:03 +0000", "April 30, 2026 2:21 AM UTC", "PayPal"), "g1");
@@ -425,6 +426,11 @@ const joinWrong = [];
   const pp2 = read(payPalTo({ cut: "Trailpoint Ltd", full: "Trailpoint Ltd", email: "team@trailpoint.co.uk", orderId: "106000001", lines: [], money: [], total: "£79.98", date: "Sun, 21 Dec 2025 19:02:59 +0000", txn: "9ZZ11111ZZ2223334" }), "pp2");
   const sp = mergeOrderEmails([so, pp2]);
   if (sp.length !== 1 || sp[0].totalPence !== 7998 || sp[0].orderRef !== "106000001") joinWrong.push("a shop's order and PayPal's receipt with the same number made " + JSON.stringify(sp.map((c) => [c.emailIds, c.orderRef, c.totalPence])));
+  // A PayPal Debit Card purchase keeps PayPal's transaction ID as its reference; PayPal's older receipt keeps its Invoice ID.
+  const debit = parseReceiptEmail(rawEmail(fx("holdout14a-paypal-debit-card")));
+  if (debit.orderRef !== "4AB12345CD6789012") joinWrong.push("a PayPal Debit Card purchase's reference read as " + debit.orderRef);
+  const older = parseReceiptEmail(rawEmail(fx("holdout16d-paypal-older-receipt")));
+  if (older.orderRef !== "WC-31002") joinWrong.push("PayPal's older receipt's Invoice ID read as " + older.orderRef);
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

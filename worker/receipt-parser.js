@@ -1075,6 +1075,17 @@ function transactionBlockItems(text) {
 function payPalItems(text) {
   const lines = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const out = [];
+  // (PayPal's older receipt sets each thing out as labelled rows: "Quantity | 1", "Item | 3 Month Print Subscription", "Price |
+  // €80.00 EUR". Round 15.)
+  for (let i = 0; i < lines.length - 2; i++) {
+    const q = /^Quantity:? (\d{1,3})$/i.exec(lines[i]), n = /^Item:? (.{2,120})$/i.exec(lines[i + 1] || "");
+    if (!q || !n) continue;
+    let k = i + 2;
+    if (/^ID number\b/i.test(lines[k] || "")) k++;
+    const pm = /^Price:? (?:US\$|CA\$|A\$|MX\$|£|€|\$)\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*[A-Z]{3})?$/.exec(lines[k] || "");
+    if (pm) out.push({ name: n[1].replace(/\s*(?:\.\.\.|…)$/, ""), qty: Number(q[1]), pricePence: Math.round(Number(pm[1].replace(/,/g, "")) * 100) });
+  }
+  if (out.length) return out;
   for (let i = 1; i < lines.length; i++) {
     const q = /^Qty:\s*(\d{1,3})$/i.exec(lines[i]);
     if (!q) continue;
@@ -1351,6 +1362,9 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     merchantName: sentDomain && isVia(sentDomain) ? (((text.match(/^[#*|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*merchant(?: name)?\s*[:|]\s*\**\s*([^\n|*]{2,40}?)\s*\**\s*\|?\s*$/im) ||
       text.match(/^[ \t#*|]*merchant(?: name)?[ \t]*[:|]?[ \t|]*\n[ \t|]*([^\n|]{2,40}?)[ \t]*\|?[ \t]*$/im) ||
       text.match(/\byour PayPal Debit Card (?:ending in [•·*.\d ]{2,12} )?at ([^\n|]{2,40}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
+      // (PayPal's older receipt: "Payment to: The Clare Champion Ltd accounts@…", "purchase details from The Clare Champion Ltd
+      // on 25 September 2023". Round 15.)
+      text.match(/^[ \t|*]*payment to\s*:\s*([^\n|@]{2,60}?)\s+[^\s@|]+@[^\s|]+/im) || text.match(/\bpurchase details from ([^\n|]{2,60}?) on \d{1,2} [A-Za-z]{3,9} \d{4}/i) ||
       /\b[Pp]ayment transaction\b.*\sat\s+(\p{Lu}[\p{L}\d&'’. -]{2,40}?)\s*$/u.exec(subject) || [])[1] || "").replace(/\s+\S+@\S+$/, "") || null) : null,
     linkDomain: mainLinkDomain(html),
     // (The game's name is a heading in the HTML; a plain-text part may not carry it at all.)
@@ -1935,7 +1949,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // (Its own "Order ID", 24 letters and digits, is the order's number when the email gives it; the receipt number is kept
   // only when there is none. Round 15.)
   if (gameShop) {
-    const oid = /\border id\s*[:#]?\s*\|?\s*([0-9a-f]{20,32})\b/i.exec(fromHtml || text) || /\border id\s*[:#]?\s*\|?\s*([0-9a-f]{20,32})\b/i.exec(text);
+    const oid = /\border id[\s:#|]{0,40}([0-9a-f]{20,32})\b/i.exec(fromHtml || text) || /\border id[\s:#|]{0,40}([0-9a-f]{20,32})\b/i.exec(text);
     if (oid) result.orderRef = oid[1];
   }
   if (gameShop && !/^[0-9a-f]{20,32}$/i.test(String(result.orderRef || ""))) {
@@ -2139,6 +2153,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     if (pp.length) { result.items = pp; const sum = pp.reduce((n, i) => n + (i.pricePence ?? 0) * (i.qty || 1), 0); result.itemsCheck = result.currency === "GBP" ? checkItems(pp, moneyOf(text), result.totalPence) : { complete: null, itemsPence: sum, expectedPence: result.totalPence ?? null, missingPence: null, foreignItems: true }; }
   }
   // (An order number PayPal gives under its label, "Order ID |" over "58d0cf0e-7b50-4c34-a8bd-ebc59dd2d0b8", however long.)
+  // (A PayPal Debit Card purchase in a shop names no order: its PayPal transaction ID, "Transaction ID |" over
+  // "0HJ67367JW2999345", is the reference the shopper and PayPal go by. Round 15.)
+  if (!result.orderRef && viaPayPal && /\bPayPal Debit Card\b/i.test(text.slice(0, 3000))) { const tid = /\btransaction id[ \t|:]*(?:\n[ \t|]*){0,3}([A-Z0-9]{17})\b/i.exec(text); if (tid) result.orderRef = tid[1]; }
   if (!result.orderRef && viaPayPal) { const oid = /^[ \t|]*(?:order id|order number|invoice id)[ \t]*[:|]?[ \t|]*\n?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,63})[ \t]*\|?[ \t]*$/im.exec(text); if (oid) result.orderRef = oid[1]; }
   // (Amazon, read from its own layout: each order in the email with its own number, items and total, and every title
   // whole. Taken for this email's order when it adds up, or when the general reading didn't. Round 13.)

@@ -65,5 +65,13 @@ export default function holdout16d() {
   add("holdout16d-paypal-offer-taxed", "PayPal", "'Special Offer', 'Qty: 1', '£2.66', 'Subtotal £2.66', 'Tax £0.53', 'Total £3.19 GBP'",
     payPalToAppcharge("Special Offer", "£2.66", "£0.53", "£3.19", "Thu, 30 Apr 2026 02:21:20 +0000", "8XY11111AB2223334"),
     order([{ name: "Special Offer", qty: 1, unit: 319 }]), "Appcharge ltd", "2026-04-30", { shopAlso: ["Appcharge"] });
+  // ---- PayPal's older receipt (guest checkout, 2023): "Payment to: <shop> <email>", the thing on labelled rows ----------------
+  add("holdout16d-paypal-older-receipt", "PayPal", "'Your PayPal receipt', 'Payment to: The Riverside Herald Ltd accounts@…', 'Quantity | 1', 'Item | …', 'Price | €80.00 EUR', 'Invoice ID: WC-31002'",
+    { from: "service@paypal.co.uk", subject: "Your PayPal receipt", date: "Mon, 25 Sep 2023 10:12:00 +0000",
+      html: htmlPage("PayPal", ["Take a look at your purchase details from The Riverside Herald Ltd on 25 September 2023.", `Hi ${SHOPPER.name},`, "You paid €80.00 EUR to The Riverside Herald Ltd",
+        "Your purchase details", "Your transaction ID: 11111111AA111111A | Seller transaction ID: 22222222BB222222B", "Purchase date: 25 September 2023",
+        "Payment to: The Riverside Herald Ltd accounts@riversideherald.example | Payment from: " + SHOPPER.name, "Invoice ID: WC-31002", "Delivery address", SHOPPER.name + " " + SHOPPER.address,
+        "Quantity | 1", "Item | 3 Month Print Subscription (United Kingdom)", "ID number |", "Price | €80.00 EUR", "Subtotal | €80.00 EUR", "Total | €80.00 EUR", "You paid using: Apple Pay - AmEx 1004"]) },
+    order([{ name: "3 Month Print Subscription (United Kingdom)", qty: 1, unit: 8000 }]), "The Riverside Herald Ltd", "2023-09-25", { currency: "EUR", shopAlso: ["The Riverside Herald", "Riverside Herald"] });
   return out;
 }

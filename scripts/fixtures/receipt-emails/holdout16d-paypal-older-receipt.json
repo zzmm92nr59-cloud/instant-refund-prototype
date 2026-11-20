@@ -1,0 +1,34 @@
+{
+ "id": "holdout16d-paypal-older-receipt",
+ "sender": "PayPal",
+ "layout": "'Your PayPal receipt', 'Payment to: The Riverside Herald Ltd accounts@…', 'Quantity | 1', 'Item | …', 'Price | €80.00 EUR', 'Invoice ID: WC-31002'",
+ "headers": {
+  "from": "service@paypal.co.uk",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your PayPal receipt",
+  "date": "Mon, 25 Sep 2023 10:12:00 +0000"
+ },
+ "html": "<html><head><title>PayPal</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Take a look at your purchase details from The Riverside Herald Ltd on 25 September 2023.</td></tr>\n<tr><td>Hi Sam Taylor,</td></tr>\n<tr><td>You paid €80.00 EUR to The Riverside Herald Ltd</td></tr>\n<tr><td>Your purchase details</td></tr>\n<tr><td>Your transaction ID: 11111111AA111111A</td><td>Seller transaction ID: 22222222BB222222B</td></tr>\n<tr><td>Purchase date: 25 September 2023</td></tr>\n<tr><td>Payment to: The Riverside Herald Ltd accounts@riversideherald.example</td><td>Payment from: Sam Taylor</td></tr>\n<tr><td>Invoice ID: WC-31002</td></tr>\n<tr><td>Delivery address</td></tr>\n<tr><td>Sam Taylor 12 Example Road, Leeds, LS1 4AB</td></tr>\n<tr><td>Quantity</td><td>1</td></tr>\n<tr><td>Item</td><td>3 Month Print Subscription (United Kingdom)</td></tr>\n<tr><td>ID number |</td></tr>\n<tr><td>Price</td><td>€80.00 EUR</td></tr>\n<tr><td>Subtotal</td><td>€80.00 EUR</td></tr>\n<tr><td>Total</td><td>€80.00 EUR</td></tr>\n<tr><td>You paid using: Apple Pay - AmEx 1004</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "The Riverside Herald Ltd",
+  "date": "2023-09-25",
+  "currency": "EUR",
+  "items": [
+   {
+    "name": "3 Month Print Subscription (United Kingdom)",
+    "qty": 1,
+    "linePence": 8000
+   }
+  ],
+  "subtotalPence": 8000,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8000,
+  "shopAlso": [
+   "The Riverside Herald",
+   "Riverside Herald"
+  ]
+ }
+}
