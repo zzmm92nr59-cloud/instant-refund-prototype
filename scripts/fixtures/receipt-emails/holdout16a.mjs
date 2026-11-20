@@ -86,6 +86,24 @@ export default function holdout16a() {
     { from: '"Amazon.co.uk" <payments-messages@amazon.co.uk>', subject: "Refund on order 204-9998887-7776665", date: "Tue, 28 May 2024 11:54:13 +0000",
       text: "Dear Customer,\n\nGreetings from Amazon.co.uk.\n\nWe are writing to confirm that we are processing your refund in the amount of £849.00 for your Order 204-9998887-7776665.\n\nThis refund is for the following item(s):\n\nItem: Lumio 14-inch Laptop, 16GB RAM, 512GB SSD\nQuantity: 1\nReason for refund: Damaged during transit\n\nItem Refund: £707.50\nItem Tax Refund: £141.50\n\nMasterCard Credit Card [expiring on 3/2027]: £849.00\n" },
     "refund", { refundPence: 84900, orderRef: "204-9998887-7776665" });
+  // ---- Apple's credit note: "Credit Note" at the top of "Your invoice from Apple.", "ORDER ID MQK…-1", minus amounts ---------
+  not("holdout16a-apple-credit-note", "Apple", "'Apple Credit Note' with 'ORDER ID: MQK…-1', the in-app purchase 'Cancellation Date: …', 'This sale was cancelled', 'TOTAL: -£4.99'",
+    { from: "Apple <no_reply@email.apple.com>", subject: "Your invoice from Apple.", date: "Sun, 3 Mar 2024 09:10:00 +0000",
+      text: ["Apple Credit Note", "----------------------------------------", "", "APPLE ID", "sam@example.com", "", "BILLED TO", "Visa .... 1234", "Sam Jones", "1 Example Road", "Leeds, LS1 1AA", "GBR", "",
+        "ORDER ID:            MQKABCDE12-1", "DOCUMENT NO.:        123456789012", "SEQUENCE NO.:        2-1234567890", "INVOICE DATE:         3 Mar 2024", "TOTAL:                     -£4.99", "",
+        "App Store", "----------------------------------------", "Puzzle Garden: Match Fun               -£4.99", "Gem Pack               Inclusive of VAT at 20%  -£0.83", "In-App Purchase", "Sam's iPhone",
+        "Cancellation Date: 3 Mar 2024", "This sale was cancelled", "", "                    Subtotal    -£4.16", "          VAT charged at 20%    -£0.83", "", "                       TOTAL    -£4.99"].join("\n") },
+    "refund", { refundPence: 499, orderRef: "MQKABCDE12" });
+  // ---- Apple's iCloud invoice, 2021: the storage size a template word never filled in, the payer's block, "your bill" -----
+  {
+    const o = order([{ name: "iCloud: Storage Plan", qty: 1, unit: 79 }]);
+    const text = ["Invoice", "", "APPLE ID: sam@example.com", "BILLED TO:", "Visa .... 1234", "Sam Jones", "1 Example Road", "Leeds, LS1 1AA", "GBR", "", "DATE: Jun 24, 2021", "ORDER ID: MQKZYXW987",
+      "DOCUMENT NO.: 123456789013", "TOTAL: £0.79", "", "", "iCloud", "", "iCloud: @@totalCurrentPaidAndFreeStorageWithUnit@@ Storage Plan £0.79", "Monthly Inclusive of VAT at 20% £0.13", "Renews Jul 23, 2021",
+      "                                                              Subtotal £0.66", "                                                    VAT charged at 20% £0.13", "", "                                                                 TOTAL £0.79", "",
+      "If you have any questions about your bill, contact support. This email confirms payment for the iCloud storage plan listed above."].join("\n");
+    add("holdout16a-apple-icloud-placeholder", "Apple", "the storage size an unfilled template word ('@@…@@'), 'Monthly Inclusive of VAT at 20% £0.13' under it, the payer's block under 'BILLED TO:'",
+      { from: "Apple <no_reply@email.apple.com>", subject: "Your invoice from Apple.", date: "Thu, 24 Jun 2021 10:00:00 +0000", text }, o, "Apple", "2021-06-24", { merchant: "" });
+  }
   // ---- Etsy, 2023: the item's own line says "Returns accepted within 14 days of delivery"; the text part has the seller's
   // policy, "Just contact me within: 7 days of delivery", and what can't be returned, "- Custom or personalized orders" -------
   const etsy = (id, name, variant, unit, ref, layout) => {

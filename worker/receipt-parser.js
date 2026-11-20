@@ -1539,14 +1539,17 @@ function sameShopName(n, shop) {
 }
 function venueOf(text, shop) {
   const t = String(text || "").slice(0, 6000);
-  if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
-  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|table|thank|total|paid|date|time)\b/i.test(n) && !sameShopName(n, shop) ? n : null;
+  // ("If you have any questions about your bill", an invoice's line, is not a bill paid at a table. Round 15.)
+  if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|(?<!questions about )\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
+  // (Nor is a label, "BILLED TO", or anything in the payer's own block, "Billing and Payment" over their name and address.)
+  const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|billed|billing|table|thank|total|paid|date|time)\b|\b(?:ship(?:ped)?|deliver(?:ed)?|sent|sold)\s+to\b/i.test(n) && !sameShopName(n, shop) ? n : null;
+  const payerBlock = (ls, k) => [ls[k - 1], ls[k - 2]].some((x) => /\b(?:billing|billed to|bill to|payment|deliver(?:y|ed)? (?:to|address)|ship(?:ping)? (?:to|address)|invoice (?:to|address))\b/i.test(String(x || "")));
   const vis = /\bthanks?\s+for\s+visiting\s+(\p{Lu}[^\n|.!,]{1,40}?)\s+and\b/iu.exec(t.replace(/\s*\n\s*/g, " ").replace(/\s/g, " "));
   if (vis && ok(vis[1].trim())) return vis[1].trim();
   // (A name over a street, a town and a postcode: the venue's address block.)
   const ls = t.split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 120);
   for (let k = 0; k + 2 < ls.length; k++) {
-    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k])) continue;
+    if (!/^\p{Lu}[\p{L}'’&. -]{2,39}$/u.test(ls[k]) || payerBlock(ls, k)) continue;
     const streety = /\d|\b(?:road|street|st|lane|avenue|way|place|square|row|hill|green|parade|terrace|walk|close|drive|court|yard|wharf)\b/i.test(ls[k + 1]);
     // (Or any address line, "After Security, Stansted Airport", when the block ends in the venue's telephone. Round 15.)
     for (let j = k + 2; j < Math.min(ls.length, k + 6); j++) if (UK_POSTCODE_LINE.test(ls[j]) && (streety || (ls[k + 1].length <= 60 && !/£/.test(ls[k + 1]) && /^tel(?:ephone)?\b/i.test(ls[j + 1] || ""))) && ok(ls[k])) return ok(ls[k]);
@@ -1734,8 +1737,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   collectParts(headers, body, parts);
   if (!parts.text.length && !parts.html.length && parts.attachedText.length) parts.text.push(...parts.attachedText);
   const html = parts.html.join("\n").slice(0, MAX_INPUT);
-  const plain = tillPounds(unquoted(fullWidthPounds(linksOverLines(plainAsWritten(parts.text.join("\n").trim())))));
-  const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(html)))) : "";
+  // (A sender's template word it never filled in, Apple's "iCloud: @@totalCurrentPaidAndFreeStorageWithUnit@@ Storage
+  // Plan": left out, never read as something it isn't. Round 15.)
+  // ("iCloud+ with @@…@@ of storage": the words around it go with it, "iCloud+".)
+  // (Only where there is one, and with one space before "with", so a long run of spaces is never searched again and again.)
+  const unfilled = (t) => { t = String(t || ""); return t.includes("@@") ? t.replace(/(?:[ \t](?:with|for|of))?[ \t]?@@[A-Za-z]{3,80}@@(?:[ \t]of[ \t][A-Za-z][a-z]{2,11})?/g, "") : t; };
+  const plain = tillPounds(unquoted(fullWidthPounds(linksOverLines(plainAsWritten(unfilled(parts.text.join("\n").trim()))))));
+  const fromHtml = html ? tillPounds(unquoted(fullWidthPounds(htmlToText(unfilled(html))))) : "";
   const sender = retailerFromFrom(headers.from);
   const subject = headers.subject || null;
   // The sender's display name exactly as written (retailerFromFrom drops generic ones such as "Orders").
@@ -1799,7 +1807,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // attaches to the order it belongs to). Said in the subject, or at the top of the email ("Your order has been cancelled").
   if (NOT_A_PURCHASE_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "")) || NOT_A_PURCHASE_TOP.test(text.slice(0, 1200).replace(/\s+/g, " ")) ||
       // (Amazon's "we have processed your refund for £2.49 for the above-referenced order" under a subject naming the order. Round 15.)
-      /\bwe (?:have|(?:'|’)ve) processed your refund (?:for|of) £\s?\d/i.test(text.slice(0, 1200).replace(/\s+/g, " "))) {
+      /\bwe (?:have|(?:'|’)ve) processed your refund (?:for|of) £\s?\d/i.test(text.slice(0, 1200).replace(/\s+/g, " ")) ||
+      // (Apple's credit note: a sale undone, read as the order's refund. Round 15.)
+      appleCreditNote(headers, text)) {
     return { ok: false, reason: "refund_or_cancellation", source: "shopper_email" };
   }
   // (A table booked at a restaurant, "Table for 2 on Friday, 29 July 2022 at 17:30", with the menu it was booked for and its
@@ -2122,6 +2132,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       if (amazonSplit.length > 1 || mine.totalPence !== result.totalPence) { result.totalPence = mine.totalPence; result.currency = "GBP"; }
       if (mine.giftCardPence) result.giftCardPence = mine.giftCardPence;
     }
+  }
+  // (Apple's newer invoice sets the app, its plan and the renewal in one cell, "iCloud iCloud+ with 200 GB (Monthly) Renews
+  // 18 September 2025": the plan is what was bought, the renewal day not part of its name. Round 15.)
+  if (/(^|\.)apple\.com$/i.test(result.retailer.domain || sender?.domain || "")) for (const i of result.items) {
+    let n = String(i.name || "").replace(/\s+Renews\s+\d{1,2}\s+\p{L}{3,9}\.?\s+\d{4}$/u, "");
+    const rep = /^(\S{2,30})\s+(\1\S{0,3}\s.{3,})$/u.exec(n);
+    if (rep) n = rep[2];
+    if (n && n !== i.name) i.name = n;
   }
   // A row named only by its place in a table ("SIM 1 | ORDA… | eSIM | -- | National Plus | National | £5.00", Lycamobile):
   // the thing bought is the row's name-like cell, the plan, not "SIM 1". Round 10.
@@ -2577,6 +2595,26 @@ function shownText(parts, html) {
   const fromHtml = (htmlToText(html) || "").trim();
   return plain.replace(/\s+/g, " ").length * 2 < fromHtml.replace(/[\s|]+/g, " ").length ? fromHtml : plain;
 }
+// Apple's credit note, "Credit Note" at the top of an email sent as "Your invoice from Apple.", "ORDER ID MQKS…-1", the
+// thing cancelled ("Cancellation Date: …") and its amounts written as minus: the sale undone, its money given back, on the
+// order whose number it carries (without the "-1"). Round 15.
+const APPLE_CREDIT_TOP = /^[\s|]*(?:apple[ \t]+)?credit note[\s|]*$/im;
+function appleCreditNote(headers, text) {
+  // (Or forwarded from the shopper's mailbox: the forwarded message's own sender is Apple's, and the title is under it.)
+  const fwd = !/(^|\.)apple\.com$/i.test(retailerFromFrom(headers.from)?.domain || "");
+  const fwdFrom = fwd ? /^[ \t>*]*(?:from|von|de)[ \t*]*:[^\n]{0,80}@((?:[a-z0-9-]+\.)?apple\.com)\b/im.exec(String(text || "").slice(0, 4000)) : null;
+  if (fwd && !fwdFrom) return null;
+  const top = String(text || "").slice(0, fwd ? 4000 : 800);
+  if (!APPLE_CREDIT_TOP.test(top)) return null;
+  const t = String(text || "").slice(0, 20000);
+  const ref = /\border id[\s|:]*([A-Z0-9]{8,14})(?:-\d{1,2})?\b/i.exec(t);
+  const total = /\btotal\b[\s|:]*[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/i.exec(t) || /[-−]£\s?(\d{1,5}(?:,\d{3})*\.\d{2})/.exec(t);
+  const d = headers.date ? new Date(headers.date) : null;
+  return { ok: true, kind: "return_update", stage: "refunded", creditNote: true, at: d && !Number.isNaN(d.getTime()) ? isoDate(d) : null,
+    amountPence: total ? money(total[1]) : null, currency: total ? "GBP" : null, orderRef: ref ? ref[1] : null, returnId: null,
+    retailer: { name: "Apple", domain: fwdFrom ? fwdFrom[1].toLowerCase() : retailerFromFrom(headers.from)?.domain || "apple.com" } };
+}
+
 export function parseReturnUpdateEmail(rawEmail) {
   const raw = String(rawEmail || "").slice(0, MAX_INPUT);
   const { headers, body } = splitMessage(raw);
@@ -2584,6 +2622,11 @@ export function parseReturnUpdateEmail(rawEmail) {
   // A carrier's "we've received your return" means the carrier has it, not the shop: parseReturnParcelEmail reads those.
   if (returnCarrierOf(headers.from)) return { ok: false, reason: "not_a_return_update" };
   if (/\breturn request|\breturn label|\bhow to return|\bstart (?:a|your) return/i.test(subject)) return { ok: false, reason: "not_a_return_update" };
+  if (/\bapple\b/i.test(headers.from || "") || /\binvoice from apple\b/i.test(subject)) {
+    const cp = { text: [], html: [] }; collectParts(headers, body, cp);
+    const credit = appleCreditNote(headers, shownText(cp, cp.html.join("\n")));
+    if (credit) return credit;
+  }
   const subjectSays = /\brefund|\breturn (?:has been )?(?:received|arrived|processed)|\breceived your return|\byour return (?:has|is)/i.test(subject);
   // (A subject that only names the order, Amazon's "Your Amazon.co.uk Order #D01-…", over "We're writing to confirm that we
   // have processed your refund for £2.49 for the above-referenced order": the email's opening says it. Round 15.)
