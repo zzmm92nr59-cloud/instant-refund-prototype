@@ -44,47 +44,65 @@ export async function handleHealthRoute(path, method, env, cors, shopper, o) {
 //  * notAddingUp: the items don't come to the total (itemsCheck.complete false); noNumber, noTotal: what the email lacked.
 //  * saidSame / saidApart: shoppers who said two of their receipts were one order, or that one card was two (order-joins.js).
 export async function readingProblems(all, meId) {
+  return (await readingProblemsBoth(all, meId, !meId))[meId ? 1 : 0];
+}
+// Both lists at once: across everyone (when `everyone`) and for meId's own receipts. The receipts are read once, each
+// field taken out of its stored details once, for every count of both lists: with years of receipts this part of the
+// page was most of its wait, reading every receipt six times over (20 Nov 2026). Each shopper's receipts are compared only
+// with their own (the comparisons go shopper by shopper), so the admin's own counts are the same read on their own.
+//  w1: each receipt beside its neighbours of the same shopper, shop and total, by day, so no receipt is compared with every
+//  other. w2: a shop's receipt with no number and the payment services' receipts of the same shopper and money, in time
+//  order: the nearest payment receipt before and after each.
+export async function readingProblemsBoth(all, meId, everyone = true) {
   const DOMAIN = "lower(json_extract(details, '$.retailer.domain'))";
   const KEPT = "status NOT IN ('not_receipt', 'dismissed') AND json_extract(details, '$.kind') = 'receipt'";
-  const own = meId ? " AND shopper_id = ?" : "", args = meId ? [meId] : [];
+  const own = everyone ? "" : " AND shopper_id = ?", me = meId || null;
   const n = (v) => Number(v) || 0;
-  const [base, sameDay, paidBeside, said] = await Promise.all([
-    all(`SELECT ${DOMAIN} AS domain, COUNT(DISTINCT shopper_id) AS people, COUNT(*) AS receipts,
-      SUM(json_extract(details, '$.orderRef') IS NULL) AS noNumber, SUM(json_extract(details, '$.totalPence') IS NULL) AS noTotal,
-      SUM(json_extract(details, '$.itemsCheck.complete') = 0) AS notAddingUp
-      FROM captured_receipts WHERE ${KEPT} AND ${DOMAIN} IS NOT NULL${own} GROUP BY ${DOMAIN}`, ...args),
-    // (Each receipt beside its neighbours of the same shopper, shop and total, by day: no receipt is compared with every other.)
-    all(`WITH r AS (SELECT shopper_id AS s, ${DOMAIN} AS d, json_extract(details, '$.totalPence') AS t, json_extract(details, '$.orderRef') IS NULL AS bare,
-        julianday(COALESCE(json_extract(details, '$.orderDate'), date(created_at / 1000, 'unixepoch'))) AS j
-        FROM captured_receipts WHERE ${KEPT} AND ${DOMAIN} IS NOT NULL AND json_extract(details, '$.totalPence') IS NOT NULL${own}),
-      w AS (SELECT d, bare, j, LAG(j) OVER (PARTITION BY s, d, t ORDER BY j) AS pj, LEAD(j) OVER (PARTITION BY s, d, t ORDER BY j) AS nj FROM r)
-      SELECT d AS domain, COUNT(*) AS n FROM w WHERE bare = 1 AND (j - pj <= 1 OR nj - j <= 1) GROUP BY d`, ...args),
-    // (A shop's receipt with no number and the payment services' receipts of the same shopper and money, in time order: the
-    // nearest payment receipt before and after each.)
-    all(`WITH r AS (SELECT shopper_id AS s, json_extract(details, '$.retailer.via') IS NOT NULL AS paid, ${DOMAIN} AS d, json_extract(details, '$.orderRef') IS NULL AS bare,
-        json_extract(details, '$.totalPence') AS t, COALESCE(json_extract(details, '$.currency'), 'GBP') AS c, julianday(json_extract(details, '$.sentAt')) AS j
-        FROM captured_receipts WHERE ${KEPT} AND json_extract(details, '$.totalPence') IS NOT NULL AND json_extract(details, '$.sentAt') IS NOT NULL${own}),
-      w AS (SELECT d, paid, bare, j, MAX(CASE WHEN paid THEN j END) OVER (PARTITION BY s, t, c ORDER BY j ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS pj,
-        MIN(CASE WHEN paid THEN j END) OVER (PARTITION BY s, t, c ORDER BY j ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nj FROM r)
-      SELECT d AS domain, COUNT(*) AS n FROM w WHERE NOT paid AND bare = 1 AND d IS NOT NULL AND (j - pj <= 10.0 / 1440 OR nj - j <= 10.0 / 1440) GROUP BY d`, ...args),
-    all(`SELECT domain, COUNT(DISTINCT CASE WHEN kind = 'same' THEN shopper_id END) AS sameP, COUNT(DISTINCT CASE WHEN kind = 'apart' THEN shopper_id END) AS apartP,
+  const said = (who) => all(`SELECT domain, COUNT(DISTINCT CASE WHEN kind = 'same' THEN shopper_id END) AS sameP, COUNT(DISTINCT CASE WHEN kind = 'apart' THEN shopper_id END) AS apartP,
       SUM(kind = 'same') AS sameN, SUM(kind = 'apart') AS apartN
       FROM (SELECT shopper_id, kind, domain FROM receipt_joins UNION ALL SELECT shopper_id, kind, other_domain AS domain FROM receipt_joins WHERE other_domain IS NOT NULL AND other_domain <> COALESCE(domain, ''))
-      WHERE domain IS NOT NULL${own} GROUP BY domain`, ...args)
+      WHERE domain IS NOT NULL${who ? " AND shopper_id = ?" : ""} GROUP BY domain`, ...(who ? [who] : []));
+  const [parts, saidAll, saidMine] = await Promise.all([
+    all(`WITH k AS MATERIALIZED (SELECT shopper_id AS s, ${DOMAIN} AS d, json_extract(details, '$.retailer.via') IS NOT NULL AS paid,
+        json_extract(details, '$.orderRef') IS NULL AS bare, json_extract(details, '$.totalPence') AS t, COALESCE(json_extract(details, '$.currency'), 'GBP') AS c,
+        julianday(COALESCE(json_extract(details, '$.orderDate'), date(created_at / 1000, 'unixepoch'))) AS jd,
+        json_extract(details, '$.sentAt') IS NOT NULL AS sent, julianday(json_extract(details, '$.sentAt')) AS js,
+        json_extract(details, '$.itemsCheck.complete') = 0 AS nau
+        FROM captured_receipts WHERE ${KEPT}${own}),
+      w1 AS MATERIALIZED (SELECT s, d, bare, jd AS j, LAG(jd) OVER (PARTITION BY s, d, t ORDER BY jd) AS pj, LEAD(jd) OVER (PARTITION BY s, d, t ORDER BY jd) AS nj
+        FROM k WHERE d IS NOT NULL AND t IS NOT NULL),
+      w2 AS MATERIALIZED (SELECT s, d, paid, bare, js AS j, MAX(CASE WHEN paid THEN js END) OVER (PARTITION BY s, t, c ORDER BY js ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS pj,
+        MIN(CASE WHEN paid THEN js END) OVER (PARTITION BY s, t, c ORDER BY js ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nj FROM k WHERE t IS NOT NULL AND sent),
+      d1 AS (SELECT s, d FROM w1 WHERE bare = 1 AND (j - pj <= 1 OR nj - j <= 1)),
+      d2 AS (SELECT s, d FROM w2 WHERE NOT paid AND bare = 1 AND d IS NOT NULL AND (j - pj <= 10.0 / 1440 OR nj - j <= 10.0 / 1440))
+      SELECT 'base' AS part, d AS domain, COUNT(DISTINCT s) AS people, COUNT(*) AS receipts, SUM(bare) AS noNumber, SUM(t IS NULL) AS noTotal, SUM(nau) AS notAddingUp, NULL AS n
+        FROM k WHERE d IS NOT NULL${everyone ? "" : " AND 0"} GROUP BY d
+      UNION ALL SELECT 'day', d, NULL, NULL, NULL, NULL, NULL, COUNT(*) FROM d1${everyone ? "" : " WHERE 0"} GROUP BY d
+      UNION ALL SELECT 'paid', d, NULL, NULL, NULL, NULL, NULL, COUNT(*) FROM d2${everyone ? "" : " WHERE 0"} GROUP BY d
+      UNION ALL SELECT 'base-me', d, COUNT(DISTINCT s), COUNT(*), SUM(bare), SUM(t IS NULL), SUM(nau), NULL FROM k WHERE d IS NOT NULL AND s = ? GROUP BY d
+      UNION ALL SELECT 'day-me', d, NULL, NULL, NULL, NULL, NULL, COUNT(*) FROM d1 WHERE s = ? GROUP BY d
+      UNION ALL SELECT 'paid-me', d, NULL, NULL, NULL, NULL, NULL, COUNT(*) FROM d2 WHERE s = ? GROUP BY d`, ...(everyone ? [] : [me]), me, me, me),
+    everyone ? said(null) : Promise.resolve([]),
+    me ? said(me) : Promise.resolve([])
   ]);
-  const by = (rows) => new Map(rows.map((r) => [r.domain, n(r.n)]));
-  const dupDay = by(sameDay), dupPaid = by(paidBeside), choices = new Map(said.map((r) => [r.domain, r]));
-  const rows = base.map((r) => {
-    const c = choices.get(r.domain) || {}, a = dupDay.get(r.domain) || 0, b = dupPaid.get(r.domain) || 0;
-    const x = { domain: r.domain, people: n(r.people), receipts: n(r.receipts), duplicates: a + b, sameTotalNoNumber: a, paymentBeside: b,
-      notAddingUp: n(r.notAddingUp), noNumber: n(r.noNumber), noTotal: n(r.noTotal),
-      // Across everyone: how many shoppers said so. For the admin's own: how many times they did.
-      saidSame: meId ? n(c.sameN) : n(c.sameP), saidApart: meId ? n(c.apartN) : n(c.apartP) };
-    x.problems = x.duplicates + x.notAddingUp + x.noNumber + x.noTotal + x.saidSame + x.saidApart;
-    return x;
-  });
-  const order = (p, q) => q.problems - p.problems || q.receipts - p.receipts || String(p.domain).localeCompare(String(q.domain));
-  return rows.sort(order);
+  const part = (k) => parts.filter((r) => r.part === k);
+  const build = (base, sameDay, paidBeside, said, mine) => {
+    const by = (rows) => new Map(rows.map((r) => [r.domain, n(r.n)]));
+    const dupDay = by(sameDay), dupPaid = by(paidBeside), choices = new Map(said.map((r) => [r.domain, r]));
+    const rows = base.map((r) => {
+      const c = choices.get(r.domain) || {}, a = dupDay.get(r.domain) || 0, b = dupPaid.get(r.domain) || 0;
+      const x = { domain: r.domain, people: n(r.people), receipts: n(r.receipts), duplicates: a + b, sameTotalNoNumber: a, paymentBeside: b,
+        notAddingUp: n(r.notAddingUp), noNumber: n(r.noNumber), noTotal: n(r.noTotal),
+        // Across everyone: how many shoppers said so. For the admin's own: how many times they did.
+        saidSame: mine ? n(c.sameN) : n(c.sameP), saidApart: mine ? n(c.apartN) : n(c.apartP) };
+      x.problems = x.duplicates + x.notAddingUp + x.noNumber + x.noTotal + x.saidSame + x.saidApart;
+      return x;
+    });
+    const order = (p, q) => q.problems - p.problems || q.receipts - p.receipts || String(p.domain).localeCompare(String(q.domain));
+    return rows.sort(order);
+  };
+  return [everyone ? build(part("base"), part("day"), part("paid"), saidAll, false) : null,
+    me ? build(part("base-me"), part("day-me"), part("paid-me"), saidMine, true) : null];
 }
 
 export async function relayHealth(env, me, now = Date.now()) {
@@ -117,6 +135,8 @@ export async function relayHealth(env, me, now = Date.now()) {
   // A shop's problems: removed as not theirs, no total found, read with low confidence, added by hand, fixed by the shopper.
   const problems = (s) => s.dismissed + s.noTotal + s.low + s.pasted + (s.fixed || 0);
 
+  // (Started first: it is the slowest part, and needs nothing from the rest.)
+  const problemsBoth = readingProblemsBoth(all, me.id).catch((e) => { console.error("Reading problems failed", String(e && e.message || e).slice(0, 160)); return [null, null]; });
   const [people, sessions, signIns, inboxes, inboxPeople, checked, jobs, jobErrors, emails, kinds, purchases, purchases7, versions, unread,
     learned, marks, gifts, giftShoppers, history, perDay, shops, mine, returns, swaps, payments, labels, shopify, shopifyTest, square, pushes, watches, codeFails,
     fixes, fixReaders, fixShops, myFixes, chat, shared, aiOn, ai] = await Promise.all([
@@ -175,8 +195,7 @@ export async function relayHealth(env, me, now = Date.now()) {
   ]);
   // Likely reading problems by shop, across everyone (named from MIN_SHOPPERS_PER_SHOP shoppers; the rest counted together)
   // and in the admin's own receipts. A problem here never takes the rest of the page with it.
-  const problemsAll = await readingProblems(all).catch((e) => { console.error("Reading problems failed", String(e && e.message || e).slice(0, 160)); return null; });
-  const problemsMine = await readingProblems(all, me.id).catch(() => null);
+  const [problemsAll, problemsMine] = await problemsBoth;
   // Returns this week whose shop Relay couldn't email (no address for the shop, or the email wasn't accepted).
   const notEmailed = await one("SELECT COUNT(*) AS n FROM relay_returns WHERE created_at >= ? AND shop_notified_at IS NULL AND status != 'cancelled'", d7);
   // A problem working this part out never takes the rest of the page with it (the page says it couldn't be checked).

@@ -41,20 +41,65 @@
   var LOGO_ALIASES = {"adidas.com":"adidas.co.uk","airbnb.com":"airbnb.co.uk","amazon.com":"amazon.co.uk","argos.com":"argos.co.uk","asda.co.uk":"asda.com","asos.co.uk":"asos.com","ba.com":"britishairways.com","bandq.co.uk":"diy.com","bensons-for-beds.co.uk":"bensonsforbeds.co.uk","boohoo.co.uk":"boohoo.com","booking.co.uk":"booking.com","boots.co.uk":"boots.com","chatgpt.com":"openai.com","claude.ai":"anthropic.com","costa.com":"costa.co.uk","cultbeauty.com":"cultbeauty.co.uk","currys.com":"currys.co.uk","deliveroo.com":"deliveroo.co.uk","disneyplus.co.uk":"disneyplus.com","dominos.com":"dominos.co.uk","ebay.com":"ebay.co.uk","google.co.uk":"google.com","greggs.com":"greggs.co.uk","groupon.com":"groupon.co.uk","grouponmail.co.uk":"groupon.co.uk","hm.co.uk":"hm.com","holland-and-barrett.com":"hollandandbarrett.com","hollandandbarrett.co.uk":"hollandandbarrett.com","ikea.co.uk":"ikea.com","itunes.com":"apple.com","jdwetherspoon.co.uk":"jdwetherspoon.com","johnlewis.co.uk":"johnlewis.com","just-eat.com":"just-eat.co.uk","kfc.com":"kfc.co.uk","klarna.co.uk":"klarna.com","lego.co.uk":"lego.com","lululemon.co.uk":"lululemon.com","mcdonalds.co.uk":"mcdonalds.com","microsoft.co.uk":"microsoft.com","myeflorist.co.uk":"eflorist.co.uk","myvue.co.uk":"myvue.com","nakedwines.com":"nakedwines.co.uk","nandos.com":"nandos.co.uk","netflix.co.uk":"netflix.com","next.com":"next.co.uk","nike.co.uk":"nike.com","nordaccount.com":"nordvpn.com","oak-furniture-land.co.uk":"oakfurnitureland.co.uk","ocado.co.uk":"ocado.com","playstation.co.uk":"playstation.com","pret.com":"pret.co.uk","puma.co.uk":"puma.com","sainsburys.com":"sainsburys.co.uk","samsung.co.uk":"samsung.com","sharkninja.com":"ninjakitchen.co.uk","spotify.co.uk":"spotify.com","starbucks.com":"starbucks.co.uk","superdrug.co.uk":"superdrug.com","tempur.co.uk":"tempur.com","tesco.co.uk":"tesco.com","thetrainline.com":"trainline.com","ticketmaster.com":"ticketmaster.co.uk","tkmaxx.co.uk":"tkmaxx.com","trainline.co.uk":"trainline.com","uber.co.uk":"uber.com","uniqlo.co.uk":"uniqlo.com","waitrose.co.uk":"waitrose.com","zara.co.uk":"zara.com"};
   var MEMO_MS = 5 * 60 * 1000;
   function memoFresh(e) { return e && Date.now() - e.at < MEMO_MS; }
-  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} }
+  function memoReset() { memo = { blobs: {}, consent: null, gmail: null, receipts: null, openCat: null, openIds: {} }; forgetKept(); }
   // The last receipts and shop orders are also kept on this device (for the signed-in account only, removed on sign-out),
   // so opening Relay shows them at once instead of a loading screen, then updates them.
   var DISK_KEY = "relay.cache.v1";
   function diskRead() { try { var c = JSON.parse(localStorage.getItem(DISK_KEY) || "null"), s = load(); return c && s && c.email && c.email === s.email ? c : null; } catch (e) { return null; } }
   function diskWrite(kind, value) {
     try { var s = load(); if (!s || !s.email) return; var c = diskRead() || { email: s.email }; c[kind] = value; c.at = Date.now();
-      var t = JSON.stringify(c); if (t.length < 2500000) localStorage.setItem(DISK_KEY, t); else localStorage.removeItem(DISK_KEY); } catch (e) {}
+      // Thousands of receipts are more than the phone's quick storage holds (about 5 MB for everything): they go in the
+      // browser's own database instead (bigKeep), and the rest stays here. Before, a list that big wiped the whole copy, so
+      // a shopper with years of receipts waited for Relay every time they opened the app (20 Nov 2026).
+      var t = JSON.stringify(c);
+      if (kind === "receipts" && t.length >= 2500000) { var rows = c.receipts; delete c.receipts; c.receiptsKept = c.at; bigKeep({ email: s.email, rows: rows, at: c.at }); t = JSON.stringify(c); }
+      else if (kind === "receipts" && c.receiptsKept) { delete c.receiptsKept; bigKeep(null); t = JSON.stringify(c); }
+      if (t.length < 2500000) localStorage.setItem(DISK_KEY, t); else localStorage.removeItem(DISK_KEY); } catch (e) {}
   }
+  // The browser's own database (IndexedDB) for a list too big for the quick storage: one connection, opened when first
+  // needed, so each write lands in the order it was made. Anything going wrong there only means no copy is kept.
+  var BIG_DB = "relay.kept.v1", bigConn = null;
+  function bigDb() {
+    if (!bigConn) bigConn = new Promise(function (ok, no) {
+      try { var q = indexedDB.open(BIG_DB, 1); q.onupgradeneeded = function () { q.result.createObjectStore("kept"); }; q.onsuccess = function () { ok(q.result); }; q.onerror = q.onblocked = function () { no(q.error); }; }
+      catch (e) { no(e); }
+    }).catch(function () { bigConn = null; return null; });
+    return bigConn;
+  }
+  function bigDo(write) {
+    return bigDb().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (ok) {
+        try { var t = db.transaction("kept", write ? "readwrite" : "readonly"), st = t.objectStore("kept"), q = write ? write(st) : st.get("receipts");
+          t.oncomplete = function () { ok(write ? null : q.result); }; t.onerror = t.onabort = function () { ok(null); }; }
+        catch (e) { ok(null); }
+      });
+    });
+  }
+  function bigKeep(v) { bigDo(function (st) { return v ? st.put(v, "receipts") : st.delete("receipts"); }); }
+  // Everything of the account kept on this device, gone (signing out, another account signing in, inboxes disconnected).
+  function forgetKept() {
+    try { localStorage.removeItem(DISK_KEY); } catch (e) {}
+    try { if (bigConn) bigKeep(null); else if (window.indexedDB) indexedDB.deleteDatabase(BIG_DB); } catch (e) {}
+  }
+  // The copy kept in the database comes a moment after the page opens: Home and Receipts draw it as soon as it's here,
+  // unless Relay's own answer came first (onKept).
+  var keptWaiting = false;
+  function onKept(fn) { if (keptWaiting) window.addEventListener("relay:kept-receipts", fn, { once: true }); }
   (function () {
     var c = diskRead(); if (!c) return;
     if (Array.isArray(c.receipts)) memo.receipts = keptRows(c.receipts, 0);
     if (Array.isArray(c.purchases)) memo.walletPurchases = c.purchases;
     if (Array.isArray(c.needReceipt)) memo.needReceipt = c.needReceipt;
+    if (!Array.isArray(c.receipts) && c.receiptsKept) {
+      keptWaiting = true;
+      bigDo(null).then(function (v) {
+        keptWaiting = false;
+        var s = load();
+        if (v && Array.isArray(v.rows) && s && v.email === s.email && v.email === c.email && !memo.receipts) memo.receipts = keptRows(v.rows, 0);
+        try { window.dispatchEvent(new Event("relay:kept-receipts")); } catch (e) {}
+      });
+    }
   })();
   // The receipts the app has, with a signature to tell whether a new answer changed anything. The signature (the whole
   // list as text) is only worked out when something asks for it, not on every load: with hundreds of receipts it's slow.
@@ -89,7 +134,7 @@
   function mailOwner() { return mailName() === "Outlook" ? "Microsoft" : "Google"; }
   // An email Relay can open again: its id in Gmail or in Outlook.
   function mailRef(x) { return x && (/^[A-Za-z0-9]{6,40}$/.test(x.gmailId || "") || /^[A-Za-z0-9_=+\/-]{16,512}$/.test(x.outlookId || "")); }
-  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) { memoReset(); try { localStorage.removeItem("relay.cache.v1"); } catch (e) {} } if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
+  function save(v) { reads = {}; var was = load(); if (!v || (was && was.email !== v.email)) memoReset(); if (!v) { try { localStorage.removeItem(MAILBOX_KEY); localStorage.removeItem(PROFILE_KEY); localStorage.removeItem("relay.drafts.v1"); localStorage.removeItem("relay.pending-watches.v1"); localStorage.removeItem("relay.auctions.v1"); logoMisses = {}; window.__relayPayDue = 0; } catch (e) {} } try { v ? localStorage.setItem(KEY, JSON.stringify(v)) : localStorage.removeItem(KEY); } catch (e) {} if (!v) paintAvatars();
     if (((was && was.token) || null) !== ((v && v.token) || null)) { try { window.dispatchEvent(new Event("relay:session")); } catch (e) {} } }
   // Reads are shared and briefly remembered: two parts of a screen asking for the same thing make one request, and going
   // back to a tab within a minute reuses what was just loaded instead of asking Relay again. Any change (a POST) forgets
@@ -3889,7 +3934,7 @@
     ask("Disconnect " + mailName() + " and delete every receipt Relay captured from it?", "Disconnect and delete", function () {
       api("/relay/my/gmail/disconnect", { method: "POST" }).then(function (x) {
         if (!x.ok) return say(msg, "Couldn't disconnect. Try again.", true);
-        memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {}
+        memo.gmail = null; memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; forgetKept();
         if (x.body && x.body.nowFirst !== undefined) cachedGet("gmail", "/relay/my/gmail").then(function () { done(); }, done);
         else { rememberMailbox({ connected: false }); done(); }
       });
@@ -4413,6 +4458,7 @@
         // Show what was loaded last time straight away, then quietly update if anything changed.
         if (onPage && !shopRows.length && memo.shopRows) shopRows = memo.shopRows;
         if (drawnSig === null && memo.receipts) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); }
+        else onKept(function () { if (drawnSig === null && memo.receipts && list.isConnected) { allRows = memo.receipts.rows; drawnSig = memo.receipts.sig; drawList(); } });
         var sk = list.firstChild; if (sk && sk.className === "rl-cats" && sk.style.marginTop) sk.style.marginTop = "8px";
         // Shop orders and email receipts are drawn together, so the page never redraws itself a moment later.
         var shopsLoaded = !onPage ? Promise.resolve() : (memo.purchases || api(purchasesPath())).then(function (pr) {
@@ -6103,7 +6149,7 @@
         ask("Disconnect " + who + " and delete the receipts Relay captured from it?" + (next ? " " + (next.email || inboxName(next.provider)) + " becomes your main inbox." : ""), "Disconnect and delete", function () {
           api("/relay/my/gmail/disconnect", { method: "POST", body: x.mailbox ? { mailbox: x.mailbox } : {} }).then(function (r) {
             if (!r.ok) return say(note, "Couldn't disconnect " + who + ". Try again.", true);
-            memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; try { localStorage.removeItem("relay.cache.v1"); } catch (e) {}
+            memo.receipts = null; memo.walletPurchases = null; memo.openCat = null; forgetKept();
             again();
           }, function () { say(note, "Couldn't reach Relay. Check your connection.", true); });
         });
@@ -10698,8 +10744,10 @@
       var box = el("div", { style: "margin-top:10px" }); foot.appendChild(box); mountInstore(box, refresh, "box");
       if (testingOn()) { var t = el("div", { style: "margin-top:10px" }); foot.appendChild(t); mountSquareTest(t, refresh); mountShopifyTest(t, refresh); }
     };
+    var answered = false;
     if (memo.walletPurchases && memo.receipts) drawBoth([memo.walletPurchases, memo.receipts.rows]);
-    loadBoth().then(function (both) { if (document.body.contains(grid)) drawBoth(both); });
+    else onKept(function () { if (!answered && memo.walletPurchases && memo.receipts && document.body.contains(grid)) drawBoth([memo.walletPurchases, memo.receipts.rows]); });
+    loadBoth().then(function (both) { answered = true; if (document.body.contains(grid)) drawBoth(both); });
   }
   // One quiet row: a picture or icon, what it is, one line under it, something short on the right, and a chevron.
   function calmRow(pic, title, sub, end, endClass, onTap) {
@@ -11302,6 +11350,7 @@
       state.connected = Boolean(g.body.connected); state.mail = inboxesToFix(g.body); draw();
     }, function () {});
     if (memo.walletPurchases && memo.receipts) { state.both = [memo.walletPurchases, memo.receipts.rows]; draw(); }
+    else onKept(function () { if (!state.both && memo.walletPurchases && memo.receipts && host.isConnected) { state.both = [memo.walletPurchases, memo.receipts.rows]; draw(); } });
     loadBoth().then(function (both) { state.both = both; draw(); });
     // A win to pay for: asked only of someone who has bid before, as the tab's red number is.
     var bid = false; try { bid = localStorage.getItem(AU_BID_KEY) === "1"; } catch (e) {}

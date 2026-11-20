@@ -18,6 +18,7 @@ on:
       - relay-gestures.js
       - worker/item-kind-core.js
       - scripts/test-app-speed-ui.mjs
+      - scripts/test-receipts-kept-ui.mjs
       - scripts/test-layout-ui.mjs
       - scripts/test-tips-ui.mjs
       - scripts/sample-pictures.mjs
@@ -115,6 +116,8 @@ jobs:
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-items-ui.mjs
       - name: Same order / different orders (the short list, joined once per tap, Undo, Split it), fee lines, Relay health's likely reading problems
         run: node --import ./scripts/record-app-requests.mjs scripts/test-order-joins-ui.mjs
+      - name: Thousands of receipts kept on the phone (shown at once every time, before Relay answers; gone on sign-out)
+        run: node --import ./scripts/record-app-requests.mjs scripts/test-receipts-kept-ui.mjs
       - name: Receipt words (real reader over corpus emails; every item, quantity, price, total and currency as the receipt says; flags, cancelled, refunds, return dates)
         run: node --import ./scripts/record-app-requests.mjs scripts/test-receipt-words-ui.mjs
       - name: Pasted receipts (every corpus email pasted as text, as a browser copy and with its page; same reader and totals check; never silently wrong)

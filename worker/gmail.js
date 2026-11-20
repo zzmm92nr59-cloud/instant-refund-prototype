@@ -26,6 +26,7 @@ import { SHARED_EMAILS_SQL, sharedByReceipt, attachShared, sharedCopy, readSumma
 import { AI_READS_SQL, AI_SETTING_SQL, PICKS_AI_SQL, ITEM_KINDS_SQL, attachAiReads, aiAvailable } from "./ai-reader.js";
 import { namesCheck } from "./item-names.js";
 import { lineOf } from "./receipt-items.js";
+import { indexBy, among, amongAt, byTime, nearTime, nearTimeAt } from "./list-index.js";
 import { REREADS_SQL, REREADS_PER_DAY, REREAD_AI_PER_DAY, REREAD_AI_ALL_DAY, orderSection, askForItems, acceptAiItems, namedInEmail, rereadsUsed } from "./receipt-reread.js";
 import { PARCEL_TRACKS_SQL, PARCEL_USES_SQL, applyTracked, readTrackedRows, liveParcel } from "./parcel-tracking.js";
 import { RETURN_TRACKS_SQL, attachReturnTracking, readReturnTracks, saveReturnSent, liveReturnParcel, returnFacts } from "./return-tracking.js";
@@ -1916,6 +1917,8 @@ export function mergeOrderEmails(orders, opts = {}) {
   // joins the shop's own email for that order, "Order Number: WGR2416172", when the numbers are the same but for the
   // letters the shop puts first, the money is the same and the days are close: one purchase, never two. Round 11.)
   const paidVia = new Map();
+  // (Each order by its number and by its number without up to five marks in front, "WGR2416172" also as "2416172".)
+  const byRefTail = indexBy(orders, (o) => { if (!o.orderRef) return []; const c = refCore(o.orderRef); return [0, 1, 2, 3, 4, 5].map((k) => c.slice(k)); });
   for (const p of orders) {
     if (!(p.retailer && p.retailer.via) || !p.orderRef || isForwarded(p)) continue;
     const r = refCore(p.orderRef);
@@ -1924,7 +1927,8 @@ export function mergeOrderEmails(orders, opts = {}) {
     // SportPursuit Ltd" for "Order ID 106639728", and the shop's own email for 106639728 at £66.65 before VAT, read from
     // another inbox. The money paid is PayPal's. Round 15.)
     const sameNumber = (o) => refCore(o.orderRef) === r && r.length >= 6 && o.retailer && p.retailer.name && (nameFitsDomain(p.retailer.name, o.retailer.domain || "") || String(o.retailer.name || "").toLowerCase().replace(/[^a-z0-9]/g, "").startsWith(String(p.retailer.name).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8)));
-    const fits = orders.filter((o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && (refCore(o.orderRef) === r || new RegExp("^[A-Z]{1,4}[-#]?" + r.replace(/[^A-Z0-9]/g, "") + "$").test(refCore(o.orderRef))) &&
+    const prefixed = new RegExp("^[A-Z]{1,4}[-#]?" + r.replace(/[^A-Z0-9]/g, "") + "$");
+    const fits = among(byRefTail, [r, r.replace(/[^A-Z0-9]/g, "")]).filter((o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && (refCore(o.orderRef) === r || prefixed.test(refCore(o.orderRef))) &&
       (o.totalPence == null || p.totalPence == null || Math.abs(o.totalPence - p.totalPence) <= 1 || sameNumber(o)) &&
       (!o.orderDate || !p.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
     if (fits.length === 1) paidVia.set(p, fits[0]);
@@ -1937,17 +1941,18 @@ export function mergeOrderEmails(orders, opts = {}) {
   const paidFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && o.retailer.domain && p.retailer.name &&
     nameFitsDomain(p.retailer.name, o.retailer.domain) && o.totalPence != null && o.totalPence === p.totalPence && (o.currency || "GBP") === (p.currency || "GBP") && near(o, p);
   const unref = orders.filter((p) => p.retailer && p.retailer.via && !p.orderRef && p.totalPence != null && p.sentAt && !isForwarded(p));
+  const byTotal = unref.length ? indexBy(orders, (o) => [o.totalPence]) : null, unrefByTotal = indexBy(unref, (q) => [q.totalPence]);
   // (Several purchases of the same money minutes apart, "Special Offer £2.39" bought twice four minutes apart, each with its
   // PayPal receipt seconds after the shop's: each receipt goes with the shop's receipt nearest to it in time, when each is
   // the other's nearest, within two minutes, and no other is as near. Round 15.)
   const gap = (a, b) => Math.abs(Date.parse(a.sentAt) - Date.parse(b.sentAt));
   const nearest = (x, list) => { const s = list.slice().sort((a, b) => gap(x, a) - gap(x, b)); return s.length && (s.length === 1 || gap(x, s[0]) < gap(x, s[1])) ? s[0] : null; };
   for (const p of unref) {
-    const fits = orders.filter((o) => paidFits(p, o));
-    if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) { paidVia.set(p, fits[0]); continue; }
+    const fits = among(byTotal, [p.totalPence]).filter((o) => paidFits(p, o));
+    if (fits.length === 1 && among(unrefByTotal, [fits[0].totalPence]).filter((q) => paidFits(q, fits[0])).length === 1) { paidVia.set(p, fits[0]); continue; }
     const o = fits.length ? nearest(p, fits) : null;
     if (!o || gap(p, o) > 2 * 60000) continue;
-    if (nearest(o, unref.filter((q) => paidFits(q, o))) === p) paidVia.set(p, o);
+    if (nearest(o, among(unrefByTotal, [o.totalPence]).filter((q) => paidFits(q, o))) === p) paidVia.set(p, o);
   }
   // (A payment service's receipt that numbers the purchase its own way, PayPal's "Order ID lcbf-45343" for the shop's own
   // "Order Number [#160104]", sent within two minutes of the shop's email, for a shop whose name it gives, whole or cut short
@@ -1958,21 +1963,24 @@ export function mergeOrderEmails(orders, opts = {}) {
   const shopFits = (p, o) => o !== p && !(o.retailer && o.retailer.via) && o.orderRef && !isForwarded(o) && o.retailer && sameShop(p.retailer.name, o.retailer) &&
     (o.totalPence == null || o.totalPence === p.totalPence) && (o.currency || "GBP") === (p.currency || "GBP") && o.sentAt && gap(o, p) <= 2 * 60000;
   const loose = orders.filter((p) => p.retailer && p.retailer.via && p.retailer.name && !paidVia.has(p) && p.totalPence != null && p.sentAt && !isForwarded(p));
+  const sentTimes = loose.length ? byTime(orders, "sentAt") : null, looseTimes = byTime(loose, "sentAt");
   for (const p of loose) {
-    const fits = orders.filter((o) => shopFits(p, o));
-    if (fits.length === 1 && loose.filter((q) => shopFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
+    const fits = nearTime(sentTimes, Date.parse(p.sentAt), 2 * 60000).filter((o) => shopFits(p, o));
+    if (fits.length === 1 && nearTime(looseTimes, Date.parse(fits[0].sentAt), 2 * 60000).filter((q) => shopFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
   }
   // (An email with an order's number and nothing else to it, no money and no items, Pearson's "Theory Test - Appointment
   // Confirmation", "Order Number: 0053-1725-3254", sent with the DVSA's invoice for that very number (£23.00): the same order,
   // whatever name each gives the shop. Only for a long number, exactly one other order with it, and within three days.
   // Round 15.)
   const emptyTo = new Map();
+  let byUpperRef = null;
   const emptyOne = (o) => o.orderRef && o.totalPence == null && !(o.items || []).length && o.kind !== "order_update" && !isForwarded(o) && !paidVia.has(o);
   for (const o of orders) {
     if (!emptyOne(o)) continue;
     const ref = String(o.orderRef).toUpperCase();
     if (ref.length < 8 || !/\d/.test(ref)) continue;
-    const fits = orders.filter((p) => p !== o && !emptyOne(p) && p.orderRef && String(p.orderRef).toUpperCase() === ref && p.totalPence != null &&
+    byUpperRef = byUpperRef || indexBy(orders, (p) => (p.orderRef ? [String(p.orderRef).toUpperCase()] : []));
+    const fits = among(byUpperRef, [ref]).filter((p) => p !== o && !emptyOne(p) && p.orderRef && String(p.orderRef).toUpperCase() === ref && p.totalPence != null &&
       (!p.orderDate || !o.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
     if (fits.length === 1 && joinStore(fits[0]) !== joinStore(o)) emptyTo.set(o, fits[0]);
   }
@@ -1992,9 +2000,12 @@ export function mergeOrderEmails(orders, opts = {}) {
   // order email of the shop fits. Round 11.)
   const bare = (o) => o.detailsInAttachment && !(o.items || []).length && o.totalPence == null && o.kind !== "order_update";
   const folded = new Map();
+  // (Each order by its shop, for the joins below that are only ever within one shop.)
+  let byShop = null;
+  const sameShopAs = (o) => { byShop = byShop || indexBy(orders, (p) => [joinStore(p)]); let k; try { k = joinStore(o); } catch { return orders; } return among(byShop, [k]); };
   for (const o of orders) {
     if (!bare(o) || !o.orderDate) continue;
-    const fits = orders.filter((p) => p !== o && !bare(p) && (p.items || []).length && p.orderDate && joinStore(p) === joinStore(o) &&
+    const fits = sameShopAs(o).filter((p) => p !== o && !bare(p) && (p.items || []).length && p.orderDate && joinStore(p) === joinStore(o) &&
       (!p.orderRef || !o.orderRef || sameOrderRef(p.orderRef, o.orderRef)) &&
       // (Within three days either way, or an invoice sent later, up to 60 days after the order, when no other order of the
       // shop came in between.)
@@ -2012,7 +2023,7 @@ export function mergeOrderEmails(orders, opts = {}) {
   for (const u of orders) {
     if (!u.updatedReceipt || u.totalPence == null || isForwarded(u)) continue;
     const tip = tipOf(u);
-    const fits = orders.filter((o) => o !== u && !o.updatedReceipt && !replacedBy.has(o) && o.kind !== "order_update" && o.totalPence != null && !isForwarded(o) &&
+    const fits = sameShopAs(u).filter((o) => o !== u && !o.updatedReceipt && !replacedBy.has(o) && o.kind !== "order_update" && o.totalPence != null && !isForwarded(o) &&
       joinStore(o) === joinStore(u) && (o.currency || "GBP") === (u.currency || "GBP") && String(o.merchant || "") === String(u.merchant || "") &&
       (!o.orderRef || !u.orderRef || sameOrderRef(o.orderRef, u.orderRef)) && dayGap(o, u) >= 0 && dayGap(o, u) <= 1 &&
       (Number.isInteger(tip) ? o.totalPence + tip === u.totalPence : o.totalPence < u.totalPence && u.totalPence - o.totalPence <= Math.max(500, o.totalPence / 2)) &&
@@ -2025,7 +2036,7 @@ export function mergeOrderEmails(orders, opts = {}) {
   const sameItems = (a, b) => (a.items || []).length > 0 && a.items.length === (b.items || []).length && a.items.every((x, k) => String(x.name || "").toLowerCase() === String(b.items[k].name || "").toLowerCase() && (x.qty || 1) === (b.items[k].qty || 1) && lineOf(x) === lineOf(b.items[k]));
   for (const c of orders) {
     if (c.collection !== "collected" || isForwarded(c)) continue;
-    const fits = orders.filter((r) => r !== c && r.collection === "ready" && !replacedBy.has(r) && !isForwarded(r) && joinStore(r) === joinStore(c) && r.totalPence != null && r.totalPence === c.totalPence &&
+    const fits = sameShopAs(c).filter((r) => r !== c && r.collection === "ready" && !replacedBy.has(r) && !isForwarded(r) && joinStore(r) === joinStore(c) && r.totalPence != null && r.totalPence === c.totalPence &&
       (r.currency || "GBP") === (c.currency || "GBP") && sameItems(r, c) && dayGap(r, c) >= -1 && dayGap(r, c) <= 10 && (!r.orderRef || !c.orderRef || !sameOrderRef(r.orderRef, c.orderRef)));
     if (fits.length === 1) replacedBy.set(fits[0], c);
   }
@@ -2242,18 +2253,42 @@ const siteOf = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]
 const sameShop = (u, o) => !u.retailer || (!u.retailer.domain && !u.retailer.name) || storeKey(u) === storeKey(o) ||
   (letters(u.retailer.name).length >= 3 && letters(u.retailer.name) === letters(o.retailer && o.retailer.name)) ||
   Boolean(u.retailer.domain && o.retailer && o.retailer.domain && !isVia(u.retailer.domain) && !PERSONAL_MAIL.test(u.retailer.domain) && siteOf(u.retailer.domain) === siteOf(o.retailer.domain));
+// The orders sameShop(u, o) could be true for, by their shop's key, name and site (all of them for news that names no shop).
+function shopIndex(orders) {
+  const ix = indexBy(orders, (o) => ["k:" + storeKey(o), "n:" + letters(o.retailer && o.retailer.name), o.retailer && o.retailer.domain ? "s:" + siteOf(o.retailer.domain) : null]);
+  return (u) => {
+    if (!u.retailer || (!u.retailer.domain && !u.retailer.name)) return orders;
+    let k; try { k = storeKey(u); } catch { return orders; }
+    const n = letters(u.retailer.name), d = u.retailer.domain;
+    return among(ix, ["k:" + k, n.length >= 3 ? "n:" + n : null, d && !isVia(d) && !PERSONAL_MAIL.test(d) ? "s:" + siteOf(d) : null]);
+  };
+}
 export function attachDeliveries(orders, deliveries) {
+  // (Only the parcel emails that could be this order's are checked against it, by the same rules: those naming its number,
+  // carrying one of its tracking numbers, or naming a shop with no number or tracking number, sent in the month after it.)
+  const refIx = indexBy(deliveries, (d) => (d.orderRef ? [refCore(d.orderRef), "P:" + String(d.orderRef).toUpperCase().replace(/-\d{1,2}$/, "")] : []));
+  const trackIx = indexBy(deliveries, (d) => [d.trackingNumber || null]);
+  const named = byTime(deliveries.map((d) => (!d.trackingNumber && d.merchant && d.at ? d : null)), "at");
+  const refsOf = (o) => (o.orderRef ? [refCore(o.orderRef), ...(String(o.orderRef).length >= 5 ? ["P:" + String(o.orderRef).toUpperCase()] : [])] : []);
+  let shopIx = null;
+  const sameStore = (o) => { shopIx = shopIx || indexBy(orders, (p) => [storeKey(p)]); let k; try { k = storeKey(o); } catch { return orders; } return among(shopIx, [k]); };
   for (const o of orders) {
+    const mayAt = amongAt(refIx, refsOf(o)), mayName = mayAt.map((i) => deliveries[i]);
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
     // (a dispatch email with no items, round 6), so the carrier's own "delivered" email, which names no order, finds it.
     const nums = new Set([o.shipment && o.shipment.trackingNumber].filter(Boolean));
     // (Or a parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1". Round 15e.)
     const parcelOf = (d) => String(o.orderRef).length >= 5 && String(d.orderRef).toUpperCase().replace(/-\d{1,2}$/, "") === String(o.orderRef).toUpperCase();
     const byRef = (d) => d.orderRef && o.orderRef && (sameOrderRef(d.orderRef, o.orderRef) || parcelOf(d)) && sameShop(d, o);
-    for (const d of deliveries) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
+    for (const d of mayName) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
     const t = (o.shipment && o.shipment.trackingNumber) || [...nums][0] || null;
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;
-    for (const d of deliveries) {
+    const from = o.orderDate ? Date.parse(o.orderDate) : NaN, at = new Set(mayAt.concat(trackIx.wild));
+    for (const n of nums) for (const i of trackIx.m.get(n) || []) at.add(i);
+    // (Sent from the day of the order to 31 days after; a day either side is looked at, and the rule below decides.)
+    if (Number.isFinite(from)) for (const i of nearTimeAt(named, from + 15.5 * 86400000, 16.5 * 86400000)) at.add(i);
+    for (const i of [...at].sort((a, b) => a - b)) {
+      const d = deliveries[i];
       let hit = (d.trackingNumber && nums.has(d.trackingNumber)) || byRef(d);
       // (Never by the shop's name alone when the parcel's email names an order and this card has another number: a wine
       // order's delivery is not the same shop's monthly top-up's. Round 15.)
@@ -2261,7 +2296,7 @@ export function attachDeliveries(orders, deliveries) {
         const word = letters(d.merchant.split(/\s+/)[0]);
         const days = (Date.parse(d.at) - Date.parse(o.orderDate)) / 86400000;
         hit = word.length >= 3 && (letters(o.retailer && o.retailer.name).includes(word) || storeKey(o).includes(word)) && days >= 0 && days <= 31 &&
-          !orders.some(p => p !== o && storeKey(p) === storeKey(o) && p.orderDate > o.orderDate && p.orderDate <= d.at);
+          !sameStore(o).some(p => p !== o && storeKey(p) === storeKey(o) && p.orderDate > o.orderDate && p.orderDate <= d.at);
       }
       if (!hit) continue;
       if (!best || (STAGE[d.status] || 0) > (STAGE[best.status] || 0) || ((STAGE[d.status] || 0) === (STAGE[best.status] || 0) && (d.at || "") > (best.at || ""))) {
@@ -2314,10 +2349,12 @@ function attachPayments(orders, pays) {
 // Round 13.
 const subWords = (s) => new Set(String(s || "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 4 && !/^(?:with|from|subscription|monthly|yearly|annual|plan|trial|edit|your)$/.test(w)));
 function attachSubscriptionEnds(orders, ends) {
+  let shopOf = null;
   for (const u of ends) {
     const want = subWords(u.subscriptionName);
     if (want.size < 2) continue;
-    const fits = orders.filter((o) => o.retailer && sameShop(u, o) && Array.isArray(o.items) && o.items.length && o.orderDate && (!u.at || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 370 * 864e5)) &&
+    shopOf = shopOf || shopIndex(orders);
+    const fits = shopOf(u).filter((o) => o.retailer && sameShop(u, o) && Array.isArray(o.items) && o.items.length && o.orderDate && (!u.at || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 370 * 864e5)) &&
       o.items.some((it) => [...subWords(it && it.name)].filter((w) => want.has(w)).length >= 2));
     if (!fits.length) continue;
     const latest = fits.sort((a, b) => String(b.orderDate).localeCompare(String(a.orderDate)))[0];
@@ -2332,15 +2369,18 @@ export function attachCancellations(orders, cancels) {
   // (A shop's "Your order was canceled" that gives no order number but shows the items, Homary: it joins the one order of that
   // shop, placed in the 60 days before, that has every item it names, by the same words. Never when two orders fit. Round 11.)
   const byItems = new Map();
+  let shopOf = null;
   for (const u of cancels) {
     if (u.orderRef || !u.byItems || !Array.isArray(u.cancelledItems) || !u.cancelledItems.length) continue;
     const keys = u.cancelledItems.map(c => cancelKey(c && c.name)).filter(k => k.length >= 6);
     if (keys.length !== u.cancelledItems.length) continue;
-    const fits = orders.filter(o => o.retailer && sameShop(u, o) && u.retailer && (u.retailer.domain || u.retailer.name) && Array.isArray(o.items) && o.items.length &&
+    shopOf = shopOf || shopIndex(orders);
+    const fits = shopOf(u).filter(o => o.retailer && sameShop(u, o) && u.retailer && (u.retailer.domain || u.retailer.name) && Array.isArray(o.items) && o.items.length &&
       (!u.at || !o.orderDate || (o.orderDate <= u.at && Date.parse(u.at) - Date.parse(o.orderDate) <= 60 * 864e5)) &&
       keys.every(k => o.items.some(it => cancelKey(it && it.name) === k)));
     if (fits.length === 1) byItems.set(fits[0], [...(byItems.get(fits[0]) || []), u]);
   }
+  const cancelIx = indexBy(cancels, (u) => (u.orderRef ? [refCore(u.orderRef)] : []));
   for (const o of orders) {
     const listed = byItems.get(o);
     if (listed) {
@@ -2351,7 +2391,7 @@ export function attachCancellations(orders, cancels) {
       if (!o.orderRef) continue;
     }
     if (!o.orderRef) continue;
-    const mine = cancels.filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
+    const mine = among(cancelIx, [refCore(o.orderRef)]).filter(u => u.orderRef && sameOrderRef(u.orderRef, o.orderRef) && sameShop(u, o));
     if (!mine.length) continue;
     const whole = mine.find(u => !u.partial);
     const at = mine.map(u => u.at).filter(Boolean).sort()[0] || null;
@@ -2386,6 +2426,12 @@ export function attachCancellations(orders, cancels) {
 // nothing is guessed when no order fits exactly one way. Round 10.
 export function attachAdjustments(orders, adjusts) {
   const low = (x) => String(x || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  // (The orders each could be about, by number or by shop name, made once: the rules below are checked on those alone.)
+  let ix = null;
+  const index = () => (ix = ix || {
+    upper: indexBy(orders, (o) => (o.orderRef ? [String(o.orderRef).toUpperCase()] : [])),
+    core: indexBy(orders, (o) => (o.orderRef ? [refCore(o.orderRef)] : [])),
+    name: indexBy(orders, (o) => [low(o.retailer && o.retailer.name)]) });
   for (const a of adjusts) {
     if (!Number.isInteger(a.amountPence)) continue;
     // (Money back a shop's support team wrote about an order it names, "order #966874418": that order of that shop, when
@@ -2396,7 +2442,7 @@ export function attachAdjustments(orders, adjusts) {
       const refs = (a.orderRef ? [a.orderRef] : a.orderRefs || []).filter(Boolean).map((r) => String(r).toUpperCase());
       const base = (d) => String(d || "").toLowerCase().replace(/^(?:[^.]+\.)*?([^.]+\.(?:(?:co|org|ac)\.uk|[a-z]{2,6}))$/, "$1");
       const sameShop = (o) => (base(o.retailer && o.retailer.domain) && base(o.retailer && o.retailer.domain) === base(a.retailer && a.retailer.domain)) || low(o.retailer && o.retailer.name).startsWith(low(a.retailer && a.retailer.name).split(" ")[0] || "-");
-      const hit = refs.map((r) => orders.filter((o) => o.kind !== "order_update" && o.orderRef && String(o.orderRef).toUpperCase() === r && sameShop(o))).find((l) => l.length);
+      const hit = refs.map((r) => among(index().upper, [r]).filter((o) => o.kind !== "order_update" && o.orderRef && String(o.orderRef).toUpperCase() === r && sameShop(o))).find((l) => l.length);
       if (!hit || hit.length !== 1) continue;
       const o = hit[0], was = o.adjusted || {};
       o.adjusted = { at: a.at || was.at || null, refundPence: (was.refundPence || 0) + a.amountPence, newTotalPence: was.newTotalPence ?? null, currency: a.currency || o.currency || "GBP",
@@ -2406,11 +2452,11 @@ export function attachAdjustments(orders, adjusts) {
     // (Money back for an order it names by number, "your recent order 652658294": that order only, never another order of the
     // same shop that happens to be near in time; nothing when Relay doesn't have it. Round 15.)
     if (a.orderRef && !a.bySupport) {
-      const named = orders.filter((o) => o.kind !== "order_update" && o.orderRef && sameOrderRef(o.orderRef, a.orderRef) && sameShop(a, o));
+      const named = among(index().core, [refCore(a.orderRef)]).filter((o) => o.kind !== "order_update" && o.orderRef && sameOrderRef(o.orderRef, a.orderRef) && sameShop(a, o));
       if (named.length === 1) { const o = named[0]; o.adjusted = { at: a.at || null, refundPence: (o.adjusted ? o.adjusted.refundPence : 0) + a.amountPence, newTotalPence: a.newTotalPence ?? null, currency: a.currency || o.currency || "GBP" }; }
       continue;
     }
-    const fits = orders.filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
+    const fits = among(index().name, [low(a.retailer && a.retailer.name)]).filter((o) => o.kind !== "order_update" && low(o.retailer && o.retailer.name) === low(a.retailer && a.retailer.name) &&
       (!a.merchant || low(o.merchant) === low(a.merchant)) && (a.previousTotalPence == null || o.totalPence === a.previousTotalPence) &&
       (!a.at || !o.orderDate || (o.orderDate <= a.at && Date.parse(a.at) - Date.parse(o.orderDate) <= 7 * 864e5)));
     if (fits.length !== 1) continue;
@@ -2454,7 +2500,7 @@ export function estimateReturnBy(o, today) {
 // A payment service's refund that names no order but says what was first paid, to whom and on which day ("You originally
 // paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026"): the one order of that shop for that money on that day, or
 // the next (a shop's email can be dated the day after). Never a guess between two. Round 12.
-function refundFits(u, o, orders) {
+function refundFits(u, o, orders, byTotal) {
   if (u.stage !== "refunded" || !Number.isInteger(u.paidPence) || !/^\d{4}-\d{2}-\d{2}$/.test(u.paidOn || "")) return false;
   const words = (x) => String(x || "").toLowerCase().replace(/\b(?:payments?|uk|ltd|limited|plc|inc|online|the|gb|europe|services?)\b|[^a-z0-9 ]+/g, " ").trim().split(/\s+/).filter(Boolean);
   const fit = (x) => {
@@ -2465,17 +2511,19 @@ function refundFits(u, o, orders) {
     return a.length > 0 && b.length > 0 && (a[0] === b[0] || a.join(" ").startsWith(b.join(" ")) || b.join(" ").startsWith(a.join(" ")));
   };
   if (!fit(o)) return false;
-  return orders.filter(fit).length === 1;
+  return (byTotal ? among(byTotal, [u.paidPence]) : orders).filter(fit).length === 1;
 }
 // A return the shop has accepted that gives no order number, only what it will refund ("we will be crediting you … for the
 // value of £118.00"): it goes on the one order from that shop, bought in the 120 days before, that cost exactly that
 // (in all, or one of its lines). Two such orders, or none, and it goes nowhere: never a guess. Round 15e.
 export function attachUnnumberedPlans(orders, plans) {
+  let byKey = null;
   for (const p of plans) {
     if (!Number.isInteger(p.estimatedRefundPence) || p.estimatedRefundPence <= 0 || !p.at) continue;
     let key; try { key = storeKey(p); } catch { continue; }
     const at = Date.parse(p.at);
-    const fits = orders.filter((o) => {
+    byKey = byKey || indexBy(orders, (o) => [storeKey(o)]);
+    const fits = among(byKey, [key]).filter((o) => {
       if (o.returnPlan || !o.orderDate) return false;
       let k; try { k = storeKey(o); } catch { return false; }
       const d = Date.parse(o.orderDate);
@@ -2487,17 +2535,23 @@ export function attachUnnumberedPlans(orders, plans) {
 }
 
 export function attachReturnProgress(orders, deliveries, updates) {
+  // (Each order's updates found by its number, and refunds that name no order by what was paid: refundFits needs the same
+  // money.)
+  const refIx = indexBy(updates, (u) => (u.orderRef ? [String(u.orderRef).toUpperCase()] : []));
+  const paidIx = indexBy(updates, (u) => (!u.orderRef ? [u.paidPence] : []));
+  const byTotal = indexBy(orders, (o) => [o.totalPence]);
+  const trackIx = indexBy(deliveries, (d) => [d.trackingNumber]);
   for (const o of orders) {
     const plan = o.returnPlan || null;
     const t = plan && plan.trackingNumber;
     const ref = o.orderRef ? String(o.orderRef).toUpperCase() : null;
     let parcel = null;
-    if (t) for (const d of deliveries) {
+    if (t) for (const d of among(trackIx, [t])) {
       if (d.trackingNumber !== t) continue;
       if (!parcel || (STAGE[d.status] || 0) > (STAGE[parcel.status] || 0)) parcel = { status: d.status, at: d.at || null, carrier: d.carrier || (plan && plan.carrier) || null };
     }
-    const mine = (ref ? updates.filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
-      .concat(updates.filter(u => !u.orderRef && refundFits(u, o, orders)));
+    const mine = (ref ? among(refIx, [ref]).filter(u => u.orderRef && String(u.orderRef).toUpperCase() === ref && (!u.retailer || !u.retailer.domain || storeKey(u) === storeKey(o))) : [])
+      .concat(among(paidIx, [o.totalPence]).filter(u => !u.orderRef && refundFits(u, o, orders, byTotal)));
     const received = mine.filter(u => u.stage === "received").sort((a, b) => (a.at || "").localeCompare(b.at || ""))[0] || null;
     const refunded = mine.filter(u => u.stage === "refunded").sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
     if (!parcel && !received && !refunded && !t) continue;
