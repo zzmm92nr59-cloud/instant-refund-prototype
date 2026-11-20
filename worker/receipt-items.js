@@ -445,7 +445,7 @@ export function readItems(text, opts = {}) {
       const u = pend.unit ?? pend.unitLabelled;
       if ((pend.qty || 1) * u === l.labelledTotal) { pend.lineFromLabel = l.labelledTotal; pend.unit = u; emit(); continue; }
     }
-    // (A labelled line total that only says again the line's price just above it, "£47.50" then "Line Total: £47.50", is that
+    // (A labelled line total that only says again the line's price just above it, "£12.00" then "Line Total: £12.00", is that
     // price once. Round 16.)
     if (l.lineTotal != null && !hasName && pend && pend.name) { if (pend.prices[pend.prices.length - 1] !== l.lineTotal) pend.prices.push(l.lineTotal); pend.labelled = true; emit(); continue; }
     // How many on the line under the price ("Bosch Cordless Drill 18V", "£99.00", "Qty: 1").
@@ -680,7 +680,7 @@ function addExtras(item, extras) {
 
 // ---- What the email says the items came to ---------------------------------------------------------------------------------
 const SUBTOTAL_LABEL = /^(?:sub-?\s?total|items? (?:sub-?)?total|item\(s\) subtotal|items?|products?(?: total)?|goods total|total of items|order value|basket total|trolley (?:cost|total)|merchandise(?: total)?|guide price|item total|tickets?)(?:\s*\([^)]{0,30}\))?\s*:?\s*$/i;
-const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor) tax\b|\b(?:levy|royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|courier|(?:1st|2nd|first|second) class|tracked(?: 24| 48)?|next[- ]day|named day|removal|disposal|recycling|delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
+const FEE_LABEL = /\bfees?\b|^(?:city|tourist|local|resort|accommodation|visitor) tax\b|\b(?:levy|royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|courier|(?:1st|2nd|first|second) class|tracked(?: 24| 48)?|next[- ]day|named day|removal|disposal|recycling|delivery|shipping|postage|p\s?&\s?p|service|bag|carrier bags?|booking|small order|basket charge|minimum basket|packaging|pick(?:,|ing)?\s*(?:pack|and pack)\b|installation|surcharge|buyer protection|click\s?&\s?collect|collection|gift ?wrap\w*|card fee|admin fee|fast track)\b/i;
 const TIP_LABEL = /\btip\b|\bgratuity\b/i;
 const DISCOUNT_LABEL = /\b(?:discount|voucher|promo\w*|offers?|savings?|saved|credit|coupon|deal|3 for 2|multi-?buy|rollback|clubcard|nectar|subscribe\s?&\s?save|member|adiclub|reward)\b/i;
 const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in \d|due\b|was\b|rrp)\b/i;
@@ -723,12 +723,12 @@ export function moneyOf(text) {
       }
     }
     if (/^(?:qty|quantity)\b/i.test(label)) continue;
-    // (What the items came to before their savings, "Original subtotal | £38.99", "Basket value before offers | £66.41", is
+    // (What the items came to before their savings, "Original subtotal | £20.00", "Basket value before offers | £44.10", is
     // neither the subtotal nor money. Round 16.)
     if (/^(?:original|before savings?) sub-?\s?total\b|^sub-?\s?total before savings?\b|\bbefore (?:offers|savings|discounts?|promotions?)\b|^(?:total )?basket value\b/i.test(label)) continue;
     // (An item's own line in a text part, "1x    The C.L.T  - £11.95": the dash sets the price apart, it is no minus, and an
     // item is never money off. Round 15.)
-    // (Nor a deal bought as a line of its own, "1x Large Double Deal for £29.99": a thing at its price. Round 16.)
+    // (Nor a deal bought as a line of its own, "1x Family Box Deal for £24.99": a thing at its price. Round 16.)
     if (cells.length === 1 && /^\d{1,3}\s?x\s+\S/i.test(label) && (!DISCOUNT_LABEL.test(label) || (!amt.neg && !/\b(?:discount|voucher|promo\w*|coupon|off|saving|saved)\b/i.test(label)))) continue;
     // The VAT added on top of a subtotal ("VAT charged at 20% | £1.83", "VAT - United Kingdom (20%) | £12.78"): kept apart, so
     // the check can tell prices that include it (Apple) from prices that don't (a software invoice). Round 10.
@@ -744,7 +744,7 @@ export function moneyOf(text) {
     if (TIP_LABEL.test(label)) { out.tips += amt.p; out.found.push(["tip", label, amt.p]); continue; }
     // (The card the bill was paid with, "mastercard - 7613 | -£57.09": the payment, never money off. Round 14.)
     if (amt.neg && /^(?:visa|master ?card|maestro|amex|american express|debit card|credit card|card)\b[^|]{0,24}?\d{4}$/i.test(label)) continue;
-    // (Nor a payment set out by when it was taken, "Payment (Card)" over "11 Dec 2023 - 13:18" over "- £54.50". Round 16.)
+    // (Nor a payment set out by when it was taken, "Payment (Card)" over "2 Mar 2026 - 10:05" over "- £31.00". Round 16.)
     if (amt.neg && /^(?:outstanding |remaining )?balance\b|\bbalance (?:due|outstanding|remaining|to pay)\b|^amount (?:due|outstanding|remaining|left to pay)\b/i.test(label)) continue;
     if (amt.neg && (/^(?:\d{1,2}(?:st|nd|rd|th)? [A-Za-z]{3,9},? \d{4}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})\b[^|\p{L}]{0,12}(?:\d{1,2}:\d{2}(?::\d{2})?)?$/u.test(label) || /^payments?\b/i.test(lines[i - 1] || ""))) continue;
     if (amt.neg || DISCOUNT_LABEL.test(label)) { out.discounts += amt.p; out.found.push(["discount", label, amt.p, amt.neg]); continue; }
@@ -806,7 +806,7 @@ export function checkItems(items, money, totalPence) {
 }
 
 // (Items that come to the subtotal, when the subtotal and what the email adds and takes off don't come to the total:
-// "Subtotal £68.71", "Bag fee £0.10", "Service fee £0.99", "Total £42.32", and no money off shown. Something the email doesn't
+// "Subtotal £50.00", "Bag fee £0.10", "Service fee £0.99", "Total £31.09", and no money off shown. Something the email doesn't
 // set out was taken off, so the receipt can't say the lines are all there is. Round 16.) What is missing, or null.
 export function unexplainedGap(check, money, totalPence) {
   const m = money || {}, S = m.subtotal ?? null, T = totalPence ?? null;

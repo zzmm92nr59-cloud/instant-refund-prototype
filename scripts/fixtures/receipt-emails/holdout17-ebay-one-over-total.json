@@ -1,0 +1,31 @@
+{
+ "id": "holdout17-ebay-one-over-total",
+ "sender": "eBay",
+ "layout": "the thing over 'Total : £6.50' and 'Order number :', then 'Sponsored items' each with 'Free postage'",
+ "headers": {
+  "from": "eBay <ebay@ebay.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order confirmed: Board Game Classic Edition",
+  "date": "Wed, 18 Nov 2026 12:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>eBay</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.ebay.co.uk/?utm_source=email\"><img src=\"https://www.ebay.co.uk/static/email/logo.png\" alt=\"eBay\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks for making your purchase Sam! Your order is confirmed.</td></tr>\n<tr><td>Board Game Classic Edition (Complete) Free UK Post, Good</td></tr>\n<tr><td>Total : &pound;6.50</td></tr>\n<tr><td>Order number : 12-34567-89012</td></tr>\n<tr><td>Item number : 330011223344</td></tr>\n<tr><td>Sponsored items to complement your purchase</td></tr>\n<tr><td>Card Sleeves 100 Pack</td></tr>\n<tr><td>&pound;2.80</td></tr>\n<tr><td>Free postage</td></tr>\n<tr><td>Dice Set of 6</td></tr>\n<tr><td>&pound;4.49</td></tr>\n<tr><td>Free postage</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 eBay. All rights reserved.<br /><a href=\"https://www.ebay.co.uk/help\">Help</a> | <a href=\"https://www.ebay.co.uk/privacy\">Privacy</a> | <a href=\"https://www.ebay.co.uk/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.ebay.co.uk/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "eBay",
+  "date": "2026-11-18",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Board Game Classic Edition (Complete) Free UK Post, Good",
+    "qty": 1,
+    "linePence": 650
+   }
+  ],
+  "subtotalPence": 650,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 650,
+  "orderRef": "12-34567-89012"
+ }
+}

@@ -498,8 +498,8 @@ function slashDate(a, b, y, refDate) {
   const ref = refDate instanceof Date && !Number.isNaN(refDate.getTime()) ? refDate.getTime() + 86400000 : null;
   if (ref == null) return uk;
   const gap = (v) => { const t = Date.parse(v + "T00:00:00Z"); return t > ref ? Infinity : ref - t; };
-  // (A UK email writes the day first: "06/09/2023" a couple of days after it was sent is 6 September, a delivery day, never
-  // 9 June. Month first only when the day-first reading is weeks after the email. Round 16.)
+  // (A UK email writes the day first: "05/03/2026" a couple of days after it was sent is 5 March, a delivery day, never
+  // 3 May. Month first only when the day-first reading is weeks after the email. Round 16.)
   const ukAfter = Date.parse(uk + "T00:00:00Z") - ref;
   if (ukAfter > 0 && ukAfter <= 21 * 86400000) return uk;
   return gap(us) < gap(uk) ? us : uk;
@@ -508,8 +508,8 @@ function slashDate(a, b, y, refDate) {
 // The order's date. A date labelled as the order's ("Order date: 01/11/2026", "Placed on …") comes first, and a date after
 // the email was sent (a pre-order's release date, a concert's day, a renewal's next date) is never the order's: the next
 // date in the text is tried instead (round 3, 19 Nov 2026).
-// (The date can sit a few table cells under its label, "Order Date" over "|", "|", "30/06/2021". Round 16.)
-const ORDER_DATE_LABEL = /\b(?:order(?:ed)?|placed|purchase|booked|booking|transaction|invoice|receipt)\s*(?:date|on|made)?\s*(?:\/\s*[\p{L} ]{2,20})?\s*[:|]\s*\|?\s*(?:\|\s*){0,6}([^\n]{6,40})/giu;
+// (The date can sit a few table cells under its label, "Order Date" over "|", "|", "28/02/2026". Round 16.)
+const ORDER_DATE_LABEL = /\b(?:order(?:ed)?|placed|purchase|booked|booking|transaction|invoice|receipt)[ \t]*(?:(?:date|on|made)?[ \t]*(?:\/\s*[\p{L} ]{2,20})?\s*[:|]|(?:date|made)[ \t]*(?=\n))\s*\|?\s*(?:\|\s*){0,6}([^\n]{6,40})/giu;
 export function parseDate(text, refDate) {
   const t = String(text || "");
   const late = (v) => Boolean(v) && refDate instanceof Date && !Number.isNaN(refDate.getTime()) && new Date(v + "T00:00:00Z").getTime() > refDate.getTime() + 2 * 86400000;
@@ -517,7 +517,7 @@ export function parseDate(text, refDate) {
   // ("Ordered on 18 November 2026", "Placed on Wed 18 Nov 2026" with no colon: still the order's date, before a delivery
   // day written higher up. Round 8.)
   for (const m of t.slice(0, 20000).matchAll(/\b(?:ordered|placed|order placed)\s+on\s+([^\n|]{6,40})/gi)) { const v = dateFound(m[1], refDate); if (v && !late(v)) return v; }
-  // (A delivery or collection day after the email was sent, "Delivery date:" over "06/09/2023", is not when it was ordered:
+  // (A delivery or collection day after the email was sent, "Delivery date:" over "05/03/2026", is not when it was ordered:
   // it is passed over, and the email's own day is the order's. Round 16.)
   const refDay = refDate instanceof Date && !Number.isNaN(refDate.getTime()) ? refDate.toISOString().slice(0, 10) : null;
   const WHEN_COMES = /\b(?:deliver(?:y|ed|s)?|dispatch(?:ed|es)?|despatch(?:ed)?|arriv(?:e|es|al|ing)|collect(?:ion|ed)?|expected|estimated|ready (?:to|for))\b/i;
@@ -596,10 +596,10 @@ function fromText(text, refDate, ctx = {}) {
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/\border\s*#\s*([A-Z0-9-]{3,24})/i) ||
-    // ("ORDER: 274918A" on its line, "Order 5027210" alone on its line under the shop's name. Round 16.)
+    // ("ORDER: 51207B" on its line, "Order 7730041" alone on its line under the shop's name. Round 16.)
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s*:\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s+#?(\d{4,12})[\s|]*$/im) ||
-    // ("Order: # 204-0229696-1513963", Amazon's dispatch email. Round 16.)
+    // ("Order: # 202-1234567-7654321", Amazon's dispatch email. Round 16.)
     text.match(/\border\s*:\s*#\s*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})/i) ||
     // ("Order:" alone on its line, the number on the next: Homary. Round 11.)
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
@@ -632,7 +632,7 @@ function fromText(text, refDate, ctx = {}) {
   const before = (m) => text.slice(Math.max(0, m.index - 14), m.index);
   // (Nor a total before VAT, "Total (exc. VAT): £12.50", when the email also gives the total with it: coverage round.)
   const notSub = totals.filter((m) => !/sub[-\s]?$/i.test(before(m)) && !/\b(?:items?|products?|goods|line|item\(s\)|basket|trolley|cart|bag)[ \t]*$/i.test(before(m)) &&
-    // (Nor when the email's own plain total follows it: "Total (Excl. VAT) £66.65", "of which VAT £13.33", "Total £79.98". Round 16.)
+    // (Nor when the email's own plain total follows it: "Total (Excl. VAT) £50.00", "of which VAT £10.00", "Total £60.00". Round 16.)
     !(/^total\s*\((?:exc|excl|excluding|ex)\b/i.test(m[0]) && totals.some((o) => /^total\s*\((?:inc|incl|including)\b/i.test(o[0]) || (o.index > m.index && /^total\s*(?![\s(\[]*(?:exc|excl|excluding|ex|before|net)\b)[:|\s]*£/i.test(o[0])))) &&
     // (Nor a "net total" before VAT, when the bill's own total follows it: "net total £42.42", "v.a.t £8.48", "bill total
     // £50.90". Round 13.)
@@ -1487,7 +1487,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
   // Uber sends rides and Uber Eats orders from the same address and name: a food order is Uber Eats.
   if (/(^|\.)uber\.com$/i.test(sentDomain || "") && /^uber$/i.test(ranked.name || "") && (/\buber eats\b/i.test(subject) || (/\border\b/i.test(subject) && /\buber eats\b/i.test(text.slice(0, 4000))))) ranked.name = "Uber Eats";
   // (An ordering platform's email, or one whose sender gives no name of its own, names the restaurant it was for: "Your order
-  // with Catch Seafood (Holmfirth) is confirmed", "Thank you for ordering with Pizza Hut Restaurants!". The restaurant is the
+  // with Harbour Chippy (Whitby) is confirmed", "Thank you for ordering with Pizza Hut Restaurants!". The restaurant is the
   // shop, never the platform ("Preoday") or a word from its address ("Pizza"). Round 16.)
   {
     const hay = String(subject || "") + "\n" + text.slice(0, 4000);
@@ -1497,7 +1497,7 @@ function shopOf({ ld, sender, fromName, subject, text, html, otherText }) {
     const weak = !ranked.name || (sentDomain && isVia(sentDomain)) || !sentName || (named && named.toLowerCase().startsWith(String(ranked.name).toLowerCase() + " "));
     const longer = named && ranked.name && named.toLowerCase().startsWith(String(ranked.name).toLowerCase() + " ");
     if (named && weak && !/^(?:us|you|the|your|our)\b/i.test(named) && (longer || !sameShopName(named, ranked.name))) {
-      // (The branch in brackets is where, not who: "Catch Seafood (Holmfirth)" is Catch Seafood.)
+      // (The branch in brackets is where, not who: "Harbour Chippy (Whitby)" is Harbour Chippy.)
       ranked.name = named.replace(/\s*\([^()]{1,40}\)$/, "").replace(/^(\p{Lu}[\p{L}'’]+(?: \p{Lu}[\p{L}'’]+)+) [Rr]estaurants?$/u, "$1");
       if (sentDomain && isVia(sentDomain)) ranked.via = ranked.via || sentDomain;
     }
@@ -1535,8 +1535,8 @@ function legsByWay(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
   const out = { outbound: [], return: [], ticketsIn: { outbound: 0, return: 0 } };
   let way = null, inOrder = false, prev = null;
-  // (A way with no "A to B" rows under it sets out its train by the times it leaves and arrives, "11:17 London Kings Cross",
-  // "14:12 Brighouse": that is its leg. Round 16.)
+  // (A way with no "A to B" rows under it sets out its train by the times it leaves and arrives, "09:05 Leeds",
+  // "11:40 London Kings Cross": that is its leg. Round 16.)
   const timed = { outbound: [], return: [] };
   for (const r of rows) {
     const h = /^(outbound|return)\s+(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/i.exec(r);
@@ -1548,7 +1548,7 @@ function legsByWay(text) {
     if (inOrder) { if (RAIL_TICKET.test(r) && r !== prev) out.ticketsIn[way]++; prev = r; continue; }
     const leg = RAIL_LEG.exec(r);
     if (leg && !/^your\b/i.test(r)) {
-      // ("Pontefract Monkhill or Pontefract Tanshelf to Brighouse", "Newark Castle or Northgate to Retford": the station the
+      // ("Halton Lea or Halton Bridge to Marsham", "Elmford Castle or Central to Wrayton": the station the
       // train is boarded at, by the times it is set out with or the leg before; else the first.)
       const alt = /^(\p{Lu}[\p{L}\d .'’&-]{1,40}?) or (\p{Lu}[\p{L}\d .'’&-]{1,40}?) to (.+)$/u.exec(r);
       let from = leg[1];
@@ -1565,8 +1565,8 @@ function legsByWay(text) {
   for (const w of ["outbound", "return"]) if (!out[w].length && timed[w].length >= 2) out[w].push(`${timed[w][0]} to ${timed[w][timed[w].length - 1]}`);
   return out;
 }
-// A leg of a rail journey on a row of its own: "London Kings Cross to Pontefract Monkhill", or with a choice of stations,
-// "Pontefract Monkhill or Pontefract Tanshelf to Brighouse".
+// A leg of a rail journey on a row of its own: "Leeds to Halton Lea", or with a choice of stations,
+// "Halton Lea or Halton Bridge to Marsham".
 const RAIL_LEG = /^(\p{Lu}[\p{L}\d .'’&-]{1,40}?(?: or \p{Lu}[\p{L}\d .'’&-]{1,40}?)?) to (\p{Lu}[\p{L}\d .'’&-]{1,40})$/u;
 function railTickets(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
@@ -1598,7 +1598,7 @@ function legOf(text, type, nth = 0) {
 // (each fee or extra over its price, or "No booking fee"), down to "Total amount": a rail booking, a railcard, a ticket
 // change ("Pay The Difference: Adult - Advance Single" with no price of its own, then "Admin Fee" over "£7.50"). Null when
 // the email has no such list. Round 15.
-const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
+const DETAILS_HEAD = /^order details$/i, COSTS_HEAD = /^other costs\*?$/i, DETAILS_END = /^(?:total(?: amount| paid| price| cost)?)\s*:?(?:\s*£\s?[\d,]+\.\d{2})?$/i;
 function detailsList(text) {
   const rows = String(text || "").split("\n").map((x) => x.replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
   const start = rows.findIndex((r) => DETAILS_HEAD.test(r));
@@ -1714,7 +1714,7 @@ function venueOf(text, shop) {
   if (!/\btable (?:number|no\.?)\s*:?|\bthanks?\s+for\s+visiting\b|(?<!questions about )\byour\s+bill\b|\bbill\s+has\s+been\s+paid\b/i.test(t)) return null;
   // (Nor is a label, "BILLED TO", or anything in the payer's own block, "Billing and Payment" over their name and address.)
   const ok = (n) => n && n.length >= 3 && n.length <= 40 && /^\p{Lu}/u.test(n) && !/\d{3}|@|\b(?:order|receipt|bill|billed|billing|table|thank|total|paid|date|time)\b|\b(?:ship(?:ped)?|deliver(?:ed)?|sent|sold)\s+to\b/i.test(n) && !sameShopName(n, shop) ? n : null;
-  // (Up to four lines above: "Billing address" over "Apartment 3003" over "11" over the building's name. Round 16.)
+  // (Up to four lines above: "Billing address" over "Flat 12" over "4" over the building's name. Round 16.)
   const payerBlock = (ls, k) => [ls[k - 1], ls[k - 2], ls[k - 3], ls[k - 4]].some((x) => /\b(?:billing|billed to|bill to|payment|deliver(?:y|ed)? (?:to|address)|ship(?:ping)? (?:to|address)|invoice (?:to|address))\b/i.test(String(x || "")));
   const vis = /\bthanks?\s+for\s+visiting\s+(\p{Lu}[^\n|.!,]{1,40}?)\s+and\b/iu.exec(t.replace(/\s*\n\s*/g, " ").replace(/\s/g, " "));
   if (vis && ok(vis[1].trim())) return vis[1].trim();
@@ -1870,7 +1870,7 @@ function unwrapNames(lines) {
   return out;
 }
 // (A table whose headings and cells each sit on lines of their own, "Qty", "Product", "Unit Price", "Total", "Saved", then
-// "1", "Tesco British Chicken Breast Fillets 950G", "£6.50", "£5.96", "£0.54" for each row: how many, the name and the line's
+// "1", "Chicken Thigh Fillets 500G", "£4.00", "£3.60", "£0.40" for each row: how many, the name and the line's
 // total, never the unit price or what was saved. A section's name between rows ("Fridge", "Freezer") and a row's notes
 // ("Substitutions: On", "£2.75 Clubcard Price") are not things. Round 16.)
 const SPLIT_HEAD = { qty: /^(?:qty\.?|quantity)$/i, name: /^(?:product|item|description|product name)$/i, unit: /^(?:unit price|price each|price)$/i, line: /^(?:total|line total|item total|amount)$/i, saved: /^(?:saved?|saving|savings|you save|discount)$/i };
@@ -1880,7 +1880,7 @@ function splitColumns(t) {
   for (let h = 0; h < cells.length; h++) {
     const roles = [];
     for (let k = h; k < cells.length && roles.length < 6; k++) { const r = roleOf(cells[k]); if (!r || roles.includes(r)) break; roles.push(r); }
-    if (roles.length < 3 || !roles.includes("name") || !roles.includes("line") || !roles.includes("qty")) continue;
+    if (roles.length < 4 || !roles.includes("name") || !roles.includes("line") || !roles.includes("qty") || !roles.includes("unit")) continue;
     const out = [];
     const MONEYC = /^£\s?(\d{1,4}(?:,\d{3})*\.\d{2})$/;
     for (let k = h + roles.length; k < cells.length && out.length < 80;) {
@@ -2060,24 +2060,25 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     const fromA = same(addr(headers.from)), toName = nameOf(headers.to), fromName0 = nameOf(headers.from);
     const innerTo = /^[>\s*]*to:\s*(.+)$/im.exec(text.slice(0, 4000));
     const words = (n) => new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3));
-    // (Two people of one family share a surname: "Declan Gamble" forwarding to "Connor Gamble" is still someone else. The same
+    // (Two people of one family share a surname: "Jo Taylor" forwarding to "Sam Taylor" is still someone else. The same
     // first name, or an initial for it, is the same person. Round 16.)
     const firstW = (n) => (String(n || "").trim().split(/\s+/)[0] || "").toLowerCase().replace(/[^\p{L}]/gu, "");
     const f1 = firstW(fromName0), t1 = firstW(toName);
     const shared = f1 && t1 && f1.length > 1 && t1.length > 1 ? f1 === t1 : [...words(fromName0)].some((w) => words(toName).has(w));
     if (fromA && innerTo && same(innerTo[1].toLowerCase()).includes(fromA) && toName && fromName0 && !shared) return { ok: false, reason: "someone_elses_purchase", source: "shopper_email" };
   }
-  // (Or the forwarded email greets someone else by name, "Hi Declan," and was first sent to their address, not the shopper's,
-  // "To: dec-…@…": their purchase, even when the two share a family name, or the shopper forwarded it from another inbox.
+  // (Or the forwarded email greets someone else by name, "Hi Jo," and was first sent to their address, not the shopper's,
+  // "To: jo-…@…": their purchase, even when the two share a family name, or the shopper forwarded it from another inbox.
   // Round 16.)
   if (!opts.lenient) {
     const top = text.slice(0, 5000);
-    const fwdBlock = /^[>\s*]*from:[^\n]{3,200}\n(?:[>\s*]*(?:sent|date):[^\n]{3,120}\n)[>\s*]*to:\s*([^\n]{3,200})$/im.exec(top);
+    // (Each forward's header block, the shopper's own forward and the one inside it.)
+    const fwdBlocks = [...top.matchAll(/^[>\s*]*from:[^\n]{3,200}\n(?:[>\s*]*(?:sent|date):[^\n]{3,120}\n)[>\s*]*to:\s*([^\n]{3,200})$/gim)];
     const toHeader = String(headers.to || ""), toAddr = ((toHeader.match(/<([^>]+)>/) || [])[1] || toHeader).trim().toLowerCase();
     const toFirst = ((toHeader.match(/^\s*"?([^"<@]+?)"?\s*</) || [])[1] || "").trim().split(/\s+/)[0].toLowerCase();
-    // (Or no greeting, but the order's own "Name: DECLAN GAMBLE" in its address block.)
-    const hi = /^[>\s*]*(?:hi|hello|hey|dear)\s+(\p{Lu}[\p{Ll}'’-]{2,20})\s*[,!]/imu.exec(top) || /^[>\s*|]*(?:name|customer name|full name)\s*:\s*(\p{Lu}[\p{L}'’-]{2,20})\s+\p{Lu}[\p{L}'’-]{1,30}\s*$/imu.exec(text.slice(0, 8000));
-    if (fwdBlock && hi && /@/.test(toAddr)) {
+    // (Or no greeting, but the order's own "Name: JO TAYLOR" in its address block.)
+    const hi = /^[>\s*]*(?:hi|hello|hey|dear)\s+(\p{Lu}[\p{Ll}'’-]{1,20})\s*[,!]/imu.exec(top) || /^[>\s*|]*(?:name|customer name|full name)\s*:\s*(\p{Lu}[\p{L}'’-]{2,20})\s+\p{Lu}[\p{L}'’-]{1,30}\s*$/imu.exec(text.slice(0, 8000));
+    for (const fwdBlock of hi && /@/.test(toAddr) ? fwdBlocks : []) {
       const innerAddr = ((fwdBlock[1].match(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i) || [])[0] || "").toLowerCase();
       const g = hi[1].toLowerCase(), local = (a) => String(a || "").split("@")[0].replace(/[^a-z]/g, "");
       const fromH = String(headers.from || ""), fromAddr = ((fromH.match(/<([^>]+)>/) || [])[1] || fromH).trim().toLowerCase();
@@ -2265,7 +2266,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       // "Return |": each ticket takes the legs of its own way, in order. Round 15.)
       const byWay = legsByWay(body);
       const wayN = {};
-      // (Split tickets of one kind set out as one line, "2 × Adult - Advance Single" "£5.80", for a way of two legs: a ticket
+      // (Split tickets of one kind set out as one line, "2 × Adult - Advance Single" "£6.20", for a way of two legs: a ticket
       // for each leg, each at its price. Round 16.)
       const tk = tickets.flatMap((t) => { const legs = t.way ? byWay[t.way] : byWay.outbound; return t.qty > 1 && legs && legs.length === t.qty && tickets.filter((x) => x.way === t.way).length === 1 && !/^child/i.test(t.passenger || "") && /^adults?$/i.test(t.passenger || "") && /\b1x adult\b|\b1 adult\b/i.test(body.replace(/\s+/g, " ")) ? Array.from({ length: t.qty }, (_, k) => ({ ...t, qty: 1, leg: legs[k] })) : [t]; });
       result.items = tk.map((t) => {
@@ -2277,7 +2278,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         .concat(fees.map((f) => ({ name: f.name, qty: 1, pricePence: f.pricePence })));
     } else result.items = [{ name: trip, ...(tickets.length === 1 ? { variant: detail(tickets[0]) } : {}), qty: 1, pricePence: result.totalPence ?? null }];
     // (The booking's number is its "Transaction ID", on the line under its label.)
-    const tx = /\btransaction id\s*:?\s*\|?\s*\n?\s*\|?\s*([A-Z0-9][A-Z0-9-]{5,24})\b/i.exec(body);
+    const tx = /\btransaction id\s*:?[\s|]{0,12}([A-Z0-9][A-Z0-9-]{5,24})\b/i.exec(body);
     if (!result.orderRef && tx) result.orderRef = tx[1];
   }
   // A booking whose subject names no journey but which lists what was paid for under "Order Details" and "Other costs" (a
@@ -2350,11 +2351,11 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     // "Basket Total: £134.88": that one thing, before a price printed above the next words is tried. Round 12.)
     for (const t of [textR, otherR]) if (t) { const one = soleItemOverPrice(t, moneyOf(t), result.totalPence); if (one) cands.push({ items: [one], money: moneyOf(t) }); }
     for (const t of [textR, otherR]) if (t) cands.push({ items: readable(readItems(t, { priceAbove: true })), money: moneyOf(t) });
-    // (A list of names each over its price and nothing else, "inari taco" / "£3.25" / "wasabi" / "£0.00" / "crunchy cali roll
-    // (3x Pieces)" / "£4.25", under "Order Summary": tried last, so it is taken only when it adds up and nothing else does.
+    // (A list of names each over its price and nothing else, "miso soup" / "£2.50" / "ginger" / "£0.00" / "salmon roll
+    // (4x Pieces)" / "£5.10", under "Order Summary": tried last, so it is taken only when it adds up and nothing else does.
     // Round 16.)
     for (const t of [textR, otherR]) if (t) { const pp = namePricePairs(t); if (pp.length >= 2) cands.push({ items: readable(pp), money: moneyOf(t) }); }
-    for (const t of [textR, otherR]) if (t) { const sc = splitColumns(t); if (sc.length >= 2) cands.unshift({ items: readable(sc), money: moneyOf(t), byHeadings: true }); }
+    for (const t of [textR, otherR]) if (t) { const sc = splitColumns(t); if (sc.length >= 2) cands.push({ items: readable(sc), money: moneyOf(t), byHeadings: true }); }
     // "Read it again" (receipt-reread.js) also tries the older readers on both parts.
     if (opts.wide) for (const t of [text, otherPart]) if (t) cands.push({ items: cleanItems(itemsFromCells(t)), money: moneyOf(t) }, { items: cleanItems(fromText(t, refDate).items), money: moneyOf(t) });
     const settled = cands.map((c) => ({ ...settleItems(c.items, c.money, result.totalPence), money: c.money, byHeadings: Boolean(c.byHeadings) }));
@@ -2696,7 +2697,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // receipt's number the reference. Any biller, any site. Round 12.
   // A list of what was ordered with no prices ("1x Large 13.5" Texas BBQ®", "+ Classic Crust", "1x Strippers Combo"), the
   // prices only in the total: the things bought, each with how many and its extras, and no price made up. Round 13.
-  // (Some lines can carry a price, "1x All Large Pizza £14", "1x Large Double Deal for £29.99", and the rest none: then the
+  // (Some lines can carry a price, "1x Any Large Pizza £15", "1x Family Box Deal for £24.99", and the rest none: then the
   // reader's own list can be just the last line at the whole total. The whole list is read instead. Round 16.)
   const oneAtTotal = result.items.length === 1 && result.totalPence != null && result.items[0].pricePence === result.totalPence && /^\d{1,2}\s?[x×]\s/m.test(text);
   if ((!result.items.length || oneAtTotal) && !isFlight && !journey) {
@@ -2706,8 +2707,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     for (const r of rows.slice(0, 2000)) {
       if (got.length >= 60) break;
       // ("1x 21 Chicken Kickers™": a name can start with a number. A deal set out as a line, "1x 40% off …", is not a thing.)
-      // (A deal's name can carry its terms, "Large Pizza for £12.99 Each When You Buy Any Chicken Side": the name, with no
-      // price of its own. One that ends "for" before its price, "1x Large Double Deal for £29.99", keeps the price in its
+      // (A deal's name can carry its terms, "Medium Pizza for £9.99 Each When You Buy Any Side": the name, with no
+      // price of its own. One that ends "for" before its price, "1x Family Box Deal for £24.99", keeps the price in its
       // name too. Round 16.)
       const m = /^(\d{1,2})\s?[x×]\s+((?:\p{Lu}|\d{1,3}\s\p{Lu})[^£|]{2,80}?)(?:\s+£\s?(\d{1,3}(?:\.\d{2})?))?$/u.exec(r) ||
         /^(\d{1,2})\s?[x×]\s+((?:\p{Lu}|\d{1,3}\s\p{Lu})[^£|]{2,60}? for £\s?\d{1,3}(?:\.\d{2})? (?:[Ee]ach|[Ww]hen|[Ww]ith|[Ii]f)\b[^£|]{2,60})()$/u.exec(r);
@@ -2743,8 +2744,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
         : { complete: null, itemsPence: priced.reduce((a, g) => a + g.pricePence, 0), expectedPence: result.totalPence ?? null, missingPence: null, noPrices: true };
     }
   }
-  // (A restaurant app's order summary that prices each thing without a pound sign, "Buffet Only" over "12.99", "San Miguel"
-  // over "5.29", the parts of a meal deal on the rows under it with no price ("Kids Fries"), then "Subtotal" and "Total: £36.56":
+  // (A restaurant app's order summary that prices each thing without a pound sign, "Lunch Buffet" over "10.50", "Lemonade"
+  // over "3.20", the parts of a meal deal on the rows under it with no price ("Kids Chips"), then "Subtotal" and "Total: £27.40":
   // each thing at its price, its parts as its details, when they come to the total. Round 16.)
   if (!result.items.length && !isFlight && !journey && Number.isInteger(result.totalPence)) {
     const rows = String(fromHtml || text).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 1500);
@@ -2768,7 +2769,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = { complete: true, itemsPence: sum, expectedPence: result.totalPence, missingPence: 0 };
     }
   }
-  // (The thing bought set out under labels of its own, "Product" over "Waltz", "Price" over "£13.99", then the payment's
+  // (The thing bought set out under labels of its own, "Product" over "Spring Posy", "Price" over "£24.00", then the payment's
   // money: that thing at that price. Round 16.)
   if ((!result.items.some((i) => namesCheck([i], { shop: result.retailer.name || "" }).namesOk) || !result.items.some((i) => i.pricePence > 0)) && !isFlight && !journey) {
     const pr = /^[ \t|]*product(?: name)?[ \t|]*\n[\s|]*(\p{L}[^\n|£]{1,80}?)[ \t|]*\n[\s|]*price[ \t|]*\n[\s|]*£\s?([\d,]+\.\d{2})[ \t|]*$/imu.exec(fromHtml || text);
@@ -2777,8 +2778,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = checkItems(result.items, moneyOf(fromHtml || text), result.totalPence);
     }
   }
-  // (One thing over its total and the order's and item's numbers, eBay's "Call of Duty: Modern Warfare 3 (…) Free UK Post,
-  // Good" / "Total : £4.00" / "Order number : 01-…" / "Item number : 1745…": that thing, at that total. Round 16.)
+  // (One thing over its total and the order's and item's numbers, eBay's "Board Game Classic Edition (…) Free UK Post,
+  // Good" / "Total : £6.50" / "Order number : 12-…" / "Item number : 3300…": that thing, at that total. Round 16.)
   if (!result.items.length && !isFlight && !journey && Number.isInteger(result.totalPence)) {
     const one = /^[ \t|]*(\p{L}[^\n|£]{7,160}?)[ \t|]*\n[\s|]*total\s*:?\s*£\s?([\d,]+\.\d{2})[ \t|]*\n[\s|]*(?:order|item) (?:number|no\.?)\b/imu.exec(fromHtml || text);
     if (one && money(one[2]) === result.totalPence && !/^(?:sub-?\s?total|delivery|postage|shipping|total|order)\b/i.test(one[1])) {
@@ -2786,7 +2787,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 };
     }
   }
-  // (An order email that lists nothing but names the order in its subject, Amazon's 'Your Amazon.co.uk order of "Vocal-Star
+  // (An order email that lists nothing but names the order in its subject, Amazon's 'Your Amazon.co.uk order of "Garden Hose
   // VS-600 HDMI..."': that is what was bought, its name as the subject cuts it, with no price made up; "and 4 more item(s)"
   // says how many more there are. Round 16.)
   if (!result.items.length && !isFlight && !journey) {
@@ -2849,15 +2850,15 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // a label, a size or a code makes namesOk false (with suspectNames), and the app says some names may not be right.
   if (result.items.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, ...namesCheck(result.items, { shop: (result.retailer && result.retailer.name) || "" }) };
   // (A phone network's plan order paid by the month, "Total upfront cost £0.00" or "Pay today: £0.00" beside "Total monthly
-  // cost £18.50": a contract, not a one-off purchase. A SIM plan alone is not a purchase at all; a device on it, "Meta Quest
-  // 3S | White" at "£26.00" "For 11 months", is the thing bought, said once, with what it costs a month and no made-up total.
+  // cost £21.00": a contract, not a one-off purchase. A SIM plan alone is not a purchase at all; a device on it, "Tablet
+  // 10 | Grey" at "£15.00" "For 24 months", is the thing bought, said once, with what it costs a month and no made-up total.
   // Round 16.)
   if (!opts.lenient) {
     const flatM = text.slice(0, 20000).replace(/[\s|]+/g, " ");
     if (/\b(?:total upfront cost|upfront cost|pay today|(?:total )?(?:cost )?paid today|due today)\s*:?\s*£\s?0(?:\.00)?\b/i.test(flatM) && /\b(?:total |additional )?monthly (?:cost|price|payment)\b|\bcontract (?:length|start date)\b/i.test(flatM)) {
       const PLAN = /\bsim\b|\bplan\b|\bunlimited\b|\b\d{1,2}m\b|^for \d{1,2} months?$|^\(?increases?\b|^(?:monthly )?discounts?\b|^delivery\b|^your (?:current )?(?:phone )?plan\b|^(?:scam guard|no spend cap|add-?ons?|extras?|roam(?:ing)?\b.*|deposit|data gifting|insurance)\b/i;
       const seen = new Set(), devices = [];
-      for (const it of result.items) { const n = String(it.name || "").trim(); if (!n || PLAN.test(n) || seen.has(n.toLowerCase())) continue; seen.add(n.toLowerCase()); devices.push({ name: n, qty: 1, pricePence: null }); }
+      for (const it of result.items) { const n = String(it.name || "").trim(); if (!n || it.pricePence == null || PLAN.test(n) || /^(?:additional items?|your (?:new )?plan|plan (?:name|cost|description))\b/i.test(n) || seen.has(n.toLowerCase())) continue; seen.add(n.toLowerCase()); devices.push({ name: n, qty: 1, pricePence: null }); }
       if (!devices.length) return { ok: false, reason: "contract", source: "shopper_email" };
       const per = /£\s?(\d{1,4}\.\d{2})\s+for (\d{1,2}) months\b/i.exec(flatM);
       if (per && devices.length === 1) devices[0].variant = `£${per[1]} a month for ${per[2]} months`;
@@ -2870,8 +2871,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!opts.lenient && result.totalPence == null && !result.items.some((i) => Number.isInteger(i.pricePence) && i.pricePence > 0) && SURVEY_TOP.test(text.slice(0, 3000).replace(/\s+/g, " "))) {
     return { ok: false, reason: "survey", source: "shopper_email" };
   }
-  // (Something free, "Fortnite (Game) £0.00", "Total: £0.00", with no money anywhere in the email but what a trial will cost
-  // later, "Recurring Subscription Fee: £6.99 will be charged on 06/03/2021": nothing was paid, so it is not a purchase. A
+  // (Something free, "Sky Racers (Game) £0.00", "Total: £0.00", with no money anywhere in the email but what a trial will cost
+  // later, "Recurring Subscription Fee: £7.99 will be charged on 01/04/2026": nothing was paid, so it is not a purchase. A
   // free film bought with a promotion, "£3.99" then "Promotions: -£3.99", still shows its price, and stays one. Round 16.)
   if (!opts.lenient && result.totalPence === 0 && !result.items.some((i) => Number.isInteger(i.pricePence) && i.pricePence > 0)) {
     const paid = text.slice(0, 30000).split("\n").filter((l) => !/\bwill be (?:charged|taken|billed)\b|\bafter (?:the|your) (?:free )?trial\b|\bthen £|\bper (?:month|year)\b/i.test(l)).some((l) => /£\s?(?!0+(?:\.00)?(?![\d.,]))\d/.test(l));
@@ -2967,9 +2968,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
     const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && f[1] !== zeroedGift && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|(?<!\d)(?!(?:19|20)\d{2}(?!\d))\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
     if (percentOff && !off.some((d) => d.pence === percentOff.pence)) off.push(percentOff);
-    // (A line that only sums up what was saved, "You've Saved £5.85" or "You're Saving £6.50", is not more money off; and when the
+    // (A line that only sums up what was saved, "You've Saved £3.00" or "You're Saving £2.00", is not more money off; and when the
     // items as priced already come to what was paid with the fees, the money off is inside their prices, "Black Friday - Save
-    // 15 percent" "-£5.85" under the item and "Product Saving -£5.85" under the list: never taken off a second time. Round 16.)
+    // 15 percent" "-£3.00" under the item and "Product Saving -£3.00" under the list: never taken off a second time. Round 16.)
     const itemsP = result.items.reduce((a, i) => a + (Number.isInteger(i.pricePence) ? (i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)) : NaN), 0);
     const inPrices = Number.isInteger(result.totalPence) && !Number.isNaN(itemsP) && off.length && Math.abs(itemsP + (mon.fees || 0) + (mon.tips || 0) - result.totalPence) <= 1 && /\b(?:original subtotal|you(?:'|’)?(?:ve| have)? sav(?:ed|ing)|you(?:'|’)re saving|product saving|total savings?)\b/i.test(text);
     for (let k = off.length - 1; k >= 0; k--) if (inPrices || /^(?:you(?:'|’)?(?:ve| have)? saved|you(?:'|’)re saving|you saved|total savings?|savings? today)\b/i.test(off[k].label) && !(mon.found || []).some((f) => f[0] === "discount" && f[1] === off[k].label && f[3] === true)) off.splice(k, 1);
@@ -3010,8 +3011,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     }
   }
   // (A ride is its fare; the fees, tip and credits under it are what was added and taken off, each as Uber labels it, so the
-  // ride line never counts them a second time: "Trip fare £31.48", "Uber pet fee £3.47", "Uber One credits -£1.58", total
-  // £33.37. Round 16.)
+  // ride line never counts them a second time: "Trip fare £20.00", "Uber pet fee £3.00", "Uber One credits -£1.00", total
+  // £22.00. Round 16.)
   if (ride && result.items.length === 1 && (uber.cancelled || uber.membership) && Number.isInteger(result.totalPence)) {
     result.items = [{ ...result.items[0], pricePence: result.totalPence }];
     delete result.fees; delete result.discounts;

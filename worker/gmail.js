@@ -2017,7 +2017,7 @@ export function mergeOrderEmails(orders, opts = {}) {
     if (fits.length === 1) replacedBy.set(fits[0], u);
   }
   // (A click-and-collect order's "ready to collect" email and its "You've collected your items" receipt, which can number the
-  // order differently, a collection reference "FT913088" against the order's "6557486156": one purchase when the shop, the
+  // order differently, a collection reference "QX402117" against the order's "8812203345": one purchase when the shop, the
   // things, how many and what they cost, and the total are the same, collected within ten days. The receipt leads. Round 16.)
   const sameItems = (a, b) => (a.items || []).length > 0 && a.items.length === (b.items || []).length && a.items.every((x, k) => String(x.name || "").toLowerCase() === String(b.items[k].name || "").toLowerCase() && (x.qty || 1) === (b.items[k].qty || 1) && lineOf(x) === lineOf(b.items[k]));
   for (const c of orders) {

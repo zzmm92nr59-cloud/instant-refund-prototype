@@ -40,8 +40,8 @@ export function uberEmail(domain, subject, text) {
     const pet = /\buber pet\b|\bpet fee\b/i.test(t);
     return { kind: "ride", item: pet ? "Uber Pet ride" : "Uber ride" };
   }
-  // (A trip cancelled after the grace period: "Here's the receipt for your canceled trip", "Cancellation fee £7.98". What was
-  // paid is the fee. And Uber One's own payment, "Your Uber One payment was successful", "Total charged £4.99": the
+  // (A trip cancelled after the grace period: "Here's the receipt for your canceled trip", "Cancellation fee £5.00". What was
+  // paid is the fee. And Uber One's own payment, "Your Uber One payment was successful", "Total charged £5.99": the
   // membership. Round 16.)
   if (/\b(?:here(?:'|’)s )?(?:the|your) receipt for your cancel+ed trip\b/i.test(top + "\n" + (subject || "")) && /^cancellation fee\b/im.test(t)) return { kind: "ride", item: "Cancellation fee", cancelled: true };
   if (/\byour uber one payment was successful\b/i.test(top + "\n" + (subject || "")) && /\btotal charged\b/i.test(t)) return { kind: "ride", item: "Uber One membership", membership: true };
@@ -52,16 +52,16 @@ export function uberEmail(domain, subject, text) {
   return null;
 }
 // What a ride's receipt sets out between its total and its payments: the trip's fare, then each fee, tip or credit on a row
-// of its own, its amount beside it or on the row under it ("Trip fare | £31.48", "Uber pet fee", "£3.47", "Wait Time", "£0.36",
-// "UberX Priority £1.98", "Tip £2.00", "Uber One credits -£1.58", "Promotion -£3.00"). The ride is the fare; the rest are what
+// of its own, its amount beside it or on the row under it ("Trip fare | £20.00", "Uber pet fee", "£3.00", "Wait Time", "£0.40",
+// "UberX Priority £2.00", "Tip £2.00", "Uber One credits -£1.00", "Promotion -£3.00"). The ride is the fare; the rest are what
 // was added or taken off, so nothing is counted twice. Only when every amount is in pounds and fare, plus fees and tips,
 // less money off, comes to the total; otherwise null (and the ride stays one line for what was paid). Round 16.
 const RIDE_SKIP = /^(?:subtotal|total|fare total|uber one credits earned|credits? earned|estimated fare\b.*|conversion\b.*|payments?)$/i;
 export function uberRideMoney(text, totalPence) {
   if (!Number.isInteger(totalPence) || totalPence <= 0) return null;
   const list = rows(String(text || "").slice(0, 20000));
-  // (A ride abroad paid in pounds: its fare lines are in euros, and under the payments "Fare total £18.67" and "Currency
-  // conversion fee £0.28" make up the £18.95 paid.)
+  // (A ride abroad paid in pounds: its fare lines are in euros, and under the payments "Fare total £15.00" and "Currency
+  // conversion fee £0.30" make up the £15.30 paid.)
   const fareTotal = labelled(list, /fare total/), conv = labelled(list, /currency conversion fee/);
   if (fareTotal != null && conv != null && fareTotal + conv === totalPence && list.some((r) => /^trip fare\b/i.test(r)) && list.some((r) => /€|\b(?:EUR|USD|MXN|PLN)\b/.test(r)))
     return { farePence: fareTotal, fees: [{ label: "Currency conversion fee", pence: conv }], discounts: [] };

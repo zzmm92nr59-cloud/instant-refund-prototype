@@ -41,9 +41,9 @@ const NOTE = [
   /^(?:royal mail|evri|hermes|dpd|dhl|ups|yodel|parcelforce|inpost)\b.*\b(?:class|tracked|signed for|delivery|shipping|next day|standard|express|24|48)$/i,
   /\bgift (?:message|note|receipt)\b/i, /^(?:note|notes|comment|instructions?)\s*:/i, /^please\b/i,
   /\b(?:reward|points?) (?:earned|redeemed|applied|used)\b/i, /^(?:pack(?:ed)? in|bagged|bag \d)/i,
-  // (Round 16, Connor's Outlook inbox: a delivery day or window, "Sunday 10 December", "Tue 20 Dec - Fri 23 Dec"; a column's
+  // (Round 16, a real inbox: a delivery day or window, "Monday 3 March", "Wed 4 Mar - Fri 6 Mar"; a column's
   // or a document's heading, "Item Desc", "Item Value", "Invoice receipt"; how it was paid, "Offline payment"; a plan's
-  // terms, "For 11 months", "(Increases by"; the end of an address, "Kingdom"; a gift message's sign-off, "Sam xx".)
+  // terms, "For 24 months", "(Increases by"; the end of an address, "Kingdom"; a gift message's sign-off, "Sam xx".)
   /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]{0,6}\.?,? \d{1,2}(?:st|nd|rd|th)? [a-z]{3,9}\.?(?: \d{4})?(?:\s*[-–]\s*(?:mon|tue|wed|thu|fri|sat|sun)[a-z]{0,6}\.?,? \d{1,2}(?:st|nd|rd|th)? [a-z]{3,9}\.?(?: \d{4})?)?$/i,
   /^item (?:desc(?:ription)?|value|name|price|details?)$/i, /^(?:invoice|tax invoice|invoice receipt|receipt|payment receipt)$/i, /^(?:offline|online|card|cash) payment$/i,
   /^for \d{1,2} (?:months?|years?|weeks?)$/i, /^\(?\s*increases? by\b/i, /^(?:united )?kingdom$|^great britain$/i, /^\p{Lu}\p{Ll}{1,20} x{2,4}$/u,
