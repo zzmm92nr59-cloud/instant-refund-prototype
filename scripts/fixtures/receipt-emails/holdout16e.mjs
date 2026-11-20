@@ -26,6 +26,19 @@ export const SHIRT_DELIVERED = fixture("holdout16e-carrier-delivered-link", "Par
   text: "Your Collarworks package was delivered\n\nYour package from Collarworks was delivered. Your package was left with the receptionist Today, 10:04 AM.\n\nTrack and manage package (https://track.parcelways.example/tracking/UK4471100293?ref=email)\n" },
   { notPurchase: { kind: "delivered" } });
 
+// (Not in the corpus as a purchase: a sports nutrition shop's order and its email cancelling one of its things, "We have
+// cancelled the following item(s) from your order 771508763", below a long menu, the thing's name with its link over
+// "Quantity 1". Only that thing is cancelled.)
+export const NUTRITION_ORDER = fixture("holdout16e-nutrition-order", "Musclemart", "an order of three things", {
+  from: "Musclemart <orders@musclemart.example>", subject: "Thank you for your order", date: "Sat, 07 Nov 2026 10:00:00 +0000",
+  html: page({ brand: "Musclemart", domain: "musclemart.example", rows: [rows(["Order Number: 771508763", "Whey Protein - 1kg - Vanilla || Qty: 1 || £23.38", "Protein Bar - 12 x 45g - Cookie Dough || Qty: 1 || £13.76", "Whey Protein - 1kg - Chocolate || Qty: 1 || £23.38", "Total: || £60.52"])] }) },
+  { orderRef: "771508763" });
+export const NUTRITION_PART_CANCEL = fixture("holdout16e-nutrition-part-cancel", "Musclemart", "subject 'Order Cancelled'; a long menu; 'We have cancelled the following item(s) from your order 771508763.'; 'Items'; the thing's name with its link, over 'Quantity 1'", {
+  from: "Musclemart <orders@t.musclemart.example>", subject: "Order Cancelled", date: "Wed, 11 Nov 2026 09:00:00 +0000",
+  text: Array.from({ length: 60 }, (_, k) => `Shop our range ${k + 1} <https://links.musclemart.example/ls/click?upn=${"x".repeat(80)}${k}>`).join("\n") +
+    "\n\nHello Sam\n\nThank you for your purchase.\n\nWe have cancelled the following item(s) from your order 771508763. If a charge has been taken, then a refund will be processed.\n\nItems\nProtein Bar - 12 x 45g - Cookie Dough <https://links.musclemart.example/ls/click?upn=abc>\nQuantity 1\n\nKind regards\nMusclemart\n" },
+  { notPurchase: { kind: "cancelled" } });
+
 export default function holdout16e() {
   const out = [];
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };

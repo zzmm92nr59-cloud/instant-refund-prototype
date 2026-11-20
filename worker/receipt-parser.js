@@ -596,7 +596,7 @@ function fromText(text, refDate, ctx = {}) {
     text.match(/^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*order\s*:[\s|]*\n[\s|]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,30})[\s|]*$/im) ||
     // A booking's own number ("Confirmation # : 2110090879", "Booking reference: ABC123"), so its later emails match it.
     // (A booking reference of capitals only, "Your booking reference is: NTEFH", "Reservation summary for order AGQNAOQ". Round 15.)
-    text.match(/\b(?:[Bb]ooking|[Rr]eservation) [Rr]eference(?: is)?\s*:?\s*([A-Z]{5,8})\b(?![a-z])/) ||
+    text.match(/\b(?:[Bb]ooking|[Rr]eservation) (?:[Rr]eference|[Cc]ode)(?: is)?\s*:?\s*([A-Z]{5,8})\b(?![a-z])/) ||
     text.match(/\b(?:[Ss]ummary|[Cc]onfirmation) for order\s+((?=[A-Z0-9]*[A-Z])[A-Z0-9]{5,12})\b(?![a-z])/) ||
     // (Whole, never cut: "Your booking reference is 20220316-NZ194227806625361" as it is. Round 15.)
     text.match(/\b(?:confirmation|booking|reservation)\s*(?:number|no\.?|ref(?:erence)?|code|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,34})(?![A-Z0-9-])/i) ||
@@ -3376,7 +3376,9 @@ function updateParts(rawEmail) {
     subject.match(/\border\b[^\n]{0,40}?[\s#:-](\d{6,16})\s*$/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*(?:is\s*)?[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
     // (Round 15e: "Despatch Confirmation - Ref: wuk12804674", "Your order number is: wuk12804674".)
     subject.match(/\bref(?:erence)?\s*[:#]\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24})\b/i) ||
-    text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
+    text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+    // (Round 15e: "We have cancelled the following item(s) from your order 491508763", below the shop's menu.)
+    text.slice(0, 15000).match(/\bcancell?ed\b[^.\n]{0,60}\bfrom your order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
   return { headers, parts, html, text, subject, at, orderRef: ref ? ref[1] : null };
 }
 // "Your order KO-1001 has been dispatched": a shop's dispatch email with no items in it. It used to be dropped, and with it the
@@ -3437,6 +3439,18 @@ function namedInOrderBlock(text) {
   }
   return out;
 }
+// The things a cancellation lists as each name over how many, "Lean Protein Bar - 12 x 45g - Chocolate" over "Quantity 1".
+// Round 15e.
+function namedOverQuantity(text) {
+  const rows = String(text || "").slice(0, 40000).split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean);
+  const out = [];
+  for (let i = 1; i < rows.length && out.length < 20; i++) {
+    const q = /^(?:quantity|qty)\s*:?\s*(\d{1,3})$/i.exec(rows[i]);
+    const n = rows[i - 1].replace(/\s*<https?:[^>\s]{1,2000}>/g, "").trim();
+    if (q && /\p{L}{3}/u.test(n) && n.length <= 120 && !/£|:\s*$|^(?:items?|products?|size|colou?r)$/i.test(n)) out.push({ name: n, qty: Number(q[1]) });
+  }
+  return out;
+}
 export function parseCancellationEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_cancellation" };
   const u = updateParts(rawEmail);
@@ -3479,11 +3493,15 @@ export function parseCancellationEmail(rawEmail) {
     return { ok: true, kind: "order_update", stage: "cancelled", partial: false, at: u.at, orderRef: null, byItems: true, cancelledItems: items,
       amountPence: null, currency: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
   }
-  const partial = /\b(?:part of|some of|one of|an item|some items|items? (?:in|from|of) your order (?:has|have) been|(?:has|have) been cancell?ed from your order)\b/i.test(u.subject + " " + top) &&
+  // (Or "We have cancelled the following item(s) from your order", "the following products have been successfully cancelled":
+  // only what it lists. Round 15e.)
+  const top2 = u.text.slice(0, 15000).replace(/\s+/g, " ");
+  const partial = (/\b(?:part of|some of|one of|an item|some items|items? (?:in|from|of) your order (?:has|have) been|(?:has|have) been cancell?ed from your order)\b/i.test(u.subject + " " + top) ||
+    /\bcancell?ed the following (?:items?|products?|item\(s\))\b|\bthe following (?:items?|products?|item\(s\)) (?:has|have) been (?:successfully )?cancell?ed\b/i.test(top2)) &&
     !/(?<!\b(?:part|some|one|items?) (?:of|in|from) )\b(?:your|the|this) (?:whole |entire )?order (?:has been|was|is) cancell?ed\b/i.test(u.subject + " " + top);
   const amt = (top.match(/\brefund(?:ed)?\b[^£€\n]{0,40}([£€])\s*([0-9][0-9,]*\.[0-9]{2})/i) || top.match(/([£€])\s*([0-9][0-9,]*\.[0-9]{2})[^.\n]{0,40}\b(?:refund|back to your|returned to your)/i));
   return { ok: true, kind: "order_update", stage: "cancelled", partial, at: u.at, orderRef: u.orderRef,
-    ...(partial ? { cancelledItems: cancelledNames(u.text) } : {}),
+    ...(partial ? { cancelledItems: cancelledNames(u.text).length ? cancelledNames(u.text) : namedInOrderBlock(u.text).length ? namedInOrderBlock(u.text) : namedOverQuantity(u.text) } : {}),
     amountPence: amt ? money(amt[2]) : null, currency: amt ? (amt[1] === "€" ? "EUR" : "GBP") : null,
     retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts) };
 }

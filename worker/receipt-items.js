@@ -822,7 +822,9 @@ export function checkItems(items, money, totalPence) {
   if (vatAdded) targets.push(T - m.vat - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0));
   // (An offer that made delivery free, "… plus FREE delivery!" over "- £3.99", when the delivery line says "£0.00": the
   // delivery it took off was never added, so the items come to the total with that one offer left out. Round 15.)
-  const freeDelivery = (m.found || []).some((f) => f[0] === "fee" && f[2] === 0 && /\b(?:delivery|shipping|postage)\b/i.test(f[1]));
+  // (Or the delivery line already shows what is left after it, "Exclusive FREE delivery on 15 spend - £4.49" and "Delivery:
+  // £1.50": that offer was taken off the delivery, not the items. Round 15e.)
+  const freeDelivery = (m.found || []).some((f) => f[0] === "fee" && /\b(?:delivery|shipping|postage)\b/i.test(f[1]));
   const waived = [];
   if (freeDelivery && T != null && S == null) for (const f of (m.found || [])) if (f[0] === "discount" && /\bfree\b[^|]{0,20}\b(?:delivery|shipping|postage)\b/i.test(f[1])) waived.push(T - (m.fees || 0) - (m.tips || 0) + (m.discounts || 0) - f[2]);
   targets.push(...waived);

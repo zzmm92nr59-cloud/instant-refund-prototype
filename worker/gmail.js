@@ -1886,7 +1886,8 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
 // The shop an order email is from, for joining one order's emails: its address without the part a shop sends a kind of
 // email from ("order.detalecph.com" is detalecph.com). Round 11.
-const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m)\./i;
+// ("comms.vueling.com", "updates.…", "alerts.…": the same. Round 15e.)
+const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m|comms?|communications?|updates?|alerts?|messages?|mailer|transactional|txn)\./i;
 function joinStore(o) {
   const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
   return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
@@ -2209,7 +2210,9 @@ export function attachDeliveries(orders, deliveries) {
     // The parcel's tracking numbers: the order's own emails', and those of the shop's parcel emails that name this order
     // (a dispatch email with no items, round 6), so the carrier's own "delivered" email, which names no order, finds it.
     const nums = new Set([o.shipment && o.shipment.trackingNumber].filter(Boolean));
-    const byRef = (d) => d.orderRef && o.orderRef && sameOrderRef(d.orderRef, o.orderRef) && sameShop(d, o);
+    // (Or a parcel of a split order named by the order's number and its parcel's, "DET-7vxlt1dlf1s-1". Round 15e.)
+    const parcelOf = (d) => String(o.orderRef).length >= 5 && String(d.orderRef).toUpperCase().replace(/-\d{1,2}$/, "") === String(o.orderRef).toUpperCase();
+    const byRef = (d) => d.orderRef && o.orderRef && (sameOrderRef(d.orderRef, o.orderRef) || parcelOf(d)) && sameShop(d, o);
     for (const d of deliveries) if (d.trackingNumber && byRef(d)) nums.add(d.trackingNumber);
     const t = (o.shipment && o.shipment.trackingNumber) || [...nums][0] || null;
     let best = o.shipment ? { status: o.shipment.status || "shipped", at: null, carrier: o.shipment.carrier || null, trackingNumber: t || null } : null;

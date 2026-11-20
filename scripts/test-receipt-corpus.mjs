@@ -555,6 +555,19 @@ const joinWrong = [];
     if (dlv.kind !== "delivery_update" || dlv.trackingNumber !== "UK4471100293") joinWrong.push("a carrier's delivered email read as " + JSON.stringify([dlv.kind, dlv.trackingNumber]));
     const m = mergeOrderEmails([o]); attachDeliveries(m, [dsp, dlv]);
     if (m.length !== 1 || !m[0].delivery || m[0].delivery.status !== "delivered") joinWrong.push("despatch and delivery didn't reach the order (" + JSON.stringify(m[0] && m[0].delivery) + ")"); }
+  // (Round 15e: a booking's confirmation sent again from the shop's "comms." address joins the first by its code; a parcel
+  // of a split order, its number the order's with "-1", brings its tracking to the order.)
+  { const b = (id, domain, date) => ({ id, kind: "receipt", retailer: { name: "Skyhop", domain }, orderRef: "QZXKPL", orderDate: date, totalPence: 8299, currency: "EUR", items: [{ name: "Flight", qty: 1, pricePence: 8299 }] });
+    if (mergeOrderEmails([b("a", "skyhop.example", "2026-06-20"), b("b", "comms.skyhop.example", "2026-08-23")]).length !== 1) joinWrong.push("a booking sent again from the airline's comms address made a second card");
+    const o = [{ id: "o", kind: "receipt", retailer: { name: "Hall", domain: "hallhome.example" }, orderRef: "HAL-7vxlt1dl", orderDate: "2026-11-01", totalPence: 15450, items: [] }];
+    attachDeliveries(o, [{ kind: "delivery_update", status: "shipped", at: "2026-11-04", carrier: "FedEx", trackingNumber: "391714842934", retailer: { name: "Hall", domain: "hallhome.example" }, orderRef: "HAL-7vxlt1dl-1" }]);
+    if (!o[0].delivery || o[0].delivery.trackingNumber !== "391714842934") joinWrong.push("a split order's parcel numbered '-1' didn't bring its tracking to the order"); }
+  // (Round 15e: "We have cancelled the following item(s) from your order …" cancels only the thing it lists.)
+  { const { NUTRITION_ORDER, NUTRITION_PART_CANCEL } = await import("./fixtures/receipt-emails/holdout16e.mjs");
+    const d = (f) => ({ ...classifyEmail(rawEmail(f)).details, id: f.id });
+    const c = d(NUTRITION_PART_CANCEL), m = mergeOrderEmails([d(NUTRITION_ORDER)]); attachCancellations(m, [c]);
+    const marked = (m[0] && m[0].items || []).filter((i) => i.cancelled).map((i) => i.name);
+    if (c.kind !== "order_update" || !m[0].cancelled || !m[0].cancelled.partial || marked.length !== 1 || !/protein bar/i.test(marked[0])) joinWrong.push("a cancellation of one listed thing read as " + JSON.stringify([c.kind, c.partial, c.orderRef, m[0] && m[0].cancelled, marked])); }
   // (Round 15e: a return the shop accepted with no order number, only what it will refund, goes on the one order from that
   // shop that cost exactly that; with two such orders it goes on neither.)
   { const shop = { name: "Stretchwell", domain: "stretchwell.example" };
