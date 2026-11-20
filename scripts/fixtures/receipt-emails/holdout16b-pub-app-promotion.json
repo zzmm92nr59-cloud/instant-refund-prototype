@@ -1,0 +1,41 @@
+{
+ "id": "holdout16b-pub-app-promotion",
+ "sender": "Tapster Inns",
+ "layout": "'Qty | Description | Amount' table; '1 | Promotion Applied | -£1.95' between items; 'VAT (20.00%)'; 'Order Total'",
+ "headers": {
+  "from": "Tapster Inns <orders@tapsterinns.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Tapster Inns Order Confirmation: 3120",
+  "date": "Sun, 15 Nov 2026 12:46:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Tapster Inns</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.tapsterinns.example/?utm_source=email\"><img src=\"https://www.tapsterinns.example/static/email/logo.png\" alt=\"Tapster Inns\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for your order...</td></tr><tr><td>The Weavers Arms</td></tr><tr><td>18 Mill Street</td></tr><tr><td>Hebden</td></tr><tr><td>HX7 1AA</td></tr><tr><td>Order Id: 2207731145</td></tr><tr><td>Order Date: Sunday, November 15, 2026</td></tr><tr><td>Table Number: 21</td></tr><tr><td>Qty</td><td>Description</td><td>Amount</td></tr><tr><td>1</td><td>Spiced Rum (Double)</td><td>&pound;4.55</td></tr><tr><td>1</td><td>Cola</td><td>&pound;0.00</td></tr><tr><td>1</td><td>Promotion Applied</td><td>-&pound;1.95</td></tr><tr><td>1</td><td>Big Breakfast</td><td>&pound;9.25</td></tr><tr><td>VAT (20.00%)</td><td>&pound;2.14</td></tr><tr><td>Payment Type</td><td>Apple Pay</td></tr><tr><td>Order Total</td><td>&pound;11.85</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Tapster Inns. All rights reserved.<br /><a href=\"https://www.tapsterinns.example/help\">Help</a> | <a href=\"https://www.tapsterinns.example/privacy\">Privacy</a> | <a href=\"https://www.tapsterinns.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.tapsterinns.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Tapster Inns",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Spiced Rum (Double)",
+    "qty": 1,
+    "linePence": 455
+   },
+   {
+    "name": "Cola",
+    "qty": 1,
+    "linePence": 0
+   },
+   {
+    "name": "Big Breakfast",
+    "qty": 1,
+    "linePence": 925
+   }
+  ],
+  "subtotalPence": 1380,
+  "feesPence": 0,
+  "discountsPence": 195,
+  "tipsPence": 0,
+  "totalPence": 1185,
+  "orderRef": "2207731145"
+ }
+}

@@ -1,0 +1,31 @@
+{
+ "id": "holdout16b-railcard",
+ "sender": "Railwise",
+ "layout": "subject 'Your digital railcard purchase is complete. Transaction Id …'; 'Order Details' then '16-25 Railcard' over '£35.00'; 'Other costs' 'Booking Fee' 'No booking fee'",
+ "headers": {
+  "from": "Railwise <auto-confirm@info.railwise.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your digital railcard purchase is complete. Transaction Id 730118299102",
+  "date": "Tue, 10 Nov 2026 08:15:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Railwise</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.railwise.example/?utm_source=email\"><img src=\"https://www.railwise.example/static/email/logo.png\" alt=\"Railwise\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your digital 16-25 Railcard is ready to use in the app</td></tr><tr><td>16-25</td></tr><tr><td>Railcard</td></tr><tr><td>Valid from</td></tr><tr><td>Tue, 10 Nov 2026</td></tr><tr><td>Valid to</td></tr><tr><td>Wed, 10 Nov 2027</td></tr><tr><td>Payment information</td></tr><tr><td>Transaction ID:</td></tr><tr><td>730118299102</td></tr><tr><td>Transaction Date:</td></tr><tr><td>10 November 2026</td></tr><tr><td>Payment Type:</td></tr><tr><td>Apple Pay</td></tr><tr><td>Order Details |</td></tr><tr><td>16-25 Railcard</td></tr><tr><td>&pound;35.00</td></tr><tr><td>Other costs |</td></tr><tr><td>Booking Fee</td></tr><tr><td>No booking fee</td></tr><tr><td>Total amount:</td><td>&pound;35.00 |</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Railwise. All rights reserved.<br /><a href=\"https://www.railwise.example/help\">Help</a> | <a href=\"https://www.railwise.example/privacy\">Privacy</a> | <a href=\"https://www.railwise.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.railwise.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Railwise",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "16-25 Railcard",
+    "qty": 1,
+    "linePence": 3500
+   }
+  ],
+  "subtotalPence": 3500,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 3500,
+  "orderRef": "730118299102"
+ }
+}

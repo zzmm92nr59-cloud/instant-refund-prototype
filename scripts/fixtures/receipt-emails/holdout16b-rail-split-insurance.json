@@ -1,0 +1,41 @@
+{
+ "id": "holdout16b-rail-split-insurance",
+ "sender": "Railwise",
+ "layout": "journey in the subject; 'you just have multiple tickets'; '2x Advance Single'; two 'Adult - Advance Single - [16-25 Railcard]' rows each over a price; 'Other costs' 'Insurance' '£1.10'",
+ "headers": {
+  "from": "Railwise <auto-confirm@info.railwise.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation for Marston to Oakford (14 November, 18:20)",
+  "date": "Wed, 11 Nov 2026 12:30:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Railwise</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.railwise.example/?utm_source=email\"><img src=\"https://www.railwise.example/static/email/logo.png\" alt=\"Railwise\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>There&rsquo;s no difference to your journey, you just have multiple tickets</td></tr><tr><td>Outbound Saturday, 14 November</td></tr><tr><td>01h 15m, 0 changes</td></tr><tr><td>18:20 Marston Central</td></tr><tr><td>Advance Single</td></tr><tr><td>Marston Central to Hollins Junction</td></tr><tr><td>Advance Single</td></tr><tr><td>Hollins Junction to Oakford Parkway</td></tr><tr><td>19:35 Oakford Parkway</td></tr><tr><td>2x Advance Single</td></tr><tr><td>1x Adult</td></tr><tr><td>You&rsquo;re covered by Insurance</td></tr><tr><td>Transaction ID:</td></tr><tr><td>730118301877</td></tr><tr><td>Order Details |</td></tr><tr><td>Adult - Advance Single - [16-25 Railcard]</td></tr><tr><td>&pound;4.80</td></tr><tr><td>Adult - Advance Single - [16-25 Railcard]</td></tr><tr><td>&pound;12.90</td></tr><tr><td>Other costs |</td></tr><tr><td>Insurance</td></tr><tr><td>&pound;1.10</td></tr><tr><td>Booking Fee</td></tr><tr><td>No booking fee</td></tr><tr><td>Total amount:</td><td>&pound;18.80 |</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Railwise. All rights reserved.<br /><a href=\"https://www.railwise.example/help\">Help</a> | <a href=\"https://www.railwise.example/privacy\">Privacy</a> | <a href=\"https://www.railwise.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.railwise.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Railwise",
+  "date": "2026-11-11",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Marston Central to Hollins Junction",
+    "qty": 1,
+    "linePence": 480
+   },
+   {
+    "name": "Hollins Junction to Oakford Parkway",
+    "qty": 1,
+    "linePence": 1290
+   },
+   {
+    "name": "Insurance",
+    "qty": 1,
+    "linePence": 110
+   }
+  ],
+  "subtotalPence": 1880,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 1880,
+  "orderRef": "730118301877"
+ }
+}
