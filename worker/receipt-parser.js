@@ -1190,9 +1190,12 @@ function googlePlayItems(text) {
   // (Paragraphs in the text part; in the HTML's text, one row a line, the cells apart by "|".)
   const paras = body.split(/\n[ \t|]*\n/);
   const pieces = paras.length > 1 ? paras : body.split("\n");
+  const flat = (x) => x.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim();
+  const row = (x) => /^(.{3,300}?)\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*\/\s*(?:month|year|week|day))?$/i.exec(flat(x));
   for (const para of pieces) {
-    const p = para.replace(/[ \t|]*\n[ \t|]*/g, " ").replace(/\s*\|\s*/g, " ").replace(/\s+/g, " ").trim();
-    const m = /^(.{3,300}?)\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})(?:\s*\/\s*(?:month|year|week|day))?$/i.exec(p);
+    // (In the HTML's text a row's note sits on the line under it, "Monthly Subscription ‐ Next payment …": the row is its
+    // own line, the one that ends in the price.)
+    const m = row(para) || (para.includes("\n") ? para.split("\n").map(row).find(Boolean) : null);
     if (!m) continue;
     const name = m[1].replace(/\s*\(by [^()]{2,60}\)\s*$/i, "").trim();
     if (name.length >= 3) out.push({ name, qty: 1, pricePence: money(m[2]) });
@@ -2297,7 +2300,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (tixItems) { result.items = tixItems; result.itemsCheck = { ...checkItems(tixItems, moneyOf(text), result.totalPence), complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 }; }
   // (Google Play's receipt: the thing bought over "Item Price", its name wrapped over lines and its developer after it,
   // "Office 365 personal with trial (…) (by Microsoft Corporation) £5.99/month", a plan's price per month. Round 13.)
-  if (!result.items.length && /(^|\.)google\.com$/i.test(result.retailer.domain || sender?.domain || "") && /\bgoogle play\b/i.test(text.slice(0, 3000))) {
+  // (Pasted with no sender's address: Google Play's own order number, "GPA.3399-…", says whose receipt it is.)
+  if (!result.items.length && (/(^|\.)google\.com$/i.test(result.retailer.domain || sender?.domain || "") || (!sender?.domain && /\bOrder number:?[ \t]*GPA\.\d{4}-/.test(text))) && /\bgoogle play\b/i.test(text.slice(0, 3000))) {
     const gp = googlePlayItems(plain || text);
     if (gp.length) { result.items = gp; result.itemsCheck = checkItems(gp, moneyOf(text), result.totalPence); }
   }
@@ -2306,7 +2310,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0, pack: true };
   // (A PayPal receipt's own list: the name, "Qty: 1", sometimes "Product ID: home_screen_offer_3", then the price in the
   // payment's currency, "US$5.00" or "£3.99". The name as PayPal gives it, cut short or not: nothing is added. Round 13.)
-  const viaPayPal = /(^|\.)paypal\.[a-z.]+$/i.test(sender?.domain || "") || /(^|\.)paypal\./i.test(result.retailer.via || "");
+  // (Pasted with no sender's address: a receipt that opens as PayPal's and gives PayPal's transaction ID.)
+  const viaPayPal = /(^|\.)paypal\.[a-z.]+$/i.test(sender?.domain || "") || /(^|\.)paypal\./i.test(result.retailer.via || "") ||
+    (!sender?.domain && /^[\s|]*PayPal\b/.test(text) && /\btransaction ID\b/i.test(text.slice(0, 4000)));
   // (PayPal's own list comes first: a general reading can take a label for the thing bought, "Merchant" over "£25.00".)
   if (viaPayPal) {
     const pp = payPalItems(text);
