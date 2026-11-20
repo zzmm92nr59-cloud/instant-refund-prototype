@@ -334,7 +334,8 @@ const finish = (b, opts = {}) => {
   else if (b.free) pricePence = 0;
   if (pricePence == null) return null;
   // (An option's own label is not what it is: "Option: Brown, No Size" is "Brown, No Size". Round 15e.)
-  const variant = [...b.variant.map((v) => String(v).replace(/^option\s*:\s*/i, "")), ...b.extras].filter((x, i, a) => x && a.indexOf(x) === i).join(", ").slice(0, 160);
+  // (Nor a picture's placeholder, "[divider]".)
+  const variant = [...b.variant.map((v) => String(v).replace(/^option\s*:\s*/i, "")), ...b.extras].filter((x, i, a) => x && a.indexOf(x) === i && !/^\[[^\]]{1,30}\]$/.test(String(x).trim())).join(", ").slice(0, 160);
   // (The unit price, when the email gave one beside the line's price, is kept for the totals check: how many times the
   // unit price must come to the line's price. receipt-parser.js takes it off again.)
   const unitPence = b.unit != null && b.lineFromLabel == null && prices.length ? b.unit : null;
@@ -423,6 +424,11 @@ export function readItems(text, opts = {}) {
   raw = byColumns(raw);
   if (opts.priceAbove) raw = priceAbove(raw);
   const read = raw.map(readLine);
+  // (A choice on the line after a lone "+", "Mustard" (a topping, not a colour): a name, so it is the item's extra. Round 15e.)
+  for (let k = 1; k < read.length; k++) {
+    const a = read[k - 1], b = read[k];
+    if (a.plus && !a.names.length && !a.prices.length && !a.extras.length && !b.names.length && !b.prices.length && b.variant.length === 1 && b.cells.length === 1) { b.names = [b.variant[0]]; b.variant = []; }
+  }
   // A cell over several lines: its first line (a name, no price, not ending a cell) after a row that ended, and the rest of
   // the cell ending its row with the price. What follows the name in that cell is its note or its extras, never an item.
   if (!opts.priceAbove) for (let k = 0; k + 1 < read.length; k++) {
@@ -691,6 +697,7 @@ function addVariant(item, variant) {
   item.variant = [item.variant, ...variant].filter((x, i, a) => x && a.indexOf(x) === i).join(", ").slice(0, 160);
 }
 function addExtras(item, extras) {
+  extras = extras.filter((x) => !/^\[[^\]]{1,30}\]$/.test(String(x || "").trim()));
   item.extras = [...(item.extras || []), ...extras].slice(0, 8);
   item.variant = [item.variant, ...extras].filter(Boolean).join(", ").slice(0, 160);
 }

@@ -2718,7 +2718,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     // (And what it added for delivery, service and the like, "Service fee £0.82", "Delivery £5.00", as each is labelled, so the
     // receipt can show every line of what was paid. Round 15.)
     // (A label run on from the line before it, "Subtotal £39.50 Delivery": only what follows the last amount. Round 15e.)
-    const feeLabel = (l) => String(l).replace(/^.*[£€$]\s?\d[\d,]*(?:\.\d{2})?\s+(?=\p{L})/u, "").replace(/[:\s]+$/, "").slice(0, 60);
+    const feeLabel = (l) => String(l).replace(/^(?:sub-?\s?total|total|items?)\b[^£€$\n]{0,30}[£€$]\s?\d[\d,]*(?:\.\d{2})?\s+(?=\p{L})/iu, "").replace(/[:\s]+$/, "").slice(0, 60);
     const fees = (mon.found || []).filter((f) => f[0] === "fee" && f[2] > 0 && !result.items.some((i) => String(i.name || "").toLowerCase() === String(f[1]).toLowerCase())).slice(0, 6).map((f) => ({ label: feeLabel(f[1]), pence: f[2] }));
     if (columnFee && columnFee.fee > 0 && !fees.length) fees.push({ label: columnFee.label, pence: columnFee.fee });
     if (fees.length) result.fees = fees;
