@@ -2793,7 +2793,10 @@ function carrierIn(text) { for (const [n, re] of CARRIER_NAMES) if (re.test(text
 function trackingIn(text) {
   const rm = text.match(ROYAL_MAIL_REF);
   if (rm) return { trackingNumber: rm[1], carrier: "Royal Mail" };
-  const m = text.match(/\btracking\s*(?:number|no\.?|#|id|code)?\s*[:#]\s*([A-Z0-9]{8,30})\b/i) || text.match(/\btracking\s+(?:number|no\.?|id|code)\s+(?:is\s+)?([A-Z0-9]{8,30})\b/i);
+  const m = text.match(/\btracking\s*(?:number|no\.?|#|id|code)?\s*[:#]\s*([A-Z0-9]{8,30})\b/i) || text.match(/\btracking\s+(?:number|no\.?|id|code)\s+(?:is\s+)?([A-Z0-9]{8,30})\b/i) ||
+    // (Round 15e: written as data in the email, "trackingNumber":"UK3362226979", or only in the carrier's tracking link,
+    // "https://track.amazon.co.uk/tracking/UK3362226979".)
+    text.match(/"tracking_?number"\s*:\s*"([A-Z0-9]{8,30})"/i) || text.match(/\bhttps?:\/\/track(?:ing)?\.[a-z0-9.-]{3,40}\/(?:tracking|track|parcels?)\/([A-Z]{0,4}\d[A-Z0-9]{7,29})(?![A-Z0-9])/i);
   return m && /\d/.test(m[1]) ? { trackingNumber: m[1].toUpperCase(), carrier: null } : null;
 }
 function shipmentOf(subject, text) {
@@ -3145,13 +3148,15 @@ function updateParts(rawEmail) {
   // (Or a number the subject ends with after saying what happened to the order, "Your order has been cancelled 930952163":
   // digits only, so a word is never taken for it. Round 15.)
   const ref = subject.match(/\border\s*(?:number|no\.?)?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
-    subject.match(/\border\b[^\n]{0,40}?[\s#:-](\d{6,16})\s*$/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+    subject.match(/\border\b[^\n]{0,40}?[\s#:-](\d{6,16})\s*$/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*(?:is\s*)?[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
+    // (Round 15e: "Despatch Confirmation - Ref: wuk12804674", "Your order number is: wuk12804674".)
+    subject.match(/\bref(?:erence)?\s*[:#]\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24})\b/i) ||
     text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
   return { headers, parts, html, text, subject, at, orderRef: ref ? ref[1] : null };
 }
 // "Your order KO-1001 has been dispatched": a shop's dispatch email with no items in it. It used to be dropped, and with it the
 // parcel's tracking number, so the carrier's later "delivered" email had nothing to join (round 6). Kept as a parcel update.
-const DISPATCH_SUBJECT = /\b(?:dispatched|despatched|shipped|has shipped|on (?:its|it's|the) way|been sent|been posted)\b/i;
+const DISPATCH_SUBJECT = /\b(?:dispatched|despatched|shipped|has shipped|on (?:its|it's|the) way|been sent|been posted|(?:dispatch|despatch|shipping|shipment) (?:confirmation|notification))\b/i;
 const NOT_DISPATCH = /\b(?:return(?:s|ed|ing)?|refund(?:ed|s)?|cancell?(?:ed|ation)|delay(?:ed)?|problem|unable|failed|couldn(?:'|’)?t)\b/i;
 export function parseDispatchEmail(rawEmail) {
   const no = { ok: false, reason: "not_a_dispatch_email" };
@@ -3159,7 +3164,7 @@ export function parseDispatchEmail(rawEmail) {
   if (!DISPATCH_SUBJECT.test(u.subject) || NOT_DISPATCH.test(u.subject) || !/\border\b/i.test(u.subject + "\n" + u.text.slice(0, 1500))) return no;
   if (CARRIER_SENDERS.some(([, re]) => re.test(String(u.headers.from || ""))) || returnCarrierOf(u.headers.from)) return no;
   if (!u.orderRef) return no;
-  const t = trackingIn(u.text);
+  const t = trackingIn(u.text) || trackingIn(String(u.html || "").replace(/&quot;/g, '"').replace(/\\\//g, "/"));
   return { ok: true, kind: "delivery_update", status: "shipped", at: u.at, carrier: (t && t.carrier) || carrierIn(u.text) || null,
     trackingNumber: t ? t.trackingNumber : null, merchant: null, retailer: shopOfUpdate(u.headers, u.text, u.html, u.parts), orderRef: u.orderRef };
 }

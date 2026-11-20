@@ -1102,7 +1102,9 @@ function classify(rawText, ref, lenient = false) {
       source: "shopper_email", refundEligible: false, parserVersion: PARSER_VERSION
     };
   // (A restaurant table booked but not paid for is never a purchase in the inbox: the bill is. Round 14.)
-  } else if (receipt.ok && !(receipt.tableBooking && !lenient)) {
+  // (A shop's despatch email read as a receipt with nothing in it, no items and no total, "Despatch Confirmation - Ref: …":
+  // its parcel's news, so the order it names shows it is on its way. Round 15e.)
+  } else if (receipt.ok && !(receipt.tableBooking && !lenient) && !(!(receipt.items || []).length && receipt.totalPence == null && parseDispatchEmail(rawText).ok)) {
     // Keep only extracted fields. The email text is dropped here.
     details = {
       kind: "receipt", ...ref,

@@ -10,6 +10,22 @@ const mail = (brand, domain, lines) => page({ brand, domain, rows: [rows(lines)]
 // (Each line in a table of its own, nested in the page's cell, as some builders nest them.)
 const nested = (brand, domain, lines) => page({ brand, domain, rows: [lines.map((l) => `<table role="presentation" width="100%"><tr><td>${cell(l)}</td></tr></table>`).join("")] });
 
+// (Not in the corpus: a shirt shop's order, its despatch email with no items or money ("Despatch Confirmation - Ref: …",
+// "Your order number is: …", its parcel's number only as data in the page), and the carrier's "delivered" email that gives
+// the parcel's number only in its tracking link. The despatch joins the order by its number, the delivery by the parcel's.)
+export const SHIRT_ORDER = fixture("holdout16e-shirt-order", "Collarworks", "an order with its number in the subject", {
+  from: "Collarworks <orders@collarworks.example>", subject: "Collarworks Order Confirmation - Ref: cwk55120931", date: "Mon, 16 Nov 2026 11:14:08 +0000",
+  html: page({ brand: "Collarworks", domain: "collarworks.example", rows: [`<p>Thank you for your order</p><p>Your order number is: cwk55120931</p><table><tr><td>Oxford shirt</td><td>Qty: 1</td><td>&pound;59.95</td></tr><tr><td>Total</td><td>&pound;59.95</td></tr></table>`] }) },
+  { orderRef: "cwk55120931" });
+export const SHIRT_DESPATCH = fixture("holdout16e-shirt-despatch", "Collarworks", "subject 'Collarworks Despatch Confirmation - Ref: cwk55120931 (cwk55120931)'; 'Your order number is: cwk55120931'; the parcel's number only in a data block", {
+  from: "Collarworks <orders@collarworks.example>", subject: "Collarworks Despatch Confirmation - Ref: cwk55120931 (cwk55120931)", date: "Thu, 19 Nov 2026 06:31:49 +0000",
+  html: page({ brand: "Collarworks", domain: "collarworks.example", rows: [`<p>ORDER DESPATCHED</p><p>Dear Mr Taylor, Your order number is: cwk55120931</p><p>We are pleased to advise you that your order has been despatched.</p><div style="display:none">{&quot;orderNumber&quot;:&quot;cwk55120931&quot;,&quot;trackingNumber&quot;:&quot;UK4471100293&quot;,&quot;trackingURL&quot;:&quot;https:\\/\\/track.parcelways.example\\/tracking\\/UK4471100293&quot;}</div>`] }) },
+  { notPurchase: { kind: "dispatch" } });
+export const SHIRT_DELIVERED = fixture("holdout16e-carrier-delivered-link", "Parcelways", "a carrier's 'Your Collarworks package was delivered' with the parcel's number only in 'Track and manage package (https://track.parcelways.example/tracking/UK4471100293)'", {
+  from: "Parcelways <no-reply@shipping.parcelways.example>", subject: "Your Collarworks package was delivered", date: "Fri, 20 Nov 2026 10:04:00 +0000",
+  text: "Your Collarworks package was delivered\n\nYour package from Collarworks was delivered. Your package was left with the receptionist Today, 10:04 AM.\n\nTrack and manage package (https://track.parcelways.example/tracking/UK4471100293?ref=email)\n" },
+  { notPurchase: { kind: "delivered" } });
+
 export default function holdout16e() {
   const out = [];
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };

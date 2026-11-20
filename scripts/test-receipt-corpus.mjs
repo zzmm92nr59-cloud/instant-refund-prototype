@@ -462,6 +462,15 @@ const joinWrong = [];
   const det = (id) => ({ ...classifyEmail(rawEmail(fx(id))).details, id });
   const cards = mergeOrderEmails([det("holdout16b-shop-order-one-figure-pence"), det("holdout16b-shop-order-completed-resend")]);
   if (cards.length !== 1 || cards[0].orderRef !== "61822" || cards[0].totalPence !== 2100) joinWrong.push("a shop's order email re-sent with a new status made " + cards.length + " cards");
+  // (Round 15e: a despatch email with no items or money is the parcel's news and joins its order by the number; the carrier's
+  // "delivered" email that gives the parcel's number only in its tracking link joins by that number.)
+  { const { SHIRT_ORDER, SHIRT_DESPATCH, SHIRT_DELIVERED } = await import("./fixtures/receipt-emails/holdout16e.mjs");
+    const d = (f) => ({ ...classifyEmail(rawEmail(f)).details, id: f.id });
+    const [o, dsp, dlv] = [d(SHIRT_ORDER), d(SHIRT_DESPATCH), d(SHIRT_DELIVERED)];
+    if (dsp.kind !== "delivery_update" || dsp.orderRef !== "cwk55120931" || dsp.trackingNumber !== "UK4471100293") joinWrong.push("an empty despatch email read as " + JSON.stringify([dsp.kind, dsp.orderRef, dsp.trackingNumber]));
+    if (dlv.kind !== "delivery_update" || dlv.trackingNumber !== "UK4471100293") joinWrong.push("a carrier's delivered email read as " + JSON.stringify([dlv.kind, dlv.trackingNumber]));
+    const m = mergeOrderEmails([o]); attachDeliveries(m, [dsp, dlv]);
+    if (m.length !== 1 || !m[0].delivery || m[0].delivery.status !== "delivered") joinWrong.push("despatch and delivery didn't reach the order (" + JSON.stringify(m[0] && m[0].delivery) + ")"); }
   // (Round 15e: a return the shop accepted with no order number, only what it will refund, goes on the one order from that
   // shop that cost exactly that; with two such orders it goes on neither.)
   { const shop = { name: "Stretchwell", domain: "stretchwell.example" };
