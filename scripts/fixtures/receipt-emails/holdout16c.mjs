@@ -178,7 +178,8 @@ export default function holdout16c() {
       from: "Clayworks Studio <mail@bookings.example>", subject: "Booking confirmation. Ref: KQWZT", date: "Sat, 14 Nov 2026 09:00:00 +0000",
       text: "Your booking reference is: KQWZT\n\nYou can access your booking using the link below.\n\nBooking details:\n\nADULT CLASS - Throw a pot like a pro\nClayworks, Mill Lane, Leeds, LS1 4AB\n  Sat 21 Nov, 10:00am - 1:00pm\n    4 x Throw a pot like a pro @ £40.00\n    sam taylor\n    alex taylor\n    jo taylor\n    kim taylor\n" },
       o, "Clayworks Studio", "2026-11-14", { orderRef: "KQWZT" });
-    f.expected.totalPence = null;
+    // (Round 19: with no total, no "Amount paid" and no deposit anywhere, what was booked is what it cost: £160.00. It was
+    // null before.)
   }
   // ---- A coach company: "GBR 22.89", "Reservation summary for order QWZRTYP", the journey "From:" and "To:" -----------------
   {

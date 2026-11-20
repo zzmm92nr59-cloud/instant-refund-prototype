@@ -25,7 +25,7 @@
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,
-  "totalPence": null,
+  "totalPence": 16000,
   "orderRef": "KQWZT"
  }
 }

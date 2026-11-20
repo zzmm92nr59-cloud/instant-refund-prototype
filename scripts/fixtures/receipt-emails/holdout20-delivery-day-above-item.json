@@ -1,0 +1,31 @@
+{
+ "id": "holdout20-delivery-day-above-item",
+ "sender": "Shelfmart",
+ "layout": "'Order Number:' '7001234567', 'Delivery of 1 items on', 'Thursday 26 November', '10:00 - 13:00', 'Subtotal', 'SMART DOORBELL CAMERA 3RD GEN BLACK', 'Qty 1', '£89.99', 'Delivery:' '£0.00', 'Total:' '£89.99'",
+ "headers": {
+  "from": "Shelfmart <noreply@shelfmart.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Confirmation Email for Home Delivery",
+  "date": "Sun, 15 Nov 2026 16:00:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Shelfmart</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.shelfmart.example/?utm_source=email\"><img src=\"https://www.shelfmart.example/static/email/logo.png\" alt=\"Shelfmart\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Confirmation Email for Home Delivery</td></tr>\n<tr><td>Sam,</td></tr>\n<tr><td>Thanks for your order. Here are your delivery details.</td></tr>\n<tr><td>Home delivery items</td></tr>\n<tr><td>Order Number:</td></tr>\n<tr><td>7001234567</td></tr>\n<tr><td>Delivery of 1 items on</td></tr>\n<tr><td>Thursday 26 November</td></tr>\n<tr><td>10:00 - 13:00</td></tr>\n<tr><td>Subtotal</td></tr>\n<tr><td>SMART DOORBELL CAMERA 3RD GEN BLACK</td></tr>\n<tr><td>Qty 1</td></tr>\n<tr><td>&pound;89.99</td></tr>\n<tr><td>Delivery address:</td></tr>\n<tr><td>12 Example Road</td></tr>\n<tr><td>LEEDS</td></tr>\n<tr><td>LS1 4AB</td></tr>\n<tr><td>Delivery:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Savings:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Total:</td></tr>\n<tr><td>&pound;89.99</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Shelfmart. All rights reserved.<br /><a href=\"https://www.shelfmart.example/help\">Help</a> | <a href=\"https://www.shelfmart.example/privacy\">Privacy</a> | <a href=\"https://www.shelfmart.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.shelfmart.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Shelfmart",
+  "date": "2026-11-15",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "SMART DOORBELL CAMERA 3RD GEN BLACK",
+    "qty": 1,
+    "linePence": 8999
+   }
+  ],
+  "subtotalPence": 8999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8999,
+  "orderRef": "7001234567"
+ }
+}

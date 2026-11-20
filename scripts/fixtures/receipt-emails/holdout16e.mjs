@@ -99,11 +99,12 @@ export default function holdout16e() {
   // ---- A parking app's receipt sent through Apple's Hide My Email: the shop's address inside the relay's; "Cost: £1.40
   // including 20% VAT and Service Charge" the only amount, under its "Transaction ID" --------------------------------------
   {
-    const o = order([]);
+    // (Round 19: the parking is its one thing paid for, named by where it was. It had no item before.)
+    const o = order([{ name: "Parking at Market Street", qty: 1, unit: 140 }]);
     add("holdout16e-parking-hidden-sender-cost", "Parkly", "from 'noreply_at_parkly_example_ab12cd34ef_0a1b2c3d@privaterelay.appleid.com' (Apple's Hide My Email); subject 'Parkly Parking Receipt'; 'Transaction ID: 2071188801'; 'Cost: £1.40 including 20% VAT and Service Charge'; no item list", {
       from: "<noreply_at_parkly_example_ab12cd34ef_0a1b2c3d@privaterelay.appleid.com>", subject: "Parkly Parking Receipt", date: "Sat, 14 Nov 2026 12:25:22 +0000",
       html: "Parkly Parking Receipt<br><br>Transaction ID: 2071188801<br>Location: 401122<br>License: AB12 CDE<br><br>Description: MARKET STREET<br><br>Start Parking: 2026/11/14 12:31PM<br>Stop Parking: 2026/11/14 1:31PM<br>Cost: &pound;1.40 including 20% VAT and Service Charge<br><br>Thank you for using the Parkly parking service." },
-      { ...o, total: 140 }, "Parkly", "2026-11-14", { orderRef: "2071188801", totalPence: 140 });
+      o, "Parkly", "2026-11-14", { orderRef: "2071188801" });
   }
   // ---- An events app's ticket order: subject "Your order for <event>", "Order" over its number ---------------------------
   {
