@@ -221,7 +221,9 @@ const PAID_LABEL = /^[\s|]*(?:total(?:\s+(?:price|paid|cost|amount|charged))?(?:
 const PAID_SKIP = /^[\s|]*(?:(?:visa|mastercard|master card|amex|american express|maestro|paypal|apple pay|google pay|debit card|credit card|card)(?:\s+(?:debit|credit))?|ending in|\d{4}|\*{2,}\d{4})?[\s|:]*$/i;
 const AMOUNT_ONLY = /^[\s|]*(£|€|\$|GBP|EUR|USD)?\s?(\d{1,3}(?:,\d{3})*(?:[.,]\d{2})|\d+(?:[.,]\d{2}))\s?(GBP|EUR|USD)?[\s|]*$/;
 function paidBelow(lines, i) {
-  for (let k = i + 1; k <= i + 6 && k < lines.length; k++) {
+  for (let k = i + 1, seen = 0; k < lines.length && seen < 6; k++) {
+    if (/^[\s|]*$/.test(lines[k])) continue;
+    seen++;
     const m = AMOUNT_ONLY.exec(lines[k]);
     if (m && (m[1] || m[3])) return lines[k].replace(/^[\s|]+|[\s|]+$/g, "");
     if (!PAID_SKIP.test(lines[k])) return null;
@@ -259,7 +261,10 @@ export function flightBooking({ subject, text, senderDomain, fromName, refDate }
   const travelSender = TRAVEL_DOMAIN.test(senderDomain || "") || TRAVEL_NAME.test(fromName || "");
   const numbers = (body.match(FLIGHT_NO_G) || []).length;
   if (!travelSender && !numbers) return null;
-  const legs = flightLegs(body, refDate);
+  // (With flight numbers in the body but its airports only in the subject, "Booking details | … | LHR-WDH": the trip as the
+  // subject names it, as it is read when the email is forwarded with its subject in the body. Round 18.)
+  let legs = flightLegs(body, refDate);
+  if (!legs.length && numbers && sub) legs = flightLegs(sub, refDate);
   if (!legs.length) return null;
   const ref = refOf(body) || refOf(sub), paid = paidOf(body);
   if (PROMO.test(sub) && !ref) return null;

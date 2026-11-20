@@ -105,7 +105,9 @@ export function suspectItemNames(items, opts = {}) {
   const out = [];
   // (A model the email itself names over its labelled style code, "608" over "Style #: WX608RG1", is a name even when it is
   // all figures. Round 14.)
-  list.forEach((i, k) => { const w = why(i.name, opts, list); if (w && !(w === "short" && i.namedBy === "model")) out.push({ index: k, name: i.name, why: w }); });
+  // (Nor a free gift the shop lists with its worth and takes off again, "10% off sitewide at …!" at £0.00: its name is the
+  // shop's own. Round 18.)
+  list.forEach((i, k) => { const w = why(i.name, opts, list); if (w && !(w === "short" && i.namedBy === "model") && !(i.free && i.pricePence === 0 && w === "sentence")) out.push({ index: k, name: i.name, why: w }); });
   return out;
 }
 

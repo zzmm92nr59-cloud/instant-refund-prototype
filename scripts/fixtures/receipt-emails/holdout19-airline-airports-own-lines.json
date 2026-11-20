@@ -1,0 +1,31 @@
+{
+ "id": "holdout19-airline-airports-own-lines",
+ "sender": "Brightwing",
+ "layout": "subject 'Booking details | Departure: 6 March 2027 | LHR-WDH'; 'Brightwing booking code:' over 'PQRSTV'; each leg as 'Sat. 6 March 2027: London – Frankfurt', '15:30 h', 'London London Heathrow (LHR)', 'Terminal 2', '18:05 h', 'Frankfurt Frankfurt (FRA)', 'LH 1901'; 'Total Price for all Passengers' over 'GBP 1450.20'",
+ "headers": {
+  "from": "Brightwing <online@booking.brightwing-air.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Booking details | Departure: 6 March 2027 | LHR-WDH",
+  "date": "Tue, 10 Nov 2026 13:02:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Brightwing</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.brightwing-air.example/?utm_source=email\"><img src=\"https://www.brightwing-air.example/static/email/logo.png\" alt=\"Brightwing\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Brightwing booking code:</td></tr>\n<tr><td>PQRSTV</td></tr>\n<tr><td>Your itinerary</td></tr>\n<tr><td>Sat. 6 March 2027: London – Frankfurt</td></tr>\n<tr><td>15:30 h</td></tr>\n<tr><td>London London Heathrow (LHR)</td></tr>\n<tr><td>Terminal 2</td></tr>\n<tr><td>18:05 h</td></tr>\n<tr><td>Frankfurt Frankfurt (FRA)</td></tr>\n<tr><td>Terminal 1</td></tr>\n<tr><td>LH 1901</td></tr>\n<tr><td>operated by:</td></tr>\n<tr><td>Brightwing</td></tr>\n<tr><td>Status: confirmed</td></tr>\n<tr><td>Sat. 6 March 2027: Frankfurt – Windhoek</td></tr>\n<tr><td>21:40 h</td></tr>\n<tr><td>Frankfurt Frankfurt (FRA)</td></tr>\n<tr><td>Terminal 2</td></tr>\n<tr><td>09:05 h</td></tr>\n<tr><td>Windhoek Windhoek Intl Apt (WDH)</td></tr>\n<tr><td>Terminal 1</td></tr>\n<tr><td>LH 1902</td></tr>\n<tr><td>operated by:</td></tr>\n<tr><td>Brightwing</td></tr>\n<tr><td>Status: confirmed</td></tr>\n<tr><td>Sat. 20 March 2027: Windhoek – Frankfurt</td></tr>\n<tr><td>20:00 h</td></tr>\n<tr><td>Windhoek Windhoek Intl Apt (WDH)</td></tr>\n<tr><td>Terminal 2</td></tr>\n<tr><td>05:20 h</td></tr>\n<tr><td>Frankfurt Frankfurt (FRA)</td></tr>\n<tr><td>Terminal 1</td></tr>\n<tr><td>LH 1903</td></tr>\n<tr><td>operated by:</td></tr>\n<tr><td>Brightwing</td></tr>\n<tr><td>Status: confirmed</td></tr>\n<tr><td>Sun. 21 March 2027: Frankfurt – London</td></tr>\n<tr><td>07:25 h</td></tr>\n<tr><td>Frankfurt Frankfurt (FRA)</td></tr>\n<tr><td>Terminal 2</td></tr>\n<tr><td>08:05 h</td></tr>\n<tr><td>London London Heathrow (LHR)</td></tr>\n<tr><td>Terminal 1</td></tr>\n<tr><td>LH 1904</td></tr>\n<tr><td>operated by:</td></tr>\n<tr><td>Brightwing</td></tr>\n<tr><td>Status: confirmed</td></tr>\n<tr><td>Total Price of your Ticket</td></tr>\n<tr><td>Passenger Type</td><td>Price</td><td>Taxes, fees &amp; surcharges</td><td>Passengers</td><td>Total Price of your Ticket</td></tr>\n<tr><td>Adult</td><td>GBP 1000.00</td><td>GBP 450.20</td><td>1</td><td>GBP 1450.20</td></tr>\n<tr><td>Total Price for all Passengers</td></tr>\n<tr><td>GBP 1450.20</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Brightwing. All rights reserved.<br /><a href=\"https://www.brightwing-air.example/help\">Help</a> | <a href=\"https://www.brightwing-air.example/privacy\">Privacy</a> | <a href=\"https://www.brightwing-air.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.brightwing-air.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Brightwing",
+  "date": "2026-11-10",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Return flights London Heathrow to Windhoek",
+    "qty": 1,
+    "linePence": 145020
+   }
+  ],
+  "subtotalPence": 145020,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 145020,
+  "orderRef": "PQRSTV"
+ }
+}

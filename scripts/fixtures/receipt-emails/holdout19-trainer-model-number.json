@@ -1,0 +1,36 @@
+{
+ "id": "holdout19-trainer-model-number",
+ "sender": "Stridewell",
+ "layout": "'YOUR ORDER', '574', 'Style #:', 'ML574EV2', 'UK Size: UK 8 - D', 'Navy with Grey', 'QUANTITY: 1', 'PRICE: £75.00'; 'Shipping: £4.50', 'Shipping Discount: £' with no amount",
+ "headers": {
+  "from": "Stridewell UK <stridewell@mail.stridewell.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank You for Your Order",
+  "date": "Thu, 05 Nov 2026 12:53:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Stridewell</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.stridewell.example/?utm_source=email\"><img src=\"https://www.stridewell.example/static/email/logo.png\" alt=\"Stridewell\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>ORDER NUMBER: SW04040404</td></tr>\n<tr><td>SHIPPING METHOD</td></tr>\n<tr><td>Standard</td></tr>\n<tr><td>YOUR ORDER</td></tr>\n<tr><td>574</td></tr>\n<tr><td>Style #:</td></tr>\n<tr><td>ML574EV2</td></tr>\n<tr><td>UK Size: UK 8 - D</td></tr>\n<tr><td>Navy with Grey</td></tr>\n<tr><td>QUANTITY: 1</td></tr>\n<tr><td>PRICE: &pound;75.00</td></tr>\n<tr><td>Order Subtotal: &pound;75.00</td></tr>\n<tr><td>Discount: &pound;7.50</td></tr>\n<tr><td>Shipping: &pound;4.50</td></tr>\n<tr><td>Shipping Discount: &pound;</td></tr>\n<tr><td>Order Total: &pound;67.50</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Stridewell. All rights reserved.<br /><a href=\"https://www.stridewell.example/help\">Help</a> | <a href=\"https://www.stridewell.example/privacy\">Privacy</a> | <a href=\"https://www.stridewell.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.stridewell.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Stridewell",
+  "date": "2026-11-05",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "574",
+    "qty": 1,
+    "linePence": 7500,
+    "extras": [
+     "ML574EV2",
+     "UK 8 - D",
+     "Navy with Grey"
+    ]
+   }
+  ],
+  "subtotalPence": 7500,
+  "feesPence": 450,
+  "discountsPence": 1200,
+  "tipsPence": 0,
+  "totalPence": 6750,
+  "orderRef": "SW04040404"
+ }
+}

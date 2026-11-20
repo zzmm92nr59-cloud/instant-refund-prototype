@@ -1,0 +1,31 @@
+{
+ "id": "holdout19-airline-fare-and-fees",
+ "sender": "Flyvia",
+ "layout": "'Booking code ZXCVBN'; '| LGW | BCN |'; '1 adult | 40.10 EUR', '1 rear seat | 0.00 EUR', 'Fees | 29.90 EUR', 'Total: 70.00 EUR'",
+ "headers": {
+  "from": "Flyvia Airlines <no-reply@flyvia.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking confirmation - ZXCVBN LGW-BCN 19 December",
+  "date": "Wed, 11 Nov 2026 09:00:00 +0000"
+ },
+ "html": "",
+ "text": "| Booking code ZXCVBN |\n| Outbound | |\n| Saturday, 19 December 2026 |\n| London (Gatwick) (TS) | Barcelona (T1) |\n| LGW | BCN |\n| 07:20h | 10:35h |\n| VY6014 |\n| Passengers and services |\n| 1 adult | 40.10 EUR |\n| 1 rear seat | 0.00 EUR |\n| Fees | 29.90 EUR |\n| Total: 70.00 EUR |\n| Status: | | Confirmed |\n",
+ "expected": {
+  "shop": "Flyvia Airlines",
+  "date": "2026-11-11",
+  "currency": "EUR",
+  "items": [
+   {
+    "name": "Flight London Gatwick to Barcelona",
+    "qty": 1,
+    "linePence": 4010
+   }
+  ],
+  "subtotalPence": 4010,
+  "feesPence": 2990,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 7000,
+  "orderRef": "ZXCVBN"
+ }
+}

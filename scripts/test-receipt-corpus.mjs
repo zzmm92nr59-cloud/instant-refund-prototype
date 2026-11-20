@@ -617,7 +617,7 @@ const joinWrong = [];
   if (!(tk.returns && tk.returns.nonRefundable) || (tk.items || [])[0]?.variant !== "Full Price Ticket" || (tx.items || [])[0]?.variant !== "Seats, Full Price Ticket")
     joinWrong.push("ticket orders read as " + JSON.stringify([tk.returns, (tk.items || [])[0], (tx.items || [])[0]]));
   { const th = det("holdout16c-theatre-total-paid-dash"); if (!(th.returns && th.returns.nonRefundable)) joinWrong.push("'Tickets are non-refundable' not kept: " + JSON.stringify(th.returns)); }
-  { const g = det("holdout16c-gifts-priced-and-taken-off"); if (!g.itemsCheck.complete || (g.discounts || []).some((d) => /gift/i.test(d.label || d.name || "")) || (g.items || []).length !== 2)
+  { const g = det("holdout16c-gifts-priced-and-taken-off"); if (!g.itemsCheck.complete || (g.discounts || []).some((d) => /gift/i.test(d.label || d.name || "")) || (g.items || []).length !== 3 || !(g.items[2].free && g.items[2].pricePence === 0))
       joinWrong.push("free gifts priced and taken off read as " + JSON.stringify([g.itemsCheck, g.discounts, (g.items || []).map((i) => i.name)])); }
   { const d = det("holdout16c-delivery-dash-prices"); if ((d.discounts || []).length !== 1 || !(d.fees || []).some((f) => f.label === "Service fee" && f.pence === 82))
       joinWrong.push("a delivery app's dash-priced items read as " + JSON.stringify([d.discounts, d.fees])); }

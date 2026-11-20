@@ -129,7 +129,9 @@ export default function holdout16d() {
       { from: "lufthansa.com <online@booking.lufthansa.com>", subject: "Booking details | Departure: 14 December 2021 | LHR-WDH", date: "Wed, 10 Nov 2021 13:02:53 +0000",
         html: htmlPage("Lufthansa", ["Ticket details & travel information", "Lufthansa booking code: | ABCDEF", "Passenger information", "TAYLOR/SAM MR", "Tue. 14 December 2021: London – Frankfurt", "LH 909",
           "Total Price of your Ticket", "Passenger Type | Price | Taxes, fees & surcharges | Passengers | Total Price of your Ticket", "Adult | GBP 771.00 | GBP 430.72 | 1 | GBP 1201.72", "Total Price for all Passengers | GBP 1201.72"]) },
-      { ...expected("Lufthansa", "2021-11-10", order([])), items: [{ name: "Adult", qty: 1, linePence: 120172 }], totalPence: 120172, shopAlso: ["lufthansa.com"] });
+      { ...expected("Lufthansa", "2021-11-10", order([])), items: [{ name: "Flight London Heathrow to Windhoek", qty: 1, linePence: 120172 }], totalPence: 120172, shopAlso: ["lufthansa.com"] });
+    // (Round 18: the flights are what was bought, never the fare's passenger type "Adult"; the airports here are only in the
+    // subject, so the trip as it names it.)
     out.push(f);
   }
   // Ticket Tailor: "Order complete: …", an order summary with its columns named and bare amounts.

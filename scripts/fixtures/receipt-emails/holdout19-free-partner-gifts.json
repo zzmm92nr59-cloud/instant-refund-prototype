@@ -1,0 +1,46 @@
+{
+ "id": "holdout19-free-partner-gifts",
+ "sender": "Proteo",
+ "layout": "each line 'Name', 'Quantity', '1', 'Price', '£…'; two partner offers ('15% off sitewide at Kettleworks!' at £1.50, 'Free MealKit box' at £12.00) taken off again as '2 FREE gifts on all orders - £13.50'",
+ "headers": {
+  "from": "Proteo <service@t.proteo-nutrition.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Thank you for your order",
+  "date": "Sun, 08 Nov 2026 10:13:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Proteo</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.proteo-nutrition.example/?utm_source=email\"><img src=\"https://www.proteo-nutrition.example/static/email/logo.png\" alt=\"Proteo\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you for your order</td></tr>\n<tr><td>Whey Isolate - 1kg - Vanilla</td></tr>\n<tr><td>Quantity</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Price</td></tr>\n<tr><td>&pound;24.99</td></tr>\n<tr><td>Oat Bar - 12 x 60g - Toffee</td></tr>\n<tr><td>Quantity</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Price</td></tr>\n<tr><td>&pound;14.50</td></tr>\n<tr><td>15% off sitewide at Kettleworks!</td></tr>\n<tr><td>Quantity</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Price</td></tr>\n<tr><td>&pound;1.50</td></tr>\n<tr><td>Free MealKit box</td></tr>\n<tr><td>Quantity</td></tr>\n<tr><td>1</td></tr>\n<tr><td>Price</td></tr>\n<tr><td>&pound;12.00</td></tr>\n<tr><td>Order Summary</td></tr>\n<tr><td>Order Number:</td></tr>\n<tr><td>662019384</td></tr>\n<tr><td>Order Date:</td></tr>\n<tr><td>2026-11-08 10:12 UTC</td></tr>\n<tr><td>Offers Used:</td></tr>\n<tr><td>Spring savings</td></tr>\n<tr><td>- &pound;2.50</td></tr>\n<tr><td>2 FREE gifts on all orders</td></tr>\n<tr><td>- &pound;13.50</td></tr>\n<tr><td>Delivery:</td></tr>\n<tr><td>&pound;0.00</td></tr>\n<tr><td>Total Cost:</td></tr>\n<tr><td>&pound;36.99</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Proteo. All rights reserved.<br /><a href=\"https://www.proteo-nutrition.example/help\">Help</a> | <a href=\"https://www.proteo-nutrition.example/privacy\">Privacy</a> | <a href=\"https://www.proteo-nutrition.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.proteo-nutrition.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Proteo",
+  "date": "2026-11-08",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Whey Isolate - 1kg - Vanilla",
+    "qty": 1,
+    "linePence": 2499
+   },
+   {
+    "name": "Oat Bar - 12 x 60g - Toffee",
+    "qty": 1,
+    "linePence": 1450
+   },
+   {
+    "name": "15% off sitewide at Kettleworks!",
+    "qty": 1,
+    "linePence": 0
+   },
+   {
+    "name": "Free MealKit box",
+    "qty": 1,
+    "linePence": 0
+   }
+  ],
+  "subtotalPence": 3949,
+  "feesPence": 0,
+  "discountsPence": 250,
+  "tipsPence": 0,
+  "totalPence": 3699,
+  "orderRef": "662019384"
+ }
+}

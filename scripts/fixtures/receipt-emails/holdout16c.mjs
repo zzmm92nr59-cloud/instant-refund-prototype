@@ -66,7 +66,8 @@ export default function holdout16c() {
   }
   // ---- An airline's booking: the airports' codes alone in a row of cells under their names, a booking code of letters -----
   {
-    const o = order([{ name: "Flight London Gatwick to Barcelona", qty: 1, unit: 6450 }]);
+    // (Round 18: its "Fees | 26.40 EUR" line is the fees, the flight what is left, as the email sets them out.)
+    const o = order([{ name: "Flight London Gatwick to Barcelona", qty: 1, unit: 3810 }], { fees: [["Fees", 2640]] });
     const f = add("holdout16c-airline-codes-in-cells", "Flyvia", "subject 'Your booking confirmation - QWMZRT LGW-BCN 12 December'; 'Booking code QWMZRT'; 'London (Gatwick) | Barcelona (T1)' over '| LGW | BCN |'; '1 adult | 38.10 EUR', '1 rear seat | 0.00 EUR', 'Fees | 26.40 EUR', 'Total: 64.50 EUR'", {
       from: "Flyvia Airlines <no-reply@flyvia.example>", subject: "Your booking confirmation - QWMZRT LGW-BCN 12 December", date: "Tue, 10 Nov 2026 09:00:00 +0000",
       text: "| Booking code QWMZRT |\n| Outbound | |\n| Saturday, 12 December 2026 |\n| London (Gatwick) (TS) | Barcelona (T1) |\n| LGW | BCN |\n| 07:20h | 10:35h |\n| VY6012 |\n| Passengers and services |\n| 1 adult | 38.10 EUR |\n| 1 rear seat | 0.00 EUR |\n| Fees | 26.40 EUR |\n| Total: 64.50 EUR |\n| Status: | | Confirmed |\n" },
@@ -136,8 +137,9 @@ export default function holdout16c() {
   }
   // ---- A sports-nutrition shop: "Quantity" over "1", "Price" over "£20.00" under each name; free gifts priced and taken off --
   {
-    const o = order([{ name: "Whey Isolate - 1kg - Vanilla", qty: 1, unit: 2000 }, { name: "Protein Bar - 12 x 60g - Salted Caramel", qty: 1, unit: 1500 }], { discounts: [["You've saved up to 60%", 200]] });
-    add("holdout16c-gifts-priced-and-taken-off", "Liftwell", "each item's name over 'Quantity' / '1' and 'Price' / '£20.00'; 'Free Recipe Box' priced '£5.00' (a promotion, never an item); 'Offers Used:' 'You've saved up to 60%' '- £2.00', 'Up to 60% off almost everything, plus FREE delivery!' '- £3.99', '3 FREE gifts on all orders' '- £5.00'; 'Delivery:' '£0.00'; 'Total Cost:' '£33.00'", {
+    // (Round 18: the gift the email lists as a line of the order is listed, free, at £0.00: what the offer took off is its worth.)
+    const o = order([{ name: "Whey Isolate - 1kg - Vanilla", qty: 1, unit: 2000 }, { name: "Protein Bar - 12 x 60g - Salted Caramel", qty: 1, unit: 1500 }, { name: "Free Recipe Box", qty: 1, unit: 0 }], { discounts: [["You've saved up to 60%", 200]] });
+    add("holdout16c-gifts-priced-and-taken-off", "Liftwell", "each item's name over 'Quantity' / '1' and 'Price' / '£20.00'; 'Free Recipe Box' priced '£5.00' (a gift, listed free); 'Offers Used:' 'You've saved up to 60%' '- £2.00', 'Up to 60% off almost everything, plus FREE delivery!' '- £3.99', '3 FREE gifts on all orders' '- £5.00'; 'Delivery:' '£0.00'; 'Total Cost:' '£33.00'", {
       from: "Liftwell <orders@liftwell.example>", subject: "Your Liftwell order confirmation", date: "Sat, 31 Oct 2026 07:40:00 +0000",
       html: mail("Liftwell", "liftwell.example", ["Thanks for your order", "Order number: 491223376", "Whey Isolate - 1kg - Vanilla", "Quantity", "1", "Price", "£20.00", "Protein Bar - 12 x 60g - Salted Caramel", "Quantity", "1", "Price", "£15.00",
         "Free Recipe Box", "Quantity", "1", "Price", "£5.00", "Offers Used:", "You've saved up to 60%", "- £2.00", "Up to 60% off almost everything, plus FREE delivery!", "- £3.99", "3 FREE gifts on all orders", "- £5.00", "Delivery:", "£0.00", "Total Cost:", "£33.00"]) },

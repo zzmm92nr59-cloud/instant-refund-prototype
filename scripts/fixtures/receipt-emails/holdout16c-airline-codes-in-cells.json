@@ -18,11 +18,11 @@
    {
     "name": "Flight London Gatwick to Barcelona",
     "qty": 1,
-    "linePence": 6450
+    "linePence": 3810
    }
   ],
-  "subtotalPence": 6450,
-  "feesPence": 0,
+  "subtotalPence": 3810,
+  "feesPence": 2640,
   "discountsPence": 0,
   "tipsPence": 0,
   "totalPence": 6450,
