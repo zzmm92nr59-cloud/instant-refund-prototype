@@ -184,6 +184,9 @@ const PATTERNS = [
   [new RegExp("^/relay/my/receipts/" + uuidish + "/share$"), { fields: { note: text(300), delete: bool } }],
   // "Read it again" (receipt-reread.js): no fields; the receipt is in the address.
   [new RegExp("^/relay/my/receipts/" + uuidish + "/reread$"), NOTHING],
+  // "Same order as another receipt" (with: the other receipt's id), "These are different orders", or undoing either
+  // (order-joins.js checks both receipts are the shopper's own).
+  [new RegExp("^/relay/my/receipts/" + uuidish + "/join$"), { fields: { action: one("same", "apart", "undo"), with: str(36), kind: one("same", "apart") } }],
   // "I've sent it back" (return-tracking.js): the return's tracking number and carrier if the shopper has them, the day
   // they sent it, or undo. The route checks the number's format, the carrier against its list and the date.
   [new RegExp("^/relay/my/receipts/" + uuidish + "/return-sent$"), { fields: { trackingNumber: str(60), carrier: str(20), sentOn: str(10), undo: bool } }],
