@@ -62,12 +62,12 @@ const stored = (raw, createdAt) => { const c = classifyEmail(raw); assert.ok(c.d
 }
 // 3. Ticket fees are the lines the email sets out, and stay in the list shown.
 {
-  for (const id of ["holdout20-tickets-per-ticket-fees", "holdout20-tickets-fees-in-brackets"]) {
+  for (const id of ["holdout16c-tickets-order-details-text", "holdout20-tickets-fees-in-brackets"]) {
     const r = read(id);
     assert.deepEqual(listed(r.items).map((i) => [i.name, i.qty, i.pricePence]), r.items.map((i) => [i.name, i.qty, i.pricePence]), id + ": every line kept when listed");
     assert.equal(r.items.reduce((s, i) => s + i.pricePence * i.qty, 0), r.totalPence);
   }
-  assert.ok(read("holdout20-tickets-per-ticket-fees").items.some((i) => i.name === "Delivery/transaction costs"));
+  assert.ok(read("holdout16c-tickets-order-details-text").items.some((i) => i.name === "Delivery/transaction costs"));
   assert.ok(read("holdout20-tickets-fees-in-brackets").items.some((i) => i.name === "Service Charge Full Price Ticket"));
   // (A line named only by money words that no ticket list set out is still left out.)
   assert.equal(listed([{ name: "Service charge", qty: 1, pricePence: 200 }]).length, 0);

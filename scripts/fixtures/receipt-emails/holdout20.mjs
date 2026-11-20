@@ -1,8 +1,8 @@
 // A twenty-third set of made-up emails (see lib.mjs), round 19 (20 Nov 2026): layouts of receipts in a real inbox that Relay
 // still read wrongly after round 18, written again with everything in them made up (shops, events, items, prices, people,
-// numbers). A ticket seller's per-ticket fees set out as "Booking fee: 2 x £ 3.10 = £ 6.20" with the order's fees under
-// the subtotal, and one whose fees sit in brackets beside each ticket type, "£3.30 (Service Charge Full Price Ticket) x2"
-// (each fee is a line of the list, and stays one in the list shown: scripts/test-receipt-real-19.mjs);
+// numbers). A ticket seller whose fees sit in brackets beside each ticket type, "£3.30 (Service Charge Full Price Ticket) x2"
+// (each fee is a line of the list, and stays one in the list shown: scripts/test-receipt-real-19.mjs, which also reads
+// holdout16c's plain-text ticket order for its "Delivery/transaction costs");
 // a payment service's receipt whose HTML gives each label and its value on lines of their own; a web shop's money off set
 // out under the thing it was taken off; a home-delivery email whose delivery day sits above the item. (A parking app's
 // receipt and a booking with no total are holdout16e's and holdout16c's, whose answers this round changes.)
@@ -15,23 +15,6 @@ export default function holdout20() {
   const out = [];
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };
 
-  // ---- A ticket seller's plain-text order: per-ticket fees under the seats, the order's own fees under the subtotal -------
-  {
-    const o = order([{ name: "Comedy Night: The Big Laugh", qty: 2, unit: 2800 }, { name: "Booking fee", qty: 2, unit: 310 }, { name: "Venue Levy", qty: 2, unit: 100 }, { name: "Processing fee", qty: 1, unit: 125 }, { name: "Delivery/transaction costs", qty: 1, unit: 199 }]);
-    add("holdout20-tickets-per-ticket-fees", "Ticketvale", "'Order details', the event's name, 'Date:', 'Venue:', then 'Seats, Full Price Ticket | 2 × £ 28.00 | £ 56.00', the seats, 'Booking fee | 2 × £ 3.10 | £ 6.20', 'Venue Levy | 2 × £ 1.00 | £ 2.00', 'Subtotal | £ 64.20', 'Total', 'Processing fee | £ 1.25', 'Delivery/transaction costs | £ 1.99', 'Total incl. VAT | £ 67.44'",
-      { from: "Ticketvale UK <noreply@ticketvale.example>", subject: "Your order confirmation from www.ticketvale.example, order number: 2045123456", date: "Sat, 14 Nov 2026 19:20:00 +0000",
-        html: mail("Ticketvale", "ticketvale.example", ["Hi Sam Taylor ,", "Thanks for placing your order with Ticketvale - see below for details of your order.", "Comedy Night: The Big Laugh LEEDS, 04/12/2026", "Order number: | 2045123456", "Order date: | 14/11/2026",
-          "Order total: | £ 67.44", "Delivery: | e-ticket", "Order details", "Comedy Night: The Big Laugh", "Date:", "Fri., 04/12/2026, 20:00", "Venue:", "Example Hall, 1 Example Square, LS1 4AB LEEDS, United Kingdom",
-          "Seats, Full Price Ticket | 2 × £ 28.00 | £ 56.00", "Entrance A, Block B, Row C, Seat 11", "Entrance A, Block B, Row C, Seat 12",
-          "Booking fee | 2 × £ 3.10 | £ 6.20", "Venue Levy | 2 × £ 1.00 | £ 2.00", "Subtotal | £ 64.20", "Total", "Processing fee | £ 1.25", "Delivery/transaction costs | £ 1.99",
-          "Total incl. VAT | £ 67.44", "Ticket delivery"]),
-        text: ["Hi Sam Taylor ,", "Thanks for placing your order with Ticketvale - see below for details of your order.", "Order number: 2045123456", "Order date: 14/11/2026", "Order total: £ 67.44", "",
-          "ORDER DETAILS", "Comedy Night: The Big Laugh", "Date: Fri., 04/12/2026, 20:00", "Venue: Example Hall, 1 Example Square, LS1 4AB LEEDS, United Kingdom",
-          "Seats, Full Price Ticket: 2 x £ 28.00 = £ 56.00", "Entrance A, Block B, Row C, Seat 11", "Entrance A, Block B, Row C, Seat 12", "Booking fee: 2 x £ 3.10 = £ 6.20", "Venue Levy: 2 x £ 1.00 = £ 2.00",
-          "------------------------------------------", "Subtotal: £ 64.20", "==========================================", "TOTAL", "Processing fee: £ 1.25", "Delivery/transaction costs: £ 1.99",
-          "------------------------------------------", "Total incl. VAT: £ 67.44", "=========================================="].join("\n").replace(/£ /g, "£\u00a0") },
-      o, "Ticketvale", "2026-11-14", { orderRef: "2045123456" });
-  }
   // ---- A ticket seller's HTML order: each fee in brackets beside the ticket type it is charged on -------------------------
   {
     const o = order([{ name: "Sam Example: Live In Leeds", qty: 2, unit: 3500 }, { name: "Service Charge Full Price Ticket", qty: 2, unit: 330 }, { name: "Facility Charge Full Price Ticket", qty: 2, unit: 150 }, { name: "Handling Fee", qty: 1, unit: 250 }]);
