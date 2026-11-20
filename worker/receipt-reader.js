@@ -181,7 +181,7 @@ const FW_MARK = /forwarded message|begin forwarded message|original message|^[ \
 // Verzonden: …", "Da: … Inviato: …", "De: … Enviado: …". Round 4, 19 Nov 2026.)
 const FW_FROM = /(?:^|\n)[ \t>*]*(?:from|de|von|van|da|fra|från|od)[ \t*]*:[ \t*]*"?([^"<>[\]\n@]{0,60}?)"?[ \t]*(?:<[ \t]*(?:mailto:)?|\[mailto:|\()?[ \t]*([^\s<>[\]()"'@]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+))/gi;
 // Apple's Hide My Email writes the shop's own address into the one it forwards from,
-// "noreply_at_paybyphone_com_ff7rwfjnyk_bd0c0537@privaterelay.appleid.com": the shop's web address is paybyphone.com.
+// "noreply_at_parkly_example_ab12cd34ef_0a1b2c3d@privaterelay.appleid.com": the shop's web address is parkly.example.
 // Round 15e.
 export function hiddenSenderDomain(address) {
   const a = String(address || "").toLowerCase().trim();

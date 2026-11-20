@@ -1886,7 +1886,7 @@ const whenOf = (c) => c.orderDate || new Date(c.createdAt || 0).toISOString().sl
 const isForwarded = (o) => PERSONAL_MAIL.test(String((o.retailer && o.retailer.domain) || ""));
 // The shop an order email is from, for joining one order's emails: its address without the part a shop sends a kind of
 // email from ("order.detalecph.com" is detalecph.com). Round 11.
-// ("comms.vueling.com", "updates.…", "alerts.…": the same. Round 15e.)
+// ("comms.skyhop.example", "updates.…", "alerts.…": the same. Round 15e.)
 const SEND_LABEL = /^(?:orders?|mail|e?mail\d?|e|em|news|info|shop|store|no-?reply|notify|notifications?|send|service|support|t|m|comms?|communications?|updates?|alerts?|messages?|mailer|transactional|txn)\./i;
 function joinStore(o) {
   const k = storeKey(o), d = o && o.retailer && o.retailer.domain;

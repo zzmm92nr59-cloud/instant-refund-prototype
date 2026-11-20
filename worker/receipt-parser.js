@@ -586,7 +586,7 @@ function fromText(text, refDate, ctx = {}) {
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
     // capitals ("QWERTZ"). Round 11.) (The number in the next cell, "Order number: | 851791895 |": round 15.)
-    // (Or set in bold in a text part, "Order number: *73970624*". Round 15e.)
+    // (Or set in bold in a text part, "Order number: *55120378*". Round 15e.)
     [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?\*{0,2}([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => (/\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) && !(m[0].includes("|") && /[A-Z0-9-]/i.test(text[m.index + m[0].length] || ""))) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
@@ -1004,7 +1004,7 @@ function receiptSignals(subject, text) {
     /\breceipt\s*[:#]\s*#?\d{4,}\s*$|\breservations? (?:have|has) been (?:made|confirmed)\b/.test(s) ||
     // (Round 15e: "Your order for Warmer People & Chevry Agency: …", a ticket seller's order named by its event.)
     /^\s*(?:(?:fwd?|fw)\s*:\s*)?your order for\b/.test(s) ||
-    // (Round 15e: "Your booking with Nottingham Winter Wonderland! - 3142790", a booking named by its number.)
+    // (Round 15e: "Your booking with Frost Fair Leeds! - 5520193", a booking named by its number.)
     /\byour booking (?:with|at|for)\b[^?]{0,60}?\s[-–:#]\s*#?\d{5,12}\s*$/.test(s) ||
     /\bhas (?:got )?your order\b|\byour order(?:'|’)?s (?:in the kitchen|being prepared|being made)\b|\byour bill (?:has been|was|is) paid\b|\bpayment transaction for your order\b|^\s*(?:(?:fwd?|fw)\s*:\s*)?[\w&'’.-]+(?:\s+[\w&'’.-]+){0,2}\s+(?:e-?)?receipt\s*$/.test(s);
   // (A total in euros counts as a total: the receipt is kept with its amount in euros, never turned into pounds.)
@@ -1014,10 +1014,10 @@ function receiptSignals(subject, text) {
   // (A restaurant's order email whose subject says nothing about it, "We're on it!": the email itself opens with "Thanks for
   // your order" and names the order, "order #500dc2". Round 15.)
   const top = String(text || "").slice(0, 2500);
-  // (Or in brackets, "Your Order (#4F786F5CD2BB):", a ticket seller's order under "Thank you for your order from …". Round 15e.)
+  // (Or in brackets, "Your Order (#9C41AB77E0D2):", a ticket seller's order under "Thank you for your order from …". Round 15e.)
   const bodyOrder = (/\bthanks? (?:you )?for your order\b/i.test(top) && /\border\s*(?:\(\s*)?#\s?[a-z0-9]{4,12}\b/i.test(top)) ||
-    // (Or it says the booking is confirmed and gives its reference, "Your booking at Tenpin Nottingham is confirmed" and
-    // "Reservation ID: 949926", under a subject that says nothing, "You're in the game!". Round 15e.)
+    // (Or it says the booking is confirmed and gives its reference, "Your booking at Strikeworld Leeds is confirmed" and
+    // "Reservation ID: 551204", under a subject that says nothing, "You're in the game!". Round 15e.)
     (/\byour (?:booking|reservation)\b[^.!?\n]{0,60}\b(?:is|has been) confirmed\b/i.test(top) && /\b(?:reservation|booking|transaction) (?:id|reference|ref\.?|number|no\.?)\s*:/i.test(String(text || "").slice(0, 6000)));
   // (A booking's line "4 x Make a pot like Grayson Perry @ £40.00": what was bought and its price, with no total. Round 15.)
   const atPrice = /^[ \t|]*\d{1,3}\s*x\s+[^\n@£|]{2,80}@\s*£\s?\d/m.test(String(text || "").slice(0, 20000));
@@ -1899,7 +1899,7 @@ function stackedFeeColumns(text, total) {
   return null;
 }
 // A booking set out as its name, its reference and who it is for, then what it cost, "Standard Bowling", "Reservation ID:
-// 949926", "2 x Adults", "2 x Games", "Cost: £29.80", that cost the whole total: the one thing booked. Round 15e.
+// 551204", "2 x Adults", "2 x Games", "Cost: £29.80", that cost the whole total: the one thing booked. Round 15e.
 const WHO_FOR_LINE = /^\d{1,3}\s*[x×]\s*(?:adults?|child(?:ren)?|kids?|games?|people|persons?|guests?|players?|seniors?|students?|infants?)$/i;
 function bookingOverCost(text, total) {
   if (total == null) return null;
@@ -1919,7 +1919,7 @@ function bookingOverCost(text, total) {
   return null;
 }
 // An invoice's columns set out one under another, "Quantity" / "Item ID" / "Description" / … / "Unit Price" / "Amount", then
-// the row's values the same way with the prices written without "£", "1" / "369896836" / "Car" / … / "23.00" / "23.00" /
+// the row's values the same way with the prices written without "£", "1" / "480012345" / "Car" / … / "23.00" / "23.00" /
 // "GBP": the one line, when its amount is the whole total. Round 15e.
 function stackedInvoiceRow(text, total) {
   if (total == null) return null;
@@ -2204,13 +2204,13 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.orderRef) { const sr = /\border\s+(?:confirmation|confirmed|received|placed|update|status)\s*:?\s*#\s?(\d{3,12})\b/i.exec(String(subject || "")) || /\byour order \(#?(\d{3,12})\) (?:has been|is|was)\b/i.exec(text); if (sr) result.orderRef = sr[1]; }
   // ("Merchant Reference: a82d1340-3ad7-4d8d-9352-1c48ea195b90", a card payment page's receipt: the shop's own number for the
   // payment, whole. Round 15.)
-  // (The order's number in brackets as a heading, "Your Order (#4F786F5CD2BB):", a ticket seller's order. Round 15e.)
+  // (The order's number in brackets as a heading, "Your Order (#9C41AB77E0D2):", a ticket seller's order. Round 15e.)
   if (!result.orderRef) { const br = /\b(?:your order|order summary|order details)\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(text) || /\b(?:your order|order summary|order details)\s*\(\s*#\s?((?=[A-Za-z0-9]*\d)[A-Za-z0-9]{5,20})\s*\)\s*:?[ \t|]*$/im.exec(otherText0(text, plain, fromHtml)); if (br) result.orderRef = br[1]; }
-  // (A booking named by its number at the end of the subject, "Your booking with Nottingham Winter Wonderland! - 3142790".)
+  // (A booking named by its number at the end of the subject, "Your booking with Frost Fair Leeds! - 5520193".)
   if (!result.orderRef) { const sb = /\byour booking\b[^?\n]{0,80}?\s[-–:#]\s*#?(\d{5,12})\s*$/i.exec(String(subject || "")); if (sb) result.orderRef = sb[1]; }
-  // (A booking's own reference, "Reservation ID: 949926". Round 15e.)
+  // (A booking's own reference, "Reservation ID: 551204". Round 15e.)
   if (!result.orderRef) { const rv = /\b(?:reservation|booking) (?:id|number|no\.?)\s*:[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{3,23})(?![A-Za-z0-9-])/i.exec(text); if (rv) result.orderRef = rv[1]; }
-  // (The word "Order" alone on its line over the order's number on the next, "Order" / "RA26061085-262". Round 15e.)
+  // (The word "Order" alone on its line over the order's number on the next, "Order" / "GL31207733-118". Round 15e.)
   if (!result.orderRef) { const ol = /^[ \t|]*order[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*((?=[A-Za-z0-9-]*\d{5})[A-Za-z0-9][A-Za-z0-9-]{5,23})[ \t|]*$/im.exec(fromHtml || text) || /^[ \t|]*order[ \t|]*\n(?:[ \t|]*\n){0,3}[ \t|]*((?=[A-Za-z0-9-]*\d{5})[A-Za-z0-9][A-Za-z0-9-]{5,23})[ \t|]*$/im.exec(plain || ""); if (ol) result.orderRef = ol[1]; }
   if (!result.orderRef) { const mr = /\bmerchant (?:reference|ref\.?)(?: number)?\s*:?[ \t|]*((?=[A-Za-z0-9-]*\d)[A-Za-z0-9][A-Za-z0-9-]{5,63})(?![A-Za-z0-9-])/i.exec(text); if (mr) result.orderRef = mr[1]; }
   // ("Order TSR89717 confirmed": a number of letters and digits right after "Order", with what happened to it after. Round 15.)
@@ -3024,8 +3024,8 @@ function trackingIn(text) {
   const rm = text.match(ROYAL_MAIL_REF);
   if (rm) return { trackingNumber: rm[1], carrier: "Royal Mail" };
   const m = text.match(/\btracking\s*(?:number|no\.?|#|id|code)?\s*[:#]\s*([A-Z0-9]{8,30})\b/i) || text.match(/\btracking\s+(?:number|no\.?|id|code)\s+(?:is\s+)?([A-Z0-9]{8,30})\b/i) ||
-    // (Round 15e: written as data in the email, "trackingNumber":"UK3362226979", or only in the carrier's tracking link,
-    // "https://track.amazon.co.uk/tracking/UK3362226979".)
+    // (Round 15e: written as data in the email, "trackingNumber":"UK4471100293", or only in the carrier's tracking link,
+    // "https://track.amazon.co.uk/tracking/UK4471100293".)
     text.match(/"tracking_?number"\s*:\s*"([A-Z0-9]{8,30})"/i) || text.match(/\bhttps?:\/\/track(?:ing)?\.[a-z0-9.-]{3,40}\/(?:tracking|track|parcels?)\/([A-Z]{0,4}\d[A-Z0-9]{7,29})(?![A-Z0-9])/i);
   return m && /\d/.test(m[1]) ? { trackingNumber: m[1].toUpperCase(), carrier: null } : null;
 }
@@ -3379,10 +3379,10 @@ function updateParts(rawEmail) {
   // digits only, so a word is never taken for it. Round 15.)
   const ref = subject.match(/\border\s*(?:number|no\.?)?\s*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
     subject.match(/\border\b[^\n]{0,40}?[\s#:-](\d{6,16})\s*$/i) || text.match(/\border\s*(?:number|no\.?|id|#)\s*(?:is\s*)?[:#\s]*#?\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
-    // (Round 15e: "Despatch Confirmation - Ref: wuk12804674", "Your order number is: wuk12804674".)
+    // (Round 15e: "Despatch Confirmation - Ref: cwk55120931", "Your order number is: cwk55120931".)
     subject.match(/\bref(?:erence)?\s*[:#]\s*((?=[A-Z0-9-]*\d)[A-Z0-9-]{5,24})\b/i) ||
     text.slice(0, 1500).match(/\byour order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i) ||
-    // (Round 15e: "We have cancelled the following item(s) from your order 491508763", below the shop's menu.)
+    // (Round 15e: "We have cancelled the following item(s) from your order 771508763", below the shop's menu.)
     text.slice(0, 15000).match(/\bcancell?ed\b[^.\n]{0,60}\bfrom your order\s+#?((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,24})\b/i);
   return { headers, parts, html, text, subject, at, orderRef: ref ? ref[1] : null };
 }

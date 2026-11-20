@@ -395,7 +395,7 @@ export function readItems(text, opts = {}) {
       // (A label on its own line over its value in a cell of its own, "Quantity" / "1 |", "Price" / "£2.80 |", under each
       // item's name: read as the label's cell and the value's. Round 15.)
       .replace(/^([ \t]*)(quantity|qty|price)[ \t|]*\n(?=[ \t]*(?:\d{1,3}|£ ?\d[\d,]*\.\d{2})(?:[ \t]*\|)+[ \t]*$)/gim, "$1$2 | ")
-      // (Empty cells before a line's one cell, "| | ASOS DESIGN skinny chino shorts in navy |" (an image's cell): just that
+      // (Empty cells before a line's one cell, "| | Skinny chino shorts in navy |" (an image's cell): just that
       // cell. Round 15e.)
       .replace(/^[ \t]*(?:\|[ \t]*){2,4}(?=[^|\s][^|\n]*\|?[ \t]*$)/gm, "")
       // (The colour and size set apart by slashes before how many, "Brown / No Size / Qty 1", under an item's price: what it
