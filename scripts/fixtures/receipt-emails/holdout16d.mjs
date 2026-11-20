@@ -184,5 +184,18 @@ export default function holdout16d() {
     { from: '"Homary.com" <service@homary.com>', subject: "We've received your payment and your order is under processing.", date: "Wed, 30 Jul 2025 12:03:00 +0000",
       html: htmlPage("Homary", ["Free Shipping", "On All Orders", "30-Day Return", "Within 30-Day Of Delivery", "Order No.: UKA2507300000000000001", "Rattan Floor Lamp | 1 | £79.99", "Subtotal | £79.99", "Total | £79.99"]) },
     order([{ name: "Rattan Floor Lamp", qty: 1, unit: 7999 }]), "Homary.com", "2025-07-30", { shopAlso: ["Homary"] });
+  // Stripe receipts: a credit for unused time ("−£11.10", a true minus sign; its label has a date with a year in it), and a
+  // discount on a dollar receipt ("Pro Subscription 51% Discount (51% off) | -$11.53"); the text part runs all into one line.
+  add("holdout16d-stripe-unused-time", "Anthropic", "'Unused time on … after 26 Oct 2026', 'Qty 1', '−£10.00' under the plan; VAT on top; text part one long line",
+    { from: "Northlight Labs Ireland, Limited <invoice+statements+acct_9@stripe.com>", subject: "Your receipt from Northlight Labs Ireland, Limited #2300-0001", date: "Mon, 26 Oct 2026 09:00:00 +0000",
+      text: "Receipt from Northlight Labs Ireland, Limited £45.60 Paid on October 26, 2026 Receipt #2300-0001 Oct 26–Nov 26, 2026 Studio plan Qty 1 £48.00 Unused time on Starter plan after 26 Oct 2026 Qty 1 −£10.00 Subtotal £38.00 VAT - United Kingdom (20%) £7.60 Total £45.60 Amount paid £45.60",
+      html: htmlPage("Stripe", ["Receipt from Northlight Labs Ireland, Limited", "£45.60", "Paid on October 26, 2026", "Receipt #2300-0001", "Oct 26–Nov 26, 2026", "Studio plan", "Qty 1", "£48.00",
+        "Unused time on Starter plan after 26 Oct 2026", "Qty 1", "−£10.00", "Subtotal", "£38.00", "Total excluding tax", "£38.00", "VAT - United Kingdom (20%)", "£7.60", "Total", "£45.60", "Amount paid", "£45.60"]) },
+    order([{ name: "Studio plan", qty: 1, unit: 4800 }]), "Northlight Labs", "2026-10-26", { totalPence: 4560, shopAlso: ["Northlight Labs Ireland", "Northlight"] });
+  add("holdout16d-stripe-dollar-discount", "Stripe", "'Paladin Pro Subscription | Qty 1 | $22.61', 'Pro Subscription 51% Discount (51% off) | -$11.53', 'Total | $11.08'",
+    { from: "Brainwave, Inc. <invoice+statements+acct_2@stripe.com>", subject: "Your receipt from Brainwave, Inc. #2700-0001", date: "Sun, 1 Mar 2026 10:00:00 +0000",
+      html: htmlPage("Stripe", ["Receipt from Brainwave, Inc.", "$11.08", "Paid March 1, 2026", "Receipt number 2700-0001", "Receipt #2700-0001", "Mar 1–Apr 2, 2026", "Thinker Pro Subscription", "Qty 1 | $22.61", "Subtotal | $22.61",
+        "Pro Subscription 51% Discount (51% off) | -$11.53", "Total | $11.08", "Amount paid | $11.08"]) },
+    order([{ name: "Thinker Pro Subscription", qty: 1, unit: 2261 }], { discounts: [["Pro Subscription 51% Discount (51% off)", 1153]] }), "Brainwave, Inc", "2026-03-01", { currency: "USD", shopAlso: ["Brainwave", "Brainwave, Inc."] });
   return out;
 }

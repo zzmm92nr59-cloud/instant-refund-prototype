@@ -467,6 +467,10 @@ const joinWrong = [];
   if (deal.orderRef !== "1200-000001-000001" || !(deal.returns && deal.returns.windowDays === 14 && deal.returns.windowFrom === "delivery")) joinWrong.push("a deals site's order and right to cancel read as " + JSON.stringify([deal.orderRef, deal.returns && deal.returns.windowDays, deal.returns && deal.returns.windowFrom]));
   const lamp = parseReceiptEmail(rawEmail(fx("holdout16d-home-window-heading")));
   if (!(lamp.returns && lamp.returns.windowDays === 30 && lamp.returns.windowFrom === "delivery")) joinWrong.push("'30-Day Return' over 'Within 30-Day Of Delivery' read as " + JSON.stringify(lamp.returns));
+  const credit = parseReceiptEmail(rawEmail(fx("holdout16d-stripe-unused-time")));
+  if (!(credit.discounts || []).some((d) => d.pence === 1000 && /^Unused time/.test(d.label))) joinWrong.push("Stripe's unused-time credit (−£10.00) not kept as money off: " + JSON.stringify(credit.discounts));
+  const usd = parseReceiptEmail(rawEmail(fx("holdout16d-stripe-dollar-discount")));
+  if (!(usd.discounts || []).some((d) => d.pence === 1153)) joinWrong.push("a dollar receipt's 51% discount not kept: " + JSON.stringify(usd.discounts));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

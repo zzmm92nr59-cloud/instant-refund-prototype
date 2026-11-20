@@ -2533,11 +2533,27 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (others.length) result.moreOrders = others;
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
-  if (result.items.length && (result.currency || "GBP") === "GBP") {
-    const mon = moneyOf(text);
-    // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
-    const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+  // (Money off a receipt in dollars or euros, Stripe's "Pro Subscription 51% Discount (51% off) | -$11.53": kept as it is
+  // labelled, in the receipt's own currency. Round 15.)
+  if (result.items.length && result.currency && result.currency !== "GBP" && !result.discounts) {
+    const rowsOf = String(fromHtml || text).slice(0, 60000).replace(/\n\n\|\n\n/g, " | ").split("\n");
+    const off = [];
+    for (const r of rowsOf) {
+      const m = /^[ \t|]*(\p{L}[^|\n]{2,80}?)[ \t]*(?:\|[ \t]*){0,6}[-−–][ \t]?(?:US ?\$|CA\$|A\$|MX ?\$|\$|€)[ \t]?(\d[\d,]{0,8}\.\d{2})\b/u.exec(r);
+      if (m && /\b(?:discount|off|promo(?:tion)?|coupon|credit|unused time|voucher|saving)\b/i.test(m[1]) && off.length < 8) off.push({ label: m[1].trim().slice(0, 60), pence: money(m[2]) });
+    }
     if (off.length) result.discounts = off;
+  }
+  if (result.items.length && (result.currency || "GBP") === "GBP") {
+    // (A text part that runs everything into one line, Stripe's "… Qty 1 -£11.10 Subtotal …", gives no rows to read: the
+    // HTML's rows are read instead. Round 15.)
+    let mon = moneyOf(text);
+    if (!(mon.found || []).some((f) => f[0] === "discount") && fromHtml && text !== fromHtml) { const alt = moneyOf(fromHtml); if ((alt.found || []).some((f) => f[0] === "discount")) mon = alt; }
+    // (Any amount taken off as a minus, "Happy Hour -£2.00", is money off whatever it is called; a card or payment never is.)
+    const off = (mon.found || []).filter((f) => f[0] === "discount" && f[2] > 0 && (f[3] === true || /\b(?:discounts?|promo(?:tion)?s?|offers?|vouchers?|coupons?|credit|savings?|saved|deals?|rewards?|loyalty|multi-?buy|money off|\d{1,3}% off)\b|\bapplied\b/i.test(String(f[1]))) && !/\b(?:card|payment|paid|pay|gift ?card|balance|refund)\b|(?<!\d)(?!(?:19|20)\d{2}(?!\d))\d{4}|\*{2,}|•/i.test(String(f[1]))).slice(0, 8).map((f) => ({ label: String(f[1]).replace(/[:\s]+$/, "").slice(0, 60), pence: f[2] }));
+    if (off.length) result.discounts = off;
+    // (A credit now shown as money off is not said again as the item's detail. Round 15.)
+    for (const it of result.items) if (it.variant && off.some((d) => it.variant.includes(d.label + " −£"))) { const v = it.variant.split(", ").filter((p) => !off.some((d) => p.startsWith(d.label + " −£"))).join(", "); if (v) it.variant = v; else delete it.variant; }
     // The items, less the money off the receipt shows, must come to what was paid (with its fees and tips): a check that only
     // adds up with money off the receipt doesn't show is not complete. Round 15.
     const shownOff = off.reduce((a, d) => a + d.pence, 0);
