@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { handleAuthRoute } from "../worker/auth.js";
-import { CONSENT_VERSION, autoScanGmail, catchUpFullReads, READER_FULL_REV } from "../worker/gmail.js";
+import { CONSENT_VERSION, autoScanGmail, catchUpFullReads, retireSkippedMail, READER_FULL_REV, PARSER_VERSION } from "../worker/gmail.js";
 
 const sqlite = new DatabaseSync(":memory:");
 for (const f of readdirSync("worker/migrations").filter(f => f.endsWith(".sql")).sort()) sqlite.exec(readFileSync("worker/migrations/" + f, "utf8"));
@@ -259,3 +259,56 @@ assert.equal(row().problem, null);
 assert.equal((await (await call("/relay/my/gmail", { token: alice })).json()).needsReconnect, false);
 tokenAnswer = "ok";
 console.log("ok - Google being busy is tried again later and never says connect again");
+
+// 12. Receipts an older reader made from the shopper's own sent mail (a receipt they forwarded, a reply), which the scan no
+//     longer lists ("-in:sent"), are retired in the background once the mailbox is read again with this reader: only those
+//     Gmail labels SENT, never one put up for sale, never one this reader made, never while the re-read is still going.
+{
+  const shopper = sqlite.prepare("SELECT shopper_id AS id FROM gmail_connections").get().id;
+  const labels = { sentfwd001: ["SENT"], sentfwd002: ["SENT", "INBOX"], inboxold01: ["INBOX", "CATEGORY_PURCHASES"], sentcur001: ["SENT"], sentsale01: ["SENT"], sentmbx001: ["SENT"] };
+  let looked = 0;
+  const labelled = async (url, init) => {
+    const m = /\/messages\/([A-Za-z0-9]+)\?format=minimal$/.exec(String(url));
+    if (m) { looked++; return labels[m[1]] ? Response.json({ id: m[1], labelIds: labels[m[1]] }) : new Response("{}", { status: 404 }); }
+    return fetchImpl(url, init);
+  };
+  const add = (id, gmailId, version, extra = {}) => sqlite.prepare("INSERT INTO captured_receipts (id,shopper_id,message_ref,status,details,created_at) VALUES (?,?,?,?,?,?)")
+    .run(id, shopper, "ref-" + id, "pending", JSON.stringify({ kind: "receipt", gmailId, parserVersion: version, orderRef: "R-" + id, ...extra }), clock);
+  add("rx-sent1", "sentfwd001", 42); add("rx-sent2", "sentfwd002", 43); add("rx-inbox", "inboxold01", 42); add("rx-gone", "gonegone01", 42);
+  add("rx-current", "sentcur001", PARSER_VERSION); add("rx-sale", "sentsale01", 42); add("rx-other", "sentmbx001", 42, { mailbox: 2 });
+  add("rx-pasted", null, 42, { pasted: 1 });
+  sqlite.prepare("CREATE TABLE IF NOT EXISTS return_reminders (receipt_id TEXT PRIMARY KEY, shopper_id TEXT NOT NULL, deadline TEXT NOT NULL, remind_at INTEGER NOT NULL, title TEXT NOT NULL, sent_at INTEGER)").run();
+  sqlite.prepare("INSERT INTO return_reminders VALUES ('rx-sent1', ?, '2026-12-01', 1, 'x', NULL)").run(shopper);
+  sqlite.prepare("CREATE TABLE IF NOT EXISTS resale_listings (id TEXT PRIMARY KEY, seller_id TEXT NOT NULL, receipt_id TEXT NOT NULL, item_index INTEGER NOT NULL, title TEXT NOT NULL, store TEXT, currency TEXT, size TEXT, condition TEXT NOT NULL, ask_pence INTEGER, swap_ok INTEGER NOT NULL DEFAULT 0, note TEXT, has_image INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, created_at INTEGER NOT NULL)").run();
+  sqlite.prepare("INSERT INTO resale_listings (id,seller_id,receipt_id,item_index,title,condition,status,created_at) VALUES ('l1', ?, 'rx-sale', 0, 'Jumper', 'good', 'active', 1)").run(shopper);
+  const has = (id) => Boolean(sqlite.prepare("SELECT 1 FROM captured_receipts WHERE id = ?").get(id));
+  // Still being read again with this reader: nothing is looked up or removed.
+  sqlite.prepare("UPDATE gmail_connections SET full_rev = ?").run(READER_FULL_REV - 1);
+  assert.equal((await retireSkippedMail(env, clock, labelled)).checked, 0, "not while the mailbox is still being read again");
+  sqlite.prepare("UPDATE gmail_connections SET full_rev = ?").run(READER_FULL_REV);
+  sqlite.prepare("INSERT INTO gmail_history_years (shopper_id, year, done_at, rev) VALUES (?, 2019, 1, 1)").run(shopper);
+  assert.equal((await retireSkippedMail(env, clock, labelled)).checked, 0, "not while a year the shopper added is still to be read again");
+  sqlite.prepare("UPDATE gmail_history_years SET rev = ? WHERE year = 2019").run(READER_FULL_REV);
+  assert.equal(looked, 0);
+  const r = await retireSkippedMail(env, clock, labelled);
+  assert.equal(r.checked, 1); assert.equal(r.results[0].retired, 2, JSON.stringify(r));
+  assert.equal(has("rx-sent1"), false, "a receipt from the shopper's sent mail is removed");
+  assert.equal(has("rx-sent2"), false, "one the shopper sent themselves too (the scan leaves out anything sent)");
+  assert.equal(sqlite.prepare("SELECT COUNT(*) n FROM return_reminders WHERE receipt_id = 'rx-sent1'").get().n, 0, "with what hangs off it");
+  for (const keep of ["rx-inbox", "rx-gone", "rx-current", "rx-sale", "rx-other", "rx-pasted"]) assert.equal(has(keep), true, keep + " stays");
+  assert.equal(looked, 5, "only this inbox's receipts from an older reader are looked up: " + looked);
+  assert.equal(sqlite.prepare("SELECT retire_rev AS r FROM gmail_connections").get().r, READER_FULL_REV, "the mailbox is gone through once per reader");
+  assert.equal((await retireSkippedMail(env, clock + 60000, labelled)).checked, 0, "and then left alone");
+  assert.equal(count() >= 122, true);
+  // A big mailbox is gone through a few a minute, carrying on where it stopped; Gmail busy stops the round without removing anything.
+  for (let i = 0; i < 45; i++) { labels["sentbulk" + String(i).padStart(2, "0")] = ["SENT"]; add("ry-" + String(i).padStart(2, "0"), "sentbulk" + String(i).padStart(2, "0"), 41); }
+  sqlite.prepare("UPDATE gmail_connections SET retire_rev = NULL").run();
+  let busyOnce = true;
+  const busy = async (url, init) => (busyOnce && /format=minimal/.test(String(url)) && /sentbulk2[0-9]/.test(String(url)) ? (busyOnce = false, new Response("{}", { status: 503 })) : labelled(url, init));
+  const sweep = () => sqlite.prepare("SELECT COUNT(*) n FROM captured_receipts WHERE id LIKE 'ry-%'").get().n;
+  let rounds = 0;
+  while (sweep() > 0 && rounds < 10) { await retireSkippedMail(env, clock + 120000 + rounds * 60000, rounds === 1 ? async (u, i) => (/sentbulk/.test(String(u)) && /format=minimal/.test(String(u)) ? new Response("{}", { status: 503 }) : labelled(u, i)) : busy); rounds++; }
+  assert.equal(sweep(), 0, "every one is reached"); assert.ok(rounds >= 3 && rounds <= 5, "a few a minute: " + rounds);
+  assert.equal(has("rx-inbox") && has("rx-sale") && has("rx-gone"), true);
+  console.log("ok - receipts older readers made from the shopper's own sent mail are retired once the mailbox is read again (only SENT, never for sale, never this reader's)");
+}
