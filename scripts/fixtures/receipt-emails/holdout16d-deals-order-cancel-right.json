@@ -1,0 +1,30 @@
+{
+ "id": "holdout16d-deals-order-cancel-right",
+ "sender": "Groupon",
+ "layout": "'Thank you for your order (#1200-000001-000001), placed on …'; the right to cancel within 14 days of having the goods",
+ "headers": {
+  "from": "Groupon <orders@r.grouponmail.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Purchase Confirmed: Thank you for your purchase!",
+  "date": "Tue, 12 Dec 2023 20:00:00 +0000"
+ },
+ "html": "<html><head><title>Groupon</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Your Groupon purchase was successful!</td></tr>\n<tr><td>Order summary:</td></tr>\n<tr><td>Thank you for your order (#1200-000001-000001), placed on 12 December 2023.</td></tr>\n<tr><td>Description</td><td>Quantity</td><td>Price</td></tr>\n<tr><td>Oak Bedside Table Set</td><td>1</td><td>&pound;89.99</td></tr>\n<tr><td>Total</td><td>&pound;89.99</td></tr>\n<tr><td>This email confirms that Groupon Goods Global GmbH has accepted your order. You are legally entitled to cancel your order for any reason within 14 days from the day on which you (or a third party nominated by you) acquire physical possession of the goods. To exercise your cancellation rights, please return the item back to us.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Groupon",
+  "date": "2023-12-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Oak Bedside Table Set",
+    "qty": 1,
+    "linePence": 8999
+   }
+  ],
+  "subtotalPence": 8999,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 8999
+ }
+}

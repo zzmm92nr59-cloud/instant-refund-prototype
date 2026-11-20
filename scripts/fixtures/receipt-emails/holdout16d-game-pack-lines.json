@@ -1,0 +1,37 @@
+{
+ "id": "holdout16d-game-pack-lines",
+ "sender": "Appcharge",
+ "layout": "'Items', then 'Lantern Cat | 1', 'Arcade Tokens | x 20', 'Coins | 1,000' on rows of their own; one price for the pack; 'Order ID' under the receipt number",
+ "headers": {
+  "from": "no-reply <no-reply@appcharge.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your HARBOUR HEROES-TIDEWORKS receipt #308-512-774",
+  "date": "Sat, 25 Apr 2026 19:20:11 +0000"
+ },
+ "html": "<html><head><title>Appcharge Reciept</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Purchase Confirmation</td></tr>\n<tr><td>HARBOUR HEROES-TIDEWORKS</td></tr>\n<tr><td>Receipt number</td><td>308-512-774</td></tr>\n<tr><td>Payment method</td><td>Apple Pay</td></tr>\n<tr><td>Payment date</td><td>April 25, 2026 7:20 PM UTC</td></tr>\n<tr><td>Country</td><td>United Kingdom</td></tr>\n<tr><td>Order ID</td><td>6a9f01c2b3d4e5f60718293a</td></tr>\n<tr><td>Items</td></tr>\n<tr><td>Lantern Cat</td><td>1</td></tr>\n<tr><td>Arcade Tokens</td><td>x 20</td></tr>\n<tr><td>Coins</td><td>1,000</td></tr>\n<tr><td>Subtotal</td><td>&pound;3.99</td></tr>\n<tr><td>VAT (20%)</td><td>&pound;0.80</td></tr>\n<tr><td>Total</td><td>&pound;4.79</td></tr></table><p>For questions or assistance, contact <a href=\"https://appchargehelp.zendesk.com/hc/en-us/requests/new?tf_1=6a9f01c2b3d4e5f60718293a\">Appcharge support</a></p></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Harbour Heroes",
+  "date": "2026-04-25",
+  "currency": "GBP",
+  "totalPence": 479,
+  "orderRef": "6a9f01c2b3d4e5f60718293a",
+  "items": [
+   {
+    "name": "Lantern Cat",
+    "qty": 1,
+    "linePence": null
+   },
+   {
+    "name": "Arcade Tokens",
+    "qty": 20,
+    "linePence": null
+   },
+   {
+    "name": "1,000 Coins",
+    "qty": 1,
+    "linePence": null
+   }
+  ]
+ }
+}

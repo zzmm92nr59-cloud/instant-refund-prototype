@@ -1,0 +1,29 @@
+{
+ "id": "holdout16d-booking-pay-at-stay",
+ "sender": "Booking.com",
+ "layout": "'You'll pay when you stay at …', 'Price details', '2 rooms | US$900', taxes and a service charge on rows of their own, 'Total price US$1,140.00', 'Room 1:' over the room",
+ "headers": {
+  "from": "Booking.com <noreply@booking.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your booking is confirmed at Palm Reef Lodge",
+  "date": "Fri, 1 Aug 2025 09:00:00 +0000"
+ },
+ "html": "<html><head><title>Booking.com</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thanks! Your booking is confirmed at Palm Reef Lodge</td></tr>\n<tr><td>Palm Reef Lodge is expecting you on Sat 14 Mar</td></tr>\n<tr><td>You'll pay when you stay at Palm Reef Lodge</td></tr>\n<tr><td>Check-in</td><td>Saturday, 14 March 2026 (from 14:00)</td></tr>\n<tr><td>Check-out</td><td>Sunday, 22 March 2026 (until 12:00)</td></tr>\n<tr><td>Your reservation</td><td>8 nights, 2 rooms</td></tr>\n<tr><td>Confirmation number: 5550001111</td></tr>\n<tr><td>PIN code:</td><td>1234</td></tr>\n<tr><td>Price details</td></tr>\n<tr><td>2 rooms</td><td>US$900</td></tr>\n<tr><td>Goods &amp; services tax</td><td>US$150.00</td></tr>\n<tr><td>Property service charge</td><td>US$90.00</td></tr>\n<tr><td>Total price</td><td>US$1,140.00</td></tr>\n<tr><td>Payment information</td></tr>\n<tr><td>You&rsquo;ve guaranteed your booking by credit card</td></tr>\n<tr><td>•••• 4242</td></tr>\n<tr><td>Some charges will be collected by the property:</td></tr>\n<tr><td>Environment fee</td><td>US$96</td></tr>\n<tr><td>Room</td></tr>\n<tr><td>1:</td></tr>\n<tr><td>Garden Villa with Pool</td></tr>\n<tr><td>Copyright © 1996–2025 Booking.com. All rights reserved.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Booking.com",
+  "date": "2025-08-01",
+  "currency": "USD",
+  "totalPence": 114000,
+  "items": [
+   {
+    "name": "Garden Villa with Pool",
+    "qty": 2,
+    "linePence": 90000,
+    "extras": [
+     "8 nights"
+    ]
+   }
+  ]
+ }
+}

@@ -1,0 +1,27 @@
+{
+ "id": "holdout16d-holiday-documents-attached",
+ "sender": "loveholidays",
+ "layout": "'Booking Confirmation', 'Your Booking Reference: LOV1000001A', 'Please find all of your documents attached to this email', a PDF attached",
+ "headers": {
+  "from": "loveholidays <noreply@loveholidays.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your loveholidays Booking Confirmation and Vouchers",
+  "date": "Mon, 29 May 2023 09:00:00 +0000"
+ },
+ "html": "<html><head><title>loveholidays</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Booking Confirmation</td></tr>\n<tr><td>Your Booking Reference: LOV1000001A</td></tr>\n<tr><td>Please find all of your documents attached to this email</td></tr>\n<tr><td>Hi Sam,</td></tr>\n<tr><td>Thank you for choosing loveholidays.</td></tr>\n<tr><td>Your booking is now confirmed and your holiday countdown can now begin!</td></tr>\n<tr><td>Also attached is a PDF which contains the full details of your booking.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "loveholidays",
+  "date": "2023-05-29",
+  "currency": null,
+  "totalPence": null,
+  "items": [],
+  "attachmentOnly": "pdf"
+ },
+ "attach": [
+  {
+   "type": "application/pdf",
+   "name": "booking.pdf"
+  }
+ ]
+}

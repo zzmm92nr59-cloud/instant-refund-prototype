@@ -16,12 +16,22 @@
   "currency": "GBP",
   "items": [
    {
-    "name": "Lucky Cat, Rainbow Sticker, 10 Hammers",
+    "name": "Lucky Cat",
     "qty": 1,
-    "linePence": 239
+    "linePence": null
+   },
+   {
+    "name": "Rainbow Sticker",
+    "qty": 1,
+    "linePence": null
+   },
+   {
+    "name": "10 Hammers",
+    "qty": 1,
+    "linePence": null
    }
   ],
-  "subtotalPence": 239,
+  "subtotalPence": 0,
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,

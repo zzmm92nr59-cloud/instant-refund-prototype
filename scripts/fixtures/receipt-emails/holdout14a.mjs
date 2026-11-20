@@ -177,20 +177,20 @@ in-app subscriptions.
     { from: "Google Play <googleplay-noreply@google.com>", subject: "Your Inkwell: Draw, Sketch & Paint Anywhere subscription will be cancelled", date: "Mon, 15 Jul 2019 11:17:31 +0000",
       text: "Google Play\n\nYour Inkwell: Draw, Sketch & Paint Anywhere subscription from Google Commerce Limited on Google Play will be cancelled on 13 Aug 2019. No refunds will be issued (Refund Policy).\n" }, "subscription_ending");
   // ---- A game shop sold through Appcharge, bought in Mexico ("MX$ 30.00") and in the United States (a bare "$5.39") --------------
-  const game = (id, layout, receipt, country, lines, money, total, date, when) => {
+  const game = (id, layout, receipt, country, lines, money, total, date, when, orderId = "6b0c1d2e3f405162738495a6") => {
     const html = htmlPage("Purchase Confirmation", ["Purchase Confirmation", "LANTERN ISLES-BRIGHTFOX", "Receipt Number | " + receipt, "Payment Method | PayPal", "Payment Date | " + when,
-      "Country | " + country, "Order ID | 6b0c1d2e3f405162738495a6", "Items", ...lines, ...money, "Total | " + total],
+      "Country | " + country, "Order ID | " + orderId, "Items", ...lines, ...money, "Total | " + total],
       `<p>Powered by <img alt="Appcharge" src="https://cdn.appcharge.com/logo.png"> For questions or assistance, contact <a href="https://appchargehelp.zendesk.com/hc/en-us/requests/new">Appcharge support</a></p>`);
     return { from: "no-reply <no-reply@appcharge.com>", subject: "Your LANTERN ISLES-BRIGHTFOX receipt #" + receipt, date, html };
   };
   {
-    const o = order([{ name: "1,800 Pearls, 10 Compass Tokens", qty: 1, unit: 4500 }]);
+    const o = { ...{ ...order([]), bought: [{ name: "1,800 Pearls", qty: 1, line: null }, { name: "10 Compass Tokens", qty: 1, line: null }] }, total: 4500 };
     add("holdout14a-game-shop-mxn", "Lantern Isles", "a game shop's receipt in Mexican pesos: 'Subtotal MX$ 38.79', 'Tax (16%) MX$ 6.21', 'Total MX$ 45.00'",
-      game("holdout14a-game-shop-mxn", "", "481-516-342", "Mexico", ["Pearls | 1,800", "Compass Tokens | 10"], ["Subtotal | MX$ 38.79", "Tax (16%) | MX$ 6.21"], "MX$ 45.00", "Sat, 30 May 2026 22:39:50 +0000", "May 30, 2026 10:39 PM UTC"),
+      game("holdout14a-game-shop-mxn", "", "481-516-342", "Mexico", ["Pearls | 1,800", "Compass Tokens | 10"], ["Subtotal | MX$ 38.79", "Tax (16%) | MX$ 6.21"], "MX$ 45.00", "Sat, 30 May 2026 22:39:50 +0000", "May 30, 2026 10:39 PM UTC", "6b0c1d2e3f405162738495a7"),
       o, "Lantern Isles", "2026-05-30", { currency: "MXN" });
   }
   {
-    const o = order([{ name: "Storm Lantern, 600 Pearls", qty: 1, unit: 647 }]);
+    const o = { ...{ ...order([]), bought: [{ name: "Storm Lantern", qty: 1, line: null }, { name: "600 Pearls", qty: 1, line: null }] }, total: 647 };
     add("holdout14a-game-shop-usd", "Lantern Isles", "a game shop's receipt bought in the United States: a bare '$', 'Country United States, TX'",
       game("holdout14a-game-shop-usd", "", "612-904-337", "United States, TX", ["Storm Lantern | 1", "Pearls | 600"], ["Subtotal | $5.99", "Sales Tax (8%) | $0.48"], "$6.47", "Tue, 2 Jun 2026 15:30:58 +0000", "June 02, 2026 3:30 PM UTC"),
       o, "Lantern Isles", "2026-06-02", { currency: "USD" });

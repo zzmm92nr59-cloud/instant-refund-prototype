@@ -1,0 +1,30 @@
+{
+ "id": "holdout16d-creator-subscription",
+ "sender": "OnlyFans",
+ "layout": "'Confirmation of NEW Subscription!', 'You have successfully subscribed to …', 'Subscribed for $7.00'",
+ "headers": {
+  "from": "OnlyFans <no-reply@onlyfans.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Confirmation of NEW Subscription!",
+  "date": "Wed, 15 Jan 2025 16:18:08 +0000"
+ },
+ "html": "<html><head><title>OnlyFans</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Congratulations!</td></tr>\n<tr><td>You have successfully subscribed to A Creator.</td></tr>\n<tr><td>A Creator</td></tr>\n<tr><td>Subscribed for $7.00</td></tr>\n<tr><td>If you did not make this purchase, please click here immediately</td></tr>\n<tr><td>©2025 OnlyFans</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "OnlyFans",
+  "date": "2025-01-15",
+  "currency": "USD",
+  "items": [
+   {
+    "name": "Subscription",
+    "qty": 1,
+    "linePence": 700
+   }
+  ],
+  "subtotalPence": 700,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 700
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "holdout16d-payment-received",
+ "sender": "Dr Fox",
+ "layout": "'Payment receipt confirmation 3170000' subject; 'Your payment of £54.40 has been successfully processed'",
+ "headers": {
+  "from": "Dr Fox <noreply@doctorfox.co.uk>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Payment receipt confirmation 3170000",
+  "date": "Thu, 11 Dec 2025 09:00:00 +0000"
+ },
+ "html": "<html><head><title>Payment received</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Payment received</td></tr>\n<tr><td>Your payment of &pound;54.40 has been successfully processed - payment will show as 'INDEXMED' on your bank statement. You will be notified by email once your order has been processed.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Dr Fox",
+  "date": "2025-12-11",
+  "currency": "GBP",
+  "items": [],
+  "subtotalPence": 0,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 5440
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "id": "holdout16d-expedia-dollars-at-property",
+ "sender": "Expedia",
+ "layout": "'Itinerary # …', 'You booked 1 room.' over the room, 'Price summary' (name over amount), 'Total' over 'US$1,560.00 (£1,240.00)', 'Collected at the property', 'Rate quotes in GBP …'",
+ "headers": {
+  "from": "\"Expedia.co.uk\" <expedia@eg.expedia.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Expedia travel confirmation - Sun, 20 Jul - (Itinerary # 73000000000001)",
+  "date": "Sun, 12 Jan 2025 18:00:00 +0000"
+ },
+ "html": "<html><head><title>Expedia</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Thank you, Sam! Your booking is confirmed.</td></tr>\n<tr><td>Itinerary # 73000000000001</td></tr>\n<tr><td>View full itinerary</td></tr>\n<tr><td>Traveller details</td></tr>\n<tr><td>Adults, 2</td></tr>\n<tr><td>The Linden Hotel</td></tr>\n<tr><td>Check-in</td></tr>\n<tr><td>Check-out</td></tr>\n<tr><td>Sun, 20 Jul</td></tr>\n<tr><td>Sun, 27 Jul</td></tr>\n<tr><td>Free cancellation until 19 Jul 2025 at 15:00 (property local time)</td></tr>\n<tr><td>Accommodation details</td></tr>\n<tr><td>You booked 1 room .</td></tr>\n<tr><td>Deluxe Room, 1 King Bed</td></tr>\n<tr><td>Price summary</td></tr>\n<tr><td>Accommodation 1</td></tr>\n<tr><td>US$1,400.00</td></tr>\n<tr><td>Nights: 7 (avg./night)</td></tr>\n<tr><td>US$180.00</td></tr>\n<tr><td>Taxes</td></tr>\n<tr><td>US$140.00</td></tr>\n<tr><td>Locally collected mandatory fees/taxes*</td></tr>\n<tr><td>US$160.00</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>US$1,560.00 (&pound;1,240.00)</td></tr>\n<tr><td>Collected at the property</td></tr>\n<tr><td>Unless specified otherwise, rates are quoted in British pounds sterling.</td></tr>\n<tr><td>Rate quotes in GBP are based on current exchange rates, which may vary at time of travel. Final payment will be settled in local currency directly with the property.</td></tr>\n<tr><td>© 2025 Expedia, Inc., an Expedia Group company. All rights reserved.</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Expedia",
+  "date": "2025-01-12",
+  "currency": "USD",
+  "totalPence": 156000,
+  "items": [
+   {
+    "name": "Deluxe Room, 1 King Bed",
+    "qty": 1,
+    "linePence": 140000,
+    "extras": [
+     "7 nights"
+    ]
+   }
+  ]
+ }
+}

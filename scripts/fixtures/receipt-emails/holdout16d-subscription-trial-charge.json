@@ -1,0 +1,30 @@
+{
+ "id": "holdout16d-subscription-trial-charge",
+ "sender": "Financial Times",
+ "layout": "'Your subscription is ready to use'; 'signed up to a Premium Digital subscription'; 'Trial charge: GBP 1.00', 'Monthly payment: GBP 55.00 per month'",
+ "headers": {
+  "from": "Financial Times <service@mail.ft.com>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your subscription is ready to use",
+  "date": "Sat, 2 Dec 2023 10:00:00 +0000"
+ },
+ "html": "<html><head><title>FT</title></head><body><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Welcome to the Financial Times</td></tr>\n<tr><td>Hello Sam,</td></tr>\n<tr><td>You have signed up to a Premium Digital subscription with a trial price of GBP 1.00 for your first four weeks.</td></tr>\n<tr><td>Billing details</td></tr>\n<tr><td>Trial charge: GBP 1.00</td></tr>\n<tr><td>Trial end date: 29 December 2023</td></tr>\n<tr><td>Monthly payment: GBP 55.00 per month</td></tr>\n<tr><td>Renewal date: 30 December 2023</td></tr>\n<tr><td>Payment method: Credit Card</td></tr></table></body></html>",
+ "text": "",
+ "expected": {
+  "shop": "Financial Times",
+  "date": "2023-12-02",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Premium Digital subscription (trial)",
+    "qty": 1,
+    "linePence": 100
+   }
+  ],
+  "subtotalPence": 100,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 100
+ }
+}
