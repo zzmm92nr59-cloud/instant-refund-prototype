@@ -1900,11 +1900,12 @@ function splitColumns(t) {
   }
   return [];
 }
+const DATE_ROW = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,? )?(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}(?:st|nd|rd|th)?,? \d{4}|\d{1,2}(?:st|nd|rd|th)? (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,? \d{4})$/i;
 function namePricePairs(t) {
   const rows = String(t || "").split("\n").map((x) => x.replace(/^[\s|]+|[\s|]+$/g, "")).filter(Boolean).slice(0, 2000);
   let best = [], cur = [];
   for (let k = 0; k < rows.length; k++) {
-    const nm = /^\p{L}[^£$€|\n]{1,80}$/u.test(rows[k]) && !/^(?:sub-?\s?total|total|vat|delivery|service|tip|payment|discount|order|date|address)\b/i.test(rows[k]);
+    const nm = /^\p{L}[^£$€|\n]{1,80}$/u.test(rows[k]) && !/^(?:sub-?\s?total|total|vat|delivery|service|tip|payment|discount|order|date|address)\b/i.test(rows[k]) && !DATE_ROW.test(rows[k]);
     const pr = rows[k + 1] && /^£\s?(\d{1,4}(?:,\d{3})*\.\d{2})$/.exec(rows[k + 1]);
     if (nm && pr) { cur.push({ name: rows[k], qty: 1, pricePence: money(pr[1]), lineTotal: true }); k++; continue; }
     if (cur.length > best.length) best = cur;
@@ -2787,16 +2788,19 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.itemsCheck = { complete: true, itemsPence: result.totalPence, expectedPence: result.totalPence, missingPence: 0 };
     }
   }
+  let subjectNamed = false;
   // (An order email that lists nothing but names the order in its subject, Amazon's 'Your Amazon.co.uk order of "Garden Hose
   // VS-600 HDMI..."': that is what was bought, its name as the subject cuts it, with no price made up; "and 4 more item(s)"
   // says how many more there are. Round 16.)
   if (!result.items.length && !isFlight && !journey) {
     const so = /\border of\s+["“]([^"”\n]{3,120}?)["”](?:\s+and\s+(\d{1,3})\s+more\s+items?(?:\(s\))?)?\s*$/i.exec(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, ""));
     if (so) {
+      subjectNamed = true;
       const name = so[1].replace(/\s*(?:\.{3}|…)\s*$/, "…").trim();
       result.items = [{ name, qty: 1, pricePence: null }];
       if (so[2]) result.itemCount = 1 + Number(so[2]);
-      result.itemsCheck = { complete: so[2] ? false : null, itemsPence: 0, expectedPence: result.totalPence ?? null, missingPence: null, nameFromSubject: true };
+      // (Its name cut short and no price of its own: the receipt says some details may be missing.)
+      result.itemsCheck = { complete: false, itemsPence: 0, expectedPence: result.totalPence ?? null, missingPence: null, nameFromSubject: true };
     }
   }
   if (!result.items.length && result.totalPence != null) {
@@ -2849,6 +2853,8 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // The name check (item-names.js, round 9): money that adds up says nothing about the names. A name that looks like a note,
   // a label, a size or a code makes namesOk false (with suspectNames), and the app says some names may not be right.
   if (result.items.length && result.itemsCheck) result.itemsCheck = { ...result.itemsCheck, ...namesCheck(result.items, { shop: (result.retailer && result.retailer.name) || "" }) };
+  // (A thing named only by the subject, its name cut short, no price: some of it is missing.)
+  if (subjectNamed && result.items.length === 1 && result.items[0].pricePence == null) result.itemsCheck = { ...(result.itemsCheck || {}), complete: false, nameFromSubject: true };
   // (A phone network's plan order paid by the month, "Total upfront cost £0.00" or "Pay today: £0.00" beside "Total monthly
   // cost £21.00": a contract, not a one-off purchase. A SIM plan alone is not a purchase at all; a device on it, "Tablet
   // 10 | Grey" at "£15.00" "For 24 months", is the thing bought, said once, with what it costs a month and no made-up total.
@@ -3053,7 +3059,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (amazonFamily && result.totalPence === 0 && !result.giftCardPence && !(result.discounts && result.discounts.length) && boughtSomething) {
     result.totalPence = null; result.totalFrom = "unknown_gift_card";
     // (Items not read at all are still flagged as missing.)
-    result.itemsCheck = { ...(result.itemsCheck || {}), expectedPence: null, missingPence: null, complete: result.items.length ? null : false };
+    result.itemsCheck = { ...(result.itemsCheck || {}), expectedPence: null, missingPence: null, complete: result.items.length && !subjectNamed ? null : false };
   }
   // (A summary written before VAT, "Item Subtotal: £4.16" "Promotions: -£4.16" "Total Before VAT: £0.00" "VAT: £0.00"
   // "Order Grand Total: £0.00", under a film listed at £4.99 with its VAT: the promotion paid for all of it, so what it took

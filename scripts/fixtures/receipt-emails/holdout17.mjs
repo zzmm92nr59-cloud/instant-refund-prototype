@@ -85,7 +85,7 @@ export default function holdout17() {
     html: mail("Amazon.co.uk", "amazon.co.uk", ["Order Confirmation", "Order # 202-4455667-1122334", "Hello,", "Thanks for your order. We'll let you know once your item(s) have dispatched.", "Arriving:", "Friday, November 13", "Order Total:", "£24.99",
       "Top picks for you", "Watering Can 10L", "£8.99", "Hose Nozzle Set", "£6.49"]) },
     { ...order([]), bought: [] }, "Amazon", "2026-11-11");
-  out[out.length - 1].expected.items = [{ name: "Garden Hose Reel 30m…", qty: 1, linePence: null }]; out[out.length - 1].expected.totalPence = 2499;
+  out[out.length - 1].expected.items = [{ name: "Garden Hose Reel 30m…", qty: 1, linePence: null }]; out[out.length - 1].expected.totalPence = 2499; out[out.length - 1].expected.partial = true;
   // ---- an ordering platform's email names the restaurant; a restaurant's own summary without pound signs ----------------------
   add("holdout17-platform-restaurant", "Ordering platform", "sent by the platform: 'Your order with Harbour Chippy (Whitby) is confirmed', 'Please collect from:'", {
     from: "Preoday <noreply@preoday.com>", subject: "Your order with Harbour Chippy (Whitby) is confirmed", date: "Fri, 13 Nov 2026 18:30:00 +0000",
@@ -152,6 +152,6 @@ export default function holdout17() {
     html: mail("Amazon.co.uk", "amazon.co.uk", ["Dispatch Confirmation", "Order: # 202-4455667-1122334", "Hello, We thought you'd like to know that we've dispatched your item(s).", "Arriving:", "Friday, November 13", "Order Total:", "£24.99", "Paid by Visa:", "£24.99",
       "Your item(s) is (are) being sent by Amazon Logistics. Your tracking number is QB0099887766. Depending on the delivery method you chose, it's possible that the tracking information might not be visible immediately.", "Top picks for you", "Watering Can 10L", "£8.99"]) },
     { ...order([]), bought: [] }, "Amazon", "2026-11-12", { orderRef: "202-4455667-1122334" });
-  out[out.length - 1].expected.items = [{ name: "Garden Hose Reel 30m…", qty: 1, linePence: null }]; out[out.length - 1].expected.totalPence = 2499;
+  out[out.length - 1].expected.items = [{ name: "Garden Hose Reel 30m…", qty: 1, linePence: null }]; out[out.length - 1].expected.totalPence = 2499; out[out.length - 1].expected.partial = true;
   return out;
 }

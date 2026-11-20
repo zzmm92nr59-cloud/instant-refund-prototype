@@ -45,6 +45,7 @@ const NOTE = [
   // or a document's heading, "Item Desc", "Item Value", "Invoice receipt"; how it was paid, "Offline payment"; a plan's
   // terms, "For 24 months", "(Increases by"; the end of an address, "Kingdom"; a gift message's sign-off, "Sam xx".)
   /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]{0,6}\.?,? \d{1,2}(?:st|nd|rd|th)? [a-z]{3,9}\.?(?: \d{4})?(?:\s*[-–]\s*(?:mon|tue|wed|thu|fri|sat|sun)[a-z]{0,6}\.?,? \d{1,2}(?:st|nd|rd|th)? [a-z]{3,9}\.?(?: \d{4})?)?$/i,
+  /^(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}(?:st|nd|rd|th)?,? \d{4}|\d{1,2}(?:st|nd|rd|th)? (?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,? \d{4})$/i,
   /^item (?:desc(?:ription)?|value|name|price|details?)$/i, /^(?:invoice|tax invoice|invoice receipt|receipt|payment receipt)$/i, /^(?:offline|online|card|cash) payment$/i,
   /^for \d{1,2} (?:months?|years?|weeks?)$/i, /^\(?\s*increases? by\b/i, /^(?:united )?kingdom$|^great britain$/i, /^\p{Lu}\p{Ll}{1,20} x{2,4}$/u,
 ];

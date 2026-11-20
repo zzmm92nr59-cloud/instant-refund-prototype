@@ -26,6 +26,7 @@
   "discountsPence": 0,
   "tipsPence": 0,
   "totalPence": 2499,
-  "orderRef": "202-4455667-1122334"
+  "orderRef": "202-4455667-1122334",
+  "partial": true
  }
 }
