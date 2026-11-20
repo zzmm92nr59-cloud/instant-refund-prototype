@@ -727,6 +727,7 @@ const NOT_MONEY_LINE = /\b(?:vat|tax|paid today|next payment|instal+ment|pay in 
 // (Money lines set out as a column of labels beside a column of amounts, "Subtotal" / "Shipping(Royal Mail Tracked 48)" then
 // "£17.97" / "£2.99": each label with its amount, in order. Only when every label is a money line's own (a subtotal, a fee,
 // money off) and the amounts are as many as the labels. Round 15e.)
+const STACK_VAT = /^(?:vat|tax)(?:\s+(?:included|incl\.?|@\s?\d{1,2}%|\(?\d{1,2}%\)?))?$/i;
 const STACK_MONEY = /^-?(?:£|€|\$)\s?\d[\d,]*(?:\.\d{2})?$|^free$/i;
 function stackedMoney(lines) {
   const out = [];
@@ -734,10 +735,13 @@ function stackedMoney(lines) {
     let n = 0;
     while (n < 4 && i + n < lines.length) {
       const c = lines[i + n].replace(/\|/g, "").trim(), l = c.replace(/\s*\(.*$/, "").replace(/[:*]+$/, "").trim();
-      if (!c || c.length > 80 || !/\p{L}/u.test(l) || /\d\.\d{2}/.test(l) || !(SUBTOTAL_LABEL.test(l) || FEE_LABEL.test(l) || DISCOUNT_LABEL.test(l) || /^(?:order |grand )?total$/i.test(l))) break;
+      if (!c || c.length > 80 || !/\p{L}/u.test(l) || /\d\.\d{2}/.test(l) || !(SUBTOTAL_LABEL.test(l) || FEE_LABEL.test(l) || DISCOUNT_LABEL.test(l) || STACK_VAT.test(l) || /^(?:order |grand )?total$/i.test(l))) break;
       n++;
     }
-    if (n >= 2 && i + 2 * n <= lines.length && lines.slice(i + n, i + 2 * n).every((x) => STACK_MONEY.test(x.replace(/\|/g, "").trim()))) {
+    // (The amounts must be exactly as many as the labels: "Subtotal (1 item)", "VAT Included", "Shipping", "Total" over four
+    // amounts is never "Shipping" with the first and "Total" with the second. Round 16b.)
+    const isAmt = (x) => x != null && STACK_MONEY.test(x.replace(/\|/g, "").trim());
+    if (n >= 2 && i + 2 * n <= lines.length && lines.slice(i + n, i + 2 * n).every(isAmt) && !isAmt(lines[i + 2 * n])) {
       for (let k = 0; k < n; k++) out.push(lines[i + k].replace(/\|/g, "").trim().replace(/\s*\(.*$/, "") + " | " + lines[i + n + k].replace(/\|/g, "").trim());
       i += 2 * n - 1; continue;
     }
