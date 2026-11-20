@@ -464,6 +464,10 @@ const joinWrong = [];
   const can = det("holdout16c-grocer-cancelled-subject-number");
   attachCancellations(both, [can]);
   if (can.kind !== "order_update" || can.stage !== "cancelled" || !both[0].cancelled) joinWrong.push("a grocer's cancellation by the number in its subject not joined: " + JSON.stringify([can.kind, can.stage, can.orderRef]));
+  // An exam board's appointment email with only the order's number joins its invoice (another name for the shop).
+  const { EXAM_APPOINTMENT } = await import("./fixtures/receipt-emails/holdout16c.mjs");
+  const exam = mergeOrderEmails([det("holdout16c-exam-invoice-number-cell"), { ...classifyEmail(rawEmail(EXAM_APPOINTMENT)).details, id: "appt" }]);
+  if (exam.length !== 1 || exam[0].totalPence !== 2300) joinWrong.push("an appointment email with only the order's number made " + exam.length + " cards");
   const c1 = det("holdout16c-grocer-c1-apostrophe");
   if (!(c1.items || []).some((i) => i.name === "By Hartley’s Ripe Avocado")) joinWrong.push("a U+0092 apostrophe read as " + JSON.stringify((c1.items || []).map((i) => i.name)));
 }

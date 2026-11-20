@@ -6,6 +6,13 @@ import { order, expected, page, fixture, h } from "./lib.mjs";
 const rows = (lines) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${lines.map((l) => `<tr>${l.split(" | ").map((c) => `<td>${h(c)}</td>`).join("")}</tr>`).join("")}</table>`;
 const mail = (brand, domain, lines) => page({ brand, domain, rows: [rows(lines)] });
 
+// (Not in the corpus: an email with an order's number and no money, from the company that runs the tests for the board,
+// which joins the board's invoice for that number.)
+export const EXAM_APPOINTMENT = fixture("holdout16c-exam-appointment-only-number", "Examhall", "subject 'Theory Test - Order Confirmation Email'; 'Appointment Details'; 'Order Number: | 0071-4410-2290 |'; no money anywhere", {
+    from: "Examhall <confirmation@examhall.example>", subject: "Theory Test - Order Confirmation Email", date: "Mon, 09 Nov 2026 10:04:30 +0000",
+    text: "Theory Test - Appointment Confirmation\nPlease get to the test centre 15 minutes before your appointment time.\n| Appointment Details |\n| Order Number: | 0071-4410-2290 |\n| Person Taking Test: | SAM TAYLOR |\n| Test Booked: | Car |\n| Date: | 03 December 2026 |\n| Start Time: | 02:15 PM |\n" },
+    { orderRef: "0071-4410-2290" });
+
 export default function holdout16c() {
   const out = [];
   const add = (id, sender, layout, m, o, shop, date, extra = {}) => { const f = fixture(id, sender, layout, m, expected(shop, date, o, extra)); out.push(f); return f; };
@@ -48,5 +55,31 @@ export default function holdout16c() {
       o, "Hartley's Grocers", "2026-11-16", { orderRef: "772555301" });
     f.html = f.html.replace(/By Hartley(?:&rsquo;|’)s/, "By Hartley\u0092s");
   }
+  // ---- An exam board's invoice: its number in the cell after "Invoice Number:"; the appointment email has only the number --
+  {
+    const o = order([{ name: "Theory Test Car", qty: 1, unit: 2300 }]);
+    add("holdout16c-exam-invoice-number-cell", "Testwise", "subject 'Driving Test Board Confirmation of Payment'; 'This is an invoice for your order'; 'Invoice Number: |' over '0071-4410-2290 |'; the item 'Theory Test Car | £23.00'; 'Total | £23.00'", {
+      from: "Testwise <confirmation@testwise.example>", subject: "Driving Test Board Confirmation of Payment", date: "Mon, 09 Nov 2026 10:04:00 +0000",
+      html: mail("Testwise", "testwise.example", ["This is an invoice for your order and should be kept as your receipt.", "INVOICE", "Invoice Number: |", "\u200e0071-4410-2290\u200e |",
+        "Transaction Date: | 09 November 2026 10:04", "Description | Amount", "Theory Test Car | £23.00", "Total | £23.00"]) },
+      o, "Testwise", "2026-11-09", { orderRef: "0071-4410-2290" });
+  }
+  // ---- An airline's booking: the airports' codes alone in a row of cells under their names, a booking code of letters -----
+  {
+    const o = order([{ name: "Flight London Gatwick to Barcelona", qty: 1, unit: 6450 }]);
+    const f = add("holdout16c-airline-codes-in-cells", "Flyvia", "subject 'Your booking confirmation - QWMZRT LGW-BCN 12 December'; 'Booking code QWMZRT'; 'London (Gatwick) | Barcelona (T1)' over '| LGW | BCN |'; '1 adult | 38.10 EUR', '1 rear seat | 0.00 EUR', 'Fees | 26.40 EUR', 'Total: 64.50 EUR'", {
+      from: "Flyvia Airlines <no-reply@flyvia.example>", subject: "Your booking confirmation - QWMZRT LGW-BCN 12 December", date: "Tue, 10 Nov 2026 09:00:00 +0000",
+      text: "| Booking code QWMZRT |\n| Outbound | |\n| Saturday, 12 December 2026 |\n| London (Gatwick) (TS) | Barcelona (T1) |\n| LGW | BCN |\n| 07:20h | 10:35h |\n| VY6012 |\n| Passengers and services |\n| 1 adult | 38.10 EUR |\n| 1 rear seat | 0.00 EUR |\n| Fees | 26.40 EUR |\n| Total: 64.50 EUR |\n| Status: | | Confirmed |\n" },
+      o, "Flyvia Airlines", "2026-11-10", { orderRef: "QWMZRT" });
+    f.expected.currency = "EUR";
+  }
+  // ---- A hotel's online check-in: the room and what was paid, for a stay booked elsewhere --------------------------------
+  not("holdout16c-hotel-online-check-in", "Harbour Hotels", "subject 'Online Check In Confirmation - Quayside Hotel'; 'You did it! You completed your online check-in service.'; 'Double Room | £189.00', 'Total | £189.00', 'Paid Already | £189.00'", {
+    from: "Harbour Hotels <noreply@harbourhotels.example>", subject: "Online Check In Confirmation - Quayside Hotel", date: "Fri, 06 Nov 2026 19:02:20 +0000",
+    text: "| Check-In Sat 07 Nov 2pm |\n| Check-Out Sun 08 Nov 11am |\n| Confirmation No. 400118273 |\n| Hello Sam Taylor, |\n| You did it! You completed your online check-in service. Safe travels! |\n| Double Room | Checked-In |\n| Double Room | £189.00 |\n| Total | £189.00 |\n| Paid Already | £189.00 |\n| Balance Due | £0.00 |\n" }, "check_in");
+  // ---- A race ballot: everything pre-authorised, nothing paid ------------------------------------------------------------
+  not("holdout16c-ballot-pre-authorised", "Racedays", "subject 'Your Payment Receipt'; '1x Ballot Entry (Pre-authorised) £40.00', '1x Booking Fee (Pre-authorised) £2.00', 'Total Pre-authorised £42.00', 'Total paid today £0.00'", {
+    from: "Racedays <hello@info.racedays.example>", subject: "Your Payment Receipt", date: "Thu, 05 Nov 2026 21:03:39 +0000",
+    text: "Your\nreceipt\n\n1x Ballot Entry - November Ballot Entry (Pre-authorised)\n£40.00\n\n1x Booking Fee (Pre-authorised)\n£2.00\n\nTotal Pre-authorised\n£42.00\n\nCity Half Marathon 2027 Ballot - 1x Training Plan Free Trial\n£0.00\n\nTotal paid today\n£0.00\n\nPayment\nReference 6a7ee826c31fc5c2239742aa\n" }, "pre_authorised");
   return out;
 }

@@ -573,7 +573,7 @@ function fromText(text, refDate, ctx = {}) {
   const ref =
     // (Never a word: "Order Details" over a table is not order number "Details". A number has a digit, or is a code in
     // capitals ("QWERTZ"). Round 11.) (The number in the next cell, "Order number: | 851791895 |": round 15.)
-    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => /\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) ||
+    [...text.matchAll(/\border\.?\s*(?:number|no\.?|id|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[ \t]*)?([A-Z0-9](?:[A-Z0-9-]|_(?=[A-Z0-9])){3,24})/gi)].find((m) => (/\d/.test(m[1]) || /^[A-Z]{5,10}$/.test(m[1])) && !(m[0].includes("|") && /[A-Z0-9-]/i.test(text[m.index + m[0].length] || ""))) ||
     // ("Order number |" with the number in the row under it, as an HTML email's table gives it. Round 10.) ("Your order
     // number is: |" over it too. Round 11.)
     text.match(/\border\s*(?:number|no\.?|id)\s*(?:is\s*)?:?[\s|]*\n[\s|]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})[\s|]*$/im) ||
@@ -588,7 +588,8 @@ function fromText(text, refDate, ctx = {}) {
     // (round 7), so its later emails (dispatch, refund) can find it. Only with a digit in it ("Invoice No. attached" isn't one).
     // (A receipt's own number, "Receipt #2937-1380-5587" (Stripe's receipts, which name it in the subject too). Round 11.)
     text.match(/\breceipt\s*(?:number|no\.?|#)\s*[:#\s]*#?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
-    text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
+    // (Also in the cell after it, "Invoice Number: |" over "0053-1725-3254 |". Round 15.)
+    text.match(/\binvoice\s*(?:number|no\.?|ref(?:erence)?|#)\s*(?:is\s*)?[:#\s]*(?:\|[\s|]*)?((?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{3,24})\b/i) ||
     // (A restaurant bill's own number, "check number" over "#7093" (or "Bill No: 7093"): the number its till prints. Round 15.)
     text.match(/\b(?:check|cheque|bill)\s*(?:number|no\.?|#)\s*:?[ \t|]*(?:\n[ \t|]*)?#?(\d{3,12})\b/i) ||
     // ("Ref: 419694" on a line of its own, a pub's order. Round 12.)
@@ -1787,6 +1788,14 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (PAYMENT_PROBLEM.test(subject || "") || PAYMENT_PROBLEM.test(text.slice(0, 1500))) {
     return { ok: false, reason: "payment_problem", source: "shopper_email" };
   }
+  // (A hotel's "Online Check In Confirmation", "You completed your online check-in service", with the room and what was paid
+  // for it: news about a stay booked and paid for elsewhere (the booking's own email is the purchase), never a second one.
+  // Round 15.)
+  if (!opts.lenient && (/\b(?:online\s+)?check[- ]?in\s+(?:confirmation|confirmed|completed?)\b/i.test(String(subject || "")) ||
+    /\byou(?:(?:'|’)ve| have)? (?:successfully )?completed (?:your|the) (?:online )?check[- ]?in\b/i.test(text.slice(0, 3000)))) return { ok: false, reason: "check_in", source: "shopper_email" };
+  // (A hold on a card, not a payment: a ballot entry "Total Pre-authorised £67.50" with "Total paid today £0.00". Nothing was
+  // bought yet, and may never be. Round 15.)
+  if (/\bpre-?authori[sz]ed\b/i.test(text.slice(0, 6000)) && /\btotal paid(?: today)?\s*:?[\s|]*£\s?0(?:\.00)?(?![\d.])/i.test(text.slice(0, 8000))) return { ok: false, reason: "pre_authorised", source: "shopper_email" };
   // Money paid into an account to spend later (a deposit credited to a balance) is not a purchase.
   if (ACCOUNT_DEPOSIT.test(text.slice(0, 3000))) return { ok: false, reason: "account_deposit", source: "shopper_email" };
   // A payment towards a household bill (water, energy, council tax), taken by a card processor "on behalf of Thames Water

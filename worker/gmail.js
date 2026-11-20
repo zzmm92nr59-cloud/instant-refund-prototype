@@ -1922,8 +1922,23 @@ export function mergeOrderEmails(orders) {
     const fits = orders.filter((o) => paidFits(p, o));
     if (fits.length === 1 && unref.filter((q) => paidFits(q, fits[0])).length === 1) paidVia.set(p, fits[0]);
   }
+  // (An email with an order's number and nothing else to it, no money and no items, Pearson's "Theory Test - Appointment
+  // Confirmation", "Order Number: 0053-1725-3254", sent with the DVSA's invoice for that very number (£23.00): the same order,
+  // whatever name each gives the shop. Only for a long number, exactly one other order with it, and within three days.
+  // Round 15.)
+  const emptyTo = new Map();
+  const emptyOne = (o) => o.orderRef && o.totalPence == null && !(o.items || []).length && o.kind !== "order_update" && !isForwarded(o) && !paidVia.has(o);
+  for (const o of orders) {
+    if (!emptyOne(o)) continue;
+    const ref = String(o.orderRef).toUpperCase();
+    if (ref.length < 8 || !/\d/.test(ref)) continue;
+    const fits = orders.filter((p) => p !== o && !emptyOne(p) && p.orderRef && String(p.orderRef).toUpperCase() === ref && p.totalPence != null &&
+      (!p.orderDate || !o.orderDate || Math.abs(Date.parse(o.orderDate) - Date.parse(p.orderDate)) <= 3 * 864e5));
+    if (fits.length === 1 && joinStore(fits[0]) !== joinStore(o)) emptyTo.set(o, fits[0]);
+  }
   const keyOf = (o) => {
     if (paidVia.has(o)) { const t = paidVia.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
+    if (emptyTo.has(o)) { const t = emptyTo.get(o); return joinStore(t) + "|" + baseRef(t, String(t.orderRef).toUpperCase()); }
     if (!o.orderRef) return null;
     const ref = baseRef(o, String(o.orderRef).toUpperCase());
     if (isForwarded(o)) {
