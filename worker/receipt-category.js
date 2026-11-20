@@ -117,6 +117,7 @@ const NAME_WORDS = [
 const HARDWARE = /\b(iphone|ipad|macbook|imac|mac mini|mac studio|airpods|apple watch|airtag|apple tv 4k|homepod|apple pencil|magic (mouse|keyboard|trackpad)|charger|cable|case|keyboard|mouse|monitor|laptop|phone|tablet|headphones)\b/i;
 // Kitchen things a coffee or food shop also sells: they can usually be returned even though the group is Food & drink.
 const APPLIANCE = /\b(machines?|frothers?|aeroccino|grinders?|kettles?|toasters?|blenders?|cafeti[eè]res?|french press|mugs?|cups|glass(es)?|tumblers?|flasks?|carafes?)\b/i;
+const EATERY_APPLIANCE = /\b(machines?|frothers?|aeroccino|grinders?|kettles?|toasters?|blenders?|cafeti[eè]res?|french press|mugs?|tumblers?|flasks?)\b/i;
 // The order ties are settled in: groups that can usually be returned first, so a return window is never hidden.
 const TIE_ORDER = ["electronics", "fashion", "home", "beauty", "food", "digital", "travel", "experiences"];
 
@@ -308,6 +309,11 @@ function categoriseBy(card, learned) {
   if (Array.isArray(card.flights) && card.flights.length) return finish("travel", items, noReturn);
   // Apple sells both phones and App Store credit: the items decide.
   if (/(^|\b|\.)apple(\b|\.)/i.test(store) && !/applebee/i.test(store) && !isVia(r.domain)) return finish(HARDWARE.test(items) ? "electronics" : "digital", items, noReturn);
+  // (Amazon's digital orders, numbered "D01-…" (Prime Video films and rentals, Kindle books, apps), are digital whatever their
+  // lines say, so nothing is ever offered back for a film watched. A café, restaurant, pub or takeaway's bill is food and
+  // drink, whatever a dish is called ("BBQ" is not a barbecue for the garden). Round 15.)
+  if (/(^|\.)amazon\.[a-z.]+$/i.test(String(r.domain || "")) && /^D\d{2}-\d{7}-\d{7}$/i.test(String(card.orderRef || "").trim())) return finish("digital", items, noReturn);
+  if (shopHintFor(card) === "eatery") return finish("food", items, noReturn, false, true);
   const score = categoryScores(card);
   let best = null;
   for (const c of TIE_ORDER) if (score[c] && (!best || score[c] > score[best])) best = c;
@@ -351,6 +357,9 @@ export function shopHintFor(card) {
   card = card || {};
   const { shop, nameGroup } = shopClues(card), r = card.retailer || {};
   if (shop && EATERY.has(shop.key)) return "eatery";
+  // (A bill paid through a pub or restaurant's own ordering or paying service, "Brewdog" by Pepper, "Kricket" by sunday, is
+  // the place's food and drink. Round 15.)
+  if (EATERY_VIA.test(String(r.via || "")) || EATERY_VIA.test(String(r.domain || ""))) return "eatery";
   if (shop && GROCER.has(shop.key)) return "grocer";
   // A shop that sells a bit of everything (Argos, Very, John Lewis, M&S): what each item is called decides.
   if (shop && MIXED.has(shop.key)) return null;
@@ -393,6 +402,7 @@ const EATERY = new Set(("starbucks costa costacoffee caffenero nero pret pretama
   "boltfood wolt honestburgers dishoom nandos wagamama fiveguys mcdonalds kfc burgerking dominos papajohns pizzahut pizzaexpress francomanca " +
   "pandamami gordonramsayrestaurants gordonramsay hawksmoor flatiron bao padella greeneking stonegate stonegatepubs wetherspoon jdwetherspoon " +
   "wetherspoons leon itsu wasabi yosushi tortilla chipotle krispykreme").split(" "));
+const EATERY_VIA = /(^|\.)(pepperhq\.com|sundayapp\.io|slerp\.com|touchtakeaway\.net|toasttab\.com|flipdish\.com|orderyoyo\.com|mryum\.com|storekit\.com)$/i;
 const EATERY_NAME = /\b(pub|tavern|inn|arms|restaurant|cafe|café|coffee house|bakery|patisserie|takeaway|pizza|pizzeria|burgers?|sushi|ramen|curry|grill|deli|bistro|brasserie|diner|eatery|noodles?|dumplings?|bubble tea|kebabs?|chippy|fish (and|&) chips|bar)\b/i;
 export function returnableItems(card, kinds) {
   card = card || {};
@@ -411,9 +421,11 @@ export function returnableItems(card, kinds) {
   });
   return out;
 }
-function finish(category, items, noReturn, grocer) {
-  // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned (not from a supermarket).
-  const returnable = noReturn ? false : category === "food" ? !grocer && APPLIANCE.test(items || "") : category !== "digital" && category !== "travel" && category !== "experiences";
+function finish(category, items, noReturn, grocer, eatery) {
+  // A coffee machine or mug from a coffee shop is in Food & drink but can still be returned (not from a supermarket). (From a
+  // café, restaurant or pub only a thing that is plainly one, a machine, kettle or mug: never a drink served "(Pint glass)",
+  // "a glass of" wine, a carafe or cups of something, which were drunk there. Round 15.)
+  const returnable = noReturn ? false : category === "food" ? !grocer && (eatery ? EATERY_APPLIANCE.test(String(items || "").replace(/\([^)]{0,80}\)/g, " ")) : APPLIANCE.test(items || "")) : category !== "digital" && category !== "travel" && category !== "experiences";
   const reason = returnable ? null :
     noReturn ? "Bets and games of chance can't be returned." :
     category === "digital" ? "Digital purchases and subscriptions usually can't be returned. Cancel or ask the provider instead." :

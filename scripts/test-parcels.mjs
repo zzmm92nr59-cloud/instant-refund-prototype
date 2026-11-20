@@ -148,7 +148,7 @@ console.log("ok - return tracking: parcel delivered to the shop, return received
 // 8. Return dates Relay can safely go by when the emails don't give one, counted from the order date (made-up orders).
 import { estimateReturnBy } from "../worker/gmail.js";
 const TODAY = "2026-11-03";
-const anOrder = (extra = {}) => ({ id: "o", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderRef: "KL-1", orderDate: "2026-11-01", items: [], ...extra });
+const anOrder = (extra = {}) => ({ id: "o", kind: "receipt", retailer: { name: "Kick Lane", domain: "kicklane.example" }, orderRef: "KL-1", orderDate: "2026-11-01", items: [{ name: "Trail running shoes", pricePence: 6000 }], ...extra });
 assert.deepEqual(estimateReturnBy(anOrder(), TODAY), { date: "2026-11-15", basis: "uk_law", from: "order", estimate: true }, "no return wording: 14 days from the order date");
 assert.deepEqual(estimateReturnBy(anOrder({ returns: { windowDays: 30, windowFrom: null } }), TODAY), { date: "2026-12-01", basis: "window", from: "order", estimate: true }, "'30 days to return': from the order date");
 assert.equal(estimateReturnBy(anOrder({ returns: { deadline: "2026-11-20" } }), TODAY), null, "the email's own date wins");
@@ -167,6 +167,19 @@ assert.deepEqual(estimateReturnBy(anOrder({ currency: "GBP", totalPence: 8000 })
 }
 assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-10-01" }), TODAY), null, "a worked-out date that has passed isn't given");
 assert.equal(estimateReturnBy(anOrder({ orderDate: "2026-12-01" }), TODAY), null, "an order date in the future is a misread");
+// (UK law's 14 days are never worked out for what the law leaves out or Relay can't tell: food and drink, digital content,
+// memberships and subscriptions, tickets, travel, personalised or perishable things, or an order whose things aren't known.
+// The shop's own stated window still counts. Round 15.)
+assert.equal(estimateReturnBy(anOrder({ items: [] }), TODAY), null, "nothing known about what was bought (a payment service's receipt): no legal date");
+assert.equal(estimateReturnBy(anOrder({ category: "food", items: [{ name: "Chicken katsu curry", pricePence: 1450 }] }), TODAY), null, "a restaurant bill: no legal date");
+assert.equal(estimateReturnBy(anOrder({ category: "digital", items: [{ name: "Paddington 2 (HD rental)", pricePence: 349 }] }), TODAY), null, "a film rental: no legal date");
+assert.equal(estimateReturnBy(anOrder({ category: "experiences" }), TODAY), null);
+assert.equal(estimateReturnBy(anOrder({ category: "travel" }), TODAY), null);
+assert.equal(estimateReturnBy(anOrder({ items: [{ name: "Personalised name keyring", pricePence: 899 }] }), TODAY), null, "a personalised thing: no legal date");
+assert.equal(estimateReturnBy(anOrder({ items: [{ name: "Gold membership (monthly)", pricePence: 1699 }] }), TODAY), null, "a membership: no legal date");
+assert.equal(estimateReturnBy(anOrder({ items: [{ name: "Seasonal flower bouquet", pricePence: 3500 }] }), TODAY), null, "flowers go off: no legal date");
+assert.deepEqual(estimateReturnBy(anOrder({ items: [{ name: "Personalised name keyring", pricePence: 899 }], returns: { windowDays: 30, windowFrom: null } }), TODAY), { date: "2026-12-01", basis: "window", from: "order", estimate: true }, "the shop's own window still counts");
+assert.deepEqual(estimateReturnBy(anOrder({ category: "fashion" }), TODAY), { date: "2026-11-15", basis: "uk_law", from: "order", estimate: true });
 // A window that starts at delivery is counted from the day the parcel arrived.
 const w = [anOrder({ returns: { windowDays: 28, windowFrom: "delivery" }, shipment: { trackingNumber: "JK000000009GB", carrier: "Royal Mail", status: "shipped" } })];
 attachDeliveries(w, [{ kind: "delivery_update", status: "delivered", at: "2026-11-02", carrier: "Royal Mail", trackingNumber: "JK000000009GB" }]);

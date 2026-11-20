@@ -2083,7 +2083,7 @@ export function attachDeliveries(orders, deliveries) {
     // When the email gives no return deadline, show the least UK law allows for online orders: 14 days after delivery to tell the shop.
     // When it gives a window that starts at delivery ("within 28 days of delivery"), count it from the day it arrived.
     const r = o.returns || {};
-    if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays && paidInPounds(o)) {
+    if (best.status === "delivered" && best.at && !r.deadline && !r.windowDays && paidInPounds(o) && lawCovers(o) && categorise(o).returnable !== false) {
       const d = new Date(Date.parse(best.at) + 14 * 86400000);
       if (!Number.isNaN(d.getTime())) o.returnBy = { date: d.toISOString().slice(0, 10), basis: "uk_law" };
     } else if (best.status === "delivered" && best.at && !r.deadline && r.windowFrom === "delivery" && Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365) {
@@ -2224,11 +2224,23 @@ const cancelKey = (s) => String(s || "").toLowerCase().replace(/[^\p{L}\p{N}]+/g
 // only arrive after it): the window the email gives ("30 days to return", without saying from when), or, for an online
 // order (one with an order number) that Relay has no parcel news for, the least UK law allows: 14 days. Marked `estimate`
 // so the app says how it was worked out. Only a date still to come is given: one that's passed says nothing for sure.
+// UK law's 14 days are for goods bought online, so they are never worked out for what the law leaves out or Relay can't
+// tell: food and drink, digital content, subscriptions and memberships, travel, tickets and experiences, things made to
+// order or personalised, things that go off (flowers, cakes), or an order whose things Relay doesn't know (a payment
+// service's receipt that names no item). The shop's own stated window still counts. Round 15.
+const LAW_LEAVES_OUT = /\b(personali[sz]ed|personali[sz]ation|custom(?:i[sz]ed)?|made[- ]to[- ](?:order|measure)|bespoke|engraved|engraving|monogram(?:med)?|embroidered name|bouquets?|flowers?|roses|cakes?|cupcakes?|hampers?|memberships?|subscriptions?|renews?|monthly plan|annual plan|top[- ]?up|gift ?cards?|e-?gift|vouchers?|tickets?|admission|entry|deposit)\b/i;
+function lawCovers(o) {
+  const category = typeof o.category === "string" ? o.category : categorise(o).category;
+  if (["food", "digital", "travel", "experiences"].includes(category)) return false;
+  const names = (o.items || []).map((i) => i && typeof i.name === "string" ? i.name + " " + (i.variant || "") : "").filter((n) => n.trim());
+  if (!names.length) return false;
+  return !names.some((n) => LAW_LEAVES_OUT.test(n.slice(0, 400)));
+}
 export function estimateReturnBy(o, today) {
   const r = (o && o.returns) || {};
   if (!o || o.returnBy || r.deadline || !/^\d{4}-\d{2}-\d{2}$/.test(o.orderDate || "") || o.orderDate > today) return null;
   const windowDays = Number.isInteger(r.windowDays) && r.windowDays > 0 && r.windowDays <= 365 ? r.windowDays : null;
-  const days = windowDays || (o.orderRef && !o.delivery && paidInPounds(o) ? 14 : null);
+  const days = windowDays || (o.orderRef && !o.delivery && paidInPounds(o) && lawCovers(o) ? 14 : null);
   if (!days) return null;
   const d = new Date(o.orderDate + "T00:00:00Z");
   if (Number.isNaN(d.getTime())) return null;
@@ -2501,7 +2513,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
       returnable: false, returns: c.returns ? { ...c.returns, deadline: null, windowDays: null } : null };
     const policy = (group.returnable || keep.length) && !said ? policyFor(retailer, c.currency) : null;
     const byPolicy = policy ? policyReturnBy(c, policy, today) : null;
-    const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy(c, today) : null);
+    const guess = byPolicy || (group.returnable || keep.length ? estimateReturnBy({ ...c, category: group.returnable ? group.category : "other", items: keep.length && !group.returnable ? keep.map((i) => items[i]) : items }, today) : null);
     // A photo is only shown when it is of the item bought (not the shop's logo or an advert in the email).
     return { ...c, items, hasImage: Boolean(c.hasImage && c.photoIsItem === true), ...group, categoryLearned: Boolean(learned), storeKey: k,
       ...(keep.length ? { returnableItems: keep } : {}), ...(guess ? { returnBy: guess } : {}), ...(policy ? { returnPolicy: policyForApp(policy) } : {}) };

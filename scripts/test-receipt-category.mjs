@@ -194,4 +194,23 @@ t("kitchen kit named after food still counts, and so do a sports-nutrition shop'
   const gym = { retailer: { name: "Myprotein", domain: "myprotein.com" }, items: [{ name: "Impact Whey Protein 1kg", pricePence: 2999 }, { name: "Training Shorts - Black - L", pricePence: 1099 }] };
   assert.deepEqual(returnableItems(gym), [1]);
 });
+// Round 15 (made-up bills in the layouts of Connor's real ones): a pub's drink "served in a (Pint glass)" or a restaurant's
+// "BBQ" dish never makes a bill returnable; a bill paid through a restaurant's own ordering service (Pepper, sunday) is food;
+// Amazon's digital orders ("D01-…", films bought or rented) are digital, so neither gets a return date.
+t("pub, restaurant and app-ordered bills are never returnable; Amazon digital orders are digital", () => {
+  const pub = categorise({ retailer: { name: "J D Wetherspoon", domain: "jdwetherspoon.co.uk" }, items: [{ name: "Pepsi Max (Pint glass - 3 kcal)" }, { name: "Scampi and chips" }] });
+  assert.equal(pub.category, "food"); assert.equal(pub.returnable, false);
+  const glass = categorise({ retailer: { name: "J D Wetherspoon", domain: "jdwetherspoon.co.uk" }, items: [{ name: "Large glass of house red" }, { name: "Carafe of rosé" }] });
+  assert.equal(glass.returnable, false);
+  const bbq = categorise({ retailer: { name: "The Smokehouse BBQ Restaurant", domain: "smokehouse-example.co.uk" }, items: [{ name: "Pulled Pork As it comes BBQ" }, { name: "Fries Mayo BBQ" }] });
+  assert.equal(bbq.category, "food"); assert.equal(bbq.returnable, false);
+  const pepper = categorise({ retailer: { name: "Brewdog", domain: "pepperhq.com" }, items: [{ name: "2/3 Jackhammer" }] });
+  assert.equal(pepper.category, "food"); assert.equal(pepper.returnable, false);
+  const sunday = categorise({ retailer: { name: "Kricket - Canary Wharf", domain: "sundayapp.io" }, items: [] });
+  assert.equal(sunday.returnable, false);
+  const film = categorise({ retailer: { name: "Amazon", domain: "amazon.co.uk" }, orderRef: "D01-1234567-7654321", items: [] });
+  assert.equal(film.category, "digital"); assert.equal(film.returnable, false);
+  // (A coffee shop's own coffee grinder still goes back.)
+  assert.equal(categorise({ retailer: { name: "Costa Coffee", domain: "costa.co.uk" }, items: [{ name: "Costa coffee grinder" }] }).returnable, true);
+});
 console.log(`\n${n} category tests passed`);
