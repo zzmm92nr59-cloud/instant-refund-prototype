@@ -1137,6 +1137,8 @@ function classify(rawText, ref, lenient = false) {
       ...(receipt.sentAt ? { sentAt: receipt.sentAt } : {}), ...(receipt.giftCardPence ? { giftCardPence: receipt.giftCardPence } : {}),
       // (A stay booked to be paid at the property: nothing was taken up front, the card only guaranteed it. Round 15.)
       ...(receipt.payAtProperty ? { payAtProperty: true } : {}),
+      // (An email about the order's progress, not the order: it never leads the order's card. Round 19.)
+      ...(receipt.progressEmail ? { progressEmail: true } : {}),
       // (A receipt sent again with a tip added: it replaces the first one for the same purchase. Round 16.)
       ...(receipt.updatedReceipt ? { updatedReceipt: true } : {}), ...(receipt.collection ? { collection: receipt.collection } : {}),
       // The receipt is only in the email's attachment ("pdf" or "image"): the app says so and nothing is read from it.
@@ -1902,6 +1904,23 @@ function joinStore(o) {
   const k = storeKey(o), d = o && o.retailer && o.retailer.domain;
   return d && SEND_LABEL.test(d) && k === storeKey({ retailer: { domain: d } }) ? storeKey({ retailer: { domain: d.replace(SEND_LABEL, "") } }) : k;
 }
+// When each email was sent, for ordering one order's emails (NaN when unknown).
+const sentMs = (o) => (o && o.sentAt != null ? (typeof o.sentAt === "number" ? o.sentAt : Date.parse(o.sentAt)) : NaN);
+// One order's emails that are not the order itself: those about its progress (the reader marks them progressEmail), and the
+// order's confirmation sent again days later (the same number, money and things as an earlier one, with no change to the order).
+// Only ever when one of the order's own emails is there to lead instead. Round 19.
+export function laterCopies(g) {
+  const out = new Set();
+  const own = (o) => !o.progressEmail && !o.orderUpdate && !isForwarded(o) && (o.kind == null || o.kind === "receipt") && !(o.retailer && o.retailer.via);
+  for (const o of g) if (o.progressEmail && g.some((p) => p !== o && own(p))) out.add(o);
+  const firsts = g.filter((o) => own(o) && !out.has(o) && !Number.isNaN(sentMs(o)));
+  for (const o of firsts) {
+    const earlier = firsts.find((p) => p !== o && sentMs(o) - sentMs(p) >= 3 * 864e5 && p.totalPence != null && p.totalPence === o.totalPence &&
+      (p.currency || "GBP") === (o.currency || "GBP") && (p.items || []).length === (o.items || []).length && !out.has(p));
+    if (earlier) out.add(o);
+  }
+  return out;
+}
 // opts.keyFor(email): the group an email must be in (the shopper's own "same order" / "different orders", order-joins.js),
 // or undefined for the reader's own joining.
 export function mergeOrderEmails(orders, opts = {}) {
@@ -2076,13 +2095,18 @@ export function mergeOrderEmails(orders, opts = {}) {
     if (!Array.isArray(g)) return g;
     if (g.length === 1) return g[0];
     // (A changed order's email, "We got your changes", never leads: the order's own confirmation keeps its day and number.)
-    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || score(b) - score(a) || a.createdAt - b.createdAt);
+    // (An email about the order's progress, "We're working on your order", "Your parcel is on its way", never leads, and
+    // nor does the order's confirmation sent again later, the day before a flight: the order's own email gives its day and its
+    // lines. Round 19.)
+    const later = laterCopies(g);
+    const [lead, ...rest] = g.slice().sort((a, b) => (a.orderUpdate === "amended") - (b.orderUpdate === "amended") || later.has(a) - later.has(b) || score(b) - score(a) || a.createdAt - b.createdAt);
     const c = { ...lead, items: (lead.items || []).map(i => ({ ...i })), returns: lead.returns ? { ...lead.returns } : null };
     // (The order's day is the day it was placed: the first day one of its emails was sent when the leading email's day is
     // only the day it was sent, so a re-sent confirmation or a status email that leads with its fuller list never moves the
     // order to its own later day. A day another email states is used only when none was dated by its sending. Round 17.)
     if (c.orderDateFrom === "email" || !c.orderDate) {
-      const ok = (o) => o.orderDate && /^\d{4}-\d{2}-\d{2}/.test(String(o.orderDate)) && !isForwarded(o) && o.kind !== "return_update" && o.kind !== "refund";
+      // (Not a progress email's or a later copy's day: only the order's own emails say when it was placed. Round 19.)
+      const ok = (o) => o.orderDate && /^\d{4}-\d{2}-\d{2}/.test(String(o.orderDate)) && !isForwarded(o) && o.kind !== "return_update" && o.kind !== "refund" && (!later.has(o) || later.size === g.length);
       const stated = g.filter((o) => ok(o) && o.orderDateFrom !== "email").map((o) => String(o.orderDate)).sort();
       const sent = g.filter((o) => ok(o) && o.orderDateFrom === "email").map((o) => String(o.orderDate)).sort();
       const day = sent[0] || stated[0];

@@ -106,6 +106,9 @@ const WHO_FOR = /^\d{1,3}\s*[x×]\s*(?:adults?|child(?:ren)?|kids?|games?|people
 const DATE_LINE = /^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?\d{1,2}(?:st|nd|rd|th)?[\s/.-]+(?:\d{1,2}|[a-z]{3,9})[\s/.,-]+\d{2,4}\b[^|]{0,20}$|^\d{4}-\d{2}-\d{2}$|^(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b[^|]{0,20}$/i;
 const GREETING = /^(?:for (?:full|more) (?:ingredients|information|details|nutritional)|hi|hello|hey|dear|thanks|thank you|thank-you|here is|here are|we(?:'|’)re|we have|we(?:'|’)ve|your (?:order|delivery|basket|tickets?|booking) (?:is|has|was|will)|here(?:'|’)s|enjoy|if you|you (?:sent|paid|can|will|have)|questions)\b/i;
 // A subscription's period on a line of its own ("Oct 26–Nov 26, 2026", "26 Oct – 26 Nov 2026"): when, never what. Round 10.
+// (A day named with its date and no year, "Thursday 26 November", "Thu, 26 Nov", "Thursday, November 26": a delivery or
+// collection day, never a thing bought. Round 19.)
+const WEEKDAY_DATE = /^(?:mon|tue|wed|thu|fri|sat|sun)[a-z]{0,6}\.?,?\s+(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]{0,6}|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]{0,6}\.?\s+\d{1,2}(?:st|nd|rd|th)?)\.?(?:,?\s+\d{1,2}(?:[:.]\d{2})?\s?(?:am|pm)?(?:\s?[-–]\s?\d{1,2}(?:[:.]\d{2})?\s?(?:am|pm)?)?(?:\s[A-Z]{3,4})?)?$/i;
 const DATE_RANGE = /^(?:[a-z]{3,9}\.? \d{1,2}|\d{1,2} [a-z]{3,9})(?:,? \d{4})?\s*[–—-]\s*(?:[a-z]{3,9}\.? \d{1,2}|\d{1,2} [a-z]{3,9}),? \d{4}$/i;
 const FULL_DATE = /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/i;
 const HARD_END = /^(?:retail price\b|sub-?\s?total|subtotal|items? sub-?\s?total|item\(s\) total|(?:order |grand |basket |estimated |trolley |items? |products? |goods |net |bill |check )?total\b|trolley cost\b|total of items|item\(s\) subtotal|guide price|order value|items$|products$|payment|payments|paid\b|amount (?:paid|due)|total paid|includes vat|including vat|incl\.? vat|vat\b|v\.a\.t\b|tax\b)/i;
@@ -298,6 +301,7 @@ function readLine(raw) {
     // apart by commas. Never what was bought. Round 11.)
     if (i === 0 && cells.length === 1 && (/^\p{Lu}[\p{L}'’-]+(?: \p{Lu}[\p{L}'’-]+){0,3} \+?\d[\d ]{8,14}$/u.test(t) || (/,/.test(t) && /\b[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}\b/.test(t) && !/£/.test(t)))) { line.noise = true; continue; }
     if (i === 0 && DATE_RANGE.test(t)) { line.noise = true; continue; }
+    if (i === 0 && cells.length === 1 && WEEKDAY_DATE.test(t)) { line.noise = true; continue; }
     // (The end of a sentence carried onto its own line, "our nutritional page.": small letter first, a full stop last.)
     if (i === 0 && cells.length === 1 && /^\p{Ll}/u.test(t) && /\.$/.test(t) && t.split(/\s+/).length <= 6) { line.noise = true; continue; }
     // (A heading or a button's words after a drawn symbol, "🧾 View Order", or with how many after them, "Product Ordered (3)",

@@ -1,0 +1,51 @@
+{
+ "id": "holdout20-tickets-per-ticket-fees",
+ "sender": "Ticketvale",
+ "layout": "'Order details', the event's name, 'Date:', 'Venue:', then 'Seats, Full Price Ticket | 2 × £ 28.00 | £ 56.00', the seats, 'Booking fee | 2 × £ 3.10 | £ 6.20', 'Venue Levy | 2 × £ 1.00 | £ 2.00', 'Subtotal | £ 64.20', 'Total', 'Processing fee | £ 1.25', 'Delivery/transaction costs | £ 1.99', 'Total incl. VAT | £ 67.44'",
+ "headers": {
+  "from": "Ticketvale UK <noreply@ticketvale.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Your order confirmation from www.ticketvale.example, order number: 2045123456",
+  "date": "Sat, 14 Nov 2026 19:20:00 +0000"
+ },
+ "html": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" /><meta name=\"viewport\" content=\"width=device-width\" />\n<title>Ticketvale</title><style type=\"text/css\">body{margin:0;padding:0}td{font-family:Helvetica,Arial,sans-serif;font-size:14px;color:#222}.muted{color:#777}@media only screen and (max-width:600px){.w600{width:100%!important}}</style></head>\n<body style=\"margin:0;padding:0;background-color:#f3f3f3\">\n<div style=\"display:none;max-height:0;overflow:hidden\">&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#f3f3f3\"><tr><td align=\"center\">\n<table role=\"presentation\" class=\"w600\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" bgcolor=\"#ffffff\">\n<tr><td style=\"padding:24px 24px 8px 24px\"><a href=\"https://www.ticketvale.example/?utm_source=email\"><img src=\"https://www.ticketvale.example/static/email/logo.png\" alt=\"Ticketvale\" width=\"140\" height=\"40\" border=\"0\" /></a></td></tr>\n<tr><td style=\"padding:6px 24px\"><table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td>Hi Sam Taylor ,</td></tr>\n<tr><td>Thanks for placing your order with Ticketvale - see below for details of your order.</td></tr>\n<tr><td>Comedy Night: The Big Laugh LEEDS, 04/12/2026</td></tr>\n<tr><td>Order number:</td><td>2045123456</td></tr>\n<tr><td>Order date:</td><td>14/11/2026</td></tr>\n<tr><td>Order total:</td><td>&pound; 67.44</td></tr>\n<tr><td>Delivery:</td><td>e-ticket</td></tr>\n<tr><td>Order details</td></tr>\n<tr><td>Comedy Night: The Big Laugh</td></tr>\n<tr><td>Date:</td></tr>\n<tr><td>Fri., 04/12/2026, 20:00</td></tr>\n<tr><td>Venue:</td></tr>\n<tr><td>Example Hall, 1 Example Square, LS1 4AB LEEDS, United Kingdom</td></tr>\n<tr><td>Seats, Full Price Ticket</td><td>2 × &pound; 28.00</td><td>&pound; 56.00</td></tr>\n<tr><td>Entrance A, Block B, Row C, Seat 11</td></tr>\n<tr><td>Entrance A, Block B, Row C, Seat 12</td></tr>\n<tr><td>Booking fee</td><td>2 × &pound; 3.10</td><td>&pound; 6.20</td></tr>\n<tr><td>Venue Levy</td><td>2 × &pound; 1.00</td><td>&pound; 2.00</td></tr>\n<tr><td>Subtotal</td><td>&pound; 64.20</td></tr>\n<tr><td>Total</td></tr>\n<tr><td>Processing fee</td><td>&pound; 1.25</td></tr>\n<tr><td>Delivery/transaction costs</td><td>&pound; 1.99</td></tr>\n<tr><td>Total incl. VAT</td><td>&pound; 67.44</td></tr>\n<tr><td>Ticket delivery</td></tr></table></td></tr>\n<tr><td style=\"padding:24px;font-size:12px\" class=\"muted\">&copy; 2026 Ticketvale. All rights reserved.<br /><a href=\"https://www.ticketvale.example/help\">Help</a> | <a href=\"https://www.ticketvale.example/privacy\">Privacy</a> | <a href=\"https://www.ticketvale.example/unsubscribe\">Unsubscribe</a></td></tr>\n</table></td></tr></table>\n<img src=\"https://click.ticketvale.example/open/abc123.gif\" width=\"1\" height=\"1\" alt=\"\" />\n</body></html>",
+ "text": "Hi Sam Taylor ,\nThanks for placing your order with Ticketvale - see below for details of your order.\nOrder number: 2045123456\nOrder date: 14/11/2026\nOrder total: £ 67.44\n\nORDER DETAILS\nComedy Night: The Big Laugh\nDate: Fri., 04/12/2026, 20:00\nVenue: Example Hall, 1 Example Square, LS1 4AB LEEDS, United Kingdom\nSeats, Full Price Ticket: 2 x £ 28.00 = £ 56.00\nEntrance A, Block B, Row C, Seat 11\nEntrance A, Block B, Row C, Seat 12\nBooking fee: 2 x £ 3.10 = £ 6.20\nVenue Levy: 2 x £ 1.00 = £ 2.00\n------------------------------------------\nSubtotal: £ 64.20\n==========================================\nTOTAL\nProcessing fee: £ 1.25\nDelivery/transaction costs: £ 1.99\n------------------------------------------\nTotal incl. VAT: £ 67.44\n==========================================",
+ "expected": {
+  "shop": "Ticketvale",
+  "date": "2026-11-14",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Comedy Night: The Big Laugh",
+    "qty": 2,
+    "linePence": 5600
+   },
+   {
+    "name": "Booking fee",
+    "qty": 2,
+    "linePence": 620
+   },
+   {
+    "name": "Venue Levy",
+    "qty": 2,
+    "linePence": 200
+   },
+   {
+    "name": "Processing fee",
+    "qty": 1,
+    "linePence": 125
+   },
+   {
+    "name": "Delivery/transaction costs",
+    "qty": 1,
+    "linePence": 199
+   }
+  ],
+  "subtotalPence": 6744,
+  "feesPence": 0,
+  "discountsPence": 0,
+  "tipsPence": 0,
+  "totalPence": 6744,
+  "orderRef": "2045123456"
+ }
+}

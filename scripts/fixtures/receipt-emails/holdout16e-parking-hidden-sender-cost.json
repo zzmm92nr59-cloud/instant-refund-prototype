@@ -14,8 +14,14 @@
   "shop": "Parkly",
   "date": "2026-11-14",
   "currency": "GBP",
-  "items": [],
-  "subtotalPence": 0,
+  "items": [
+   {
+    "name": "Parking at Market Street",
+    "qty": 1,
+    "linePence": 140
+   }
+  ],
+  "subtotalPence": 140,
   "feesPence": 0,
   "discountsPence": 0,
   "tipsPence": 0,

@@ -951,6 +951,7 @@ function extractReturns(text, html, orderDate, other = "") {
 const CARRIER_WORDS = "royal mail|parcelforce|evri|hermes|dpd|dhl|ups|yodel|inpost|fedex|our courier|the courier|our delivery partner";
 const CARRIER_PROGRESS = new RegExp("\\b(?:order|parcel|package|delivery)\\b[^!?\\n]{0,30}\\b(?:is|has been) (?:now )?(?:with|handed (?:over )?to|collected by|received by) (?:" + CARRIER_WORDS + ")\\b|\\b(?:order|parcel|package)\\b[^!?\\n]{0,30}\\b(?:is out for delivery|has been delivered|was delivered)\\b", "i");
 const SHIPMENT_SUBJECT = /\b\d{1,3} of (?:your )?\d{1,3} items?\b[^!?]{0,30}\b(?:have |has )?(?:shipped|dispatched|been sent|on (?:their|its) way)\b|\b(?:part|some) of your order\b[^!?]{0,40}\b(?:shipped|dispatched|sent|on its way)\b|\bsome of your items\b[^!?]{0,30}\b(?:shipped|dispatched|on (?:their|its) way)\b/i;
+const PROGRESS_SUBJECT = /\b(?:we(?:'|’)?re|we are|we(?:'|’)?ve started|now) (?:working on|preparing|packing|processing|picking)\b[^!?\n]{0,40}\border\b|\b(?:order|tech|items?|parcel|package|purchase)\b[^!?\n]{0,30}\b(?:is|are|has been|have been) (?:being (?:prepared|packed|processed|picked)|(?:now )?ready (?:to|for) (?:collect\w*|pick(?:ing)?[- ]?up)|(?:dispatched|shipped|posted|sent out)|on (?:its|their) way|out for delivery|delivered)\b|\b(?:ready to collect|ready for collection|on (?:its|it(?:'|’)s|their) way|out for delivery|has (?:been )?(?:dispatched|shipped))\b|\breminder\b|\b(?:check[- ]?in (?:is )?(?:now )?open|time to check[- ]?in)\b/i;
 // An invoice the email says is paid ("Thank you for your payment", "Amount paid £60.00", "Balance due £0.00"), and nothing in it
 // asks for money still to come ("Amount due £160.80", "Please pay by …", "Due date: …"). Round 8.
 function paidInvoice(text) {
@@ -1039,7 +1040,7 @@ function receiptSignals(subject, text) {
     // (Or it says the booking is confirmed and gives its reference, "Your booking at Strikeworld Leeds is confirmed" and
     // "Reservation ID: 551204", under a subject that says nothing, "You're in the game!". Round 15e.)
     (/\byour (?:booking|reservation)\b[^.!?\n]{0,60}\b(?:is|has been) confirmed\b/i.test(top) && /\b(?:reservation|booking|transaction) (?:id|reference|ref\.?|number|no\.?)\s*:/i.test(String(text || "").slice(0, 6000)));
-  // (A booking's line "4 x Make a pot like Grayson Perry @ £40.00": what was bought and its price, with no total. Round 15.)
+  // (A booking's line "4 x Throw a pot like a pro @ £40.00": what was bought and its price, with no total. Round 15.)
   const atPrice = /^[ \t|]*\d{1,3}\s*x\s+[^\n@£|]{2,80}@\s*£\s?\d/m.test(String(text || "").slice(0, 20000));
   // (A receipt whose one amount is labelled what it cost, "Cost: £1.20 including 20% VAT and Service Charge", a parking
   // app's receipt under its "Transaction ID". Round 15e.)
@@ -1199,7 +1200,13 @@ function transactionBlockItems(text) {
 // currency ("US$5.00", "£3.99", "€4.00", "MX$30.94"), the cells' "|" around them. Round 13.
 const PAYPAL_LABEL = /^(?:funding sources? used|paid with|paid using|you paid using|sent (?:to|from)|transaction (?:id|date)|seller|instructions to seller|payment from|payment to)\b/i;
 function payPalItems(text) {
-  const lines = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const cells = String(text || "").split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+  // (Its HTML gives each label and its value as lines of their own, "Quantity", "1", "Item", "6 Month Digital Subscription",
+  // "ID number" with nothing, "Price", "£45.00 GBP": read as the labelled rows they are. Round 19.)
+  const ROW = /^(?:Quantity|Item|ID number|Price)$/i, lines = [];
+  for (let i = 0; i < cells.length; i++) {
+    if (ROW.test(cells[i]) && cells[i + 1] && !/^(?:Quantity|Item|ID number|Price)\b/i.test(cells[i + 1])) { lines.push(cells[i] + " " + cells[i + 1]); i++; } else lines.push(cells[i]);
+  }
   const out = [];
   // (PayPal's older receipt sets each thing out as labelled rows: "Quantity | 1", "Item | 3 Month Print Subscription", "Price |
   // €80.00 EUR". Round 15.)
@@ -3273,6 +3280,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   // number, its items and its total, and gmail.js mergeOrderEmails makes a card of each. Round 12.)
   // (When the email was sent: gmail.js joins a payment service's receipt to the shop's by it. Round 13.)
   if (refDate && !Number.isNaN(refDate.getTime())) result.sentAt = refDate.toISOString();
+  // (An email about how the order is getting on, not the order itself, "We're working on your order", "Your items are
+  // ready to collect", "Your order has been dispatched": gmail.js never lets it lead the order's card or give its day. Round 19.)
+  if (PROGRESS_SUBJECT.test(String(subject || "").replace(/^\s*(?:(?:fwd?|fw)\s*:\s*)+/i, "").slice(0, 300)) || SHIPMENT_SUBJECT.test(String(subject || ""))) result.progressEmail = true;
   if (tableBooking) result.tableBooking = true;
   const others = amazonSplit && amazonSplit.length > 1 && amazonSplit[0].orderRef.toUpperCase() === String(result.orderRef || "").toUpperCase() ? amazonSplit.slice(1) :
     isFlight || dayOf || amended ? [] : moreOrders(text, result.orderRef).length ? moreOrders(text, result.orderRef) : moreOrders(otherPart, result.orderRef);
@@ -3281,6 +3291,32 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   if (!result.items.length && result.totalPence != null && !isFlight && !dayOf) {
     const row = stackedInvoiceRow(fromHtml || text, result.totalPence) || (plain ? stackedInvoiceRow(plain, result.totalPence) : null);
     if (row) { result.items = [row]; result.itemsCheck = { complete: true, itemsPence: row.pricePence * row.qty, expectedPence: result.totalPence, missingPence: 0, ...namesCheck([row], {}) }; }
+  }
+  // (A booking that sets out what was booked as "4 x Throw a pot like a pro @ £40.00" and gives no total at all, no
+  // "Total", no "Amount paid", no balance or deposit: what was booked is what it cost, the lines added up. Round 19.)
+  if (result.totalPence == null && result.items.length && result.items.length <= 10 && !isFlight && !dayOf && result.items.every((i) => Number.isInteger(i.pricePence))) {
+    const body = String(plain || fromHtml || text).slice(0, 30000);
+    const atLines = body.split("\n").filter((l) => /^[ \t|]*\d{1,3}[ \t]*[x×][ \t]+[^\n@£]{2,120}?[ \t]@[ \t]*£[ \t]?\d{1,5}(?:,\d{3})*\.\d{2}[ \t|]*$/.test(l));
+    const noSum = !/\b(?:sub-?\s?total|total|amount|balance|deposit|paid|due|charged|price)\b[^\n]{0,40}£|£[^\n]{0,20}\b(?:total|paid|due|deposit)\b/i.test(body);
+    if (atLines.length === result.items.length && noSum) {
+      const sum = result.items.reduce((n, i) => n + (i.lineTotal ? i.pricePence : i.pricePence * (i.qty || 1)), 0);
+      result.totalPence = sum; result.currency = result.currency || "GBP";
+      result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: sum, expectedPence: sum, missingPence: 0 };
+    }
+  }
+  // (A parking app's receipt, "Start Parking: … Stop Parking: …", "Description: MARKET STREET", "Cost: £1.40 including 20% VAT":
+  // the parking is the one thing paid for, named by where it was. Round 19.)
+  if (!result.items.length && result.totalPence != null && !isFlight && !dayOf) {
+    const pk = String(plain && /\bstart parking\b/i.test(plain) ? plain : fromHtml || text).slice(0, 6000);
+    if (/^[ \t|]*start parking\s*:/im.test(pk) && /^[ \t|]*stop parking\s*:/im.test(pk)) {
+      const cost = /^[ \t|]*(?:cost|amount|total)\s*:\s*£\s?(\d{1,4}\.\d{2})\b/im.exec(pk);
+      if (cost && money(cost[1]) === result.totalPence) {
+        const where = (/^[ \t|]*(?:description|location name|car park|zone name)\s*:[ \t]*([\p{L}][\p{L}\d '&.,-]{1,50}?)[ \t|]*$/imu.exec(pk) || [])[1];
+        const nice = where ? where.toLowerCase().replace(/(^|[\s-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : "";
+        const row = { name: nice ? "Parking at " + nice : "Parking", qty: 1, pricePence: result.totalPence };
+        result.items = [row]; result.itemsCheck = { complete: true, itemsPence: row.pricePence, expectedPence: result.totalPence, missingPence: 0, ...namesCheck([row], {}) };
+      }
+    }
   }
   // Money the email took off the order ("Promotion Applied -£1.99", "Discounts -£1.16", "Credit £4.11"), each as it is
   // labelled, so the receipt can say why the items come to more than was paid. Only a pounds receipt with items. Round 13.
@@ -3379,6 +3415,42 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
       result.items = goods;
       result.fees = [...(result.fees || []), ...feeIt.map((i) => ({ label: String(i.name).trim(), pence: sum([i]) }))];
       result.itemsCheck = { ...(result.itemsCheck || {}), complete: true, itemsPence: sum(goods), expectedPence: sum(goods), missingPence: 0 };
+    }
+  }
+  // (A thing's own money off set out under it, a web shop's "Linen Cushion Cover Set × 1", "WINTER25", "(-£10.00)", "£40.00",
+  // "£30.00": the thing at its price, £40.00, and the money off as its own line labelled as the shop labels it, so the lines
+  // come to what was paid. Only when the price less the money off is the price read for it. Round 19.)
+  if (result.items.length && result.items.length <= 30 && !(result.discounts || []).length && (result.currency || "GBP") === "GBP" && result.itemsCheck && result.itemsCheck.complete === true) {
+    const ls = String(plain || text).slice(0, 60000).split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+    const gbp = (x) => { const m = /^£\s?(\d{1,5}(?:,\d{3})*\.\d{2})$/.exec(x || ""); return m ? money(m[1]) : null; };
+    const low = (x) => String(x || "").toLowerCase().replace(/\s*[×x]\s*\d{1,3}$/, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const offs = [];
+    // (The thing's name may run over two or three lines, and its options, "Vogue Grey / King", may sit between it and the label.)
+    const namedAbove = (at, name) => [at, at - 1].some((end) => [1, 2, 3].some((k) => end - k >= 0 && low(ls.slice(end - k, end).join(" ")) === low(name)));
+    let seen = 0;
+    for (let i = 2; i + 2 < ls.length && offs.length < 10; i++) {
+      const m = /^\(\s*[-−–]\s*£\s?(\d{1,5}(?:,\d{3})*\.\d{2})\s*\)$/.exec(ls[i]);
+      if (!m) continue;
+      seen++;
+      const off = money(m[1]), was = gbp(ls[i + 1]), now = gbp(ls[i + 2]), label = ls[i - 1];
+      if (off == null || was == null || now == null || Math.abs(was - off - now) > 1 || label.length > 40 || /£/.test(label)) continue;
+      const it = result.items.find((x) => !x.__off && (x.lineTotal ? x.pricePence : x.pricePence * (x.qty || 1)) === now && namedAbove(i - 1, x.name));
+      if (!it) continue;
+      offs.push({ it, was, off, label });
+      Object.defineProperty(it, "__off", { value: true, enumerable: false, configurable: true });
+    }
+    // (A price for several that doesn't split evenly into each one's stays as read.)
+    if (offs.length && offs.length === seen && offs.every((o) => o.it.lineTotal || (o.it.qty || 1) === 1 || o.was % (o.it.qty || 1) === 0)) {
+      for (const o of offs) {
+        o.it.pricePence = o.it.lineTotal || (o.it.qty || 1) === 1 ? o.was : o.was / (o.it.qty || 1);
+        if (o.it.variant) { const rest = String(o.it.variant).split(/\s*,\s*/).filter((v) => low(v) !== low(o.label)).join(", "); if (rest) o.it.variant = rest; else delete o.it.variant; }
+      }
+      const add = offs.reduce((n, o) => n + o.off, 0);
+      // (One code taken off several things is one line of money off.)
+      const byLabel = new Map();
+      for (const o of offs) { const k = o.label.slice(0, 60); byLabel.set(k, (byLabel.get(k) || 0) + o.off); }
+      result.discounts = [...byLabel].map(([label, pence]) => ({ label, pence }));
+      result.itemsCheck = { ...result.itemsCheck, itemsPence: result.itemsCheck.itemsPence + add, expectedPence: (result.itemsCheck.expectedPence ?? result.itemsCheck.itemsPence) + add, missingPence: 0, discountsPence: add };
     }
   }
   // (A ride is its fare; the fees, tip and credits under it are what was added and taken off, each as Uber labels it, so the

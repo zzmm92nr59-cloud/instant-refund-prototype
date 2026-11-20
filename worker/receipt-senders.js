@@ -66,7 +66,7 @@ export function uberRideMoney(text, totalPence) {
   if (fareTotal != null && conv != null && fareTotal + conv === totalPence && list.some((r) => /^trip fare\b/i.test(r)) && list.some((r) => /€|\b(?:EUR|USD|MXN|PLN)\b/.test(r)))
     return { farePence: fareTotal, fees: [{ label: "Currency conversion fee", pence: conv }], discounts: [] };
   const at = list.findIndex((r) => /^trip fare\b/i.test(r));
-  if (at < 0) return null;
+  if (at < 0) return fareParts(list, totalPence);
   const AMT = /^([-−–]?)\s*[£€$]\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})$/;
   let fare = null, sym = null; const fees = [], off = [];
   for (let i = at; i < list.length && i < at + 40; i++) {
@@ -84,6 +84,38 @@ export function uberRideMoney(text, totalPence) {
     if (sym == null) sym = cur; else if (cur !== sym) return null;
     if (/^trip fare\b/i.test(label)) { if (fare == null) fare = p; continue; }
     if (fare == null) continue;
+    if (amt[1] || /\b(?:credits?|promotions?|discount|savings?)\b/i.test(label)) off.push({ label, pence: p }); else fees.push({ label, pence: p });
+    if (fees.length + off.length > 10) return null;
+  }
+  if (fare == null) return null;
+  const sum = fare + fees.reduce((a, f) => a + f.pence, 0) - off.reduce((a, f) => a + f.pence, 0);
+  return Math.abs(sum - totalPence) <= 1 ? { farePence: fare, fees, discounts: off } : null;
+}
+// (Uber's older receipt sets the fare out in parts, "Base fare €2.50", "Time €6.00", "Distance €20.10", then "Subtotal
+// €28.60", and under it what was added, "Wait Time €0.40": the ride is the subtotal the parts come to, and each line under it
+// a fee of its own, so the lines come to the total. Only when the parts come to the subtotal and the subtotal, plus the
+// fees, less money off, to the total. Round 19.)
+function fareParts(list, totalPence) {
+  const b = list.findIndex((r) => /^base fare\b/i.test(r));
+  if (b < 0) return null;
+  const AMT = /^([-−–]?)\s*(?:[£€$]|[A-Z]{3}\s)\s?(\d{1,3}(?:,\d{3})+|\d+)\.(\d{2})$/;
+  let parts = 0, fare = null, sym = null; const fees = [], off = [];
+  for (let i = b; i < list.length && i < b + 40; i++) {
+    const r = list[i];
+    if (/^(?:payments?|amount charged|trip details|switch|download)\b/i.test(r) || /•{2,}|\*{4}/.test(r)) break;
+    let label = null, amt = null, raw = null;
+    const one = /^([^|£€$\d−–-][^|£€$]{1,60}?)\s*(?:\|\s*)?([-−–]?\s*(?:[£€$]|[A-Z]{3}\s)\s?(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2})$/.exec(r);
+    if (one && !/^[A-Z]{3}$/.test(one[1].trim())) { label = one[1].trim(); raw = one[2]; }
+    else if (!AMT.test(r) && list[i + 1] && AMT.test(list[i + 1])) { label = r; raw = list[i + 1]; i++; }
+    if (!label || !raw) continue;
+    amt = AMT.exec(raw.replace(/^([-−–]?)\s+/, "$1"));
+    if (!amt || label.length > 50 || /[.!?]$/.test(label)) return null;
+    const cur = (/[£€$]|[A-Z]{3}/.exec(raw) || [""])[0];
+    if (sym == null) sym = cur; else if (cur !== sym) return null;
+    const p = Number(amt[2].replace(/,/g, "")) * 100 + Number(amt[3]);
+    if (/^total$/i.test(label)) continue;
+    if (/^subtotal$/i.test(label)) { if (fare != null || Math.abs(parts - p) > 1) return null; fare = p; continue; }
+    if (fare == null) { if (amt[1]) return null; parts += p; continue; }
     if (amt[1] || /\b(?:credits?|promotions?|discount|savings?)\b/i.test(label)) off.push({ label, pence: p }); else fees.push({ label, pence: p });
     if (fees.length + off.length > 10) return null;
   }
@@ -282,6 +314,8 @@ export function expediaStay(text) {
   return { rooms, roomName, roomPence: room.pence, nights: n ? Number(n[1]) : null, fees, payAtProperty, orderRef: ref ? ref[1] : null };
 }
 
+// (Each fee is marked charge: true, so the list shown keeps it as the line the email sets out, "Service Charge Full Price
+// Ticket", "Delivery/transaction costs", where a line named only by money words would be left out. Round 19.)
 // ---- A ticket seller's payment summary (round 15) ------------------------------------------------------------------------
 // "Payment Summary", "2 Full Price Ticket" over "£40.00 x2" and the line's "£80.00", then "Per Item Fees" with
 // "£4.40 (Service Charge Full Price Ticket) x2", then "Order Processing Fees" with "Handling Fee (£2.95)", then "Total":
@@ -304,11 +338,11 @@ function ticketDetails(list, totalPence) {
     if (per) {
       if (Number(per[2]) * pence(MONEY.exec("£" + per[3])) !== pence(MONEY.exec("£" + per[4]))) return null;
       const ticket = /\btickets?\b/i.test(per[1]);
-      items.push({ name: ticket && event ? event : per[1].trim(), ...(ticket && event ? { variant: per[1].trim() } : {}), qty: Number(per[2]), pricePence: pence(MONEY.exec("£" + per[3])) });
+      items.push({ name: ticket && event ? event : per[1].trim(), ...(ticket && event ? { variant: per[1].trim() } : { charge: true }), qty: Number(per[2]), pricePence: pence(MONEY.exec("£" + per[3])) });
       continue;
     }
     const once = ONCE.exec(l);
-    if (once && !/^(?:sub-?\s?total|total|order total|vat|date|venue|promoter)\b/i.test(once[1])) items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])) });
+    if (once && !/^(?:sub-?\s?total|total|order total|vat|date|venue|promoter)\b/i.test(once[1])) items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])), charge: true });
   }
   const sum = items.reduce((n, i) => n + i.qty * i.pricePence, 0);
   return items.some((i) => i.variant || /ticket/i.test(i.name)) && sum === totalPence ? items : null;
@@ -330,9 +364,9 @@ export function ticketSummary(text, totalPence) {
       k++; continue;
     }
     const fee = /^£\s?([\d,]+\.\d{2})\s*\(([^()£]{3,60})\)\s*x\s?(\d{1,2})$/i.exec(l);
-    if (fee) { items.push({ name: fee[2].trim(), qty: Number(fee[3]), pricePence: pence(MONEY.exec("£" + fee[1])) }); continue; }
+    if (fee) { items.push({ name: fee[2].trim(), qty: Number(fee[3]), pricePence: pence(MONEY.exec("£" + fee[1])), charge: true }); continue; }
     const once = /^(\p{L}[^()£]{2,60}?)\s*\(£\s?([\d,]+\.\d{2})\)$/u.exec(l);
-    if (once) { items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])) }); continue; }
+    if (once) { items.push({ name: once[1].trim(), qty: 1, pricePence: pence(MONEY.exec("£" + once[2])), charge: true }); continue; }
   }
   const sum = items.reduce((n, i) => n + i.qty * i.pricePence, 0);
   return items.length && items.some((i) => i.variant || /ticket/i.test(i.name)) && sum === totalPence ? items : null;

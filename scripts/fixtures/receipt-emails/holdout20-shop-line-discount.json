@@ -1,0 +1,36 @@
+{
+ "id": "holdout20-shop-line-discount",
+ "sender": "Hearth & Field",
+ "layout": "plain text: 'Linen Cushion Cover Set × 1', 'Oat / Large', 'WINTER25', '(-£10.00)', '£40.00', '£30.00'; 'Stoneware Mug × 1', 'WINTER25', '(-£3.00)', '£12.00', '£9.00'; 'Subtotal £39.00', 'Shipping £3.95', 'Total £42.95 GBP'",
+ "headers": {
+  "from": "Hearth & Field <shop@hearthandfield.example>",
+  "to": "sam.taylor@example.co.uk",
+  "subject": "Order #HF1042 confirmed",
+  "date": "Thu, 12 Nov 2026 09:40:00 +0000"
+ },
+ "html": "",
+ "text": "Hearth & Field\nORDER #HF1042\nThank you for your purchase!\n\nOrder summary\n-------------\n\nLinen Cushion Cover Set × 1\n\nOat / Large\n\nWINTER25\n(-£10.00)\n\n£40.00\n\n£30.00\n\nStoneware Mug × 1\n\nWINTER25\n(-£3.00)\n\n£12.00\n\n£9.00\n\nSubtotal\n\n£39.00\n\nShipping\n\n£3.95\n\nTotal\n\n£42.95 GBP\n\nYou saved £13.00",
+ "expected": {
+  "shop": "Hearth & Field",
+  "date": "2026-11-12",
+  "currency": "GBP",
+  "items": [
+   {
+    "name": "Linen Cushion Cover Set",
+    "qty": 1,
+    "linePence": 4000
+   },
+   {
+    "name": "Stoneware Mug",
+    "qty": 1,
+    "linePence": 1200
+   }
+  ],
+  "subtotalPence": 5200,
+  "feesPence": 395,
+  "discountsPence": 1300,
+  "tipsPence": 0,
+  "totalPence": 4295,
+  "orderRef": "HF1042"
+ }
+}

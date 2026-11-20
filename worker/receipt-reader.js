@@ -257,7 +257,8 @@ export function cleanItem(item, stored = false) {
   const model = item.namedBy === "model" && /^\d{2,6}[A-Za-z]?$/.test(name) && Boolean(item.variant);
   if (letters(name).replace(/[0-9]/g, "").length < 2 && !model) return null;
   if (/:\s*$/.test(item.name.trim()) || /:$/.test(name)) return null;
-  if (CARD_DIGITS.test(name) || MONEY_WORDS.test(name) || LABEL_ONLY.test(name) || (OFFER_LINE.test(name) && !(item.free && item.pricePence === 0))) return null;
+  // (A ticket seller's fee the reader set out as a line of its own, item.charge, is kept: it is what the email lists. Round 19.)
+  if (CARD_DIGITS.test(name) || (MONEY_WORDS.test(name) && !item.charge) || LABEL_ONLY.test(name) || (OFFER_LINE.test(name) && !(item.free && item.pricePence === 0))) return null;
   // "Mastercard", "Paid with Apple Pay": how it was paid. ("Credit card holder" is a thing you can buy.)
   if (PAYMENT.test(name) && !/\b(holders?|cases?|wallets?|covers?|sleeves?|organi[sz]ers?|pouch(es)?|purses?|stands?|mounts?|readers?)\b/i.test(name)) return null;
   if (/^[x×]\s?\d+$|^\d+\s?[x×]$|^[\d\s.,£$€%-]+$/i.test(name) && !model) return null;
