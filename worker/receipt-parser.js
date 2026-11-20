@@ -2496,8 +2496,9 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
     }
   }
   // (A digital railcard or another booking with no order number but its "Transaction ID:" over the number, the number the
-  // shop asks for: the order's number. Round 13.)
-  if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*)?(\d{8,16})[ \t|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
+  // shop asks for: the order's number. Round 13. The number can sit a cell or two under its label, "Transaction ID:" then
+  // an empty cell then the number, as on a rail ticket change. Round 17.)
+  if (!result.orderRef && !isFlight) { const tx = /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,3}(\d{8,16})[ \t|]*$/im.exec(text); if (tx) result.orderRef = tx[1]; }
   // Every way of reading the items is tried on both parts of the email, and the totals check picks: the first reading whose
   // items add up to what the email says they came to, else the one that comes closest. What was picked carries its check.
   const otherPart = text === fromHtml ? plain : fromHtml;
@@ -3605,7 +3606,7 @@ export function parseReturnUpdateEmail(rawEmail) {
   // (A payment service's refund names the shop's invoice, "Invoice ID: WB11050983-P001", which is that order's number. Round 12.)
   const inv = !ref ? text.match(/\binvoice\s*(?:id|number|no\.?)\s*[:#\s]*((?=[A-Z0-9-]*\d)[A-Z0-9-]{4,30})\b/i) ||
     // (A booking refunded by its "Transaction ID:" over the number, the number its booking email gave. Round 15.)
-    /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*)?(\d{8,16})[ \t|]*$/im.exec(text) : null;
+    /^[|\t\v\f \u00a0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]*(?:your )?transaction id[ \t]*:?[ \t|]*(?:\n[ \t|]*){0,3}(\d{8,16})[ \t|]*$/im.exec(text) : null;
   // (And what was first paid, to whom and when: "You originally paid UBER PAYMENTS UK LIMITED £4.99 GBP on 5 March 2026".)
   const orig = /\byou originally paid (.{2,60}?) £\s?([\d,]+\.\d{2})(?: GBP)? on (\d{1,2} [A-Za-z]{3,9} \d{4})/i.exec(both.replace(/\s+/g, " "));
   const fwdVia = PERSONAL_MAIL.test(sender?.domain || "") ? forwardedSender(text, { subject, personal: (d) => PERSONAL_MAIL.test(d) }) : null;

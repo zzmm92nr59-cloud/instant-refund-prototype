@@ -232,13 +232,16 @@ const CARD_DIGITS = /\d{4,}[*•xX]{3,}|[*•]{3,}\s?\d{2,}|\b(?:x{3,}|\*{3,})\d
 const OFFER_LINE = /^(?:\d{1,3}\s?% off\b|free\s+(?:[\p{L}'’-]+\s+){1,3}(?:box|trial|months?)\b)|\b(?:get|claim|enjoy)\s+\d+\s+months?\b[^£]*\bfree\b|\bfree for \d+ months?\b/iu;
 
 // Returns the item tidied ({ name, qty, ... }) or null when the line isn't an item.
-export function cleanItem(item) {
+// (`stored`: items Relay already read and saved. Their names were tidied when they were read, so a name that still ends in
+// "x6" is a pack size the quantity column was read apart from, "Wholemeal Pittas x6" bought once: it is never cut off as
+// the quantity again when the list is shown. Round 17.)
+export function cleanItem(item, stored = false) {
   if (!item || typeof item.name !== "string") return null;
   let name = item.name.replace(/\s+\|\s*$/, "").replace(/[ \t]+/g, " ").trim();
   let qty = item.qty;
   // "Chocolate Brown                1": the quantity column ran into the name.
   // (Not when the item's own quantity was given apart from its name: "Screen Protector x2" over "Quantity: 2" is a 2-pack.)
-  const tail = item.keepName ? null : item.name.match(/\s{2,}(\d{1,2})\s*$/) || name.match(/\s+[x×]\s?(\d{1,2})$/i);
+  const tail = item.keepName || stored ? null : item.name.match(/\s{2,}(\d{1,2})\s*$/) || name.match(/\s+[x×]\s?(\d{1,2})$/i);
   if (tail) { name = name.slice(0, name.length - tail[0].trim().length).trim(); if (!qty || qty === 1) qty = Number(tail[1]) || qty; }
   name = name.replace(/\s*[-–:|]+$/, "").trim();
   // (A list's dash or bullet before the name, "- Payment for invoice(s) 250515", is not part of it. Round 15.)
@@ -273,8 +276,8 @@ export function cleanItem(item) {
   }
   return { ...rest, name, qty: qty || 1 };
 }
-export function cleanItems(items) {
-  return (Array.isArray(items) ? items : []).map(cleanItem).filter(Boolean);
+export function cleanItems(items, { stored = false } = {}) {
+  return (Array.isArray(items) ? items : []).map((i) => cleanItem(i, stored)).filter(Boolean);
 }
 
 // ---- Item tables read as cells ----------------------------------------------------------------------------------

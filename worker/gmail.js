@@ -2775,7 +2775,7 @@ async function listReceipts(env, shopperId, timing, opts = {}) {
     const retailer = { ...r0, domain: isVia(domain) ? null : domain, name: shown || r0.name || null, ...(shown && r0.name && shown !== r0.name ? { legalName: r0.name } : {}), ...(via ? { via } : {}) };
     // Where the app gets the shop's logo from (null: no logo to look for, so the app draws one from what was bought).
     retailer.logoDomain = logoDomainFor(retailer);
-    c = { ...c, retailer, items: cleanItems(c.items), ...(shopKinds.get(k) ? { shopKindAi: shopKinds.get(k) } : {}) };
+    c = { ...c, retailer, items: cleanItems(c.items, { stored: true }), ...(shopKinds.get(k) ? { shopKindAi: shopKinds.get(k) } : {}) };
     const group = categorise(c, learned);
     // Each item's own group too (a supermarket shop's kitchen roll is Home & garden, its bananas Food & drink), with
     // `categorySure` when the item's own name said so rather than only the shop. Wrapped counts each item where it belongs.
