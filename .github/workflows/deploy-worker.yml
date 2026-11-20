@@ -82,6 +82,7 @@ jobs:
           node scripts/test-more-inboxes.mjs
           node scripts/test-outlook.mjs
           node scripts/test-outlook-throttle.mjs
+          node scripts/test-outlook-search.mjs
           node scripts/test-mail-parity.mjs
           node scripts/test-mail-push.mjs
           node scripts/test-resale.mjs
