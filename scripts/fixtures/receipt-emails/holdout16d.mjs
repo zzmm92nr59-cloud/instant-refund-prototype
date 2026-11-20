@@ -171,5 +171,18 @@ export default function holdout16d() {
         "Order Confirmation Summary", "Subtotal:", "£179.99", "Promotion Discount:", "£0.00", "Discount Code Applied:", "£36.00", "Delivery Charges:", "£0.00", "Total: | | |", "£143.99",
         "WE THINK YOU MAY ALSO LIKE", "Afternoon Tea for Two | £49.00", "Spa Day for Two | £99.00"]) },
     order([{ name: "Two Night Hotel Break for Two", qty: 1, unit: 17999 }], { discounts: [["Discount Code Applied", 3600]] }), "Buyagift", "2026-02-10");
+  // A deals site's order: "Thank you for your order (#1200-…)", the legal right to cancel "within 14 days from the day on which
+  // you … acquire physical possession of the goods".
+  add("holdout16d-deals-order-cancel-right", "Groupon", "'Thank you for your order (#1200-000001-000001), placed on …'; the right to cancel within 14 days of having the goods",
+    { from: "Groupon <orders@r.grouponmail.co.uk>", subject: "Purchase Confirmed: Thank you for your purchase!", date: "Tue, 12 Dec 2023 20:00:00 +0000",
+      html: htmlPage("Groupon", ["Your Groupon purchase was successful!", "Order summary:", "Thank you for your order (#1200-000001-000001), placed on 12 December 2023.", "Description | Quantity | Price",
+        "Oak Bedside Table Set | 1 | £89.99", "Total | £89.99",
+        "This email confirms that Groupon Goods Global GmbH has accepted your order. You are legally entitled to cancel your order for any reason within 14 days from the day on which you (or a third party nominated by you) acquire physical possession of the goods. To exercise your cancellation rights, please return the item back to us."]) },
+    order([{ name: "Oak Bedside Table Set", qty: 1, unit: 8999 }]), "Groupon", "2023-12-12");
+  // A home shop's "30-Day Return" heading over "Within 30-Day Of Delivery".
+  add("holdout16d-home-window-heading", "Homary", "'30-Day Return' heading over 'Within 30-Day Of Delivery'",
+    { from: '"Homary.com" <service@homary.com>', subject: "We've received your payment and your order is under processing.", date: "Wed, 30 Jul 2025 12:03:00 +0000",
+      html: htmlPage("Homary", ["Free Shipping", "On All Orders", "30-Day Return", "Within 30-Day Of Delivery", "Order No.: UKA2507300000000000001", "Rattan Floor Lamp | 1 | £79.99", "Subtotal | £79.99", "Total | £79.99"]) },
+    order([{ name: "Rattan Floor Lamp", qty: 1, unit: 7999 }]), "Homary.com", "2025-07-30", { shopAlso: ["Homary"] });
   return out;
 }

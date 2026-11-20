@@ -463,6 +463,10 @@ const joinWrong = [];
   const sentToMe = mail(["From: Apple Store <shipping_notification@orders.apple.com>", "To: " + SHOPPER.email, "Subject: Your shipment is on its way. Order No. W1000000001", "Date: Wed, 25 Mar 2026 18:00:00 +0000", "Content-Type: text/plain; charset=utf-8", "",
     "Your items have shipped.", "Jo Rivers has sent you the following items.", "Order Number: W1000000001", "Ordered on: 25/03/2026", "Personalised AirPods Pro 3", "Qty 1", "Engravings", "FREE"]);
   if (parseReceiptEmail(sentToMe).ok) joinWrong.push("things someone else sent the shopper read as the shopper's purchase");
+  const deal = parseReceiptEmail(rawEmail(fx("holdout16d-deals-order-cancel-right")));
+  if (deal.orderRef !== "1200-000001-000001" || !(deal.returns && deal.returns.windowDays === 14 && deal.returns.windowFrom === "delivery")) joinWrong.push("a deals site's order and right to cancel read as " + JSON.stringify([deal.orderRef, deal.returns && deal.returns.windowDays, deal.returns && deal.returns.windowFrom]));
+  const lamp = parseReceiptEmail(rawEmail(fx("holdout16d-home-window-heading")));
+  if (!(lamp.returns && lamp.returns.windowDays === 30 && lamp.returns.windowFrom === "delivery")) joinWrong.push("'30-Day Return' over 'Within 30-Day Of Delivery' read as " + JSON.stringify(lamp.returns));
   // (Further apart than two minutes, or two shop receipts as near as each other: no guess, each stays its own card.)
   const p3 = { ...p1, id: "p3", sentAt: "2026-04-30T02:30:00.000Z" };
   if (mergeOrderEmails([g1, g2, p3]).length !== 3) joinWrong.push("a PayPal receipt five minutes from either game purchase was joined to one");

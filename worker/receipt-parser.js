@@ -764,7 +764,8 @@ function extractReturns(text, html, orderDate, other = "") {
   for (const sent of sentences) {
     if (out.cancelWithin) break;
     if (!/return|refund|exchange/i.test(sent) || sent.length > 400) continue;
-    let m = sent.match(/within\s+(\d{1,3})\s+(?:calendar\s+|working\s+)?days?(?:\s+(?:of|from|after)\s+(?:the\s+)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
+    // (Also "Within 30-Day Of Delivery", Homary's way. Round 15.)
+    let m = sent.match(/within\s+(\d{1,3})(?:\s+|-)(?:calendar\s+|working\s+)?days?(?:\s+(?:of|from|after)\s+(?:the\s+)?(delivery|receiv\w*|dispatch\w*|purchase|order\w*|today))?/i) ||
       sent.match(/(\d{1,3})[-\s]days?\s+(?:free\s+)?returns?/i);
     if (m) {
       out.windowDays = Number(m[1]);
@@ -772,6 +773,18 @@ function extractReturns(text, html, orderDate, other = "") {
       out.windowFrom = /^(delivery|receiv|dispatch)/.test(basis) ? "delivery" : /^(purchase|order|today)/.test(basis) ? "order" : null;
       break;
     }
+  }
+  // (The shop's own statement of the right to cancel, Groupon's "You are legally entitled to cancel your order for any reason
+  // within 14 days from the day on which you … acquire physical possession of the goods": that window, from delivery. Round 15.)
+  if (!out.windowDays) {
+    const law = /\b(?:entitled|right) to cancel (?:your order|the contract|this contract)\b[^.\n]{0,40}?\bwithin (\d{1,3}) days? (?:from|of|after) the day (?:on which )?you\b[^.\n]{0,80}?\b(?:possession|receive|delivered)/i.exec(flat.slice(0, 60000));
+    if (law) { out.windowDays = Number(law[1]); out.windowFrom = "delivery"; }
+  }
+  // (The window read from a heading, "30-Day Return", with when it starts on the line under it, "Within 30-Day Of Delivery".
+  // Round 15.)
+  if (out.windowDays && !out.windowFrom && !out.cancelWithin) {
+    const from = new RegExp("\\bwithin\\s+" + out.windowDays + "(?:\\s+|-)(?:calendar\\s+|working\\s+)?days?\\s+(?:of|from|after)\\s+(?:the\\s+)?(delivery|receiv|dispatch|purchase|order)", "i").exec(flat.slice(0, 60000));
+    if (from) out.windowFrom = /^(?:delivery|receiv|dispatch)/i.test(from[1]) ? "delivery" : "order";
   }
   // (A seller's own policy, "I gladly accept returns, exchanges, and cancellations" "Just contact me within: 7 days of
   // delivery" "Ship returns back to me within: 30 days of delivery": the days to get in touch are the window that counts, over
@@ -2250,6 +2263,7 @@ export function parseReceiptEmail(rawEmail, opts = {}) {
   }
   // ("Your order reference number is BUY37490811 ." in a sentence; and the thing bought as its name over "Product Code:",
   // "Quantity:" and "Price:" rows (Buyagift), never a "You may also like" offer further down. Round 15.)
+  if (!result.orderRef) { const ty = /\bthank you for your order \(#?([A-Z0-9][A-Z0-9-]{5,24})\)/i.exec(text.slice(0, 8000)); if (ty && /\d/.test(ty[1])) result.orderRef = ty[1]; }
   if (!result.orderRef) { const sn = /\byour order (?:reference )?(?:number|reference)(?: number)? is ([A-Z]{0,4}\d[A-Z0-9-]{4,20})\b/i.exec(text.slice(0, 8000)); if (sn) result.orderRef = sn[1]; }
   {
     const L = text.slice(0, 30000).split("\n").map((l) => l.replace(/\|/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
